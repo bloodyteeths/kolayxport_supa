@@ -1,0 +1,18 @@
+{
+  "created": "2025-05-01T12:55:41.576499Z",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Init",
+      "description": "init repo",
+      "prompt": "git init",
+      "status": "pending",
+      "dependencies": [],
+      "outputs": []
+    }
+  ],
+  "referenceScripts": {
+    "syncAllToKargov2": "/* syncAllToKargov2 function placeholder */",
+    "generateLabelForRow": "/* generateLabelForRow function placeholder */"
+  }
+}

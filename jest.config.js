@@ -6,5 +6,8 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   transform: {
     '^.+\\.[tj]sx?$': 'babel-jest'
-  }
+  },
+  transformIgnorePatterns: [
+    '/node_modules/(?!node-fetch)/'
+  ]
 }; 

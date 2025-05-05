@@ -1,0 +1,25 @@
+{
+  "timeZone": "UTC",
+  "exceptionLogging": "STACKDRIVER",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/script.projects",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/script.storage",
+    "https://www.googleapis.com/auth/script.container.ui"
+  ],
+  "executionApi": {
+    "access": "ANYONE"
+  },
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "MyBabySyncCoreLogicLibrary",
+        "libraryId": "1bSTvF23q6Pp2FzWa-c0OIs2y8-rUSFK7Fu6FwH6dZYvKuHGxLW_NJjei",
+        "version": "2"
+      }
+    ]
+  }
+} 

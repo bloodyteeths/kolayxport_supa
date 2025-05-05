@@ -16,7 +16,7 @@ function useTabs() {
 }
 
 export function TabsList({ className = '', ...props }) {
-  return <div className={`inline-flex gap-2 ${className}`} {...props} />;
+  return <div className={`flex border-b border-gray-200 ${className}`} {...props} />;
 }
 
 export function TabsTrigger({ value, children, className = '', ...props }) {
@@ -24,7 +24,12 @@ export function TabsTrigger({ value, children, className = '', ...props }) {
   const isActive = activeTab === value;
   return (
     <button
-      className={`px-3 py-1 rounded-md text-sm font-medium ${isActive ? 'bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200'} ${className}`}
+      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
+        ${isActive
+          ? 'border-blue-600 text-blue-600 focus:outline-none'
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none focus:text-gray-700 focus:border-gray-300'
+        }
+        ${className}`}
       onClick={() => setActiveTab(value)}
       {...props}
     >
@@ -36,5 +41,5 @@ export function TabsTrigger({ value, children, className = '', ...props }) {
 export function TabsContent({ value, children, className = '', ...props }) {
   const { activeTab } = useTabs();
   if (activeTab !== value) return null;
-  return <div className={className} {...props}>{children}</div>;
+  return <div className={`mt-6 ${className}`} {...props}>{children}</div>;
 } 

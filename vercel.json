@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "next.config.js", "use": "@vercel/next" }
+  ],
+  "env": {
+    "GOOGLE_SHEETS_CLIENT_EMAIL": "@google_sheets_client_email",
+    "GOOGLE_SHEETS_PRIVATE_KEY": "@google_sheets_private_key",
+    "GOOGLE_SHEETS_SPREADSHEET_ID": "@google_sheets_spreadsheet_id",
+    "VEEQO_API_KEY": "@veeqo_api_key",
+    "TRENDYOL_SUPPLIER_ID": "@trendyol_supplier_id",
+    "TRENDYOL_API_KEY": "@trendyol_api_key",
+    "TRENDYOL_API_SECRET": "@trendyol_api_secret",
+    "SHIPPO_TOKEN": "@shippo_token",
+    "FEDEX_API_KEY": "@fedex_api_key",
+    "FEDEX_API_SECRET": "@fedex_api_secret",
+    "FEDEX_ACCOUNT_NUMBER": "@fedex_account_number",
+    "FEDEX_FOLDER_ID": "@fedex_folder_id"
+  }
+} 

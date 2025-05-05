@@ -75,6 +75,16 @@ export default function Layout({ children }) {
           )}
           {session && children}
         </main>
+
+        <footer className="bg-white border-t py-4 text-center">
+          <Link href="/privacy">Privacy Policy</Link>{" | "}
+          <Link href="/privacy-tr">Gizlilik Politikası</Link>
+          {session && (
+            <>
+              {" | "}<Link href="/logout">Logout</Link>
+            </>
+          )}
+        </footer>
       </div>
     </div>
   )

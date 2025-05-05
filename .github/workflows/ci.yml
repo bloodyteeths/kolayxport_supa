@@ -32,4 +32,10 @@ jobs:
         with:
           start: npm start
           spec: cypress/e2e/**/*.cy.js
-          browser: chrome 
+          browser: chrome
+        env:
+          # Pass the secret to Cypress environment
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          # Pass other necessary env vars if Cypress tests need them
+          # Example: GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }} # Add if needed
+          # Example: DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }} # Add if needed 

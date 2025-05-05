@@ -27,13 +27,9 @@ jobs:
       - name: Run Unit Tests
         run: npm test
 
-      - name: Start Next.js
-        run: npm start &
-
       - name: Cypress Run
         uses: cypress-io/github-action@v6
         with:
+          start: npm start
           spec: cypress/e2e/**/*.cy.js
-          browser: chrome
-          headless: true
-          start: npm start 
+          browser: chrome 

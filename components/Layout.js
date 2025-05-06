@@ -3,17 +3,24 @@ import * as React from 'react'
 import { Home, CreditCard, Bell, LogIn, LogOut } from 'lucide-react'
 import { useSession, signIn, signOut } from "next-auth/react"
 import { Button } from '@/components/ui/button'
+import { useRouter } from 'next/router'
 
 export default function Layout({ children }) {
   const { data: session, status } = useSession();
   const loading = status === "loading";
+  const router = useRouter();
+
+  const publicPaths = ['/privacy', '/privacy-tr', '/auth/error', '/404'];
+  const isPublicPage = publicPaths.includes(router.pathname);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200">
         <div className="p-6">
-          <h1 className="text-2xl font-bold text-blue-600">MyBabySync</h1>
+          <Link href="/">
+            <h1 className="text-2xl font-bold text-blue-600 cursor-pointer">KolayXport</h1>
+          </Link>
         </div>
         {session && (
           <nav className="flex-1 px-4 space-y-2">
@@ -28,7 +35,6 @@ export default function Layout({ children }) {
           </nav>
         )}
         <div className="p-4 mt-auto">
-           {/* Login/Logout Button */} 
            {!session && (
               <Button onClick={() => signIn('google')} className="w-full flex items-center justify-center">
                   <LogIn className="w-4 h-4 mr-2" /> Google ile Giriş Yap
@@ -37,7 +43,7 @@ export default function Layout({ children }) {
            {session?.user && (
               <div className="flex flex-col items-center space-y-2">
                   <span className="text-sm text-gray-600 truncate" title={session.user.email}>{session.user.name || session.user.email}</span>
-                  <Button onClick={() => signOut()} variant="outline" className="w-full flex items-center justify-center">
+                  <Button onClick={() => signOut({ callbackUrl: '/' })} variant="outline" className="w-full flex items-center justify-center">
                      <LogOut className="w-4 h-4 mr-2" /> Çıkış Yap
                   </Button>
               </div>
@@ -49,9 +55,10 @@ export default function Layout({ children }) {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="bg-white shadow p-4 flex justify-between items-center">
-           {/* Update header content based on session? */}
-          <h2 className="text-xl font-semibold text-gray-900">{session ? 'Dashboard' : 'Lütfen Giriş Yapın'}</h2>
-          {session && (
+          <h2 className="text-xl font-semibold text-gray-900">
+            {isPublicPage ? '' : (session ? 'Dashboard' : 'Lütfen Giriş Yapın')}
+          </h2>
+          {session && !isPublicPage && (
              <button className="p-2 rounded hover:bg-gray-100">
                  <Bell className="w-6 h-6 text-gray-600" />
              </button>
@@ -60,30 +67,34 @@ export default function Layout({ children }) {
 
         {/* Page Content Area */}
         <main className="flex-1 overflow-auto p-8 bg-gray-100">
-          {/* Conditionally render children based on auth status */}
-          {loading && <p>Loading session...</p>}
-          {!session && !loading && (
-            <div>
-              <p>Giriş yapmanız gerekiyor.</p>
-              {/* Show login button on small screens (sidebar hidden) */}
-              <div className="block md:hidden mt-4">
-                <Button onClick={() => signIn('google')} className="w-full flex items-center justify-center">
+          {loading && !isPublicPage && <p>Loading session...</p>}
+          {!isPublicPage && !session && !loading && (
+            <div className="text-center">
+              <p className="mb-4">Bu sayfayı görüntülemek için giriş yapmanız gerekiyor.</p>
+              <Button onClick={() => signIn('google')} className="w-auto flex items-center justify-center mx-auto">
                   <LogIn className="w-4 h-4 mr-2" /> Google ile Giriş Yap
-                </Button>
-              </div>
+              </Button>
             </div>
           )}
-          {session && children}
+          {(session || isPublicPage) && children}
         </main>
 
-        <footer className="bg-white border-t py-4 text-center">
-          <Link href="/privacy">Privacy Policy</Link>{" | "}
-          <Link href="/privacy-tr">Gizlilik Politikası</Link>
+        <footer className="bg-white border-t py-4 text-center text-sm text-gray-600">
+          <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+          <span className="mx-2">|</span>
+          <Link href="/privacy-tr" className="hover:underline">Gizlilik Politikası</Link>
           {session && (
             <>
-              {" | "}<Link href="/logout">Logout</Link>
+              <span className="mx-2">|</span>
+              <Link href="/logout" className="hover:underline">Logout</Link>
             </>
           )}
+          <div className="mt-2">
+            &copy; {new Date().getFullYear()} Tamsar Tekstil Dış Tic. Ltd. Şti. All rights reserved.
+          </div>
+          <div className="mt-1">
+            Support: <a href="mailto:destek@kolayxport.com" className="hover:underline">destek@kolayxport.com</a>
+          </div>
         </footer>
       </div>
     </div>

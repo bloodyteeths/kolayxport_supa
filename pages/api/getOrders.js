@@ -71,21 +71,42 @@ export default async function handler(req, res) {
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET
     );
+    
+    // Log tokens retrieved from DB
+    console.log(`DB Account Data: AccessToken ${oauthAccount.access_token ? 'Exists' : 'MISSING'}, RefreshToken ${oauthAccount.refresh_token ? 'Exists' : 'MISSING'}, ExpiresAt: ${oauthAccount.expires_at}`);
+
     // Set both the current access token and refresh token
     userAuth.setCredentials({
       access_token: oauthAccount.access_token,
       refresh_token: oauthAccount.refresh_token,
     });
-    // Re-enable explicit refresh and add detailed logging
+
+    // Attempt refresh and add detailed logging
     try {
       console.log('Attempting to get/refresh access token...');
-      const { token } = await userAuth.getAccessToken();
-      console.log('Successfully obtained/refreshed access token for Sheets API:', token ? 'Token received' : 'Token NOT received');
-      // Ensure the client uses the potentially new token
-      userAuth.setCredentials({ access_token: token }); 
+      // Ensure we get the full credentials object back
+      const credentials = await userAuth.getCredentials(); 
+      console.log('Token state BEFORE explicit getAccessToken:', { 
+        accessTokenExists: !!credentials.access_token, 
+        expiryDate: credentials.expiry_date ? new Date(credentials.expiry_date).toISOString() : 'N/A' 
+      });
+
+      console.log('Forcing refresh with refreshAccessToken()...');
+      const refreshResult = await userAuth.refreshAccessToken();
+      console.log('refreshAccessToken() completed.');
+      
+      // Log token state AFTER explicit refresh attempt
+      const refreshedCredentials = refreshResult.credentials;
+      console.log('Token state AFTER refreshAccessToken:', { 
+        accessTokenExists: !!refreshedCredentials.access_token, 
+        expiryDate: refreshedCredentials.expiry_date ? new Date(refreshedCredentials.expiry_date).toISOString() : 'N/A' 
+      });
+
+      // Use the potentially new token
+      userAuth.setCredentials(refreshedCredentials); 
+
     } catch (refreshErr) {
       console.error('Detailed error obtaining/refreshing access token:', JSON.stringify(refreshErr, null, 2));
-      // Log the specific error properties if available
       if (refreshErr.response?.data) {
          console.error('Refresh token error details:', JSON.stringify(refreshErr.response.data, null, 2));
       }
@@ -117,6 +138,7 @@ export default async function handler(req, res) {
 
     // Use the Google Sheets API directly to fetch rows from the 'integration' sheet
     console.log(`Fetching rows via Sheets API for sheet ${userRecord.googleSheetId}`);
+    console.log(`Using token with expiry: ${userAuth.credentials.expiry_date ? new Date(userAuth.credentials.expiry_date).toISOString() : 'N/A'}`);
     const sheets = google.sheets({ version: 'v4', auth: userAuth });
     const SHEET_NAME = 'Kargov2';
     try {
@@ -129,6 +151,11 @@ export default async function handler(req, res) {
       console.log(`Fetched ${sheetData.length} rows from sheet.`);
       return res.status(200).json({ success: true, data: sheetData });
     } catch (sheetsErr) {
+      // Log the auth object state just before the failing call
+      console.error('Auth object state just before Sheets API error:', { 
+        accessTokenExists: !!userAuth.credentials.access_token, 
+        expiryDate: userAuth.credentials.expiry_date ? new Date(userAuth.credentials.expiry_date).toISOString() : 'N/A' 
+      });
       console.error('Sheets API Error (getOrders):', sheetsErr);
       return res.status(500).json({ error: `Failed to fetch sheet data: ${sheetsErr.message}` });
     }

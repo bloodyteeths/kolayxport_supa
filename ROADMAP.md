@@ -2,6 +2,13 @@
 
 This document outlines planned features, improvements, and long-term vision for the project.
 
+## Current Status & Blockers (May 5, 2025)
+
+*   **Core Functionality Blocked by Google OAuth Verification:** After refactoring to the central Apps Script architecture and resolving various setup issues (library dependencies, deployment IDs, GCP project linking, CI fixes), the application is currently blocked by persistent `Invalid Credentials (401)` errors when calling Google APIs (Sheets, Drive, Apps Script Execution) using the user's OAuth token.
+*   **Troubleshooting Done:** Verified client ID/secret, OAuth scopes in NextAuth & GCP, API enablement, token refresh logic, forced token revocation/re-granting. The issue persists even when the `googleapis` library reports successful token refresh.
+*   **Likely Cause:** Restrictions imposed by Google on OAuth clients in "Testing" mode using sensitive scopes, requiring formal verification.
+*   **Next Step:** The Google OAuth verification process has been initiated (scope justifications submitted). **A demo video proving scope usage is required by Google and needs to be created and added to the verification submission.** Progress on API-dependent features is paused until this verification is underway or complete.
+
 ## Upcoming Features
 
 - [ ] Implement full Apps Script deployment flow via /api/setScriptProps

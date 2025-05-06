@@ -117,7 +117,8 @@
       "id": 18,
       "title": "Test End-to-End Flow",
       "description": "Thoroughly test onboarding, settings saving, order sync, order display, and label generation.",
-      "status": "in progress",
+      "status": "blocked",
+      "notes": "Completed onboarding and settings tests. Encountered persistent 'Invalid Credentials' (401) errors when calling Google Sheets/Drive/Apps Script Execution APIs, despite correct scopes, client ID, and successful token refresh logging. Troubleshooting included verifying GCP settings, forcing token refresh, checking API enablement, and pushing to GitHub. CI issues related to lock file and Jest transforms were resolved. Root cause is likely limitations due to OAuth consent screen being in 'Testing' mode and requiring verification for sensitive scopes.",
       "dependencies": [13, 15, 16],
       "subtasks": [
         {
@@ -132,23 +133,33 @@
         },
         {
           "title": "Manual Testing: Sync Orders",
-          "description": "Click 'Sync Orders' and verify orders appear in the table."
+          "description": "Click 'Sync Orders' and verify orders appear in the table.",
+          "status": "blocked - Invalid Credentials (401)"
+        },
+        {
+           "title": "Manual Testing: Get Orders",
+           "description": "Verify order table loads data from sheet.",
+           "status": "blocked - Invalid Credentials (401)"
         },
         {
           "title": "Manual Testing: Generate Label",
-          "description": "Click 'Generate Label' for an order and verify a label is created and a link appears."
+          "description": "Click 'Generate Label' for an order and verify a label is created and a link appears.",
+           "status": "pending - Likely blocked by same auth issue"
         },
         {
           "title": "Unit Tests: Run Jest",
-          "description": "Open a terminal, run 'npm test', and check that all tests pass. If any fail, read the error message and ask for help if needed."
+          "description": "Open a terminal, run 'npm test', and check that all tests pass. If any fail, read the error message and ask for help if needed.",
+          "status": "completed"
         },
         {
           "title": "E2E Tests: Run Cypress",
-          "description": "Open a terminal, run 'npx cypress open' or 'npx cypress run', and follow the on-screen instructions."
+          "description": "Open a terminal, run 'npx cypress open' or 'npx cypress run', and follow the on-screen instructions.",
+          "status": "pending"
         },
         {
           "title": "Report Issues",
-          "description": "If anything does not work as expected, write down what you did and what happened. Share this with the developer for help."
+          "description": "If anything does not work as expected, write down what you did and what happened. Share this with the developer for help.",
+          "status": "completed"
         }
       ]
     },
@@ -156,8 +167,31 @@
       "id": 19,
       "title": "Prepare for Deployment",
       "description": "Configure production database, set all production environment variables on hosting platform.",
-      "status": "pending",
-      "dependencies": [18]
+      "status": "completed",
+      "dependencies": [18, 22],
+      "notes": "Successfully configured Supabase with direct IPv4-enabled connection for DATABASE_URL in Vercel. All critical environment variables set. Application login successful on kolayxport.com.",
+      "subtasks": [
+        {
+          "title": "Set up Supabase Database & Get Direct IPv4 Connection String",
+          "description": "Ensured Supabase project is active and obtained the IPv4-enabled direct connection string (with add-on).",
+          "status": "completed"
+        },
+        {
+          "title": "Configure DATABASE_URL in Vercel with Supabase Direct Connection",
+          "description": "Added the Supabase direct IPv4-enabled connection string as DATABASE_URL environment variable in Vercel for production.",
+          "status": "completed"
+        },
+        {
+          "title": "Push Prisma Schema to Supabase DB",
+          "description": "Successfully ran 'npx prisma db push' against the Supabase database using the direct IPv4-enabled connection string.",
+          "status": "completed"
+        },
+        {
+          "title": "Set Other Production Environment Variables",
+          "description": "Ensured NEXTAUTH_SECRET, NEXTAUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are set in Vercel.",
+          "status": "completed"
+        }
+      ]
     },
     {
       "id": 20,
@@ -172,6 +206,14 @@
       "description": "Install missing shadcn/ui components (label, etc.) so the dev server can start.",
       "status": "in progress",
       "dependencies": [20]
+    },
+    {
+      "id": 22,
+      "title": "Submit Google OAuth Verification",
+      "description": "Complete the Google Cloud OAuth Consent Screen verification process, including scope justifications and providing a demo video, to enable full API access.",
+      "status": "in progress",
+      "dependencies": [],
+      "notes": "Verification submitted, awaiting Google review (can take 4-6 weeks). App functionality requiring sensitive scopes (Sheets, Drive, Apps Script Execution API) is blocked until verification progresses/completes."
     }
   ],
   "notes": "Architecture pivoted to a central API Executable Wrapper Script calling a private Core Logic Library. User-specific data (sheetId, keys, folderId) is stored in the backend DB and passed as parameters.",

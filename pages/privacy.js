@@ -1,120 +1,134 @@
 import React from "react";
+import Layout from "@/components/Layout"; // Assuming Layout handles overall page structure
 
-export default function PrivacyPolicy() {
+export default function PrivacyPolicyEN() {
+  const companyName = "Tamsar Tekstil Dış Tic. Ltd. Şti.";
+  const appName = "KolayXport";
+  const supportEmail = "destek@kolayxport.com";
+  const websiteUrl = "https://kolayxport.com";
+  const lastUpdated = "May 7, 2025"; // Update as needed
+
   return (
-    <div style={{ padding: "2rem", maxWidth: "800px", margin: "0 auto" }}>
-      <h1>Privacy Policy</h1>
-      <p>Last updated: May 5, 2025</p>
+    <Layout>
+      <div style={{ padding: "2rem", maxWidth: "800px", margin: "0 auto", lineHeight: "1.6" }}>
+        <h1>{appName} Privacy Policy</h1>
+        <p><em>Last Updated: {lastUpdated}</em></p>
 
-      <section>
-        <h2>1. Introduction</h2>
         <p>
-          Welcome to MyBaby Sync ("we", "us", "our"). We value your privacy and
-          are committed to protecting your personal information in compliance
-          with applicable laws, including Turkey's Law on the Protection of
-          Personal Data (KVKK).
+          This Privacy Policy explains how {companyName} ("Company", "we", "us", or "our")
+          collects, uses, discloses, and protects your personal data when you use the {appName}
+          application ("Application") and the {websiteUrl} website ("Site"). Please read this policy carefully.
+          By using our Services, you agree to the practices described in this Privacy Policy.
         </p>
-      </section>
 
-      <section>
-        <h2>2. Information We Collect</h2>
+        <h2>1. Data Controller</h2>
+        <p>
+          In accordance with Turkey's Law on the Protection of Personal Data No. 6698 ("KVKK"),
+          the data controller for your personal data is {companyName}, a company established in Turkey.
+        </p>
+        
+        <h2>2. Personal Data We Collect</h2>
+        <p>We may collect the following personal data from you:</p>
         <ul>
           <li>
-            <strong>Basic Profile Information:</strong> We collect your Google
-            account name and email address via OAuth just to identify you and
-            personalize your experience.
+            <strong>Identity and Contact Information:</strong> Your name, surname, and email address when you sign in with your Google account.
           </li>
           <li>
-            <strong>OAuth Tokens:</strong> We store access and refresh tokens to
-            call Google APIs on your behalf (e.g., accessing a designated
-            spreadsheet or folder). These tokens are encrypted and stored in
-            our database.
+            <strong>Google Account Data (with OAuth Permissions):</strong>
+            <ul>
+              <li><code>openid, https://www.googleapis.com/auth/userinfo.email, https://www.googleapis.com/auth/userinfo.profile</code>: To authenticate you and retrieve basic profile information (name, email, profile picture).</li>
+              <li><code>https://www.googleapis.com/auth/spreadsheets</code>: To read and write data to the specific Google Sheet you designate for the Application to function. This is the primary sheet where your orders and related data are stored and processed.</li>
+              <li><code>https://www.googleapis.com/auth/drive.file</code>: To access, manage, and save specific files that the Application creates or that you authorize it to access (e.g., generated shipping labels) into a specific Google Drive folder. We do not request access to your entire Drive.</li>
+              <li><code>https://www.googleapis.com/auth/script.projects, script.scriptapp, script.external_request, script.storage</code>: To run our backend scripts via the Google Apps Script Execution API to perform automation tasks such as order synchronization and label generation. This enables the core functionalities of the Application.</li>
+            </ul>
           </li>
           <li>
-            <strong>Resource Identifiers:</strong> We store the IDs of your
-            specific Google Sheet, Drive folder, and Apps Script deployment so
-            that we can run the syncing and labeling operations you request.
+            <strong>Usage Data:</strong> Information about how you use our Application and Site (e.g., access times, pages viewed).
+          </li>
+          <li>
+            <strong>Other Stored Data:</strong> We store certain identifiers in our database, such as your Google Sheet ID, Google Drive Folder ID, and any third-party API keys (e.g., shipping carrier API keys) you provide to configure the Application settings. These keys are stored encrypted.
           </li>
         </ul>
-      </section>
 
-      <section>
-        <h2>3. How We Use Your Information</h2>
+        <h2>3. How We Use Your Personal Data</h2>
+        <p>We use your personal data for the following purposes:</p>
         <ul>
-          <li>
-            <strong>Authentication:</strong> Use your Google profile to log in
-            securely.<br />
-          </li>
-          <li>
-            <strong>Spreadsheet Sync:</strong> Read and write data to the single
-            "wrapper" Google Sheet you specify.<br />
-          </li>
-          <li>
-            <strong>Folder Labeling:</strong> Apply or update labels within the
-            specific Google Drive folder you choose.
-          </li>
+          <li>To provide, maintain, and improve our Services.</li>
+          <li>To authenticate you with your Google account.</li>
+          <li>To synchronize order data with your designated Google Sheet.</li>
+          <li>To create and manage shipping labels in your Google Drive.</li>
+          <li>To respond to your requests and provide support. Contact: <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.</li>
+          <li>To comply with legal obligations.</li>
         </ul>
-      </section>
 
-      <section>
-        <h2>4. OAuth Scopes We Request</h2>
+        <h2>4. Legal Basis for Processing Personal Data</h2>
+        <p>We process your personal data based on the following legal grounds under KVKK Article 5:</p>
         <ul>
-          <li>
-            <code>openid</code>, <code>userinfo.email</code>, <code>userinfo.profile</code>: Authenticate you and read your basic profile.
-          </li>
-          <li>
-            <code>https://www.googleapis.com/auth/spreadsheets</code>: Read and write the designated spreadsheet.
-          </li>
-          <li>
-            <code>https://www.googleapis.com/auth/drive.file</code>: Create or modify files your app touches (apply labels to your chosen folder only).
-          </li>
-          <li>
-            <code>https://www.googleapis.com/auth/script.projects</code>, <code>script.scriptapp</code>, <code>script.external_request</code>, <code>script.storage</code>: Run our Apps Script wrapper via the Execution API to perform sync and labeling operations.
-          </li>
+          <li>Processing is necessary for the establishment or performance of a contract to which you are a party.</li>
+          <li>Processing is necessary for compliance with a legal obligation to which the data controller is subject.</li>
+          <li>Processing is necessary for the legitimate interests pursued by the data controller, provided that such processing does not harm your fundamental rights and freedoms.</li>
+          <li>Your explicit consent (which will be sought separately for specific situations).</li>
         </ul>
-      </section>
 
-      <section>
-        <h2>5. Data Retention</h2>
-        <p>
-          We retain your data (profile info, tokens, and resource IDs) only as
-          long as your account is active. You may delete your account and data
-          at any time by contacting us.
-        </p>
-      </section>
+        <h2>5. Sharing of Personal Data</h2>
+        <p>We do not share your personal data with third parties, except in the following circumstances:</p>
+        <ul>
+          <li>With Google (via OAuth and API services, with your consent).</li>
+          <li>If required by law or upon request from public authorities.</li>
+          <li>With trusted service providers who assist us in delivering our Services (e.g., database hosting), but only if they comply with this policy and confidentiality obligations.</li>
+        </ul>
 
-      <section>
-        <h2>6. Your Rights Under KVKK</h2>
+        <h2>6. Data Retention and Security</h2>
         <p>
-          Under Turkey's KVKK, you have the right to access, rectify, delete,
-          or object to processing of your personal data. To exercise these
-          rights, please contact us using the details below.
+          We retain your personal data for as long as necessary for the purposes for which it was collected or as required by law.
+          We take appropriate technical and organizational measures to protect your data against unauthorized access, alteration, disclosure, or destruction.
+          Sensitive data such as API keys are stored encrypted in our database.
         </p>
-      </section>
 
-      <section>
-        <h2>7. Security Measures</h2>
-        <p>
-          We implement industry-standard technical and organizational measures
-          to protect your data against unauthorized access, alteration,
-          disclosure, or destruction.
-        </p>
-      </section>
+        <h2>7. Your Rights Under KVKK</h2>
+        <p>Under KVKK Article 11, you have the following rights:</p>
+        <ul>
+          <li>To learn whether your personal data is processed.</li>
+          <li>To request information if your personal data has been processed.</li>
+          <li>To learn the purpose of processing your personal data and whether they are used appropriately for their purpose.</li>
+          <li>To know the third parties to whom your personal data is transferred domestically or abroad.</li>
+          <li>To request correction of your personal data if it is incomplete or incorrectly processed.</li>
+          <li>To request the deletion or destruction of your personal data under the conditions stipulated in KVKK Article 7.</li>
+          <li>To request notification of the operations carried out pursuant to sub-paragraphs (d) and (e) to third parties to whom your personal data has been transferred.</li>
+          <li>To object to the occurrence of a result against you by analyzing your processed data exclusively through automated systems.</li>
+          <li>To claim compensation for damages arising from the unlawful processing of your personal data.</li>
+        </ul>
+        <p>You can exercise these rights by contacting us at {supportEmail}.</p>
 
-      <section>
-        <h2>8. Contact Us</h2>
+        <h2>8. Cookies</h2>
         <p>
-          If you have any questions or requests regarding your personal data,
-          please contact us at <a href="mailto:support@example.com">support@example.com</a>.
+          Our Site may use cookies to enhance user experience. You can refuse cookies through your browser settings,
+          but this may cause some functions of the Site to not operate properly.
         </p>
-      </section>
 
-      <footer>
+        <h2>9. Links to Other Websites</h2>
         <p>
-          This policy may be updated periodically. We will notify you of any
-          material changes.
+          Our Site may contain links to other websites that are not operated by us.
+          If you click on a third-party link, you will be directed to that third party's site.
+          We strongly advise you to review the Privacy Policy of every site you visit.
+          We have no control over and assume no responsibility for the content, privacy policies, or practices of any third-party sites or services.
         </p>
-      </footer>
-    </div>
+
+        <h2>10. Changes to This Privacy Policy</h2>
+        <p>
+          We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on the Site.
+          You are advised to review this Privacy Policy periodically for any changes.
+        </p>
+
+        <h2>11. Contact Us</h2>
+        <p>
+          If you have any questions about this Privacy Policy, please contact us:
+          <br />
+          {companyName}
+          <br />
+          Email: <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
+        </p>
+      </div>
+    </Layout>
   );
 } 

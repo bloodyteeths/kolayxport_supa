@@ -149,3 +149,4 @@ Thumbs.db
 
 # Test outputs
 coverage/
+.vercel

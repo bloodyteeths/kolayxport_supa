@@ -3,7 +3,7 @@ import Link from 'next/link';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { NextSeo } from 'next-seo';
-import { MapPin, Briefcase, Clock, Coffee, RocketLaunch, Gift, MessageCircle, Globe, Users, Zap, Palette, Brain } from 'lucide-react';
+import { MapPin, Briefcase, Clock, Coffee, Rocket, Gift, MessageCircle, Globe, Users, Zap, Palette, Brain, MessageSquare } from 'lucide-react';
 
 const sectionVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -62,7 +62,7 @@ const cultureCards = [
   {
     title: 'Continuous Shipment',
     description: 'Hızlı iterasyonlar ve sürekli teslimat ile kullanıcılarımıza en iyi deneyimi sunmak için çalışıyoruz. Bürokrasiden uzak, çevik bir yapıdayız.',
-    icon: RocketLaunch,
+    icon: Rocket,
   },
 ];
 
@@ -106,7 +106,7 @@ const openRoles = [
 ];
 
 const timelineEvents = [
-  { year: '2023', title: 'MVP Lansmanı', description: 'İlk prototip ve temel özellikler yayında.', icon: RocketLaunch },
+  { year: '2023', title: 'MVP Lansmanı', description: 'İlk prototip ve temel özellikler yayında.', icon: Rocket },
   { year: '2024', title: 'İlk 50 Satıcı', description: 'Platformumuz ilk kullanıcılarıyla buluştu ve değerli geri bildirimler toplandı.', icon: Users },
   { year: '2025', title: 'Global Pazar Açılımı', description: 'Uluslararası pazarlara açılarak daha geniş bir kitleye ulaşma hedefi.', icon: Globe },
 ];

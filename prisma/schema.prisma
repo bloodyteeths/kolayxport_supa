@@ -7,42 +7,43 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../lib/generated/prisma"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
   provider = "postgresql"
   // The URL will be read from the .env file
   // For PostgreSQL, it points to the database connection string
-  url      = env("DATABASE_URL") 
+  url      = env("DATABASE_URL")
 }
 
 // --- User Model --- 
 model User {
-  id             String  @id @default(cuid())
-  name           String?
-  email          String?  @unique // Email is often unique, provided by Google
-  emailVerified  DateTime? // Useful field from NextAuth adapter
-  image          String?   // User profile image URL
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique // Email is often unique, provided by Google
+  emailVerified DateTime? // Useful field from NextAuth adapter
+  image         String? // User profile image URL
 
   googleAccountId String? @unique // From NextAuth account.providerAccountId - IMPORTANT for linking
-  googleSheetId  String? // Unique ID of their copied Google Sheet
-  driveFolderId  String? // Unique ID of their 'shippingLabels' Drive folder
-  
+  googleSheetId   String? // Unique ID of their copied Google Sheet
+  driveFolderId   String? // Unique ID of their 'shippingLabels' Drive folder
+
   // --- User-Specific API Keys & Settings --- 
   // IMPORTANT: Consider encrypting these values before storing in production
-  veeqoApiKey             String? 
-  shippoToken             String? 
-  fedexAccountNumber      String? 
-  fedexMeterNumber        String? // If needed by your core library
-  fedexApiKey             String? 
-  fedexSecretKey          String? 
+  veeqoApiKey        String?
+  shippoToken        String?
+  fedexAccountNumber String?
+  fedexMeterNumber   String? // If needed by your core library
+  fedexApiKey        String?
+  fedexSecretKey     String?
   // Add other keys/settings needed by the core library if applicable (e.g., Trendyol)
   // trendyolSupplierId      String?
   // trendyolApiKey          String?
   // trendyolApiSecret       String?
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // --- NextAuth Adapter Fields --- 
   // These are needed if using the PrismaAdapter with NextAuth
@@ -52,19 +53,19 @@ model User {
 
 // --- NextAuth Models (Required for PrismaAdapter) --- 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  // Store refresh token securely!
-  access_token       String?  
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  
-  session_state      String?
-  refresh_token_expires_in Int?  // Add field for Google OAuth
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? // Store refresh token securely!
+  access_token             String?
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String?
+  session_state            String?
+  refresh_token_expires_in Int? // Add field for Google OAuth
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

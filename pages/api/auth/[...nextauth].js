@@ -25,6 +25,12 @@ const customAdapter = {
 };
 
 export const authOptions = {
+  // Enable debug logs to assist with diagnosing errors
+  debug: true,
+  // Use a custom error page to capture and display auth errors
+  pages: {
+    error: '/auth/error',
+  },
   adapter: customAdapter,
   providers: [
     GoogleProvider({
@@ -39,7 +45,7 @@ export const authOptions = {
             "openid",
             "https://www.googleapis.com/auth/userinfo.email",
             "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/drive.file",
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/script.projects",
             "https://www.googleapis.com/auth/script.scriptapp",

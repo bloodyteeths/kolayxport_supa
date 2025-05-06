@@ -11,10 +11,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // The URL will be read from the .env file
-  // For PostgreSQL, it points to the database connection string
-  url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL") // Added for migrations
+  url       = env("DATABASE_URL")
+  // directUrl = env("DIRECT_URL") // Removed as we're using direct URL for runtime too
 }
 
 // --- User Model --- 

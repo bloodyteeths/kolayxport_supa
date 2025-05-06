@@ -52,7 +52,7 @@ const PublicNav = ({ ctaLink = '/auth/signup' }) => {
 
   return (
     <>
-      <motion.nav
+      <motion.header
         initial="hidden"
         animate="visible"
         variants={navVariants}
@@ -71,7 +71,7 @@ const PublicNav = ({ ctaLink = '/auth/signup' }) => {
           </motion.div>
 
           {/* Desktop Nav Links */}
-          <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
+          <nav className="hidden md:flex items-center gap-x-6 lg:gap-x-8">
             {navLinks.map((link) => (
               <motion.div variants={linkVariants} key={link.name}>
                 <Link href={link.href} legacyBehavior>
@@ -88,7 +88,7 @@ const PublicNav = ({ ctaLink = '/auth/signup' }) => {
                 </a>
               </Link>
             </motion.div>
-          </div>
+          </nav>
 
           {/* Mobile Menu Button */}
           <div className="md:hidden">
@@ -96,13 +96,14 @@ const PublicNav = ({ ctaLink = '/auth/signup' }) => {
               onClick={toggleMenu}
               className="p-2 rounded-md text-gray-600 hover:text-blue-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
               aria-label="Menüyü aç/kapat"
+              aria-expanded={isOpen}
               variants={linkVariants}
             >
               {isOpen ? <X size={24} /> : <Menu size={24} />}
             </motion.button>
           </div>
         </div>
-      </motion.nav>
+      </motion.header>
 
       {/* Mobile Menu Dialog */}
       <AnimatePresence>
@@ -112,22 +113,14 @@ const PublicNav = ({ ctaLink = '/auth/signup' }) => {
             animate="visible"
             exit="exit"
             variants={mobileMenuVariants}
-            className="fixed inset-0 z-40 bg-white/95 backdrop-blur-md md:hidden flex flex-col items-center justify-center p-6 pt-[72px]" // pt to avoid overlap with nav
+            className="fixed inset-0 z-40 bg-white/90 backdrop-blur-sm md:hidden flex flex-col items-center justify-center p-6 pt-[72px]"
           >
-            <button
-              onClick={toggleMenu}
-              className="absolute top-5 right-5 p-2 rounded-md text-gray-600 hover:text-blue-600 focus:outline-none"
-              aria-label="Menüyü kapat"
-            >
-              <X size={28} />
-            </button>
-            
             <nav className="flex flex-col items-center space-y-6 text-center">
               {navLinks.map((link) => (
                 <motion.div variants={linkVariants} key={link.name}>
                   <Link href={link.href} legacyBehavior>
                     <a 
-                      onClick={toggleMenu} // Close menu on link click
+                      onClick={toggleMenu}
                       className="text-xl font-medium text-gray-700 hover:text-blue-600 transition-colors"
                     >
                       {link.name}
@@ -138,7 +131,7 @@ const PublicNav = ({ ctaLink = '/auth/signup' }) => {
               <motion.div variants={linkVariants} className="mt-8">
                 <Link href={ctaLink} legacyBehavior>
                   <a
-                    onClick={toggleMenu} // Close menu on link click
+                    onClick={toggleMenu}
                     className="px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out"
                   >
                     Ücretsiz Dene

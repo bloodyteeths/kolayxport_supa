@@ -1,5 +1,6 @@
 import React, { Fragment } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { ChevronDown, Star, Truck, BarChart3, Box } from 'lucide-react';
@@ -114,60 +115,29 @@ const StarRating = ({ rating }) => (
 export default function HomePage() {
   return (
     <PublicLayout title="KolayXport - E-Ticaret Otomasyon Platformu" description="E-ticaret operasyonlarınızı otomatikleştirin. Sipariş, kargo, envanter yönetimi ve faturalama KolayXport ile çok kolay.">
-      {/* Section 1: HERO */}
-      <motion.section
-        className="relative min-h-screen flex items-center justify-center text-center px-6 lg:px-8 overflow-hidden bg-gradient-to-b from-blue-50 to-white"
-        variants={sectionVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-multiply pointer-events-none" />
-        <div className="relative z-10 py-20 md:py-32">
-          <motion.h1
-            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-800 tracking-tight"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            Bütün Marketplacelere Tek Panelden Hükmedin.
-          </motion.h1>
-          <motion.p
-            className="mt-6 max-w-xl mx-auto text-lg text-slate-600"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            Sipariş yönetimi, faturalama, kargo ve envanter senkronizasyonu—hepsi %100 Türkçe, hepsi tek tıkla.
-          </motion.p>
-          <motion.div
-            className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-          >
-            <Link href="#signup-form" legacyBehavior>
-              <a className="px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
-                Ücretsiz Dene
-              </a>
-            </Link>
-            <Link href="/iletisim?subject=Demo%20Talebi" legacyBehavior>
-              <a className="px-8 py-3 text-lg font-semibold text-blue-600 bg-white rounded-full shadow-lg hover:scale-105 hover:bg-slate-50 transform transition-all duration-200 ease-out border border-slate-300">
-                Demo İste
-              </a>
-            </Link>
-          </motion.div>
+      {/* Section 1: HERO - REPLACED */}
+      <motion.section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-sky-50 to-white">
+        <div className="absolute inset-0 -z-10 bg-[url('/noise.png')] opacity-10 pointer-events-none" />
+        <div className="mx-auto max-w-7xl px-6 py-32 text-center">
+          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900">
+            Bütün Marketplacelere <span className="text-primary">Tek Panelden</span> Hükmedin.
+          </h1>
+          <p className="mt-6 mx-auto max-w-2xl text-lg text-slate-600">
+            Sipariş yönetimi, kargo, envanter senkronizasyonu—%100 Türkçe, hepsi tek tıkla.
+          </p>
+          <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
+            <Link href="/auth/signup" className="btn-primary">Ücretsiz Dene</Link>
+            <Link href="#demo" className="btn-secondary">Demo İste</Link>
+          </div>
+          <Image
+            src="/images/hero-macbook.png"
+            width={1600}
+            height={1200}
+            alt="KolayXport dashboard preview"
+            className="mx-auto mt-16 w-full max-w-4xl drop-shadow-2xl"
+            priority
+          />
         </div>
-        <motion.div 
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-64 md:h-96 opacity-30 md:opacity-50 pointer-events-none"
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.7, ease: 'easeOut' }}
-        >
-           <div className="w-full h-full bg-contain bg-no-repeat bg-bottom [mask-image:linear-gradient(to_bottom,white,white,transparent)]" 
-             style={{ backgroundImage: 'url("/placeholder-dashboard-hero.svg")' }} 
-             aria-label="KolayXport Dashboard Mockup">
-           </div>
-        </motion.div>
       </motion.section>
 
       {/* Section 2: TRUST BADGES */}

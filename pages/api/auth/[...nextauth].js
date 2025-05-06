@@ -27,6 +27,7 @@ const customAdapter = {
 console.log("[AUTH_DEBUG] NEXTAUTH_SECRET from env:", process.env.NEXTAUTH_SECRET);
 console.log("[AUTH_DEBUG] GOOGLE_CLIENT_ID from env:", process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
 console.log("[AUTH_DEBUG] GOOGLE_CLIENT_SECRET from env:", process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
+console.log("[AUTH_DEBUG] DATABASE_URL from env:", process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 30) + '...' : 'NOT SET');
 
 export const authOptions = {
   // Enable debug logs to assist with diagnosing errors

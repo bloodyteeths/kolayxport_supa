@@ -109,11 +109,12 @@ export default async function handler(req, res) {
     // --- 2. Copy Template Sheet (if needed) --- 
     if (!googleSheetId) {
       console.log(`User ${userId}: Copying template sheet ${TEMPLATE_SHEET_ID}...`);
-      const copyMetadata = { 
-          name: `MyBabySync Orders - ${session.user.email || userId}`, // Use user email in name
-          // Optional: Place the copy in the folder created above?
-          // parents: [driveFolderId] 
-      };
+      const copyMetadata = {}; // Simplest possible copy
+      // const copyMetadata = { 
+      //     name: `MyBabySync Orders - ${session.user.email || userId}`, // Use user email in name
+      //     // Optional: Place the copy in the folder created above?
+      //     // parents: [driveFolderId] 
+      // };
       try {
         const copiedFile = await drive.files.copy({ 
             fileId: TEMPLATE_SHEET_ID,

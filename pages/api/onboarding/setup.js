@@ -147,9 +147,30 @@ export default async function handler(req, res) {
         console.log(`User ${userId}: Renamed first sheet to 'Kargov2'.`);
         
       } catch (copyErr) {
-         console.error(`User ${userId}: Sheet copy/rename failed:`, copyErr);
-         // Consider checking error type, e.g., if template sheet not found/accessible
-         throw new Error(`Failed to copy or rename template sheet.`); // Keep error generic
+         console.error(`User ${userId}: Sheet copy attempt failed.`);
+         console.error(`User ${userId}: copyErr.code = ${copyErr.code}`);
+         console.error(`User ${userId}: copyErr.message = ${copyErr.message}`);
+
+         if (copyErr.errors && Array.isArray(copyErr.errors)) {
+             console.error(`User ${userId}: Detailed Google API errors (copyErr.errors):`);
+             copyErr.errors.forEach((err, index) => {
+                 console.error(`Error ${index}: domain=${err.domain}, reason=${err.reason}, message=${err.message}, extendedHelp=${err.extendedHelp}, location=${err.location}, locationType=${err.locationType}`);
+             });
+         } else {
+             console.error(`User ${userId}: copyErr.errors array not found or not an array. Full error object:`, JSON.stringify(copyErr, null, 2));
+         }
+         
+         // Fallback to a general full stringify if the specific fields aren't there as expected
+         if (!(copyErr.errors && Array.isArray(copyErr.errors))) {
+            console.error(`User ${userId}: Full copyErr object (fallback):`, JSON.stringify(copyErr, Object.getOwnPropertyNames(copyErr), 2));
+         }
+
+         let errorMessage = "Failed to copy or rename template sheet.";
+         if (copyErr.message) errorMessage += ` Original error: ${copyErr.message}`;
+         if (copyErr.code) errorMessage += ` API responded with code: ${copyErr.code}.`;
+         errorMessage += " Check server logs for details from 'Detailed Google API errors' or 'Full copyErr object'.";
+         
+         throw new Error(errorMessage);
       }
     } else {
        console.log(`User ${userId}: Sheet already exists: ${googleSheetId}`);

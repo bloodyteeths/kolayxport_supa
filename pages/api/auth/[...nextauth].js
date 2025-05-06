@@ -35,6 +35,7 @@ export const authOptions = {
   // Use a custom error page to capture and display auth errors
   pages: {
     error: '/auth/error',
+    signIn: '/auth/signin',
   },
   adapter: customAdapter,
   providers: [

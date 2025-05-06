@@ -8,6 +8,8 @@ This document outlines planned features, improvements, and long-term vision for 
 *   **Troubleshooting Done:** Verified client ID/secret, OAuth scopes in NextAuth & GCP, API enablement, token refresh logic, forced token revocation/re-granting. The issue persists even when the `googleapis` library reports successful token refresh.
 *   **Likely Cause:** Restrictions imposed by Google on OAuth clients in "Testing" mode using sensitive scopes, requiring formal verification.
 *   **Next Step:** The Google OAuth verification process has been initiated (scope justifications submitted). **A demo video proving scope usage is required by Google and needs to be created and added to the verification submission.** Progress on API-dependent features is paused until this verification is underway or complete.
+*   **Google OAuth Verification In Progress:** The app is undergoing Google OAuth consent screen verification. Key API functionalities (Drive, Sheets, Apps Script Execution) might be limited until full verification. Current steps involve resolving homepage ownership in Google Search Console and ensuring the privacy policy URL is correctly configured in GCP.
+*   **Sitemap Generated:** A `sitemap.xml` is now generated via `next-sitemap` during the build process.
 
 ## Upcoming Features
 

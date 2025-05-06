@@ -1,57 +1,58 @@
-# MyBaby Sync Product
+# KolayXport: E-Ticaret Otomasyon SaaS
 
-A Next.js + React dashboard acting as a control panel for per-user Google Apps Script instances that automate order synchronization and label generation.
+A Next.js + React dashboard acting as a control panel for e-commerce sellers, integrating with various marketplaces and services. It leverages a central Google Apps Script API for certain backend operations like Google Sheet/Drive interactions for order processing and label generation assistance.
 
 ## Architecture Overview
 
-This application enables users to manage their own automated workflows hosted within their Google account, leveraging a central Apps Script API.
-
-1.  **Authentication:** Users log in via their Google Account using NextAuth.js.
-2.  **Onboarding:** Upon first login, the backend (`/api/onboarding/setup.js`):
+1.  **Public Frontend**: A set of static and server-rendered pages (Homepage, About, Integrations, How-to, Contact, Pricing, Careers, Docs) built with Next.js and React, using `PublicLayout.js` for consistent structure and `next-seo` for SEO management.
+2.  **Authenticated App**: The user dashboard resides under the `/app` path, using a dedicated `AppLayout.js` which includes a sidebar and topbar for navigation and core app functionalities.
+3.  **Authentication**: Users log in via their Google Account using NextAuth.js.
+4.  **Onboarding**: Upon first login, the backend (`/api/onboarding/setup.js`):
     *   Copies a template Google Sheet into the user\'s Google Drive.
-    *   Creates a dedicated folder (e.g., "myBabySync_ShippingLabels") in the user\'s Drive.
-    *   Stores the new `googleSheetId` and `driveFolderId` in the application\'s user database (Prisma). **It no longer copies or stores a script ID.**
-3.  **Configuration:** Users input their API keys (Veeqo, Trendyol, FedEx, etc.) via a Settings Modal in the Next.js UI.
-    *   The frontend calls a backend API route (e.g., `/api/saveUserSettings`).
-    *   This backend route **saves the encrypted keys directly into the user's record in the application database**. It **no longer** calls Apps Script to save keys.
-4.  **Sync Operation:**
-    *   User triggers sync from the Next.js UI ("Senkron" tab).
-    *   Frontend calls the backend (`/api/syncOrders`).
-    *   Backend fetches the user's `googleSheetId` and relevant API keys from the database.
-    *   Backend uses a Service Account and the Apps Script API (`scripts.run`) to execute the `syncOrdersToSheet` function within the **central, deployed Wrapper Apps Script** (identified by `NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID`).
-    *   The backend passes the user's `spreadsheetId` and API keys as parameters to the Wrapper Script.
-    *   The Wrapper Script calls the Core Logic Library, passing the necessary data.
-    *   The Core Logic Library performs the sync and returns results to the Wrapper.
-    *   The Wrapper appends data to the user's sheet (using `SpreadsheetApp.openById(spreadsheetId)`).
-5.  **Data Display:**
-    *   The frontend (`OrdersTable` component) calls a backend API (`/api/getOrders`).
-    *   Backend fetches the user's `googleSheetId` from the database.
-    *   Backend uses `scripts.run` to execute `getOrdersFromSheet` in the **central Wrapper Script**, passing the `spreadsheetId`.
-    *   The Wrapper Script reads data from the user's Sheet (using `openById`) and returns it for display.
-6.  **Label Generation:**
-    *   Triggered from the UI (`OrdersTable`).
-    *   Calls a backend API (`/api/generateLabel`).
-    *   Backend fetches the user's FedEx keys and `driveFolderId` from the database.
-    *   Backend uses `scripts.run` to execute `generateLabelForOrder` in the **central Wrapper Script**, passing the FedEx keys, `driveFolderId`, and necessary `orderData`.
-    *   The Wrapper Script calls the Core Logic Library, passing the data.
-    *   The Core Logic Library generates the label via FedEx API, saves it to the user's Drive folder (using `DriveApp.getFolderById(driveFolderId)`), and returns the result (e.g., tracking number, Drive file URL).
+    *   Creates a dedicated folder (e.g., "KolayXport_Labels") in the user\'s Drive.
+    *   Stores the new `googleSheetId` and `driveFolderId` in the application\'s user database (Prisma).
+5.  **Configuration**: Users input their API keys (e.g., for marketplaces, shipping providers) via a Settings Modal in the `/app/settings` section.
+    *   Keys are saved securely in the application database.
+6.  **Core Operations (via Apps Script)**:
+    *   User triggers operations like order sync or label generation from the `/app` UI.
+    *   The Next.js backend fetches user-specific data (sheetId, API keys) from the database.
+    *   It uses a Service Account and the Apps Script API (`scripts.run`) to execute functions within a **central, deployed Wrapper Apps Script** (identified by `NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID`).
+    *   The Wrapper Script calls a private Core Logic Library (another Apps Script project) to perform the actual tasks (e.g., interacting with Google Sheets/Drive, calling external APIs like FedEx).
 
-## Features (Current State)
+## Features
 
-- Google Account Login (NextAuth.js)
-- **Central API Executable Wrapper Apps Script (`apps-script/mergedSyncAndLabel.gs`) deployed (ID: `NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID`)**
-- **Private Core Logic Apps Script Library (referenced by Wrapper)**
-- Backend API structure for interacting with the central Wrapper script via `scripts.run`
-  - `/api/syncOrders`
-  - `/api/generateLabel`
-  - `/api/getOrders`
-  - `/api/setScriptProps` (Needs refactoring to save keys to DB)
-  - `/api/onboarding/setup.js` (Needs refactoring for new architecture)
-- Prisma ORM setup (needs schema update: remove `googleScriptId`, add keys/folderId).
-- Frontend Dashboard (`Dashboard.js`, `Layout.js`)
-- Settings Modal (`SettingsModal.jsx`) (Needs update to call new key saving API).
-- Orders Table (`OrdersTable.jsx`)
-- Unit tests setup (Jest), E2E tests setup (Cypress).
+- **Public Frontend**:
+  - Homepage (`pages/index.js`)
+  - About/Kurumsal (`pages/kurumsal.js`)
+  - Integrations (`pages/entegrasyonlar.js`)
+  - How-to/Nasıl Kullanılır (`pages/nasil-kullanirim.js`)
+  - Contact (`pages/iletisim.js`)
+  - Pricing (`pages/fiyatlandirma.js`)
+  - Careers (`pages/kariyer.js`)
+  - Documentation Landing (`pages/docs/index.js`)
+  - Privacy Policy (EN & TR)
+- **Authenticated Application (at `/app`)**:
+  - Google Account Login (NextAuth.js)
+  - Modern Dashboard Layout (`components/AppLayout.js`) with collapsible sidebar and topbar.
+  - User-specific dashboard view (`pages/app/index.js`)
+  - Sections for Orders, Products, Shipping, Analytics, Settings (placeholder pages to be built).
+- **Backend & Core Logic**:
+  - Central API Executable Wrapper Apps Script deployed.
+  - Private Core Logic Apps Script Library.
+  - Backend API routes for onboarding, settings, and core operations.
+  - Prisma ORM with Supabase (PostgreSQL) for database management.
+- **SEO & General**:
+  - Global SEO management with `next-seo` (`next-seo.config.js`).
+  - Sitemap generation (`next-sitemap`).
+  - Unit tests (Jest), E2E tests (Cypress).
+  - GitHub Actions for CI.
+
+## SEO & Verification
+
+- **Sitemap:** `sitemap.xml` and an updated `robots.txt` are generated on build using `next-sitemap`.
+- **SEO Meta:** Global and per-page SEO metadata is managed using `next-seo`.
+- **OpenGraph Images:** Ensure `/og-public.png`, `/og-pricing.png`, `/og-kariyer.png`, `/og-docs.png` (and others as needed) are present in the `/public` directory.
+- **Google OAuth Verification:** The app is currently undergoing Google OAuth consent screen verification. This is necessary to ensure full, unrestricted access to Google APIs (Drive, Sheets, Apps Script Execution). Progress is tracked in `dev_plan.json`.
 
 ## Getting Started
 
@@ -59,15 +60,12 @@ This application enables users to manage their own automated workflows hosted wi
 
 - Node.js 18+ and npm
 - A Google Cloud Project with:
-  - **Google Drive API** enabled
-  - **Google Sheets API** enabled
-  - **Apps Script API** enabled
-- OAuth 2.0 Client ID credentials (for NextAuth Google Provider)
-- A Service Account with credentials (JSON key) and appropriate permissions:
-  - Required Scopes: `https://www.googleapis.com/auth/script.projects` (to run the central script). The Service Account *does not* need Drive/Sheet permissions itself if the central script runs as the user or uses user tokens.
-- A **Template Google Sheet** (used for copying during onboarding).
-- A **Deployed Central Wrapper Apps Script (API Executable)** - See `NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID`.
-- A **Private Core Logic Apps Script** added as a library to the Wrapper Script.
+  - Google Drive API, Google Sheets API, Apps Script API enabled.
+- OAuth 2.0 Client ID credentials.
+- A Service Account with credentials (JSON key) and `https://www.googleapis.com/auth/script.projects` scope.
+- A Template Google Sheet.
+- Deployed Central Wrapper Apps Script & Private Core Logic Library.
+- Supabase project for PostgreSQL database.
 
 ### Installation
 
@@ -75,55 +73,39 @@ This application enables users to manage their own automated workflows hosted wi
 2.  Install dependencies: `npm install`
 3.  Configure Environment Variables (`.env.local`):
     ```env
-    # Database (SQLite or PostgreSQL)
-    DATABASE_URL="file:./prisma/dev.db" # Or your PostgreSQL URL
-
-    # NextAuth
+    DATABASE_URL="your_supabase_direct_connection_string"
     GOOGLE_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
     GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
     NEXTAUTH_SECRET=GENERATE_A_STRONG_SECRET_KEY
-    NEXTAUTH_URL=http://localhost:3000
-
-    # App Specific
-    TEMPLATE_SHEET_ID=YOUR_TEMPLATE_GOOGLE_SHEET_ID
-    # Central Apps Script API Executable Deployment ID
+    NEXTAUTH_URL=http://localhost:3000 # For local dev; https://kolayxport.com for production
+    
+    GOOGLE_SHEETS_SPREADSHEET_ID=YOUR_TEMPLATE_GOOGLE_SHEET_ID
     NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID=YOUR_WRAPPER_SCRIPT_DEPLOYMENT_ID
-    # (Optional but good practice) Central Wrapper Script ID (for reference/OAuth scope if needed)
-    NEXT_PUBLIC_APPS_SCRIPT_ID=YOUR_WRAPPER_SCRIPT_ID
+    NEXT_PUBLIC_APPS_SCRIPT_ID=YOUR_WRAPPER_SCRIPT_ID # Optional, for reference
 
-    # Service Account Credentials (for Backend -> Apps Script API)
     GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
-    GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\nYOUR_KEY_HERE\\n-----END PRIVATE KEY-----\\n"
-
-    # REMOVE this if present: TEMP_USER_SCRIPT_ID=...
+    GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_KEY_HERE\n-----END PRIVATE KEY-----\n"
     ```
 4.  Apply Database Migrations:
     ```bash
-    # Update prisma/schema.prisma first (remove googleScriptId, add fields)
-    npx prisma migrate dev
+    npx prisma db push # If schema is already aligned with DB
+    # or npx prisma migrate dev # If you have pending migrations
     ```
 
 ## Development
 
 - Run the development server: `npm run dev`
 - Open http://localhost:3000.
-- Log in with your Google Account.
-- **Onboarding:** The `/api/onboarding/setup.js` route needs to be implemented/refactored to copy the sheet, create the folder, and save `googleSheetId`/`driveFolderId` to the DB.
-- Open the "Ayarlar" tab, click "API Anahtarlarını ve Ayarları Yönet". This needs to be refactored to save keys to the **database** via a new API endpoint, not Apps Script PropertiesService.
-- Go to the "Senkron" tab and click "Sync Orders". Backend API (`/api/syncOrders`) needs refactoring to fetch user data/keys from DB and call the central Wrapper script.
+- Log in with your Google Account (redirects to `/app`).
+- Navigate the public pages and the authenticated app section (`/app`).
 
-## Key Implementation TODOs (Refactoring for Central Script Architecture)
+## Key Implementation Status (Refactoring for Central Script Architecture)
 
-- **Prisma Schema:** Update `prisma/schema.prisma` to remove `googleScriptId`, add `driveFolderId`, add fields for user API keys (consider encryption). Run `npx prisma migrate dev`.
-- **Onboarding (`/api/onboarding/setup.js`):** Refactor to only copy sheet and create folder, storing only `googleSheetId` and `driveFolderId` in DB. Remove Script ID logic.
-- **API Key Saving:** Refactor `/api/setScriptProps.js` (or create `/api/saveUserSettings`) to save keys to the Prisma DB. Update `SettingsModal.jsx` to call this new endpoint.
-- **Backend API Calls:** Modify `/api/syncOrders`, `/api/getOrders`, `/api/generateLabel` to:
-    - Fetch user's `googleSheetId`, `driveFolderId`, and API keys from DB based on session.
-    - Call the **central Wrapper Script's Deployment ID** using `scripts.run`.
-    - Pass the fetched `spreadsheetId`, keys, `driveFolderId`, etc., as parameters to the wrapper script functions.
-- **Core Logic Library:** Ensure the online private library script functions accept all necessary data as parameters.
-- **`OrdersTable` Data Fetching & Display:** Ensure it calls the refactored `/api/getOrders` and renders data correctly.
-- **Label Generation:** Ensure `OrdersTable` calls the refactored `/api/generateLabel` correctly.
+- **Prisma Schema:** Updated for user API keys, `driveFolderId`. **(Completed)**
+- **Onboarding (`/api/onboarding/setup.js`):** Copies sheet, creates folder, saves IDs to DB. **(Completed)**
+- **API Key Saving:** Saves keys to Prisma DB. `SettingsModal.jsx` updated. **(Completed)**
+- **Backend API Calls:** `/api/syncOrders`, `/api/getOrders`, `/api/generateLabel` use central script & DB data. **(Completed)**
+- **Core Logic Library:** Functions accept parameters. **(Completed)**
 
 ## Testing
 
@@ -132,9 +114,9 @@ This application enables users to manage their own automated workflows hosted wi
 
 ## Deployment
 
-- **Database:** Switch Prisma provider to PostgreSQL and configure connection URL. Run migrations.
-- **Apps Scripts:** Ensure the **central Wrapper Script** is deployed as an API Executable and the **Core Logic Library** is saved. No per-user script deployment needed.
-- **Next.js App:** Deploy to Vercel, Netlify, Fly.io, etc. Ensure all production environment variables are set, especially `NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID`.
+- **Database:** Supabase (PostgreSQL) is configured.
+- **Apps Scripts:** Central Wrapper Script deployed as API Executable; Core Logic Library saved.
+- **Next.js App:** Deploy to Vercel. Ensure all production environment variables are set.
 
 ## Roadmap
 

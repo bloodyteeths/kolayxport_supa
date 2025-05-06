@@ -104,13 +104,13 @@
       "title": "Refactor Backend API Callers",
       "description": "Update /api/syncOrders, /api/getOrders, /api/generateLabel to fetch user data/keys from DB, call central deployment ID, and pass parameters to wrapper script.",
       "status": "completed",
-      "dependencies": [12, 7] 
+      "dependencies": [12, 7]
     },
     {
       "id": 17,
-      "title": "Update Documentation (README, ROADMAP)",
+      "title": "Update Documentation (README, ROADMAP) - Initial Phase",
       "description": "Update README.md and ROADMAP.md to reflect the new central script architecture.",
-      "status": "completed", 
+      "status": "completed",
       "dependencies": [10]
     },
     {
@@ -118,7 +118,7 @@
       "title": "Test End-to-End Flow",
       "description": "Thoroughly test onboarding, settings saving, order sync, order display, and label generation.",
       "status": "blocked",
-      "notes": "Completed onboarding and settings tests. Encountered persistent 'Invalid Credentials' (401) errors when calling Google Sheets/Drive/Apps Script Execution APIs, despite correct scopes, client ID, and successful token refresh logging. Troubleshooting included verifying GCP settings, forcing token refresh, checking API enablement, and pushing to GitHub. CI issues related to lock file and Jest transforms were resolved. Root cause is likely limitations due to OAuth consent screen being in 'Testing' mode and requiring verification for sensitive scopes.",
+      "notes": "Completed onboarding and settings tests. Encountered persistent 'Invalid Credentials' (401) / 'File Not Found' (404) errors when calling Google Sheets/Drive/Apps Script Execution APIs. Root cause is likely limitations due to OAuth consent screen being in 'Testing' mode and requiring verification for sensitive scopes. Also addressed GCP verification center issues (domain, privacy URL).",
       "dependencies": [13, 15, 16],
       "subtasks": [
         {
@@ -134,17 +134,17 @@
         {
           "title": "Manual Testing: Sync Orders",
           "description": "Click 'Sync Orders' and verify orders appear in the table.",
-          "status": "blocked - Invalid Credentials (401)"
+          "status": "blocked - OAuth Verification"
         },
         {
            "title": "Manual Testing: Get Orders",
            "description": "Verify order table loads data from sheet.",
-           "status": "blocked - Invalid Credentials (401)"
+           "status": "blocked - OAuth Verification"
         },
         {
           "title": "Manual Testing: Generate Label",
           "description": "Click 'Generate Label' for an order and verify a label is created and a link appears.",
-           "status": "pending - Likely blocked by same auth issue"
+           "status": "pending - Likely blocked by OAuth Verification"
         },
         {
           "title": "Unit Tests: Run Jest",
@@ -188,7 +188,7 @@
         },
         {
           "title": "Set Other Production Environment Variables",
-          "description": "Ensured NEXTAUTH_SECRET, NEXTAUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET are set in Vercel.",
+          "description": "Ensured NEXTAUTH_SECRET, NEXTAUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID are set in Vercel.",
           "status": "completed"
         }
       ]
@@ -204,38 +204,142 @@
       "id": 21,
       "title": "Fix Missing UI Components for Dev Server",
       "description": "Install missing shadcn/ui components (label, etc.) so the dev server can start.",
-      "status": "in progress",
+      "status": "completed", 
       "dependencies": [20]
     },
     {
       "id": 22,
-      "title": "Submit Google OAuth Verification",
-      "description": "Complete the Google Cloud OAuth Consent Screen verification process, including scope justifications and providing a demo video, to enable full API access.",
+      "title": "Google OAuth & GCP Setup and Verification",
+      "description": "Complete the Google Cloud OAuth Consent Screen verification process, including scope justifications and providing a demo video, to enable full API access. Ensure domain verification and correct privacy/homepage URLs.",
       "status": "in progress",
       "dependencies": [],
-      "notes": "Verification submitted, awaiting Google review (can take 4-6 weeks). App functionality requiring sensitive scopes (Sheets, Drive, Apps Script Execution API) is blocked until verification progresses/completes."
+      "notes": "Verification submitted. App functionality requiring sensitive scopes (Sheets, Drive, Apps Script Execution API) may be limited until verification completes. Homepage ownership and privacy policy URL discrepancies resolved.",
+      "subtasks": [
+        {
+          "title": "Verify Homepage Ownership with Google Search Console",
+          "description": "Add TXT record to DNS for domain verification.",
+          "status": "completed"
+        },
+        {
+          "title": "Resolve Privacy Policy URL in GCP Consent Screen",
+          "description": "Ensure the privacy policy link is distinct from the homepage link and points to the correct page.",
+          "status": "completed"
+        },
+        {
+          "title": "Await Full OAuth Verification from Google",
+          "description": "Monitor Google's review process after resolving initial discrepancies.",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "title": "Generate Sitemap",
+      "description": "Install next-sitemap, configure, and generate sitemap.xml and robots.txt.",
+      "status": "completed"
+    },
+    {
+      "id": 24,
+      "title": "Create Public Footer Component",
+      "description": "Create components/PublicFooter.js with specified three-column layout, dark gradient, social links, product/resource links, and copyright.",
+      "status": "completed"
+    },
+    {
+      "id": 25,
+      "title": "Implement Public Pages Structure",
+      "description": "Created PublicLayout, PublicNav, refactored public pages (index, privacy, signin, error) to use PublicLayout. Established new /dashboard route for authenticated users.",
+      "status": "completed",
+      "dependencies": [24]
+    },
+    {
+      "id": 26,
+      "title": "Redesign Homepage (pages/index.js)",
+      "description": "Implemented a new Apple-esque landing page design with multiple sections (Hero, Trust Badges, Features, Comparison, Testimonials, CTA, FAQ).",
+      "status": "completed",
+      "dependencies": [25]
+    },
+    {
+      "id": 27,
+      "title": "Create Placeholder Page: Kurumsal (pages/kurumsal.js)",
+      "description": "Created corporate/about page with hero, timeline, and CTA.",
+      "status": "completed",
+      "dependencies": [25]
+    },
+    {
+      "id": 28,
+      "title": "Create Placeholder Page: Entegrasyonlar (pages/entegrasyonlar.js)",
+      "description": "Created integrations page with hero and filterable logo grid.",
+      "status": "completed",
+      "dependencies": [25]
+    },
+    {
+      "id": 29,
+      "title": "Create Placeholder Page: Nasıl Kullanılır (pages/nasil-kullanirim.js)",
+      "description": "Created how-to page with hero, stepper component, and Loom video placeholder.",
+      "status": "completed",
+      "dependencies": [25]
+    },
+    {
+      "id": 30,
+      "title": "Create Placeholder Page: İletişim (pages/iletisim.js)",
+      "description": "Created contact page with hero, two-column layout (form with react-hook-form, office info/map), and toast notifications.",
+      "status": "completed",
+      "dependencies": [25]
+    },
+    {
+      "id": 31,
+      "title": "Create Placeholder Page: Fiyatlandırma (pages/fiyatlandirma.js)",
+      "description": "Created pricing page with hero, plans grid, comparison table, and FAQ accordion.",
+      "status": "completed",
+      "dependencies": [25]
+    },
+    {
+      "id": 32,
+      "title": "Create Placeholder Page: Kariyer (pages/kariyer.js)",
+      "description": "Created careers page with hero (aurora SVG), culture section, open roles list, timeline, and CTA banner.",
+      "status": "completed",
+      "dependencies": [25]
+    },
+    {
+      "id": 33,
+      "title": "Create Docs Landing Page (pages/docs/index.js)",
+      "description": "Created documentation landing page with hero, featured guides grid, and code snippet preview.",
+      "status": "completed",
+      "dependencies": [25]
+    },
+    {
+      "id": 34,
+      "title": "Setup next-seo for Global SEO Management",
+      "description": "Installed next-seo, created next-seo.config.js, and integrated DefaultSeo into _app.js. Updated PublicLayout to use NextSeo.",
+      "status": "completed"
+    },
+    {
+      "id": 35,
+      "title": "Create Authenticated App Layout (components/AppLayout.js)",
+      "description": "Designed and implemented a new layout for the authenticated dashboard area, featuring a collapsible sidebar and sticky topbar.",
+      "status": "completed"
+    },
+    {
+      "id": 36,
+      "title": "Refactor Dashboard to /app Route and AppLayout",
+      "description": "Created pages/app/index.js using AppLayout, migrated old dashboard content, and updated sign-in and relevant links to point to /app.",
+      "status": "completed",
+      "dependencies": [35]
     }
   ],
-  "notes": "Architecture pivoted to a central API Executable Wrapper Script calling a private Core Logic Library. User-specific data (sheetId, keys, folderId) is stored in the backend DB and passed as parameters.",
+  "notes": "Architecture pivoted to a central API Executable Wrapper Script calling a private Core Logic Library. User-specific data (sheetId, keys, folderId) is stored in the backend DB and passed as parameters. Public pages and authenticated app section now have distinct, modern layouts.",
   "testingStrategy": {
     "overview": "Testing ensures the app works for real users and catches bugs before deployment. We use three types: manual testing (step-by-step checks in the browser), unit tests (automated checks for small pieces of code), and end-to-end (E2E) tests (automated checks for the whole user flow).",
-    "manual": [
-      "Follow the subtasks under 'Test End-to-End Flow' in this file.",
-      "Check each feature as a real user would: onboarding, settings, syncing, and label generation.",
-      "Write down any problems or confusing steps."
-    ],
-    "unit": [
-      "Run 'npm test' in the terminal to check that all code modules work as expected.",
-      "If a test fails, read the error and ask for help if unsure."
-    ],
-    "e2e": [
-      "Run 'npx cypress open' or 'npx cypress run' to launch automated browser tests.",
-      "Follow the instructions in the Cypress window to run all tests.",
-      "If a test fails, note the error and what you were doing."
-    ],
-    "reporting": [
-      "For any issue, write down what you did, what you expected, and what actually happened.",
-      "Share this with the developer or support team for help."
-    ]
+    "manualTesting": {
+      "onboarding": "Log in with a new Google account, complete onboarding, and verify a new sheet and folder are created in your Google Drive.",
+      "settings": "Open the Settings page, enter API keys, and save. Refresh and verify the keys persist.",
+      "syncOrders": "Click \"Sync Orders\" and verify orders appear in the table.",
+      "getOrders": "Verify order table loads data from sheet.",
+      "generateLabel": "Click \"Generate Label\" for an order and verify a label is created and a link appears.",
+      "publicPages": "Navigate through all public pages (Homepage, Kurumsal, Entegrasyonlar, Nasıl Kullanılır, İletişim, Fiyatlandırma, Kariyer, Dokümanlar) and check for layout, content, and link integrity."
+    },
+    "unitTests": "Open a terminal, run \"npm test\", and check that all tests pass. If any fail, read the error message and ask for help if needed.",
+    "e2eTests": "Open a terminal, run \"npx cypress open\" or \"npx cypress run\", and follow the on-screen instructions.",
+    "reportingIssues": "If anything does not work as expected, write down what you did and what happened. Share this with the developer for help."
   }
 }

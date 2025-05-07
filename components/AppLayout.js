@@ -23,7 +23,8 @@ import {
   FileText,
   LifeBuoy,
   Info,
-  BookOpen
+  BookOpen,
+  Link2
 } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import useSidebar from '../hooks/useSidebar'; // Import the hook
@@ -31,6 +32,7 @@ import SidebarToggle from './SidebarToggle'; // Import the toggle component
 
 const navItems = [
   { href: '/app', icon: LayoutDashboard, label: 'Genel Bakış' },
+  { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: 'Entegrasyonlar' },
   { href: '/app/settings', icon: Settings, label: 'Ayarlar' },
 ];
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import PublicLayout from '../components/PublicLayout';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, ShoppingBag, Truck, Send, FileText, PlayCircle } from 'lucide-react';
+import { UserPlus, ShoppingBag, Truck, Send, FileText, PlayCircle, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
 
 const sectionVariants = {

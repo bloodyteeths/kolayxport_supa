@@ -13,12 +13,4 @@ html {
   font-family: var(--font-sans);
 }
 
-/* Custom Button Styles (Updated) */
-@layer components {
-  .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#3b82f6] to-[#6366f1] px-6 py-3 font-semibold text-white shadow-lg hover:scale-105 transition;
-  }
-  .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-full border border-primary text-primary px-6 py-3 font-semibold hover:bg-primary hover:text-white transition;
-  }
-} 
+/* Custom Button Styles (Updated) - Temporarily removed for troubleshooting */ 

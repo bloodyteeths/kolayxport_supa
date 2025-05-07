@@ -3,22 +3,10 @@ module.exports = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx}',
     './components/**/*.{js,ts,jsx,tsx}',
+    // Add other paths if necessary, e.g., './app/**/*.{js,ts,jsx,tsx}' for App Router
   ],
   theme: {
-    extend: {
-      fontFamily: {
-        sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui'],
-      },
-      colors: {
-        primary: {
-          DEFAULT: '#3b82f6',
-          dark: '#6366f1',
-        },
-      },
-    },
+    extend: {},
   },
-  plugins: [
-    require('@tailwindcss/typography'),
-    require('@tailwindcss/forms'),
-  ],
+  plugins: [],
 };

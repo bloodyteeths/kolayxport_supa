@@ -6,7 +6,7 @@ import { Menu, X } from 'lucide-react'; // Using lucide-react for icons
 
 const navLinks = [
   { name: 'Kurumsal', href: '/kurumsal' },
-  { name: 'Özellikler', href: '/ozellikler' },
+  // { name: 'Özellikler', href: '/ozellikler' }, // Temporarily removed as page doesn't exist
   { name: 'Entegrasyonlar', href: '/entegrasyonlar' },
   { name: 'Nasıl Kullanırım', href: '/nasil-kullanirim' },
   { name: 'İletişim', href: '/iletisim' },
@@ -36,7 +36,7 @@ const mobileMenuVariants = {
   exit: { opacity: 0, scale: 0.95, transition: { duration: 0.15, ease: 'easeIn' } },
 };
 
-const PublicNav = ({ ctaLink = '/auth/signup' }) => {
+const PublicNav = ({ ctaLink = '/api/auth/signin' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 

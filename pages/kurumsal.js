@@ -103,13 +103,9 @@ export default function KurumsalPage() {
             <div className="hidden sm:block absolute w-1 bg-sky-200 h-full left-1/2 transform -translate-x-1/2"></div>
             
             {timelineEvents.map((event, index) => (
-              <motion.div
+              <div
                 key={event.year}
                 className={`mb-12 flex items-center w-full ${index % 2 === 0 ? 'sm:flex-row-reverse' : 'sm:flex-row'}`}
-                initial={{ opacity: 0, x: index % 2 === 0 ? 50 : -50 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, amount: 0.3 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
               >
                 <>
                   <div className="sm:w-1/2">
@@ -128,7 +124,7 @@ export default function KurumsalPage() {
                   </div>
                   <div className="sm:w-1/2" /> {/* Spacer */}
                 </>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>

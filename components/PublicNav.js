@@ -6,7 +6,7 @@ import { Menu, X } from 'lucide-react'; // Using lucide-react for icons
 
 const navLinks = [
   { name: 'Kurumsal', href: '/kurumsal' },
-  // { name: 'Özellikler', href: '/ozellikler' }, // Temporarily removed as page doesn't exist
+  { name: 'Özellikler', href: '/ozellikler' },
   { name: 'Entegrasyonlar', href: '/entegrasyonlar' },
   { name: 'Nasıl Kullanırım', href: '/nasil-kullanirim' },
   { name: 'İletişim', href: '/iletisim' },

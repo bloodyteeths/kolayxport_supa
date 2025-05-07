@@ -103,30 +103,31 @@ export default function KurumsalPage() {
             <div className="hidden sm:block absolute w-1 bg-sky-200 h-full left-1/2 transform -translate-x-1/2"></div>
             
             {timelineEvents.map((event, index) => (
-              <motion.div 
+              <motion.div
                 key={event.year}
                 className={`mb-12 flex items-center w-full ${index % 2 === 0 ? 'sm:flex-row-reverse' : 'sm:flex-row'}`}
                 initial={{ opacity: 0, x: index % 2 === 0 ? 50 : -50 }}
-                whileInView={{ opacity: 1, x: 0}}
+                whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true, amount: 0.3 }}
-                transition={{ duration: 0.6, delay: index * 0.1}}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
               >
-                <div className="sm:w-1/2">
-                  <div className={`p-6 rounded-xl shadow-lg ${index % 2 === 0 ? 'sm:mr-auto sm:text-right' : 'sm:ml-auto sm:text-left'} bg-white border border-slate-100`}>
-                    <div className={`text-3xl font-bold text-sky-500 mb-2 ${index % 2 === 0 ? 'sm:justify-end' : 'sm:justify-start'} flex items-center`}>
-                      {React.createElement(event.icon, { className: "w-8 h-8 mr-2 sm:mr-0 sm:ml-2", strokeWidth: 1.5 })}
-                      {event.year}
+                <>
+                  <div className="sm:w-1/2">
+                    <div className={`p-6 rounded-xl shadow-lg ${index % 2 === 0 ? 'sm:mr-auto sm:text-right' : 'sm:ml-auto sm:text-left'} bg-white border border-slate-100`}>
+                      <div className={`text-3xl font-bold text-sky-500 mb-2 ${index % 2 === 0 ? 'sm:justify-end' : 'sm:justify-start'} flex items-center`}>
+                        {React.createElement(event.icon, { className: 'w-8 h-8 mr-2 sm:mr-0 sm:ml-2', strokeWidth: 1.5 })}
+                        {event.year}
+                      </div>
+                      <h3 className="text-xl font-semibold text-slate-700 mb-1">{event.title}</h3>
+                      <p className="text-slate-500 text-sm leading-relaxed">{event.description}</p>
                     </div>
-                    <h3 className="text-xl font-semibold text-slate-700 mb-1">{event.title}</h3>
-                    <p className="text-slate-500 text-sm leading-relaxed">{event.description}</p>
                   </div>
-                </div>
-                {/* Circle on the timeline */}
-                <div className="hidden sm:flex absolute w-6 h-6 bg-sky-500 rounded-full border-4 border-white left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center justify-center">
-                  {/* Inner dot */}
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="sm:w-1/2"></div> { /* Spacer for the other side on mobile */}
+                  {/* Circle on the timeline */}
+                  <div className="hidden sm:flex absolute w-6 h-6 bg-sky-500 rounded-full border-4 border-white left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+                    <div className="w-2 h-2 bg-white rounded-full" />
+                  </div>
+                  <div className="sm:w-1/2" /> {/* Spacer */}
+                </>
               </motion.div>
             ))}
           </div>

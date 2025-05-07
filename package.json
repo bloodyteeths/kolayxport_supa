@@ -25,6 +25,7 @@
     "next": "latest",
     "next-auth": "^4.24.11",
     "next-seo": "^6.6.0",
+    "prop-types": "^15.8.1",
     "react": "latest",
     "react-dom": "latest",
     "react-hook-form": "^7.56.2",

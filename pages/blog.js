@@ -3,54 +3,61 @@ import Link from 'next/link';
 import PublicLayout from '../components/PublicLayout';
 import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
-import { PenTool } from 'lucide-react';
+
+// Placeholder blog posts data. Replace with real content or fetch from an API.
+const posts = [
+  {
+    slug: 'kolayxport-nedir',
+    title: 'KolayXport Nedir, Nasıl Kullanılır?',
+    date: '2025-05-01',
+    excerpt: 'KolayXport ile e-ticaret operasyonlarınızı nasıl merkezileştirebileceğinizi keşfedin. Temel işlevler, entegrasyonlar ve daha fazlası bu yazıda yer alıyor.',
+  },
+  {
+    slug: 'trend-entegrasyonlari',
+    title: 'Trend Entegrasyon Rehberleri',
+    date: '2025-04-20',
+    excerpt: 'Pazardaki popüler platformlarla entegrasyon adımlarını detaylı bir şekilde açıkladığımız seri yazımıza göz atın.',
+  },
+  {
+    slug: 'kargo-yonetimi',
+    title: 'Kargo Yönetimini Otomatikleştirmek',
+    date: '2025-04-10',
+    excerpt: 'KolayXport ve FedEx entegrasyonu sayesinde kargo süreçlerinizi nasıl hızlandırabileceğinizi öğrenin.',
+  },
+];
 
 export default function BlogPage() {
   return (
-    <PublicLayout
-      title="KolayXport | Blog"
-      description="KolayXport blog - E-ticaret ipuçları, otomasyon stratejileri ve güncellemeler."
-    >
-      <NextSeo
-        title="KolayXport Blog | E-Ticaret Haberleri ve İpuçları"
-        description="E-ticaret dünyasındaki son gelişmeler, otomasyon taktikleri ve KolayXport yenilikleri hakkında bilgi edinin."
-        openGraph={{
-          url: 'https://kolayxport.com/blog',
-          title: 'KolayXport Blog',
-          description: 'E-ticaret uzmanlarından ipuçları, sektör analizleri ve KolayXport güncellemeleri.',
-          images: [
-            {
-              url: 'https://kolayxport.com/og-blog.png', // TODO: Create and place /public/og-blog.png (1200x630)
-              width: 1200,
-              height: 630,
-              alt: 'KolayXport Blog',
-            },
-          ],
-        }}
-      />
-      <motion.section
+    <PublicLayout title="Blog - KolayXport" description="KolayXport Blog: E-ticaret otomasyonu, entegrasyon rehberleri ve en iyi uygulamalar hakkında makaleler.">
+      <NextSeo title="KolayXport Blog" />
+
+      <motion.div
+        className="container max-w-5xl mx-auto px-6 lg:px-8 py-20"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="py-20 md:py-32 text-center px-6 lg:px-8 bg-slate-50"
+        transition={{ duration: 0.6 }}
       >
-        <div className="container max-w-3xl mx-auto">
-          <div className="flex justify-center mb-8">
-            <PenTool size={64} className="text-blue-500" />
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-bold text-slate-800 mb-6">
-            Blog Sayfamız Yakında Sizlerle!
-          </h1>
-          <p className="text-lg sm:text-xl text-slate-600 mb-10">
-            E-ticaret dünyasındaki en son trendler, otomasyon stratejileri, başarı hikayeleri ve KolayXport hakkındaki güncellemeler için bizi takip etmeye devam edin.
-          </p>
-          <Link href="/" legacyBehavior>
-            <a className="inline-block px-8 py-3 text-base font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
-              Anasayfaya Dön
-            </a>
-          </Link>
+        <h1 className="text-4xl font-bold text-slate-800 mb-12">KolayXport Blog</h1>
+
+        <div className="space-y-16">
+          {posts.map((post) => (
+            <article key={post.slug} className="prose prose-slate lg:prose-lg">
+              <h2 className="text-2xl font-semibold text-blue-600 hover:underline">
+                <Link href={`/blog/${post.slug}`} legacyBehavior>
+                  <a>{post.title}</a>
+                </Link>
+              </h2>
+              <p className="text-sm text-slate-500">Yayın Tarihi: {post.date}</p>
+              <p>{post.excerpt}</p>
+              <p>
+                <Link href={`/blog/${post.slug}`} legacyBehavior>
+                  <a className="text-blue-600 hover:underline">Devamını Oku →</a>
+                </Link>
+              </p>
+            </article>
+          ))}
         </div>
-      </motion.section>
+      </motion.div>
     </PublicLayout>
   );
 } 

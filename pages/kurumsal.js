@@ -186,6 +186,4 @@ export default function KurumsalPage() {
       </motion.section>
     </PublicLayout>
   );
-}
-
-KurumsalPage.getLayout = (page) => <PublicLayout>{page}</PublicLayout>; 
+} 

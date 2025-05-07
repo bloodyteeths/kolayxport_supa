@@ -157,10 +157,22 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
 
             {/* Right: Actions */}
             <div className="flex items-center space-x-3 sm:space-x-4">
-              <button className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors">
-                <Bell size={20} />
-                <span className="sr-only">Bildirimler</span>
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => alert('Yeni bildiriminiz yok.')} // Basic alert for now, can be a dropdown
+                  className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <Bell size={20} />
+                  <span className="sr-only">Bildirimler</span>
+                </button>
+                {/* Basic popover idea - can be expanded with Headless UI Popover or similar
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg p-4 text-sm text-slate-700">
+                    Yeni bildiriminiz yok.
+                  </div>
+                )}
+                */}
+              </div>
               <button className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors">
                 <Globe size={20} />
                 <span className="sr-only">Dil Seçimi</span>

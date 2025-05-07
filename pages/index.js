@@ -112,33 +112,38 @@ const StarRating = ({ rating }) => (
   </div>
 );
 
+const HeroSection = () => (
+  <motion.section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-sky-50 to-indigo-50">
+    <div aria-hidden className="absolute inset-0 -z-10 bg-[url('/noise.png')] opacity-10" />
+    <div className="mx-auto max-w-7xl px-6 py-32 text-center">
+      <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900">
+        Bütün Marketplacelere <span className="text-primary">Tek Panelden</span> Hükmedin.
+      </h1>
+      <p className="mt-6 mx-auto max-w-2xl text-lg text-slate-600">
+        Sipariş yönetimi, kargo, envanter senkronizasyonu—%100 Türkçe, hepsi tek tıkla.
+      </p>
+
+      <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
+        <Link href="/auth/signup" className="btn-primary">Ücretsiz Dene</Link>
+        <Link href="#demo"  className="btn-secondary">Demo İste</Link>
+      </div>
+
+      <Image
+        src="/images/hero-macbook.png"
+        width={1600}
+        height={1100}
+        alt="KolayXport dashboard preview"
+        className="mx-auto mt-16 w-full max-w-4xl drop-shadow-2xl rounded-xl"
+        priority
+      />
+    </div>
+  </motion.section>
+);
+
 export default function HomePage() {
   return (
     <PublicLayout title="KolayXport - E-Ticaret Otomasyon Platformu" description="E-ticaret operasyonlarınızı otomatikleştirin. Sipariş, kargo, envanter yönetimi ve faturalama KolayXport ile çok kolay.">
-      {/* Section 1: HERO - REPLACED */}
-      <motion.section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-sky-50 to-white">
-        <div className="absolute inset-0 -z-10 bg-[url('/noise.png')] opacity-10 pointer-events-none" />
-        <div className="mx-auto max-w-7xl px-6 py-32 text-center">
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900">
-            Bütün Marketplacelere <span className="text-primary">Tek Panelden</span> Hükmedin.
-          </h1>
-          <p className="mt-6 mx-auto max-w-2xl text-lg text-slate-600">
-            Sipariş yönetimi, kargo, envanter senkronizasyonu—%100 Türkçe, hepsi tek tıkla.
-          </p>
-          <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
-            <Link href="/auth/signup" className="btn-primary">Ücretsiz Dene</Link>
-            <Link href="#demo" className="btn-secondary">Demo İste</Link>
-          </div>
-          <Image
-            src="/images/hero-macbook.png"
-            width={1600}
-            height={1200}
-            alt="KolayXport dashboard preview"
-            className="mx-auto mt-16 w-full max-w-4xl drop-shadow-2xl"
-            priority
-          />
-        </div>
-      </motion.section>
+      <HeroSection />
 
       {/* Section 2: TRUST BADGES */}
       <motion.section 

@@ -13,7 +13,7 @@ html {
   font-family: var(--font-sans);
 }
 
-/* Custom Button Styles */
+/* Custom Button Styles (Updated) */
 @layer components {
   .btn-primary {
     @apply inline-flex items-center justify-center rounded-full bg-gradient-to-r from-primary to-primary-dark px-6 py-3 font-semibold text-white shadow-lg hover:scale-105 transition;

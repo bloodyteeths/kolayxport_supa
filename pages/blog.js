@@ -60,4 +60,7 @@ export default function BlogPage() {
       </motion.div>
     </PublicLayout>
   );
-} 
+}
+
+// Ensure Next.js doesn't wrap this page with the auth Layout
+BlogPage.getLayout = (page) => page; 

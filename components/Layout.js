@@ -10,7 +10,10 @@ export default function Layout({ children }) {
   const loading = status === "loading";
   const router = useRouter();
 
-  const publicPaths = ['/privacy', '/privacy-tr', '/auth/error', '/404'];
+  const publicPaths = [
+    '/privacy','/privacy-tr','/auth/error','/404',
+    '/blog','/ozellikler','/entegrasyonlar','/kurumsal','/fiyatlandirma','/iletisim','/kariyer','/docs','/','/docs/index'
+  ];
   const isGenericPublicPage = publicPaths.includes(router.pathname);
   const isHomePage = router.pathname === '/';
 

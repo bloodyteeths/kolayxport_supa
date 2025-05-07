@@ -34,6 +34,7 @@ const navItems = [
   { href: '/app', icon: LayoutDashboard, label: 'Genel Bakış' },
   { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: 'Entegrasyonlar' },
   { href: '/app/settings', icon: Settings, label: 'Ayarlar' },
+  { href: '/app/senkron', icon: ShoppingCart, label: 'Senkron' },
 ];
 
 const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {

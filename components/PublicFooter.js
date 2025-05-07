@@ -4,16 +4,12 @@ import { Twitter, Linkedin, Youtube } from 'lucide-react'; // Using lucide-react
 
 const productLinks = [
   { name: 'Gönderim', href: '/features/shipping' },
-  { name: 'Envanter', href: '/features/inventory' },
   { name: 'Otomasyon', href: '/features/automation' },
-  { name: 'Fiyatlandırma', href: '/features/pricing' },
 ];
 
 const resourceLinks = [
   { name: 'Blog', href: '/blog' },
-  { name: 'Başarı Hikayeleri', href: '/case-studies' },
-  { name: 'API Dokümanları', href: '/docs/api' },
-  { name: 'Destek', href: '/support' },
+  { name: 'Destek', href: '/iletisim' },
 ];
 
 const socialLinks = [
@@ -61,9 +57,9 @@ const PublicFooter = () => {
             </div>
           </div>
 
-          {/* Column 2: Ürün */}
+          {/* Column 2: Çözümlerimiz */}
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Ürün</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">Çözümlerimiz</h3>
             <ul className="space-y-2.5">
               {productLinks.map((link) => (
                 <ListItem key={link.name} href={link.href}>

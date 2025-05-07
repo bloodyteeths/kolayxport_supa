@@ -264,4 +264,6 @@ export default function NasilKullanirimPage() {
 
     </PublicLayout>
   );
-} 
+}
+
+NasilKullanirimPage.getLayout = (page)=>page; 

@@ -125,7 +125,7 @@ const HeroSection = () => (
 
       <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
         <Link href="/api/auth/signin" className="btn-primary">Ücretsiz Dene</Link>
-        <Link href="#demo"  className="btn-secondary">Demo İste</Link>
+        <Link href="/iletisim"  className="btn-secondary">Demo İste</Link>
       </div>
 
       <Image

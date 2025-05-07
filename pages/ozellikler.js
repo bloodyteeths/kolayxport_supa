@@ -167,4 +167,6 @@ export default function OzelliklerPage() {
 
     </PublicLayout>
   );
-} 
+}
+
+OzelliklerPage.getLayout = (page) => page; 

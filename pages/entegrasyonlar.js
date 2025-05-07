@@ -161,4 +161,6 @@ export default function EntegrasyonlarPage() {
       </motion.section>
     </PublicLayout>
   );
-} 
+}
+
+EntegrasyonlarPage.getLayout = (page) => page; 

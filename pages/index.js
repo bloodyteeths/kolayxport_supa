@@ -9,8 +9,8 @@ import { Disclosure, Transition } from '@headlessui/react';
 // Placeholder data - replace with your actual data or fetch from an API
 const trustLogos = [
   { name: 'Amazon', src: '/logos/amazon.svg', width: 120, height: 40 },
-  { name: 'Trendyol', src: '/logos/trendyol.svg', width: 140, height: 40 },
-  { name: 'Hepsiburada', src: '/logos/hepsiburada.svg', width: 160, height: 40 },
+  { name: 'Trendyol', src: '/logos/trendyol.png', width: 140, height: 40 },
+  { name: 'Hepsiburada', src: '/logos/hepsiburada.png', width: 160, height: 40 },
   { name: 'n11', src: '/logos/n11.svg', width: 80, height: 40 },
   { name: 'Shopify', src: '/logos/shopify.svg', width: 130, height: 40 },
   { name: 'WooCommerce', src: '/logos/woocommerce.svg', width: 180, height: 40 },
@@ -51,7 +51,7 @@ const testimonials = [
     quote: 'KolayXport sayesinde operasyonel yükümüz %70 azaldı! Artık işimizi büyütmeye odaklanabiliyoruz.',
     name: 'Ayşe Yılmaz',
     company: 'HarikaSepetim.com',
-    image: '/testimonials/ayse.jpg', 
+    image: '/testimonials/ayse.jpeg',
     stars: 5,
   },
   {
@@ -142,7 +142,22 @@ const HeroSection = () => (
 
 export default function HomePage() {
   return (
-    <PublicLayout title="KolayXport - E-Ticaret Otomasyon Platformu" description="E-ticaret operasyonlarınızı otomatikleştirin. Sipariş, kargo, envanter yönetimi ve faturalama KolayXport ile çok kolay.">
+    <PublicLayout 
+      title="KolayXport – E-commerce Automation Platform" 
+      description="Automate orders, shipping, inventory and invoicing from one dashboard." 
+      seo={{
+        openGraph: {
+          images: [
+            {
+              url: 'https://kolayxport.com/og-public.png',
+              width: 1200,
+              height: 630,
+              alt: 'KolayXport Overview',
+            },
+          ],
+        },
+      }}
+    >
       <HeroSection />
 
       {/* Section 2: TRUST BADGES */}

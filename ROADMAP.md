@@ -10,9 +10,16 @@ This document outlines planned features, improvements, and long-term vision for 
 *   **Next Step:** The Google OAuth verification process has been initiated (scope justifications submitted). **A demo video proving scope usage is required by Google and needs to be created and added to the verification submission.** Progress on API-dependent features is paused until this verification is underway or complete.
 *   **Google OAuth Verification In Progress:** The app is undergoing Google OAuth consent screen verification. Key API functionalities (Drive, Sheets, Apps Script Execution) might be limited until full verification. Current steps involve resolving homepage ownership in Google Search Console and ensuring the privacy policy URL is correctly configured in GCP.
 *   **Sitemap Generated:** A `sitemap.xml` is now generated via `next-sitemap` during the build process.
+*   **Public Blog Implemented:** Initial blog listing page (`/blog`) and dynamic post pages (`/blog/[slug]`) are now live with placeholder content. This lays the groundwork for content marketing and additional SEO opportunities.
 
 ## Upcoming Features
 
+- [ ] Structured data (JSON-LD) for products, articles, and organization
+- [ ] Per-page Open Graph & Twitter images
+- [ ] Canonical URL tags and noindex for staging/preview
+- [ ] Image optimization audit (WebP, responsive sizes, lazy-loading)
+- [ ] Accessibility review (lighthouse scores ≥ 95)
+- [ ] WYSIWYG or MDX blog authoring workflow (e.g., Contentlayer or CMS)
 - [ ] Implement full Apps Script deployment flow via /api/setScriptProps
 - [ ] Enhance Dashboard UI with visual order table and filtering
 - [ ] Add automated label PDF download and email notifications

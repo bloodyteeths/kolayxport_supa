@@ -3,6 +3,7 @@ import PublicNav from './PublicNav';
 import PublicFooter from './PublicFooter';
 import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/router';
 
 const pageVariants = {
   initial: {
@@ -28,18 +29,18 @@ const pageTransition = {
   duration: 0.5
 };
 
-const PublicLayout = ({ children, title, description }) => {
+const PublicLayout = ({ children, title, description, seo = {} }) => {
+  const router = useRouter();
+  const baseUrl = 'https://kolayxport.com';
+  const canonicalUrl = `${baseUrl}${router.asPath.split('?')[0]}`;
+
   return (
     <>
-      <NextSeo 
-        title={title} 
-        description={description} 
-        // You can add more props here to override defaults or add page-specific SEO 
-        // openGraph={{
-        //   title: title, // Default to page title
-        //   description: description, // Default to page description
-        //   // images: default defined in next-seo.config.js can be overridden here for specific pages
-        // }}
+      <NextSeo
+        title={title}
+        description={description}
+        canonical={canonicalUrl}
+        {...seo}
       />
       <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
         <PublicNav />

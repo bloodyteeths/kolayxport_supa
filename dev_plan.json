@@ -325,6 +325,27 @@
       "description": "Created pages/app/index.js using AppLayout, migrated old dashboard content, and updated sign-in and relevant links to point to /app.",
       "status": "completed",
       "dependencies": [35]
+    },
+    {
+      "id": 37,
+      "title": "Create Blog Pages (pages/blog.js & pages/blog/[slug].js)",
+      "description": "Implemented main blog listing page and dynamic blog post pages with placeholder content, integrating with PublicLayout and NextSeo for SEO.",
+      "status": "completed",
+      "dependencies": [25]
+    },
+    {
+      "id": 38,
+      "title": "SEO Audit & Optimization Roadmap",
+      "description": "Initial SEO audit performed; identified improvements such as structured data, canonical tags, per-page Open Graph images, alt text review, performance optimizations, and Google Search Console enhancements.",
+      "status": "planned",
+      "dependencies": [34],
+      "subtasks": [
+        { "title": "Add canonical URLs with NextSeo", "status": "completed" },
+        { "title": "Per-page OG images & metadata", "status": "in progress" },
+        { "title": "Structured data (Organization, Article)", "status": "in progress" },
+        { "title": "Image optimization audit", "status": "planned" },
+        { "title": "Accessibility & Lighthouse improvements", "status": "planned" }
+      ]
     }
   ],
   "notes": "Architecture pivoted to a central API Executable Wrapper Script calling a private Core Logic Library. User-specific data (sheetId, keys, folderId) is stored in the backend DB and passed as parameters. Public pages and authenticated app section now have distinct, modern layouts.",

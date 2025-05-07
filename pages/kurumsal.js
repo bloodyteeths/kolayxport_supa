@@ -44,7 +44,22 @@ const timelineEvents = [
 
 export default function KurumsalPage() {
   return (
-    <PublicLayout title="Hakkımızda - KolayXport" description="KolayXport'un hikayesini, misyonunu ve vizyonunu keşfedin. E-ticaret süreçlerini nasıl kolaylaştırdığımızı öğrenin.">
+    <PublicLayout 
+      title="About Us – KolayXport" 
+      description="Discover KolayXport's story, mission and vision. Learn how we simplify e-commerce operations." 
+      seo={{
+        openGraph: {
+          images: [
+            {
+              url: 'https://kolayxport.com/og-about.png',
+              width: 1200,
+              height: 630,
+              alt: 'About KolayXport',
+            },
+          ],
+        },
+      }}
+    >
       {/* Hero Section */}
       <motion.section
         className="relative py-20 md:py-32 lg:py-40 text-center px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-slate-50 to-sky-100"
@@ -171,4 +186,6 @@ export default function KurumsalPage() {
       </motion.section>
     </PublicLayout>
   );
-} 
+}
+
+KurumsalPage.getLayout = (page) => <PublicLayout>{page}</PublicLayout>; 

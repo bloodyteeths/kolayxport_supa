@@ -2,11 +2,12 @@ import React from 'react';
 import AppLayout from '../../components/AppLayout';
 import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
-import { Zap, Info, Settings, HelpCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import { Zap, Info, Settings, HelpCircle, CheckCircle, ExternalLink, ShoppingCart, Briefcase, Truck } from 'lucide-react';
 import Link from 'next/link';
 
-const Section = ({ title, icon: Icon, children }) => (
-  <motion.div 
+const Section = ({ title, icon: Icon, children, id }) => (
+  <motion.div
+    id={id}
     className="bg-white p-6 md:p-8 rounded-lg shadow-md mb-8"
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -34,60 +35,106 @@ const Step = ({ number, title, children }) => (
   </div>
 );
 
+const PlatformList = ({ platforms }) => (
+  <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    {platforms.map(platform => (
+      <li key={platform} className="bg-slate-100 p-3 rounded-md text-sm text-slate-700 font-medium text-center shadow-sm">
+        {platform}
+      </li>
+    ))}
+  </ul>
+);
+
 export default function EntegrasyonlarVeRehberlerPage() {
-  // This list should be updated based on actual Veeqo/Shippo capabilities or direct integrations
-  const supportedMarketplaces = [
-    'Trendyol', 'Hepsiburada', 'Amazon (TR, EU, NA)', 'n11', 'PTTAvm',
-    'Shopify', 'WooCommerce', 'Magento', 'BigCommerce', 'Etsy' 
-    // Add more as supported
-  ];
+  const veeqoEcommercePlatforms = ['Shopify', 'Shopify Plus', 'Magento', 'BigCommerce', 'WooCommerce', 'Wix'];
+  const veeqoMarketplaces = ['Amazon', 'eBay', 'Etsy', 'Walmart'];
+
+  const shippoEcommercePlatforms = ['Shopify', 'WooCommerce', 'BigCommerce', 'Wix', 'Squarespace', 'Magento 2', 'Ecwid by Lightspeed'];
+  const shippoMarketplaces = ['Etsy', 'Amazon', 'eBay', 'Walmart', 'Mercari'];
 
   return (
     <AppLayout title="Entegrasyonlar ve Rehberler - KolayXport">
-      <NextSeo noindex={true} nofollow={true} /> {/* For internal pages, usually good to noindex */}
+      <NextSeo noindex={true} nofollow={true} />
 
-      <motion.div 
+      <motion.div
         className="mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
         <div className="bg-white p-6 rounded-lg shadow">
-            <h1 className="text-3xl font-bold text-slate-800 flex items-center">
-                <Zap size={36} className="mr-3 text-blue-600" /> 
-                Entegrasyonlar ve Kurulum Rehberleri
-            </h1>
-            <p className="mt-2 text-slate-600">
-                KolayXport'u pazaryerleri ve e-ticaret platformlarınızla nasıl entegre edeceğinizi öğrenin.
-            </p>
+          <h1 className="text-3xl font-bold text-slate-800 flex items-center">
+            <Zap size={36} className="mr-3 text-blue-600" />
+            Entegrasyonlar ve Kurulum Rehberleri
+          </h1>
+          <p className="mt-2 text-slate-600">
+            KolayXport'u e-ticaret altyapınızla nasıl entegre edeceğinizi ve verilerinizi nasıl yöneteceğinizi öğrenin.
+          </p>
         </div>
       </motion.div>
 
       <Section title="Genel Entegrasyon Yaklaşımımız" icon={Info}>
         <p>
-          KolayXport, sipariş ve ürün bilgilerinizi çeşitli e-ticaret kanallarından merkezi bir platforma çekmenize yardımcı olur.
-          Bazı entegrasyonlarımız doğrudan ilgili platformun API'si üzerinden çalışırken, daha geniş bir yelpazeye ulaşmak için Veeqo ve Shippo gibi aracı platformların API entegrasyonlarını kullanmayı hedefleyebiliriz. (Bu bölüm uygulamanızın gerçek mimarisine göre güncellenmelidir.)
+          KolayXport, e-ticaret operasyonlarınızı merkezileştirmek için esnek bir entegrasyon modeli sunar.
+          Doğrudan entegrasyonlarımızla Türkiye'nin önde gelen pazaryerlerinden olan <strong>Trendyol</strong> ve <strong>Hepsiburada</strong>'dan sipariş ve ürün verilerinizi çekebilirsiniz.
         </p>
         <p className="mt-2">
-          Aşağıda, desteklediğimiz veya desteklemeyi planladığımız başlıca platformları ve kurulum adımlarını bulabilirsiniz.
+          Daha geniş bir platform yelpazesine erişim için, mevcut <strong>Veeqo</strong> veya <strong>Shippo</strong> hesaplarınızı KolayXport'a bağlayabilirsiniz. Bu sayede, Veeqo ve Shippo'nun desteklediği çok sayıda uluslararası pazaryeri ve e-ticaret platformundan veri akışı sağlayabilirsiniz. Veeqo ve Shippo hesaplarınızı nasıl bağlayacağınıza dair detaylı bilgiyi "Nasıl Kullanırım?" sayfamızda bulabilirsiniz.
+        </p>
+        <p className="mt-2">
+          KolayXport üzerinden oluşturulan gönderileriniz için ise şu anda <strong>FedEx</strong> kargo entegrasyonumuzu kullanmaktayız.
+        </p>
+        <p className="mt-3">
+          Aşağıda, desteklediğimiz doğrudan entegrasyonları ve Veeqo/Shippo aracılığıyla erişebileceğiniz platform türlerini bulabilirsiniz. API anahtarlarınızı yönetmek ve bağlantıları kurmak için <Link href="/app/settings"><a className="text-blue-600 hover:underline">Ayarlar</a></Link> sayfanızı ziyaret edebilirsiniz.
         </p>
       </Section>
 
-      <Section title="Desteklenen Pazaryerleri ve Platformlar" icon={CheckCircle}>
-        <p className="mb-4">KolayXport ile aşağıdaki platformlardan siparişlerinizi ve ürünlerinizi yönetebilirsiniz (mevcut ve planlanan entegrasyonlar):</p>
-        <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {supportedMarketplaces.map(platform => (
-            <li key={platform} className="bg-slate-100 p-3 rounded-md text-sm text-slate-700 font-medium text-center shadow-sm">
-              {platform}
-            </li>
-          ))}
-        </ul>
+      <Section title="Doğrudan KolayXport Entegrasyonları" icon={ShoppingCart}>
+        <p className="mb-4">Aşağıdaki platformlarla doğrudan entegre olarak sipariş ve ürün verilerinizi KolayXport'a aktarabilirsiniz:</p>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold text-slate-700 mb-2">Trendyol</h3>
+            <p className="mb-3">Trendyol mağaza verilerinizi KolayXport'a bağlamak için <Link href="#trendyol-guide"><a className="text-blue-600 hover:underline">Trendyol Entegrasyon Rehberi</a></Link> bölümündeki adımları takip edebilirsiniz.</p>
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-slate-700 mb-2">Hepsiburada</h3>
+            <p>Hepsiburada entegrasyon rehberi yakında eklenecektir. Bu entegrasyon için Hepsiburada satıcı panelinizden alacağınız API bilgileri gerekecektir.</p>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Veeqo ile Erişebileceğiniz Platformlar" icon={Briefcase}>
+        <p className="mb-4">
+          Mevcut Veeqo hesabınızı KolayXport'a bağlayarak (detaylar "Nasıl Kullanırım?" sayfasında), Veeqo'nun entegre olduğu aşağıdaki gibi popüler e-ticaret platformlarından ve pazaryerlerinden veri çekebilirsiniz:
+        </p>
+        <h4 className="text-lg font-semibold text-slate-700 mt-4 mb-2">E-Ticaret Platformları:</h4>
+        <PlatformList platforms={veeqoEcommercePlatforms} />
+        <h4 className="text-lg font-semibold text-slate-700 mt-6 mb-2">Pazaryerleri:</h4>
+        <PlatformList platforms={veeqoMarketplaces} />
         <p className="mt-4 text-sm text-slate-500">
-          Entegrasyon listemiz sürekli genişlemektedir. Yeni entegrasyon talepleriniz için <Link href="/iletisim"><a className="text-blue-600 hover:underline">bizimle iletişime geçebilirsiniz</a></Link>.
+          Bu listeler başlıca platformları içermektedir. Veeqo'nun güncel ve tam entegrasyon listesi için lütfen Veeqo'nun resmi kaynaklarını kontrol ediniz. KolayXport, Veeqo hesabınız üzerinden bu platformlardan veri alabilir.
         </p>
       </Section>
 
-      <Section title="Trendyol Entegrasyon Rehberi" icon={HelpCircle}>
+      <Section title="Shippo ile Erişebileceğiniz Platformlar" icon={Briefcase}>
+        <p className="mb-4">
+          Mevcut Shippo hesabınızı KolayXport'a bağlayarak (detaylar "Nasıl Kullanırım?" sayfasında), Shippo'nun entegre olduğu aşağıdaki gibi popüler e-ticaret platformlarından ve pazaryerlerinden veri çekebilirsiniz:
+        </p>
+        <h4 className="text-lg font-semibold text-slate-700 mt-4 mb-2">E-Ticaret Platformları:</h4>
+        <PlatformList platforms={shippoEcommercePlatforms} />
+        <h4 className="text-lg font-semibold text-slate-700 mt-6 mb-2">Pazaryerleri:</h4>
+        <PlatformList platforms={shippoMarketplaces} />
+        <p className="mt-4 text-sm text-slate-500">
+          Bu listeler başlıca platformları içermektedir. Shippo'nun güncel ve tam entegrasyon listesi için lütfen Shippo'nun resmi kaynaklarını kontrol ediniz. KolayXport, Shippo hesabınız üzerinden bu platformlardan veri alabilir.
+        </p>
+      </Section>
+      
+      <Section title="Kargo Entegrasyonumuz" icon={Truck}>
+        <p>KolayXport üzerinden yapacağınız gönderiler için şu anda <strong>FedEx</strong> altyapısını kullanmaktayız. Siparişlerinizi hazırlayıp kargoya hazır hale getirdiğinizde, gönderi süreçleri FedEx üzerinden yönetilecektir.</p>
+        <p className="mt-2 text-sm text-slate-500">FedEx entegrasyonumuzla ilgili ayar veya seçenekler (eğer kullanıcı tarafından yönetilebilir ise) <Link href="/app/settings"><a className="text-blue-600 hover:underline">Ayarlar</a></Link> sayfasında veya "Nasıl Kullanırım?" bölümünde detaylandırılacaktır.</p>
+      </Section>
+
+      <Section title="Trendyol Entegrasyon Rehberi" icon={HelpCircle} id="trendyol-guide">
         <p className="mb-4">
           Trendyol mağazanızdan siparişlerinizi KolayXport'a otomatik olarak aktarmak için aşağıdaki adımları izleyin:
         </p>
@@ -112,15 +159,14 @@ export default function EntegrasyonlarVeRehberlerPage() {
         </Step>
         <Step number="4" title="Entegrasyonu Test Edin">
           <p>Bilgileri kaydettikten sonra, sistemimiz Trendyol mağazanızla bağlantıyı test edecektir. Birkaç dakika içinde siparişlerinizin akmaya başladığını görmelisiniz.</p>
-          <p className="mt-1 text-xs text-slate-500">Sorun yaşamanız durumunda <Link href="/support"><a className="text-blue-600 hover:underline">Destek sayfamızdan</a></Link> bize ulaşabilirsiniz.</p>
+          <p className="mt-1 text-xs text-slate-500">Sorun yaşamanız durumunda <Link href="/destek"><a className="text-blue-600 hover:underline">Destek sayfamızdan</a></Link> bize ulaşabilirsiniz. (Not: /support linki /destek olarak güncellendi.)</p>
         </Step>
-      </Section>
-      
-      <Section title="Diğer Entegrasyonlar (Yakında)" icon={ExternalLink}>
-        <p>Hepsiburada, Amazon, Shopify ve diğer platformlar için detaylı kurulum rehberleri yakında bu bölümde yer alacaktır.</p>
-        <p className="mt-2">Entegrasyon süreçleri genellikle benzer adımları içerir: İlgili platformun satıcı panelinden API anahtarlarını almak ve KolayXport ayarlarınıza girmek.</p>
       </Section>
 
     </AppLayout>
   );
-} 
+}
+
+EntegrasyonlarVeRehberlerPage.getLayout = function getLayout(page) {
+  return <AppLayout>{page}</AppLayout>;
+}; 

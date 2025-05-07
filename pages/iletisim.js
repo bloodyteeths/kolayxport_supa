@@ -267,4 +267,6 @@ export default function IletisimPage() {
       </section>
     </PublicLayout>
   );
-} 
+}
+
+IletisimPage.getLayout = (page) => <PublicLayout>{page}</PublicLayout>; 

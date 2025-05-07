@@ -89,12 +89,8 @@ export default function KurumsalPage() {
       </motion.section>
 
       {/* Timeline Section */}
-      <motion.section 
+      <section 
         className="py-16 md:py-24 bg-white"
-        variants={sectionVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, amount: 0.2 }}
       >
         <div className="container max-w-4xl mx-auto px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-800 text-center mb-16">Yolculuğumuz</h2>
@@ -128,7 +124,7 @@ export default function KurumsalPage() {
             ))}
           </div>
         </div>
-      </motion.section>
+      </section>
 
       {/* Main Content Stub */}
       <motion.section 

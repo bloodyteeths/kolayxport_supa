@@ -124,7 +124,7 @@ const HeroSection = () => (
       </p>
 
       <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
-        <Link href="/auth/signup" className="btn-primary">Ücretsiz Dene</Link>
+        <Link href="/api/auth/signin" className="btn-primary">Ücretsiz Dene</Link>
         <Link href="#demo"  className="btn-secondary">Demo İste</Link>
       </div>
 

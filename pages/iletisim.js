@@ -69,13 +69,33 @@ export default function IletisimPage() {
   });
 
   const onSubmit = async (data) => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log(data);
-    toast.success('Mesajınız başarıyla gönderildi! En kısa sürede dönüş yapacağız.', {
-      duration: 4000,
-    });
-    reset(); // Reset form fields
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success(result.message || 'Mesajınız başarıyla gönderildi! En kısa sürede dönüş yapacağız.', {
+          duration: 4000,
+        });
+        reset(); // Reset form fields
+      } else {
+        toast.error(result.error || 'Mesaj gönderilirken bir hata oluştu.', {
+          duration: 4000,
+        });
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
+      toast.error('Bir ağ hatası oluştu. Lütfen tekrar deneyin.', {
+        duration: 4000,
+      });
+    }
   };
 
   return (

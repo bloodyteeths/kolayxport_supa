@@ -96,7 +96,7 @@ export default function SignIn({ providers }) {
             <div className="text-sm text-center mt-8">
               <p className="text-slate-600">
                 Hesabın yok mu?{' '}
-                <Link href="/auth/signup" className="font-medium text-primary hover:text-primary-dark hover:underline">
+                <Link href="/api/auth/signin" className="font-medium text-primary hover:text-primary-dark hover:underline">
                   Kaydol
                 </Link> 
                 {/* Assuming /auth/signup will be the path. If not, adjust or point to a relevant page */}

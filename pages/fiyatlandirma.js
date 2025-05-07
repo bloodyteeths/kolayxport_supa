@@ -33,7 +33,7 @@ const plans = [
       'Topluluk Desteği',
     ],
     cta: 'Hemen Başla',
-    href: '/auth/signup',
+    href: '/api/auth/signin',
     highlight: false,
     icon: Star,
   },
@@ -51,7 +51,7 @@ const plans = [
       'E-posta Desteği',
     ],
     cta: 'Hemen Başla',
-    href: '/auth/signup',
+    href: '/api/auth/signin',
     highlight: true, // This can be used for styling the popular plan
     icon: TrendingUp,
   },
@@ -173,7 +173,7 @@ export default function FiyatlandirmaPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
           >
-            <Link href="/auth/signup" legacyBehavior>
+            <Link href="/api/auth/signin" legacyBehavior>
               <a className="px-8 py-3.5 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400">
                 Hemen Başla
               </a>

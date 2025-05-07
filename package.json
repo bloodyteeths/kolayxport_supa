@@ -16,7 +16,6 @@
     "@prisma/client": "^6.7.0",
     "@radix-ui/react-label": "^2.1.4",
     "@shadcn/ui": "latest",
-    "autoprefixer": "latest",
     "axios": "^1.9.0",
     "dotenv": "latest",
     "framer-motion": "^12.10.0",
@@ -26,12 +25,10 @@
     "next": "latest",
     "next-auth": "^4.24.11",
     "next-seo": "^6.6.0",
-    "postcss": "latest",
     "react": "latest",
     "react-dom": "latest",
     "react-hook-form": "^7.56.2",
     "react-hot-toast": "^2.5.2",
-    "tailwindcss": "latest",
     "zustand": "^5.0.4"
   },
   "devDependencies": {
@@ -42,6 +39,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@types/react": "19.1.2",
+    "autoprefixer": "^10.4.21",
     "babel-jest": "^29.7.0",
     "cypress": "^14.3.2",
     "dotenv-cli": "^8.0.0",
@@ -49,7 +47,9 @@
     "jest-environment-jsdom": "^29.7.0",
     "jsdom": "^26.1.0",
     "next-sitemap": "^4.2.3",
+    "postcss": "^8.5.3",
     "prisma": "^6.7.0",
+    "tailwindcss": "^4.1.5",
     "typescript": "^5.8.3"
   }
 }

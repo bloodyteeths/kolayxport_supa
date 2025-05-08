@@ -492,7 +492,7 @@
       },
       {
         "scriptKey": "IMPORTER_OF_RECORD",
-        "issue": "New requirement. Expects a JSON string. Frontend settings page needs new UI fields for Importer details (contact person/company/phone/email, address street/city/state/postal/country). On save, these fields should be compiled into a JSON string and saved under this key. Clarification needed for Importer's state/province code format (3-letter vs numeric)."
+        "issue": "New requirement. Expects a JSON string. Frontend settings page implements UI fields for Importer details (contact person/company/phone/email, address street/city/state/postal/country). On save, these fields are compiled into a JSON string. Importer's state/province code must be a numeric Turkish city plate code (e.g., 01 for Adana). Validation: If any Importer field has a value, all Importer fields are required to be filled before saving."
       }
     ]
   }

@@ -118,27 +118,31 @@ export default async function handler(req, res) {
     
     // --- 2. Copy Template Sheet (if needed) --- 
     if (!googleSheetId) {
-      let fileMetadataResponse; // To store response if successful
+      console.log(`User ${userId}: Attempting to GET template sheet ${TEMPLATE_SHEET_ID} for verification...`);
+      
+      // Log the service account email being used (if using service account)
+      if (process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON) {
+        const saCredentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON);
+        console.log(`User ${userId}: Using service account: ${saCredentials.client_email}`);
+      }
+      
       try {
-        // Distinct log marker for the start of this step
-        console.log(`User ${userId}: STEP 2A - Attempting drive.files.get for template sheet ID: ${TEMPLATE_SHEET_ID}`);
-        
-        fileMetadataResponse = await drive.files.get({
+        const fileMetadata = await drive.files.get({
           fileId: TEMPLATE_SHEET_ID,
-          fields: 'id, name, ownedByMe, capabilities, trashed' // Added 'trashed'
+          fields: 'id, name, ownedByMe, capabilities'
         });
         
         // CRITICAL LOG: If this line does not appear in Vercel logs for a request,
         // the drive.files.get() call above it either failed silently or hung indefinitely.
-        console.log(`User ${userId}: STEP 2B - drive.files.get SUCCEEDED for sheet. ID: ${fileMetadataResponse.data.id}, Name: ${fileMetadataResponse.data.name}, OwnedByMe: ${fileMetadataResponse.data.ownedByMe}, Trashed: ${fileMetadataResponse.data.trashed}, Capabilities: ${JSON.stringify(fileMetadataResponse.data.capabilities)}`);
+        console.log(`User ${userId}: STEP 2B - drive.files.get SUCCEEDED for sheet. ID: ${fileMetadata.data.id}, Name: ${fileMetadata.data.name}, OwnedByMe: ${fileMetadata.data.ownedByMe}, Capabilities: ${JSON.stringify(fileMetadata.data.capabilities)}`);
 
-        if (fileMetadataResponse.data.trashed) {
+        if (fileMetadata.data.trashed) {
           console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} is in the trash.`);
           throw new Error(`The template Google Sheet (ID: ${TEMPLATE_SHEET_ID}) is in the trash. Please restore it.`);
         }
 
-        if (!fileMetadataResponse.data.capabilities?.canCopy) {
-            console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} exists (not trashed) but cannot be copied by the authenticated user. Capabilities:`, fileMetadataResponse.data.capabilities);
+        if (!fileMetadata.data.capabilities?.canCopy) {
+            console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} exists (not trashed) but cannot be copied by the authenticated user. Capabilities:`, fileMetadata.data.capabilities);
             throw new Error(`The template sheet (ID: ${TEMPLATE_SHEET_ID}) exists but the authenticated user does not have permission to copy it. Please check sharing settings and ensure the 'Viewers and commenters can see the option to download, print, and copy' is enabled if relying on general access.`);
         }
         

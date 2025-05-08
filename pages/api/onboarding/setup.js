@@ -205,15 +205,15 @@ export default async function handler(req, res) {
             const serviceDrive = google.drive({ version: 'v3', auth: serviceAuthClient });
 
             // Define metadata for the new script copy
-            const scriptCopyMetadata = { 
-                 name: `KolayXport Wrapper Script - ${session.user.email || userId}`, // Unique name
-                 // parents: [driveFolderId] // Optionally place in the created folder
-            }; 
+            // const scriptCopyMetadata = { 
+            //      name: `KolayXport Wrapper Script - ${session.user.email || userId}`, // Unique name
+            //      // parents: [driveFolderId] // Optionally place in the created folder
+            // }; 
 
             // Perform the copy using the Service Account
             const copiedScriptFile = await serviceDrive.files.copy({ 
                 fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-                requestBody: scriptCopyMetadata, // Correct parameter for v3
+                // requestBody: scriptCopyMetadata, // Temporarily remove to isolate issue
                 fields: 'id' // Only need the ID of the new script file
             });
             userAppsScriptId = copiedScriptFile.data.id;

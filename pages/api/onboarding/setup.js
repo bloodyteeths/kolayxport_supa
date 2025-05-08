@@ -118,23 +118,71 @@ export default async function handler(req, res) {
     
     // --- 2. Copy Template Sheet (if needed) --- 
     if (!googleSheetId) {
-      console.log(`User ${userId}: Copying template sheet ${TEMPLATE_SHEET_ID}...`);
-      const copyMetadata = {}; // Simplest possible copy
-      // const copyMetadata = { 
-      //     name: `MyBabySync Orders - ${session.user.email || userId}`, // Use user email in name
-      //     // Optional: Place the copy in the folder created above?
-      //     // parents: [driveFolderId] 
-      // };
+      let fileMetadataResponse; // To store response if successful
+      try {
+        // Distinct log marker for the start of this step
+        console.log(`User ${userId}: STEP 2A - Attempting drive.files.get for template sheet ID: ${TEMPLATE_SHEET_ID}`);
+        
+        fileMetadataResponse = await drive.files.get({
+          fileId: TEMPLATE_SHEET_ID,
+          fields: 'id, name, ownedByMe, capabilities, trashed' // Added 'trashed'
+        });
+        
+        // CRITICAL LOG: If this line does not appear in Vercel logs for a request,
+        // the drive.files.get() call above it either failed silently or hung indefinitely.
+        console.log(`User ${userId}: STEP 2B - drive.files.get SUCCEEDED for sheet. ID: ${fileMetadataResponse.data.id}, Name: ${fileMetadataResponse.data.name}, OwnedByMe: ${fileMetadataResponse.data.ownedByMe}, Trashed: ${fileMetadataResponse.data.trashed}, Capabilities: ${JSON.stringify(fileMetadataResponse.data.capabilities)}`);
+
+        if (fileMetadataResponse.data.trashed) {
+          console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} is in the trash.`);
+          throw new Error(`The template Google Sheet (ID: ${TEMPLATE_SHEET_ID}) is in the trash. Please restore it.`);
+        }
+
+        if (!fileMetadataResponse.data.capabilities?.canCopy) {
+            console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} exists (not trashed) but cannot be copied by the authenticated user. Capabilities:`, fileMetadataResponse.data.capabilities);
+            throw new Error(`The template sheet (ID: ${TEMPLATE_SHEET_ID}) exists but the authenticated user does not have permission to copy it. Please check sharing settings and ensure the 'Viewers and commenters can see the option to download, print, and copy' is enabled if relying on general access.`);
+        }
+        
+        // Log success of checks before attempting copy
+        console.log(`User ${userId}: STEP 2C - Template sheet pre-copy checks passed (fetched, not trashed, can be copied).`);
+
+      } catch (getErr) {
+        console.error(`User ${userId}: STEP 2X - FAILED during drive.files.get or subsequent checks for template sheet ${TEMPLATE_SHEET_ID}.`);
+        
+        // Log the raw error object from googleapis more reliably
+        let rawErrorString = 'No raw error object available or stringification failed.';
+        try {
+          rawErrorString = JSON.stringify(getErr, Object.getOwnPropertyNames(getErr), 2);
+        } catch (e) {
+          // If stringify fails (e.g. circular refs not handled by Object.getOwnPropertyNames)
+          rawErrorString = `Error stringifying getErr: ${e.message}. Raw error message: ${getErr.message}`;
+        }
+        console.error(`User ${userId}: Raw getErr object:`, rawErrorString);
+
+        let detailedMessage = "Failed to access or verify the template Google Sheet.";
+        if (getErr.message) detailedMessage += ` Google API Error: ${getErr.message}`;
+        if (getErr.code) detailedMessage += ` (Code: ${getErr.code})`;
+        
+        // Construct a new error with a clear prefix
+        // This error will be caught by the outermost try...catch in your handler
+        throw new Error(`GET_SHEET_ERROR: ${detailedMessage}`); 
+      }
+
+      // If we've reached here, the drive.files.get and its checks were successful.
+      console.log(`User ${userId}: STEP 2D - Attempting drive.files.copy for template sheet ${TEMPLATE_SHEET_ID}...`);
+      const copyMetadata = { 
+          name: `KolayXport Kargo Takip - ${session.user.email || userId}`
+          // parents: [driveFolderId] // Optional
+      };
       try {
         const copiedFile = await drive.files.copy({ 
             fileId: TEMPLATE_SHEET_ID,
             resource: copyMetadata,
-            fields: 'id' // Only need the ID of the new sheet
+            fields: 'id, name, webViewLink, owners' 
         });
         googleSheetId = copiedFile.data.id;
 
         if (!googleSheetId) throw new Error('Sheet copied but ID was not returned.');
-        console.log(`User ${userId}: Copied Sheet ID: ${googleSheetId}`);
+        console.log(`User ${userId}: Copied Sheet ID: ${googleSheetId}, Name: ${copiedFile.data.name}, Link: ${copiedFile.data.webViewLink}`);
 
         // Rename the first sheet (gid=0) to "Kargov2"
         console.log(`User ${userId}: Renaming first sheet in ${googleSheetId} to 'Kargov2'...`);
@@ -157,30 +205,25 @@ export default async function handler(req, res) {
         console.log(`User ${userId}: Renamed first sheet to 'Kargov2'.`);
         
       } catch (copyErr) {
-         console.error(`User ${userId}: Sheet copy attempt failed.`);
-         console.error(`User ${userId}: copyErr.code = ${copyErr.code}`);
-         console.error(`User ${userId}: copyErr.message = ${copyErr.message}`);
-
-         if (copyErr.errors && Array.isArray(copyErr.errors)) {
-             console.error(`User ${userId}: Detailed Google API errors (copyErr.errors):`);
-             copyErr.errors.forEach((err, index) => {
-                 console.error(`Error ${index}: domain=${err.domain}, reason=${err.reason}, message=${err.message}, extendedHelp=${err.extendedHelp}, location=${err.location}, locationType=${err.locationType}`);
-             });
-         } else {
-             console.error(`User ${userId}: copyErr.errors array not found or not an array. Full error object:`, JSON.stringify(copyErr, null, 2));
-         }
+         // PREPEND a distinct marker to logs from this catch block
+         const logPrefix = `User ${userId}: COPY_SHEET_ERROR -`;
+         console.error(`${logPrefix} Sheet copy attempt failed.`);
          
-         // Fallback to a general full stringify if the specific fields aren't there as expected
-         if (!(copyErr.errors && Array.isArray(copyErr.errors))) {
-            console.error(`User ${userId}: Full copyErr object (fallback):`, JSON.stringify(copyErr, Object.getOwnPropertyNames(copyErr), 2));
-         }
+        let rawCopyErrorString = 'No raw copyErr object available or stringification failed.';
+        try {
+          rawCopyErrorString = JSON.stringify(copyErr, Object.getOwnPropertyNames(copyErr), 2);
+        } catch (e) {
+          rawCopyErrorString = `Error stringifying copyErr: ${e.message}. Raw copy error message: ${copyErr.message}`;
+        }
+        console.error(`${logPrefix} Raw copyErr object:`, rawCopyErrorString);
 
          let errorMessage = "Failed to copy or rename template sheet.";
          if (copyErr.message) errorMessage += ` Original error: ${copyErr.message}`;
          if (copyErr.code) errorMessage += ` API responded with code: ${copyErr.code}.`;
-         errorMessage += " Check server logs for details from 'Detailed Google API errors' or 'Full copyErr object'.";
+         errorMessage += " Check server logs for details.";
          
-         throw new Error(errorMessage);
+         // This error will be caught by the outermost try...catch
+         throw new Error(`COPY_SHEET_ERROR: ${errorMessage}`);
       }
     } else {
        console.log(`User ${userId}: Sheet already exists: ${googleSheetId}`);

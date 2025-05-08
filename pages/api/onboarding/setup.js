@@ -213,8 +213,7 @@ export default async function handler(req, res) {
             // Perform the copy using the Service Account
             const copiedScriptFile = await serviceDrive.files.copy({ 
                 fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-                resource: scriptCopyMetadata, // Use requestBody for v3 consistency
-                // requestBody: scriptCopyMetadata, // Correct way for v3 resource
+                requestBody: scriptCopyMetadata, // Correct parameter for v3
                 fields: 'id' // Only need the ID of the new script file
             });
             userAppsScriptId = copiedScriptFile.data.id;
@@ -226,8 +225,7 @@ export default async function handler(req, res) {
             console.log(`User ${userId}: Sharing newly copied script ${userAppsScriptId} with user ${session.user.email}...`);
             await serviceDrive.permissions.create({
                 fileId: userAppsScriptId,
-                // resource: { // Use requestBody for v3 consistency
-                requestBody: {
+                requestBody: { // Correct parameter for v3
                     role: 'writer', // Give user write access
                     type: 'user',
                     emailAddress: session.user.email

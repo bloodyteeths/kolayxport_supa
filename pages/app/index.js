@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
 import Link from 'next/link';
-import { Gift, Zap, Share2 } from 'lucide-react'; // Icons for the page
+import { Gift, Zap, Share2, Loader2 } from 'lucide-react'; // Icons for the page and Loader2
 
 // This will be the new content for the dashboard landing page.
 // The existing <Dashboard /> component can be integrated here or replaced.
@@ -66,9 +66,83 @@ const DashboardLandingContent = () => {
 export default function AppIndexPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [isOnboarding, setIsOnboarding] = useState(false);
+  const [onboardingStatus, setOnboardingStatus] = useState('');
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+
+  useEffect(() => {
+    // This effect checks onboarding status when the user is authenticated.
+    // The `onboardingComplete` state prevents it from re-running unnecessarily 
+    // within the same session after the initial check/setup attempt.
+    // If the user logs out/in, the check runs again, but the backend API 
+    // internally prevents redundant resource creation.
+    if (status === 'authenticated' && !onboardingComplete) {
+      
+      const checkAndRunOnboarding = async () => {
+        console.log('Checking onboarding status...');
+        setIsOnboarding(true);
+        setOnboardingStatus('Hesap kurulumu kontrol ediliyor...');
+
+        try {
+          const res = await fetch('/api/onboarding/setup.js', { method: 'POST' });
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error || 'Onboarding check/setup failed.');
+          }
+
+          if (data.success) {
+            console.log('Onboarding response:', data);
+            const { driveFolderId, userAppsScriptId } = data.data;
+
+            if (!driveFolderId) {
+                 console.error('Onboarding succeeded but driveFolderId missing in response.');
+                 setOnboardingStatus('Kurulum tamamlandı ancak klasör bilgisi eksik. Lütfen destek ile iletişime geçin.');
+                 return; 
+            }
+
+            setOnboardingStatus('Temel ayarlar yapılıyor (Klasör ID kaydediliyor)... ');
+            try {
+              const setPropRes = await fetch('/api/gscript/set-user-property', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ propertyName: 'FEDEX_FOLDER_ID', value: driveFolderId })
+              });
+              const setPropData = await setPropRes.json();
+
+              if (!setPropRes.ok) {
+                throw new Error(setPropData.message || 'Failed to save FEDEX_FOLDER_ID');
+              }
+              
+              console.log('Successfully set FEDEX_FOLDER_ID in UserProperties', setPropData);
+              setOnboardingStatus('Kurulum başarıyla tamamlandı!');
+              setOnboardingComplete(true);
+
+            } catch (setPropertyError) {
+              console.error('Failed to set FEDEX_FOLDER_ID after onboarding:', setPropertyError);
+              setOnboardingStatus(`Kurulum tamamlandı, ancak ${propertyName} ayarı kaydedilemedi: ${setPropertyError.message}. Lütfen Ayarlar sayfasından tekrar deneyin veya destek ile iletişime geçin.`);
+              setOnboardingComplete(true);
+            }
+
+          } else {
+            throw new Error(data.message || 'Onboarding check returned success:false');
+          }
+
+        } catch (error) {
+          console.error('Onboarding process error:', error);
+          setOnboardingStatus(`Kurulum sırasında bir hata oluştu: ${error.message}`);
+        } finally {
+           if (!onboardingComplete) {
+                setTimeout(() => setIsOnboarding(false), 3000);
+           }
+        }
+      };
+
+      checkAndRunOnboarding();
+    }
+  }, [status, onboardingComplete]);
 
   if (status === 'loading') {
-    // You might want a more sophisticated global loading state or skeleton screens
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-100">
         <p className="text-slate-500">Yükleniyor...</p>
@@ -77,8 +151,6 @@ export default function AppIndexPage() {
   }
 
   if (status === 'unauthenticated') {
-    // Redirect to sign-in if not authenticated
-    // Consider handling this at a higher level (e.g., _app.js or a custom route guard) for all /app routes
     if (typeof window !== 'undefined') {
       router.push('/auth/signin?callbackUrl=/app');
     }
@@ -89,10 +161,22 @@ export default function AppIndexPage() {
     ); 
   }
 
-  // User is authenticated
   return (
     <AppLayout title="Genel Bakış - KolayXport Dashboard">
-      <DashboardLandingContent />
+      {isOnboarding && !onboardingComplete && (
+        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+            <p className="text-slate-700 text-lg font-medium animate-pulse">{onboardingStatus || 'Hesap kurulumu yapılıyor...'}</p>
+            <p className="text-slate-500 text-sm mt-1">Bu işlem birkaç saniye sürebilir, lütfen bekleyin.</p>
+        </div>
+      )}
+      {onboardingComplete && <DashboardLandingContent />}
+      {!isOnboarding && !onboardingComplete && status === 'authenticated' && ( 
+         <div className="text-center p-10 bg-white rounded shadow">
+            <h2 className="text-xl font-semibold text-red-600">Kurulum Başlatılamadı</h2>
+            <p className="text-slate-600 mt-2">Hesap kurulumu durumu kontrol edilemedi veya başlatılamadı. Lütfen sayfayı yenileyin veya destek ile iletişime geçin.</p>
+          </div>
+      )}
     </AppLayout>
   );
 } 

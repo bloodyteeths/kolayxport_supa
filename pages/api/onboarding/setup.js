@@ -39,36 +39,46 @@ export default async function handler(req, res) {
   }
   const accessToken = oauthAccount.access_token;
 
-  // Read master template sheet ID from environment
+  // Read master template sheet ID and WRAPPER SCRIPT template ID from environment
   const TEMPLATE_SHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  const TEMPLATE_WRAPPER_SCRIPT_FILE_ID = process.env.TEMPLATE_WRAPPER_SCRIPT_FILE_ID;
+
   if (!TEMPLATE_SHEET_ID) {
     console.error('Onboarding Error: GOOGLE_SHEETS_SPREADSHEET_ID not configured.');
-    return res.status(500).json({ error: 'Server configuration error.' });
+    return res.status(500).json({ error: 'Server configuration error: Missing template sheet ID.' });
+  }
+  if (!TEMPLATE_WRAPPER_SCRIPT_FILE_ID) {
+    console.error('Onboarding Error: TEMPLATE_WRAPPER_SCRIPT_FILE_ID not configured.');
+    return res.status(500).json({ error: 'Server configuration error: Missing template script ID.' });
   }
 
-  let googleSheetId, driveFolderId;
+  let googleSheetId, driveFolderId, userAppsScriptId;
 
   try {
     // --- Check if user already fully onboarded --- 
-    // Select only the fields needed for onboarding completion check
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { googleSheetId: true, driveFolderId: true }
+      select: { googleSheetId: true, driveFolderId: true, userAppsScriptId: true } // Select all relevant IDs
     });
 
-    // If both IDs exist, onboarding is complete
-    if (existingUser?.googleSheetId && existingUser?.driveFolderId) {
-      console.log(`User ${userId} already onboarded.`);
+    // If all IDs exist, onboarding is complete
+    if (existingUser?.googleSheetId && existingUser?.driveFolderId && existingUser?.userAppsScriptId) {
+      console.log(`User ${userId} already fully onboarded.`);
       return res.status(200).json({ 
           success: true, 
           message: 'User already onboarded.', 
-          data: { googleSheetId: existingUser.googleSheetId, driveFolderId: existingUser.driveFolderId } 
+          data: { 
+              googleSheetId: existingUser.googleSheetId, 
+              driveFolderId: existingUser.driveFolderId, 
+              userAppsScriptId: existingUser.userAppsScriptId 
+            }
       });
     }
 
     // Assign existing values if partially onboarded
     googleSheetId = existingUser?.googleSheetId;
     driveFolderId = existingUser?.driveFolderId;
+    userAppsScriptId = existingUser?.userAppsScriptId;
 
     console.log(`Starting/Resuming onboarding for user ${userId}...`);
 
@@ -176,34 +186,91 @@ export default async function handler(req, res) {
        console.log(`User ${userId}: Sheet already exists: ${googleSheetId}`);
     }
 
-    // --- REMOVED: Get Script ID Logic --- 
-    // No longer needed as we use a central script
+    // --- 3. Copy Template Wrapper Script (if needed) --- 
+    if (!userAppsScriptId) {
+        console.log(`User ${userId}: Copying template wrapper script ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}...`);
+        // Note: Copying Apps Script creates a new project file in the user's Drive.
+        // Consider where this script should live (root or specific folder) and its name.
+        const scriptCopyMetadata = { 
+             name: `KolayXport Wrapper Script - ${session.user.email || userId}` // Unique name
+             // Optionally add parents: [driveFolderId] to place it in the labels folder, or another folder.
+        }; 
+        try {
+            const copiedScriptFile = await drive.files.copy({ 
+                fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
+                resource: scriptCopyMetadata,
+                fields: 'id' // Only need the ID of the new script file
+            });
+            userAppsScriptId = copiedScriptFile.data.id;
+
+            if (!userAppsScriptId) throw new Error('Wrapper script copied but ID was not returned.');
+            console.log(`User ${userId}: Copied Wrapper Script ID: ${userAppsScriptId}`);
+            
+            // IMPORTANT: Additional steps might be needed here:
+            // 1. Update Script Project Manifest: If the copied script needs to know the ID
+            //    of the specific Google Sheet it's associated with, you might need to use the
+            //    Apps Script API (requires setup, service account auth, more scopes) to update
+            //    the manifest file (appsscript.json) within the newly copied script project.
+            //    Or, pass the sheetId as a parameter during execution.
+            // 2. Deployment: The copied script is just a project file. To be executable via the 
+            //    Apps Script Execution API, it needs to be DEPLOYED. Programmatic deployment is complex.
+            //    Alternative: The user might need to manually open the script and deploy it once,
+            //    or you use a central script architecture (which we decided against for UserProperties).
+            //    For now, we are only storing the SCRIPT FILE ID. The API routes 
+            //    (/api/gscript/*) will need to target THIS SCRIPT FILE ID for execution, 
+            //    likely using the Apps Script API's `scripts.run` method which can target a 
+            //    script ID directly (often runs the HEAD/latest saved version).
+
+        } catch (scriptCopyErr) {
+            console.error(`User ${userId}: Wrapper script copy attempt failed:`, scriptCopyErr);
+            // Add similar detailed logging as sheet copy if needed
+             if (scriptCopyErr.code === 403) {
+                 // Potentially insufficient permissions or API not enabled for Drive or Apps Script?
+                  return res.status(500).json({ 
+                      error: 'Failed to copy script. Check Drive/AppsScript API enablement and permissions.' 
+                  });
+             }
+            throw new Error(`Failed to copy template wrapper script. ${scriptCopyErr.message || ''}`);
+        }
+    } else {
+        console.log(`User ${userId}: Wrapper script already exists: ${userAppsScriptId}`);
+    }
 
     // --- 4. Update User Record in Database --- 
-    // Ensure both IDs were successfully obtained/retrieved before updating
-    if (!googleSheetId || !driveFolderId) {
-        throw new Error('Missing Sheet ID or Folder ID after onboarding steps.');
+    // Ensure all required IDs were successfully obtained/retrieved before updating
+    if (!googleSheetId || !driveFolderId || !userAppsScriptId) {
+        console.error(`User ${userId}: Missing required IDs after onboarding steps. Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}`);
+        throw new Error('Missing Sheet ID, Folder ID, or Script ID after onboarding steps.');
     }
     
-    console.log(`User ${userId}: Updating user record in DB with SheetID and FolderID...`);
+    console.log(`User ${userId}: Updating user record in DB with SheetID, FolderID, and ScriptID...`);
     await prisma.user.update({
         where: { id: userId },
         data: {
-            googleSheetId, // Save the sheet ID
-            driveFolderId  // Save the folder ID
+            googleSheetId,
+            driveFolderId,
+            userAppsScriptId // Save the user's specific script ID
         }
     });
     console.log(`User ${userId}: User record updated successfully.`);
 
-    // --- REMOVED: Set FEDEX_FOLDER_ID in Script Properties --- 
-    // Not needed, folder ID stored in DB now
+    // --- 5. Set FEDEX_FOLDER_ID in the new script's UserProperties --- 
+    // Trigger this asynchronously or via a separate call from frontend after onboarding success
+    // For simplicity here, let's log that it needs to happen.
+    console.log(`User ${userId}: TODO - Trigger setting FEDEX_FOLDER_ID (${driveFolderId}) in script ${userAppsScriptId} via /api/gscript/set-user-property`);
+    // Example (conceptual - needs frontend implementation):
+    // fetch('/api/gscript/set-user-property', { 
+    //     method: 'POST', 
+    //     headers: { 'Content-Type': 'application/json', /* + Auth? */ }, 
+    //     body: JSON.stringify({ propertyName: 'FEDEX_FOLDER_ID', value: driveFolderId, userScriptId: userAppsScriptId /* If API needs it explicitly */ }) 
+    // });
 
     // --- Onboarding Complete --- 
     console.log(`User ${userId}: Onboarding process completed successfully.`);
     res.status(200).json({ 
       success: true, 
       message: 'Setup completed successfully!', 
-      data: { googleSheetId, driveFolderId } // Return the obtained IDs
+      data: { googleSheetId, driveFolderId, userAppsScriptId } // Return all obtained IDs
     });
 
   } catch (error) {

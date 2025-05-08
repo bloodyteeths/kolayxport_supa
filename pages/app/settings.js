@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
-import { Settings, Save, Key, ShoppingCart, Truck, Check, Edit, Info, FileText, Package, UserSquare } from 'lucide-react';
+import { Settings, Save, Key, ShoppingCart, Truck, Check, Edit, Info, FileText, Package, UserSquare, FolderCog, ClipboardCopy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { NextSeo } from 'next-seo';
 
@@ -66,10 +66,6 @@ export default function SettingsPage() {
   const [isVeeqoApiKeyEditing, setIsVeeqoApiKeyEditing] = useState(true);
   const [veeqoApiKeySaveStatus, setVeeqoApiKeySaveStatus] = useState('idle');
 
-  const [veeqoOrdersUrl, setVeeqoOrdersUrl] = useState('');
-  const [isVeeqoOrdersUrlEditing, setIsVeeqoOrdersUrlEditing] = useState(true);
-  const [veeqoOrdersUrlSaveStatus, setVeeqoOrdersUrlSaveStatus] = useState('idle');
-
   const [defaultCurrencyCode, setDefaultCurrencyCode] = useState('');
   const [isDefaultCurrencyCodeEditing, setIsDefaultCurrencyCodeEditing] = useState(true);
   const [defaultCurrencyCodeSaveStatus, setDefaultCurrencyCodeSaveStatus] = useState('idle');
@@ -90,11 +86,22 @@ export default function SettingsPage() {
   const [isFedexApiSecretEditing, setIsFedexApiSecretEditing] = useState(true);
   const [fedexApiSecretSaveStatus, setFedexApiSecretSaveStatus] = useState('idle');
 
-  // Shipper Information States
-  const [importerOfRecord, setImporterOfRecord] = useState('');
-  const [isImporterOfRecordEditing, setIsImporterOfRecordEditing] = useState(true);
-  const [importerOfRecordSaveStatus, setImporterOfRecordSaveStatus] = useState('idle');
+  // IMPORTER_OF_RECORD States (New: Individual fields)
+  const [importerContactPersonName, setImporterContactPersonName] = useState('');
+  const [importerContactCompanyName, setImporterContactCompanyName] = useState('');
+  const [importerContactPhoneNumber, setImporterContactPhoneNumber] = useState('');
+  const [importerContactEmailAddress, setImporterContactEmailAddress] = useState('');
+  const [importerAddressStreetLines, setImporterAddressStreetLines] = useState('');
+  const [importerAddressCity, setImporterAddressCity] = useState('');
+  const [importerAddressStateCode, setImporterAddressStateCode] = useState(''); // Numeric (e.g., 01 for Adana)
+  const [importerAddressPostalCode, setImporterAddressPostalCode] = useState('');
+  const [importerAddressCountryCode, setImporterAddressCountryCode] = useState('');
+  
+  // Combined save/edit state for the Importer of Record section
+  const [isImporterSectionEditing, setIsImporterSectionEditing] = useState(true);
+  const [importerSectionSaveStatus, setImporterSectionSaveStatus] = useState('idle');
 
+  // Shipper Information States (These will be grouped under FedEx section)
   const [shipperCity, setShipperCity] = useState('');
   const [isShipperCityEditing, setIsShipperCityEditing] = useState(true);
   const [shipperCitySaveStatus, setShipperCitySaveStatus] = useState('idle');
@@ -135,108 +142,125 @@ export default function SettingsPage() {
   const [isShipperTinNumberEditing, setIsShipperTinNumberEditing] = useState(true);
   const [shipperTinNumberSaveStatus, setShipperTinNumberSaveStatus] = useState('idle');
 
-  const [shipperTinType, setShipperTinType] = useState('');
-  const [isShipperTinTypeEditing, setIsShipperTinTypeEditing] = useState(true);
-  const [shipperTinTypeSaveStatus, setShipperTinTypeSaveStatus] = useState('idle');
+  // New System Managed Settings State
+  const [fedexFolderId, setFedexFolderId] = useState('');
 
   useEffect(() => {
     const fetchUserProperties = async () => {
-      const mockData = {
-        VEEQO_API_KEY: "EXISTING_VEEQO_KEY_FROM_DB",
-        VEEQO_ORDERS_URL: "https://api.veeqo.com/orders/existing",
-        DEFAULT_CURRENCY_CODE: "USD",
-        TRENDYOL_API_KEY: "EXISTING_TRENDYOL_KEY",
-        TRENDYOL_API_SECRET: "EXISTING_TRENDYOL_SECRET",
-        TRENDYOL_SUPPLIER_ID: "EXISTING_TRENDYOL_ID",
-        SHIPPO_TOKEN: "EXISTING_SHIPPO_TOKEN",
-        DUTIES_PAYMENT_TYPE: "SENDER",
-        FEDEX_ACCOUNT_NUMBER: "123456789",
-        FEDEX_API_KEY: "FEDEX_KEY_FROM_DB",
-        FEDEX_API_SECRET: "FEDEX_SECRET_FROM_DB",
-        IMPORTER_OF_RECORD: "KolayXport Inc.",
-        SHIPPER_CITY: "Istanbul",
-        SHIPPER_COUNTRY_CODE: "TR",
-        SHIPPER_NAME: "KolayXport Depo",
-        SHIPPER_PERSON_NAME: "Ahmet Yilmaz",
-        SHIPPER_PHONE_NUMBER: "+905551234567",
-        SHIPPER_POSTAL_CODE: "34700",
-        SHIPPER_STATE_CODE: "IST",
-        SHIPPER_STREET_1: "Eksioglu Mah. Atabey Cad. No:1 D:2",
-        SHIPPER_STREET_2: "Cekmekoy",
-        SHIPPER_TIN_NUMBER: "1234567890",
-        SHIPPER_TIN_TYPE: "VAT",
-      };
+      // ACTUAL IMPLEMENTATION: Call Next.js API route that calls Apps Script
+      try {
+        console.log('Fetching user properties from /api/gscript/get-all-user-properties');
+        const response = await fetch('/api/gscript/get-all-user-properties'); 
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch settings. Status: ${response.status}. Response: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Fetched user properties:', data);
 
-      if (mockData.VEEQO_API_KEY) {
-        setVeeqoApiKey(mockData.VEEQO_API_KEY);
-        setIsVeeqoApiKeyEditing(false);
-        setVeeqoApiKeySaveStatus('success');
-      }
-      if (mockData.VEEQO_ORDERS_URL) {
-        setVeeqoOrdersUrl(mockData.VEEQO_ORDERS_URL);
-        setIsVeeqoOrdersUrlEditing(false);
-        setVeeqoOrdersUrlSaveStatus('success');
-      }
-      if (mockData.DEFAULT_CURRENCY_CODE) {
-        setDefaultCurrencyCode(mockData.DEFAULT_CURRENCY_CODE);
-        setIsDefaultCurrencyCodeEditing(false);
-        setDefaultCurrencyCodeSaveStatus('success');
-      }
-      if (mockData.TRENDYOL_API_KEY) {
-        setTrendyolApiKey(mockData.TRENDYOL_API_KEY);
-        setIsTrendyolApiKeyEditing(false);
-        setTrendyolApiKeySaveStatus('success');
-      }
-      if (mockData.TRENDYOL_API_SECRET) {
-        setTrendyolApiSecret(mockData.TRENDYOL_API_SECRET);
-        setIsTrendyolApiSecretEditing(false);
-        setTrendyolApiSecretSaveStatus('success');
-      }
-      if (mockData.TRENDYOL_SUPPLIER_ID) {
-        setTrendyolSupplierId(mockData.TRENDYOL_SUPPLIER_ID);
-        setIsTrendyolSupplierIdEditing(false);
-        setTrendyolSupplierIdSaveStatus('success');
-      }
-      if (mockData.SHIPPO_TOKEN) {
-        setShippoApiToken(mockData.SHIPPO_TOKEN);
-        setIsShippoApiTokenEditing(false);
-        setShippoApiTokenSaveStatus('success');
-      }
-      if (mockData.DUTIES_PAYMENT_TYPE) {
-        setDutiesPaymentType(mockData.DUTIES_PAYMENT_TYPE);
-        setIsDutiesPaymentTypeEditing(false);
-        setDutiesPaymentTypeSaveStatus('success');
-      }
-      if (mockData.FEDEX_ACCOUNT_NUMBER) {
-        setFedexAccountNumber(mockData.FEDEX_ACCOUNT_NUMBER);
-        setIsFedexAccountNumberEditing(false);
-        setFedexAccountNumberSaveStatus('success');
-      }
-      if (mockData.FEDEX_API_KEY) {
-        setFedexApiKey(mockData.FEDEX_API_KEY);
-        setIsFedexApiKeyEditing(false);
-        setFedexApiKeySaveStatus('success');
-      }
-      if (mockData.FEDEX_API_SECRET) {
-        setFedexApiSecret(mockData.FEDEX_API_SECRET);
-        setIsFedexApiSecretEditing(false);
-        setFedexApiSecretSaveStatus('success');
-      }
-      
-      // Shipper Information
-      if (mockData.IMPORTER_OF_RECORD) { setImporterOfRecord(mockData.IMPORTER_OF_RECORD); setIsImporterOfRecordEditing(false); setImporterOfRecordSaveStatus('success'); }
-      if (mockData.SHIPPER_CITY) { setShipperCity(mockData.SHIPPER_CITY); setIsShipperCityEditing(false); setShipperCitySaveStatus('success'); }
-      if (mockData.SHIPPER_COUNTRY_CODE) { setShipperCountryCode(mockData.SHIPPER_COUNTRY_CODE); setIsShipperCountryCodeEditing(false); setShipperCountryCodeSaveStatus('success'); }
-      if (mockData.SHIPPER_NAME) { setShipperName(mockData.SHIPPER_NAME); setIsShipperNameEditing(false); setShipperNameSaveStatus('success'); }
-      if (mockData.SHIPPER_PERSON_NAME) { setShipperPersonName(mockData.SHIPPER_PERSON_NAME); setIsShipperPersonNameEditing(false); setShipperPersonNameSaveStatus('success'); }
-      if (mockData.SHIPPER_PHONE_NUMBER) { setShipperPhoneNumber(mockData.SHIPPER_PHONE_NUMBER); setIsShipperPhoneNumberEditing(false); setShipperPhoneNumberSaveStatus('success'); }
-      if (mockData.SHIPPER_POSTAL_CODE) { setShipperPostalCode(mockData.SHIPPER_POSTAL_CODE); setIsShipperPostalCodeEditing(false); setShipperPostalCodeSaveStatus('success'); }
-      if (mockData.SHIPPER_STATE_CODE) { setShipperStateCode(mockData.SHIPPER_STATE_CODE); setIsShipperStateCodeEditing(false); setShipperStateCodeSaveStatus('success'); }
-      if (mockData.SHIPPER_STREET_1) { setShipperStreet1(mockData.SHIPPER_STREET_1); setIsShipperStreet1Editing(false); setShipperStreet1SaveStatus('success'); }
-      if (mockData.SHIPPER_STREET_2) { setShipperStreet2(mockData.SHIPPER_STREET_2); setIsShipperStreet2Editing(false); setShipperStreet2SaveStatus('success'); }
-      if (mockData.SHIPPER_TIN_NUMBER) { setShipperTinNumber(mockData.SHIPPER_TIN_NUMBER); setIsShipperTinNumberEditing(false); setShipperTinNumberSaveStatus('success'); }
-      if (mockData.SHIPPER_TIN_TYPE) { setShipperTinType(mockData.SHIPPER_TIN_TYPE); setIsShipperTinTypeEditing(false); setShipperTinTypeSaveStatus('success'); }
+        // Set all states based on data from the API
+        // Veeqo
+        if (data.hasOwnProperty('VEEQO_API_KEY')) { 
+          setVeeqoApiKey(data.VEEQO_API_KEY);
+          setIsVeeqoApiKeyEditing(false);
+          setVeeqoApiKeySaveStatus('success');
+        }
+        // General
+        if (data.hasOwnProperty('DEFAULT_CURRENCY_CODE')) {
+          setDefaultCurrencyCode(data.DEFAULT_CURRENCY_CODE);
+          setIsDefaultCurrencyCodeEditing(false);
+          setDefaultCurrencyCodeSaveStatus('success');
+        }
+        // Trendyol
+        if (data.hasOwnProperty('TRENDYOL_API_KEY')) { 
+          setTrendyolApiKey(data.TRENDYOL_API_KEY);
+          setIsTrendyolApiKeyEditing(false);
+          setTrendyolApiKeySaveStatus('success');
+        }
+        if (data.hasOwnProperty('TRENDYOL_API_SECRET')) { 
+          setTrendyolApiSecret(data.TRENDYOL_API_SECRET);
+          setIsTrendyolApiSecretEditing(false);
+          setTrendyolApiSecretSaveStatus('success');
+        }
+        if (data.hasOwnProperty('TRENDYOL_SUPPLIER_ID')) { 
+          setTrendyolSupplierId(data.TRENDYOL_SUPPLIER_ID);
+          setIsTrendyolSupplierIdEditing(false);
+          setTrendyolSupplierIdSaveStatus('success');
+        }
+        // Shippo
+        if (data.hasOwnProperty('SHIPPO_TOKEN')) { 
+          setShippoApiToken(data.SHIPPO_TOKEN);
+          setIsShippoApiTokenEditing(false);
+          setShippoApiTokenSaveStatus('success');
+        }
+        // Customs & Payment
+        if (data.hasOwnProperty('DUTIES_PAYMENT_TYPE')) {
+          setDutiesPaymentType(data.DUTIES_PAYMENT_TYPE);
+          setIsDutiesPaymentTypeEditing(false);
+          setDutiesPaymentTypeSaveStatus('success');
+        }
+        // FedEx API
+        if (data.hasOwnProperty('FEDEX_ACCOUNT_NUMBER')) {
+          setFedexAccountNumber(data.FEDEX_ACCOUNT_NUMBER);
+          setIsFedexAccountNumberEditing(false);
+          setFedexAccountNumberSaveStatus('success');
+        }
+        if (data.hasOwnProperty('FEDEX_API_KEY')) {
+          setFedexApiKey(data.FEDEX_API_KEY);
+          setIsFedexApiKeyEditing(false);
+          setFedexApiKeySaveStatus('success');
+        }
+        if (data.hasOwnProperty('FEDEX_API_SECRET')) {
+          setFedexApiSecret(data.FEDEX_API_SECRET);
+          setIsFedexApiSecretEditing(false);
+          setFedexApiSecretSaveStatus('success');
+        }
+        // Shipper Information (now individual fields for Importer of Record)
+        if (data.hasOwnProperty('IMPORTER_OF_RECORD')) { 
+          try {
+            const importerData = JSON.parse(data.IMPORTER_OF_RECORD);
+            if (importerData && importerData.contact && importerData.address) {
+              setImporterContactPersonName(importerData.contact.personName || '');
+              setImporterContactCompanyName(importerData.contact.companyName || '');
+              setImporterContactPhoneNumber(importerData.contact.phoneNumber || '');
+              setImporterContactEmailAddress(importerData.contact.emailAddress || '');
+              setImporterAddressStreetLines(Array.isArray(importerData.address.streetLines) ? importerData.address.streetLines.join('\n') : importerData.address.streetLines || '');
+              setImporterAddressCity(importerData.address.city || '');
+              setImporterAddressStateCode(importerData.address.stateOrProvinceCode || '');
+              setImporterAddressPostalCode(importerData.address.postalCode || '');
+              setImporterAddressCountryCode(importerData.address.countryCode || '');
+              
+              setIsImporterSectionEditing(false);
+              setImporterSectionSaveStatus('success');
+            } else {
+              // Data is malformed or incomplete, keep editable
+              setIsImporterSectionEditing(true);
+              setImporterSectionSaveStatus('idle');
+            }
+          } catch (e) {
+            console.error("Error parsing IMPORTER_OF_RECORD JSON:", e);
+            setIsImporterSectionEditing(true);
+            setImporterSectionSaveStatus('idle');
+          }
+        }
+        if (data.hasOwnProperty('SHIPPER_CITY')) { setShipperCity(data.SHIPPER_CITY); setIsShipperCityEditing(false); setShipperCitySaveStatus('success'); }
+        if (data.hasOwnProperty('SHIPPER_COUNTRY_CODE')) { setShipperCountryCode(data.SHIPPER_COUNTRY_CODE); setIsShipperCountryCodeEditing(false); setShipperCountryCodeSaveStatus('success'); }
+        if (data.hasOwnProperty('SHIPPER_POSTAL_CODE')) { setShipperPostalCode(data.SHIPPER_POSTAL_CODE); setIsShipperPostalCodeEditing(false); setShipperPostalCodeSaveStatus('success'); }
+        if (data.hasOwnProperty('SHIPPER_STATE_CODE')) { setShipperStateCode(data.SHIPPER_STATE_CODE); setIsShipperStateCodeEditing(false); setShipperStateCodeSaveStatus('success'); }
+        if (data.hasOwnProperty('SHIPPER_TIN_NUMBER')) { setShipperTinNumber(data.SHIPPER_TIN_NUMBER); setIsShipperTinNumberEditing(false); setShipperTinNumberSaveStatus('success'); }
+        
+        // System Managed Settings (FEDEX_FOLDER_ID)
+        if (data.hasOwnProperty('FEDEX_FOLDER_ID')) {
+          setFedexFolderId(data.FEDEX_FOLDER_ID);
+        }
 
+      } catch (error) {
+        console.error("Error fetching user properties:", error);
+        // TODO: Optionally set an error state to display a message to the user
+        // For example: setPageErrorState('Ayarlar yüklenirken bir sorun oluştu.');
+      }
     };
 
     if (status === 'authenticated') {
@@ -269,6 +293,82 @@ export default function SettingsPage() {
       setSaveStatus('error');
       setTimeout(() => setSaveStatus('idle'), 3000);
     }
+  };
+
+  const handleSaveImporterOfRecord = async () => {
+    setImporterSectionSaveStatus('saving');
+
+    const importerFields = [
+      importerContactPersonName, importerContactCompanyName, importerContactPhoneNumber, 
+      importerContactEmailAddress, importerAddressStreetLines, importerAddressCity, 
+      importerAddressStateCode, importerAddressPostalCode, importerAddressCountryCode
+    ];
+
+    const anyFieldHasValue = importerFields.some(field => field && String(field).trim() !== '');
+    const allFieldsHaveValue = importerFields.every(field => field && String(field).trim() !== '');
+
+    if (anyFieldHasValue && !allFieldsHaveValue) {
+      alert('İthalatçı Kaydı (Importer of Record) bilgileri için, bir alan doldurulduysa tüm alanların doldurulması zorunludur.');
+      setImporterSectionSaveStatus('error');
+      setTimeout(() => setImporterSectionSaveStatus('idle'), 3000);
+      return;
+    }
+    
+    // If no fields have value, we can either save an empty object or not save at all.
+    // For now, let's save an empty object if no fields are filled, or the user can clear them.
+    // Or, we can prevent saving if all are empty unless explicitly intended.
+    // For this implementation, if all are empty, we'll still proceed to save (which might clear the property or save it as empty based on backend).
+
+    const importerJson = {
+      contact: {
+        personName: importerContactPersonName.trim(),
+        companyName: importerContactCompanyName.trim(),
+        phoneNumber: importerContactPhoneNumber.trim(),
+        emailAddress: importerContactEmailAddress.trim(),
+      },
+      address: {
+        streetLines: importerAddressStreetLines.trim().split('\n').map(line => line.trim()).filter(line => line), // Store as array of non-empty strings
+        city: importerAddressCity.trim(),
+        stateOrProvinceCode: importerAddressStateCode.trim(), // Numeric
+        postalCode: importerAddressPostalCode.trim(),
+        countryCode: importerAddressCountryCode.trim().toUpperCase(),
+      }
+    };
+
+    await handleSaveProperty('IMPORTER_OF_RECORD', JSON.stringify(importerJson), setImporterSectionSaveStatus, setIsImporterSectionEditing);
+  };
+
+  const handleSaveShipperTinNumber = async () => {
+    // First save SHIPPER_TIN_NUMBER
+    await handleSaveProperty('SHIPPER_TIN_NUMBER', shipperTinNumber, setShipperTinNumberSaveStatus, setIsShipperTinNumberEditing);
+    // Then, implicitly save SHIPPER_TIN_TYPE as 'BUSINESS_NATIONAL'
+    // We need a dummy setSaveStatus and setIsEditing for this implicit save, or adjust handleSaveProperty not to require them if not interactive.
+    // For simplicity, let's assume an immediate success/failure for the implicit part or ignore its specific UI feedback for now.
+    try {
+      console.log(`Implicitly saving SHIPPER_TIN_TYPE: BUSINESS_NATIONAL`);
+      const response = await fetch('/api/gscript/set-user-property', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: session.user.id, propertyName: 'SHIPPER_TIN_TYPE', value: 'BUSINESS_NATIONAL' }),
+      });
+      if (!response.ok) {
+        console.error('Failed to implicitly save SHIPPER_TIN_TYPE');
+        // Optionally, set an error state or notify the user about this partial failure.
+      } else {
+        console.log('Successfully saved SHIPPER_TIN_TYPE implicitly');
+      }
+    } catch (error) {
+      console.error('Error implicitly saving SHIPPER_TIN_TYPE:', error);
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('ID Kopyalandı!'); // Or use a more subtle toast notification
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+      alert('Kopyalama başarısız oldu.');
+    });
   };
 
   if (status === 'loading') {
@@ -545,7 +645,7 @@ export default function SettingsPage() {
         </div>
       </ApiSection>
 
-      <ApiSection title="FedEx API Bilgileri" icon={Truck} description="FedEx kargo entegrasyonu için hesap ve API bilgileri.">
+      <ApiSection title="FedEx API Bilgileri" icon={Truck} description="FedEx kargo entegrasyonu için hesap, API ve gönderici bilgileri.">
         <div className="flex items-end space-x-2">
           <div className="flex-grow">
             <InputField
@@ -666,285 +766,108 @@ export default function SettingsPage() {
         </div>
       </ApiSection>
 
-      <ApiSection title="Gönderici Bilgileri (Shipper Information)" icon={UserSquare} description="Gönderileriniz için varsayılan gönderici adres ve iletişim bilgileri.">
-        {/* IMPORTER_OF_RECORD */}
-        <div className="flex items-end space-x-2">
-          <div className="flex-grow">
-            <InputField
-              id="importerOfRecord"
-              label="İthalatçı Kaydı (Importer of Record)"
-              value={importerOfRecord}
-              onChange={(e) => setImporterOfRecord(e.target.value)}
-              placeholder="İthalatçı firma adı"
-              disabled={!isImporterOfRecordEditing}
-            />
-          </div>
-          {isImporterOfRecordEditing ? (
-            <button onClick={() => handleSaveProperty('IMPORTER_OF_RECORD', importerOfRecord, setImporterOfRecordSaveStatus, setIsImporterOfRecordEditing)} disabled={importerOfRecordSaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {importerOfRecordSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : importerOfRecordSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsImporterOfRecordEditing(true); setImporterOfRecordSaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {importerOfRecordSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
+      <ApiSection title="İthalatçı Kaydı Detayları (Importer of Record Details)" icon={FileText} description="Gönderileriniz için ithalatçı firma/kişi bilgileri. Bir alan doldurulduysa tüm alanların doldurulması zorunludur.">
+        <InputField
+          id="importerContactCompanyName"
+          label="Firma Adı"
+          value={importerContactCompanyName}
+          onChange={(e) => setImporterContactCompanyName(e.target.value)}
+          placeholder="İthalatçı Firma Tam Adı"
+          disabled={!isImporterSectionEditing}
+        />
+        <InputField
+          id="importerContactPersonName"
+          label="Yetkili Kişi Adı"
+          value={importerContactPersonName}
+          onChange={(e) => setImporterContactPersonName(e.target.value)}
+          placeholder="Adı Soyadı"
+          disabled={!isImporterSectionEditing}
+        />
+        <InputField
+          id="importerContactPhoneNumber"
+          label="Telefon Numarası"
+          value={importerContactPhoneNumber}
+          onChange={(e) => setImporterContactPhoneNumber(e.target.value)}
+          placeholder="+90XXXXXXXXXX"
+          disabled={!isImporterSectionEditing}
+        />
+        <InputField
+          id="importerContactEmailAddress"
+          label="E-posta Adresi"
+          type="email"
+          value={importerContactEmailAddress}
+          onChange={(e) => setImporterContactEmailAddress(e.target.value)}
+          placeholder="eposta@ornek.com"
+          disabled={!isImporterSectionEditing}
+        />
+        <div>
+          <label htmlFor="importerAddressStreetLines" className="block text-sm font-medium text-slate-700 mb-1">
+            Adres Satırları
+          </label>
+          <textarea
+            id="importerAddressStreetLines"
+            name="importerAddressStreetLines"
+            rows={3}
+            value={importerAddressStreetLines}
+            onChange={(e) => setImporterAddressStreetLines(e.target.value)}
+            placeholder="Mahalle, Cadde, Sokak, No (Yeni satır için Enter tuşunu kullanabilirsiniz)"
+            disabled={!isImporterSectionEditing}
+            className={`mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${!isImporterSectionEditing ? "bg-slate-50 text-slate-500" : ""}`}
+          />
         </div>
-
-        {/* SHIPPER_NAME */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperName"
-              label="Gönderici Adı (Shipper Name)"
-              value={shipperName}
-              onChange={(e) => setShipperName(e.target.value)}
-              placeholder="Gönderici firma veya kişi adı"
-              disabled={!isShipperNameEditing}
-            />
-          </div>
-          {isShipperNameEditing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_NAME', shipperName, setShipperNameSaveStatus, setIsShipperNameEditing)} disabled={shipperNameSaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperNameSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperNameSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
+        <InputField
+          id="importerAddressCity"
+          label="Şehir"
+          value={importerAddressCity}
+          onChange={(e) => setImporterAddressCity(e.target.value)}
+          placeholder="Örn: Adana"
+          disabled={!isImporterSectionEditing}
+        />
+        <InputField
+          id="importerAddressStateCode"
+          label="İl Kodu (Sayısal Plaka Kodu)"
+          value={importerAddressStateCode}
+          onChange={(e) => setImporterAddressStateCode(e.target.value)}
+          placeholder="Örn: 01 (Adana için), 34 (İstanbul için)"
+          disabled={!isImporterSectionEditing}
+        />
+        <InputField
+          id="importerAddressPostalCode"
+          label="Posta Kodu"
+          value={importerAddressPostalCode}
+          onChange={(e) => setImporterAddressPostalCode(e.target.value)}
+          placeholder="Örn: 01170"
+          disabled={!isImporterSectionEditing}
+        />
+        <InputField
+          id="importerAddressCountryCode"
+          label="Ülke Kodu (ISO Alpha-2)"
+          value={importerAddressCountryCode}
+          onChange={(e) => setImporterAddressCountryCode(e.target.value.toUpperCase())}
+          placeholder="Örn: TR, US"
+          disabled={!isImporterSectionEditing}
+        />
+        <div className="flex justify-end mt-6">
+          {isImporterSectionEditing ? (
+            <button 
+              onClick={handleSaveImporterOfRecord} 
+              disabled={importerSectionSaveStatus === 'saving'}
+              className="px-6 py-2.5 bg-orange-600 text-white font-semibold text-sm rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
+            >
+              {importerSectionSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : importerSectionSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />İthalatçı Bilgilerini Kaydet</>)}
             </button>
           ) : (
-            <button onClick={() => { setIsShipperNameEditing(true); setShipperNameSaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperNameSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-        
-        {/* SHIPPER_PERSON_NAME */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperPersonName"
-              label="Gönderici Yetkili Kişi (Shipper Person Name)"
-              value={shipperPersonName}
-              onChange={(e) => setShipperPersonName(e.target.value)}
-              placeholder="Yetkili kişi adı soyadı"
-              disabled={!isShipperPersonNameEditing}
-            />
-          </div>
-          {isShipperPersonNameEditing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_PERSON_NAME', shipperPersonName, setShipperPersonNameSaveStatus, setIsShipperPersonNameEditing)} disabled={shipperPersonNameSaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperPersonNameSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperPersonNameSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperPersonNameEditing(true); setShipperPersonNameSaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperPersonNameSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-
-        {/* SHIPPER_PHONE_NUMBER */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperPhoneNumber"
-              label="Gönderici Telefon Numarası (Shipper Phone Number)"
-              value={shipperPhoneNumber}
-              onChange={(e) => setShipperPhoneNumber(e.target.value)}
-              placeholder="+90XXXXXXXXXX"
-              disabled={!isShipperPhoneNumberEditing}
-            />
-          </div>
-          {isShipperPhoneNumberEditing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_PHONE_NUMBER', shipperPhoneNumber, setShipperPhoneNumberSaveStatus, setIsShipperPhoneNumberEditing)} disabled={shipperPhoneNumberSaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperPhoneNumberSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperPhoneNumberSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperPhoneNumberEditing(true); setShipperPhoneNumberSaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperPhoneNumberSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-
-        {/* SHIPPER_STREET_1 */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperStreet1"
-              label="Gönderici Adres Satırı 1 (Shipper Street 1)"
-              value={shipperStreet1}
-              onChange={(e) => setShipperStreet1(e.target.value)}
-              placeholder="Mahalle, Cadde, Sokak, No"
-              disabled={!isShipperStreet1Editing}
-            />
-          </div>
-          {isShipperStreet1Editing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_STREET_1', shipperStreet1, setShipperStreet1SaveStatus, setIsShipperStreet1Editing)} disabled={shipperStreet1SaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperStreet1SaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperStreet1SaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperStreet1Editing(true); setShipperStreet1SaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperStreet1SaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-
-        {/* SHIPPER_STREET_2 */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperStreet2"
-              label="Gönderici Adres Satırı 2 (Shipper Street 2 - Opsiyonel)"
-              value={shipperStreet2}
-              onChange={(e) => setShipperStreet2(e.target.value)}
-              placeholder="Bina adı, İç kapı no vb."
-              disabled={!isShipperStreet2Editing}
-            />
-          </div>
-          {isShipperStreet2Editing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_STREET_2', shipperStreet2, setShipperStreet2SaveStatus, setIsShipperStreet2Editing)} disabled={shipperStreet2SaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperStreet2SaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperStreet2SaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperStreet2Editing(true); setShipperStreet2SaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperStreet2SaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-
-        {/* SHIPPER_CITY */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperCity"
-              label="Gönderici Şehir (Shipper City)"
-              value={shipperCity}
-              onChange={(e) => setShipperCity(e.target.value)}
-              placeholder="Örn: İstanbul"
-              disabled={!isShipperCityEditing}
-            />
-          </div>
-          {isShipperCityEditing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_CITY', shipperCity, setShipperCitySaveStatus, setIsShipperCityEditing)} disabled={shipperCitySaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperCitySaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperCitySaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperCityEditing(true); setShipperCitySaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperCitySaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-
-        {/* SHIPPER_POSTAL_CODE */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperPostalCode"
-              label="Gönderici Posta Kodu (Shipper Postal Code)"
-              value={shipperPostalCode}
-              onChange={(e) => setShipperPostalCode(e.target.value)}
-              placeholder="Örn: 34700"
-              disabled={!isShipperPostalCodeEditing}
-            />
-          </div>
-          {isShipperPostalCodeEditing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_POSTAL_CODE', shipperPostalCode, setShipperPostalCodeSaveStatus, setIsShipperPostalCodeEditing)} disabled={shipperPostalCodeSaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperPostalCodeSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperPostalCodeSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperPostalCodeEditing(true); setShipperPostalCodeSaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperPostalCodeSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-
-        {/* SHIPPER_STATE_CODE */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperStateCode"
-              label="Gönderici Eyalet/İl Kodu (Shipper State Code - Opsiyonel)"
-              value={shipperStateCode}
-              onChange={(e) => setShipperStateCode(e.target.value)}
-              placeholder="Örn: IST (TR için), CA (US için)"
-              disabled={!isShipperStateCodeEditing}
-            />
-          </div>
-          {isShipperStateCodeEditing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_STATE_CODE', shipperStateCode, setShipperStateCodeSaveStatus, setIsShipperStateCodeEditing)} disabled={shipperStateCodeSaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperStateCodeSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperStateCodeSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperStateCodeEditing(true); setShipperStateCodeSaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperStateCodeSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-
-        {/* SHIPPER_COUNTRY_CODE */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperCountryCode"
-              label="Gönderici Ülke Kodu (Shipper Country Code)"
-              value={shipperCountryCode}
-              onChange={(e) => setShipperCountryCode(e.target.value)}
-              placeholder="Örn: TR, US, DE (ISO 3166-1 alpha-2)"
-              disabled={!isShipperCountryCodeEditing}
-            />
-          </div>
-          {isShipperCountryCodeEditing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_COUNTRY_CODE', shipperCountryCode, setShipperCountryCodeSaveStatus, setIsShipperCountryCodeEditing)} disabled={shipperCountryCodeSaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperCountryCodeSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperCountryCodeSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperCountryCodeEditing(true); setShipperCountryCodeSaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperCountryCodeSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-
-        {/* SHIPPER_TIN_NUMBER */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperTinNumber"
-              label="Gönderici Vergi Numarası (Shipper TIN Number)"
-              value={shipperTinNumber}
-              onChange={(e) => setShipperTinNumber(e.target.value)}
-              placeholder="Vergi Kimlik Numarası"
-              disabled={!isShipperTinNumberEditing}
-            />
-          </div>
-          {isShipperTinNumberEditing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_TIN_NUMBER', shipperTinNumber, setShipperTinNumberSaveStatus, setIsShipperTinNumberEditing)} disabled={shipperTinNumberSaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperTinNumberSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperTinNumberSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperTinNumberEditing(true); setShipperTinNumberSaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperTinNumberSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
-            </button>
-          )}
-        </div>
-
-        {/* SHIPPER_TIN_TYPE */}
-        <div className="flex items-end space-x-2 mt-4">
-          <div className="flex-grow">
-            <InputField
-              id="shipperTinType"
-              label="Gönderici Vergi Numarası Türü (Shipper TIN Type)"
-              value={shipperTinType}
-              onChange={(e) => setShipperTinType(e.target.value)}
-              placeholder="Örn: VAT, EORI, TCNO"
-              disabled={!isShipperTinTypeEditing}
-            />
-          </div>
-          {isShipperTinTypeEditing ? (
-            <button onClick={() => handleSaveProperty('SHIPPER_TIN_TYPE', shipperTinType, setShipperTinTypeSaveStatus, setIsShipperTinTypeEditing)} disabled={shipperTinTypeSaveStatus === 'saving'} className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              {shipperTinTypeSaveStatus === 'saving' ? (<><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>) : shipperTinTypeSaveStatus === 'error' ? (<>Hata! Tekrar Dene</>) : (<><Save size={16} className="mr-2" />Kaydet</>)}
-            </button>
-          ) : (
-            <button onClick={() => { setIsShipperTinTypeEditing(true); setShipperTinTypeSaveStatus('idle'); }} className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap">
-              <Edit size={16} className="mr-2" /> Değiştir {shipperTinTypeSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
+            <button 
+              onClick={() => { setIsImporterSectionEditing(true); setImporterSectionSaveStatus('idle'); }}
+              className="px-6 py-2.5 bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
+            >
+              <Edit size={16} className="mr-2" /> İthalatçı Bilgilerini Değiştir {importerSectionSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
             </button>
           )}
         </div>
       </ApiSection>
 
-      <ApiSection title="Veeqo API Bilgileri" icon={Truck} description="Veeqo envanter ve sipariş yönetimi entegrasyonu.">
+      <ApiSection title="Veeqo API Bilgileri" icon={ShoppingCart} description="Veeqo envanter ve sipariş yönetimi entegrasyonu.">
         <div className="flex items-end space-x-2">
           <div className="flex-grow">
             <InputField
@@ -984,45 +907,40 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
+      </ApiSection>
 
-        <div className="flex items-end space-x-2 mt-4">
+      {/* System Managed Settings Section - NEW */}
+      <ApiSection 
+        title="Otomatik Ayarlar (Sistem)" 
+        icon={FolderCog} 
+        description="Bu ayarlar sistem tarafından yönetilir ve onboarding sırasında otomatik olarak oluşturulur."
+      >
+        {/* FEDEX_FOLDER_ID - Read-only */}
+        <div className="flex items-center space-x-2">
           <div className="flex-grow">
-            <InputField
-              id="veeqoOrdersUrl"
-              label="Veeqo Siparişler URL (Veeqo Orders URL)"
-              value={veeqoOrdersUrl}
-              onChange={(e) => setVeeqoOrdersUrl(e.target.value)}
-              placeholder="https://api.veeqo.com/orders"
-              disabled={!isVeeqoOrdersUrlEditing}
-            />
+            <label htmlFor="fedexFolderIdDisplay" className="block text-sm font-medium text-slate-700 mb-1">
+              FedEx Etiket Klasör ID (FedEx Label Folder ID)
+            </label>
+            <div 
+              id="fedexFolderIdDisplay"
+              className="mt-1 block w-full px-3 py-2 bg-slate-100 border border-slate-300 rounded-md shadow-sm sm:text-sm text-slate-700 overflow-x-auto"
+            >
+              {fedexFolderId || "Yükleniyor veya ayarlanmamış..."}
+            </div>
           </div>
-          {isVeeqoOrdersUrlEditing ? (
+          {fedexFolderId && (
             <button
-              onClick={() => handleSaveProperty('VEEQO_ORDERS_URL', veeqoOrdersUrl, setVeeqoOrdersUrlSaveStatus, setIsVeeqoOrdersUrlEditing)}
-              disabled={veeqoOrdersUrlSaveStatus === 'saving'}
-              className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
+              onClick={() => copyToClipboard(fedexFolderId)}
+              title="Klasör ID'sini Kopyala"
+              className="p-2 h-[38px] mt-6 bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
-              {veeqoOrdersUrlSaveStatus === 'saving' ? (
-                <><Save size={16} className="mr-2 animate-spin" />Kaydediliyor...</>
-              ) : veeqoOrdersUrlSaveStatus === 'error' ? (
-                <>Hata! Tekrar Dene</>
-              ) : (
-                <><Save size={16} className="mr-2" />Kaydet</>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                setIsVeeqoOrdersUrlEditing(true);
-                setVeeqoOrdersUrlSaveStatus('idle');
-              }}
-              className="px-4 py-2 h-[38px] bg-slate-200 text-slate-700 font-semibold text-sm rounded-md hover:bg-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
-            >
-              <Edit size={16} className="mr-2" /> Değiştir
-              {veeqoOrdersUrlSaveStatus === 'success' && <Check size={16} className="ml-2 text-green-500" />}
+              <ClipboardCopy size={18} />
             </button>
           )}
         </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Bu ID, FedEx kargo etiketlerinizin kaydedildiği Google Drive klasörünü belirtir. Onboarding sırasında otomatik oluşturulur.
+        </p>
       </ApiSection>
 
     </AppLayout>

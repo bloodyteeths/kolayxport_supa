@@ -43,7 +43,8 @@
       "title": "Deploy Wrapper Script as API Executable",
       "description": "Configured wrapper script project settings, linked GCP project, deployed as API Executable.",
       "status": "completed",
-      "outputs": ["NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID=AKfycbxW3xcu6kw6PbkloOHd3hIdqp65yBgmrgqwSsrr-csbu0NzSz6jeHcW1V4Tf8ugLsdgBw"]
+      "outputs": ["NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID=AKfycbxW3xcu6kw6PbkloOHd3hIdqp65yBgmrgqwSsrr-csbu0NzSz6jeHcW1V4Tf8ugLsdgBw"],
+      "notes": "This ID likely refers to the deployment of the *template* wrapper script or potentially the Core IP script. It is NOT the ID used by the backend API routes to target individual user script copies for UserProperties management. Each user needs their own copied script ID stored in the DB."
     },
     {
       "id": 8,
@@ -62,7 +63,7 @@
       "title": "Refactor Core Logic Library Code",
       "description": "Modified core library script (Code.gs) to accept parameters passed from wrapper, removing direct PropertiesService usage.",
       "status": "completed",
-      "notes": "User confirmed this was done manually online."
+      "notes": "User confirmed this was done manually online. This facilitates the central wrapper script fetching user-specific settings (API keys, paths) from its UserProperties (scoped to the acting user) and passing them as parameters to the core logic library."
     },
     {
       "id": 11,
@@ -81,16 +82,44 @@
     {
       "id": 13,
       "title": "Refactor Onboarding API (/api/onboarding/setup.js)",
-      "description": "Update onboarding logic to only copy sheet, create folder, and save googleSheetId/driveFolderId to DB. Remove all script ID retrieval/saving.",
+      "description": "Onboarding logic needs to: 1) Copy the template Google Sheet for the user. 2) Create a Google Drive folder for labels. 3) **Copy the template Wrapper Google Apps Script for the user.** 4) Retrieve the **Script ID** of the new script copy. 5) Save googleSheetId, driveFolderId, and the **userAppsScriptId** to the Prisma DB.",
       "status": "completed",
-      "dependencies": [12]
+      "dependencies": [12],
+      "notes": "Backend API now handles script copying and saving userAppsScriptId. Frontend trigger implemented in pages/app/index.js, which also calls set-user-property for FEDEX_FOLDER_ID post-onboarding."
     },
     {
       "id": 14,
       "title": "Refactor/Create Key Saving API",
-      "description": "Refactor /api/setScriptProps.js (or create new route) to save/update user API keys directly in the Prisma database.",
-      "status": "completed",
-      "dependencies": [12]
+      "description": "User-specific API keys (e.g., Trendyol, FedEx) and script configurations (e.g., Shipper Info, Veeqo keys, FEDEX_FOLDER_ID, IMPORTER_OF_RECORD) will be saved to and retrieved from the UserProperties of the **user's copied wrapper Google Apps Script**. This is managed via Next.js API routes (/api/gscript/set-user-property and /api/gscript/get-all-user-properties) which call corresponding functions (`saveToUserProperties`, `getAllUserProperties`) **in the user's specific script instance** using the Apps Script Execution API.",
+      "status": "in progress",
+      "dependencies": [12, 13],
+      "subtasks": [
+        {
+          "title": "Implement Next.js API route /api/gscript/set-user-property",
+          "description": "This route must authenticate the user, **retrieve their userAppsScriptId from the DB**, and call the 'saveToUserProperties(key, value)' function in that specific Apps Script instance.",
+          "status": "completed - needs testing"
+        },
+        {
+          "title": "Implement Next.js API route /api/gscript/get-all-user-properties",
+          "description": "This route must authenticate the user, **retrieve their userAppsScriptId from the DB**, and call the 'getAllUserProperties()' function in that specific Apps Script instance.",
+          "status": "completed - needs testing"
+        },
+        {
+          "title": "Implement Apps Script functions in Template Wrapper",
+          "description": "Ensure saveToUserProperties(key, value) and getAllUserProperties() exist in the **template wrapper script** (so they are copied to user instances). These will use PropertiesService.getUserProperties().",
+          "status": "in progress"
+        },
+        {
+          "title": "Update Settings Page Frontend",
+          "description": "Modify pages/app/settings.js to use /api/gscript/get-all-user-properties for loading initial settings and ensure FEDEX_FOLDER_ID is populated.",
+          "status": "completed"
+        },
+        {
+           "title": "Implement Frontend Onboarding Trigger & Logic",
+           "description": "Added useEffect in pages/app/index.js to call /api/onboarding/setup and subsequently call /api/gscript/set-user-property to save FEDEX_FOLDER_ID.",
+           "status": "completed"
+        }
+      ]
     },
     {
       "id": 15,
@@ -344,11 +373,16 @@
         { "title": "Per-page OG images & metadata", "status": "in progress" },
         { "title": "Structured data (Organization, Article)", "status": "in progress" },
         { "title": "Image optimization audit", "status": "planned" },
-        { "title": "Accessibility & Lighthouse improvements", "status": "planned" }
+        { "title": "Accessibility & Lighthouse improvements", "status": "planned" },
+        { 
+          "title": "Implement File Uploads for Settings", 
+          "description": "Handle LETTERHEAD_FILE_ID and STAMP_FILE_ID uploads in settings, saving to Drive and storing IDs in UserProperties.",
+          "status": "planned"
+        }
       ]
     }
   ],
-  "notes": "Architecture pivoted to a central API Executable Wrapper Script calling a private Core Logic Library. User-specific data (sheetId, keys, folderId) is stored in the backend DB and passed as parameters. Public pages and authenticated app section now have distinct, modern layouts.",
+  "notes": "Architecture pivoted to a central API Executable Wrapper Script calling a private Core Logic Library. User-specific data (sheetId, keys, folderId) is stored in the backend DB and passed as parameters. Public pages and authenticated app section now have distinct, modern layouts. **Correction:** Architecture uses a user-specific **copied** wrapper Apps Script (stored in user's Google Account) which holds UserProperties. This wrapper script calls the central Core Logic Library. Backend API routes target the user's specific script copy ID (stored in DB) for settings management.",
   "testingStrategy": {
     "overview": "Testing ensures the app works for real users and catches bugs before deployment. We use three types: manual testing (step-by-step checks in the browser), unit tests (automated checks for small pieces of code), and end-to-end (E2E) tests (automated checks for the whole user flow).",
     "manualTesting": {
@@ -362,5 +396,104 @@
     "unitTests": "Open a terminal, run \"npm test\", and check that all tests pass. If any fail, read the error message and ask for help if needed.",
     "e2eTests": "Open a terminal, run \"npx cypress open\" or \"npx cypress run\", and follow the on-screen instructions.",
     "reportingIssues": "If anything does not work as expected, write down what you did and what happened. Share this with the developer for help."
+  },
+  "scriptUserPropertiesReference": {
+    "description": "List of property keys expected by the user's copied Google Apps Script (wrapper script) in its UserProperties. The Next.js settings page (pages/app/settings.js) and onboarding logic should save/retrieve values using these exact keys. VEEQO_ORDERS_URL is hardcoded in the script.",
+    "properties": [
+      "VEEQO_API_KEY",
+      "TRENDYOL_SUPPLIER_ID",
+      "TRENDYOL_API_KEY",
+      "TRENDYOL_API_SECRET",
+      "SHIPPO_TOKEN",
+      "DEFAULT_CURRENCY_CODE",
+      "FEDEX_API_KEY",
+      "FEDEX_API_SECRET",
+      "FEDEX_ACCOUNT_NUMBER",
+      "FEDEX_FOLDER_ID",
+      "SHIPPER_NAME",
+      "SHIPPER_PERSON_NAME",
+      "SHIPPER_PHONE_NUMBER",
+      "SHIPPER_STREET_1",
+      "SHIPPER_STREET_2",
+      "SHIPPER_CITY",
+      "SHIPPER_STATE_CODE",
+      "SHIPPER_POSTAL_CODE",
+      "SHIPPER_COUNTRY_CODE",
+      "SHIPPER_TIN_NUMBER",
+      "SHIPPER_TIN_TYPE",
+      "DUTIES_PAYMENT_TYPE",
+      "IMPORTER_OF_RECORD"
+    ],
+    "alignmentNotes": [
+      {
+        "scriptKey": "SHIPPO_TOKEN",
+        "frontendKeySuggestion": "SHIPPO_API_TOKEN",
+        "issue": "Script expects 'SHIPPO_TOKEN'. Frontend settings page likely uses/saves as 'SHIPPO_API_TOKEN'. Frontend should be updated to save with key 'SHIPPO_TOKEN'."
+      },
+      {
+        "scriptKey": "DEFAULT_CURRENCY_CODE",
+        "frontendKeySuggestion": "DEFAULT_CURRENCY",
+        "issue": "Script expects 'DEFAULT_CURRENCY_CODE'. Frontend settings page likely uses/saves as 'DEFAULT_CURRENCY'. Frontend should be updated to save with key 'DEFAULT_CURRENCY_CODE'."
+      },
+      {
+        "scriptKey": "SHIPPER_NAME",
+        "frontendKeySuggestion": "SHIPPER_CONTACT_COMPANY_NAME",
+        "issue": "Script expects 'SHIPPER_NAME'. Frontend settings page likely uses/saves as 'SHIPPER_CONTACT_COMPANY_NAME'. Frontend should be updated to save with key 'SHIPPER_NAME'."
+      },
+      {
+        "scriptKey": "SHIPPER_PERSON_NAME",
+        "frontendKeySuggestion": "SHIPPER_CONTACT_PERSON_NAME",
+        "issue": "Script expects 'SHIPPER_PERSON_NAME'. Frontend settings page likely uses/saves as 'SHIPPER_CONTACT_PERSON_NAME'. Frontend should be updated to save with key 'SHIPPER_PERSON_NAME'."
+      },
+      {
+        "scriptKey": "SHIPPER_PHONE_NUMBER",
+        "frontendKeySuggestion": "SHIPPER_CONTACT_PHONE_NUMBER",
+        "issue": "Script expects 'SHIPPER_PHONE_NUMBER'. Frontend settings page likely uses/saves as 'SHIPPER_CONTACT_PHONE_NUMBER'. Frontend should be updated to save with key 'SHIPPER_PHONE_NUMBER'."
+      },
+      {
+        "scriptKey": "SHIPPER_STREET_1",
+        "frontendKeySuggestion": "SHIPPER_ADDRESS_LINE1",
+        "issue": "Script expects 'SHIPPER_STREET_1'. Frontend settings page likely uses/saves as 'SHIPPER_ADDRESS_LINE1'. Frontend should be updated to save with key 'SHIPPER_STREET_1'."
+      },
+      {
+        "scriptKey": "SHIPPER_STREET_2",
+        "frontendKeySuggestion": "SHIPPER_ADDRESS_LINE2",
+        "issue": "Script expects 'SHIPPER_STREET_2'. Frontend settings page likely uses/saves as 'SHIPPER_ADDRESS_LINE2'. Frontend should be updated to save with key 'SHIPPER_STREET_2'."
+      },
+      {
+        "scriptKey": "SHIPPER_CITY",
+        "frontendKeySuggestion": "SHIPPER_ADDRESS_CITY",
+        "issue": "Script expects 'SHIPPER_CITY'. Frontend settings page likely uses/saves as 'SHIPPER_ADDRESS_CITY'. Frontend should be updated to save with key 'SHIPPER_CITY'."
+      },
+      {
+        "scriptKey": "SHIPPER_STATE_CODE",
+        "frontendKeySuggestion": "SHIPPER_ADDRESS_STATE_PROVINCE_CODE",
+        "issue": "Script expects 'SHIPPER_STATE_CODE'. Frontend settings page should clarify that a 3-letter Turkish city code is expected (e.g., ADA for Adana). Frontend should be updated to save with key 'SHIPPER_STATE_CODE'."
+      },
+      {
+        "scriptKey": "SHIPPER_POSTAL_CODE",
+        "frontendKeySuggestion": "SHIPPER_ADDRESS_POSTAL_CODE",
+        "issue": "Script expects 'SHIPPER_POSTAL_CODE'. Frontend settings page likely uses/saves as 'SHIPPER_ADDRESS_POSTAL_CODE'. Frontend should be updated to save with key 'SHIPPER_POSTAL_CODE'."
+      },
+      {
+        "scriptKey": "SHIPPER_COUNTRY_CODE",
+        "frontendKeySuggestion": "SHIPPER_ADDRESS_COUNTRY_CODE",
+        "issue": "Script expects 'SHIPPER_COUNTRY_CODE'. Frontend settings page likely uses/saves as 'SHIPPER_ADDRESS_COUNTRY_CODE'. Frontend should be updated to save with key 'SHIPPER_COUNTRY_CODE'."
+      },
+      {
+        "scriptKey": "SHIPPER_TIN_NUMBER",
+        "frontendKeySuggestion": "SHIPPER_TAX_ID",
+        "issue": "Script expects 'SHIPPER_TIN_NUMBER'. Frontend settings page likely uses/saves as 'SHIPPER_TAX_ID'. Frontend should be updated to save with key 'SHIPPER_TIN_NUMBER'."
+      },
+      {
+        "scriptKey": "SHIPPER_TIN_TYPE",
+        "frontendKeySuggestion": "SHIPPER_TAX_ID_TYPE",
+        "issue": "Script expects 'SHIPPER_TIN_TYPE'. This will be a constant 'BUSINESS_NATIONAL' and should be set implicitly when SHIPPER_TIN_NUMBER is saved. No UI field needed. Frontend should be updated to save with key 'SHIPPER_TIN_TYPE'."
+      },
+      {
+        "scriptKey": "IMPORTER_OF_RECORD",
+        "issue": "New requirement. Expects a JSON string. Frontend settings page needs new UI fields for Importer details (contact person/company/phone/email, address street/city/state/postal/country). On save, these fields should be compiled into a JSON string and saved under this key. Clarification needed for Importer's state/province code format (3-letter vs numeric)."
+      }
+    ]
   }
 }

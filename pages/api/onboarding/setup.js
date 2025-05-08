@@ -236,23 +236,30 @@ export default async function handler(req, res) {
         console.log(`User ${userId}: Wrapper script already exists: ${userAppsScriptId}`);
     }
 
-    // --- 4. Update User Record in Database --- 
-    // Ensure all required IDs were successfully obtained/retrieved before updating
-    if (!googleSheetId || !driveFolderId || !userAppsScriptId) {
-        console.error(`User ${userId}: Missing required IDs after onboarding steps. Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}`);
-        throw new Error('Missing Sheet ID, Folder ID, or Script ID after onboarding steps.');
+    // --- 4. Save IDs to Database --- 
+    if (driveFolderId || googleSheetId || userAppsScriptId) { // Only update if at least one new ID was generated
+      console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}`);
+      try {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            ...(googleSheetId && { googleSheetId }), // Conditionally add if defined
+            ...(driveFolderId && { driveFolderId }), // Conditionally add if defined
+            ...(userAppsScriptId && { userAppsScriptId }), // Conditionally add if defined
+          },
+        });
+        console.log(`User ${userId}: Database updated successfully with new IDs.`);
+      } catch (dbError) {
+        console.error(`User ${userId}: Database update failed:`, dbError);
+        // Critical: If DB update fails after creating Google resources, user is in an inconsistent state.
+        // This specific error should be clearly logged and communicated.
+        return res.status(500).json({ 
+            success: false, 
+            error: 'Failed to save setup progress to database. Please contact support.',
+            details: dbError.message // Provide some detail for debugging
+        });
+      }
     }
-    
-    console.log(`User ${userId}: Updating user record in DB with SheetID, FolderID, and ScriptID...`);
-    await prisma.user.update({
-        where: { id: userId },
-        data: {
-            googleSheetId,
-            driveFolderId,
-            userAppsScriptId // Save the user's specific script ID
-        }
-    });
-    console.log(`User ${userId}: User record updated successfully.`);
 
     // --- 5. Set FEDEX_FOLDER_ID in the new script's UserProperties --- 
     // Trigger this asynchronously or via a separate call from frontend after onboarding success
@@ -265,18 +272,27 @@ export default async function handler(req, res) {
     //     body: JSON.stringify({ propertyName: 'FEDEX_FOLDER_ID', value: driveFolderId, userScriptId: userAppsScriptId /* If API needs it explicitly */ }) 
     // });
 
-    // --- Onboarding Complete --- 
+    // --- Success --- 
     console.log(`User ${userId}: Onboarding process completed successfully.`);
-    res.status(200).json({ 
-      success: true, 
-      message: 'Setup completed successfully!', 
-      data: { googleSheetId, driveFolderId, userAppsScriptId } // Return all obtained IDs
+    return res.status(200).json({
+      success: true,
+      message: 'Onboarding complete. Resources created and IDs saved.',
+      data: {
+        googleSheetId,
+        driveFolderId,
+        userAppsScriptId,
+      },
     });
 
   } catch (error) {
-    // Log the detailed error on the server
-    console.error(`Onboarding failed for user ${userId}:`, error.message, error.stack);
-    // Return a generic error message to the client
-    res.status(500).json({ error: `Setup failed: ${error.message}` });
+    // This is a general catch-all for errors during the onboarding steps (Drive/Sheet/Script creation)
+    console.error(`User ${userId}: Critical onboarding error in main try-catch:`, error.message);
+    console.error(`User ${userId}: Full error object:`, error);
+    // Ensure a JSON response is always sent for errors caught here
+    return res.status(500).json({ 
+        success: false, 
+        error: error.message || 'An unexpected error occurred during account setup.', 
+        details: error.stack // Include stack for debugging if available
+    });
   }
 } 

@@ -72,15 +72,12 @@ export default function AppIndexPage() {
   const [onboardingComplete, setOnboardingComplete] = useState(false);
 
   useEffect(() => {
-    console.log('[AppIndexPage Effect] Running effect. Status:', status, 'OnboardingComplete:', onboardingComplete);
-    // This effect checks onboarding status when the user is authenticated.
-    // The `onboardingComplete` state prevents it from re-running unnecessarily 
-    // within the same session after the initial check/setup attempt.
-    // If the user logs out/in, the check runs again, but the backend API 
-    // internally prevents redundant resource creation.
-    // TEMPORARILY removing !onboardingComplete check for debugging
-    if (status === 'authenticated' /*&& !onboardingComplete*/) {
-      console.log('[AppIndexPage Effect] Status is authenticated. Session:', session); // Log session object
+    console.log('[AppIndexPage Effect] Running effect. Status:', status, 'OnboardingComplete:', onboardingComplete, 'Session User ID:', session?.user?.id); // Updated log
+    
+    // Check if we have an authenticated session with a user ID AND onboarding hasn't completed
+    if (status === 'authenticated' && session?.user?.id && !onboardingComplete) {
+      console.log('[AppIndexPage Effect] Conditions met. Session:', session);
+      
       const checkAndRunOnboarding = async () => {
         console.log('Checking onboarding status...');
         setIsOnboarding(true);
@@ -142,6 +139,8 @@ export default function AppIndexPage() {
       };
 
       checkAndRunOnboarding();
+    } else {
+        console.log('[AppIndexPage Effect] Conditions NOT met for onboarding trigger.');
     }
   }, [status, onboardingComplete, session?.user?.id]);
 

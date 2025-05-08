@@ -197,23 +197,43 @@ export default async function handler(req, res) {
 
     // --- 3. Copy Template Wrapper Script (if needed) --- 
     if (!userAppsScriptId) {
-        console.log(`User ${userId}: Copying template wrapper script ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}...`);
-        // Note: Copying Apps Script creates a new project file in the user's Drive.
-        // Consider where this script should live (root or specific folder) and its name.
-        const scriptCopyMetadata = { 
-             name: `KolayXport Wrapper Script - ${session.user.email || userId}` // Unique name
-             // Optionally add parents: [driveFolderId] to place it in the labels folder, or another folder.
-        }; 
+        console.log(`User ${userId}: Copying template wrapper script ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID} using SERVICE ACCOUNT...`);
+        
         try {
-            const copiedScriptFile = await drive.files.copy({ 
+            // Get Service Account authenticated client specifically for this step
+            const serviceAuthClient = await getServiceAccountGoogleApiClient();
+            const serviceDrive = google.drive({ version: 'v3', auth: serviceAuthClient });
+
+            // Define metadata for the new script copy
+            const scriptCopyMetadata = { 
+                 name: `KolayXport Wrapper Script - ${session.user.email || userId}`, // Unique name
+                 // parents: [driveFolderId] // Optionally place in the created folder
+            }; 
+
+            // Perform the copy using the Service Account
+            const copiedScriptFile = await serviceDrive.files.copy({ 
                 fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-                resource: scriptCopyMetadata,
+                resource: scriptCopyMetadata, // Use requestBody for v3 consistency
+                // requestBody: scriptCopyMetadata, // Correct way for v3 resource
                 fields: 'id' // Only need the ID of the new script file
             });
             userAppsScriptId = copiedScriptFile.data.id;
 
-            if (!userAppsScriptId) throw new Error('Wrapper script copied but ID was not returned.');
-            console.log(`User ${userId}: Copied Wrapper Script ID: ${userAppsScriptId}`);
+            if (!userAppsScriptId) throw new Error('Wrapper script copied (by SA) but ID was not returned.');
+            console.log(`User ${userId}: Copied Wrapper Script ID via SA: ${userAppsScriptId}`);
+
+            // Share the newly copied script (created by SA) with the user
+            console.log(`User ${userId}: Sharing newly copied script ${userAppsScriptId} with user ${session.user.email}...`);
+            await serviceDrive.permissions.create({
+                fileId: userAppsScriptId,
+                // resource: { // Use requestBody for v3 consistency
+                requestBody: {
+                    role: 'writer', // Give user write access
+                    type: 'user',
+                    emailAddress: session.user.email
+                }
+            });
+            console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email}.`);
             
             // IMPORTANT: Additional steps might be needed here:
             // 1. Update Script Project Manifest: If the copied script needs to know the ID
@@ -231,15 +251,29 @@ export default async function handler(req, res) {
             //    script ID directly (often runs the HEAD/latest saved version).
 
         } catch (scriptCopyErr) {
-            console.error(`User ${userId}: Wrapper script copy attempt failed:`, scriptCopyErr);
-            // Add similar detailed logging as sheet copy if needed
-             if (scriptCopyErr.code === 403) {
+            console.error(`User ${userId}: SERVICE ACCOUNT failed Wrapper script copy attempt:`, scriptCopyErr);
+            // Log raw error details
+             let rawCopyErrorString = 'No raw copyErr object available or stringification failed.';
+             try {
+               rawCopyErrorString = JSON.stringify(scriptCopyErr, Object.getOwnPropertyNames(scriptCopyErr), 2);
+             } catch (e) {
+               rawCopyErrorString = `Error stringifying copyErr: ${e.message}. Raw copy error message: ${scriptCopyErr.message}`;
+             }
+            console.error(`User ${userId}: Raw SA scriptCopyErr object:`, rawCopyErrorString);
+
+             if (scriptCopyErr.code === 404) {
+                // If even the SA gets 404, the file ID is likely wrong or inaccessible to the project
+                 return res.status(500).json({ 
+                     error: `Template script (ID: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}) not found, even by Service Account. Check ID and sharing with SA: ${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || 'SA email not readable'}.`
+                 });
+             } else if (scriptCopyErr.code === 403) {
                  // Potentially insufficient permissions or API not enabled for Drive or Apps Script?
                   return res.status(500).json({ 
-                      error: 'Failed to copy script. Check Drive/AppsScript API enablement and permissions.' 
+                      error: 'Failed to copy script using Service Account. Check Drive/AppsScript API enablement and SA permissions.' 
                   });
              }
-            throw new Error(`Failed to copy template wrapper script. ${scriptCopyErr.message || ''}`);
+            // General error
+            throw new Error(`Failed to copy template wrapper script using Service Account. ${scriptCopyErr.message || ''}`);
         }
     } else {
         console.log(`User ${userId}: Wrapper script already exists: ${userAppsScriptId}`);

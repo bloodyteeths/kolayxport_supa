@@ -71,6 +71,7 @@ export default function AppIndexPage() {
   const [onboardingComplete, setOnboardingComplete] = useState(false);
 
   useEffect(() => {
+    console.log('[AppIndexPage Effect] Running effect. Status:', status, 'OnboardingComplete:', onboardingComplete);
     // This effect checks onboarding status when the user is authenticated.
     // The `onboardingComplete` state prevents it from re-running unnecessarily 
     // within the same session after the initial check/setup attempt.
@@ -140,7 +141,7 @@ export default function AppIndexPage() {
 
       checkAndRunOnboarding();
     }
-  }, [status, onboardingComplete]);
+  }, [status, onboardingComplete, session?.user?.id]);
 
   if (status === 'loading') {
     return (

@@ -84,7 +84,10 @@ export default function AppIndexPage() {
         setOnboardingStatus('Hesap kurulumu kontrol ediliyor...');
 
         try {
-          const res = await fetch('/api/onboarding/setup.js', { method: 'POST' });
+          const res = await fetch('/api/onboarding/setup.js', { 
+            method: 'POST', 
+            credentials: 'include'
+          });
           const data = await res.json();
 
           if (!res.ok) {

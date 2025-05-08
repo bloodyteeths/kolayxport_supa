@@ -1,5 +1,6 @@
 import { getSession } from 'next-auth/react';
 import { google } from 'googleapis';
+import { GoogleAuth } from 'google-auth-library';
 import prisma from '@/lib/prisma'; // Your prisma client instance
 import dotenv from 'dotenv';
 
@@ -15,8 +16,24 @@ function getUserGoogleApiClient(accessToken) {
   return auth;
 }
 
-// --- REMOVED: Service Account Helper - Not needed for onboarding in this architecture ---
-// async function getServiceAccountGoogleApiClient() { ... }
+// Helper function to get Google API client authenticated as the service account
+async function getServiceAccountGoogleApiClient() {
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON) {
+    throw new Error('GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON environment variable is not set');
+  }
+  
+  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON);
+  const auth = new GoogleAuth({
+    credentials,
+    scopes: [
+      'https://www.googleapis.com/auth/drive',
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/script.projects',
+    ],
+  });
+  
+  return auth.getClient();
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -120,21 +137,20 @@ export default async function handler(req, res) {
     if (!googleSheetId) {
       console.log(`User ${userId}: Attempting to GET template sheet ${TEMPLATE_SHEET_ID} for verification...`);
       
-      // Log the service account email being used (if using service account)
+      // Log the service account email being used
       if (process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON) {
         const saCredentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON);
         console.log(`User ${userId}: Using service account: ${saCredentials.client_email}`);
       }
       
       try {
+        // First try with user auth
         const fileMetadata = await drive.files.get({
           fileId: TEMPLATE_SHEET_ID,
-          fields: 'id, name, ownedByMe, capabilities'
+          fields: 'id, name, ownedByMe, capabilities, trashed'
         });
         
-        // CRITICAL LOG: If this line does not appear in Vercel logs for a request,
-        // the drive.files.get() call above it either failed silently or hung indefinitely.
-        console.log(`User ${userId}: STEP 2B - drive.files.get SUCCEEDED for sheet. ID: ${fileMetadata.data.id}, Name: ${fileMetadata.data.name}, OwnedByMe: ${fileMetadata.data.ownedByMe}, Capabilities: ${JSON.stringify(fileMetadata.data.capabilities)}`);
+        console.log(`User ${userId}: STEP 2B - drive.files.get SUCCEEDED for sheet. ID: ${fileMetadata.data.id}, Name: ${fileMetadata.data.name}, OwnedByMe: ${fileMetadata.data.ownedByMe}, Trashed: ${fileMetadata.data.trashed}, Capabilities: ${JSON.stringify(fileMetadata.data.capabilities)}`);
 
         if (fileMetadata.data.trashed) {
           console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} is in the trash.`);
@@ -142,95 +158,81 @@ export default async function handler(req, res) {
         }
 
         if (!fileMetadata.data.capabilities?.canCopy) {
-            console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} exists (not trashed) but cannot be copied by the authenticated user. Capabilities:`, fileMetadata.data.capabilities);
-            throw new Error(`The template sheet (ID: ${TEMPLATE_SHEET_ID}) exists but the authenticated user does not have permission to copy it. Please check sharing settings and ensure the 'Viewers and commenters can see the option to download, print, and copy' is enabled if relying on general access.`);
+          console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} exists (not trashed) but cannot be copied by the authenticated user. Capabilities:`, fileMetadata.data.capabilities);
+          
+          // Try again with the service account to see if it has access
+          console.log(`User ${userId}: Checking sheet access with service account...`);
+          try {
+            const serviceAuthClient = await getServiceAccountGoogleApiClient();
+            const serviceDrive = google.drive({ version: 'v3', auth: serviceAuthClient });
+            
+            const serviceMetadata = await serviceDrive.files.get({
+              fileId: TEMPLATE_SHEET_ID,
+              fields: 'id, name, capabilities'
+            });
+            
+            console.log(`User ${userId}: Service account CAN access the template sheet. ID: ${serviceMetadata.data.id}, Capabilities: ${JSON.stringify(serviceMetadata.data.capabilities)}`);
+            
+            if (serviceMetadata.data.capabilities?.canCopy) {
+              console.log(`User ${userId}: Service account has copy permission. Using service account to copy the sheet.`);
+              
+              // Use service account to copy the sheet
+              const sheetCopyResponse = await serviceDrive.files.copy({
+                fileId: TEMPLATE_SHEET_ID,
+                requestBody: {
+                  name: `Senkronizasyon Verileri - ${session.user.name || 'User'}`,
+                },
+              });
+              
+              googleSheetId = sheetCopyResponse.data.id;
+              console.log(`User ${userId}: Copied template sheet successfully with service account. New Sheet ID: ${googleSheetId}`);
+              
+              // Share the copied sheet with the user
+              await serviceDrive.permissions.create({
+                fileId: googleSheetId,
+                requestBody: {
+                  role: 'writer',
+                  type: 'user',
+                  emailAddress: session.user.email,
+                },
+              });
+              
+              console.log(`User ${userId}: Shared copied sheet with user email: ${session.user.email}`);
+            } else {
+              throw new Error(`The service account cannot copy the template sheet. Please check sharing settings.`);
+            }
+          } catch (serviceError) {
+            console.error(`User ${userId}: Service account failed to access template sheet:`, serviceError);
+            throw new Error(`The template sheet (ID: ${TEMPLATE_SHEET_ID}) cannot be accessed by either the user or the service account. Please check sharing settings.`);
+          }
+        } else {
+          // Original user-authenticated copy logic
+          const sheetCopyResponse = await drive.files.copy({
+            fileId: TEMPLATE_SHEET_ID,
+            requestBody: {
+              name: `Senkronizasyon Verileri - ${session.user.name || 'User'}`,
+            },
+          });
+          
+          googleSheetId = sheetCopyResponse.data.id;
+          console.log(`User ${userId}: Copied template sheet successfully with user auth. New Sheet ID: ${googleSheetId}`);
         }
-        
-        // Log success of checks before attempting copy
-        console.log(`User ${userId}: STEP 2C - Template sheet pre-copy checks passed (fetched, not trashed, can be copied).`);
-
       } catch (getErr) {
         console.error(`User ${userId}: STEP 2X - FAILED during drive.files.get or subsequent checks for template sheet ${TEMPLATE_SHEET_ID}.`);
-        
-        // Log the raw error object from googleapis more reliably
-        let rawErrorString = 'No raw error object available or stringification failed.';
-        try {
-          rawErrorString = JSON.stringify(getErr, Object.getOwnPropertyNames(getErr), 2);
-        } catch (e) {
-          // If stringify fails (e.g. circular refs not handled by Object.getOwnPropertyNames)
-          rawErrorString = `Error stringifying getErr: ${e.message}. Raw error message: ${getErr.message}`;
-        }
-        console.error(`User ${userId}: Raw getErr object:`, rawErrorString);
-
+        console.error(`User ${userId}: Raw getErr object:`, getErr);
+        // Improved error detail formatting: include code, message, and API-level details if available
         let detailedMessage = "Failed to access or verify the template Google Sheet.";
-        if (getErr.message) detailedMessage += ` Google API Error: ${getErr.message}`;
-        if (getErr.code) detailedMessage += ` (Code: ${getErr.code})`;
+        if (getErr.code && getErr.message) {
+          detailedMessage += ` Google API Error: ${getErr.message} (Code: ${getErr.code})`;
+        } else if (getErr.message) {
+          detailedMessage += ` Error: ${getErr.message}`;
+        }
         
-        // Construct a new error with a clear prefix
         // This error will be caught by the outermost try...catch in your handler
         throw new Error(`GET_SHEET_ERROR: ${detailedMessage}`); 
       }
-
-      // If we've reached here, the drive.files.get and its checks were successful.
-      console.log(`User ${userId}: STEP 2D - Attempting drive.files.copy for template sheet ${TEMPLATE_SHEET_ID}...`);
-      const copyMetadata = { 
-          name: `KolayXport Kargo Takip - ${session.user.email || userId}`
-          // parents: [driveFolderId] // Optional
-      };
-      try {
-        const copiedFile = await drive.files.copy({ 
-            fileId: TEMPLATE_SHEET_ID,
-            resource: copyMetadata,
-            fields: 'id, name, webViewLink, owners' 
-        });
-        googleSheetId = copiedFile.data.id;
-
-        if (!googleSheetId) throw new Error('Sheet copied but ID was not returned.');
-        console.log(`User ${userId}: Copied Sheet ID: ${googleSheetId}, Name: ${copiedFile.data.name}, Link: ${copiedFile.data.webViewLink}`);
-
-        // Rename the first sheet (gid=0) to "Kargov2"
-        console.log(`User ${userId}: Renaming first sheet in ${googleSheetId} to 'Kargov2'...`);
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId: googleSheetId,
-          requestBody: {
-            requests: [
-              {
-                updateSheetProperties: {
-                  properties: {
-                    sheetId: 0, // Target the first sheet (gid=0)
-                    title: "Kargov2",
-                  },
-                  fields: "title",
-                },
-              },
-            ],
-          },
-        });
-        console.log(`User ${userId}: Renamed first sheet to 'Kargov2'.`);
-        
-      } catch (copyErr) {
-         // PREPEND a distinct marker to logs from this catch block
-         const logPrefix = `User ${userId}: COPY_SHEET_ERROR -`;
-         console.error(`${logPrefix} Sheet copy attempt failed.`);
-         
-        let rawCopyErrorString = 'No raw copyErr object available or stringification failed.';
-        try {
-          rawCopyErrorString = JSON.stringify(copyErr, Object.getOwnPropertyNames(copyErr), 2);
-        } catch (e) {
-          rawCopyErrorString = `Error stringifying copyErr: ${e.message}. Raw copy error message: ${copyErr.message}`;
-        }
-        console.error(`${logPrefix} Raw copyErr object:`, rawCopyErrorString);
-
-         let errorMessage = "Failed to copy or rename template sheet.";
-         if (copyErr.message) errorMessage += ` Original error: ${copyErr.message}`;
-         if (copyErr.code) errorMessage += ` API responded with code: ${copyErr.code}.`;
-         errorMessage += " Check server logs for details.";
-         
-         // This error will be caught by the outermost try...catch
-         throw new Error(`COPY_SHEET_ERROR: ${errorMessage}`);
-      }
     } else {
-       console.log(`User ${userId}: Sheet already exists: ${googleSheetId}`);
+      console.log(`User ${userId}: Sheet already exists: ${googleSheetId}`);
     }
 
     // --- 3. Copy Template Wrapper Script (if needed) --- 

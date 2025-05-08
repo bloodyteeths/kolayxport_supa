@@ -195,61 +195,79 @@ export default async function handler(req, res) {
       console.log(`User ${userId}: Sheet already exists: ${googleSheetId}`);
     }
 
-    // --- 3. Copy Template Wrapper Script (if needed) --- 
+    // --- 3. Create & Populate Wrapper Script using USER Auth & Apps Script API ---
     if (!userAppsScriptId) {
-      console.log(`User ${userId}: Copying template wrapper script ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID} using USER authentication...`);
-      
+      console.log(`User ${userId}: Creating & populating new Apps Script project using USER authentication via Apps Script API...`);
+
+      const WRAPPER_CODE_FILENAME = 'wrapper.gs';
+      const WRAPPER_MANIFEST_FILENAME = 'appsscript.json';
+
+      // !!! IMPORTANT: Manually paste the correct code/manifest content below !!!
+      const WRAPPER_CODE_CONTENT = `// PASTE WRAPPER_CODE_CONTENT HERE (ensure escaping if needed)`;
+      const WRAPPER_MANIFEST_CONTENT = `{/* PASTE WRAPPER_MANIFEST_CONTENT HERE */}`; // Use JSON format
+
       try {
-        // Use the USER's authenticated Drive client
-        const scriptCopyMetadata = { 
-          name: `KolayXport Wrapper Script - ${session.user.name || session.user.email || userId}`, // Unique name
-          // parents: [driveFolderId] // Optionally place in the created folder later if needed
-        }; 
+        // Use the USER's authenticated client for Apps Script API
+        // Ensure userAuth (OAuth2 client with user's accessToken) is initialized correctly above
+        const scriptApi = google.script({ version: 'v1', auth: userAuth });
 
-        // Perform the copy using USER auth
-        const copiedScriptFile = await drive.files.copy({ // Using `drive` which is user-authenticated
-          fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-          requestBody: scriptCopyMetadata,
-          fields: 'id', 
-          supportsAllDrives: true // Keep this, it might help edge cases
+        // A. Create a new, empty script project using USER AUTH
+        console.log(`User ${userId}: User is creating a new empty script project...`);
+        const newProject = await scriptApi.projects.create({
+          resource: {
+            title: `KolayXport Wrapper Script - ${session.user.name || session.user.email || userId}`
+          }
         });
-        userAppsScriptId = copiedScriptFile.data.id;
+        const newScriptId = newProject.data.scriptId;
+        if (!newScriptId) throw new Error('User created new script project, but scriptId was not returned.');
+        console.log(`User ${userId}: User created new script project ID: ${newScriptId}`);
 
-        if (!userAppsScriptId) throw new Error('Wrapper script copied (by user) but ID was not returned.');
-        console.log(`User ${userId}: Copied Wrapper Script ID via user auth: ${userAppsScriptId}`);
+        // B. Update content of the new script using USER AUTH
+        console.log(`User ${userId}: User is updating content of new script ${newScriptId} with wrapper code and manifest...`);
+        await scriptApi.projects.updateContent({
+          scriptId: newScriptId,
+          resource: {
+            files: [
+              {
+                name: WRAPPER_MANIFEST_FILENAME,
+                type: 'JSON',
+                source: WRAPPER_MANIFEST_CONTENT
+              },
+              {
+                name: WRAPPER_CODE_FILENAME,
+                type: 'SERVER_JS', // Assuming .gs file
+                source: WRAPPER_CODE_CONTENT
+              }
+            ]
+          }
+        });
+        console.log(`User ${userId}: User successfully updated content of new script ${newScriptId}.`);
 
-        // Note: Sharing is likely not needed now as the user owns the copy.
-        // We might need to move it to the created folder if desired.
-        // console.log(`User ${userId}: Moving newly copied script ${userAppsScriptId} to folder ${driveFolderId}...`);
-        // await drive.files.update({
-        //   fileId: userAppsScriptId,
-        //   addParents: driveFolderId,
-        //   removeParents: 'root', // Assuming it was copied to root initially
-        //   fields: 'id, parents'
-        // });
-        // console.log(`User ${userId}: Moved script ${userAppsScriptId} to folder.`);
+        userAppsScriptId = newScriptId; // This is the ID we store
 
-      } catch (scriptCopyErr) {
-        console.error(`User ${userId}: USER failed Wrapper script copy attempt:`, scriptCopyErr);
+        // C. No Sharing needed - user created it, user owns it.
+
+      } catch (scriptApiErr) {
+        console.error(`User ${userId}: USER failed during Apps Script project creation/population via API:`, scriptApiErr);
         let rawErrorString = 'Error details not available or stringification failed.';
         try {
-          rawErrorString = JSON.stringify(scriptCopyErr, Object.getOwnPropertyNames(scriptCopyErr), 2);
+          rawErrorString = JSON.stringify(scriptApiErr, Object.getOwnPropertyNames(scriptApiErr), 2);
         } catch (e) {
-          rawErrorString = `Error stringifying scriptCopyErr: ${e.message}. Raw error message: ${scriptCopyErr.message}`;
+          rawErrorString = `Error stringifying scriptApiErr: ${e.message}. Raw error message: ${scriptApiErr.message}`;
         }
-        console.error(`User ${userId}: Raw user scriptCopyErr object:`, rawErrorString);
+        console.error(`User ${userId}: Raw user scriptApiErr object:`, rawErrorString);
 
-        let errorMessage = 'Failed to copy the template script using your Google account.';
-        if (scriptCopyErr.code) {
-          errorMessage += ` (Code: ${scriptCopyErr.code})`;
-          if (scriptCopyErr.code === 404) {
-            errorMessage += ` Please ensure the template script (ID starting ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID.substring(0, 6)}...) is shared correctly (Anyone with link -> Viewer).`;
-          } else if (scriptCopyErr.code === 403) {
-             errorMessage += ` You might lack permission to copy this specific file, or the Drive API might be disabled for the project.`;
-          }
+        let errorMessage = 'Failed to create/populate the script using your Google account via Apps Script API.';
+        if (scriptApiErr.code) {
+          errorMessage += ` (Code: ${scriptApiErr.code})`;
+           if (scriptApiErr.code === 403 && scriptApiErr.message && scriptApiErr.message.includes('User has not enabled the Apps Script API')) {
+             errorMessage += ` The Apps Script API might need to be enabled in your Google Account settings (script.google.com/home/usersettings).`;
+           } else if (scriptApiErr.code === 403) {
+              errorMessage += ` You might lack permission, or the Apps Script API might be disabled for the Cloud project.`;
+           }
         }
-        if (scriptCopyErr.errors && scriptCopyErr.errors[0] && scriptCopyErr.errors[0].message) {
-          errorMessage += ` Details: ${scriptCopyErr.errors[0].message}`;
+        if (scriptApiErr.errors && scriptApiErr.errors[0] && scriptApiErr.errors[0].message) {
+          errorMessage += ` Details: ${scriptApiErr.errors[0].message}`;
         }
 
         return res.status(500).json({ error: errorMessage, details: rawErrorString });

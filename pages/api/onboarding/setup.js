@@ -133,103 +133,63 @@ export default async function handler(req, res) {
        console.log(`User ${userId}: Drive folder already exists: ${driveFolderId}`);
     }
     
-    // --- 2. Copy Template Sheet (if needed) --- 
+    // --- 2. Create New Google Sheet (if needed) --- 
     if (!googleSheetId) {
-      console.log(`User ${userId}: Attempting to GET template sheet ${TEMPLATE_SHEET_ID} for verification...`);
-      
-      // Log the service account email being used
-      if (process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON) {
-        const saCredentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON);
-        console.log(`User ${userId}: Using service account: ${saCredentials.client_email}`);
-      }
-      
+      console.log(`User ${userId}: Creating new Google Sheet...`);
       try {
-        // First try with user auth
-        const fileMetadata = await drive.files.get({
-          fileId: TEMPLATE_SHEET_ID,
-          fields: 'id, name, ownedByMe, capabilities, trashed'
-        });
-        
-        console.log(`User ${userId}: STEP 2B - drive.files.get SUCCEEDED for sheet. ID: ${fileMetadata.data.id}, Name: ${fileMetadata.data.name}, OwnedByMe: ${fileMetadata.data.ownedByMe}, Trashed: ${fileMetadata.data.trashed}, Capabilities: ${JSON.stringify(fileMetadata.data.capabilities)}`);
-
-        if (fileMetadata.data.trashed) {
-          console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} is in the trash.`);
-          throw new Error(`The template Google Sheet (ID: ${TEMPLATE_SHEET_ID}) is in the trash. Please restore it.`);
-        }
-
-        if (!fileMetadata.data.capabilities?.canCopy) {
-          console.error(`User ${userId}: Template sheet ${TEMPLATE_SHEET_ID} exists (not trashed) but cannot be copied by the authenticated user. Capabilities:`, fileMetadata.data.capabilities);
-          
-          // Try again with the service account to see if it has access
-          console.log(`User ${userId}: Checking sheet access with service account...`);
-          try {
-            const serviceAuthClient = await getServiceAccountGoogleApiClient();
-            const serviceDrive = google.drive({ version: 'v3', auth: serviceAuthClient });
-            
-            const serviceMetadata = await serviceDrive.files.get({
-              fileId: TEMPLATE_SHEET_ID,
-              fields: 'id, name, capabilities'
-            });
-            
-            console.log(`User ${userId}: Service account CAN access the template sheet. ID: ${serviceMetadata.data.id}, Capabilities: ${JSON.stringify(serviceMetadata.data.capabilities)}`);
-            
-            if (serviceMetadata.data.capabilities?.canCopy) {
-              console.log(`User ${userId}: Service account has copy permission. Using service account to copy the sheet.`);
-              
-              // Use service account to copy the sheet
-              const sheetCopyResponse = await serviceDrive.files.copy({
-                fileId: TEMPLATE_SHEET_ID,
-                requestBody: {
-                  name: `Senkronizasyon Verileri - ${session.user.name || 'User'}`,
-                },
-              });
-              
-              googleSheetId = sheetCopyResponse.data.id;
-              console.log(`User ${userId}: Copied template sheet successfully with service account. New Sheet ID: ${googleSheetId}`);
-              
-              // Share the copied sheet with the user
-              await serviceDrive.permissions.create({
-                fileId: googleSheetId,
-                requestBody: {
-                  role: 'writer',
-                  type: 'user',
-                  emailAddress: session.user.email,
-                },
-              });
-              
-              console.log(`User ${userId}: Shared copied sheet with user email: ${session.user.email}`);
-            } else {
-              throw new Error(`The service account cannot copy the template sheet. Please check sharing settings.`);
+        const spreadsheet = await sheets.spreadsheets.create({
+          resource: {
+            properties: {
+              // Dynamically set title using user's name/email for uniqueness
+              title: `KolayXport Kargo Takip - ${session.user.name || session.user.email || userId}` 
             }
-          } catch (serviceError) {
-            console.error(`User ${userId}: Service account failed to access template sheet:`, serviceError);
-            throw new Error(`The template sheet (ID: ${TEMPLATE_SHEET_ID}) cannot be accessed by either the user or the service account. Please check sharing settings.`);
-          }
+          },
+          fields: 'spreadsheetId,spreadsheetUrl' // Get ID and URL
+        });
+
+        googleSheetId = spreadsheet.data.spreadsheetId;
+        if (!googleSheetId) throw new Error('Spreadsheet created but ID was not returned.');
+        console.log(`User ${userId}: Created new Sheet ID: ${googleSheetId}, URL: ${spreadsheet.data.spreadsheetUrl}`);
+
+        // Rename the first sheet (gid=0) to "Kargov2"
+        console.log(`User ${userId}: Renaming first sheet in ${googleSheetId} to 'Kargov2'...`);
+        // Find the sheetId of the first sheet (usually 0, but safer to fetch)
+        const sheetMetadata = await sheets.spreadsheets.get({
+            spreadsheetId: googleSheetId,
+            fields: 'sheets(properties(sheetId,index))',
+        });
+        const firstSheetId = sheetMetadata.data.sheets?.find(s => s.properties?.index === 0)?.properties?.sheetId;
+
+        if (firstSheetId === undefined || firstSheetId === null) {
+           console.warn(`User ${userId}: Could not find the first sheet (index 0) in new spreadsheet ${googleSheetId} to rename.`);
         } else {
-          // Original user-authenticated copy logic
-          const sheetCopyResponse = await drive.files.copy({
-            fileId: TEMPLATE_SHEET_ID,
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: googleSheetId,
             requestBody: {
-              name: `Senkronizasyon Verileri - ${session.user.name || 'User'}`,
+              requests: [
+                {
+                  updateSheetProperties: {
+                    properties: {
+                      sheetId: firstSheetId, // Use the fetched sheetId
+                      title: "Kargov2",
+                    },
+                    fields: "title",
+                  },
+                },
+              ],
             },
           });
-          
-          googleSheetId = sheetCopyResponse.data.id;
-          console.log(`User ${userId}: Copied template sheet successfully with user auth. New Sheet ID: ${googleSheetId}`);
+          console.log(`User ${userId}: Renamed first sheet to 'Kargov2'.`);
         }
-      } catch (getErr) {
-        console.error(`User ${userId}: STEP 2X - FAILED during drive.files.get or subsequent checks for template sheet ${TEMPLATE_SHEET_ID}.`);
-        console.error(`User ${userId}: Raw getErr object:`, getErr);
-        // Improved error detail formatting: include code, message, and API-level details if available
-        let detailedMessage = "Failed to access or verify the template Google Sheet.";
-        if (getErr.code && getErr.message) {
-          detailedMessage += ` Google API Error: ${getErr.message} (Code: ${getErr.code})`;
-        } else if (getErr.message) {
-          detailedMessage += ` Error: ${getErr.message}`;
-        }
-        
-        // This error will be caught by the outermost try...catch in your handler
-        throw new Error(`GET_SHEET_ERROR: ${detailedMessage}`); 
+      } catch (sheetCreateErr) {
+         console.error(`User ${userId}: Failed to create or rename new Google Sheet:`, sheetCreateErr);
+         // Add specific error handling if needed (e.g., Sheets API disabled)
+         if (sheetCreateErr.code === 403) {
+           return res.status(500).json({
+             error: 'Google Sheets API may be disabled or user lacks permission to create sheets. Please check Google Cloud Console.'
+           });
+         }
+         throw new Error(`Failed to create/setup new Google Sheet. ${sheetCreateErr.message || ''}`);
       }
     } else {
       console.log(`User ${userId}: Sheet already exists: ${googleSheetId}`);

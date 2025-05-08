@@ -214,7 +214,8 @@ export default async function handler(req, res) {
             const copiedScriptFile = await serviceDrive.files.copy({ 
                 fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
                 requestBody: scriptCopyMetadata, // Restore the requestBody
-                fields: 'id' // Only need the ID of the new script file
+                fields: 'id',
+                supportsAllDrives: true // Add supportsAllDrives
             });
             userAppsScriptId = copiedScriptFile.data.id;
 

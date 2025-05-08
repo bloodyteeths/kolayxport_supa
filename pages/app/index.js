@@ -64,6 +64,7 @@ const DashboardLandingContent = () => {
 };
 
 export default function AppIndexPage() {
+  console.log('[AppIndexPage Render] Component rendering...'); // Log component render
   const { data: session, status } = useSession();
   const router = useRouter();
   const [isOnboarding, setIsOnboarding] = useState(false);
@@ -77,8 +78,9 @@ export default function AppIndexPage() {
     // within the same session after the initial check/setup attempt.
     // If the user logs out/in, the check runs again, but the backend API 
     // internally prevents redundant resource creation.
-    if (status === 'authenticated' && !onboardingComplete) {
-      
+    // TEMPORARILY removing !onboardingComplete check for debugging
+    if (status === 'authenticated' /*&& !onboardingComplete*/) {
+      console.log('[AppIndexPage Effect] Status is authenticated. Session:', session); // Log session object
       const checkAndRunOnboarding = async () => {
         console.log('Checking onboarding status...');
         setIsOnboarding(true);

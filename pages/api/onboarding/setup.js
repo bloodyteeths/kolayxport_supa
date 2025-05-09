@@ -205,13 +205,14 @@ export default async function handler(req, res) {
         // Use the USER's authenticated Drive client
         const scriptCopyMetadata = { 
           name: `KolayXport Wrapper Script - ${session.user.name || session.user.email || userId}`, // Unique name
+          mimeType: 'application/vnd.google-apps.script',
           // parents: [driveFolderId] // Optionally place in the created folder later if needed
         }; 
 
         // Perform the copy using USER auth
         const copiedScriptFile = await drive.files.copy({ // Using `drive` which is user-authenticated
           fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-          // requestBody: scriptCopyMetadata, // Temporarily removed for diagnosis
+          requestBody: scriptCopyMetadata, // Re-enabled with explicit mimeType
           fields: 'id',
           supportsAllDrives: true // Keep this, it might help edge cases
         });

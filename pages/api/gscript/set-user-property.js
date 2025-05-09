@@ -11,7 +11,11 @@ import prisma from '@/lib/prisma'; // Import Prisma client
 // Helper function to get Google API client authenticated AS THE USER (with auto-refresh)
 // Accepts access_token, refresh_token, and expiry to auto-refresh tokens
 function getUserGoogleApiClient({ access_token, refresh_token, expires_at }) {
-  const auth = new google.auth.OAuth2();
+  // Create OAuth2 client with client ID/secret so it can auto-refresh tokens
+  const auth = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
   auth.setCredentials({
     access_token,
     refresh_token,

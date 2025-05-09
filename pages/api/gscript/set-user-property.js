@@ -3,8 +3,8 @@
 // specific script ID from DB, and calls Apps Script to save UserProperties
 // using the USER'S OAuth token.
 
-import { getSession } from 'next-auth/react';
-// import { GoogleAuth } from 'google-auth-library'; // No longer using Service Account here
+import { unstable_getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]";
 import { google } from 'googleapis';
 import prisma from '@/lib/prisma'; // Import Prisma client
 
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  const session = await getSession({ req });
+  const session = await unstable_getServerSession(req, res, authOptions);
   if (!session || !session.user?.id) { // Ensure user ID is present
     return res.status(401).json({ message: 'Not authenticated' });
   }

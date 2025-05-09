@@ -9,7 +9,11 @@ dotenv.config();
 // --- Helper: Get Google API Client authenticated AS THE USER (with auto-refresh) ---
 // Accepts access_token, refresh_token, and expiry to auto-refresh tokens
 function getUserGoogleApiClient({ access_token, refresh_token, expires_at }) {
-  const auth = new google.auth.OAuth2();
+  // Include clientId and clientSecret so OAuth2 can auto-refresh
+  const auth = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
   auth.setCredentials({
     access_token,
     refresh_token,
@@ -314,16 +318,26 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- 5. Set FEDEX_FOLDER_ID in the new script's UserProperties --- 
-    // Trigger this asynchronously or via a separate call from frontend after onboarding success
-    // For simplicity here, let's log that it needs to happen.
-    console.log(`User ${userId}: TODO - Trigger setting FEDEX_FOLDER_ID (${driveFolderId}) in script ${userAppsScriptId} via /api/gscript/set-user-property`);
-    // Example (conceptual - needs frontend implementation):
-    // fetch('/api/gscript/set-user-property', { 
-    //     method: 'POST', 
-    //     headers: { 'Content-Type': 'application/json', /* + Auth? */ }, 
-    //     body: JSON.stringify({ propertyName: 'FEDEX_FOLDER_ID', value: driveFolderId, userScriptId: userAppsScriptId /* If API needs it explicitly */ }) 
-    // });
+    // --- 5. Set FEDEX_FOLDER_ID in the new script's UserProperties on the server ---
+    try {
+      console.log(`User ${userId}: Setting FEDEX_FOLDER_ID (${driveFolderId}) in Apps Script ${userAppsScriptId}`);
+      const scriptApi = google.script({ version: 'v1', auth: userAuth });
+      const execResponse = await scriptApi.scripts.run({
+        scriptId: userAppsScriptId,
+        resource: {
+          function: 'saveToUserProperties',
+          parameters: ['FEDEX_FOLDER_ID', driveFolderId],
+          devMode: true,
+        },
+      });
+      if (execResponse.data.error) {
+        console.error(`User ${userId}: Apps Script error setting FEDEX_FOLDER_ID:`, JSON.stringify(execResponse.data.error, null, 2));
+      } else {
+        console.log(`User ${userId}: FEDEX_FOLDER_ID set successfully in Apps Script.`);
+      }
+    } catch (propErr) {
+      console.error(`User ${userId}: Failed to set FEDEX_FOLDER_ID in Apps Script:`, propErr);
+    }
 
     // --- Success --- 
     console.log(`User ${userId}: Onboarding process completed successfully.`);

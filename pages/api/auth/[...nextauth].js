@@ -56,8 +56,7 @@ export const authOptions = {
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/script.projects", // For creating/managing script projects (not directly used by run)
             "https://www.googleapis.com/auth/script.storage", // For the script to access its own UserProperties
-            "https://www.googleapis.com/auth/script.scriptapp",
-            "https://www.googleapis.com/auth/script.googleapis.com" // Re-added broader scope
+            "https://www.googleapis.com/auth/script.scriptapp"
             // "https://www.googleapis.com/auth/script.external_request", // Only if script makes UrlFetch to external services
           ].join(" "),
         },

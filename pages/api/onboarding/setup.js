@@ -151,6 +151,20 @@ export default async function handler(req, res) {
         if (!googleSheetId) throw new Error('Spreadsheet created but ID was not returned.');
         console.log(`User ${userId}: Created new Sheet ID: ${googleSheetId}, URL: ${spreadsheet.data.spreadsheetUrl}`);
 
+        // Move the newly created sheet to the user's Drive folder
+        if (driveFolderId) {
+          console.log(`User ${userId}: Moving sheet ${googleSheetId} to folder ${driveFolderId}...`);
+          await drive.files.update({
+            fileId: googleSheetId,
+            addParents: driveFolderId,
+            removeParents: 'root', // Remove from root if it was added there by default
+            fields: 'id, parents'
+          });
+          console.log(`User ${userId}: Successfully moved sheet ${googleSheetId} to folder ${driveFolderId}.`);
+        } else {
+          console.warn(`User ${userId}: driveFolderId is not defined, cannot move sheet ${googleSheetId} to a folder.`);
+        }
+
         // Rename the first sheet (gid=0) to "Kargov2"
         console.log(`User ${userId}: Renaming first sheet in ${googleSheetId} to 'Kargov2'...`);
         // Find the sheetId of the first sheet (usually 0, but safer to fetch)

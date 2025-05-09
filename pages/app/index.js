@@ -123,7 +123,7 @@ export default function AppIndexPage() {
 
             } catch (setPropertyError) {
               console.error('Failed to set FEDEX_FOLDER_ID after onboarding:', setPropertyError);
-              setOnboardingStatus(`Kurulum tamamlandı, ancak ${propertyName} ayarı kaydedilemedi: ${setPropertyError.message}. Lütfen Ayarlar sayfasından tekrar deneyin veya destek ile iletişime geçin.`);
+              setOnboardingStatus(`Kurulum tamamlandı, ancak FEDEX_FOLDER_ID ayarı kaydedilemedi: ${setPropertyError.message}. Lütfen Ayarlar sayfasından tekrar deneyin veya destek ile iletişime geçin.`);
               setOnboardingComplete(true);
             }
 

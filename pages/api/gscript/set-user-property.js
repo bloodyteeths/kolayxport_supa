@@ -8,12 +8,15 @@ import { authOptions } from "../auth/[...nextauth]";
 import { google } from 'googleapis';
 import prisma from '@/lib/prisma'; // Import Prisma client
 
-// Helper function to get Google API client authenticated AS THE USER
-function getUserGoogleApiClient(accessToken) {
+// Helper function to get Google API client authenticated AS THE USER (with auto-refresh)
+// Accepts access_token, refresh_token, and expiry to auto-refresh tokens
+function getUserGoogleApiClient({ access_token, refresh_token, expires_at }) {
   const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: accessToken });
-  // Consider adding logic to handle token refresh if these operations become long-lived
-  // or if you encounter token expiry issues here. For a single API call, it's often fine.
+  auth.setCredentials({
+    access_token,
+    refresh_token,
+    expiry_date: expires_at * 1000
+  });
   return auth;
 }
 
@@ -29,22 +32,22 @@ export default async function handler(req, res) {
   }
   const userId = session.user.id;
 
-  // Retrieve the stored OAuth access token from Prisma's Account table
-  // This is crucial for making calls AS THE USER.
-  let accessToken;
+  // Retrieve the stored OAuth tokens from Prisma's Account table
+  let oauthAccount;
   try {
-    const oauthAccount = await prisma.account.findFirst({
-      where: { userId, provider: 'google' }, // Assuming 'google' is your provider ID
+    oauthAccount = await prisma.account.findFirst({
+      where: { userId, provider: 'google' },
     });
     if (!oauthAccount?.access_token) {
       console.error(`User ${userId}: OAuth access token not found in DB for set-user-property.`);
       return res.status(401).json({ message: 'User OAuth token not found. Please re-authenticate.' });
     }
-    accessToken = oauthAccount.access_token;
   } catch (dbError) {
     console.error(`User ${userId}: Database error fetching OAuth token:`, dbError);
     return res.status(500).json({ message: 'Server error retrieving authentication details.' });
   }
+  // Destructure the tokens for user authentication
+  const { access_token, refresh_token, expires_at } = oauthAccount;
 
   const { propertyName, value } = req.body;
   if (!propertyName) {
@@ -64,8 +67,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'User onboarding incomplete or script ID missing.' });
     }
     
-    // 1. Authenticate with Google using THE USER'S OAuth Access Token
-    const userAuthClient = getUserGoogleApiClient(accessToken);
+    // 1. Authenticate with Google using THE USER'S OAuth tokens (with refresh)
+    const userAuthClient = getUserGoogleApiClient({ access_token, refresh_token, expires_at });
     const script = google.script({ version: 'v1', auth: userAuthClient }); // Use user-authenticated client
 
     // 2. Prepare and Call Google Apps Script Execution API using the USER'S script ID

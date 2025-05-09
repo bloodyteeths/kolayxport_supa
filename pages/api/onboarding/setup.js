@@ -6,13 +6,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// --- Helper: Get Google API Client authenticated AS THE USER ---
-// We need this to perform actions in *their* Drive/Sheets
-function getUserGoogleApiClient(accessToken) {
+// --- Helper: Get Google API Client authenticated AS THE USER (with auto-refresh) ---
+// Accepts access_token, refresh_token, and expiry to auto-refresh tokens
+function getUserGoogleApiClient({ access_token, refresh_token, expires_at }) {
   const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: accessToken });
-  // TODO: Potentially handle token refresh if needed, though access token
-  // from NextAuth session should be valid for the request duration.
+  auth.setCredentials({
+    access_token,
+    refresh_token,
+    expiry_date: expires_at * 1000
+  });
   return auth;
 }
 
@@ -54,7 +56,8 @@ export default async function handler(req, res) {
     console.error(`Onboarding Error: No OAuth access token found for user ${userId}.`);
     return res.status(401).json({ message: 'Authentication required.' });
   }
-  const accessToken = oauthAccount.access_token;
+  // Destructure access and refresh tokens for user authentication
+  const { access_token, refresh_token, expires_at } = oauthAccount;
 
   // Read master template sheet ID and WRAPPER SCRIPT template ID from environment
   const TEMPLATE_SHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
@@ -99,8 +102,8 @@ export default async function handler(req, res) {
 
     console.log(`Starting/Resuming onboarding for user ${userId}...`);
 
-    // --- Authenticate as the User for Drive/Sheet operations --- 
-    const userAuth = getUserGoogleApiClient(accessToken);
+    // --- Authenticate as the User for Drive/Sheet operations (with refresh) ---
+    const userAuth = getUserGoogleApiClient({ access_token, refresh_token, expires_at });
     const drive = google.drive({ version: 'v3', auth: userAuth });
     const sheets = google.sheets({ version: 'v4', auth: userAuth });
 

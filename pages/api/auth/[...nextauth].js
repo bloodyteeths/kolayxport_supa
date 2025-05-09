@@ -47,6 +47,7 @@ export const authOptions = {
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
+          include_granted_scopes: "true",
           scope: [ // Request scopes needed for onboarding & Execution API
             "openid",
             "https://www.googleapis.com/auth/userinfo.email",

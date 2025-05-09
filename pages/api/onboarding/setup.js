@@ -202,6 +202,29 @@ export default async function handler(req, res) {
       console.log(`User ${userId}: User email attempting copy: ${session.user.email}`);
       
       try {
+        // Verify template script details first
+        try {
+          console.log(`User ${userId}: Verifying details for template script ID: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
+          const templateFileMeta = await drive.files.get({
+            fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
+            fields: 'id, name, mimeType, trashed',
+            supportsAllDrives: true,
+          });
+          console.log(`User ${userId}: Template script details: Name: ${templateFileMeta.data.name}, MIME Type: ${templateFileMeta.data.mimeType}, ID: ${templateFileMeta.data.id}, Trashed: ${templateFileMeta.data.trashed}`);
+          if (templateFileMeta.data.mimeType !== 'application/vnd.google-apps.script') {
+            console.warn(`User ${userId}: WARNING - Template script MIME type is ${templateFileMeta.data.mimeType}, not application/vnd.google-apps.script. This could cause copy issues.`);
+          }
+          if (templateFileMeta.data.trashed) {
+            console.error(`User ${userId}: ERROR - Template script ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID} is in the trash. Cannot be copied.`);
+            return res.status(500).json({ error: 'Template script is in the trash and cannot be used.'});
+          }
+        } catch (metaErr) {
+          console.error(`User ${userId}: Failed to retrieve metadata for template script ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}:`, metaErr.message);
+          // Also log detailed error from Google if available
+          console.error(`User ${userId}: Detailed metadata error from Google:`, JSON.stringify(metaErr.response?.data, null, 2));
+          return res.status(500).json({ error: `Failed to verify template script. ${metaErr.message}` });
+        }
+
         // Use the USER's authenticated Drive client
         const scriptCopyMetadata = { 
           name: `KolayXport Wrapper Script - ${session.user.name || session.user.email || userId}`, // Unique name
@@ -234,6 +257,7 @@ export default async function handler(req, res) {
 
       } catch (scriptCopyErr) {
         console.error(`User ${userId}: USER failed Wrapper script copy attempt:`, scriptCopyErr);
+        console.error(`User ${userId}: Detailed error from Google:`, JSON.stringify(scriptCopyErr.response?.data, null, 2));
         let rawErrorString = 'Error details not available or stringification failed.';
         try {
           rawErrorString = JSON.stringify(scriptCopyErr, Object.getOwnPropertyNames(scriptCopyErr), 2);

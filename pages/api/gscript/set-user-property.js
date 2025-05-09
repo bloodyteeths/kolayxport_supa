@@ -82,7 +82,7 @@ export default async function handler(req, res) {
       resource: {
         function: 'saveToUserProperties',
         parameters: [propertyName, value],
-        // devMode: false, // Typically false for user-specific scripts unless specific versioning is used
+        devMode: true, // Run the head version without needing a formal deployment
       },
     };
 

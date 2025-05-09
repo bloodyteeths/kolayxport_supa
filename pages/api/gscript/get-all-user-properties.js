@@ -59,8 +59,7 @@ export default async function handler(req, res) {
       scriptId: userScriptId, // Use the ID fetched from the database
       resource: {
         function: 'getAllUserProperties',
-        // No parameters needed
-        // devMode: true // Consider if needed
+        devMode: true, // Run the head version without needing a formal deployment
       },
     };
 

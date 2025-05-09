@@ -197,7 +197,9 @@ export default async function handler(req, res) {
 
     // --- 3. Copy Template Wrapper Script (if needed) --- 
     if (!userAppsScriptId) {
-      console.log(`User ${userId}: Copying template wrapper script ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID} using USER authentication...`);
+      console.log(`User ${userId}: Preparing to copy template wrapper script using USER authentication...`);
+      console.log(`User ${userId}: Template Script ID from env: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
+      console.log(`User ${userId}: User email attempting copy: ${session.user.email}`);
       
       try {
         // Use the USER's authenticated Drive client
@@ -209,8 +211,8 @@ export default async function handler(req, res) {
         // Perform the copy using USER auth
         const copiedScriptFile = await drive.files.copy({ // Using `drive` which is user-authenticated
           fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-          requestBody: scriptCopyMetadata,
-          fields: 'id', 
+          // requestBody: scriptCopyMetadata, // Temporarily removed for diagnosis
+          fields: 'id',
           supportsAllDrives: true // Keep this, it might help edge cases
         });
         userAppsScriptId = copiedScriptFile.data.id;

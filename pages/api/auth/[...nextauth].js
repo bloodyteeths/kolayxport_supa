@@ -80,7 +80,7 @@ export const authOptions = {
     async session({ session, user }) {
       session.user.id = user.id; // Add the user ID from the DB
       // Add other DB fields needed on the client
-      session.user.googleScriptId = user.googleScriptId;
+      session.user.googleScriptId = user.userAppsScriptId;
       session.user.googleSheetId = user.googleSheetId;
       session.user.driveFolderId = user.driveFolderId;
 

@@ -212,48 +212,35 @@ export default async function handler(req, res) {
           });
           console.log(`User ${userId}: Template script details: Name: ${templateFileMeta.data.name}, MIME Type: ${templateFileMeta.data.mimeType}, ID: ${templateFileMeta.data.id}, Trashed: ${templateFileMeta.data.trashed}`);
           if (templateFileMeta.data.mimeType !== 'application/vnd.google-apps.script') {
-            console.warn(`User ${userId}: WARNING - Template script MIME type is ${templateFileMeta.data.mimeType}, not application/vnd.google-apps.script. This could cause copy issues.`);
+            throw new Error(`Template script has incorrect MIME type: ${templateFileMeta.data.mimeType}`);
           }
           if (templateFileMeta.data.trashed) {
-            console.error(`User ${userId}: ERROR - Template script ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID} is in the trash. Cannot be copied.`);
-            return res.status(500).json({ error: 'Template script is in the trash and cannot be used.'});
+            throw new Error('Template script is in the trash.');
           }
-        } catch (metaErr) {
-          console.error(`User ${userId}: Failed to retrieve metadata for template script ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}:`, metaErr.message);
-          // Also log detailed error from Google if available
-          console.error(`User ${userId}: Detailed metadata error from Google:`, JSON.stringify(metaErr.response?.data, null, 2));
-          return res.status(500).json({ error: `Failed to verify template script. ${metaErr.message}` });
+        } catch (verifyErr) {
+          console.error(`User ${userId}: Failed to verify template script:`, verifyErr);
+          // Rethrow or handle as critical error, as copy will likely fail
+          throw new Error(`Critical error verifying template script before copy: ${verifyErr.message}`);
         }
-
-        // Use the USER's authenticated Drive client
+        
         const scriptCopyMetadata = { 
           name: `KolayXport Wrapper Script - ${session.user.name || session.user.email || userId}`, // Unique name
           mimeType: 'application/vnd.google-apps.script',
-          // parents: [driveFolderId] // Optionally place in the created folder later if needed
+          parents: [driveFolderId] // CRITICAL: Place copy in the user's folder
         }; 
+
+        console.log(`User ${userId}: Attempting to copy script with metadata:`, JSON.stringify(scriptCopyMetadata));
 
         // Perform the copy using USER auth
         const copiedScriptFile = await drive.files.copy({ // Using `drive` which is user-authenticated
           fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-          requestBody: scriptCopyMetadata, // Re-enabled with explicit mimeType
-          fields: 'id',
-          supportsAllDrives: true // Keep this, it might help edge cases
+          requestBody: scriptCopyMetadata, 
+          fields: 'id, name, webViewLink', // Request id, name, and webViewLink
+          supportsAllDrives: true 
         });
+        
         userAppsScriptId = copiedScriptFile.data.id;
-
-        if (!userAppsScriptId) throw new Error('Wrapper script copied (by user) but ID was not returned.');
-        console.log(`User ${userId}: Copied Wrapper Script ID via user auth: ${userAppsScriptId}`);
-
-        // Note: Sharing is likely not needed now as the user owns the copy.
-        // We might need to move it to the created folder if desired.
-        // console.log(`User ${userId}: Moving newly copied script ${userAppsScriptId} to folder ${driveFolderId}...`);
-        // await drive.files.update({
-        //   fileId: userAppsScriptId,
-        //   addParents: driveFolderId,
-        //   removeParents: 'root', // Assuming it was copied to root initially
-        //   fields: 'id, parents'
-        // });
-        // console.log(`User ${userId}: Moved script ${userAppsScriptId} to folder.`);
+        console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${copiedScriptFile.data.webViewLink}`);
 
       } catch (scriptCopyErr) {
         console.error(`User ${userId}: USER failed Wrapper script copy attempt:`, scriptCopyErr);

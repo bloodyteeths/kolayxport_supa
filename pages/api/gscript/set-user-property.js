@@ -78,11 +78,11 @@ export default async function handler(req, res) {
     // 2. Prepare and Call Google Apps Script Execution API using the USER'S script ID
     console.log(`User ${userId}: Executing Apps Script function: saveToUserProperties for '${propertyName}' in user script: ${userScriptId} (as user)`);
     const scriptRequest = {
-      scriptId: userScriptId,
+      // Use the locked-down API executable deployment
+      scriptId: 'AKfycby4D7mkv-F3ZVJ1-MJcFbx23wy8q-B7TEkkNc6p68S4-We50VZlfUStrBktzoPAaBblJA',
       resource: {
         function: 'saveToUserProperties',
         parameters: [propertyName, value],
-        devMode: true, // Run the head version without needing a formal deployment
       },
     };
 

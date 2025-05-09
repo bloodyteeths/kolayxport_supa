@@ -323,11 +323,11 @@ export default async function handler(req, res) {
       console.log(`User ${userId}: Setting FEDEX_FOLDER_ID (${driveFolderId}) in Apps Script ${userAppsScriptId}`);
       const scriptApi = google.script({ version: 'v1', auth: userAuth });
       const execResponse = await scriptApi.scripts.run({
-        scriptId: userAppsScriptId,
+        // Use the locked-down API executable deployment
+        scriptId: 'AKfycby4D7mkv-F3ZVJ1-MJcFbx23wy8q-B7TEkkNc6p68S4-We50VZlfUStrBktzoPAaBblJA',
         resource: {
           function: 'saveToUserProperties',
           parameters: ['FEDEX_FOLDER_ID', driveFolderId],
-          devMode: true,
         },
       });
       if (execResponse.data.error) {

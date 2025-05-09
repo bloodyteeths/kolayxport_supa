@@ -56,10 +56,10 @@ export default async function handler(req, res) {
     // 2. Prepare and Call Google Apps Script Execution API using the USER'S script ID
     console.log(`Executing Apps Script function: getAllUserProperties in user script: ${userScriptId}`);
     const scriptRequest = {
-      scriptId: userScriptId, // Use the ID fetched from the database
+      // Use the locked-down API executable deployment
+      scriptId: 'AKfycby4D7mkv-F3ZVJ1-MJcFbx23wy8q-B7TEkkNc6p68S4-We50VZlfUStrBktzoPAaBblJA',
       resource: {
         function: 'getAllUserProperties',
-        devMode: true, // Run the head version without needing a formal deployment
       },
     };
 

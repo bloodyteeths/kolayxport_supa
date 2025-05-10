@@ -4,7 +4,7 @@ import PublicLayout from "@/components/PublicLayout";
 export default function TermsOfServiceTR() {
   const companyName = "Tamsar Tekstil Dış Tic. Ltd. Şti.";
   const appName = "KolayXport";
-  const supportEmail = "destek@kolayxport.com";
+  const supportEmail = "kolayxport@gmail.com";
   const lastUpdated = "May 7, 2025";
 
   return (
@@ -15,7 +15,7 @@ export default function TermsOfServiceTR() {
           <p><em>Son Güncelleme: {lastUpdated}</em></p>
 
           <h2>1. Kabul</h2>
-          <p>Google hesabınızla oturum açarak ve {appName}’i kullanarak bu Kullanım Şartları’nı kabul etmiş olursunuz.</p>
+          <p>Google hesabınızla oturum açarak ve {appName}’i kullanarak bu Kullanım Şartları'nı kabul etmiş olursunuz.</p>
 
           <h2>2. Hizmet Tanımı</h2>
           <p>{appName}, kargo iş akışları için Google Drive klasörleri, E-Tablolar ve Apps Script oluşturmayı otomatikleştirir.</p>
@@ -23,7 +23,7 @@ export default function TermsOfServiceTR() {
           <h2>3. Kullanıcı Yükümlülükleri</h2>
           <ul>
             <li>Geçerli bir Google hesabı sağlamalı ve yalnızca istenen OAuth izinlerini vermelisiniz.</li>
-            <li>API’leri kötüye kullanmamalı veya hizmet işlemlerini engellememelisiniz.</li>
+            <li>API'leri kötüye kullanmamalı veya hizmet işlemlerini engellememelisiniz.</li>
           </ul>
 
           <h2>4. Lisans</h2>
@@ -31,7 +31,7 @@ export default function TermsOfServiceTR() {
 
           <h2>5. Yasaklanan Davranışlar</h2>
           <ul>
-            <li>İzinsiz tarama, hackleme veya kodumuzun/API’lerimizin tersine mühendisliği.</li>
+            <li>İzinsiz tarama, hackleme veya kodumuzun/API'lerimizin tersine mühendisliği.</li>
             <li>Oluşturulan Drive dosyaları aracılığıyla yasadışı içerik yükleme veya paylaşma.</li>
           </ul>
 
@@ -48,7 +48,7 @@ export default function TermsOfServiceTR() {
           <p>Bu Şartları güncelleyebiliriz; güncellenen sürümler güncellenme tarihi ile yayınlanacaktır.</p>
 
           <h2>10. Geçerli Hukuk</h2>
-          <p>Bu Şartlar, {companyName}’in bulunduğu yerin yasalarına tabidir.</p>
+          <p>Bu Şartlar, {companyName}'in bulunduğu yerin yasalarına tabidir.</p>
 
           <h2>11. İletişim</h2>
           <p>

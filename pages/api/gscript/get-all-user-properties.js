@@ -47,7 +47,13 @@ export default async function handler(req, res) {
       // Scopes should be appropriate for what the script execution needs.
       // If just reading properties via a script that doesn't make other API calls,
       // fewer scopes might be needed than for setting properties or more complex scripts.
-      scopes: ['https://www.googleapis.com/auth/script.projects', 'https://www.googleapis.com/auth/script.deployments', 'https://www.googleapis.com/auth/script.metrics'], 
+      scopes: [
+        'https://www.googleapis.com/auth/script.scriptapp',
+        'https://www.googleapis.com/auth/script.projects',
+        'https://www.googleapis.com/auth/script.deployments',
+        'https://www.googleapis.com/auth/script.metrics'
+      ],
+      clientOptions: { quotaProjectId: process.env.GCP_PROJECT_ID }
     });
 
     const client = await auth.getClient();
@@ -56,7 +62,7 @@ export default async function handler(req, res) {
     // 2. Prepare and Call Google Apps Script Execution API using the USER'S script ID
     console.log(`Executing Apps Script function: getAllUserProperties in user script: ${userScriptId}`);
     const scriptRequest = {
-      scriptId: userScriptId, // Use the actual Apps Script project ID
+      scriptId: userScriptId,
       resource: {
         function: 'getAllUserProperties',
       },

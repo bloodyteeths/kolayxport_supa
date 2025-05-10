@@ -4,7 +4,7 @@ import PublicLayout from "@/components/PublicLayout";
 export default function TermsOfServiceEN() {
   const companyName = "Tamsar Tekstil Dış Tic. Ltd. Şti.";
   const appName = "KolayXport";
-  const supportEmail = "destek@kolayxport.com";
+  const supportEmail = "kolayxport@gmail.com";
   const websiteUrl = "https://kolayxport.com";
   const lastUpdated = "May 7, 2025";
 

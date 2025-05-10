@@ -11,10 +11,10 @@ const resourceLinks = [
   { name: 'Blog', href: '/blog' },
   { name: 'Destek', href: '/iletisim' },
   // Legal Links
-  { name: 'Privacy Policy', href: '/docs/privacy' },
-  { name: 'Terms of Service', href: '/docs/terms' },
-  { name: 'Gizlilik Politikası', href: '/docs/privacy-tr' },
-  { name: 'Kullanım Şartları', href: '/docs/terms-tr' },
+  { name: 'Privacy Policy', href: '/privacy' },
+  { name: 'Terms of Service', href: '/terms' },
+  { name: 'Gizlilik Politikası', href: '/privacy-tr' },
+  { name: 'Kullanım Şartları', href: '/terms-tr' },
 ];
 
 const socialLinks = [

@@ -19,6 +19,7 @@ function getUserGoogleApiClient({ access_token, refresh_token, expires_at }) {
     refresh_token,
     expiry_date: expires_at * 1000
   });
+  auth.requestOptions = { quotaProjectId: process.env.GCP_PROJECT_ID };
   return auth;
 }
 
@@ -36,6 +37,7 @@ async function getServiceAccountGoogleApiClient() {
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/script.projects',
     ],
+    clientOptions: { quotaProjectId: process.env.GCP_PROJECT_ID }
   });
   
   return auth.getClient();
@@ -323,7 +325,7 @@ export default async function handler(req, res) {
       console.log(`User ${userId}: Setting FEDEX_FOLDER_ID (${driveFolderId}) in Apps Script ${userAppsScriptId}`);
       const scriptApi = google.script({ version: 'v1', auth: userAuth });
       const execResponse = await scriptApi.scripts.run({
-        scriptId: userAppsScriptId, // Use the actual Apps Script project ID
+        scriptId: userAppsScriptId,
         resource: {
           function: 'saveToUserProperties',
           parameters: ['FEDEX_FOLDER_ID', driveFolderId],

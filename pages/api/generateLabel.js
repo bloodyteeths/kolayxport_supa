@@ -19,6 +19,7 @@ async function getAppsScriptAPI() {
     GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, '\n'),
     ['https://www.googleapis.com/auth/script.projects']
   );
+  auth.projectId = process.env.GCP_PROJECT_ID;
   await auth.authorize();
   return google.script({ version: 'v1', auth });
 }
@@ -105,7 +106,6 @@ export default async function handler(req, res) {
         // Pass parameters in the order expected by the Apps Script function:
         // function generateLabelForOrder(fedexKeys, driveFolderId, orderData)
         parameters: [fedexKeys, driveFolderId, orderData], 
-        devMode: false, 
       },
     });
 

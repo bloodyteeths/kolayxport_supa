@@ -21,6 +21,7 @@ function getUserGoogleApiClient({ access_token, refresh_token, expires_at }) {
     refresh_token,
     expiry_date: expires_at * 1000
   });
+  auth.requestOptions = { quotaProjectId: process.env.GCP_PROJECT_ID };
   return auth;
 }
 
@@ -78,7 +79,7 @@ export default async function handler(req, res) {
     // 2. Prepare and Call Google Apps Script Execution API using the USER'S script ID
     console.log(`User ${userId}: Executing Apps Script function: saveToUserProperties for '${propertyName}' in user script: ${userScriptId} (as user)`);
     const scriptRequest = {
-      scriptId: userScriptId, // Use the actual Apps Script project ID
+      scriptId: userScriptId,
       resource: {
         function: 'saveToUserProperties',
         parameters: [propertyName, value],

@@ -81,13 +81,18 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server configuration error: Missing template script ID.' });
   }
 
-  let googleSheetId, driveFolderId, userAppsScriptId;
+  let googleSheetId, driveFolderId, userAppsScriptId, deploymentId;
 
   try {
     // --- Check if user already fully onboarded --- 
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { googleSheetId: true, driveFolderId: true, userAppsScriptId: true } // Select all relevant IDs
+      select: { 
+        googleSheetId: true, 
+        driveFolderId: true, 
+        userAppsScriptId: true,
+        googleScriptDeploymentId: true 
+      } // Select all relevant IDs
     });
 
     // If all IDs exist, onboarding is complete
@@ -99,7 +104,8 @@ export default async function handler(req, res) {
           data: { 
               googleSheetId: existingUser.googleSheetId, 
               driveFolderId: existingUser.driveFolderId, 
-              userAppsScriptId: existingUser.userAppsScriptId 
+              userAppsScriptId: existingUser.userAppsScriptId,
+              googleScriptDeploymentId: existingUser.googleScriptDeploymentId
             }
       });
     }
@@ -108,6 +114,7 @@ export default async function handler(req, res) {
     googleSheetId = existingUser?.googleSheetId;
     driveFolderId = existingUser?.driveFolderId;
     userAppsScriptId = existingUser?.userAppsScriptId;
+    deploymentId = existingUser?.googleScriptDeploymentId;
 
     console.log(`Starting/Resuming onboarding for user ${userId}...`);
 
@@ -304,20 +311,43 @@ export default async function handler(req, res) {
             try {
               console.log(`User ${userId}: Share attempt ${shareAttempt}/${MAX_SHARE_RETRIES}...`);
               
-              // Using the SA-authenticated drive client
+              // First grant editor access (which is more likely to succeed) before attempting owner transfer
+              console.log(`User ${userId}: First granting editor access before owner transfer...`);
               await driveSA.permissions.create({
                 fileId: userAppsScriptId,
                 requestBody: {
-                  role: 'owner',
+                  role: 'writer',
                   type: 'user',
-                  emailAddress: session.user.email,
-                  transferOwnership: true
+                  emailAddress: session.user.email
                 },
-                sendNotificationEmail: false
+                sendNotificationEmail: false,
+                supportsAllDrives: true
               });
               
+              console.log(`User ${userId}: Editor access granted, waiting 3 seconds before attempting ownership transfer...`);
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              
+              // Now try to transfer ownership
+              try {
+                await driveSA.permissions.create({
+                  fileId: userAppsScriptId,
+                  requestBody: {
+                    role: 'owner',
+                    type: 'user',
+                    emailAddress: session.user.email,
+                    transferOwnership: true
+                  },
+                  sendNotificationEmail: false,
+                  supportsAllDrives: true
+                });
+                console.log(`User ${userId}: Successfully transferred ownership to ${session.user.email}`);
+              } catch (ownershipErr) {
+                console.log(`User ${userId}: Ownership transfer failed, but editor access was granted. Error: ${ownershipErr.message}`);
+                // Continue with editor access if ownership transfer fails
+              }
+              
               scriptShared = true;
-              console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email} as 'owner'.`);
+              console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email}.`);
               
               // Now move the script to the user's folder
               if (driveFolderId && scriptShared) {
@@ -385,10 +415,28 @@ export default async function handler(req, res) {
         // --- End Script Sharing ---
 
         // --- 6. Create a script version (needed for deployment) ---
-        // Try with user's auth first, fall back to SA if needed
-        const scriptClient = scriptShared ? script : scriptSA;
+        const script = google.script({ version: 'v1', auth: userAuth }); // User-authenticated client
+        const scriptSA = await getSAScriptClient(); // Service account-authenticated client
+        
+        // We'll default to service account for more reliability
+        // but try with user auth if script was successfully shared
         try {
-          console.log(`User ${userId}: Creating new script version for script ${userAppsScriptId}...`);
+          // Try a pre-flight check to see if the user has access to the script
+          let userCanAccessScript = false;
+          try {
+            console.log(`User ${userId}: Testing if user can access script ${userAppsScriptId}...`);
+            await script.projects.get({ scriptId: userAppsScriptId });
+            userCanAccessScript = true;
+            console.log(`User ${userId}: Confirmed user can access script ${userAppsScriptId}`);
+          } catch (accessErr) {
+            console.log(`User ${userId}: User cannot access script yet: ${accessErr.message}`);
+          }
+          
+          // Choose which client to use based on access test
+          const scriptClient = userCanAccessScript ? script : scriptSA;
+          const clientType = userCanAccessScript ? "user" : "service account";
+          
+          console.log(`User ${userId}: Creating new script version for script ${userAppsScriptId} using ${clientType} auth...`);
           const createVersionResponse = await scriptClient.projects.versions.create({
             scriptId: userAppsScriptId
           });
@@ -397,7 +445,7 @@ export default async function handler(req, res) {
           console.log(`User ${userId}: Created script version: ${versionNumber}`);
           
           // --- 7. Create a deployment for this version ---
-          console.log(`User ${userId}: Creating new deployment for script ${userAppsScriptId} version ${versionNumber}...`);
+          console.log(`User ${userId}: Creating new deployment for script ${userAppsScriptId} version ${versionNumber} using ${clientType} auth...`);
           const deploymentResponse = await scriptClient.projects.deployments.create({
             scriptId: userAppsScriptId,
             requestBody: {
@@ -414,7 +462,8 @@ export default async function handler(req, res) {
           await prisma.user.update({
             where: { id: userId },
             data: {
-              googleScriptDeploymentId: deploymentId
+              googleScriptId: userAppsScriptId,
+              userAppsScriptId: userAppsScriptId,
             }
           });
           console.log(`User ${userId}: Saved deployment ID ${deploymentId} to user record.`);
@@ -456,8 +505,8 @@ export default async function handler(req, res) {
     }
 
     // --- 4. Save IDs to Database --- 
-    if (driveFolderId || googleSheetId || userAppsScriptId || newDeploymentId) { // Only update if at least one new ID was generated
-      console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}, Deployment: ${newDeploymentId}`);
+    if (driveFolderId || googleSheetId || userAppsScriptId || deploymentId) { // Only update if at least one new ID was generated
+      console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}, Deployment: ${deploymentId}`);
       try {
         await prisma.user.update({
           where: { id: userId },
@@ -465,8 +514,8 @@ export default async function handler(req, res) {
             ...(googleSheetId && { googleSheetId }), // Conditionally add if defined
             ...(driveFolderId && { driveFolderId }), // Conditionally add if defined
             ...(userAppsScriptId && { userAppsScriptId }), // Conditionally add if defined
-            ...(newDeploymentId && { googleScriptDeploymentId: newDeploymentId }), // Save the new deployment ID
-            onboardingComplete: !!(driveFolderId && googleSheetId && userAppsScriptId && newDeploymentId) // Mark complete if all IDs are present
+            ...(deploymentId && { googleScriptDeploymentId: deploymentId }), // Save the new deployment ID
+            onboardingComplete: !!(driveFolderId && googleSheetId && userAppsScriptId && deploymentId) // Mark complete if all IDs are present
           },
         });
         console.log(`User ${userId}: Database updated successfully with new IDs.`);
@@ -485,8 +534,8 @@ export default async function handler(req, res) {
     // --- 5. Initial Script Execution (Set FEDEX_FOLDER_ID if needed) ---
     // This should run as the user since it often involves setting user-specific properties.
     // The script itself should be designed to handle this (e.g., using UserProperties service).
-    if (userAppsScriptId && driveFolderId && newDeploymentId) { // Ensure script, folder, and deployment ID exist
-      console.log(`User ${userId}: Attempting to set FEDEX_FOLDER_ID in script ${userAppsScriptId} using deployment ${newDeploymentId} (User Auth)`);
+    if (userAppsScriptId && driveFolderId && deploymentId) { // Ensure script, folder, and deployment ID exist
+      console.log(`User ${userId}: Attempting to set FEDEX_FOLDER_ID in script ${userAppsScriptId} using deployment ${deploymentId} (User Auth)`);
       const MAX_RETRIES = 6;
       const RETRY_DELAY_MS = 10000;
       let attempt = 0;
@@ -521,7 +570,7 @@ export default async function handler(req, res) {
             resource: {
               function: 'saveToUserProperties',
               parameters: ['FEDEX_FOLDER_ID', driveFolderId],
-              deploymentId: newDeploymentId 
+              deploymentId: deploymentId 
             },
           });
 
@@ -569,8 +618,8 @@ export default async function handler(req, res) {
       }
       console.log(`User ${userId}: Successfully set FEDEX_FOLDER_ID in Apps Script ${userAppsScriptId}`);
     } else {
-      if (!newDeploymentId) {
-        console.warn(`User ${userId}: Skipping FEDEX_FOLDER_ID setup because newDeploymentId is missing. Onboarding might be incomplete if script creation/deployment failed earlier.`);
+      if (!deploymentId) {
+        console.warn(`User ${userId}: Skipping FEDEX_FOLDER_ID setup because deploymentId is missing. Onboarding might be incomplete if script creation/deployment failed earlier.`);
       } else {
         console.log(`User ${userId}: Skipping FEDEX_FOLDER_ID setup because some prerequisite IDs are missing (userAppsScriptId: ${userAppsScriptId}, driveFolderId: ${driveFolderId})`);
       }
@@ -586,8 +635,8 @@ export default async function handler(req, res) {
         googleSheetId,
         driveFolderId,
         userAppsScriptId,
-        googleScriptDeploymentId: newDeploymentId, // Include deployment ID in success response
-        onboardingComplete: !!(driveFolderId && googleSheetId && userAppsScriptId && newDeploymentId)
+        googleScriptDeploymentId: deploymentId, // Include deployment ID in success response
+        onboardingComplete: !!(driveFolderId && googleSheetId && userAppsScriptId && deploymentId)
       },
     });
 

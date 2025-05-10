@@ -6,6 +6,7 @@ export default function TermsOfServiceTR() {
   const appName = "KolayXport";
   const supportEmail = "kolayxport@gmail.com";
   const lastUpdated = "May 7, 2025";
+  const websiteUrl = "https://www.kolayxport.com";
 
   return (
     <PublicLayout title="Kullanım Şartları">
@@ -13,6 +14,7 @@ export default function TermsOfServiceTR() {
         <article className="prose prose-slate lg:prose-lg mx-auto">
           <h1>{appName} Kullanım Şartları</h1>
           <p><em>Son Güncelleme: {lastUpdated}</em></p>
+          <p>Bu Kullanım Şartları {appName} hizmeti ve <a href={websiteUrl}>{websiteUrl}</a> sitesi için geçerlidir.</p>
 
           <h2>1. Kabul</h2>
           <p>Google hesabınızla oturum açarak ve {appName}’i kullanarak bu Kullanım Şartları'nı kabul etmiş olursunuz.</p>

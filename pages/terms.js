@@ -6,6 +6,7 @@ export default function TermsOfServiceEN() {
   const appName = "KolayXport";
   const supportEmail = "kolayxport@gmail.com";
   const lastUpdated = "May 7, 2025";
+  const websiteUrl = "https://www.kolayxport.com";
 
   return (
     <PublicLayout title="Terms of Service">
@@ -13,6 +14,7 @@ export default function TermsOfServiceEN() {
         <article className="prose prose-slate lg:prose-lg mx-auto">
           <h1>{appName} Terms of Service</h1>
           <p><em>Last Updated: {lastUpdated}</em></p>
+          <p>These Terms of Service apply to {appName} at <a href={websiteUrl}>{websiteUrl}</a>.</p>
 
           <h2>1. Acceptance</h2>
           <p>By signing in with your Google account and using {appName}, you agree to these Terms of Service.</p>

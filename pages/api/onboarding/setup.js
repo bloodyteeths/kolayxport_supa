@@ -4,13 +4,22 @@ import { google } from 'googleapis';
 // import { GoogleAuth } from 'google-auth-library';
 import prisma from '@/lib/prisma'; // Your prisma client instance
 import dotenv from 'dotenv';
-// Import service account client getters
-import { getScriptServiceClient as getSAScriptClient, getDriveServiceClient as getSADriveClient } from '@/lib/googleServiceAccountAuth';
+// Import service account client getters and user impersonation clients
+import { 
+  getScriptServiceClient as getSAScriptClient, 
+  getDriveServiceClient as getSADriveClient,
+  getDriveClientForUser,
+  getScriptClientForUser,
+  getSheetsClientForUser
+} from '@/lib/googleServiceAccountAuth';
 
 dotenv.config();
 
+// Check if Domain-Wide Delegation is enabled
+const useDomainWideDelegation = process.env.DOMAIN_WIDE_DELEGATION === 'true';
+
 // --- Helper: Get Google API Client authenticated AS THE USER (with auto-refresh) ---
-// Accepts access_token, refresh_token, and expiry to auto-refresh tokens
+// Only kept for backward compatibility - will be used as fallback if DWD is disabled
 function getUserGoogleApiClient({ access_token, refresh_token, expires_at }) {
   // Include clientId and clientSecret so OAuth2 can auto-refresh
   const auth = new google.auth.OAuth2(
@@ -57,16 +66,33 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Authentication required.' });
   }
   const userId = session.user.id;
-  // Retrieve the stored OAuth access token from Prisma's Account table
-  const oauthAccount = await prisma.account.findFirst({
-    where: { userId, provider: 'google' }
-  });
-  if (!oauthAccount?.access_token) {
-    console.error(`Onboarding Error: No OAuth access token found for user ${userId}.`);
-    return res.status(401).json({ message: 'Authentication required.' });
+  const userEmail = session.user.email;
+  
+  if (!userEmail) {
+    console.error(`Onboarding Error: No email found for user ${userId}.`);
+    return res.status(400).json({ message: 'User email is required for onboarding.' });
   }
-  // Destructure access and refresh tokens for user authentication
-  const { access_token, refresh_token, expires_at } = oauthAccount;
+  
+  console.log(`[ONBOARDING] Starting onboarding for user ${userId} (${userEmail})`);
+  console.log(`[ONBOARDING] Domain-Wide Delegation is ${useDomainWideDelegation ? 'ENABLED' : 'DISABLED'}`);
+
+  // Retrieve the stored OAuth access token from Prisma's Account table (only needed if DWD is disabled)
+  let userOAuthCredentials;
+  if (!useDomainWideDelegation) {
+    const oauthAccount = await prisma.account.findFirst({
+      where: { userId, provider: 'google' }
+    });
+    if (!oauthAccount?.access_token) {
+      console.error(`Onboarding Error: No OAuth access token found for user ${userId}.`);
+      return res.status(401).json({ message: 'Authentication required.' });
+    }
+    // Destructure access and refresh tokens for user authentication
+    userOAuthCredentials = {
+      access_token: oauthAccount.access_token,
+      refresh_token: oauthAccount.refresh_token,
+      expires_at: oauthAccount.expires_at
+    };
+  }
 
   // Read master template sheet ID and WRAPPER SCRIPT template ID from environment
   const TEMPLATE_SHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
@@ -118,10 +144,23 @@ export default async function handler(req, res) {
 
     console.log(`Starting/Resuming onboarding for user ${userId}...`);
 
-    // --- Authenticate as the User for Drive/Sheet operations (with refresh) ---
-    const userAuth = getUserGoogleApiClient({ access_token, refresh_token, expires_at });
-    const drive = google.drive({ version: 'v3', auth: userAuth });
-    const sheets = google.sheets({ version: 'v4', auth: userAuth });
+    // --- Get API Clients (either impersonated or fallback to old method) ---
+    // If Domain-Wide Delegation is enabled, get clients that impersonate the user
+    let drive, sheets, script;
+    
+    if (useDomainWideDelegation) {
+      console.log(`[ONBOARDING] Using Domain-Wide Delegation to impersonate ${userEmail}`);
+      drive = getDriveClientForUser(userEmail);
+      sheets = getSheetsClientForUser(userEmail);
+      script = getScriptClientForUser(userEmail);
+    } else {
+      console.log(`[ONBOARDING] Using OAuth fallback method for ${userEmail}`);
+      // Initialize with user OAuth (traditional method)
+      const userAuth = getUserGoogleApiClient(userOAuthCredentials);
+      drive = google.drive({ version: 'v3', auth: userAuth });
+      sheets = google.sheets({ version: 'v4', auth: userAuth });
+      script = google.script({ version: 'v1', auth: userAuth });
+    }
 
     // --- 1. Create "myBabySync_ShippingLabels" Folder (if needed) --- 
     if (!driveFolderId) {
@@ -230,16 +269,15 @@ export default async function handler(req, res) {
 
     // --- 3. Copy Template Wrapper Script (if needed) --- 
     if (!userAppsScriptId) {
-      console.log(`User ${userId}: Preparing to copy template wrapper script using SERVICE ACCOUNT authentication...`);
+      console.log(`User ${userId}: Preparing to copy template wrapper script...`);
       console.log(`User ${userId}: Template Script ID from env: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
-      console.log(`User ${userId}: User email for script naming: ${session.user.email}`);
+      console.log(`User ${userId}: User email for script naming: ${userEmail}`);
       
       try {
-        // Use service account to verify template script details first
+        // Verify template script details first
         try {
-          const driveSA = await getSADriveClient();
-          console.log(`User ${userId}: Verifying details for template script ID: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID} (using SA)`);
-          const templateFileMeta = await driveSA.files.get({
+          console.log(`User ${userId}: Verifying details for template script ID: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
+          const templateFileMeta = await drive.files.get({
             fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
             fields: 'id, name, mimeType, trashed',
             supportsAllDrives: true,
@@ -252,25 +290,22 @@ export default async function handler(req, res) {
             throw new Error('Template script is in the trash.');
           }
         } catch (verifyErr) {
-          console.error(`User ${userId}: Failed to verify template script with SA:`, verifyErr);
-          // Rethrow or handle as critical error, as copy will likely fail
+          console.error(`User ${userId}: Failed to verify template script:`, verifyErr);
           throw new Error(`Critical error verifying template script before copy: ${verifyErr.message}`);
         }
 
-        // Create copy of template script using SERVICE ACCOUNT
-        const driveSA = await getSADriveClient();
-        console.log(`User ${userId}: Using SERVICE ACCOUNT to copy template script...`);
+        // Create copy of template script
+        console.log(`User ${userId}: Copying template script...`);
         
         const scriptCopyMetadata = { 
           name: `KolayXport Wrapper Script - ${session.user.name || session.user.email || userId}`, // Unique name
-          mimeType: 'application/vnd.google-apps.script',
-          parents: ['root'] // Add root as parent - service account will own it initially, then share it
+          parents: [driveFolderId] // Add directly to user's folder
         }; 
 
         console.log(`User ${userId}: Attempting to copy script with metadata:`, JSON.stringify(scriptCopyMetadata));
 
-        // Perform the copy using SERVICE ACCOUNT auth
-        const scriptCopy = await driveSA.files.copy({
+        // Perform the copy
+        const scriptCopy = await drive.files.copy({
           fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
           requestBody: scriptCopyMetadata,
           fields: 'id, name, webViewLink',
@@ -278,11 +313,10 @@ export default async function handler(req, res) {
         });
           
         userAppsScriptId = scriptCopy.data.id;
-        console.log('Service-account copied script:', scriptCopy.data);
-        console.log(`User ${userId}: Copied script successfully with SA. New Script ID: ${userAppsScriptId}, Name: ${scriptCopy.data.name}, Link: ${scriptCopy.data.webViewLink}`);
+        console.log(`User ${userId}: Copied script data:`, scriptCopy.data);
+        console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${scriptCopy.data.name}, Link: ${scriptCopy.data.webViewLink}`);
         
         // Save the script ID to the user record immediately so we don't lose it
-        // even if sharing fails temporarily
         await prisma.user.update({
           where: { id: userId },
           data: {
@@ -291,180 +325,21 @@ export default async function handler(req, res) {
         });
         console.log(`User ${userId}: Successfully saved script ID ${userAppsScriptId} to user record.`);
         
-        // Add a longer delay before sharing to ensure the file is fully processed by Google Drive
-        console.log(`User ${userId}: Waiting 10 seconds for the script to be fully available in Google Drive...`);
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        // With DWD, we no longer need the complex sharing logic - the user already owns the script!
+        console.log(`User ${userId}: Script ${userAppsScriptId} is already owned by ${userEmail} through impersonation.`);
         
-        // --- Share the SA-copied script with the User ---
-        let scriptShared = false;
-        if (userAppsScriptId) {
-          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with user ${session.user.email} as 'owner'. (SA Auth)`);
-          
-          // Define constants for sharing attempts
-          const MAX_SHARE_RETRIES = 5;
-          const SHARE_RETRY_DELAY_MS = 5000;
-          
-          // Verify script exists before attempting to share
-          try {
-            // First check if script exists with SA
-            console.log(`User ${userId}: Verifying script ${userAppsScriptId} exists before sharing...`);
-            const driveSA = await getSADriveClient();
-            const fileCheck = await driveSA.files.get({
-              fileId: userAppsScriptId,
-              fields: 'id,name,owners',
-              supportsAllDrives: true
-            });
-            console.log(`User ${userId}: Script exists. Current owner: ${fileCheck.data.owners?.[0]?.emailAddress || 'Unknown'}`);
-            
-            // Add retry logic for sharing
-            let shareAttempt = 0;
-            
-            while (shareAttempt < MAX_SHARE_RETRIES && !scriptShared) {
-              shareAttempt++;
-              try {
-                console.log(`User ${userId}: Share attempt ${shareAttempt}/${MAX_SHARE_RETRIES}...`);
-                
-                // First grant editor access (which is more likely to succeed) before attempting owner transfer
-                console.log(`User ${userId}: First granting editor access before owner transfer...`);
-                await driveSA.permissions.create({
-                  fileId: userAppsScriptId,
-                  requestBody: {
-                    role: 'writer',
-                    type: 'user',
-                    emailAddress: session.user.email
-                  },
-                  sendNotificationEmail: false,
-                  supportsAllDrives: true
-                });
-                
-                console.log(`User ${userId}: Editor access granted, waiting 3 seconds before attempting ownership transfer...`);
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                
-                // Now try to transfer ownership
-                try {
-                  await driveSA.permissions.create({
-                    fileId: userAppsScriptId,
-                    requestBody: {
-                      role: 'owner',
-                      type: 'user',
-                      emailAddress: session.user.email,
-                      transferOwnership: true
-                    },
-                    sendNotificationEmail: false,
-                    supportsAllDrives: true
-                  });
-                  console.log(`User ${userId}: Successfully transferred ownership to ${session.user.email}`);
-                } catch (ownershipErr) {
-                  console.log(`User ${userId}: Ownership transfer failed, but editor access was granted. Error: ${ownershipErr.message}`);
-                  // Continue with editor access if ownership transfer fails
-                }
-                
-                scriptShared = true;
-                console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email}.`);
-                
-                // Now move the script to the user's folder
-                if (driveFolderId && scriptShared) {
-                  try {
-                    console.log(`User ${userId}: Moving script ${userAppsScriptId} to user's folder ${driveFolderId}...`);
-                    // Use the user's drive client to move the file after ownership transfer
-                    await drive.files.update({
-                      fileId: userAppsScriptId,
-                      addParents: driveFolderId,
-                      removeParents: 'root',
-                      fields: 'id, parents'
-                    });
-                    console.log(`User ${userId}: Successfully moved script ${userAppsScriptId} to folder ${driveFolderId}.`);
-                  } catch (movingErr) {
-                    console.log(`User ${userId}: Error moving script to folder: ${movingErr.message}. Will continue with deployment.`);
-                    // Continue with the process even if moving fails
-                  }
-                }
-              } catch (shareErr) {
-                const errDetails = shareErr.response?.data?.error?.errors || [];
-                console.error(`User ${userId}: Share attempt ${shareAttempt} failed. Error: ${shareErr.message}. ${JSON.stringify(errDetails)}`);
-                
-                if (shareAttempt < MAX_SHARE_RETRIES) {
-                  console.log(`User ${userId}: Waiting ${SHARE_RETRY_DELAY_MS}ms before retry...`);
-                  await new Promise(resolve => setTimeout(resolve, SHARE_RETRY_DELAY_MS));
-                }
-              }
-            }
-          } catch (fileCheckErr) {
-            console.error(`User ${userId}: Script verification failed before sharing. Error: ${fileCheckErr.message}`);
-            console.error(`User ${userId}: Will continue but sharing may fail.`);
-          }
-          
-          if (!scriptShared) {
-            console.error(`User ${userId}: Failed to transfer script ownership to user after ${MAX_SHARE_RETRIES} attempts. Will continue with deployment using service account.`);
-            // Don't throw an error - continue to the deployment step even if sharing fails
-          }
-        }
-        
-        // --- Share the newly copied script with the Service Account (to maintain access) ---
-        const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-        if (userAppsScriptId && serviceAccountEmail) {
-          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'writer'. (User Auth)`);
-          try {
-            // Using the user-authenticated 'drive' client here is correct,
-            // as the user owns the script and is granting permission.
-            await drive.permissions.create({
-              fileId: userAppsScriptId,
-              requestBody: {
-                role: 'writer',
-                type: 'user',
-                emailAddress: serviceAccountEmail,
-              },
-              supportsAllDrives: true, // Important if the user's Drive is part of a Shared Drive
-            });
-            console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with ${serviceAccountEmail} as 'writer'.`);
-          } catch (shareError) {
-            console.error(`User ${userId}: Failed to share script ${userAppsScriptId} with service account ${serviceAccountEmail}. Error:`, shareError.message, shareError.errors);
-            // Decide if this is a critical failure for onboarding.
-            // For now, log and continue, but script execution by SA will fail later.
-            // Consider throwing an error if SA access is immediately required.
-          }
-        } else {
-          if (!serviceAccountEmail) {
-            console.warn(`User ${userId}: GOOGLE_SERVICE_ACCOUNT_EMAIL is not set. Cannot share script ${userAppsScriptId}. Service account operations will fail.`);
-          }
-          // userAppsScriptId missing here would be an earlier logic error
-        }
-        // --- End Script Sharing ---
-
         // --- 7. Create a deployment for this version ---
-        // Move deployment creation outside the previous conditions to ensure it runs even if the script already exists
-        let deploymentId = null;
         try {
-          // Initialize script clients
-          const script = google.script({ version: 'v1', auth: userAuth }); // User-authenticated client
-          const scriptSA = await getSAScriptClient(); // Service account client
-
-          // First, test if user can access the script (could be existing script)
-          let userCanAccessScript = false;
-          try {
-            console.log(`User ${userId}: Testing if user can access script ${userAppsScriptId}...`);
-            await script.projects.get({ scriptId: userAppsScriptId });
-            userCanAccessScript = true;
-            console.log(`User ${userId}: User can access script ${userAppsScriptId}.`);
-          } catch (accessErr) {
-            console.log(`User ${userId}: User cannot access script, will use SA: ${accessErr.message}`);
-            userCanAccessScript = false;
-          }
-          
-          // Choose which client to use based on access test
-          const scriptClient = userCanAccessScript ? script : scriptSA;
-          const clientType = userCanAccessScript ? "user" : "service account";
-          
-          console.log(`User ${userId}: Creating new script version for script ${userAppsScriptId} using ${clientType} auth...`);
-          const createVersionResponse = await scriptClient.projects.versions.create({
+          console.log(`User ${userId}: Creating new script version for script ${userAppsScriptId}...`);
+          const createVersionResponse = await script.projects.versions.create({
             scriptId: userAppsScriptId
           });
           
           const versionNumber = createVersionResponse.data.versionNumber;
           console.log(`User ${userId}: Created script version: ${versionNumber}`);
           
-          console.log(`User ${userId}: Creating new deployment for script ${userAppsScriptId} version ${versionNumber} using ${clientType} auth...`);
-          const deploymentResponse = await scriptClient.projects.deployments.create({
+          console.log(`User ${userId}: Creating new deployment for script ${userAppsScriptId} version ${versionNumber}...`);
+          const deploymentResponse = await script.projects.deployments.create({
             scriptId: userAppsScriptId,
             requestBody: {
               versionNumber: versionNumber,
@@ -493,7 +368,7 @@ export default async function handler(req, res) {
         }
 
       } catch (scriptCopyErr) {
-        console.error(`User ${userId}: USER failed Wrapper script copy attempt:`, scriptCopyErr);
+        console.error(`User ${userId}: Script copy attempt failed:`, scriptCopyErr);
         console.error(`User ${userId}: Detailed error from Google:`, JSON.stringify(scriptCopyErr.response?.data, null, 2));
         let rawErrorString = 'Error details not available or stringification failed.';
         try {
@@ -501,9 +376,9 @@ export default async function handler(req, res) {
         } catch (e) {
           rawErrorString = `Error stringifying scriptCopyErr: ${e.message}. Raw error message: ${scriptCopyErr.message}`;
         }
-        console.error(`User ${userId}: Raw user scriptCopyErr object:`, rawErrorString);
+        console.error(`User ${userId}: Raw scriptCopyErr object:`, rawErrorString);
 
-        let errorMessage = 'Failed to copy the template script using your Google account.';
+        let errorMessage = 'Failed to copy the template script.';
         if (scriptCopyErr.code) {
           errorMessage += ` (Code: ${scriptCopyErr.code})`;
           if (scriptCopyErr.code === 404) {
@@ -527,8 +402,8 @@ export default async function handler(req, res) {
       console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}, Deployment: ${deploymentId}`);
       try {
         await prisma.user.update({
-          where: { id: userId },
-          data: {
+        where: { id: userId },
+        data: {
             ...(googleSheetId && { googleSheetId }), // Conditionally add if defined
             ...(driveFolderId && { driveFolderId }), // Conditionally add if defined
             ...(userAppsScriptId && { userAppsScriptId }), // Conditionally add if defined
@@ -549,38 +424,20 @@ export default async function handler(req, res) {
     }
 
     // --- 5. Initial Script Execution (Set FEDEX_FOLDER_ID if needed) ---
-    // This should run as the user since it often involves setting user-specific properties.
-    // The script itself should be designed to handle this (e.g., using UserProperties service).
     if (userAppsScriptId && driveFolderId && deploymentId) { // Ensure script, folder, and deployment ID exist
-      console.log(`User ${userId}: Attempting to set FEDEX_FOLDER_ID in script ${userAppsScriptId} using deployment ${deploymentId} (User Auth)`);
-      const MAX_RETRIES = 6;
-      const RETRY_DELAY_MS = 10000;
+      console.log(`User ${userId}: Attempting to set FEDEX_FOLDER_ID in script ${userAppsScriptId} using deployment ${deploymentId}`);
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY_MS = 5000;
       let attempt = 0;
       let success = false;
-
-      const script = google.script({ version: 'v1', auth: userAuth }); // User-authenticated client
 
       while (attempt < MAX_RETRIES && !success) {
         attempt++;
         console.log(`User ${userId}: Attempt ${attempt}/${MAX_RETRIES} to set FEDEX_FOLDER_ID.`);
         try {
-          console.log(`User ${userId}: (Retry Attempt ${attempt}) Pre-flight check for script ${userAppsScriptId} (as user) before setting FEDEX_FOLDER_ID.`);
+          console.log(`User ${userId}: (Attempt ${attempt}) Pre-flight check for script ${userAppsScriptId}.`);
           const project = await script.projects.get({ scriptId: userAppsScriptId });
-          console.log(`User ${userId}: (Retry Attempt ${attempt}) Pre-flight SUCCESS for script ${userAppsScriptId}. Title: ${project.data.title}.`);
-
-          // Log current permissions as seen by the user before running the script
-          try {
-            console.log(`User ${userId}: (Retry Attempt ${attempt}) Listing permissions for script ${userAppsScriptId} (as user) before running saveToUserProperties.`);
-            const permissionsList = await drive.permissions.list({ // drive is user-authenticated here
-              fileId: userAppsScriptId,
-              fields: 'permissions(id,emailAddress,role,type)',
-              supportsAllDrives: true,
-            });
-            console.log(`User ${userId}: (Retry Attempt ${attempt}) Permissions for script ${userAppsScriptId}:`, JSON.stringify(permissionsList.data.permissions, null, 2));
-          } catch (permError) {
-            console.warn(`User ${userId}: (Retry Attempt ${attempt}) Failed to list permissions for script ${userAppsScriptId} (as user). Error:`, permError.message);
-            // Continue with the run attempt despite this logging failure
-          }
+          console.log(`User ${userId}: (Attempt ${attempt}) Pre-flight SUCCESS for script ${userAppsScriptId}. Title: ${project.data.title}.`);
 
           const execResponse = await script.scripts.run({
             scriptId: userAppsScriptId, 
@@ -588,7 +445,7 @@ export default async function handler(req, res) {
               function: 'saveToUserProperties',
               parameters: ['FEDEX_FOLDER_ID', driveFolderId],
               deploymentId: deploymentId 
-            },
+            }
           });
 
           if (execResponse.data.error) {
@@ -596,44 +453,40 @@ export default async function handler(req, res) {
             const apiErrorStatus = execResponse.data.error.code;
             const appsScriptErrorDetails = execResponse.data.error.details && execResponse.data.error.details[0];
 
-            if (apiErrorStatus === 404 && attempt < MAX_RETRIES -1) {
+            if (apiErrorStatus === 404 && attempt < MAX_RETRIES) {
               console.log(`User ${userId}: Script ${userAppsScriptId} not found (404), will retry after ${RETRY_DELAY_MS}ms...`);
               await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-            } else if (attempt >= MAX_RETRIES -1) {
-              console.error(`User ${userId}: Final attempt failed for script ${userAppsScriptId} with error code ${apiErrorStatus}.`);
-              throw new Error(`Apps Script execution failed after ${MAX_RETRIES} attempts: Code ${apiErrorStatus}, Message: ${appsScriptErrorDetails?.errorMessage || JSON.stringify(execResponse.data.error)}`);
             } else {
-              // For other errors or if it's not the last attempt for 404
-              console.warn(`User ${userId}: Apps Script execution error (not 404 or not final attempt), details:`, JSON.stringify(execResponse.data.error, null, 2));
-              // Potentially retry for other transient errors too, or throw immediately
-              // For now, let's assume only 404 is retried, others will throw via the outer catch if not caught here
-               throw new Error(`Apps Script execution failed: Code ${apiErrorStatus}, Message: ${appsScriptErrorDetails?.errorMessage || JSON.stringify(execResponse.data.error)}`);
+              throw new Error(`Apps Script execution failed: Code ${apiErrorStatus}, Message: ${appsScriptErrorDetails?.errorMessage || JSON.stringify(execResponse.data.error)}`);
             }
           } else {
             console.log(`User ${userId}: FEDEX_FOLDER_ID set successfully in Apps Script on attempt ${attempt}.`);
             success = true;
-            // No break needed, loop condition will handle it
           }
         } catch (runError) {
-          console.error(`User ${userId}: Error during script.scripts.run on attempt ${attempt}/${MAX_RETRIES} for FEDEX_FOLDER_ID:`, runError.message, runError.response ? runError.response.data : runError.toString());
-          if (runError.code === 404 && attempt < MAX_RETRIES -1) {
-            console.log(`User ${userId}: Script ${userAppsScriptId} not found (404 on runError), will retry after ${RETRY_DELAY_MS}ms...`);
+          console.error(`User ${userId}: Error during script execution on attempt ${attempt}/${MAX_RETRIES}:`, runError.message);
+          if (runError.code === 404 && attempt < MAX_RETRIES) {
+            console.log(`User ${userId}: Script ${userAppsScriptId} not found (404), will retry after ${RETRY_DELAY_MS}ms...`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
           } else {
-            console.error(`User ${userId}: Final attempt failed or non-404 error for script ${userAppsScriptId} on attempt ${attempt}/${MAX_RETRIES}. Error:`, runError.message);
-            const contextError = new Error(`SETUP_STEP5_SCRIPT_RUN_FAILED: Script ${userAppsScriptId}, Prop: FEDEX_FOLDER_ID. Attempts: ${attempt}/${MAX_RETRIES}. Google API Error: ${runError.message} (Code: ${runError.code})`);
-            contextError.originalError = runError;
-            console.log(`User ${userId}: Throwing contextError from loop: ${contextError.message}`);
-            throw contextError; // Rethrow to be caught by the outer try-catch for this step
+            console.error(`User ${userId}: Final attempt failed or non-404 error on attempt ${attempt}/${MAX_RETRIES}`);
+            // On the final attempt, or for non-404 errors, just log and continue
+            // We don't want to fail the entire onboarding just because property setting failed
+            if (attempt >= MAX_RETRIES) {
+              console.warn(`User ${userId}: Property setting failed after all retries, but onboarding will continue.`);
+              break;
+            }
           }
-        } // End of try-catch for a single attempt
-      } // End of while loop
+        }
+      }
 
       if (!success) {
-        console.error(`User ${userId}: FEDEX_FOLDER_ID could not be set in script ${userAppsScriptId} after all ${MAX_RETRIES} retries (loop completed without success).`);
-        throw new Error(`SETUP_STEP5_PROP_SET_FAILED_POST_LOOP: Failed to set FEDEX_FOLDER_ID for script ${userAppsScriptId} after ${MAX_RETRIES} attempts.`);
+        console.error(`User ${userId}: FEDEX_FOLDER_ID could not be set in script ${userAppsScriptId} after all ${MAX_RETRIES} retries.`);
+        // We don't throw here - just log error and continue
+        console.warn(`User ${userId}: Continuing onboarding despite property setting failure. User may need to set properties manually.`);
+      } else {
+        console.log(`User ${userId}: Successfully set FEDEX_FOLDER_ID in Apps Script ${userAppsScriptId}`);
       }
-      console.log(`User ${userId}: Successfully set FEDEX_FOLDER_ID in Apps Script ${userAppsScriptId}`);
     } else {
       if (!deploymentId) {
         console.warn(`User ${userId}: Skipping FEDEX_FOLDER_ID setup because deploymentId is missing. Onboarding might be incomplete if script creation/deployment failed earlier.`);
@@ -646,7 +499,7 @@ export default async function handler(req, res) {
     // --- Success --- 
     console.log(`User ${userId}: Onboarding process completed successfully.`);
     return res.status(200).json({
-      success: true,
+      success: true, 
       message: 'Onboarding complete. Resources created and IDs saved.',
       data: {
         googleSheetId,

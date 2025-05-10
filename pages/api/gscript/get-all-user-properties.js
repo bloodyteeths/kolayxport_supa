@@ -7,7 +7,15 @@ import { getSession } from 'next-auth/react';
 // import { GoogleAuth } from 'google-auth-library';
 // import { google } from 'googleapis';
 import prisma from '@/lib/prisma'; // Import Prisma client
-import { getScriptServiceClient, getDriveServiceClient as getSADriveClient } from '@/lib/googleServiceAccountAuth'; // Import SA Drive client
+import { 
+  getScriptServiceClient, 
+  getScriptClientForUser,
+  getDriveServiceClient as getSADriveClient,
+  getDriveClientForUser
+} from '@/lib/googleServiceAccountAuth'; // Import both SA and impersonation clients
+
+// Check if Domain-Wide Delegation is enabled
+const useDomainWideDelegation = process.env.DOMAIN_WIDE_DELEGATION === 'true';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -20,6 +28,15 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Not authenticated' });
   }
   const userId = session.user.id;
+  const userEmail = session.user.email;
+
+  if (!userEmail && useDomainWideDelegation) {
+    console.error(`User ${userId}: User email is required for Domain-Wide Delegation but is missing from session.`);
+    return res.status(400).json({ message: 'User email is required for authentication.' });
+  }
+
+  console.log(`[GET_PROPS] Starting property fetch for user ${userId} (${userEmail || 'email unknown'})`);
+  console.log(`[GET_PROPS] Domain-Wide Delegation is ${useDomainWideDelegation ? 'ENABLED' : 'DISABLED'}`);
 
   try {
     // 0. Fetch user's specific Apps Script ID and Deployment ID from DB
@@ -46,67 +63,57 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'User script deployment ID missing. Please ensure onboarding created a deployment.' });
     }
 
-    // 1. Authenticate with Google using Service Account Credentials
-    // The GOOGLE_SERVICE_ACCOUNT_JSON parsing and GoogleAuth setup is now handled by the imported module.
-    // The check for process.env.GOOGLE_SERVICE_ACCOUNT_JSON is done within the module.
-    /*
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON) { // This env var is now GOOGLE_SERVICE_ACCOUNT_JSON
-        console.error('Critical: GOOGLE_SERVICE_ACCOUNT_JSON is not set.'); // Adjusted message
-        return res.status(500).json({ message: 'Server configuration error: Auth credentials missing.' });
-    }
-    // const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON); // Now GOOGLE_SERVICE_ACCOUNT_JSON
+    // Get appropriate script and drive clients based on DWD setting
+    let script, drive;
     
-    // const auth = new GoogleAuth({
-    //   credentials,
-    //   scopes: [
-    //     'https://www.googleapis.com/auth/script.scriptapp',
-    //     'https://www.googleapis.com/auth/script.projects',
-    //     'https://www.googleapis.com/auth/script.deployments',
-    //     'https://www.googleapis.com/auth/script.metrics'
-    //   ],
-    //   clientOptions: { quotaProjectId: process.env.GCP_PROJECT_ID }
-    // });
+    if (useDomainWideDelegation && userEmail) {
+      console.log(`[GET_PROPS] Using Domain-Wide Delegation to impersonate ${userEmail}`);
+      // Get clients that impersonate the user
+      script = getScriptClientForUser(userEmail);
+      drive = getDriveClientForUser(userEmail);
+    } else {
+      console.log(`[GET_PROPS] Using service account authentication (fallback method)`);
+      // Use service account (traditional method)
+      script = await getScriptServiceClient();
+      drive = await getSADriveClient();
+    }
 
-    // const client = await auth.getClient();
-    // const script = google.script({ version: 'v1', auth: client });
-    */
-
-    const script = await getScriptServiceClient();
-    const driveSA = await getSADriveClient(); // Get Service Account Drive client
-
-    // --- Pre-flight check: Verify script project accessibility AND service account permissions ---
+    // --- Pre-flight check: Verify script project accessibility ---
     try {
-      console.log(`User ${userId}: Pre-flight check - script.projects.get for scriptId: ${userScriptId} (using service account)`);
+      console.log(`User ${userId}: Pre-flight check - script.projects.get for scriptId: ${userScriptId}`);
       const project = await script.projects.get({ scriptId: userScriptId });
       console.log(`User ${userId}: Pre-flight check SUCCESS for scriptId: ${userScriptId}. Project title: ${project.data.title}`);
 
-      // Log permissions for the service account
-      console.log(`User ${userId}: Fetching permissions for script ${userScriptId} (SA) to verify 'writer' access.`);
-      const permissionsResponse = await driveSA.permissions.list({
-        fileId: userScriptId,
-        fields: 'permissions(id,emailAddress,role,type)',
-        supportsAllDrives: true,
-      });
-      const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-      const saPermission = permissionsResponse.data.permissions?.find(p => p.emailAddress === serviceAccountEmail);
-      if (saPermission) {
-        console.log(`User ${userId}: Service Account ${serviceAccountEmail} has role '${saPermission.role}' on script ${userScriptId}.`);
-        if (saPermission.role !== 'writer' && saPermission.role !== 'owner') {
-          console.warn(`User ${userId}: Service Account ${serviceAccountEmail} has role '${saPermission.role}' but needs 'writer' or 'owner' for script ${userScriptId}. Execution might fail.`);
-          // Consider returning a 403 here if writer is strictly necessary
+      // If not using DWD, check permissions for the service account
+      if (!useDomainWideDelegation) {
+        console.log(`User ${userId}: Fetching permissions for script ${userScriptId} to verify access.`);
+        const permissionsResponse = await drive.permissions.list({
+          fileId: userScriptId,
+          fields: 'permissions(id,emailAddress,role,type)',
+          supportsAllDrives: true,
+        });
+        const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+        const saPermission = permissionsResponse.data.permissions?.find(p => p.emailAddress === serviceAccountEmail);
+        if (saPermission) {
+          console.log(`User ${userId}: Service Account ${serviceAccountEmail} has role '${saPermission.role}' on script ${userScriptId}.`);
+          if (saPermission.role !== 'writer' && saPermission.role !== 'owner') {
+            console.warn(`User ${userId}: Service Account ${serviceAccountEmail} has role '${saPermission.role}' but needs 'writer' or 'owner' for script ${userScriptId}. Execution might fail.`);
+          }
+        } else {
+          console.warn(`User ${userId}: Service Account ${serviceAccountEmail} has NO explicit permissions on script ${userScriptId}. Execution will likely fail.`);
         }
-      } else {
-        console.warn(`User ${userId}: Service Account ${serviceAccountEmail} has NO explicit permissions on script ${userScriptId}. Execution will likely fail.`);
-        // Consider returning a 403 here
       }
-      // console.log(`User ${userId}: Full permissions list for script ${userScriptId}:`, JSON.stringify(permissionsResponse.data.permissions, null, 2));
-
     } catch (projectGetError) {
       console.error(`User ${userId}: Pre-flight check FAILED for scriptId: ${userScriptId}. Error:`, projectGetError.message);
       if (projectGetError.code === 404) {
-        return res.status(404).json({ message: `Script project not found (ID: ${userScriptId}). Ensure it exists and is shared with the service account.`, details: projectGetError.message });
+        return res.status(404).json({ message: `Script project not found (ID: ${userScriptId}).`, details: projectGetError.message });
       } else if (projectGetError.code === 403) {
-        return res.status(403).json({ message: `Service account lacks permission to access script project (ID: ${userScriptId}). Check IAM and script sharing.`, details: projectGetError.message });
+        return res.status(403).json({ 
+          message: useDomainWideDelegation 
+            ? `Unable to access script project as user ${userEmail} (ID: ${userScriptId}).` 
+            : `Service account lacks permission to access script project (ID: ${userScriptId}).`, 
+          details: projectGetError.message 
+        });
       }
       return res.status(500).json({ message: 'Error verifying script project accessibility.', details: projectGetError.message });
     }
@@ -118,8 +125,7 @@ export default async function handler(req, res) {
       scriptId: userScriptId, // scriptId is still needed here
       resource: {
         function: 'getAllUserProperties',
-        // devMode: true // REMOVED: Use deploymentId instead
-        deploymentId: userScriptDeploymentId // ADDED: Use the user-specific deployment ID
+        deploymentId: userScriptDeploymentId // Use the user-specific deployment ID
       },
     };
 
@@ -135,17 +141,19 @@ export default async function handler(req, res) {
       const errorMessage = errorDetails?.errorMessage || 'Unknown script execution error';
       
       if (errorCode === 403) {
-        console.error(`PERMISSION ERROR: Service account ${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '[EMAIL NOT SET]'} lacks permission to execute script ${userScriptId}. Check if script is shared with service account as a 'writer' or 'editor'.`);
+        const authSubject = useDomainWideDelegation ? `User ${userEmail}` : `Service account ${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '[EMAIL NOT SET]'}`;
+        console.error(`PERMISSION ERROR: ${authSubject} lacks permission to execute script ${userScriptId}.`);
         return res.status(403).json({ 
-          message: 'Permission denied executing script. The service account needs "writer" or "editor" access, not just "reader" access.',
+          message: useDomainWideDelegation
+            ? 'Permission denied executing script as the user.'
+            : 'Permission denied executing script. The service account needs "writer" or "editor" access.',
           details: errorMessage,
-          scriptId: userScriptId,
-          serviceAccount: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '[EMAIL NOT SET]'
+          scriptId: userScriptId
         });
       } else if (errorCode === 404) {
-        console.error(`NOT FOUND ERROR: Script ${userScriptId} not found or not accessible by service account.`);
+        console.error(`NOT FOUND ERROR: Script ${userScriptId} not found or not accessible.`);
         return res.status(404).json({ 
-          message: 'Script not found or not accessible. Verify the script exists and is shared with the service account.',
+          message: 'Script not found or not accessible.',
           details: errorMessage,
           scriptId: userScriptId
         });

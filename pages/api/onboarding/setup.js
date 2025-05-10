@@ -256,23 +256,23 @@ export default async function handler(req, res) {
         
         const scriptCopyMetadata = { 
           name: `KolayXport Wrapper Script - ${session.user.name || session.user.email || userId}`, // Unique name
-          mimeType: 'application/vnd.google-apps.script'
-          // NOTE: Not adding parents since SA will own it initially, then share it
+          mimeType: 'application/vnd.google-apps.script',
+          parents: ['root'] // Add root as parent - service account will own it initially, then share it
         }; 
 
         console.log(`User ${userId}: Attempting to copy script with metadata:`, JSON.stringify(scriptCopyMetadata));
 
         // Perform the copy using SERVICE ACCOUNT auth
-        const copiedScriptFile = await driveSA.files.copy({
+        const scriptCopy = await driveSA.files.copy({
           fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-          requestBody: scriptCopyMetadata, 
-          fields: 'id, name, webViewLink', // Request id, name, and webViewLink
-          supportsAllDrives: true 
+          requestBody: scriptCopyMetadata,
+          fields: 'id, name, webViewLink',
+          supportsAllDrives: true
         });
           
-        userAppsScriptId = copiedScriptFile.data.id;
-        console.log('Service-account copied script:', copiedScriptFile.data);
-        console.log(`User ${userId}: Copied script successfully with SA. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${copiedScriptFile.data.webViewLink}`);
+        userAppsScriptId = scriptCopy.data.id;
+        console.log('Service-account copied script:', scriptCopy.data);
+        console.log(`User ${userId}: Copied script successfully with SA. New Script ID: ${userAppsScriptId}, Name: ${scriptCopy.data.name}, Link: ${scriptCopy.data.webViewLink}`);
         
         // --- Share the SA-copied script with the User ---
         if (userAppsScriptId) {

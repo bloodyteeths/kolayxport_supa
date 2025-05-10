@@ -274,21 +274,32 @@ export default async function handler(req, res) {
         console.log('Service-account copied script:', scriptCopy.data);
         console.log(`User ${userId}: Copied script successfully with SA. New Script ID: ${userAppsScriptId}, Name: ${scriptCopy.data.name}, Link: ${scriptCopy.data.webViewLink}`);
         
-        // Add a delay before sharing to ensure the file is fully processed by Google Drive
-        console.log(`User ${userId}: Waiting 5 seconds for the script to be fully available in Google Drive...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Save the script ID to the user record immediately so we don't lose it
+        // even if sharing fails temporarily
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            googleScriptId: userAppsScriptId,
+            userAppsScriptId: userAppsScriptId,
+          }
+        });
+        console.log(`User ${userId}: Successfully saved script ID ${userAppsScriptId} to user record.`);
+        
+        // Add a longer delay before sharing to ensure the file is fully processed by Google Drive
+        console.log(`User ${userId}: Waiting 10 seconds for the script to be fully available in Google Drive...`);
+        await new Promise(resolve => setTimeout(resolve, 10000));
         
         // --- Share the SA-copied script with the User ---
+        let scriptShared = false;
         if (userAppsScriptId) {
           console.log(`User ${userId}: Sharing script ${userAppsScriptId} with user ${session.user.email} as 'owner'. (SA Auth)`);
           
           // Add retry logic for sharing
-          const MAX_SHARE_RETRIES = 3;
-          const SHARE_RETRY_DELAY_MS = 3000;
+          const MAX_SHARE_RETRIES = 5;  // Increased from 3 to 5
+          const SHARE_RETRY_DELAY_MS = 5000;  // Increased from 3000 to 5000
           let shareAttempt = 0;
-          let shareSuccess = false;
           
-          while (shareAttempt < MAX_SHARE_RETRIES && !shareSuccess) {
+          while (shareAttempt < MAX_SHARE_RETRIES && !scriptShared) {
             shareAttempt++;
             try {
               console.log(`User ${userId}: Share attempt ${shareAttempt}/${MAX_SHARE_RETRIES}...`);
@@ -300,43 +311,45 @@ export default async function handler(req, res) {
                   role: 'owner',
                   type: 'user',
                   emailAddress: session.user.email,
+                  transferOwnership: true
                 },
-                supportsAllDrives: true, 
-                transferOwnership: true,
+                sendNotificationEmail: false
               });
               
+              scriptShared = true;
               console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email} as 'owner'.`);
-              shareSuccess = true;
-            } catch (shareError) {
-              console.error(`User ${userId}: Share attempt ${shareAttempt} failed. Error:`, shareError.message, shareError.errors);
+              
+              // Now move the script to the user's folder
+              if (driveFolderId && scriptShared) {
+                try {
+                  console.log(`User ${userId}: Moving script ${userAppsScriptId} to user's folder ${driveFolderId}...`);
+                  // Use the user's drive client to move the file after ownership transfer
+                  await drive.files.update({
+                    fileId: userAppsScriptId,
+                    addParents: driveFolderId,
+                    removeParents: 'root',
+                    fields: 'id, parents'
+                  });
+                  console.log(`User ${userId}: Successfully moved script ${userAppsScriptId} to folder ${driveFolderId}.`);
+                } catch (movingErr) {
+                  console.log(`User ${userId}: Error moving script to folder: ${movingErr.message}. Will continue with deployment.`);
+                  // Continue with the process even if moving fails
+                }
+              }
+            } catch (shareErr) {
+              const errDetails = shareErr.response?.data?.error?.errors || [];
+              console.error(`User ${userId}: Share attempt ${shareAttempt} failed. Error: ${shareErr.message}. ${JSON.stringify(errDetails)}`);
               
               if (shareAttempt < MAX_SHARE_RETRIES) {
                 console.log(`User ${userId}: Waiting ${SHARE_RETRY_DELAY_MS}ms before retry...`);
                 await new Promise(resolve => setTimeout(resolve, SHARE_RETRY_DELAY_MS));
-              } else {
-                // This is the last attempt, so throw the error
-                throw new Error(`Failed to transfer script ownership to user after ${MAX_SHARE_RETRIES} attempts: ${shareError.message}`);
               }
             }
           }
           
-          // Now move the script to the user's folder
-          if (driveFolderId) {
-            console.log(`User ${userId}: Moving script ${userAppsScriptId} to user's folder ${driveFolderId}...`);
-            try {
-              // Use the user's drive client to move the file after ownership transfer
-              await drive.files.update({
-                fileId: userAppsScriptId,
-                addParents: driveFolderId,
-                removeParents: 'root',
-                fields: 'id, parents'
-              });
-              console.log(`User ${userId}: Successfully moved script ${userAppsScriptId} to folder ${driveFolderId}.`);
-            } catch (moveError) {
-              console.error(`User ${userId}: Failed to move script ${userAppsScriptId} to folder ${driveFolderId}. Error:`, moveError.message);
-              // This is not a critical failure - script will still function but won't be in the folder
-              console.warn(`User ${userId}: Script ownership was transferred, but script will not appear in the user's Drive folder.`);
-            }
+          if (!scriptShared) {
+            console.error(`User ${userId}: Failed to transfer script ownership to user after ${MAX_SHARE_RETRIES} attempts. Will continue with deployment using service account.`);
+            // Don't throw an error - continue to the deployment step even if sharing fails
           }
         }
         
@@ -371,61 +384,46 @@ export default async function handler(req, res) {
         }
         // --- End Script Sharing ---
 
-        // --- Create Script Version and Deployment (using User Auth) ---
-        let newDeploymentId;
-        if (userAppsScriptId) {
-          console.log(`User ${userId}: Creating version and deployment for script ${userAppsScriptId} (User Auth)`);
-          try {
-            const script = google.script({ version: 'v1', auth: userAuth }); // User-authenticated client
-
-            // 1. Create a new version
-            console.log(`User ${userId}: Creating new version for script ${userAppsScriptId}...`);
-            const version = await script.projects.versions.create({
-              scriptId: userAppsScriptId,
-              requestBody: {
-                description: 'Initial version after copy - v1.0.0',
-              },
-            });
-            const newVersionNumber = version.data.versionNumber;
-            if (!newVersionNumber) {
-              throw new Error('Script version created but version number was not returned.');
+        // --- 6. Create a script version (needed for deployment) ---
+        // Try with user's auth first, fall back to SA if needed
+        const scriptClient = scriptShared ? script : scriptSA;
+        try {
+          console.log(`User ${userId}: Creating new script version for script ${userAppsScriptId}...`);
+          const createVersionResponse = await scriptClient.projects.versions.create({
+            scriptId: userAppsScriptId
+          });
+          
+          const versionNumber = createVersionResponse.data.versionNumber;
+          console.log(`User ${userId}: Created script version: ${versionNumber}`);
+          
+          // --- 7. Create a deployment for this version ---
+          console.log(`User ${userId}: Creating new deployment for script ${userAppsScriptId} version ${versionNumber}...`);
+          const deploymentResponse = await scriptClient.projects.deployments.create({
+            scriptId: userAppsScriptId,
+            requestBody: {
+              versionNumber: versionNumber,
+              manifestFileName: "appsscript",
+              description: `API Deployment for ${session.user.name || session.user.email || userId}`
             }
-            console.log(`User ${userId}: Created script version ${newVersionNumber} for script ${userAppsScriptId}.`);
-
-            // 2. Create a deployment for the new version
-            // Ensure your script's manifest (appsscript.json) is configured for API execution.
-            // Example manifest snippet:
-            // {
-            //   "timeZone": "America/New_York",
-            //   "dependencies": {},
-            //   "exceptionLogging": "STACKDRIVER",
-            //   "runtimeVersion": "V8",
-            //   "executionApi": {
-            //     "access": "ANYONE"
-            //   }
-            // }
-            console.log(`User ${userId}: Creating deployment for script ${userAppsScriptId}, version ${newVersionNumber}...`);
-            const deployment = await script.projects.deployments.create({
-              scriptId: userAppsScriptId,
-              requestBody: {
-                versionNumber: newVersionNumber,
-                description: 'API Executable - v1.0.0',
-                manifestFileName: 'appsscript' // Assuming manifest is named appsscript.json
-              },
-            });
-            newDeploymentId = deployment.data.deploymentId;
-            if (!newDeploymentId) {
-              throw new Error('Script deployment created but deployment ID was not returned.');
+          });
+          
+          const deploymentId = deploymentResponse.data.deploymentId;
+          console.log(`User ${userId}: Created deployment ID: ${deploymentId}`);
+          
+          // Save this deployment ID to the user record
+          await prisma.user.update({
+            where: { id: userId },
+            data: {
+              googleScriptDeploymentId: deploymentId
             }
-            console.log(`User ${userId}: Created deployment ${newDeploymentId} for script ${userAppsScriptId}, version ${newVersionNumber}.`);
+          });
+          console.log(`User ${userId}: Saved deployment ID ${deploymentId} to user record.`);
 
-          } catch (deployError) {
-            console.error(`User ${userId}: Failed to create version or deployment for script ${userAppsScriptId}. Error:`, deployError.message, deployError.errors);
-            // This is likely a critical error for subsequent operations. Consider how to handle.
-            // For now, log and continue, userAppsScriptId will be saved, but deploymentId will be missing.
-          }
+        } catch (deployError) {
+          console.error(`User ${userId}: Failed to create version or deployment for script ${userAppsScriptId}. Error:`, deployError.message, deployError.errors);
+          // This is likely a critical error for subsequent operations. Consider how to handle.
+          // For now, log and continue, userAppsScriptId will be saved, but deploymentId will be missing.
         }
-        // --- End Create Script Version and Deployment ---
 
       } catch (scriptCopyErr) {
         console.error(`User ${userId}: USER failed Wrapper script copy attempt:`, scriptCopyErr);

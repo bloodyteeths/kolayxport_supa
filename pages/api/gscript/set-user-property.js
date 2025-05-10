@@ -100,6 +100,7 @@ export default async function handler(req, res) {
       resource: {
         function: 'saveToUserProperties',
         parameters: [propertyName, value],
+        devMode: true // Execute latest saved code
       },
     };
 

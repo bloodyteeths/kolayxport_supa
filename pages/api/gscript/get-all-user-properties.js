@@ -81,6 +81,7 @@ export default async function handler(req, res) {
       scriptId: userScriptId,
       resource: {
         function: 'getAllUserProperties',
+        devMode: true // Execute latest saved code
       },
     };
 

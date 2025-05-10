@@ -377,6 +377,7 @@ export default async function handler(req, res) {
             resource: {
               function: 'saveToUserProperties',
               parameters: ['FEDEX_FOLDER_ID', driveFolderId],
+              devMode: true, // Explicitly set devMode
             },
           });
 

@@ -3,9 +3,11 @@
 // and calls Apps Script to retrieve all UserProperties for that user.
 
 import { getSession } from 'next-auth/react';
-import { GoogleAuth } from 'google-auth-library';
-import { google } from 'googleapis';
+// Remove GoogleAuth and google imports as they are handled by the service module
+// import { GoogleAuth } from 'google-auth-library';
+// import { google } from 'googleapis';
 import prisma from '@/lib/prisma'; // Import Prisma client
+import { getScriptServiceClient } from '@/lib/googleServiceAccountAuth'; // Import the new service client getter
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -36,28 +38,31 @@ export default async function handler(req, res) {
     }
 
     // 1. Authenticate with Google using Service Account Credentials
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON) {
-        console.error('Critical: GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON is not set.');
+    // The GOOGLE_SERVICE_ACCOUNT_JSON parsing and GoogleAuth setup is now handled by the imported module.
+    // The check for process.env.GOOGLE_SERVICE_ACCOUNT_JSON is done within the module.
+    /*
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON) { // This env var is now GOOGLE_SERVICE_ACCOUNT_JSON
+        console.error('Critical: GOOGLE_SERVICE_ACCOUNT_JSON is not set.'); // Adjusted message
         return res.status(500).json({ message: 'Server configuration error: Auth credentials missing.' });
     }
-    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON);
+    // const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_JSON); // Now GOOGLE_SERVICE_ACCOUNT_JSON
     
-    const auth = new GoogleAuth({
-      credentials,
-      // Scopes should be appropriate for what the script execution needs.
-      // If just reading properties via a script that doesn't make other API calls,
-      // fewer scopes might be needed than for setting properties or more complex scripts.
-      scopes: [
-        'https://www.googleapis.com/auth/script.scriptapp',
-        'https://www.googleapis.com/auth/script.projects',
-        'https://www.googleapis.com/auth/script.deployments',
-        'https://www.googleapis.com/auth/script.metrics'
-      ],
-      clientOptions: { quotaProjectId: process.env.GCP_PROJECT_ID }
-    });
+    // const auth = new GoogleAuth({
+    //   credentials,
+    //   scopes: [
+    //     'https://www.googleapis.com/auth/script.scriptapp',
+    //     'https://www.googleapis.com/auth/script.projects',
+    //     'https://www.googleapis.com/auth/script.deployments',
+    //     'https://www.googleapis.com/auth/script.metrics'
+    //   ],
+    //   clientOptions: { quotaProjectId: process.env.GCP_PROJECT_ID }
+    // });
 
-    const client = await auth.getClient();
-    const script = google.script({ version: 'v1', auth: client });
+    // const client = await auth.getClient();
+    // const script = google.script({ version: 'v1', auth: client });
+    */
+
+    const script = await getScriptServiceClient(); // Use the new service client
 
     // --- Pre-flight check: Verify script project accessibility ---
     try {

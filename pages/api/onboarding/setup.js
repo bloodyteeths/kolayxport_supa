@@ -429,22 +429,20 @@ export default async function handler(req, res) {
         }
         // --- End Script Sharing ---
 
-        // --- 6. Create a script version (needed for deployment) ---
-        const script = google.script({ version: 'v1', auth: userAuth }); // User-authenticated client
-        const scriptSA = await getSAScriptClient(); // Service account-authenticated client
-        
-        // We'll default to service account for more reliability
-        // but try with user auth if script was successfully shared
+        // --- 7. Create a deployment for this version ---
+        // Move deployment creation outside the previous conditions to ensure it runs even if the script already exists
+        let deploymentId = null;
         try {
-          // Try a pre-flight check to see if the user has access to the script
+          // First, test if user can access the script (could be existing script)
           let userCanAccessScript = false;
           try {
             console.log(`User ${userId}: Testing if user can access script ${userAppsScriptId}...`);
             await script.projects.get({ scriptId: userAppsScriptId });
             userCanAccessScript = true;
-            console.log(`User ${userId}: Confirmed user can access script ${userAppsScriptId}`);
+            console.log(`User ${userId}: User can access script ${userAppsScriptId}.`);
           } catch (accessErr) {
-            console.log(`User ${userId}: User cannot access script yet: ${accessErr.message}`);
+            console.log(`User ${userId}: User cannot access script, will use SA: ${accessErr.message}`);
+            userCanAccessScript = false;
           }
           
           // Choose which client to use based on access test
@@ -459,7 +457,6 @@ export default async function handler(req, res) {
           const versionNumber = createVersionResponse.data.versionNumber;
           console.log(`User ${userId}: Created script version: ${versionNumber}`);
           
-          // --- 7. Create a deployment for this version ---
           console.log(`User ${userId}: Creating new deployment for script ${userAppsScriptId} version ${versionNumber} using ${clientType} auth...`);
           const deploymentResponse = await scriptClient.projects.deployments.create({
             scriptId: userAppsScriptId,
@@ -470,23 +467,22 @@ export default async function handler(req, res) {
             }
           });
           
-          const deploymentId = deploymentResponse.data.deploymentId;
+          deploymentId = deploymentResponse.data.deploymentId;
           console.log(`User ${userId}: Created deployment ID: ${deploymentId}`);
           
-          // Save this deployment ID to the user record
+          // Save this deployment ID to the user record immediately
           await prisma.user.update({
             where: { id: userId },
             data: {
-              userAppsScriptId: userAppsScriptId,
               googleScriptDeploymentId: deploymentId
             }
           });
-          console.log(`User ${userId}: Saved deployment ID ${deploymentId} to user record.`);
-
-        } catch (deployError) {
-          console.error(`User ${userId}: Failed to create version or deployment for script ${userAppsScriptId}. Error:`, deployError.message, deployError.errors);
-          // This is likely a critical error for subsequent operations. Consider how to handle.
-          // For now, log and continue, userAppsScriptId will be saved, but deploymentId will be missing.
+          console.log(`User ${userId}: Successfully saved deployment ID ${deploymentId} to user record.`);
+          
+        } catch (deploymentErr) {
+          console.error(`User ${userId}: Failed to create deployment for script ${userAppsScriptId}:`, deploymentErr);
+          console.error(`User ${userId}: Raw deployment error:`, JSON.stringify(deploymentErr));
+          // Log but continue - this is not a fatal error as user can try again or use reshare utility
         }
 
       } catch (scriptCopyErr) {

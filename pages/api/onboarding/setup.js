@@ -286,7 +286,6 @@ export default async function handler(req, res) {
         await prisma.user.update({
           where: { id: userId },
           data: {
-            googleScriptId: userAppsScriptId,
             userAppsScriptId: userAppsScriptId,
           }
         });
@@ -462,8 +461,8 @@ export default async function handler(req, res) {
           await prisma.user.update({
             where: { id: userId },
             data: {
-              googleScriptId: userAppsScriptId,
               userAppsScriptId: userAppsScriptId,
+              googleScriptDeploymentId: deploymentId
             }
           });
           console.log(`User ${userId}: Saved deployment ID ${deploymentId} to user record.`);

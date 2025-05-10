@@ -300,80 +300,96 @@ export default async function handler(req, res) {
         if (userAppsScriptId) {
           console.log(`User ${userId}: Sharing script ${userAppsScriptId} with user ${session.user.email} as 'owner'. (SA Auth)`);
           
-          // Add retry logic for sharing
-          const MAX_SHARE_RETRIES = 5;  // Increased from 3 to 5
-          const SHARE_RETRY_DELAY_MS = 5000;  // Increased from 3000 to 5000
-          let shareAttempt = 0;
-          
-          while (shareAttempt < MAX_SHARE_RETRIES && !scriptShared) {
-            shareAttempt++;
-            try {
-              console.log(`User ${userId}: Share attempt ${shareAttempt}/${MAX_SHARE_RETRIES}...`);
-              
-              // First grant editor access (which is more likely to succeed) before attempting owner transfer
-              console.log(`User ${userId}: First granting editor access before owner transfer...`);
-              await driveSA.permissions.create({
-                fileId: userAppsScriptId,
-                requestBody: {
-                  role: 'writer',
-                  type: 'user',
-                  emailAddress: session.user.email
-                },
-                sendNotificationEmail: false,
-                supportsAllDrives: true
-              });
-              
-              console.log(`User ${userId}: Editor access granted, waiting 3 seconds before attempting ownership transfer...`);
-              await new Promise(resolve => setTimeout(resolve, 3000));
-              
-              // Now try to transfer ownership
+          // Verify script exists before attempting to share
+          try {
+            // First check if script exists with SA
+            console.log(`User ${userId}: Verifying script ${userAppsScriptId} exists before sharing...`);
+            const driveSA = await getSADriveClient();
+            const fileCheck = await driveSA.files.get({
+              fileId: userAppsScriptId,
+              fields: 'id,name,owners',
+              supportsAllDrives: true
+            });
+            console.log(`User ${userId}: Script exists. Current owner: ${fileCheck.data.owners?.[0]?.emailAddress || 'Unknown'}`);
+            
+            // Add retry logic for sharing
+            const MAX_SHARE_RETRIES = 5;
+            const SHARE_RETRY_DELAY_MS = 5000;
+            let shareAttempt = 0;
+            
+            while (shareAttempt < MAX_SHARE_RETRIES && !scriptShared) {
+              shareAttempt++;
               try {
+                console.log(`User ${userId}: Share attempt ${shareAttempt}/${MAX_SHARE_RETRIES}...`);
+                
+                // First grant editor access (which is more likely to succeed) before attempting owner transfer
+                console.log(`User ${userId}: First granting editor access before owner transfer...`);
                 await driveSA.permissions.create({
                   fileId: userAppsScriptId,
                   requestBody: {
-                    role: 'owner',
+                    role: 'writer',
                     type: 'user',
-                    emailAddress: session.user.email,
-                    transferOwnership: true
+                    emailAddress: session.user.email
                   },
                   sendNotificationEmail: false,
                   supportsAllDrives: true
                 });
-                console.log(`User ${userId}: Successfully transferred ownership to ${session.user.email}`);
-              } catch (ownershipErr) {
-                console.log(`User ${userId}: Ownership transfer failed, but editor access was granted. Error: ${ownershipErr.message}`);
-                // Continue with editor access if ownership transfer fails
-              }
-              
-              scriptShared = true;
-              console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email}.`);
-              
-              // Now move the script to the user's folder
-              if (driveFolderId && scriptShared) {
+                
+                console.log(`User ${userId}: Editor access granted, waiting 3 seconds before attempting ownership transfer...`);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                // Now try to transfer ownership
                 try {
-                  console.log(`User ${userId}: Moving script ${userAppsScriptId} to user's folder ${driveFolderId}...`);
-                  // Use the user's drive client to move the file after ownership transfer
-                  await drive.files.update({
+                  await driveSA.permissions.create({
                     fileId: userAppsScriptId,
-                    addParents: driveFolderId,
-                    removeParents: 'root',
-                    fields: 'id, parents'
+                    requestBody: {
+                      role: 'owner',
+                      type: 'user',
+                      emailAddress: session.user.email,
+                      transferOwnership: true
+                    },
+                    sendNotificationEmail: false,
+                    supportsAllDrives: true
                   });
-                  console.log(`User ${userId}: Successfully moved script ${userAppsScriptId} to folder ${driveFolderId}.`);
-                } catch (movingErr) {
-                  console.log(`User ${userId}: Error moving script to folder: ${movingErr.message}. Will continue with deployment.`);
-                  // Continue with the process even if moving fails
+                  console.log(`User ${userId}: Successfully transferred ownership to ${session.user.email}`);
+                } catch (ownershipErr) {
+                  console.log(`User ${userId}: Ownership transfer failed, but editor access was granted. Error: ${ownershipErr.message}`);
+                  // Continue with editor access if ownership transfer fails
+                }
+                
+                scriptShared = true;
+                console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email}.`);
+                
+                // Now move the script to the user's folder
+                if (driveFolderId && scriptShared) {
+                  try {
+                    console.log(`User ${userId}: Moving script ${userAppsScriptId} to user's folder ${driveFolderId}...`);
+                    // Use the user's drive client to move the file after ownership transfer
+                    await drive.files.update({
+                      fileId: userAppsScriptId,
+                      addParents: driveFolderId,
+                      removeParents: 'root',
+                      fields: 'id, parents'
+                    });
+                    console.log(`User ${userId}: Successfully moved script ${userAppsScriptId} to folder ${driveFolderId}.`);
+                  } catch (movingErr) {
+                    console.log(`User ${userId}: Error moving script to folder: ${movingErr.message}. Will continue with deployment.`);
+                    // Continue with the process even if moving fails
+                  }
+                }
+              } catch (shareErr) {
+                const errDetails = shareErr.response?.data?.error?.errors || [];
+                console.error(`User ${userId}: Share attempt ${shareAttempt} failed. Error: ${shareErr.message}. ${JSON.stringify(errDetails)}`);
+                
+                if (shareAttempt < MAX_SHARE_RETRIES) {
+                  console.log(`User ${userId}: Waiting ${SHARE_RETRY_DELAY_MS}ms before retry...`);
+                  await new Promise(resolve => setTimeout(resolve, SHARE_RETRY_DELAY_MS));
                 }
               }
-            } catch (shareErr) {
-              const errDetails = shareErr.response?.data?.error?.errors || [];
-              console.error(`User ${userId}: Share attempt ${shareAttempt} failed. Error: ${shareErr.message}. ${JSON.stringify(errDetails)}`);
-              
-              if (shareAttempt < MAX_SHARE_RETRIES) {
-                console.log(`User ${userId}: Waiting ${SHARE_RETRY_DELAY_MS}ms before retry...`);
-                await new Promise(resolve => setTimeout(resolve, SHARE_RETRY_DELAY_MS));
-              }
             }
+          } catch (fileCheckErr) {
+            console.error(`User ${userId}: Script verification failed before sharing. Error: ${fileCheckErr.message}`);
+            console.error(`User ${userId}: Will continue but sharing may fail.`);
           }
           
           if (!scriptShared) {
@@ -513,8 +529,7 @@ export default async function handler(req, res) {
             ...(googleSheetId && { googleSheetId }), // Conditionally add if defined
             ...(driveFolderId && { driveFolderId }), // Conditionally add if defined
             ...(userAppsScriptId && { userAppsScriptId }), // Conditionally add if defined
-            ...(deploymentId && { googleScriptDeploymentId: deploymentId }), // Save the new deployment ID
-            onboardingComplete: !!(driveFolderId && googleSheetId && userAppsScriptId && deploymentId) // Mark complete if all IDs are present
+            ...(deploymentId && { googleScriptDeploymentId: deploymentId }) // Save the new deployment ID
           },
         });
         console.log(`User ${userId}: Database updated successfully with new IDs.`);

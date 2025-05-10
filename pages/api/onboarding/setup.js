@@ -359,8 +359,21 @@ export default async function handler(req, res) {
       for (let i = 0; i < MAX_RETRIES; i++) {
         try {
           console.log(`User ${userId}: Attempt ${i + 1}/${MAX_RETRIES} to set FEDEX_FOLDER_ID (${driveFolderId}) in Apps Script ${userAppsScriptId}`);
+          
+          // --- Pre-flight check within retry loop: Verify script project accessibility AS USER ---
+          try {
+            console.log(`User ${userId}: (Retry Loop Attempt ${i + 1}) Pre-flight GET for scriptId: ${userAppsScriptId} (as user)`);
+            const project = await scriptApi.projects.get({ scriptId: userAppsScriptId }); // scriptApi uses userAuth
+            console.log(`User ${userId}: (Retry Loop Attempt ${i + 1}) Pre-flight GET SUCCESS for scriptId: ${userAppsScriptId}. Project title: ${project.data.title}`);
+          } catch (projectGetError) {
+            console.warn(`User ${userId}: (Retry Loop Attempt ${i + 1}) Pre-flight GET FAILED for scriptId: ${userAppsScriptId} (as user). Error:`, projectGetError.message);
+            // If 404 here, it's a strong indicator the script isn't findable, even before run()
+            // We'll still proceed to the run() call to see its specific error, but this log is important.
+          }
+          // --- End Pre-flight check ---
+
           const execResponse = await scriptApi.scripts.run({
-            scriptId: userAppsScriptId,
+            scriptId: userAppsScriptId, // Use the actual Apps Script project ID
             resource: {
               function: 'saveToUserProperties',
               parameters: ['FEDEX_FOLDER_ID', driveFolderId],

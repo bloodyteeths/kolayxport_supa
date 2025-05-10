@@ -290,6 +290,25 @@ export default async function handler(req, res) {
               transferOwnership: true,
             });
             console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email} as 'owner'.`);
+            
+            // Now move the script to the user's folder
+            if (driveFolderId) {
+              console.log(`User ${userId}: Moving script ${userAppsScriptId} to user's folder ${driveFolderId}...`);
+              try {
+                // Use the user's drive client to move the file after ownership transfer
+                await drive.files.update({
+                  fileId: userAppsScriptId,
+                  addParents: driveFolderId,
+                  removeParents: 'root',
+                  fields: 'id, parents'
+                });
+                console.log(`User ${userId}: Successfully moved script ${userAppsScriptId} to folder ${driveFolderId}.`);
+              } catch (moveError) {
+                console.error(`User ${userId}: Failed to move script ${userAppsScriptId} to folder ${driveFolderId}. Error:`, moveError.message);
+                // This is not a critical failure - script will still function but won't be in the folder
+                console.warn(`User ${userId}: Script ownership was transferred, but script will not appear in the user's Drive folder.`);
+              }
+            }
           } catch (shareError) {
             console.error(`User ${userId}: Failed to share script ${userAppsScriptId} with user ${session.user.email}. Error:`, shareError.message, shareError.errors);
             // This is a critical failure as the user needs to own the script

@@ -223,15 +223,16 @@ export default async function handler(req, res) {
 
     // --- 3. Copy Template Wrapper Script (if needed) --- 
     if (!userAppsScriptId) {
-      console.log(`User ${userId}: Preparing to copy template wrapper script using USER authentication...`);
+      console.log(`User ${userId}: Preparing to copy template wrapper script using SERVICE ACCOUNT authentication...`);
       console.log(`User ${userId}: Template Script ID from env: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
-      console.log(`User ${userId}: User email attempting copy: ${session.user.email}`);
+      console.log(`User ${userId}: User email for script naming: ${session.user.email}`);
       
       try {
-        // Verify template script details first
+        // Use service account to verify template script details first
         try {
-          console.log(`User ${userId}: Verifying details for template script ID: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
-          const templateFileMeta = await drive.files.get({
+          const driveSA = await getSADriveClient();
+          console.log(`User ${userId}: Verifying details for template script ID: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID} (using SA)`);
+          const templateFileMeta = await driveSA.files.get({
             fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
             fields: 'id, name, mimeType, trashed',
             supportsAllDrives: true,
@@ -244,82 +245,59 @@ export default async function handler(req, res) {
             throw new Error('Template script is in the trash.');
           }
         } catch (verifyErr) {
-          console.error(`User ${userId}: Failed to verify template script:`, verifyErr);
+          console.error(`User ${userId}: Failed to verify template script with SA:`, verifyErr);
           // Rethrow or handle as critical error, as copy will likely fail
           throw new Error(`Critical error verifying template script before copy: ${verifyErr.message}`);
         }
+
+        // Create copy of template script using SERVICE ACCOUNT
+        const driveSA = await getSADriveClient();
+        console.log(`User ${userId}: Using SERVICE ACCOUNT to copy template script...`);
         
         const scriptCopyMetadata = { 
           name: `KolayXport Wrapper Script - ${session.user.name || session.user.email || userId}`, // Unique name
-          mimeType: 'application/vnd.google-apps.script',
-          parents: [driveFolderId] // CRITICAL: Place copy in the user's folder
+          mimeType: 'application/vnd.google-apps.script'
+          // NOTE: Not adding parents since SA will own it initially, then share it
         }; 
 
         console.log(`User ${userId}: Attempting to copy script with metadata:`, JSON.stringify(scriptCopyMetadata));
 
-        // Add more detailed logging and error handling
-        try {
-          // Check if the user can list files to verify OAuth is working properly
-          console.log(`User ${userId}: Pre-copy verification - Testing if user can list their own files...`);
-          const fileList = await drive.files.list({
-            pageSize: 1,
-            fields: 'files(id, name)'
-          });
-          console.log(`User ${userId}: Pre-copy verification - User can list files: ${fileList.data.files.length > 0 ? 'Yes' : 'No'}`);
+        // Perform the copy using SERVICE ACCOUNT auth
+        const copiedScriptFile = await driveSA.files.copy({
+          fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
+          requestBody: scriptCopyMetadata, 
+          fields: 'id, name, webViewLink', // Request id, name, and webViewLink
+          supportsAllDrives: true 
+        });
           
-          // Check if the user can read the template file directly
-          console.log(`User ${userId}: Pre-copy verification - Testing if user can access template file...`);
-          const templateCheck = await drive.files.get({
-            fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-            fields: 'id, name, sharingUser, shared',
-            supportsAllDrives: true
-          });
-          console.log(`User ${userId}: Pre-copy verification - User can access template: Yes, name: ${templateCheck.data.name}, shared: ${templateCheck.data.shared}`);
-        } catch (preCheckErr) {
-          console.error(`User ${userId}: Pre-copy verification failed:`, preCheckErr.message);
-          console.error(`User ${userId}: Pre-copy verification error details:`, JSON.stringify(preCheckErr.response?.data || {}, null, 2));
-          // Continue with the copy attempt anyway to see the specific error
-        }
-
-        // Perform the copy using USER auth with more detailed error handling
-        try {
-          // Using `drive` which is user-authenticated
-          const copiedScriptFile = await drive.files.copy({
-            fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-            requestBody: scriptCopyMetadata, 
-            fields: 'id, name, webViewLink', // Request id, name, and webViewLink
-            supportsAllDrives: true 
-          });
-          
-          userAppsScriptId = copiedScriptFile.data.id;
-          console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${copiedScriptFile.data.webViewLink}`);
-        } catch (copyError) {
-          console.error(`User ${userId}: Script copy operation failed with error:`, copyError.message);
-          
-          // Log detailed API error information
-          if (copyError.response?.data) {
-            console.error(`User ${userId}: API error details:`, JSON.stringify(copyError.response.data, null, 2));
+        userAppsScriptId = copiedScriptFile.data.id;
+        console.log('Service-account copied script:', copiedScriptFile.data);
+        console.log(`User ${userId}: Copied script successfully with SA. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${copiedScriptFile.data.webViewLink}`);
+        
+        // --- Share the SA-copied script with the User ---
+        if (userAppsScriptId) {
+          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with user ${session.user.email} as 'owner'. (SA Auth)`);
+          try {
+            // Using the SA-authenticated drive client
+            await driveSA.permissions.create({
+              fileId: userAppsScriptId,
+              requestBody: {
+                role: 'owner',
+                type: 'user',
+                emailAddress: session.user.email,
+              },
+              supportsAllDrives: true, 
+              transferOwnership: true,
+            });
+            console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email} as 'owner'.`);
+          } catch (shareError) {
+            console.error(`User ${userId}: Failed to share script ${userAppsScriptId} with user ${session.user.email}. Error:`, shareError.message, shareError.errors);
+            // This is a critical failure as the user needs to own the script
+            throw new Error(`Failed to transfer script ownership to user: ${shareError.message}`);
           }
-          
-          // Check for specific error codes
-          if (copyError.code === 403) {
-            console.error(`User ${userId}: Permission denied (403). Possible causes:`);
-            console.error(`  - The template script is not shared with the user or "Anyone with link"`);
-            console.error(`  - The Drive API might not be enabled in the Google Cloud project`);
-            console.error(`  - The OAuth token might not have the correct scopes`);
-          } else if (copyError.code === 404) {
-            console.error(`User ${userId}: File not found (404). The template script ID might be incorrect or the file was deleted.`);
-          } else if (copyError.code === 429) {
-            console.error(`User ${userId}: Rate limit exceeded (429). The Drive API quota might be exceeded.`);
-          } else if (copyError.code === 500) {
-            console.error(`User ${userId}: Server error (500). This could be a temporary issue with Google's servers.`);
-          }
-          
-          // Rethrow to be caught by the outer catch block
-          throw copyError;
         }
         
-        // --- Share the newly copied script with the Service Account ---
+        // --- Share the newly copied script with the Service Account (to maintain access) ---
         const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
         if (userAppsScriptId && serviceAccountEmail) {
           console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'writer'. (User Auth)`);

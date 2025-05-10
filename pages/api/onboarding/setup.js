@@ -257,17 +257,68 @@ export default async function handler(req, res) {
 
         console.log(`User ${userId}: Attempting to copy script with metadata:`, JSON.stringify(scriptCopyMetadata));
 
-        // Perform the copy using USER auth
-        const copiedScriptFile = await drive.files.copy({ // Using `drive` which is user-authenticated
-          fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-          requestBody: scriptCopyMetadata, 
-          fields: 'id, name, webViewLink', // Request id, name, and webViewLink
-          supportsAllDrives: true 
-        });
-        
-        userAppsScriptId = copiedScriptFile.data.id;
-        console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${copiedScriptFile.data.webViewLink}`);
+        // Add more detailed logging and error handling
+        try {
+          // Check if the user can list files to verify OAuth is working properly
+          console.log(`User ${userId}: Pre-copy verification - Testing if user can list their own files...`);
+          const fileList = await drive.files.list({
+            pageSize: 1,
+            fields: 'files(id, name)'
+          });
+          console.log(`User ${userId}: Pre-copy verification - User can list files: ${fileList.data.files.length > 0 ? 'Yes' : 'No'}`);
+          
+          // Check if the user can read the template file directly
+          console.log(`User ${userId}: Pre-copy verification - Testing if user can access template file...`);
+          const templateCheck = await drive.files.get({
+            fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
+            fields: 'id, name, sharingUser, shared',
+            supportsAllDrives: true
+          });
+          console.log(`User ${userId}: Pre-copy verification - User can access template: Yes, name: ${templateCheck.data.name}, shared: ${templateCheck.data.shared}`);
+        } catch (preCheckErr) {
+          console.error(`User ${userId}: Pre-copy verification failed:`, preCheckErr.message);
+          console.error(`User ${userId}: Pre-copy verification error details:`, JSON.stringify(preCheckErr.response?.data || {}, null, 2));
+          // Continue with the copy attempt anyway to see the specific error
+        }
 
+        // Perform the copy using USER auth with more detailed error handling
+        try {
+          // Using `drive` which is user-authenticated
+          const copiedScriptFile = await drive.files.copy({
+            fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
+            requestBody: scriptCopyMetadata, 
+            fields: 'id, name, webViewLink', // Request id, name, and webViewLink
+            supportsAllDrives: true 
+          });
+          
+          userAppsScriptId = copiedScriptFile.data.id;
+          console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${copiedScriptFile.data.webViewLink}`);
+        } catch (copyError) {
+          console.error(`User ${userId}: Script copy operation failed with error:`, copyError.message);
+          
+          // Log detailed API error information
+          if (copyError.response?.data) {
+            console.error(`User ${userId}: API error details:`, JSON.stringify(copyError.response.data, null, 2));
+          }
+          
+          // Check for specific error codes
+          if (copyError.code === 403) {
+            console.error(`User ${userId}: Permission denied (403). Possible causes:`);
+            console.error(`  - The template script is not shared with the user or "Anyone with link"`);
+            console.error(`  - The Drive API might not be enabled in the Google Cloud project`);
+            console.error(`  - The OAuth token might not have the correct scopes`);
+          } else if (copyError.code === 404) {
+            console.error(`User ${userId}: File not found (404). The template script ID might be incorrect or the file was deleted.`);
+          } else if (copyError.code === 429) {
+            console.error(`User ${userId}: Rate limit exceeded (429). The Drive API quota might be exceeded.`);
+          } else if (copyError.code === 500) {
+            console.error(`User ${userId}: Server error (500). This could be a temporary issue with Google's servers.`);
+          }
+          
+          // Rethrow to be caught by the outer catch block
+          throw copyError;
+        }
+        
         // --- Share the newly copied script with the Service Account ---
         const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
         if (userAppsScriptId && serviceAccountEmail) {

@@ -1,8 +1,11 @@
 import { getSession } from 'next-auth/react';
 import { google } from 'googleapis';
-import { GoogleAuth } from 'google-auth-library';
+// Remove direct GoogleAuth import if service account auth is fully handled by the new module
+// import { GoogleAuth } from 'google-auth-library';
 import prisma from '@/lib/prisma'; // Your prisma client instance
 import dotenv from 'dotenv';
+// Import service account client getters
+import { getScriptServiceClient as getSAScriptClient, getDriveServiceClient as getSADriveClient } from '@/lib/googleServiceAccountAuth';
 
 dotenv.config();
 
@@ -268,8 +271,10 @@ export default async function handler(req, res) {
         // --- Share the newly copied script with the Service Account ---
         const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
         if (userAppsScriptId && serviceAccountEmail) {
-          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'writer'.`);
+          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'writer'. (User Auth)`);
           try {
+            // Using the user-authenticated 'drive' client here is correct,
+            // as the user owns the script and is granting permission.
             await drive.permissions.create({
               fileId: userAppsScriptId,
               requestBody: {
@@ -277,20 +282,78 @@ export default async function handler(req, res) {
                 type: 'user',
                 emailAddress: serviceAccountEmail,
               },
-              supportsAllDrives: true, // Important if the user's Drive is part of a Shared Drive or if the template was
+              supportsAllDrives: true, // Important if the user's Drive is part of a Shared Drive
             });
-            console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with ${serviceAccountEmail}.`);
+            console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with ${serviceAccountEmail} as 'writer'.`);
           } catch (shareError) {
-            // Log the error but don't let it block the rest of the onboarding for now.
-            // The get-all-user-properties might fail later, but basic onboarding can proceed.
-            console.warn(`User ${userId}: Failed to share script ${userAppsScriptId} with service account ${serviceAccountEmail}. This might affect fetching all properties later. Error:`, shareError.message);
+            console.error(`User ${userId}: Failed to share script ${userAppsScriptId} with service account ${serviceAccountEmail}. Error:`, shareError.message, shareError.errors);
+            // Decide if this is a critical failure for onboarding.
+            // For now, log and continue, but script execution by SA will fail later.
+            // Consider throwing an error if SA access is immediately required.
           }
         } else {
           if (!serviceAccountEmail) {
-            console.warn(`User ${userId}: GOOGLE_SERVICE_ACCOUNT_EMAIL is not set in .env. Cannot share copied script.`);
+            console.warn(`User ${userId}: GOOGLE_SERVICE_ACCOUNT_EMAIL is not set. Cannot share script ${userAppsScriptId}. Service account operations will fail.`);
+          }
+          // userAppsScriptId missing here would be an earlier logic error
+        }
+        // --- End Script Sharing ---
+
+        // --- Create Script Version and Deployment (using User Auth) ---
+        let newDeploymentId;
+        if (userAppsScriptId) {
+          console.log(`User ${userId}: Creating version and deployment for script ${userAppsScriptId} (User Auth)`);
+          try {
+            const script = google.script({ version: 'v1', auth: userAuth }); // User-authenticated client
+
+            // 1. Create a new version
+            console.log(`User ${userId}: Creating new version for script ${userAppsScriptId}...`);
+            const version = await script.projects.versions.create({
+              scriptId: userAppsScriptId,
+              requestBody: {
+                description: 'Initial version after copy - v1.0.0',
+              },
+            });
+            const newVersionNumber = version.data.versionNumber;
+            if (!newVersionNumber) {
+              throw new Error('Script version created but version number was not returned.');
+            }
+            console.log(`User ${userId}: Created script version ${newVersionNumber} for script ${userAppsScriptId}.`);
+
+            // 2. Create a deployment for the new version
+            // Ensure your script's manifest (appsscript.json) is configured for API execution.
+            // Example manifest snippet:
+            // {
+            //   "timeZone": "America/New_York",
+            //   "dependencies": {},
+            //   "exceptionLogging": "STACKDRIVER",
+            //   "runtimeVersion": "V8",
+            //   "executionApi": {
+            //     "access": "ANYONE"
+            //   }
+            // }
+            console.log(`User ${userId}: Creating deployment for script ${userAppsScriptId}, version ${newVersionNumber}...`);
+            const deployment = await script.projects.deployments.create({
+              scriptId: userAppsScriptId,
+              requestBody: {
+                versionNumber: newVersionNumber,
+                description: 'API Executable - v1.0.0',
+                manifestFileName: 'appsscript' // Assuming manifest is named appsscript.json
+              },
+            });
+            newDeploymentId = deployment.data.deploymentId;
+            if (!newDeploymentId) {
+              throw new Error('Script deployment created but deployment ID was not returned.');
+            }
+            console.log(`User ${userId}: Created deployment ${newDeploymentId} for script ${userAppsScriptId}, version ${newVersionNumber}.`);
+
+          } catch (deployError) {
+            console.error(`User ${userId}: Failed to create version or deployment for script ${userAppsScriptId}. Error:`, deployError.message, deployError.errors);
+            // This is likely a critical error for subsequent operations. Consider how to handle.
+            // For now, log and continue, userAppsScriptId will be saved, but deploymentId will be missing.
           }
         }
-        // --- End of sharing ---
+        // --- End Create Script Version and Deployment ---
 
       } catch (scriptCopyErr) {
         console.error(`User ${userId}: USER failed Wrapper script copy attempt:`, scriptCopyErr);
@@ -323,8 +386,8 @@ export default async function handler(req, res) {
     }
 
     // --- 4. Save IDs to Database --- 
-    if (driveFolderId || googleSheetId || userAppsScriptId) { // Only update if at least one new ID was generated
-      console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}`);
+    if (driveFolderId || googleSheetId || userAppsScriptId || newDeploymentId) { // Only update if at least one new ID was generated
+      console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}, Deployment: ${newDeploymentId}`);
       try {
         await prisma.user.update({
           where: { id: userId },
@@ -332,6 +395,8 @@ export default async function handler(req, res) {
             ...(googleSheetId && { googleSheetId }), // Conditionally add if defined
             ...(driveFolderId && { driveFolderId }), // Conditionally add if defined
             ...(userAppsScriptId && { userAppsScriptId }), // Conditionally add if defined
+            ...(newDeploymentId && { googleScriptDeploymentId: newDeploymentId }), // Save the new deployment ID
+            onboardingComplete: !!(driveFolderId && googleSheetId && userAppsScriptId && newDeploymentId) // Mark complete if all IDs are present
           },
         });
         console.log(`User ${userId}: Database updated successfully with new IDs.`);
@@ -347,91 +412,100 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- 5. Set FEDEX_FOLDER_ID in the new script's UserProperties on the server ---
-    try {
-      console.log(`User ${userId}: Setting FEDEX_FOLDER_ID (${driveFolderId}) in Apps Script ${userAppsScriptId}`);
-      const scriptApi = google.script({ version: 'v1', auth: userAuth });
+    // --- 5. Initial Script Execution (Set FEDEX_FOLDER_ID if needed) ---
+    // This should run as the user since it often involves setting user-specific properties.
+    // The script itself should be designed to handle this (e.g., using UserProperties service).
+    if (userAppsScriptId && driveFolderId && newDeploymentId) { // Ensure script, folder, and deployment ID exist
+      console.log(`User ${userId}: Attempting to set FEDEX_FOLDER_ID in script ${userAppsScriptId} using deployment ${newDeploymentId} (User Auth)`);
+      const MAX_RETRIES = 6;
+      const RETRY_DELAY_MS = 10000;
+      let attempt = 0;
+      let success = false;
 
-      const MAX_RETRIES = 6; // Increased from 3
-      const RETRY_DELAY_MS = 10000; // Increased from 5000ms (10 seconds)
-      let fedexPropSet = false;
+      const script = google.script({ version: 'v1', auth: userAuth }); // User-authenticated client
 
-      for (let i = 0; i < MAX_RETRIES; i++) {
+      while (attempt < MAX_RETRIES && !success) {
+        attempt++;
+        console.log(`User ${userId}: Attempt ${attempt}/${MAX_RETRIES} to set FEDEX_FOLDER_ID.`);
         try {
-          console.log(`User ${userId}: Attempt ${i + 1}/${MAX_RETRIES} to set FEDEX_FOLDER_ID (${driveFolderId}) in Apps Script ${userAppsScriptId}`);
-          
-          // --- Pre-flight check within retry loop: Verify script project accessibility AS USER ---
-          try {
-            console.log(`User ${userId}: (Retry Loop Attempt ${i + 1}) Pre-flight GET for scriptId: ${userAppsScriptId} (as user)`);
-            const project = await scriptApi.projects.get({ scriptId: userAppsScriptId }); // scriptApi uses userAuth
-            console.log(`User ${userId}: (Retry Loop Attempt ${i + 1}) Pre-flight GET SUCCESS for scriptId: ${userAppsScriptId}. Project title: ${project.data.title}`);
-          } catch (projectGetError) {
-            console.warn(`User ${userId}: (Retry Loop Attempt ${i + 1}) Pre-flight GET FAILED for scriptId: ${userAppsScriptId} (as user). Error:`, projectGetError.message);
-            // If 404 here, it's a strong indicator the script isn't findable, even before run()
-            // We'll still proceed to the run() call to see its specific error, but this log is important.
-          }
-          // --- End Pre-flight check ---
+          console.log(`User ${userId}: (Retry Attempt ${attempt}) Pre-flight check for script ${userAppsScriptId} (as user) before setting FEDEX_FOLDER_ID.`);
+          const project = await script.projects.get({ scriptId: userAppsScriptId });
+          console.log(`User ${userId}: (Retry Attempt ${attempt}) Pre-flight SUCCESS for script ${userAppsScriptId}. Title: ${project.data.title}.`);
 
-          const execResponse = await scriptApi.scripts.run({
-            scriptId: userAppsScriptId, // Use the actual Apps Script project ID
+          // Log current permissions as seen by the user before running the script
+          try {
+            console.log(`User ${userId}: (Retry Attempt ${attempt}) Listing permissions for script ${userAppsScriptId} (as user) before running saveToUserProperties.`);
+            const permissionsList = await drive.permissions.list({ // drive is user-authenticated here
+              fileId: userAppsScriptId,
+              fields: 'permissions(id,emailAddress,role,type)',
+              supportsAllDrives: true,
+            });
+            console.log(`User ${userId}: (Retry Attempt ${attempt}) Permissions for script ${userAppsScriptId}:`, JSON.stringify(permissionsList.data.permissions, null, 2));
+          } catch (permError) {
+            console.warn(`User ${userId}: (Retry Attempt ${attempt}) Failed to list permissions for script ${userAppsScriptId} (as user). Error:`, permError.message);
+            // Continue with the run attempt despite this logging failure
+          }
+
+          const execResponse = await script.scripts.run({
+            scriptId: userAppsScriptId, 
             resource: {
               function: 'saveToUserProperties',
               parameters: ['FEDEX_FOLDER_ID', driveFolderId],
-              devMode: true, // Explicitly set devMode
+              deploymentId: newDeploymentId 
             },
           });
 
           if (execResponse.data.error) {
-            console.error(`User ${userId}: Apps Script error on attempt ${i + 1} setting FEDEX_FOLDER_ID:`, JSON.stringify(execResponse.data.error, null, 2));
-            // Check if the error is from the Apps Script execution itself (e.g. script function threw an error)
-            // or if it's an API level error like 404 for the scriptId
-            const apiErrorStatus = execResponse.data.error.code; // Google API errors often have a 'code'
+            console.error(`User ${userId}: Apps Script error on attempt ${attempt} setting FEDEX_FOLDER_ID:`, JSON.stringify(execResponse.data.error, null, 2));
+            const apiErrorStatus = execResponse.data.error.code;
             const appsScriptErrorDetails = execResponse.data.error.details && execResponse.data.error.details[0];
 
-            if (apiErrorStatus === 404 && i < MAX_RETRIES - 1) {
+            if (apiErrorStatus === 404 && attempt < MAX_RETRIES -1) {
               console.log(`User ${userId}: Script ${userAppsScriptId} not found (404), will retry after ${RETRY_DELAY_MS}ms...`);
               await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-              continue;
+            } else if (attempt >= MAX_RETRIES -1) {
+              console.error(`User ${userId}: Final attempt failed for script ${userAppsScriptId} with error code ${apiErrorStatus}.`);
+              throw new Error(`Apps Script execution failed after ${MAX_RETRIES} attempts: Code ${apiErrorStatus}, Message: ${appsScriptErrorDetails?.errorMessage || JSON.stringify(execResponse.data.error)}`);
+            } else {
+              // For other errors or if it's not the last attempt for 404
+              console.warn(`User ${userId}: Apps Script execution error (not 404 or not final attempt), details:`, JSON.stringify(execResponse.data.error, null, 2));
+              // Potentially retry for other transient errors too, or throw immediately
+              // For now, let's assume only 404 is retried, others will throw via the outer catch if not caught here
+               throw new Error(`Apps Script execution failed: Code ${apiErrorStatus}, Message: ${appsScriptErrorDetails?.errorMessage || JSON.stringify(execResponse.data.error)}`);
             }
-            // If it's another type of Apps Script error or last retry for 404
-            throw new Error(`Apps Script execution failed: Code ${apiErrorStatus}, Message: ${appsScriptErrorDetails?.errorMessage || JSON.stringify(execResponse.data.error)}`);
           } else {
-            console.log(`User ${userId}: FEDEX_FOLDER_ID set successfully in Apps Script on attempt ${i + 1}.`);
-            fedexPropSet = true;
-            break; // Success
+            console.log(`User ${userId}: FEDEX_FOLDER_ID set successfully in Apps Script on attempt ${attempt}.`);
+            success = true;
+            // No break needed, loop condition will handle it
           }
-        } catch (runError) { // Catch errors from scriptApi.scripts.run directly (e.g. network, auth library errors)
-          console.error(`User ${userId}: Error during scriptApi.scripts.run on attempt ${i + 1}/${MAX_RETRIES} for FEDEX_FOLDER_ID:`, runError.message, runError.response ? runError.response.data : runError.toString());
-          if (runError.code === 404 && i < MAX_RETRIES - 1) {
-            console.log(`User ${userId}: Script ${userAppsScriptId} not found (404), will retry after ${RETRY_DELAY_MS}ms...`);
+        } catch (runError) {
+          console.error(`User ${userId}: Error during script.scripts.run on attempt ${attempt}/${MAX_RETRIES} for FEDEX_FOLDER_ID:`, runError.message, runError.response ? runError.response.data : runError.toString());
+          if (runError.code === 404 && attempt < MAX_RETRIES -1) {
+            console.log(`User ${userId}: Script ${userAppsScriptId} not found (404 on runError), will retry after ${RETRY_DELAY_MS}ms...`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
           } else {
-            console.error(`User ${userId}: Final attempt failed or non-404 error for script ${userAppsScriptId} on attempt ${i + 1}/${MAX_RETRIES}. Error:`, runError.message);
-            const contextError = new Error(`SETUP_STEP5_SCRIPT_RUN_FAILED: Script ${userAppsScriptId}, Prop: FEDEX_FOLDER_ID. Attempts: ${i + 1}/${MAX_RETRIES}. Google API Error: ${runError.message} (Code: ${runError.code})`);
+            console.error(`User ${userId}: Final attempt failed or non-404 error for script ${userAppsScriptId} on attempt ${attempt}/${MAX_RETRIES}. Error:`, runError.message);
+            const contextError = new Error(`SETUP_STEP5_SCRIPT_RUN_FAILED: Script ${userAppsScriptId}, Prop: FEDEX_FOLDER_ID. Attempts: ${attempt}/${MAX_RETRIES}. Google API Error: ${runError.message} (Code: ${runError.code})`);
             contextError.originalError = runError;
-            console.log(`User ${userId}: Throwing contextError from loop: ${contextError.message}`); // Explicit log
-            throw contextError;
+            console.log(`User ${userId}: Throwing contextError from loop: ${contextError.message}`);
+            throw contextError; // Rethrow to be caught by the outer try-catch for this step
           }
-        }
-      }
+        } // End of try-catch for a single attempt
+      } // End of while loop
 
-      if (!fedexPropSet) {
-        // This path should ideally not be reached if the loop throws on its last attempt's failure.
+      if (!success) {
         console.error(`User ${userId}: FEDEX_FOLDER_ID could not be set in script ${userAppsScriptId} after all ${MAX_RETRIES} retries (loop completed without success).`);
         throw new Error(`SETUP_STEP5_PROP_SET_FAILED_POST_LOOP: Failed to set FEDEX_FOLDER_ID for script ${userAppsScriptId} after ${MAX_RETRIES} attempts.`);
       }
-
       console.log(`User ${userId}: Successfully set FEDEX_FOLDER_ID in Apps Script ${userAppsScriptId}`);
-
-    } catch (error) {
-      console.error(`User ${userId}: Critical error during step 5 (setting FEDEX_FOLDER_ID):`, error.message, error.originalError || error.toString());
-      // Return a 500 error with a success:false, the general error message, and the specific error.message as details
-      return res.status(500).json({ 
-        success: false, 
-        error: 'Failed to set initial Apps Script properties during onboarding.', 
-        details: error.message // This should now be the more specific message from contextError or the post-loop throw
-      });
+    } else {
+      if (!newDeploymentId) {
+        console.warn(`User ${userId}: Skipping FEDEX_FOLDER_ID setup because newDeploymentId is missing. Onboarding might be incomplete if script creation/deployment failed earlier.`);
+      } else {
+        console.log(`User ${userId}: Skipping FEDEX_FOLDER_ID setup because some prerequisite IDs are missing (userAppsScriptId: ${userAppsScriptId}, driveFolderId: ${driveFolderId})`);
+      }
     }
+    // --- End Initial Script Execution ---
 
     // --- Success --- 
     console.log(`User ${userId}: Onboarding process completed successfully.`);
@@ -442,6 +516,8 @@ export default async function handler(req, res) {
         googleSheetId,
         driveFolderId,
         userAppsScriptId,
+        googleScriptDeploymentId: newDeploymentId, // Include deployment ID in success response
+        onboardingComplete: !!(driveFolderId && googleSheetId && userAppsScriptId && newDeploymentId)
       },
     });
 

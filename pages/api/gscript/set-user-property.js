@@ -60,27 +60,51 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 0. Fetch user's specific Apps Script ID from DB
+    // 0. Fetch user's specific Apps Script ID and Deployment ID from DB
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { userAppsScriptId: true },
+      select: { userAppsScriptId: true, googleScriptDeploymentId: true }, // Fetch deploymentId
     });
 
     const userScriptId = user?.userAppsScriptId;
+    const userScriptDeploymentId = user?.googleScriptDeploymentId; // Get deploymentId
+
     if (!userScriptId) {
       console.error(`User ${userId} tried to set property but userAppsScriptId not found in DB.`);
       return res.status(400).json({ message: 'User onboarding incomplete or script ID missing.' });
     }
+    if (!userScriptDeploymentId) {
+      console.error(`User ${userId} has scriptId ${userScriptId} but googleScriptDeploymentId not found in DB. Script execution may fail.`);
+      return res.status(400).json({ message: 'User script deployment ID missing. Please ensure onboarding created a deployment.' });
+    }
     
     // 1. Authenticate with Google using THE USER'S OAuth tokens (with refresh)
     const userAuthClient = getUserGoogleApiClient({ access_token, refresh_token, expires_at });
-    const script = google.script({ version: 'v1', auth: userAuthClient }); // Use user-authenticated client
+    const script = google.script({ version: 'v1', auth: userAuthClient });
+    const drive = google.drive({ version: 'v3', auth: userAuthClient }); // User-authenticated Drive client
 
-    // --- Pre-flight check: Verify script project accessibility ---
+    // --- Pre-flight check: Verify script project accessibility AND LOG PERMISSIONS (as user) ---
     try {
       console.log(`User ${userId}: Pre-flight check - script.projects.get for scriptId: ${userScriptId} (as user)`);
       const project = await script.projects.get({ scriptId: userScriptId });
       console.log(`User ${userId}: Pre-flight check SUCCESS for scriptId: ${userScriptId}. Project title: ${project.data.title}`);
+      
+      // Log permissions for the user (owner) and service account on this script
+      console.log(`User ${userId}: Fetching permissions for script ${userScriptId} (as User) to verify access.`);
+      const permissionsResponse = await drive.permissions.list({
+        fileId: userScriptId,
+        fields: 'permissions(id,emailAddress,role,type)',
+        supportsAllDrives: true,
+      });
+      console.log(`User ${userId}: Permissions list for script ${userScriptId}:`, JSON.stringify(permissionsResponse.data.permissions, null, 2));
+      const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+      const saPermission = permissionsResponse.data.permissions?.find(p => p.emailAddress === serviceAccountEmail);
+      if (saPermission) {
+        console.log(`User ${userId}: Service Account ${serviceAccountEmail} has role '${saPermission.role}' on script ${userScriptId} (according to user's view).`);
+      } else {
+        console.warn(`User ${userId}: Service Account ${serviceAccountEmail} has NO explicit permissions on script ${userScriptId} (according to user's view).`);
+      }
+
     } catch (projectGetError) {
       console.error(`User ${userId}: Pre-flight check FAILED for scriptId: ${userScriptId} (as user). Error:`, projectGetError.message);
       // For user-auth, 404 means script is gone, 403 could be scope issue (though user is owner)
@@ -94,13 +118,14 @@ export default async function handler(req, res) {
     // --- End Pre-flight check ---
 
     // 2. Prepare and Call Google Apps Script Execution API using the USER'S script ID
-    console.log(`User ${userId}: Executing Apps Script function: saveToUserProperties for '${propertyName}' in user script: ${userScriptId} (as user)`);
+    console.log(`User ${userId}: Executing Apps Script function: saveToUserProperties for '${propertyName}' in user script: ${userScriptId} using deploymentId ${userScriptDeploymentId} (as user)`);
     const scriptRequest = {
-      scriptId: userScriptId,
+      scriptId: userScriptId, // scriptId is still needed here
       resource: {
         function: 'saveToUserProperties',
         parameters: [propertyName, value],
-        devMode: true // Execute latest saved code
+        // devMode: true // REMOVED: Use deploymentId instead
+        deploymentId: userScriptDeploymentId // ADDED: Use the user-specific deployment ID
       },
     };
 

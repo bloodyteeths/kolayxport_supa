@@ -10,6 +10,11 @@ const productLinks = [
 const resourceLinks = [
   { name: 'Blog', href: '/blog' },
   { name: 'Destek', href: '/iletisim' },
+  // Legal Links
+  { name: 'Privacy Policy', href: '/docs/privacy' },
+  { name: 'Terms of Service', href: '/docs/terms' },
+  { name: 'Gizlilik Politikası', href: '/docs/privacy-tr' },
+  { name: 'Kullanım Şartları', href: '/docs/terms-tr' },
 ];
 
 const socialLinks = [

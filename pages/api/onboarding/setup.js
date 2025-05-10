@@ -268,12 +268,12 @@ export default async function handler(req, res) {
         // --- Share the newly copied script with the Service Account ---
         const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
         if (userAppsScriptId && serviceAccountEmail) {
-          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'reader'.`);
+          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'writer'.`);
           try {
             await drive.permissions.create({
               fileId: userAppsScriptId,
               requestBody: {
-                role: 'reader',
+                role: 'writer',
                 type: 'user',
                 emailAddress: serviceAccountEmail,
               },

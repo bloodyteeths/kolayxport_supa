@@ -95,10 +95,31 @@ export default async function handler(req, res) {
     // 3. Handle Apps Script Response
     if (response.data.error) {
       console.error('Apps Script Execution Error (getAllUserProperties):', JSON.stringify(response.data.error, null, 2));
-      const scriptErrorMessage = response.data.error.details && response.data.error.details[0] ? 
-                                 response.data.error.details[0].errorMessage :
-                                 'Apps Script execution failed while fetching properties.';
-      return res.status(500).json({ message: scriptErrorMessage, details: response.data.error.details });
+      
+      // Add more detailed error diagnosis for common issues
+      const errorCode = response.data.error.code;
+      const errorDetails = response.data.error.details && response.data.error.details[0];
+      const errorMessage = errorDetails?.errorMessage || 'Unknown script execution error';
+      
+      if (errorCode === 403) {
+        console.error(`PERMISSION ERROR: Service account ${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '[EMAIL NOT SET]'} lacks permission to execute script ${userScriptId}. Check if script is shared with service account as a 'writer' or 'editor'.`);
+        return res.status(403).json({ 
+          message: 'Permission denied executing script. The service account needs "writer" or "editor" access, not just "reader" access.',
+          details: errorMessage,
+          scriptId: userScriptId,
+          serviceAccount: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '[EMAIL NOT SET]'
+        });
+      } else if (errorCode === 404) {
+        console.error(`NOT FOUND ERROR: Script ${userScriptId} not found or not accessible by service account.`);
+        return res.status(404).json({ 
+          message: 'Script not found or not accessible. Verify the script exists and is shared with the service account.',
+          details: errorMessage,
+          scriptId: userScriptId
+        });
+      }
+      
+      const scriptErrorMessage = errorDetails ? errorMessage : 'Apps Script execution failed while fetching properties.';
+      return res.status(500).json({ message: scriptErrorMessage, details: response.data.error.details, code: errorCode });
     }
 
     const userProperties = response.data.response?.result;

@@ -274,45 +274,69 @@ export default async function handler(req, res) {
         console.log('Service-account copied script:', scriptCopy.data);
         console.log(`User ${userId}: Copied script successfully with SA. New Script ID: ${userAppsScriptId}, Name: ${scriptCopy.data.name}, Link: ${scriptCopy.data.webViewLink}`);
         
+        // Add a delay before sharing to ensure the file is fully processed by Google Drive
+        console.log(`User ${userId}: Waiting 5 seconds for the script to be fully available in Google Drive...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
         // --- Share the SA-copied script with the User ---
         if (userAppsScriptId) {
           console.log(`User ${userId}: Sharing script ${userAppsScriptId} with user ${session.user.email} as 'owner'. (SA Auth)`);
-          try {
-            // Using the SA-authenticated drive client
-            await driveSA.permissions.create({
-              fileId: userAppsScriptId,
-              requestBody: {
-                role: 'owner',
-                type: 'user',
-                emailAddress: session.user.email,
-              },
-              supportsAllDrives: true, 
-              transferOwnership: true,
-            });
-            console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email} as 'owner'.`);
-            
-            // Now move the script to the user's folder
-            if (driveFolderId) {
-              console.log(`User ${userId}: Moving script ${userAppsScriptId} to user's folder ${driveFolderId}...`);
-              try {
-                // Use the user's drive client to move the file after ownership transfer
-                await drive.files.update({
-                  fileId: userAppsScriptId,
-                  addParents: driveFolderId,
-                  removeParents: 'root',
-                  fields: 'id, parents'
-                });
-                console.log(`User ${userId}: Successfully moved script ${userAppsScriptId} to folder ${driveFolderId}.`);
-              } catch (moveError) {
-                console.error(`User ${userId}: Failed to move script ${userAppsScriptId} to folder ${driveFolderId}. Error:`, moveError.message);
-                // This is not a critical failure - script will still function but won't be in the folder
-                console.warn(`User ${userId}: Script ownership was transferred, but script will not appear in the user's Drive folder.`);
+          
+          // Add retry logic for sharing
+          const MAX_SHARE_RETRIES = 3;
+          const SHARE_RETRY_DELAY_MS = 3000;
+          let shareAttempt = 0;
+          let shareSuccess = false;
+          
+          while (shareAttempt < MAX_SHARE_RETRIES && !shareSuccess) {
+            shareAttempt++;
+            try {
+              console.log(`User ${userId}: Share attempt ${shareAttempt}/${MAX_SHARE_RETRIES}...`);
+              
+              // Using the SA-authenticated drive client
+              await driveSA.permissions.create({
+                fileId: userAppsScriptId,
+                requestBody: {
+                  role: 'owner',
+                  type: 'user',
+                  emailAddress: session.user.email,
+                },
+                supportsAllDrives: true, 
+                transferOwnership: true,
+              });
+              
+              console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with user ${session.user.email} as 'owner'.`);
+              shareSuccess = true;
+            } catch (shareError) {
+              console.error(`User ${userId}: Share attempt ${shareAttempt} failed. Error:`, shareError.message, shareError.errors);
+              
+              if (shareAttempt < MAX_SHARE_RETRIES) {
+                console.log(`User ${userId}: Waiting ${SHARE_RETRY_DELAY_MS}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, SHARE_RETRY_DELAY_MS));
+              } else {
+                // This is the last attempt, so throw the error
+                throw new Error(`Failed to transfer script ownership to user after ${MAX_SHARE_RETRIES} attempts: ${shareError.message}`);
               }
             }
-          } catch (shareError) {
-            console.error(`User ${userId}: Failed to share script ${userAppsScriptId} with user ${session.user.email}. Error:`, shareError.message, shareError.errors);
-            // This is a critical failure as the user needs to own the script
-            throw new Error(`Failed to transfer script ownership to user: ${shareError.message}`);
+          }
+          
+          // Now move the script to the user's folder
+          if (driveFolderId) {
+            console.log(`User ${userId}: Moving script ${userAppsScriptId} to user's folder ${driveFolderId}...`);
+            try {
+              // Use the user's drive client to move the file after ownership transfer
+              await drive.files.update({
+                fileId: userAppsScriptId,
+                addParents: driveFolderId,
+                removeParents: 'root',
+                fields: 'id, parents'
+              });
+              console.log(`User ${userId}: Successfully moved script ${userAppsScriptId} to folder ${driveFolderId}.`);
+            } catch (moveError) {
+              console.error(`User ${userId}: Failed to move script ${userAppsScriptId} to folder ${driveFolderId}. Error:`, moveError.message);
+              // This is not a critical failure - script will still function but won't be in the folder
+              console.warn(`User ${userId}: Script ownership was transferred, but script will not appear in the user's Drive folder.`);
+            }
           }
         }
         

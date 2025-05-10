@@ -59,6 +59,22 @@ export default async function handler(req, res) {
     const client = await auth.getClient();
     const script = google.script({ version: 'v1', auth: client });
 
+    // --- Pre-flight check: Verify script project accessibility ---
+    try {
+      console.log(`User ${userId}: Pre-flight check - script.projects.get for scriptId: ${userScriptId} (using service account)`);
+      const project = await script.projects.get({ scriptId: userScriptId });
+      console.log(`User ${userId}: Pre-flight check SUCCESS for scriptId: ${userScriptId}. Project title: ${project.data.title}`);
+    } catch (projectGetError) {
+      console.error(`User ${userId}: Pre-flight check FAILED for scriptId: ${userScriptId}. Error:`, projectGetError.message);
+      if (projectGetError.code === 404) {
+        return res.status(404).json({ message: `Script project not found (ID: ${userScriptId}). Ensure it exists and is shared with the service account.`, details: projectGetError.message });
+      } else if (projectGetError.code === 403) {
+        return res.status(403).json({ message: `Service account lacks permission to access script project (ID: ${userScriptId}). Check IAM and script sharing.`, details: projectGetError.message });
+      }
+      return res.status(500).json({ message: 'Error verifying script project accessibility.', details: projectGetError.message });
+    }
+    // --- End Pre-flight check ---
+
     // 2. Prepare and Call Google Apps Script Execution API using the USER'S script ID
     console.log(`Executing Apps Script function: getAllUserProperties in user script: ${userScriptId}`);
     const scriptRequest = {

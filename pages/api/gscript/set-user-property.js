@@ -76,6 +76,23 @@ export default async function handler(req, res) {
     const userAuthClient = getUserGoogleApiClient({ access_token, refresh_token, expires_at });
     const script = google.script({ version: 'v1', auth: userAuthClient }); // Use user-authenticated client
 
+    // --- Pre-flight check: Verify script project accessibility ---
+    try {
+      console.log(`User ${userId}: Pre-flight check - script.projects.get for scriptId: ${userScriptId} (as user)`);
+      const project = await script.projects.get({ scriptId: userScriptId });
+      console.log(`User ${userId}: Pre-flight check SUCCESS for scriptId: ${userScriptId}. Project title: ${project.data.title}`);
+    } catch (projectGetError) {
+      console.error(`User ${userId}: Pre-flight check FAILED for scriptId: ${userScriptId} (as user). Error:`, projectGetError.message);
+      // For user-auth, 404 means script is gone, 403 could be scope issue (though user is owner)
+      if (projectGetError.code === 404) {
+        return res.status(404).json({ message: `Your script project was not found (ID: ${userScriptId}). It might have been deleted.`, details: projectGetError.message });
+      } else if (projectGetError.code === 403) {
+        return res.status(403).json({ message: `You lack permission to access your script project (ID: ${userScriptId}), or required OAuth scopes are missing.`, details: projectGetError.message });
+      }
+      return res.status(500).json({ message: 'Error verifying your script project accessibility.', details: projectGetError.message });
+    }
+    // --- End Pre-flight check ---
+
     // 2. Prepare and Call Google Apps Script Execution API using the USER'S script ID
     console.log(`User ${userId}: Executing Apps Script function: saveToUserProperties for '${propertyName}' in user script: ${userScriptId} (as user)`);
     const scriptRequest = {

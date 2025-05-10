@@ -324,20 +324,70 @@ export default async function handler(req, res) {
     try {
       console.log(`User ${userId}: Setting FEDEX_FOLDER_ID (${driveFolderId}) in Apps Script ${userAppsScriptId}`);
       const scriptApi = google.script({ version: 'v1', auth: userAuth });
-      const execResponse = await scriptApi.scripts.run({
-        scriptId: userAppsScriptId,
-        resource: {
-          function: 'saveToUserProperties',
-          parameters: ['FEDEX_FOLDER_ID', driveFolderId],
-        },
-      });
-      if (execResponse.data.error) {
-        console.error(`User ${userId}: Apps Script error setting FEDEX_FOLDER_ID:`, JSON.stringify(execResponse.data.error, null, 2));
-      } else {
-        console.log(`User ${userId}: FEDEX_FOLDER_ID set successfully in Apps Script.`);
+
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY_MS = 5000; // 5 seconds
+      let fedexPropSet = false;
+
+      for (let i = 0; i < MAX_RETRIES; i++) {
+        try {
+          console.log(`User ${userId}: Attempt ${i + 1} to set FEDEX_FOLDER_ID (${driveFolderId}) in Apps Script ${userAppsScriptId}`);
+          const execResponse = await scriptApi.scripts.run({
+            scriptId: userAppsScriptId,
+            resource: {
+              function: 'saveToUserProperties',
+              parameters: ['FEDEX_FOLDER_ID', driveFolderId],
+            },
+          });
+
+          if (execResponse.data.error) {
+            console.error(`User ${userId}: Apps Script error on attempt ${i + 1} setting FEDEX_FOLDER_ID:`, JSON.stringify(execResponse.data.error, null, 2));
+            // Check if the error is from the Apps Script execution itself (e.g. script function threw an error)
+            // or if it's an API level error like 404 for the scriptId
+            const apiErrorStatus = execResponse.data.error.code; // Google API errors often have a 'code'
+            const appsScriptErrorDetails = execResponse.data.error.details && execResponse.data.error.details[0];
+
+            if (apiErrorStatus === 404 && i < MAX_RETRIES - 1) {
+              console.log(`User ${userId}: Script not found (404), will retry after ${RETRY_DELAY_MS}ms...`);
+              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+              continue;
+            }
+            // If it's another type of Apps Script error or last retry for 404
+            throw new Error(`Apps Script execution failed: Code ${apiErrorStatus}, Message: ${appsScriptErrorDetails?.errorMessage || JSON.stringify(execResponse.data.error)}`);
+          } else {
+            console.log(`User ${userId}: FEDEX_FOLDER_ID set successfully in Apps Script on attempt ${i + 1}.`);
+            fedexPropSet = true;
+            break; // Success
+          }
+        } catch (runError) { // Catch errors from scriptApi.scripts.run directly (e.g. network, auth library errors)
+          console.error(`User ${userId}: Error during scriptApi.scripts.run on attempt ${i + 1} for FEDEX_FOLDER_ID:`, runError);
+          // Check if the caught error is a googleapis error with a 404 status
+          if (runError.code === 404 && i < MAX_RETRIES - 1) {
+            console.log(`User ${userId}: Script not found (404) via caught error, will retry after ${RETRY_DELAY_MS}ms...`);
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+            continue;
+          }
+          // If it's not a 404 or it's the last retry, throw to be caught by the outer try-catch for this step.
+          // This ensures non-retryable errors or final failures are handled.
+          throw runError; 
+        }
       }
+
+      if (!fedexPropSet) {
+        console.error(`User ${userId}: CRITICAL - Failed to set FEDEX_FOLDER_ID in Apps Script after all retries.`);
+        // This error will be caught by the outer catch block for step 5
+        throw new Error('Failed to finalize Apps Script setup. Could not set initial properties after multiple attempts.');
+      }
+
     } catch (propErr) {
-      console.error(`User ${userId}: Failed to set FEDEX_FOLDER_ID in Apps Script:`, propErr);
+      console.error(`User ${userId}: Failed to set FEDEX_FOLDER_ID in Apps Script:`, propErr.message);
+      // Return an error to the client from /api/onboarding/setup
+      // This ensures the client knows this crucial step failed.
+      return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to set initial Apps Script properties during onboarding.',
+          details: propErr.message || 'Unknown error during property setting.'
+      });
     }
 
     // --- Success --- 

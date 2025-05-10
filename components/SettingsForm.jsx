@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -16,7 +16,7 @@ if (typeof window !== 'undefined') {
 
 export default function SettingsForm() {
   // NextAuth session guard
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   if (status === 'loading') {
     return <p>Loading user info...</p>;
   }
@@ -38,6 +38,7 @@ export default function SettingsForm() {
   // const { data: session } = useSession(); // moved above
   // const { toast } = useToast(); // If using shadcn toast
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null); // For displaying fetch errors
   const [formData, setFormData] = useState({
     VEEQO_API_KEY: '',
     TRENDYOL_SUPPLIER_ID: '',
@@ -50,6 +51,42 @@ export default function SettingsForm() {
     // FEDEX_API_KEY: '',
     // FEDEX_SECRET_KEY: '',
   });
+
+  // Effect to load existing user properties when the component mounts and session is available
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.id) {
+      const loadProperties = async () => {
+        console.log("[SettingsForm Effect] Fetching user properties from /api/gscript/get-all-user-properties");
+        setIsLoading(true);
+        setError(null);
+        try {
+          const res = await fetch('/api/gscript/get-all-user-properties'); // Simple GET request
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(`Failed to fetch settings. Status: ${res.status}. Response: ${JSON.stringify(errorData)}`);
+          }
+          const props = await res.json();
+          console.log("[SettingsForm Effect] Loaded properties:", props);
+          if (props && typeof props === 'object') {
+            // Only update formData with keys that exist in the initial state
+            const relevantProps = Object.keys(formData).reduce((acc, key) => {
+              if (props.hasOwnProperty(key)) {
+                acc[key] = props[key];
+              }
+              return acc;
+            }, {});
+            setFormData(prevState => ({ ...prevState, ...relevantProps }));
+          }
+        } catch (err) {
+          console.error("[SettingsForm Effect] Error fetching user properties:", err);
+          setError(err.message);
+          // alert(`Error loading existing settings: ${err.message}`);
+        }
+        setIsLoading(false);
+      };
+      loadProperties();
+    }
+  }, [status, session]); // Rerun when session status or session data changes
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -128,6 +165,7 @@ export default function SettingsForm() {
         <CardDescription>
           Enter your API keys for the integrated services. These are stored securely
           in your personal Google Apps Script properties. The required keys for order sync are Veeqo and Trendyol.
+          {error && <p className="text-red-500 mt-2">Error loading settings: {error}</p>}{/* Display error */}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>

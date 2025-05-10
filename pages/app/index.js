@@ -65,7 +65,7 @@ const DashboardLandingContent = () => {
 
 export default function AppIndexPage() {
   console.log('[AppIndexPage Render] Component rendering...'); // Log component render
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardingStatus, setOnboardingStatus] = useState('');
@@ -95,9 +95,21 @@ export default function AppIndexPage() {
           }
 
           if (data.success) {
-            console.log('Onboarding response:', data);
-            const { driveFolderId, userAppsScriptId } = data.data;
+            console.log('Onboarding response from /api/onboarding/setup:', data);
+            // const { driveFolderId, userAppsScriptId } = data.data; // We might not need these directly if server handles all
 
+            // Since /api/onboarding/setup now handles setting FEDEX_FOLDER_ID with retries,
+            // a success from it means everything is done on the server.
+            // We just need to update the client-side session to reflect any new IDs
+            // and then update the UI state.
+            
+            setOnboardingStatus('Kurulum başarıyla tamamlandı! Yönlendiriliyorsunuz...');
+            await update(); // Refresh the session to get new IDs (userAppsScriptId, etc.)
+            setOnboardingComplete(true); // Update UI state
+            // router.replace(router.asPath); // Optional: force a full re-render if needed, but setOnboardingComplete might be enough
+
+            // THE FOLLOWING BLOCK IS REMOVED as /api/onboarding/setup now handles this.
+            /*
             if (!driveFolderId) {
                  console.error('Onboarding succeeded but driveFolderId missing in response.');
                  setOnboardingStatus('Kurulum tamamlandı ancak klasör bilgisi eksik. Lütfen destek ile iletişime geçin.');
@@ -126,12 +138,17 @@ export default function AppIndexPage() {
               setOnboardingStatus(`Kurulum tamamlandı, ancak FEDEX_FOLDER_ID ayarı kaydedilemedi: ${setPropertyError.message}. Lütfen Ayarlar sayfasından tekrar deneyin veya destek ile iletişime geçin.`);
               setOnboardingComplete(true);
             }
+            */
 
           } else {
-            throw new Error(data.message || 'Onboarding check returned success:false');
+            // This 'else' corresponds to data.success === false from /api/onboarding/setup
+            console.error('Onboarding failed as reported by /api/onboarding/setup:', data.error, data.details);
+            setOnboardingStatus(`Kurulum sırasında sunucu taraflı bir hata oluştu: ${data.error || 'Bilinmeyen sunucu hatası.'}`);
+            // We might want to leave isOnboarding true but show an error, or set it to false after a delay
+            // For now, we will let finally handle setIsOnboarding(false) if not onboardingComplete
           }
 
-        } catch (error) {
+        } catch (error) { // Catches network errors with fetch to /api/onboarding/setup or if !res.ok and not json
           console.error('Onboarding process error:', error);
           setOnboardingStatus(`Kurulum sırasında bir hata oluştu: ${error.message}`);
         } finally {
@@ -145,7 +162,7 @@ export default function AppIndexPage() {
     } else {
         console.log('[AppIndexPage Effect] Conditions NOT met for onboarding trigger.');
     }
-  }, [status, onboardingComplete, session?.user?.id]);
+  }, [status, onboardingComplete, session?.user?.id, update]);
 
   if (status === 'loading') {
     return (

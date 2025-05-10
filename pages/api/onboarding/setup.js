@@ -265,6 +265,33 @@ export default async function handler(req, res) {
         userAppsScriptId = copiedScriptFile.data.id;
         console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${copiedScriptFile.data.webViewLink}`);
 
+        // --- Share the newly copied script with the Service Account ---
+        const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+        if (userAppsScriptId && serviceAccountEmail) {
+          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'reader'.`);
+          try {
+            await drive.permissions.create({
+              fileId: userAppsScriptId,
+              requestBody: {
+                role: 'reader',
+                type: 'user',
+                emailAddress: serviceAccountEmail,
+              },
+              supportsAllDrives: true, // Important if the user's Drive is part of a Shared Drive or if the template was
+            });
+            console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with ${serviceAccountEmail}.`);
+          } catch (shareError) {
+            // Log the error but don't let it block the rest of the onboarding for now.
+            // The get-all-user-properties might fail later, but basic onboarding can proceed.
+            console.warn(`User ${userId}: Failed to share script ${userAppsScriptId} with service account ${serviceAccountEmail}. This might affect fetching all properties later. Error:`, shareError.message);
+          }
+        } else {
+          if (!serviceAccountEmail) {
+            console.warn(`User ${userId}: GOOGLE_SERVICE_ACCOUNT_EMAIL is not set in .env. Cannot share copied script.`);
+          }
+        }
+        // --- End of sharing ---
+
       } catch (scriptCopyErr) {
         console.error(`User ${userId}: USER failed Wrapper script copy attempt:`, scriptCopyErr);
         console.error(`User ${userId}: Detailed error from Google:`, JSON.stringify(scriptCopyErr.response?.data, null, 2));

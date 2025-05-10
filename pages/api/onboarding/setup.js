@@ -18,6 +18,42 @@ dotenv.config();
 // Check if Domain-Wide Delegation is enabled
 const useDomainWideDelegation = process.env.DOMAIN_WIDE_DELEGATION === 'true';
 
+// Add a helper function to handle Drive errors
+function handleDriveError(error, userId, operation) {
+  console.error(`User ${userId}: ${operation} failed:`, error);
+  
+  // Check for common Domain-Wide Delegation errors
+  if (error.message && error.message.includes('unauthorized_client')) {
+    console.error(`User ${userId}: DOMAIN-WIDE DELEGATION ERROR - This is likely an issue with service account permissions in Google Admin console.`);
+    return {
+      status: 401,
+      error: 'Domain-Wide Delegation error: Service account is not authorized to access user data. Please ensure the service account is properly configured in Google Admin console with the correct scopes.',
+      details: error.message
+    };
+  }
+  
+  // General API error handling
+  if (error.code === 403) {
+    return {
+      status: 403,
+      error: `Google API access denied: ${error.message}. Please check that the ${operation} API is enabled in your Google Cloud Project.`
+    };
+  }
+  
+  if (error.code === 404) {
+    return {
+      status: 404,
+      error: `Resource not found during ${operation}. Please verify the template IDs are correct and accessible by your service account.`
+    };
+  }
+  
+  // Default error response
+  return {
+    status: 500,
+    error: `Failed during ${operation}: ${error.message || 'Unknown error'}`
+  };
+}
+
 // --- Helper: Get Google API Client authenticated AS THE USER (with auto-refresh) ---
 // Only kept for backward compatibility - will be used as fallback if DWD is disabled
 function getUserGoogleApiClient({ access_token, refresh_token, expires_at }) {
@@ -75,6 +111,14 @@ export default async function handler(req, res) {
   
   console.log(`[ONBOARDING] Starting onboarding for user ${userId} (${userEmail})`);
   console.log(`[ONBOARDING] Domain-Wide Delegation is ${useDomainWideDelegation ? 'ENABLED' : 'DISABLED'}`);
+
+  // Adding more detailed logging for Domain-Wide Delegation
+  if (useDomainWideDelegation) {
+    console.log(`[ONBOARDING] Domain-Wide Delegation is ENABLED - Service account will impersonate ${userEmail}`);
+    console.log(`[ONBOARDING] Service account email: ${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || 'Not explicitly set (using from JSON)'}`);
+  } else {
+    console.log(`[ONBOARDING] Domain-Wide Delegation is DISABLED - Using user OAuth tokens`);
+  }
 
   // Retrieve the stored OAuth access token from Prisma's Account table (only needed if DWD is disabled)
   let userOAuthCredentials;
@@ -177,15 +221,19 @@ export default async function handler(req, res) {
         driveFolderId = folder.data.id;
         if (!driveFolderId) throw new Error('Drive folder created but ID was not returned.');
         console.log(`User ${userId}: Created Drive folder ID: ${driveFolderId}`);
+        
+        // Save the folder ID immediately to ensure we don't lose it if later steps fail
+        await prisma.user.update({
+          where: { id: userId },
+          data: { driveFolderId }
+        });
+        console.log(`User ${userId}: Saved Drive folder ID to database.`);
       } catch (driveErr) {
          console.error(`User ${userId}: Drive folder creation failed:`, driveErr);
-         // If the Drive API is not enabled in the GCP project, return a helpful error
-         if (driveErr.code === 403) {
-           return res.status(500).json({
-             error: 'Google Drive API is disabled for your Google Cloud project. Please enable it at https://console.developers.google.com/apis/api/drive.googleapis.com/overview'
-           });
-         }
-         throw new Error(`Failed to create Drive folder.`);
+         
+         // Use the error handler
+         const errorResponse = handleDriveError(driveErr, userId, 'Drive folder creation');
+         return res.status(errorResponse.status).json({ error: errorResponse.error, details: errorResponse.details });
       }
     } else {
        console.log(`User ${userId}: Drive folder already exists: ${driveFolderId}`);
@@ -511,14 +559,20 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    // This is a general catch-all for errors during the onboarding steps (Drive/Sheet/Script creation)
     console.error(`User ${userId}: Critical onboarding error in main try-catch:`, error.message);
     console.error(`User ${userId}: Full error object:`, error);
-    // Ensure a JSON response is always sent for errors caught here
-    return res.status(500).json({ 
-        success: false, 
-        error: error.message || 'An unexpected error occurred during account setup.', 
-        details: error.stack // Include stack for debugging if available
+    
+    // Use more descriptive error messages
+    let errorMessage = `An error occurred during onboarding: ${error.message}`;
+    
+    if (error.message.includes('unauthorized_client')) {
+      errorMessage = 'Domain-Wide Delegation error: Your service account does not have permission to impersonate users. Please check Google Admin console configuration.';
+    }
+    
+    return res.status(500).json({
+      error: errorMessage,
+      userEmail: userEmail,
+      domainWideDelegation: useDomainWideDelegation ? 'Enabled' : 'Disabled'
     });
   }
 } 

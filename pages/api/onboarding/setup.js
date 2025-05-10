@@ -300,6 +300,10 @@ export default async function handler(req, res) {
         if (userAppsScriptId) {
           console.log(`User ${userId}: Sharing script ${userAppsScriptId} with user ${session.user.email} as 'owner'. (SA Auth)`);
           
+          // Define constants for sharing attempts
+          const MAX_SHARE_RETRIES = 5;
+          const SHARE_RETRY_DELAY_MS = 5000;
+          
           // Verify script exists before attempting to share
           try {
             // First check if script exists with SA
@@ -313,8 +317,6 @@ export default async function handler(req, res) {
             console.log(`User ${userId}: Script exists. Current owner: ${fileCheck.data.owners?.[0]?.emailAddress || 'Unknown'}`);
             
             // Add retry logic for sharing
-            const MAX_SHARE_RETRIES = 5;
-            const SHARE_RETRY_DELAY_MS = 5000;
             let shareAttempt = 0;
             
             while (shareAttempt < MAX_SHARE_RETRIES && !scriptShared) {
@@ -433,6 +435,10 @@ export default async function handler(req, res) {
         // Move deployment creation outside the previous conditions to ensure it runs even if the script already exists
         let deploymentId = null;
         try {
+          // Initialize script clients
+          const script = google.script({ version: 'v1', auth: userAuth }); // User-authenticated client
+          const scriptSA = await getSAScriptClient(); // Service account client
+
           // First, test if user can access the script (could be existing script)
           let userCanAccessScript = false;
           try {
@@ -470,14 +476,15 @@ export default async function handler(req, res) {
           deploymentId = deploymentResponse.data.deploymentId;
           console.log(`User ${userId}: Created deployment ID: ${deploymentId}`);
           
-          // Save this deployment ID to the user record immediately
+          // Save this deployment ID to the user record
           await prisma.user.update({
             where: { id: userId },
             data: {
+              userAppsScriptId: userAppsScriptId,
               googleScriptDeploymentId: deploymentId
             }
           });
-          console.log(`User ${userId}: Successfully saved deployment ID ${deploymentId} to user record.`);
+          console.log(`User ${userId}: Successfully saved script ID ${userAppsScriptId} and deployment ID ${deploymentId} to user record.`);
           
         } catch (deploymentErr) {
           console.error(`User ${userId}: Failed to create deployment for script ${userAppsScriptId}:`, deploymentErr);

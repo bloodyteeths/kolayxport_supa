@@ -81,6 +81,8 @@ export default function AppIndexPage() {
   useEffect(() => {
     console.log('[AppIndexPage Effect] Running effect. Status:', status, 'CoreSetupComplete:', coreSetupComplete, 'showManualCopyLink:', showManualCopyLink, 'Session User ID:', session?.user?.id);
     
+    let pollIntervalId = null;
+
     // If authenticated, user ID exists, and core setup is NOT complete, and we are NOT already showing the manual copy link
     if (status === 'authenticated' && session?.user?.id && !coreSetupComplete && !showManualCopyLink) {
       console.log('[AppIndexPage Effect] Conditions met for initial resource check/creation. Session:', session);
@@ -109,6 +111,15 @@ export default function AppIndexPage() {
             setResourceStatusMessage( // This message might be briefly visible before UI changes
               'Klasörünüz hazır! Lütfen aşağıdaki bağlantıyı kullanarak E-Tablo şablonunu kopyalayın.'
             );
+
+            // Start polling for session updates once copy link is shown
+            if (!pollIntervalId) { // Check to prevent multiple intervals if effect re-runs quickly
+              pollIntervalId = setInterval(async () => {
+                console.log('[AppIndexPage Polling] Checking session for updates...');
+                await update(); // Force re-fetch of session from NextAuth
+              }, 5000); // Poll every 5 seconds
+            }
+
           } else {
             console.error('API success was true but copyUrl or driveFolderId missing:', data);
             throw new Error('Önemli bilgiler (kopyalama bağlantısı veya klasör ID) sunucudan alınamadı.');
@@ -130,10 +141,31 @@ export default function AppIndexPage() {
       // Ensure isLoadingResources is false if it was somehow true.
       if (isLoadingResources) setIsLoadingResources(false);
       if (showManualCopyLink) setShowManualCopyLink(false); // Hide manual link if setup is complete
+      
+      // If core setup is now complete, clear any polling interval
+      if (pollIntervalId) {
+        console.log('[AppIndexPage Effect] Core setup complete, clearing poll interval.');
+        clearInterval(pollIntervalId);
+        pollIntervalId = null;
+      }
     } else {
         console.log('[AppIndexPage Effect] Conditions NOT met for resource preparation trigger.');
+        // Clear interval if conditions are no longer met (e.g., user logs out)
+        if (pollIntervalId) {
+            console.log('[AppIndexPage Effect] Conditions no longer met, clearing poll interval.');
+            clearInterval(pollIntervalId);
+            pollIntervalId = null;
+        }
     }
-  }, [status, coreSetupComplete, session?.user?.id, showManualCopyLink, isLoadingResources]); // Added isLoadingResources to dependencies
+
+    // Cleanup function for useEffect
+    return () => {
+      if (pollIntervalId) {
+        console.log('[AppIndexPage Cleanup] Clearing poll interval on component unmount/effect re-run.');
+        clearInterval(pollIntervalId);
+      }
+    };
+  }, [status, coreSetupComplete, session?.user?.id, showManualCopyLink, isLoadingResources, update]); // Added update to dependencies
 
   if (status === 'loading') {
     return (

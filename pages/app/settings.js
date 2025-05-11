@@ -5,6 +5,7 @@ import AppLayout from '../../components/AppLayout';
 import { Settings, Save, Key, ShoppingCart, Truck, Check, Edit, Info, FileText, Package, UserSquare, FolderCog, ClipboardCopy } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { NextSeo } from 'next-seo';
+import { supabase } from '@/lib/supabase';
 
 const InputField = ({ label, type = 'text', value, onChange, placeholder, id, disabled }) => (
   <div className="mb-4">
@@ -377,8 +378,21 @@ export default function SettingsPage() {
   }
 
   if (status === 'unauthenticated') {
-    router.push('/api/auth/signin');
-    return null;
+    if (typeof window !== 'undefined') {
+      supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.href,
+        },
+      });
+    }
+    return (
+      <AppLayout title="Giriş Yapın - KolayXport">
+        <div className="flex justify-center items-center h-screen">
+          <p>Giriş sayfasına yönlendiriliyorsunuz...</p>
+        </div>
+      </AppLayout>
+    );
   }
 
   return (

@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
 import Link from 'next/link';
 import { Gift, Zap, Share2, Loader2 } from 'lucide-react'; // Icons for the page and Loader2
+import { supabase } from '@/lib/supabase'; // ADDED
 
 // This will be the new content for the dashboard landing page.
 // The existing <Dashboard /> component can be integrated here or replaced.
@@ -176,7 +177,12 @@ export default function AppIndexPage() {
 
   if (status === 'unauthenticated') {
     if (typeof window !== 'undefined') {
-      router.push('/auth/signin?callbackUrl=/app');
+      supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/app',
+        },
+      });
     }
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-100">

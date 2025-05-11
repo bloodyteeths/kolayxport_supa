@@ -1,61 +1,13 @@
 import { getSession } from 'next-auth/react';
 import { google } from 'googleapis';
-// Remove direct GoogleAuth import if service account auth is fully handled by the new module
-// import { GoogleAuth } from 'google-auth-library';
+import { GoogleAuth } from 'google-auth-library';
 import prisma from '@/lib/prisma'; // Your prisma client instance
 import dotenv from 'dotenv';
-// Import service account client getters and user impersonation clients
-import { 
-  getScriptServiceClient as getSAScriptClient, 
-  getDriveServiceClient as getSADriveClient,
-  getDriveClientForUser,
-  getScriptClientForUser,
-  getSheetsClientForUser
-} from '@/lib/googleServiceAccountAuth';
 
 dotenv.config();
 
-// Check if Domain-Wide Delegation is enabled
-const useDomainWideDelegation = process.env.DOMAIN_WIDE_DELEGATION === 'true';
-
-// Add a helper function to handle Drive errors
-function handleDriveError(error, userId, operation) {
-  console.error(`User ${userId}: ${operation} failed:`, error);
-  
-  // Check for common Domain-Wide Delegation errors
-  if (error.message && error.message.includes('unauthorized_client')) {
-    console.error(`User ${userId}: DOMAIN-WIDE DELEGATION ERROR - This is likely an issue with service account permissions in Google Admin console.`);
-    return {
-      status: 401,
-      error: 'Domain-Wide Delegation error: Service account is not authorized to access user data. Please ensure the service account is properly configured in Google Admin console with the correct scopes.',
-      details: error.message
-    };
-  }
-  
-  // General API error handling
-  if (error.code === 403) {
-    return {
-      status: 403,
-      error: `Google API access denied: ${error.message}. Please check that the ${operation} API is enabled in your Google Cloud Project.`
-    };
-  }
-  
-  if (error.code === 404) {
-    return {
-      status: 404,
-      error: `Resource not found during ${operation}. Please verify the template IDs are correct and accessible by your service account.`
-    };
-  }
-  
-  // Default error response
-  return {
-    status: 500,
-    error: `Failed during ${operation}: ${error.message || 'Unknown error'}`
-  };
-}
-
 // --- Helper: Get Google API Client authenticated AS THE USER (with auto-refresh) ---
-// Only kept for backward compatibility - will be used as fallback if DWD is disabled
+// Accepts access_token, refresh_token, and expiry to auto-refresh tokens
 function getUserGoogleApiClient({ access_token, refresh_token, expires_at }) {
   // Include clientId and clientSecret so OAuth2 can auto-refresh
   const auth = new google.auth.OAuth2(
@@ -102,41 +54,16 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'Authentication required.' });
   }
   const userId = session.user.id;
-  const userEmail = session.user.email;
-  
-  if (!userEmail) {
-    console.error(`Onboarding Error: No email found for user ${userId}.`);
-    return res.status(400).json({ message: 'User email is required for onboarding.' });
+  // Retrieve the stored OAuth access token from Prisma's Account table
+  const oauthAccount = await prisma.account.findFirst({
+    where: { userId, provider: 'google' }
+  });
+  if (!oauthAccount?.access_token) {
+    console.error(`Onboarding Error: No OAuth access token found for user ${userId}.`);
+    return res.status(401).json({ message: 'Authentication required.' });
   }
-  
-  console.log(`[ONBOARDING] Starting onboarding for user ${userId} (${userEmail})`);
-  console.log(`[ONBOARDING] Domain-Wide Delegation is ${useDomainWideDelegation ? 'ENABLED' : 'DISABLED'}`);
-
-  // Adding more detailed logging for Domain-Wide Delegation
-  if (useDomainWideDelegation) {
-    console.log(`[ONBOARDING] Domain-Wide Delegation is ENABLED - Service account will impersonate ${userEmail}`);
-    console.log(`[ONBOARDING] Service account email: ${process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || 'Not explicitly set (using from JSON)'}`);
-  } else {
-    console.log(`[ONBOARDING] Domain-Wide Delegation is DISABLED - Using user OAuth tokens`);
-  }
-
-  // Retrieve the stored OAuth access token from Prisma's Account table (only needed if DWD is disabled)
-  let userOAuthCredentials;
-  if (!useDomainWideDelegation) {
-    const oauthAccount = await prisma.account.findFirst({
-      where: { userId, provider: 'google' }
-    });
-    if (!oauthAccount?.access_token) {
-      console.error(`Onboarding Error: No OAuth access token found for user ${userId}.`);
-      return res.status(401).json({ message: 'Authentication required.' });
-    }
-    // Destructure access and refresh tokens for user authentication
-    userOAuthCredentials = {
-      access_token: oauthAccount.access_token,
-      refresh_token: oauthAccount.refresh_token,
-      expires_at: oauthAccount.expires_at
-    };
-  }
+  // Destructure access and refresh tokens for user authentication
+  const { access_token, refresh_token, expires_at } = oauthAccount;
 
   // Read master template sheet ID and WRAPPER SCRIPT template ID from environment
   const TEMPLATE_SHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
@@ -151,18 +78,13 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server configuration error: Missing template script ID.' });
   }
 
-  let googleSheetId, driveFolderId, userAppsScriptId, deploymentId;
+  let googleSheetId, driveFolderId, userAppsScriptId;
 
   try {
     // --- Check if user already fully onboarded --- 
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { 
-        googleSheetId: true, 
-        driveFolderId: true, 
-        userAppsScriptId: true,
-        googleScriptDeploymentId: true 
-      } // Select all relevant IDs
+      select: { googleSheetId: true, driveFolderId: true, userAppsScriptId: true } // Select all relevant IDs
     });
 
     // If all IDs exist, onboarding is complete
@@ -174,8 +96,7 @@ export default async function handler(req, res) {
           data: { 
               googleSheetId: existingUser.googleSheetId, 
               driveFolderId: existingUser.driveFolderId, 
-              userAppsScriptId: existingUser.userAppsScriptId,
-              googleScriptDeploymentId: existingUser.googleScriptDeploymentId
+              userAppsScriptId: existingUser.userAppsScriptId 
             }
       });
     }
@@ -184,27 +105,13 @@ export default async function handler(req, res) {
     googleSheetId = existingUser?.googleSheetId;
     driveFolderId = existingUser?.driveFolderId;
     userAppsScriptId = existingUser?.userAppsScriptId;
-    deploymentId = existingUser?.googleScriptDeploymentId;
 
     console.log(`Starting/Resuming onboarding for user ${userId}...`);
 
-    // --- Get API Clients (either impersonated or fallback to old method) ---
-    // If Domain-Wide Delegation is enabled, get clients that impersonate the user
-    let drive, sheets, script;
-    
-    if (useDomainWideDelegation) {
-      console.log(`[ONBOARDING] Using Domain-Wide Delegation to impersonate ${userEmail}`);
-      drive = getDriveClientForUser(userEmail);
-      sheets = getSheetsClientForUser(userEmail);
-      script = getScriptClientForUser(userEmail);
-    } else {
-      console.log(`[ONBOARDING] Using OAuth fallback method for ${userEmail}`);
-      // Initialize with user OAuth (traditional method)
-      const userAuth = getUserGoogleApiClient(userOAuthCredentials);
-      drive = google.drive({ version: 'v3', auth: userAuth });
-      sheets = google.sheets({ version: 'v4', auth: userAuth });
-      script = google.script({ version: 'v1', auth: userAuth });
-    }
+    // --- Authenticate as the User for Drive/Sheet operations (with refresh) ---
+    const userAuth = getUserGoogleApiClient({ access_token, refresh_token, expires_at });
+    const drive = google.drive({ version: 'v3', auth: userAuth });
+    const sheets = google.sheets({ version: 'v4', auth: userAuth });
 
     // --- 1. Create "myBabySync_ShippingLabels" Folder (if needed) --- 
     if (!driveFolderId) {
@@ -221,19 +128,15 @@ export default async function handler(req, res) {
         driveFolderId = folder.data.id;
         if (!driveFolderId) throw new Error('Drive folder created but ID was not returned.');
         console.log(`User ${userId}: Created Drive folder ID: ${driveFolderId}`);
-        
-        // Save the folder ID immediately to ensure we don't lose it if later steps fail
-        await prisma.user.update({
-          where: { id: userId },
-          data: { driveFolderId }
-        });
-        console.log(`User ${userId}: Saved Drive folder ID to database.`);
       } catch (driveErr) {
          console.error(`User ${userId}: Drive folder creation failed:`, driveErr);
-         
-         // Use the error handler
-         const errorResponse = handleDriveError(driveErr, userId, 'Drive folder creation');
-         return res.status(errorResponse.status).json({ error: errorResponse.error, details: errorResponse.details });
+         // If the Drive API is not enabled in the GCP project, return a helpful error
+         if (driveErr.code === 403) {
+           return res.status(500).json({
+             error: 'Google Drive API is disabled for your Google Cloud project. Please enable it at https://console.developers.google.com/apis/api/drive.googleapis.com/overview'
+           });
+         }
+         throw new Error(`Failed to create Drive folder.`);
       }
     } else {
        console.log(`User ${userId}: Drive folder already exists: ${driveFolderId}`);
@@ -301,6 +204,9 @@ export default async function handler(req, res) {
           });
           console.log(`User ${userId}: Renamed first sheet to 'Kargov2'.`);
         }
+        // Store the spreadsheet URL to return later
+        spreadsheetUrl = spreadsheet.data.spreadsheetUrl; 
+
       } catch (sheetCreateErr) {
          console.error(`User ${userId}: Failed to create or rename new Google Sheet:`, sheetCreateErr);
          // Add specific error handling if needed (e.g., Sheets API disabled)
@@ -317,9 +223,9 @@ export default async function handler(req, res) {
 
     // --- 3. Copy Template Wrapper Script (if needed) --- 
     if (!userAppsScriptId) {
-      console.log(`User ${userId}: Preparing to copy template wrapper script...`);
+      console.log(`User ${userId}: Preparing to copy template wrapper script using USER authentication...`);
       console.log(`User ${userId}: Template Script ID from env: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
-      console.log(`User ${userId}: User email for script naming: ${userEmail}`);
+      console.log(`User ${userId}: User email attempting copy: ${session.user.email}`);
       
       try {
         // Verify template script details first
@@ -339,84 +245,59 @@ export default async function handler(req, res) {
           }
         } catch (verifyErr) {
           console.error(`User ${userId}: Failed to verify template script:`, verifyErr);
+          // Rethrow or handle as critical error, as copy will likely fail
           throw new Error(`Critical error verifying template script before copy: ${verifyErr.message}`);
         }
-
-        // Create copy of template script
-        console.log(`User ${userId}: Copying template script...`);
         
         const scriptCopyMetadata = { 
           name: `KolayXport Wrapper Script - ${session.user.name || session.user.email || userId}`, // Unique name
-          parents: [driveFolderId] // Add directly to user's folder
+          mimeType: 'application/vnd.google-apps.script',
+          parents: [driveFolderId] // CRITICAL: Place copy in the user's folder
         }; 
 
         console.log(`User ${userId}: Attempting to copy script with metadata:`, JSON.stringify(scriptCopyMetadata));
 
-        // Perform the copy
-        const scriptCopy = await drive.files.copy({
+        // Perform the copy using USER auth
+        const copiedScriptFile = await drive.files.copy({ // Using `drive` which is user-authenticated
           fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-          requestBody: scriptCopyMetadata,
-          fields: 'id, name, webViewLink',
-          supportsAllDrives: true
+          requestBody: scriptCopyMetadata, 
+          fields: 'id, name, webViewLink', // Request id, name, and webViewLink
+          supportsAllDrives: true 
         });
-          
-        userAppsScriptId = scriptCopy.data.id;
-        console.log(`User ${userId}: Copied script data:`, scriptCopy.data);
-        console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${scriptCopy.data.name}, Link: ${scriptCopy.data.webViewLink}`);
         
-        // Save the script ID to the user record immediately so we don't lose it
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            userAppsScriptId: userAppsScriptId,
+        userAppsScriptId = copiedScriptFile.data.id;
+        const scriptWebViewLink = copiedScriptFile.data.webViewLink; // Capture webViewLink
+        console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${scriptWebViewLink}`);
+
+        // --- Share the newly copied script with the Service Account ---
+        const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+        if (userAppsScriptId && serviceAccountEmail) {
+          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'reader'.`);
+          try {
+            await drive.permissions.create({
+              fileId: userAppsScriptId,
+              requestBody: {
+                role: 'reader',
+                type: 'user',
+                emailAddress: serviceAccountEmail,
+              },
+              supportsAllDrives: true, // Important if the user's Drive is part of a Shared Drive or if the template was
+            });
+            console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with ${serviceAccountEmail}.`);
+          } catch (shareError) {
+            // Log the error but don't let it block the rest of the onboarding for now.
+            // The get-all-user-properties might fail later, but basic onboarding can proceed.
+            console.warn(`User ${userId}: Failed to share script ${userAppsScriptId} with service account ${serviceAccountEmail}. This might affect fetching all properties later. Error:`, shareError.message);
           }
-        });
-        console.log(`User ${userId}: Successfully saved script ID ${userAppsScriptId} to user record.`);
-        
-        // With DWD, we no longer need the complex sharing logic - the user already owns the script!
-        console.log(`User ${userId}: Script ${userAppsScriptId} is already owned by ${userEmail} through impersonation.`);
-        
-        // --- 7. Create a deployment for this version ---
-        try {
-          console.log(`User ${userId}: Creating new script version for script ${userAppsScriptId}...`);
-          const createVersionResponse = await script.projects.versions.create({
-            scriptId: userAppsScriptId
-          });
-          
-          const versionNumber = createVersionResponse.data.versionNumber;
-          console.log(`User ${userId}: Created script version: ${versionNumber}`);
-          
-          console.log(`User ${userId}: Creating new deployment for script ${userAppsScriptId} version ${versionNumber}...`);
-          const deploymentResponse = await script.projects.deployments.create({
-            scriptId: userAppsScriptId,
-            requestBody: {
-              versionNumber: versionNumber,
-              manifestFileName: "appsscript",
-              description: `API Deployment for ${session.user.name || session.user.email || userId}`
-            }
-          });
-          
-          deploymentId = deploymentResponse.data.deploymentId;
-          console.log(`User ${userId}: Created deployment ID: ${deploymentId}`);
-          
-          // Save this deployment ID to the user record
-          await prisma.user.update({
-            where: { id: userId },
-            data: {
-              userAppsScriptId: userAppsScriptId,
-              googleScriptDeploymentId: deploymentId
-            }
-          });
-          console.log(`User ${userId}: Successfully saved script ID ${userAppsScriptId} and deployment ID ${deploymentId} to user record.`);
-          
-        } catch (deploymentErr) {
-          console.error(`User ${userId}: Failed to create deployment for script ${userAppsScriptId}:`, deploymentErr);
-          console.error(`User ${userId}: Raw deployment error:`, JSON.stringify(deploymentErr));
-          // Log but continue - this is not a fatal error as user can try again or use reshare utility
+        } else {
+          if (!serviceAccountEmail) {
+            console.warn(`User ${userId}: GOOGLE_SERVICE_ACCOUNT_EMAIL is not set in .env. Cannot share copied script.`);
+          }
         }
+        // --- End of sharing ---
 
       } catch (scriptCopyErr) {
-        console.error(`User ${userId}: Script copy attempt failed:`, scriptCopyErr);
+        console.error(`User ${userId}: USER failed Wrapper script copy attempt:`, scriptCopyErr);
         console.error(`User ${userId}: Detailed error from Google:`, JSON.stringify(scriptCopyErr.response?.data, null, 2));
         let rawErrorString = 'Error details not available or stringification failed.';
         try {
@@ -424,9 +305,9 @@ export default async function handler(req, res) {
         } catch (e) {
           rawErrorString = `Error stringifying scriptCopyErr: ${e.message}. Raw error message: ${scriptCopyErr.message}`;
         }
-        console.error(`User ${userId}: Raw scriptCopyErr object:`, rawErrorString);
+        console.error(`User ${userId}: Raw user scriptCopyErr object:`, rawErrorString);
 
-        let errorMessage = 'Failed to copy the template script.';
+        let errorMessage = 'Failed to copy the template script using your Google account.';
         if (scriptCopyErr.code) {
           errorMessage += ` (Code: ${scriptCopyErr.code})`;
           if (scriptCopyErr.code === 404) {
@@ -446,16 +327,50 @@ export default async function handler(req, res) {
     }
 
     // --- 4. Save IDs to Database --- 
-    if (driveFolderId || googleSheetId || userAppsScriptId || deploymentId) { // Only update if at least one new ID was generated
-      console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}, Deployment: ${deploymentId}`);
+    let dbUserAppsScriptId = userAppsScriptId; // Use the one from copy, or existing if already there
+    if (!dbUserAppsScriptId && existingUser?.userAppsScriptId) {
+        dbUserAppsScriptId = existingUser.userAppsScriptId;
+    }
+
+    // Fetch the script's webViewLink if it wasn't just copied (i.e., if userAppsScriptId already existed)
+    let finalScriptWebViewLink = scriptWebViewLink; // From the copy operation
+    if (!finalScriptWebViewLink && dbUserAppsScriptId) {
+        try {
+            const scriptFile = await drive.files.get({
+                fileId: dbUserAppsScriptId,
+                fields: 'webViewLink',
+                supportsAllDrives: true,
+            });
+            finalScriptWebViewLink = scriptFile.data.webViewLink;
+        } catch (fetchLinkError) {
+            console.warn(`User ${userId}: Could not fetch webViewLink for existing script ${dbUserAppsScriptId}:`, fetchLinkError.message);
+            // Not critical if it fails, but good to have
+        }
+    }
+    
+    // Fetch spreadsheetUrl if it wasn't just created
+    let finalSpreadsheetUrl = spreadsheetUrl; // From create operation
+    if (!finalSpreadsheetUrl && googleSheetId) {
+        try {
+            const sheetFile = await sheets.spreadsheets.get({
+                spreadsheetId: googleSheetId,
+                fields: 'spreadsheetUrl'
+            });
+            finalSpreadsheetUrl = sheetFile.data.spreadsheetUrl;
+        } catch (fetchSheetUrlError) {
+            console.warn(`User ${userId}: Could not fetch spreadsheetUrl for existing sheet ${googleSheetId}:`, fetchSheetUrlError.message);
+        }
+    }
+
+    if (driveFolderId || googleSheetId || dbUserAppsScriptId) { // Only update if at least one ID was generated or present
+      console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${dbUserAppsScriptId}`);
       try {
         await prisma.user.update({
-        where: { id: userId },
-        data: {
-            ...(googleSheetId && { googleSheetId }), // Conditionally add if defined
-            ...(driveFolderId && { driveFolderId }), // Conditionally add if defined
-            ...(userAppsScriptId && { userAppsScriptId }), // Conditionally add if defined
-            ...(deploymentId && { googleScriptDeploymentId: deploymentId }) // Save the new deployment ID
+          where: { id: userId },
+          data: {
+            ...(googleSheetId && { googleSheetId }),
+            ...(driveFolderId && { driveFolderId }),
+            ...(dbUserAppsScriptId && { userAppsScriptId: dbUserAppsScriptId }),
           },
         });
         console.log(`User ${userId}: Database updated successfully with new IDs.`);
@@ -471,108 +386,29 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- 5. Initial Script Execution (Set FEDEX_FOLDER_ID if needed) ---
-    if (userAppsScriptId && driveFolderId && deploymentId) { // Ensure script, folder, and deployment ID exist
-      console.log(`User ${userId}: Attempting to set FEDEX_FOLDER_ID in script ${userAppsScriptId} using deployment ${deploymentId}`);
-      const MAX_RETRIES = 3;
-      const RETRY_DELAY_MS = 5000;
-      let attempt = 0;
-      let success = false;
-
-      while (attempt < MAX_RETRIES && !success) {
-        attempt++;
-        console.log(`User ${userId}: Attempt ${attempt}/${MAX_RETRIES} to set FEDEX_FOLDER_ID.`);
-        try {
-          console.log(`User ${userId}: (Attempt ${attempt}) Pre-flight check for script ${userAppsScriptId}.`);
-          const project = await script.projects.get({ scriptId: userAppsScriptId });
-          console.log(`User ${userId}: (Attempt ${attempt}) Pre-flight SUCCESS for script ${userAppsScriptId}. Title: ${project.data.title}.`);
-
-          const execResponse = await script.scripts.run({
-            scriptId: userAppsScriptId, 
-            resource: {
-              function: 'saveToUserProperties',
-              parameters: ['FEDEX_FOLDER_ID', driveFolderId],
-              deploymentId: deploymentId 
-            }
-          });
-
-          if (execResponse.data.error) {
-            console.error(`User ${userId}: Apps Script error on attempt ${attempt} setting FEDEX_FOLDER_ID:`, JSON.stringify(execResponse.data.error, null, 2));
-            const apiErrorStatus = execResponse.data.error.code;
-            const appsScriptErrorDetails = execResponse.data.error.details && execResponse.data.error.details[0];
-
-            if (apiErrorStatus === 404 && attempt < MAX_RETRIES) {
-              console.log(`User ${userId}: Script ${userAppsScriptId} not found (404), will retry after ${RETRY_DELAY_MS}ms...`);
-              await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-            } else {
-              throw new Error(`Apps Script execution failed: Code ${apiErrorStatus}, Message: ${appsScriptErrorDetails?.errorMessage || JSON.stringify(execResponse.data.error)}`);
-            }
-          } else {
-            console.log(`User ${userId}: FEDEX_FOLDER_ID set successfully in Apps Script on attempt ${attempt}.`);
-            success = true;
-          }
-        } catch (runError) {
-          console.error(`User ${userId}: Error during script execution on attempt ${attempt}/${MAX_RETRIES}:`, runError.message);
-          if (runError.code === 404 && attempt < MAX_RETRIES) {
-            console.log(`User ${userId}: Script ${userAppsScriptId} not found (404), will retry after ${RETRY_DELAY_MS}ms...`);
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-          } else {
-            console.error(`User ${userId}: Final attempt failed or non-404 error on attempt ${attempt}/${MAX_RETRIES}`);
-            // On the final attempt, or for non-404 errors, just log and continue
-            // We don't want to fail the entire onboarding just because property setting failed
-            if (attempt >= MAX_RETRIES) {
-              console.warn(`User ${userId}: Property setting failed after all retries, but onboarding will continue.`);
-              break;
-            }
-          }
-        }
-      }
-
-      if (!success) {
-        console.error(`User ${userId}: FEDEX_FOLDER_ID could not be set in script ${userAppsScriptId} after all ${MAX_RETRIES} retries.`);
-        // We don't throw here - just log error and continue
-        console.warn(`User ${userId}: Continuing onboarding despite property setting failure. User may need to set properties manually.`);
-      } else {
-        console.log(`User ${userId}: Successfully set FEDEX_FOLDER_ID in Apps Script ${userAppsScriptId}`);
-      }
-    } else {
-      if (!deploymentId) {
-        console.warn(`User ${userId}: Skipping FEDEX_FOLDER_ID setup because deploymentId is missing. Onboarding might be incomplete if script creation/deployment failed earlier.`);
-      } else {
-        console.log(`User ${userId}: Skipping FEDEX_FOLDER_ID setup because some prerequisite IDs are missing (userAppsScriptId: ${userAppsScriptId}, driveFolderId: ${driveFolderId})`);
-      }
-    }
-    // --- End Initial Script Execution ---
-
     // --- Success --- 
-    console.log(`User ${userId}: Onboarding process completed successfully.`);
+    console.log(`User ${userId}: Onboarding process (resource creation/linking) completed successfully.`);
     return res.status(200).json({
-      success: true, 
-      message: 'Onboarding complete. Resources created and IDs saved.',
+      success: true,
+      message: 'Onboarding resources provisioned. Please follow sheet instructions to complete setup.',
       data: {
         googleSheetId,
         driveFolderId,
-        userAppsScriptId,
-        googleScriptDeploymentId: deploymentId, // Include deployment ID in success response
-        onboardingComplete: !!(driveFolderId && googleSheetId && userAppsScriptId && deploymentId)
+        userAppsScriptId: dbUserAppsScriptId, // Return the script ID that's in the DB or was just created
+        spreadsheetUrl: finalSpreadsheetUrl,     // Return the URL of the sheet
+        scriptWebViewLink: finalScriptWebViewLink // Return the web view link of the script
       },
     });
 
   } catch (error) {
+    // This is a general catch-all for errors during the onboarding steps (Drive/Sheet/Script creation)
     console.error(`User ${userId}: Critical onboarding error in main try-catch:`, error.message);
     console.error(`User ${userId}: Full error object:`, error);
-    
-    // Use more descriptive error messages
-    let errorMessage = `An error occurred during onboarding: ${error.message}`;
-    
-    if (error.message.includes('unauthorized_client')) {
-      errorMessage = 'Domain-Wide Delegation error: Your service account does not have permission to impersonate users. Please check Google Admin console configuration.';
-    }
-    
-    return res.status(500).json({
-      error: errorMessage,
-      userEmail: userEmail,
-      domainWideDelegation: useDomainWideDelegation ? 'Enabled' : 'Disabled'
+    // Ensure a JSON response is always sent for errors caught here
+    return res.status(500).json({ 
+        success: false, 
+        error: error.message || 'An unexpected error occurred during account setup.', 
+        details: error.stack // Include stack for debugging if available
     });
   }
 } 

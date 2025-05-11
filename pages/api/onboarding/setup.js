@@ -78,7 +78,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server configuration error: Missing template script ID.' });
   }
 
-  let googleSheetId, driveFolderId, userAppsScriptId, spreadsheetUrl, scriptWebViewLink;
+  let googleSheetId, driveFolderId, userAppsScriptId, spreadsheetUrl, scriptWebViewLink, templateScriptWebViewLinkForManualCopy = null;
 
   try {
     // --- Check if user already fully onboarded --- 
@@ -227,8 +227,6 @@ export default async function handler(req, res) {
       console.log(`User ${userId}: Template Script ID from env: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
       console.log(`User ${userId}: User email attempting copy: ${session.user.email}`);
       
-      let templateScriptWebViewLinkForManualCopy = null; // For fallback
-
       try {
         // First, try to get the webViewLink of the template itself for fallback
         try {

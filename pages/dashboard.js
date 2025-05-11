@@ -12,7 +12,7 @@ const AuthenticatedLayout = ({ children }) => {
   return <>{children}</>;
 };
 
-export default function DashboardPage() {
+export default function Dashboard() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState({
@@ -253,8 +253,8 @@ export default function DashboardPage() {
                     </svg>
                   </div>
                   <div>
-                    <h4 className="font-medium">Help & Support</h4>
-                    <p className="text-sm text-gray-500">Get assistance and resources</p>
+                    <h4 className="font-medium">Support</h4>
+                    <p className="text-sm text-gray-500">Get help and report issues</p>
                   </div>
                 </a>
               </div>

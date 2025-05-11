@@ -82,15 +82,15 @@
     {
       "id": 13,
       "title": "Refactor Onboarding API (/api/onboarding/setup.js)",
-      "description": "Onboarding logic needs to: 1) Create a Google Drive folder for labels. 2) Create a Google Sheet and place it in the folder. 3) Copy the template Wrapper Google Apps Script for the user into the same folder. 4) Retrieve the Script ID of the new script copy. 5) Save googleSheetId, driveFolderId, and the userAppsScriptId to the Prisma DB.",
+      "description": "Onboarding logic now: 1) Creates a Google Drive folder for the user. 2) Copies a template Google Sheet (which has the Wrapper Apps Script bound to it) into the user's Drive folder. 3) Saves googleSheetId and driveFolderId to the Prisma DB. userAppsScriptId is initially null and will be registered by a separate API call from the script itself after user initialization.",
       "status": "completed",
       "dependencies": [12],
-      "notes": "Backend API now handles Drive folder creation, Sheet creation and placement (moved into folder via drive.files.update), and Apps Script copy (using 'parents' in requestBody to place in user's folder, resolving 400 error). All IDs are saved to DB. Frontend trigger implemented in pages/app/index.js, which also calls set-user-property for FEDEX_FOLDER_ID post-onboarding."
+      "notes": "Backend API /api/onboarding/setup.js now copies a template sheet defined by TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID. This sheet contains the necessary bound Apps Script. The API no longer copies a standalone script file. The user's Apps Script ID is registered via a new endpoint (/api/gscript/register-script-id) called by the script upon initialization by the user. Frontend trigger in pages/app/index.js calls /api/onboarding/setup. The subsequent step for the user is to open the sheet and run an initialization function from the script's custom menu."
     },
     {
       "id": 14,
-      "title": "Refactor/Create Key Saving API",
-      "description": "User-specific API keys (e.g., Trendyol, FedEx) and script configurations (e.g., Shipper Info, Veeqo keys, FEDEX_FOLDER_ID, IMPORTER_OF_RECORD) will be saved to and retrieved from the UserProperties of the **user's copied wrapper Google Apps Script**. This is managed via Next.js API routes (/api/gscript/set-user-property and /api/gscript/get-all-user-properties) which call corresponding functions (`saveToUserProperties`, `getAllUserProperties`) **in the user's specific script instance** using the Apps Script Execution API.",
+      "title": "Refactor/Create Key Saving API & Script Registration",
+      "description": "User-specific API keys and script configurations are saved to UserProperties of the user's copied wrapper Google Apps Script. This is managed via /api/gscript/set-user-property and /api/gscript/get-all-user-properties. A new API route /api/gscript/register-script-id allows the user's script to register its ID with the backend after user initialization from the sheet.",
       "status": "in progress",
       "dependencies": [12, 13],
       "subtasks": [
@@ -105,19 +105,24 @@
           "status": "completed - needs testing"
         },
         {
+          "title": "Implement Next.js API route /api/gscript/register-script-id",
+          "description": "Create a new API route that accepts a POST request from the user's copied Apps Script. It receives the scriptId, sheetId, and a userId (or userEmail to lookup userId), authenticates the call (e.g., shared secret), and updates the user's record in Prisma with userAppsScriptId and googleSheetId.",
+          "status": "completed"
+        },
+        {
           "title": "Implement Apps Script functions in Template Wrapper",
-          "description": "Ensure saveToUserProperties(key, value) and getAllUserProperties() exist in the **template wrapper script** (so they are copied to user instances). These will use PropertiesService.getUserProperties().",
+          "description": "Ensure saveToUserProperties(key, value) and getAllUserProperties() exist in the template wrapper script. Add an onOpen() function to create a custom menu (e.g., 'KolayXport' > 'Initialize Settings'). The 'Initialize Settings' function should prompt for any initial UserProperties (like FEDEX_FOLDER_ID), save them, and then call back to the Next.js API (/api/gscript/register-script-id) with its ScriptApp.getScriptId(), SpreadsheetApp.getActiveSpreadsheet().getId(), a user identifier (email/ID), and a shared secret.",
           "status": "in progress"
         },
         {
           "title": "Update Settings Page Frontend",
-          "description": "Modify pages/app/settings.js to use /api/gscript/get-all-user-properties for loading initial settings and ensure FEDEX_FOLDER_ID is populated.",
+          "description": "Modify pages/app/settings.js to use /api/gscript/get-all-user-properties for loading initial settings. Ensure it gracefully handles cases where userAppsScriptId might be initially null (pending script initialization by the user).",
           "status": "completed"
         },
         {
            "title": "Implement Frontend Onboarding Trigger & Logic",
-           "description": "Added useEffect in pages/app/index.js to call /api/onboarding/setup and subsequently call /api/gscript/set-user-property to save FEDEX_FOLDER_ID.",
-           "status": "completed"
+           "description": "Added useEffect in pages/app/index.js to call /api/onboarding/setup. The UI should then guide the user to open their new sheet and run the 'Initialize Settings' function from the script's menu. The old logic to automatically call /api/gscript/set-user-property for FEDEX_FOLDER_ID immediately after onboarding is removed, as this is now part of the script's initialization.",
+           "status": "in progress"
         }
       ]
     },
@@ -152,7 +157,7 @@
       "subtasks": [
         {
           "title": "Manual Testing: Onboarding",
-          "description": "Log in with a new Google account, complete onboarding, and verify a new sheet and folder are created in your Google Drive, with the sheet and script inside the folder.",
+          "description": "Log in with a new Google account, complete onboarding, and verify a new sheet and folder are created in your Google Drive.",
           "status": "completed"
         },
         {
@@ -382,7 +387,7 @@
       ]
     }
   ],
-  "notes": "Architecture pivoted to a central API Executable Wrapper Script calling a private Core Logic Library. User-specific data (sheetId, keys, folderId) is stored in the backend DB and passed as parameters. Public pages and authenticated app section now have distinct, modern layouts. **Correction:** Architecture uses a user-specific **copied** wrapper Apps Script (stored in user's Google Account) which holds UserProperties. This wrapper script calls the central Core Logic Library. Backend API routes target the user's specific script copy ID (stored in DB) for settings management.",
+  "notes": "Architecture pivoted to a central API Executable Wrapper Script calling a private Core Logic Library. User-specific data (sheetId, keys, folderId) is stored in the backend DB and passed as parameters. Public pages and authenticated app section now have distinct, modern layouts. **Correction & Current Onboarding Flow:** Architecture uses a user-specific **copied template Google Sheet which contains a bound Apps Script** (this script is the 'wrapper script', stored in the user's Google Account). This wrapper script holds UserProperties and calls the central Core Logic Library. The `/api/onboarding/setup` API copies this template sheet for the user. The user then opens the sheet, runs an 'Initialize Settings' function from a custom menu. This script function saves initial settings (e.g., FedEx Folder ID) to its UserProperties AND calls back to a new Next.js API endpoint (`/api/gscript/register-script-id`) to register its `scriptId` and `sheetId` with the backend database. Subsequent backend API routes (like `/api/gscript/set-user-property`) target the user's specific script copy ID (retrieved from the DB) for settings management.",
   "testingStrategy": {
     "overview": "Testing ensures the app works for real users and catches bugs before deployment. We use three types: manual testing (step-by-step checks in the browser), unit tests (automated checks for small pieces of code), and end-to-end (E2E) tests (automated checks for the whole user flow).",
     "manualTesting": {

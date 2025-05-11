@@ -78,7 +78,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server configuration error: Missing template script ID.' });
   }
 
-  let googleSheetId, driveFolderId, userAppsScriptId;
+  let googleSheetId, driveFolderId, userAppsScriptId, spreadsheetUrl, scriptWebViewLink;
 
   try {
     // --- Check if user already fully onboarded --- 
@@ -266,7 +266,7 @@ export default async function handler(req, res) {
         });
         
         userAppsScriptId = copiedScriptFile.data.id;
-        const scriptWebViewLink = copiedScriptFile.data.webViewLink; // Capture webViewLink
+        scriptWebViewLink = copiedScriptFile.data.webViewLink; // Assign to higher-scoped variable
         console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${scriptWebViewLink}`);
 
         // --- Share the newly copied script with the Service Account ---

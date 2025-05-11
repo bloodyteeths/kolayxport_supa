@@ -100,29 +100,64 @@ export default function AppIndexPage() {
 
           if (data.success) {
             console.log('Onboarding resource creation successful:', data);
-            const { spreadsheetUrl: returnedSheetUrl, scriptWebViewLink: returnedScriptUrl, userAppsScriptId } = data.data;
+            const { 
+              spreadsheetUrl: returnedSheetUrl, 
+              scriptWebViewLink: returnedCopiedScriptUrl, // Renamed for clarity
+              userAppsScriptId,
+              manualScriptCopyRequired,
+              templateScriptWebViewLinkForManualCopy 
+            } = data.data;
 
-            if (!returnedSheetUrl || !returnedScriptUrl) {
-                console.error('Onboarding success but missing sheetUrl or scriptUrl in response:', data.data);
-                setOnboardingStatus('Kurulum kaynakları oluşturuldu ancak önemli bağlantılar eksik. Lütfen destek ile iletişime geçin.');
-                // Potentially don't set onboardingComplete true here, or have another state for this error
-                setIsOnboarding(false); // Stop loading animation
-                return;
+            let finalScriptUrlToShow;
+            let criticalLinkMissing = false;
+
+            if (!returnedSheetUrl) {
+              console.error('Onboarding critical error: Missing spreadsheetUrl in API response:', data.data);
+              setOnboardingStatus('Kurulum hatası: E-Tablo bağlantısı alınamadı. Lütfen destek ile iletişime geçin.');
+              criticalLinkMissing = true;
+            } else {
+              setSheetUrl(returnedSheetUrl);
+            }
+
+            if (manualScriptCopyRequired) {
+              if (!templateScriptWebViewLinkForManualCopy) {
+                console.error('Onboarding critical error: Manual copy required but templateScriptWebViewLinkForManualCopy is missing:', data.data);
+                setOnboardingStatus('Kurulum hatası: Manuel kurulum için komut dosyası şablon bağlantısı alınamadı. Lütfen destek ile iletişime geçin.');
+                criticalLinkMissing = true;
+              } else {
+                finalScriptUrlToShow = templateScriptWebViewLinkForManualCopy;
+                console.log('Manual script copy required. Using template link:', finalScriptUrlToShow);
+              }
+            } else { // Automatic copy succeeded (or was already done)
+              if (!returnedCopiedScriptUrl) {
+                console.error('Onboarding critical error: Automatic copy succeeded (or implied) but returnedCopiedScriptUrl is missing:', data.data);
+                // This case should ideally not happen if manualScriptCopyRequired is false and userAppsScriptId exists
+                setOnboardingStatus('Kurulum hatası: Komut dosyası bağlantısı alınamadı. Lütfen destek ile iletişime geçin.');
+                criticalLinkMissing = true;
+              } else {
+                finalScriptUrlToShow = returnedCopiedScriptUrl;
+                console.log('Using copied script link:', finalScriptUrlToShow);
+              }
             }
             
-            setSheetUrl(returnedSheetUrl);
-            setScriptUrl(returnedScriptUrl);
+            if (criticalLinkMissing) {
+              setIsOnboarding(false); // Stop loading animation
+              return; // Exit if critical links are missing
+            }
             
-            setOnboardingStatus('Temel kaynaklar oluşturuldu! Lütfen aşağıdaki adımları izleyerek kurulumu tamamlayın.');
-            setShowManualSetupInstructions(true); // Show buttons and manual instructions
+            setScriptUrl(finalScriptUrlToShow); 
             
-            await update(); // Refresh the session to get new IDs (userAppsScriptId, etc.)
-            // It's important that userAppsScriptId is in the session for subsequent Settings page calls
+            setOnboardingStatus(manualScriptCopyRequired 
+              ? 'Temel kaynaklar oluşturuldu! Lütfen aşağıdaki adımları izleyerek komut dosyasını kopyalayın ve kurulumu tamamlayın.'
+              : 'Temel kaynaklar oluşturuldu! Lütfen aşağıdaki adımları izleyerek kurulumu tamamlayın.');
+            setShowManualSetupInstructions(true); 
+            
+            await update(); 
             if (session.user.googleScriptId !== userAppsScriptId) {
                  console.log("Session updated with new script ID after onboarding.")
             }
-            setOnboardingComplete(true); // Mark initial resource creation as complete
-            setIsOnboarding(false); // Stop main loading animation, new UI will show
+            setOnboardingComplete(true); 
+            setIsOnboarding(false); 
           } else {
             console.error('Onboarding resource creation failed as reported by server:', data.error, data.details);
             setOnboardingStatus(`Kurulum sırasında sunucu taraflı bir hata oluştu: ${data.error || 'Bilinmeyen sunucu hatası.'}`);

@@ -111,3 +111,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 # kolayxport_supa
 
 <!-- Trigger Vercel Redeploy -->
+
+<!-- Ensuring Vercel picks up the latest commit -->

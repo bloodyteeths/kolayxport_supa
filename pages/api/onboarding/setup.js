@@ -227,25 +227,30 @@ export default async function handler(req, res) {
       console.log(`User ${userId}: Template Script ID from env: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
       console.log(`User ${userId}: User email attempting copy: ${session.user.email}`);
       
+      let templateScriptWebViewLinkForManualCopy = null; // For fallback
+
       try {
-        // Verify template script details first
+        // First, try to get the webViewLink of the template itself for fallback
         try {
-          console.log(`User ${userId}: Verifying details for template script ID: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
-          const templateFileMeta = await drive.files.get({
+          console.log(`User ${userId}: Fetching webViewLink for template script ID: ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID}`);
+          const templateFileForLink = await drive.files.get({
             fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-            fields: 'id, name, mimeType, trashed',
+            fields: 'webViewLink, id, name, mimeType, trashed', // Include verification fields too
             supportsAllDrives: true,
           });
-          console.log(`User ${userId}: Template script details: Name: ${templateFileMeta.data.name}, MIME Type: ${templateFileMeta.data.mimeType}, ID: ${templateFileMeta.data.id}, Trashed: ${templateFileMeta.data.trashed}`);
-          if (templateFileMeta.data.mimeType !== 'application/vnd.google-apps.script') {
-            throw new Error(`Template script has incorrect MIME type: ${templateFileMeta.data.mimeType}`);
+          templateScriptWebViewLinkForManualCopy = templateFileForLink.data.webViewLink;
+          console.log(`User ${userId}: Template script details: Name: ${templateFileForLink.data.name}, MIME Type: ${templateFileForLink.data.mimeType}, ID: ${templateFileForLink.data.id}, Trashed: ${templateFileForLink.data.trashed}, WebViewLink: ${templateScriptWebViewLinkForManualCopy}`);
+          
+          if (templateFileForLink.data.mimeType !== 'application/vnd.google-apps.script') {
+            throw new Error(`Template script has incorrect MIME type: ${templateFileForLink.data.mimeType}`);
           }
-          if (templateFileMeta.data.trashed) {
+          if (templateFileForLink.data.trashed) {
             throw new Error('Template script is in the trash.');
           }
         } catch (verifyErr) {
-          console.error(`User ${userId}: Failed to verify template script:`, verifyErr);
-          // Rethrow or handle as critical error, as copy will likely fail
+          console.error(`User ${userId}: Failed to verify template script or get its webViewLink:`, verifyErr.message);
+          // This is critical. If we can't verify or get the link, the copy will likely fail or fallback won't work.
+          // For now, we'll throw, but this could be handled by trying to proceed without templateScriptWebViewLinkForManualCopy
           throw new Error(`Critical error verifying template script before copy: ${verifyErr.message}`);
         }
         
@@ -257,83 +262,102 @@ export default async function handler(req, res) {
 
         console.log(`User ${userId}: Attempting to copy script with metadata:`, JSON.stringify(scriptCopyMetadata));
 
-        // Perform the copy using USER auth
-        const copiedScriptFile = await drive.files.copy({ // Using `drive` which is user-authenticated
-          fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
-          requestBody: scriptCopyMetadata, 
-          fields: 'id, name, webViewLink', // Request id, name, and webViewLink
-          supportsAllDrives: true 
-        });
-        
-        userAppsScriptId = copiedScriptFile.data.id;
-        scriptWebViewLink = copiedScriptFile.data.webViewLink; // Assign to higher-scoped variable
-        console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${scriptWebViewLink}`);
+        // Perform the copy using USER auth with enhanced retry logic
+        let copiedScriptFile = null;
+        const maxRetries = 3;
+        let copyAttempt = 0; // Renamed from 'attempt' to avoid conflict if declared elsewhere
+        let lastScriptCopyError = null;
 
-        // --- Share the newly copied script with the Service Account ---
-        const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-        if (userAppsScriptId && serviceAccountEmail) {
-          console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'reader'.`);
+        while (copyAttempt < maxRetries) {
+          copyAttempt++;
           try {
-            await drive.permissions.create({
-              fileId: userAppsScriptId,
-              requestBody: {
-                role: 'reader',
-                type: 'user',
-                emailAddress: serviceAccountEmail,
-              },
-              supportsAllDrives: true, // Important if the user's Drive is part of a Shared Drive or if the template was
+            copiedScriptFile = await drive.files.copy({
+              fileId: TEMPLATE_WRAPPER_SCRIPT_FILE_ID,
+              requestBody: scriptCopyMetadata, 
+              fields: 'id, name, webViewLink',
+              supportsAllDrives: true 
             });
-            console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with ${serviceAccountEmail}.`);
-          } catch (shareError) {
-            // Log the error but don't let it block the rest of the onboarding for now.
-            // The get-all-user-properties might fail later, but basic onboarding can proceed.
-            console.warn(`User ${userId}: Failed to share script ${userAppsScriptId} with service account ${serviceAccountEmail}. This might affect fetching all properties later. Error:`, shareError.message);
+            lastScriptCopyError = null; // Clear last error on success
+            console.log(`User ${userId}: Script copy successful on attempt ${copyAttempt}.`);
+            break; // Exit loop on success
+          } catch (scriptCopyAttemptErr) {
+            lastScriptCopyError = scriptCopyAttemptErr;
+            console.warn(`User ${userId}: Attempt ${copyAttempt} to copy script failed. Error Code: ${scriptCopyAttemptErr.code}. Message: ${scriptCopyAttemptErr.message}`);
+            
+            // Only retry for 500-series errors and if not max retries
+            if (scriptCopyAttemptErr.code && scriptCopyAttemptErr.code >= 500 && scriptCopyAttemptErr.code < 600 && copyAttempt < maxRetries) {
+              const delay = Math.pow(2, copyAttempt -1) * 500 + Math.random() * 200; // attempt is 1-based for pow
+              console.log(`User ${userId}: Retrying in ${delay.toFixed(0)}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+              console.error(`User ${userId}: Script copy failed after ${copyAttempt} attempts or error is non-retryable (Code: ${scriptCopyAttemptErr.code}).`);
+              // Do not rethrow here; we'll handle it after the loop
+              break; 
+            }
           }
+        }
+
+        if (copiedScriptFile && copiedScriptFile.data && copiedScriptFile.data.id) {
+          userAppsScriptId = copiedScriptFile.data.id;
+          scriptWebViewLink = copiedScriptFile.data.webViewLink;
+          console.log(`User ${userId}: Copied script successfully. New Script ID: ${userAppsScriptId}, Name: ${copiedScriptFile.data.name}, Link: ${scriptWebViewLink}`);
+
+          // --- Share the newly copied script with the Service Account ---
+          const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+          if (userAppsScriptId && serviceAccountEmail) {
+            console.log(`User ${userId}: Sharing script ${userAppsScriptId} with service account ${serviceAccountEmail} as 'reader'.`);
+            try {
+              await drive.permissions.create({
+                fileId: userAppsScriptId,
+                requestBody: {
+                  role: 'reader',
+                  type: 'user',
+                  emailAddress: serviceAccountEmail,
+                },
+                supportsAllDrives: true, // Important if the user's Drive is part of a Shared Drive or if the template was
+              });
+              console.log(`User ${userId}: Successfully shared script ${userAppsScriptId} with ${serviceAccountEmail}.`);
+            } catch (shareError) {
+              // Log the error but don't let it block the rest of the onboarding for now.
+              // The get-all-user-properties might fail later, but basic onboarding can proceed.
+              console.warn(`User ${userId}: Failed to share script ${userAppsScriptId} with service account ${serviceAccountEmail}. This might affect fetching all properties later. Error:`, shareError.message);
+            }
+          } else {
+            if (!serviceAccountEmail) {
+              console.warn(`User ${userId}: GOOGLE_SERVICE_ACCOUNT_EMAIL is not set in .env. Cannot share copied script.`);
+            }
+          }
+          // --- End of sharing ---
         } else {
-          if (!serviceAccountEmail) {
-            console.warn(`User ${userId}: GOOGLE_SERVICE_ACCOUNT_EMAIL is not set in .env. Cannot share copied script.`);
-          }
-        }
-        // --- End of sharing ---
-
-      } catch (scriptCopyErr) {
-        console.error(`User ${userId}: USER failed Wrapper script copy attempt:`, scriptCopyErr);
-        console.error(`User ${userId}: Detailed error from Google:`, JSON.stringify(scriptCopyErr.response?.data, null, 2));
-        let rawErrorString = 'Error details not available or stringification failed.';
-        try {
-          rawErrorString = JSON.stringify(scriptCopyErr, Object.getOwnPropertyNames(scriptCopyErr), 2);
-        } catch (e) {
-          rawErrorString = `Error stringifying scriptCopyErr: ${e.message}. Raw error message: ${scriptCopyErr.message}`;
-        }
-        console.error(`User ${userId}: Raw user scriptCopyErr object:`, rawErrorString);
-
-        let errorMessage = 'Failed to copy the template script using your Google account.';
-        if (scriptCopyErr.code) {
-          errorMessage += ` (Code: ${scriptCopyErr.code})`;
-          if (scriptCopyErr.code === 404) {
-            errorMessage += ` Please ensure the template script (ID starting ${TEMPLATE_WRAPPER_SCRIPT_FILE_ID.substring(0, 6)}...) is shared correctly (Anyone with link -> Viewer).`;
-          } else if (scriptCopyErr.code === 403) {
-             errorMessage += ` You might lack permission to copy this specific file, or the Drive API might be disabled for the project.`;
-          }
-        }
-        if (scriptCopyErr.errors && scriptCopyErr.errors[0] && scriptCopyErr.errors[0].message) {
-          errorMessage += ` Details: ${scriptCopyErr.errors[0].message}`;
+          // Script copy failed after all retries or due to a non-retryable error
+          console.error(`User ${userId}: USER failed Wrapper script copy attempt permanently after ${copyAttempt} attempts. Last Error:`, lastScriptCopyError?.message);
+          // userAppsScriptId and scriptWebViewLink remain null/undefined
+          // The response will indicate manual copy is required
         }
 
-        return res.status(500).json({ error: errorMessage, details: rawErrorString });
+      } catch (initialSetupOrFatalCopyError) {
+        // This catch is for errors like the initial template verification failing,
+        // or if an error was explicitly re-thrown from within the retry logic (though we try to avoid that now for copy failures).
+        console.error(`User ${userId}: A critical error occurred during script setup or a fatal copy error:`, initialSetupOrFatalCopyError);
+        // For a truly fatal error before or during copy that isn't handled by the loop's fallback:
+        // We might want to signal a more severe failure or ensure the response construction handles this.
+        // For now, if templateScriptWebViewLinkForManualCopy is not set, the fallback won't be as useful.
+        // The main error handling at the end of the 'handler' function will catch this and respond with 500.
+        throw initialSetupOrFatalCopyError; // Rethrow to be caught by the outermost try-catch
       }
     } else {
       console.log(`User ${userId}: Wrapper script already exists: ${userAppsScriptId}`);
+      // If script exists, we might still need to fetch its webViewLink if not already available
+      // This part is handled later in the 'finalScriptWebViewLink' logic
     }
 
     // --- 4. Save IDs to Database --- 
-    let dbUserAppsScriptId = userAppsScriptId; // Use the one from copy, or existing if already there
+    let dbUserAppsScriptId = userAppsScriptId; 
     if (!dbUserAppsScriptId && existingUser?.userAppsScriptId) {
         dbUserAppsScriptId = existingUser.userAppsScriptId;
     }
 
-    // Fetch the script's webViewLink if it wasn't just copied (i.e., if userAppsScriptId already existed)
-    let finalScriptWebViewLink = scriptWebViewLink; // From the copy operation
+    let finalScriptWebViewLink = scriptWebViewLink; 
     if (!finalScriptWebViewLink && dbUserAppsScriptId) {
         try {
             const scriptFile = await drive.files.get({
@@ -344,12 +368,10 @@ export default async function handler(req, res) {
             finalScriptWebViewLink = scriptFile.data.webViewLink;
         } catch (fetchLinkError) {
             console.warn(`User ${userId}: Could not fetch webViewLink for existing script ${dbUserAppsScriptId}:`, fetchLinkError.message);
-            // Not critical if it fails, but good to have
         }
     }
     
-    // Fetch spreadsheetUrl if it wasn't just created
-    let finalSpreadsheetUrl = spreadsheetUrl; // From create operation
+    let finalSpreadsheetUrl = spreadsheetUrl; 
     if (!finalSpreadsheetUrl && googleSheetId) {
         try {
             const sheetFile = await sheets.spreadsheets.get({
@@ -361,19 +383,32 @@ export default async function handler(req, res) {
             console.warn(`User ${userId}: Could not fetch spreadsheetUrl for existing sheet ${googleSheetId}:`, fetchSheetUrlError.message);
         }
     }
+    
+    // Determine if manual script copy is required
+    const manualScriptCopyRequired = !dbUserAppsScriptId; // If no script ID, manual copy is needed.
 
-    if (driveFolderId || googleSheetId || dbUserAppsScriptId) { // Only update if at least one ID was generated or present
-      console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${dbUserAppsScriptId}`);
+    if (driveFolderId || googleSheetId || dbUserAppsScriptId) { 
+      console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${dbUserAppsScriptId || null}`);
       try {
+        const dataToUpdate = {
+          ...(googleSheetId && { googleSheetId }),
+          ...(driveFolderId && { driveFolderId }),
+        };
+        if (dbUserAppsScriptId) { // Only add userAppsScriptId if it exists
+          dataToUpdate.userAppsScriptId = dbUserAppsScriptId;
+        } else if (existingUser && existingUser.userAppsScriptId && !dbUserAppsScriptId) {
+          // If copy failed, but an old ID existed, we might want to clear it or keep it.
+          // For now, if dbUserAppsScriptId is null (copy failed), we don't update/set it,
+          // effectively clearing it if it was previously set and copy failed now.
+          // Or, if we want to ensure it's cleared if copy fails:
+          // dataToUpdate.userAppsScriptId = null; // Explicitly set to null
+        }
+
         await prisma.user.update({
           where: { id: userId },
-          data: {
-            ...(googleSheetId && { googleSheetId }),
-            ...(driveFolderId && { driveFolderId }),
-            ...(dbUserAppsScriptId && { userAppsScriptId: dbUserAppsScriptId }),
-          },
+          data: dataToUpdate,
         });
-        console.log(`User ${userId}: Database updated successfully with new IDs.`);
+        console.log(`User ${userId}: Database updated.`);
       } catch (dbError) {
         console.error(`User ${userId}: Database update failed:`, dbError);
         // Critical: If DB update fails after creating Google resources, user is in an inconsistent state.
@@ -387,16 +422,20 @@ export default async function handler(req, res) {
     }
 
     // --- Success --- 
-    console.log(`User ${userId}: Onboarding process (resource creation/linking) completed successfully.`);
+    console.log(`User ${userId}: Onboarding process (resource creation/linking) completed.`);
     return res.status(200).json({
       success: true,
-      message: 'Onboarding resources provisioned. Please follow sheet instructions to complete setup.',
+      message: manualScriptCopyRequired 
+                 ? 'Sheet and Folder created. Script copy failed. Please use the link to copy the script manually.' 
+                 : 'Onboarding resources provisioned. Please follow sheet instructions to complete setup.',
       data: {
         googleSheetId,
         driveFolderId,
-        userAppsScriptId: dbUserAppsScriptId, // Return the script ID that's in the DB or was just created
-        spreadsheetUrl: finalSpreadsheetUrl,     // Return the URL of the sheet
-        scriptWebViewLink: finalScriptWebViewLink // Return the web view link of the script
+        userAppsScriptId: dbUserAppsScriptId, 
+        spreadsheetUrl: finalSpreadsheetUrl,     
+        scriptWebViewLink: finalScriptWebViewLink, 
+        manualScriptCopyRequired: manualScriptCopyRequired,
+        templateScriptWebViewLinkForManualCopy: manualScriptCopyRequired ? templateScriptWebViewLinkForManualCopy : null
       },
     });
 

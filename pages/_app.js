@@ -1,10 +1,10 @@
 import "../styles/globals.css"
 import Layout from '@/components/Layout'
-import { SessionProvider } from "next-auth/react"
 import { useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { DefaultSeo, LogoJsonLd } from 'next-seo'
 import SEO from '../next-seo.config'
+import { AuthProvider } from '@/lib/auth-context'
 
 // Override fetch globally to force GET for NextAuth session endpoint
 if (typeof window !== 'undefined') {
@@ -18,11 +18,11 @@ if (typeof window !== 'undefined') {
   };
 }
 
-export default function App({ Component, pageProps: { session, ...pageProps } }) {
+export default function App({ Component, pageProps }) {
   const getLayout = Component.getLayout || ((page) => <Layout>{page}</Layout>);
 
   return (
-    <SessionProvider session={session} refetchInterval={0} refetchOnWindowFocus={false}>
+    <AuthProvider>
       <DefaultSeo {...SEO} />
       {/* Organization structured data */}
       <LogoJsonLd
@@ -31,6 +31,6 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
       />
       <Toaster position="bottom-right" />
       {getLayout(<Component {...pageProps} />)}
-    </SessionProvider>
+    </AuthProvider>
   )
 }

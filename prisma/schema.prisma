@@ -45,10 +45,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // --- NextAuth Adapter Fields --- 
-  // These are needed if using the PrismaAdapter with NextAuth
-  accounts Account[] // Restored
-  sessions Session[] // Restored
+  // --- Relationships ---
+  accounts       Account[]
+  sessions       Session[]
+  marketplaceConfigs  MarketplaceConfig[]
+  orders         Order[]
+  products       Product[]
 }
 
 // --- NextAuth Models (Required for PrismaAdapter) --- 
@@ -86,4 +88,120 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// --- New Models from Roadmap ---
+model MarketplaceConfig {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  config        Json
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id            String    @id @default(cuid())
+  marketplace   String
+  marketplaceKey String
+  customerName  String
+  status        String
+  shipByDate    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id            String    @id @default(cuid())
+  orderId       String
+  sku           String
+  quantity      Int
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  labelJobs     LabelJob[]
+
+  // Product reference - optional as some orders may have items not in product catalog
+  productId     String?
+  product       Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+model LabelJob {
+  id            String    @id @default(cuid())
+  itemId        String
+  carrier       String
+  status        String
+  pdfUrl        String?
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  item          OrderItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+
+// --- Step 8: Inventory Management Models ---
+
+model Product {
+  id            String    @id @default(cuid())
+  sku           String
+  name          String
+  description   String?
+  price         Decimal   @db.Decimal(10, 2)
+  cost          Decimal?  @db.Decimal(10, 2)
+  weight        Float?
+  dimensions    Json?     // e.g. {"length": 10, "width": 5, "height": 2}
+  imageUrl      String?
+  active        Boolean   @default(true)
+  
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relationships
+  inventories   Inventory[]
+  orderItems    OrderItem[]
+  marketplaceProducts MarketplaceProduct[]
+  
+  @@unique([userId, sku])
+}
+
+model Inventory {
+  id            String    @id @default(cuid())
+  productId     String
+  location      String    @default("default") // e.g. warehouse name or "default"
+  quantity      Int       @default(0)
+  reorderLevel  Int?      // when to reorder
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([productId, location])
+}
+
+model MarketplaceProduct {
+  id                String  @id @default(cuid())
+  productId         String
+  marketplace       String  // e.g., "veeqo", "trendyol"
+  marketplaceId     String  // ID of the product in the marketplace
+  marketplaceData   Json?   // Additional marketplace-specific data
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([marketplace, marketplaceId])
 }

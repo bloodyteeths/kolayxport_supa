@@ -1,0 +1,122 @@
+{
+  "metadata": {
+    "generatedBy": "KolayXport LLM",
+    "generatedAt": "2025-05-11T00:00:00Z",
+    "description": "Full roadmap for migrating from Google Scripts/Sheets to a Vercel+Supabase stack with detailed phases, database schema, APIs, UI, and future extensions."
+  },
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Foundations & Infra",
+      "description": "Set up core infra on Supabase and Vercel.",
+      "steps": [
+        "Create Supabase project: enable Auth & Database.",
+        "Configure Vercel env vars for NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, API keys for Veeqo, Trendyol, Shippo, etc.",
+        "Set up Vercel Cron for scheduled tasks."
+      ]
+    },
+    {
+      "phase": 2,
+      "title": "Database Modeling",
+      "description": "Design Postgres schema for users, configs, orders, line items, and label jobs.",
+      "schema": {
+        "User": [
+          "id",
+          "email",
+          "createdAt"
+        ],
+        "MarketplaceConfig": [
+          "id",
+          "userId",
+          "name",
+          "config JSON"
+        ],
+        "Order": [
+          "id",
+          "marketplace",
+          "marketplaceKey",
+          "createdAt",
+          "customerName",
+          "status",
+          "shipByDate"
+        ],
+        "OrderItem": [
+          "id",
+          "orderId",
+          "sku",
+          "quantity",
+          "notes"
+        ],
+        "LabelJob": [
+          "id",
+          "itemId",
+          "carrier",
+          "status",
+          "pdfUrl",
+          "errorMessage",
+          "timestamps"
+        ]
+      }
+    },
+    {
+      "phase": 3,
+      "title": "Auth & Settings UI",
+      "description": "Implement user signup/login and Ayarlar screen for entering marketplace & carrier API keys.",
+      "steps": [
+        "Use Supabase Auth for email or OAuth.",
+        "Build `/ayarlar` React page: form to create/edit MarketplaceConfig entries stored in Supabase.",
+        "Server-side validation of credentials on save."
+      ]
+    },
+    {
+      "phase": 4,
+      "title": "Order Syncing Service",
+      "description": "Adapter-based syncing of orders from Veeqo & Trendyol into Supabase.",
+      "steps": [
+        "Write adapter modules: `fetchVeeqoOrders(config)`, `fetchTrendyolOrders(config)`.",
+        "API route `POST /api/sync`: loop user configs, call adapters, upsert orders & items.",
+        "Cron schedule `/api/sync` every 15m."
+      ]
+    },
+    {
+      "phase": 5,
+      "title": "Sipari\u015fler Dashboard",
+      "description": "React UI to display orders and generate labels.",
+      "features": [
+        "Table with image, name, variant, status, ship-by, marketplace key.",
+        "Checkbox or button per line-item to trigger label generation via API.",
+        "Visual feedback & link to PDF."
+      ]
+    },
+    {
+      "phase": 6,
+      "title": "Label Generation Service",
+      "description": "Server-side API to call carriers (Shippo, Veeqo) and store PDF URLs.",
+      "steps": [
+        "Implement `POST /api/labels/generate` to enqueue or run label-gen.",
+        "Update LabelJob status & store PDF in Supabase Storage or alternative.",
+        "Return signed URL to front-end."
+      ]
+    },
+    {
+      "phase": 7,
+      "title": "Dashboard & Analytics",
+      "description": "User dashboard for daily sales, order counts, and key metrics.",
+      "features": [
+        "Daily sales chart (line, bar) using React chart library.",
+        "Aggregates: total orders, revenue, shipped vs pending.",
+        "Filter by date range and marketplace."
+      ]
+    },
+    {
+      "phase": 8,
+      "title": "Future - Inventory Management",
+      "description": "Extend system to let users create/manage products in Veeqo or marketplaces.",
+      "steps": [
+        "Design Product & Inventory tables in DB.",
+        "Build UI CRUD for products.",
+        "Sync creations/updates to Veeqo and other channels."
+      ]
+    }
+  ]
+}

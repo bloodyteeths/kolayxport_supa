@@ -3,10 +3,13 @@
 // MODIFIED: Cannot use scripts.run effectively due to GCP project restrictions.
 
 // import { getSession } from 'next-auth/react'; // REMOVED
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // ADDED
-import { cookies } from 'next/headers'; // ADDED
+// import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // REMOVED
+// import { cookies } from 'next/headers'; // REMOVED
+import { createPagesRouteHandlerClient } from '@/lib/supabase/server'; // ADDED
 import { google } from 'googleapis'; // Used for type definitions if not for auth client construction
-import prisma from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // Helper function to get Google API client authenticated AS THE USER (with auto-refresh)
 // This function itself is fine, but its use with script.run for user-copied scripts is problematic.
@@ -26,49 +29,57 @@ import prisma from '@/lib/prisma';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).json({ message: `Method ${req.method} Not Allowed` });
   }
 
   // const session = await getSession({ req }); // REMOVED
-  const supabase = createRouteHandlerClient({ cookies }); // ADDED
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession(); // ADDED
-
-  if (sessionError) { // ADDED
-    console.error('Supabase getSession error in gscript/get-all-user-properties:', sessionError); // ADDED
-    return res.status(500).json({ error: 'Authentication error' }); // ADDED
-  } // ADDED
-
-  if (!session || !session.user || !session.user.id) {
-    return res.status(401).json({ error: 'User not authenticated' });
-  }
-  // We would need these if we were making a Google API call, but we're not in this modified version.
-  // if (!session.accessToken || !session.refreshToken || !session.tokenExpiresAt) {
-  //   console.error(`User ${session.user.id}: Missing token information in session for get-all-user-properties.`);
-  //   return res.status(401).json({ error: 'Incomplete authentication details for Google API access.' });
-  // }
-
-  const userId = session.user.id;
+  const supabase = createPagesRouteHandlerClient({ req, res }); // ADDED
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { userAppsScriptId: true },
-    });
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    if (!user || !user.userAppsScriptId) {
-      console.log(`User ${userId}: No Apps Script ID found in DB for get-all-user-properties. Onboarding might be incomplete.`);
-      // Return empty if no script ID, as the dashboard might expect this structure
-      return res.status(200).json({ properties: {} }); 
+    if (sessionError) {
+      console.error('Supabase session error in get-all-user-properties:', sessionError);
+      return res.status(401).json({ message: 'Supabase session error', error: sessionError.message });
+    }
+    if (!session) {
+      return res.status(401).json({ message: 'Not authenticated' });
     }
 
-    const scriptId = user.userAppsScriptId;
-    console.log(`User ${userId}: /api/gscript/get-all-user-properties called. Script ID: ${scriptId}.`);
-    console.warn(`User ${userId}: Bypassing Google Apps Script API call for getAllUserProperties due to GCP project restrictions with scripts.run. Returning empty properties.`);
+    const userId = session.user.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      // Select the fields that are relevant for the Apps Script or client
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        userAppsScriptId: true,
+        googleSheetId: true,
+        driveFolderId: true,
+        veeqoApiKey: true, // Be cautious about exposing API keys directly
+        shippoApiKey: true, // Consider if these are truly needed by the client/script via this endpoint
+        fedexApiKey: true,
+        trendyolApiKey: true,
+        trendyolApiSecret: true,
+        trendyolSupplierId: true,
+        hepsiburadaApiKey: true,
+        hepsiburadaMerchantId: true,
+        // Add any other relevant fields from your User model
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
     
-    // Temporarily return empty properties.
-    // The actual properties need to be managed/retrieved via the Apps Script itself
-    // or pushed from the Apps Script to a backend cache.
-    return res.status(200).json({ properties: {} });
+    // Mask sensitive keys before sending to client, if necessary.
+    // For now, returning them as-is, but this is a security consideration.
+    // Example: user.veeqoApiKey = user.veeqoApiKey ? '********' : null;
+
+    return res.status(200).json(user);
 
     // --- Code that would use scripts.run (currently problematic) ---
     // const userAuth = getUserGoogleApiClient({ 
@@ -117,10 +128,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     // This catch block is now less likely to be hit by Google API errors from scripts.run
-    console.error(`User ${userId}: Error in /api/gscript/get-all-user-properties:`, error.message);
-    return res.status(500).json({ 
-      error: 'An internal server error occurred.', 
-      details: error.message 
-    });
+    console.error('Error in get-all-user-properties:', error.message);
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 }

@@ -1,68 +1,81 @@
 // import { getSession } from 'next-auth/react'; // REMOVED
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // ADDED
-import { cookies } from 'next/headers'; // ADDED
-import prisma from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
+// import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // REMOVED
+// import { cookies } from 'next/headers'; // REMOVED - not used directly here for Pages Router
+import { createPagesRouteHandlerClient } from '@/lib/supabase/server'; // ADDED
+
+const prisma = new PrismaClient();
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
+    return res.status(405).json({ message: `Method ${req.method} Not Allowed` });
   }
 
-  const supabase = createRouteHandlerClient({ cookies }); // ADDED
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession(); // ADDED
-
-  if (sessionError) { // ADDED
-    console.error('Supabase getSession error in setScriptProps:', sessionError);
-    return res.status(500).json({ error: 'Authentication error' });
-  }
-
-  if (!session?.user?.id) { // ADDED session check
-    return res.status(401).json({ error: 'Unauthorized: User not authenticated' });
-  }
-  const userId = session.user.id; // ADDED: userId from Supabase session
-  
-  const body = req.body; // Body now only contains the properties to set
-
-  // const { userId, ...body } = req.body; // REMOVED: Old way of getting userId and body
-  // if (!userId) { // REMOVED: Covered by session check
-  //   return res.status(401).json({ error: 'Unauthorized: missing userId' });
-  // }
-  
-  if (!body || typeof body !== 'object' || Object.keys(body).length === 0) { // MODIFIED: Check if body is empty after extracting userId
-    return res.status(400).json({ error: 'Invalid or empty request body. Expected key-value pairs.' });
-  }
+  // const supabase = createRouteHandlerClient({ cookies }); // REMOVED
+  const supabase = createPagesRouteHandlerClient({ req, res }); // ADDED
 
   try {
-    const updateData = {};
-    if ('VEEQO_API_KEY' in body) updateData.veeqoApiKey = body.VEEQO_API_KEY;
-    if ('SHIPPO_TOKEN' in body) updateData.shippoToken = body.SHIPPO_TOKEN;
-    if ('FEDEX_API_KEY' in body) updateData.fedexApiKey = body.FEDEX_API_KEY;
-    if ('FEDEX_API_SECRET' in body) updateData.fedexSecretKey = body.FEDEX_API_SECRET;
-    if ('FEDEX_ACCOUNT_NUMBER' in body) updateData.fedexAccountNumber = body.FEDEX_ACCOUNT_NUMBER;
-    if ('FEDEX_METER_NUMBER' in body) updateData.fedexMeterNumber = body.FEDEX_METER_NUMBER;
-    if ('FEDEX_FOLDER_ID' in body) updateData.driveFolderId = body.FEDEX_FOLDER_ID;
-    // Add any other new keys from your Ayarlar page form that need to be saved to the User model
-    if ('TRENDYOL_SUPPLIER_ID' in body) updateData.trendyolSupplierId = body.TRENDYOL_SUPPLIER_ID;
-    if ('TRENDYOL_API_KEY' in body) updateData.trendyolApiKey = body.TRENDYOL_API_KEY;
-    if ('TRENDYOL_API_SECRET' in body) updateData.trendyolApiSecret = body.TRENDYOL_API_SECRET;
-    if ('HEPSIBURADA_MERCHANT_ID' in body) updateData.hepsiburadaMerchantId = body.HEPSIBURADA_MERCHANT_ID;
-    if ('HEPSIBURADA_API_KEY' in body) updateData.hepsiburadaApiKey = body.HEPSIBURADA_API_KEY;
-    // Ensure these fields exist in your prisma.schema User model
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    if (Object.keys(updateData).length === 0) {
-        return res.status(400).json({ error: 'No valid properties provided to update.' });
+    if (sessionError) {
+      console.error('Supabase session error:', sessionError);
+      return res.status(401).json({ message: 'Supabase session error', error: sessionError.message });
     }
 
-    await prisma.user.update({
-      where: { id: userId }, // userId from Supabase session
-      data: updateData,
+    if (!session) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const userId = session.user.id; // Get userId from Supabase session
+    const { appsScriptId, driveFolderId, googleSheetId, veeqoApiKey, shippoApiKey, fedexApiKey, trendyolApiKey, trendyolApiSecret, trendyolSupplierId, hepsiburadaApiKey, hepsiburadaMerchantId } = req.body;
+
+    // Validate that at least one property is being updated
+    const providedProps = { appsScriptId, driveFolderId, googleSheetId, veeqoApiKey, shippoApiKey, fedexApiKey, trendyolApiKey, trendyolApiSecret, trendyolSupplierId, hepsiburadaApiKey, hepsiburadaMerchantId };
+    if (Object.values(providedProps).every(value => value === undefined)) {
+        return res.status(400).json({ message: 'No properties provided for update.' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(appsScriptId && { userAppsScriptId: appsScriptId }),
+        ...(driveFolderId && { driveFolderId: driveFolderId }),
+        ...(googleSheetId && { googleSheetId: googleSheetId }),
+        ...(veeqoApiKey && { veeqoApiKey: veeqoApiKey }),
+        ...(shippoApiKey && { shippoApiKey: shippoApiKey }),
+        ...(fedexApiKey && { fedexApiKey: fedexApiKey }),
+        ...(trendyolApiKey && { trendyolApiKey: trendyolApiKey }),
+        ...(trendyolApiSecret && { trendyolApiSecret: trendyolApiSecret }),
+        ...(trendyolSupplierId && { trendyolSupplierId: trendyolSupplierId }),
+        ...(hepsiburadaApiKey && { hepsiburadaApiKey: hepsiburadaApiKey }),
+        ...(hepsiburadaMerchantId && { hepsiburadaMerchantId: hepsiburadaMerchantId }),
+        updatedAt: new Date(),
+      },
     });
 
-    return res.status(200).json({ success: true, message: 'Settings saved successfully.' });
-  } catch (err) {
-    console.error('API Route /api/setScriptProps Error:', err);
-    // Consider more specific error handling, e.g., if prisma.user.update fails due to user not found (though session implies user exists)
-    return res.status(500).json({ error: err.message || 'Internal Server Error' });
+    // Update Supabase user_metadata as well, if these fields are relevant there
+    // Be cautious about what you store in user_metadata, it's client-accessible.
+    // For API keys, Prisma is the secure source of truth.
+    // For IDs like googleSheetId, googleScriptId, it might be useful for client-side logic.
+    const metadataToUpdate = {};
+    if (googleSheetId) metadataToUpdate.googleSheetId = googleSheetId;
+    if (appsScriptId) metadataToUpdate.googleScriptId = appsScriptId;
+    if (driveFolderId) metadataToUpdate.driveFolderId = driveFolderId;
+
+    if (Object.keys(metadataToUpdate).length > 0) {
+        const { data: updatedUser, error: updateUserError } = await supabase.auth.updateUser({
+            data: metadataToUpdate
+        });
+        if (updateUserError) {
+            console.error('Error updating Supabase user metadata:', updateUserError);
+            // Non-critical error, proceed with success response for Prisma update
+        }
+    }
+
+    return res.status(200).json({ message: 'User properties updated successfully', user });
+  } catch (error) {
+    console.error('Error in setScriptProps:', error);
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 } 

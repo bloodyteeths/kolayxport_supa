@@ -1,10 +1,13 @@
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
 import prisma from '@/lib/prisma';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createPagesRouteHandlerClient } from '@/lib/supabase/server';
+import { PrismaClient } from '@prisma/client';
+import axios from 'axios';
 
 dotenv.config();
+
+const prismaClient = new PrismaClient();
 
 // --- Helper Functions (Copied from syncOrders.js / setScriptProps.js) ---
 async function getAppsScriptAPI() {
@@ -49,80 +52,112 @@ async function generateShippingLabel(labelData, userCarrierConfig) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method Not Allowed' });
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ message: `Method ${req.method} Not Allowed` });
   }
 
-  const supabase = createRouteHandlerClient({ cookies });
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-  if (sessionError) {
-    console.error('Supabase getSession error in generateLabel:', sessionError);
-    return res.status(500).json({ error: 'Authentication error' });
-  }
-
-  if (!session?.user?.id) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-
-  const userId = session.user.id;
-  const { orderId, items, carrier, shippingDetails } = req.body;
-
-  if (!orderId || !items || !carrier || !shippingDetails) {
-    return res.status(400).json({ message: 'Missing required label generation data.' });
-  }
+  const supabase = createPagesRouteHandlerClient({ req, res });
 
   try {
-    // TODO: Fetch user's carrier configurations (e.g., API keys for Shippo/Veeqo for the selected carrier)
-    // For now, we'll pass a placeholder or assume mock doesn't need it.
-    const userCarrierConfig = { carrierApiKey: "USER_SPECIFIC_API_KEY_FOR_" + carrier };
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    // Create a LabelJob entry (optional, but good for tracking)
-    const labelJob = await prisma.labelJob.create({
+    if (sessionError) {
+      console.error('Supabase session error in generateLabel:', sessionError);
+      return res.status(401).json({ message: 'Supabase session error', error: sessionError.message });
+    }
+    if (!session) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const userId = session.user.id;
+    const { orderId, shippingService } = req.body;
+
+    if (!orderId || !shippingService) {
+      return res.status(400).json({ message: 'Missing orderId or shippingService in request body.' });
+    }
+
+    const user = await prismaClient.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    // --- Start Mock Implementation / Prisma LabelJob --- 
+    // Simulate label generation process and store a job record.
+    // In a real scenario, this would interact with Shippo/FedEx/etc. via Apps Script or direct API calls.
+
+    const labelJob = await prismaClient.labelJob.create({
       data: {
-        order: { connect: { id: orderId } }, // Assuming orderId is the DB id of the Order
-        // If you have individual OrderItem IDs for which labels are being made, you might link them differently
-        // For now, linking to Order. This depends on your exact schema and requirements.
-        // If linking to OrderItem, you'd pass orderItemId and connect to OrderItem.
-        carrier: carrier,
+        orderId: orderId.toString(), // Ensure orderId is a string if your model expects it
         status: 'PENDING',
-        // userId: userId, // If LabelJob has a direct relation to User
+        shippingService: shippingService,
+        userId: userId,
+        // pdfUrl will be updated later when the label is actually generated
       },
     });
 
-    const labelData = { 
-      orderId, 
-      items,       // [{ orderItemId (db id), sku, quantity, name, weight, dimensions, etc.}]
-      carrier, 
-      shippingDetails // { fromAddress, toAddress, packageDetails, serviceLevel, etc. }
-    };
-    
-    const result = await generateShippingLabel(labelData, userCarrierConfig);
+    // Simulate a delay or asynchronous process
+    // In a real app, you might trigger a background job (e.g., via a queue or another serverless function)
+    // For now, let's just return success indicating the job is created.
+    // The actual label generation (and pdfUrl update) would happen elsewhere or be polled.
 
-    if (result.success) {
-      await prisma.labelJob.update({
-        where: { id: labelJob.id },
-        data: {
-          status: 'GENERATED',
-          pdfUrl: result.labelUrl,
-          trackingNumber: result.trackingNumber, // Add trackingNumber to your LabelJob schema if not present
-          // errorMessage: null, // Clear any previous error
-        },
-      });
-      return res.status(200).json(result);
-    } else {
-      await prisma.labelJob.update({
-        where: { id: labelJob.id },
-        data: {
-          status: 'FAILED',
-          errorMessage: result.message,
-        },
-      });
-      return res.status(400).json({ message: result.message || 'Failed to generate label' });
+    // If you were to call Apps Script:
+    /*
+    if (!user.userAppsScriptId) {
+      return res.status(400).json({ message: 'User Apps Script ID is not configured.' });
     }
+    const appsScriptUrl = `https://script.google.com/macros/s/${user.userAppsScriptId}/exec`;
+    const tokenResponse = await supabase.auth.getSession();
+    const accessToken = tokenResponse?.data?.session?.provider_token;
+
+    const scriptResponse = await axios.post(appsScriptUrl, {
+        action: 'generateLabelForOrder',
+        orderId: orderId,
+        shippingService: shippingService,
+        // Potentially pass user API keys for Shippo/FedEx from user record if script needs them
+      }, {
+        headers: {
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+          'Content-Type': 'application/json',
+        },
+      });
+
+    if (scriptResponse.status === 200 && scriptResponse.data?.pdfUrl) {
+        await prismaClient.labelJob.update({
+            where: { id: labelJob.id },
+            data: { status: 'COMPLETED', pdfUrl: scriptResponse.data.pdfUrl, completedAt: new Date() }
+        });
+        return res.status(200).json({ 
+            message: 'Label generation initiated and completed via Apps Script.', 
+            labelJobId: labelJob.id, 
+            pdfUrl: scriptResponse.data.pdfUrl 
+        });
+    } else {
+        await prismaClient.labelJob.update({
+            where: { id: labelJob.id },
+            data: { status: 'FAILED', failureReason: scriptResponse.data?.error || 'Apps Script call failed' }
+        });
+        console.error('Apps Script label generation failed:', scriptResponse.status, scriptResponse.data);
+        return res.status(scriptResponse.status || 500).json({ 
+            message: 'Failed to generate label via Apps Script.', 
+            labelJobId: labelJob.id, 
+            details: scriptResponse.data 
+        });
+    }
+    */
+    // --- End Mock / Prisma Logic --- 
+
+    // For the current simplified Prisma-only approach:
+    return res.status(201).json({ 
+      message: 'Label generation job created. Check status later.', 
+      labelJobId: labelJob.id,
+      status: labelJob.status
+    });
+
   } catch (error) {
-    console.error('Error in /api/generateLabel:', error);
-    // If a labelJob was created, you might want to mark it as FAILED here too
-    // await prisma.labelJob.updateMany({ where: { orderId: orderId, status: 'PENDING' }, data: { status: 'FAILED', errorMessage: error.message }});
-    return res.status(500).json({ message: 'Internal server error generating label.' });
+    console.error('Error in generateLabel API route:', error.message);
+    if (error.isAxiosError && error.response) { // If using axios for Apps Script call
+        return res.status(error.response.status || 500).json({ message: 'Error calling Apps Script for label generation', details: error.response.data });
+    }
+    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 } 

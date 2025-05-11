@@ -1,8 +1,10 @@
 // import { getSession } from 'next-auth/react'; // REMOVED
-import prisma from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+const prisma = new PrismaClient();
 
 const SCRIPT_CALLBACK_SECRET = process.env.APPS_SCRIPT_CALLBACK_SECRET;
 

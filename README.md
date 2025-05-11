@@ -109,3 +109,5 @@ This project is designed to be deployed on Vercel:
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 # kolayxport_supa
+
+<!-- Trigger Vercel Redeploy -->

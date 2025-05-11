@@ -57,10 +57,15 @@ export default async function handler(req, res) {
 
   // Use the ID of the template Google Sheet that has the script bound to it
   const TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID = process.env.TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID; // <-- RENAMED/NEW ENV VAR
+  const MASTER_TEMPLATE_SCRIPT_PROJECT_ID = process.env.MASTER_TEMPLATE_SCRIPT_PROJECT_ID; // <-- NEW ENV VAR FOR THE SCRIPT ID
 
   if (!TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID) {
     console.error('Onboarding Error: TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID not configured.');
     return res.status(500).json({ error: 'Server configuration error: Missing template sheet ID.' });
+  }
+  if (!MASTER_TEMPLATE_SCRIPT_PROJECT_ID) {
+    console.error('Onboarding Error: MASTER_TEMPLATE_SCRIPT_PROJECT_ID not configured.');
+    return res.status(500).json({ error: 'Server configuration error: Missing master script project ID.' });
   }
 
   let googleSheetId, driveFolderId, spreadsheetUrl;
@@ -211,9 +216,9 @@ export default async function handler(req, res) {
 
     let scriptContent;
     try {
-      console.log(`User ${userId}: Fetching script content from master template (script ID: ${TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID})...`);
+      console.log(`User ${userId}: Fetching script content from master template script project (ID: ${MASTER_TEMPLATE_SCRIPT_PROJECT_ID})...`);
       const contentResponse = await scriptApi.projects.getContent({
-        scriptId: TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID,
+        scriptId: MASTER_TEMPLATE_SCRIPT_PROJECT_ID, // Use the actual script project ID
       });
       scriptContent = contentResponse.data;
       if (!scriptContent || !scriptContent.files || scriptContent.files.length === 0) {
@@ -221,7 +226,7 @@ export default async function handler(req, res) {
       }
       console.log(`User ${userId}: Successfully fetched script content from master template. Found ${scriptContent.files.length} files.`);
     } catch (error) {
-      console.error(`User ${userId}: Failed to get script content from master template (ID: ${TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID}). Error:`, error.message, error.response?.data?.error);
+      console.error(`User ${userId}: Failed to get script content from master template (ID: ${MASTER_TEMPLATE_SCRIPT_PROJECT_ID}). Error:`, error.message, error.response?.data?.error);
       // Potentially clean up created sheet/folder if this fails?
       return res.status(500).json({
         error: 'Failed to retrieve master script content for setup.',
@@ -314,7 +319,7 @@ export default async function handler(req, res) {
       data: {
         googleSheetId: googleSheetId,
         driveFolderId: driveFolderId,
-        userAppsScriptId: userAppsScriptId, // This will be null
+        userAppsScriptId: userAppsScriptId, // This will contain the new script ID
       },
     });
     console.log(`User ${userId}: Database updated.`);

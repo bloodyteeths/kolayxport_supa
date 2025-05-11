@@ -5,6 +5,7 @@ import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { ChevronDown, Star, Truck, BarChart3, Box } from 'lucide-react';
 import { Disclosure, Transition } from '@headlessui/react';
+import { supabase } from '@/lib/supabase';
 
 // Placeholder data - replace with your actual data or fetch from an API
 const trustLogos = [
@@ -123,9 +124,19 @@ const HeroSection = () => (
         Sipariş yönetimi, kargo, envanter senkronizasyonu—%100 Türkçe, hepsi tek tıkla.
       </p>
 
-      <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
-        <Link href="/api/auth/signin" className="btn-primary">Ücretsiz Dene</Link>
-        <Link href="/iletisim"  className="btn-secondary">Demo İste</Link>
+      <div className="mt-10 flex items-center justify-center gap-x-6">
+        <button 
+          onClick={async () => {
+            await supabase.auth.signInWithOAuth({ 
+              provider: 'google',
+              options: { redirectTo: window.location.origin + '/app' } 
+            });
+          }}
+          className="btn-primary"
+        >
+          Ücretsiz Dene
+        </button>
+        <Link href="/hakkimizda" className="btn-secondary">Daha Fazla Bilgi <span aria-hidden="true">→</span></Link>
       </div>
 
       <Image

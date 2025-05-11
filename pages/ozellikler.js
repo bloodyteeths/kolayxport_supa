@@ -4,6 +4,7 @@ import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { NextSeo } from 'next-seo';
 import { Zap, Shuffle, Edit3, Package, Link2, Settings, ShieldCheck, Gift } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const featureSections = [
   {
@@ -60,6 +61,30 @@ const featureSections = [
 const sectionVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
+};
+
+const CallToActionSection = () => {
+  return (
+    <section className="bg-gradient-to-r from-blue-600 to-indigo-700 py-20">
+      <div className="container mx-auto px-6 text-center">
+        <h2 className="text-3xl font-bold text-white mb-6">KolayXport'u Denemeye Hazır mısınız?</h2>
+        <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
+          E-ticaret operasyonlarınızı bir üst seviyeye taşıyın. Hemen ücretsiz başlayın ve farkı görün.
+        </p>
+        <button
+          onClick={async () => {
+            await supabase.auth.signInWithOAuth({ 
+              provider: 'google',
+              options: { redirectTo: window.location.origin + '/app' } 
+            });
+          }}
+          className="bg-white text-blue-600 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-50 transition-colors text-lg"
+        >
+          Hemen Ücretsiz Başla
+        </button>
+      </div>
+    </section>
+  );
 };
 
 export default function OzelliklerPage() {
@@ -143,27 +168,7 @@ export default function OzelliklerPage() {
       </section>
       
       {/* CTA Section */}
-      <motion.section
-        className="py-20 bg-gradient-to-br from-slate-800 to-slate-900 text-white"
-        variants={sectionVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, amount: 0.2 }}
-      >
-        <div className="container max-w-4xl mx-auto px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            KolayXport ile E-ticaretinizi Bir Sonraki Seviyeye Taşıyın!
-          </h2>
-          <p className="text-lg text-slate-300 mb-10 max-w-xl mx-auto">
-            Otomasyonun gücünü keşfedin, operasyonel yükünüzü azaltın ve satışlarınıza odaklanın. Hemen ücretsiz deneyin!
-          </p>
-          <Link href="/api/auth/signin" legacyBehavior>
-            <a className="inline-block px-10 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-xl hover:scale-105 transform transition-transform duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-blue-400">
-              Ücretsiz Kaydol ve Başla
-            </a>
-          </Link>
-        </div>
-      </motion.section>
+      <CallToActionSection />
 
     </PublicLayout>
   );

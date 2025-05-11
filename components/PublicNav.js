@@ -3,6 +3,8 @@ import Link from 'next/link';
 import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react'; // Using lucide-react for icons
+import { supabase } from '@/lib/supabase'; // ADDED
+import { useRouter } from 'next/router';
 
 const navLinks = [
   { name: 'Kurumsal', href: '/kurumsal' },
@@ -36,9 +38,17 @@ const mobileMenuVariants = {
   exit: { opacity: 0, scale: 0.95, transition: { duration: 0.15, ease: 'easeIn' } },
 };
 
-const PublicNav = ({ ctaLink = '/api/auth/signin' }) => {
+const defaultCtaAction = async () => { // ADDED helper for default action
+  await supabase.auth.signInWithOAuth({ 
+    provider: 'google',
+    options: { redirectTo: window.location.origin + '/app' } 
+  });
+};
+
+const PublicNav = ({ ctaAction = defaultCtaAction, ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => { // MODIFIED: ctaLink prop changed to ctaAction (function) and ctaLabel
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -82,18 +92,12 @@ const PublicNav = ({ ctaLink = '/api/auth/signin' }) => {
               </motion.div>
             ))}
             <motion.div variants={linkVariants}>
-              <Link href={ctaLink} legacyBehavior>
-                <a className="px-6 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
-                  Ücretsiz Dene
-                </a>
-              </Link>
-            </motion.div>
-            <motion.div variants={linkVariants}>
-              <Link href="/api/auth/signin" legacyBehavior>
-                <a className="px-6 py-2.5 text-sm font-semibold text-blue-600 border border-blue-600 rounded-full shadow-lg hover:bg-blue-50 transition-transform duration-200 ease-out">
-                  Giriş Yap
-                </a>
-              </Link>
+              <button
+                onClick={ctaAction}
+                className="btn-primary"
+              >
+                {ctaLabel}
+              </button>
             </motion.div>
           </nav>
 
@@ -136,22 +140,12 @@ const PublicNav = ({ ctaLink = '/api/auth/signin' }) => {
                 </motion.div>
               ))}
               <motion.div variants={linkVariants} className="mt-8 space-y-4 flex flex-col items-center">
-                <Link href={ctaLink} legacyBehavior>
-                  <a
-                    onClick={toggleMenu}
-                    className="block px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out"
-                  >
-                    Ücretsiz Dene
-                  </a>
-                </Link>
-                <Link href="/api/auth/signin" legacyBehavior>
-                  <a
-                    onClick={toggleMenu}
-                    className="block px-8 py-3 text-lg font-semibold text-blue-600 border border-blue-600 rounded-full shadow-lg hover:bg-blue-50"
-                  >
-                    Giriş Yap
-                  </a>
-                </Link>
+                <button
+                  onClick={ctaAction}
+                  className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-slate-900 hover:bg-slate-50 w-full text-left"
+                >
+                  {ctaLabel}
+                </button>
               </motion.div>
             </nav>
           </motion.div>
@@ -162,7 +156,8 @@ const PublicNav = ({ ctaLink = '/api/auth/signin' }) => {
 };
 
 PublicNav.propTypes = {
-  ctaLink: PropTypes.string,
+  ctaAction: PropTypes.func,
+  ctaLabel: PropTypes.string,
 };
 
 export default PublicNav; 

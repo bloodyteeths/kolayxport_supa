@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import * as React from 'react'
 import { Home, CreditCard, Bell, LogIn, LogOut } from 'lucide-react'
-import { useSession, signIn, signOut } from "next-auth/react"
+import { useAuth } from "@/lib/auth-context"
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/router'
 
 export default function Layout({ children }) {
-  const { data: session, status } = useSession();
-  const loading = status === "loading";
+  const { user, session, isLoading, signIn: supabaseSignIn, signOut: supabaseSignOut } = useAuth();
   const router = useRouter();
 
   const publicPaths = [
@@ -40,15 +40,21 @@ export default function Layout({ children }) {
             </nav>
           )}
           <div className="p-4 mt-auto">
-             {!session && (
-                <Button onClick={() => signIn('google', { callbackUrl: '/app' })} className="w-full flex items-center justify-center">
+             {!user && !isLoading && (
+                <Button onClick={async () => {
+                  const { error } = await supabase.auth.signInWithOAuth({ 
+                    provider: 'google',
+                    options: { redirectTo: window.location.origin + '/app' } 
+                  });
+                  if (error) console.error('Error signing in with Google:', error);
+                }} className="w-full flex items-center justify-center">
                     <LogIn className="w-4 h-4 mr-2" /> Google ile Giriş Yap
                 </Button>
              )}
-             {session?.user && (
+             {user && (
                 <div className="flex flex-col items-center space-y-2">
-                    <span className="text-sm text-gray-600 truncate" title={session.user.email}>{session.user.name || session.user.email}</span>
-                    <Button onClick={() => signOut({ callbackUrl: '/' })} variant="outline" className="w-full flex items-center justify-center">
+                    <span className="text-sm text-gray-600 truncate" title={user.email}>{user.name || user.email}</span>
+                    <Button onClick={async () => await supabaseSignOut()} variant="outline" className="w-full flex items-center justify-center">
                        <LogOut className="w-4 h-4 mr-2" /> Çıkış Yap
                     </Button>
                 </div>
@@ -75,16 +81,22 @@ export default function Layout({ children }) {
 
         {/* Page Content Area */}
         <main className={`flex-1 overflow-auto ${isHomePage || isGenericPublicPage ? '' : 'p-8 bg-gray-100'}`}>
-          {loading && !isHomePage && !isGenericPublicPage && <p>Loading session...</p>}
-          {!isHomePage && !isGenericPublicPage && !session && !loading && (
+          {isLoading && !isHomePage && !isGenericPublicPage && <p>Yükleniyor...</p>}
+          {!isHomePage && !isGenericPublicPage && !user && !isLoading && (
             <div className="text-center">
               <p className="mb-4">Bu sayfayı görüntülemek için giriş yapmanız gerekiyor.</p>
-              <Button onClick={() => signIn('google', { callbackUrl: '/app' })} className="w-auto flex items-center justify-center mx-auto">
+              <Button onClick={async () => {
+                  const { error } = await supabase.auth.signInWithOAuth({ 
+                    provider: 'google',
+                    options: { redirectTo: window.location.origin + '/app' } 
+                  });
+                  if (error) console.error('Error signing in with Google:', error);
+                }} className="w-auto flex items-center justify-center mx-auto">
                   <LogIn className="w-4 h-4 mr-2" /> Google ile Giriş Yap
               </Button>
             </div>
           )}
-          {(session || isHomePage || isGenericPublicPage) && children}
+          {(user || isHomePage || isGenericPublicPage) && children}
         </main>
 
         {/* Footer - Conditionally render or use the one from pages/index.js for homepage */}
@@ -93,10 +105,10 @@ export default function Layout({ children }) {
             <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
             <span className="mx-2">|</span>
             <Link href="/privacy-tr" className="hover:underline">Gizlilik Politikası</Link>
-            {session && (
+            {user && (
               <>
                 <span className="mx-2">|</span>
-                <Link href="/logout" className="hover:underline">Logout</Link>
+                <Link href="#" onClick={async (e) => { e.preventDefault(); await supabaseSignOut(); }} className="hover:underline">Logout</Link>
               </>
             )}
             <div className="mt-2">

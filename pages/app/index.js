@@ -3,8 +3,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
 import Link from 'next/link';
-import { Gift, Zap, Share2, Loader2 } from 'lucide-react'; // Icons for the page and Loader2
-import { supabase } from '@/lib/supabase'; // ADDED
+import { Gift, Zap, Share2, Loader2, ExternalLink, Info } from 'lucide-react'; // Added ExternalLink, Info
+// import { supabase } from '@/lib/supabase'; // REMOVED: Use supabase from useAuth or import createClient if needed
 
 // This will be the new content for the dashboard landing page.
 // The existing <Dashboard /> component can be integrated here or replaced.
@@ -66,201 +66,193 @@ const DashboardLandingContent = () => {
 
 export default function AppIndexPage() {
   console.log('[AppIndexPage Render] Component rendering...');
-  const { user, session, isLoading: authLoading, refreshUser } = useAuth();
+  const { user, session, authLoading, refreshUser, supabaseSignInWithGoogle, supabase } = useAuth(); // Added supabase from useAuth
   const router = useRouter();
-  const [isLoadingResources, setIsLoadingResources] = useState(false);
-  const [resourceStatusMessage, setResourceStatusMessage] = useState('');
   
-  const [showManualCopyLink, setShowManualCopyLink] = useState(false);
-  const [copySheetUrl, setCopySheetUrl] = useState('');
-  const [driveFolderIdFromApi, setDriveFolderIdFromApi] = useState('');
+  const [onboardingState, setOnboardingState] = useState('initial'); // 'initial', 'loadingSetup', 'promptManualCopy', 'setupComplete', 'error'
+  const [onboardingError, setOnboardingError] = useState('');
+  const [googleSheetCopyUrl, setGoogleSheetCopyUrl] = useState('');
+  const [onboardingInstructions, setOnboardingInstructions] = useState([]);
 
-  const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
-
+  // Derived state: is the user authenticated?
+  const isAuthenticated = !!user && !!session;
+  // Derived state: is core setup (sheet ID and script ID in metadata) complete?
   const coreSetupComplete = !!(user?.user_metadata?.googleSheetId && user?.user_metadata?.googleScriptId);
 
   useEffect(() => {
-    console.log('[AppIndexPage Effect] Running effect. Status:', status, 'CoreSetupComplete:', coreSetupComplete, 'showManualCopyLink:', showManualCopyLink, 'User ID:', user?.id);
-    
-    let pollIntervalId = null;
+    console.log(`[AppIndexPage Effect] AuthLoading: ${authLoading}, IsAuthenticated: ${isAuthenticated}, CoreSetupComplete: ${coreSetupComplete}, OnboardingState: ${onboardingState}`);
 
-    if (status === 'authenticated' && user?.id && !coreSetupComplete && !showManualCopyLink) {
-      console.log('[AppIndexPage Effect] Conditions met for initial resource check/creation. User:', user);
-      
-      const checkAndPrepareManualCopy = async () => {
-        console.log('Checking/Preparing for manual sheet copy...');
-        setIsLoadingResources(true);
-        setResourceStatusMessage('Google Drive klasörünüz hazırlanıyor ve E-Tablo kopyalama bağlantınız oluşturuluyor...');
-
-        try {
-          const res = await fetch('/api/onboarding/setup', { 
-            method: 'POST', 
-            credentials: 'include' // Important for sending session cookie
-          });
-          const data = await res.json();
-
-          if (!res.ok) {
-            throw new Error(data.error || `Resource preparation failed. Status: ${res.status}`);
-          }
-
-          if (data.success && data.data?.copyUrl && data.data?.driveFolderId) {
-            console.log('Resource preparation successful:', data.data);
-            setCopySheetUrl(data.data.copyUrl);
-            setDriveFolderIdFromApi(data.data.driveFolderId); // Store if needed, e.g. for instructions
-            setShowManualCopyLink(true); // This will trigger the UI update
-            setResourceStatusMessage( // This message might be briefly visible before UI changes
-              'Klasörünüz hazır! Lütfen aşağıdaki bağlantıyı kullanarak E-Tablo şablonunu kopyalayın.'
-            );
-
-            // Start polling for session updates once copy link is shown
-            if (!pollIntervalId) { // Check to prevent multiple intervals if effect re-runs quickly
-              pollIntervalId = setInterval(async () => {
-                console.log('[AppIndexPage Polling] Checking session for updates...');
-                await refreshUser(); // If we implement a manual refresh in useAuth
-              }, 5000); // Poll every 5 seconds
-            }
-
-          } else {
-            console.error('API success was true but copyUrl or driveFolderId missing:', data);
-            throw new Error('Önemli bilgiler (kopyalama bağlantısı veya klasör ID) sunucudan alınamadı.');
-          }
-        } catch (error) { 
-          console.error('Resource preparation error (client-side catch):', error);
-          setResourceStatusMessage(`Kaynak hazırlama sırasında bir hata oluştu: ${error.message}. Lütfen sayfayı yenileyin veya destek ile iletişime geçin.`);
-          // setShowManualCopyLink(false); // Keep it false or handle retry logic
-        } finally {
-          setIsLoadingResources(false); // Stop loading animation
-        }
-      };
-
-      checkAndPrepareManualCopy();
-
-    } else if (status === 'authenticated' && coreSetupComplete) {
-      console.log('[AppIndexPage Effect] Core setup already complete. Showing dashboard.');
-      // No specific action needed here, the main return will handle showing dashboard content.
-      // Ensure isLoadingResources is false if it was somehow true.
-      if (isLoadingResources) setIsLoadingResources(false);
-      if (showManualCopyLink) setShowManualCopyLink(false); // Hide manual link if setup is complete
-      
-      // If core setup is now complete, clear any polling interval
-      if (pollIntervalId) {
-        console.log('[AppIndexPage Effect] Core setup complete, clearing poll interval.');
-        clearInterval(pollIntervalId);
-        pollIntervalId = null;
-      }
-    } else {
-        console.log('[AppIndexPage Effect] Conditions NOT met for resource preparation trigger.');
-        // Clear interval if conditions are no longer met (e.g., user logs out)
-        if (pollIntervalId) {
-            console.log('[AppIndexPage Effect] Conditions no longer met, clearing poll interval.');
-            clearInterval(pollIntervalId);
-            pollIntervalId = null;
-        }
+    if (authLoading) {
+      setOnboardingState('initial'); // Reset while auth is loading
+      return;
     }
 
-    // Cleanup function for useEffect
+    if (!isAuthenticated) {
+      // This should ideally be handled by AppLayout or a higher-order component,
+      // but if user reaches here unauthenticated, trigger sign-in.
+      console.log('[AppIndexPage Effect] User not authenticated, attempting sign in.');
+      supabaseSignInWithGoogle(); // Or router.push('/login');
+      return;
+    }
+
+    // User is authenticated
+    if (coreSetupComplete) {
+      console.log('[AppIndexPage Effect] Core setup is complete.');
+      setOnboardingState('setupComplete');
+      return;
+    }
+
+    // User is authenticated, but core setup is NOT complete
+    if (onboardingState === 'initial' || onboardingState === 'error') { // Only fetch setup if initial or retrying from error
+      console.log('[AppIndexPage Effect] Authenticated, core setup incomplete. Fetching onboarding setup.');
+      setOnboardingState('loadingSetup');
+      setOnboardingError('');
+      
+      fetch('/api/onboarding/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // credentials: 'include' // Not needed if using Supabase client for auth token on server
+      })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || `Onboarding setup failed. Status: ${res.status}`);
+        }
+        if (data.googleSheetCopyUrl && data.instructions) {
+          console.log('[AppIndexPage Effect] Onboarding setup fetched:', data);
+          setGoogleSheetCopyUrl(data.googleSheetCopyUrl);
+          setOnboardingInstructions(data.instructions || []);
+          setOnboardingState('promptManualCopy');
+        } else {
+          throw new Error('Onboarding setup data is incomplete from server.');
+        }
+      })
+      .catch(err => {
+        console.error('[AppIndexPage Effect] Onboarding setup API error:', err);
+        setOnboardingError(err.message || 'Onboarding setup could not be initiated.');
+        setOnboardingState('error');
+      });
+    }
+  }, [authLoading, isAuthenticated, coreSetupComplete, onboardingState, supabaseSignInWithGoogle, router]);
+
+  // Polling mechanism to refresh user data if they are in the manual copy step
+  useEffect(() => {
+    let pollIntervalId = null;
+    if (onboardingState === 'promptManualCopy' && isAuthenticated && !coreSetupComplete) {
+      console.log('[AppIndexPage Polling Effect] Starting polling for user metadata updates.');
+      pollIntervalId = setInterval(async () => {
+        console.log('[AppIndexPage Polling] Refreshing user session...');
+        await refreshUser(); 
+      }, 7000); // Poll every 7 seconds
+    }
     return () => {
       if (pollIntervalId) {
-        console.log('[AppIndexPage Cleanup] Clearing poll interval on component unmount/effect re-run.');
+        console.log('[AppIndexPage Polling Effect] Clearing poll interval.');
         clearInterval(pollIntervalId);
       }
     };
-  }, [status, coreSetupComplete, user, showManualCopyLink, isLoadingResources, refreshUser]);
+  }, [onboardingState, isAuthenticated, coreSetupComplete, refreshUser]);
 
-  if (status === 'loading') {
+
+  if (authLoading || (isAuthenticated && onboardingState === 'initial')) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-100">
-        <p className="text-slate-500">Yükleniyor...</p>
-      </div>
+      <AppLayout title="Yükleniyor...">
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+          <p className="text-slate-700 text-lg">Yükleniyor, lütfen bekleyin...</p>
+        </div>
+      </AppLayout>
     );
   }
 
-  if (status === 'unauthenticated') {
-    if (typeof window !== 'undefined') {
-      supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin + '/app',
-        },
-      });
-    }
+  if (!isAuthenticated && !authLoading) { // Explicitly handle if not authenticated after loading
     return (
-        <div className="flex items-center justify-center min-h-screen bg-slate-100">
-            <p className="text-slate-500">Giriş sayfasına yönlendiriliyor...</p>
+      <AppLayout title="Giriş Gerekli">
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+            <Info size={48} className="text-blue-500 mb-4" />
+            <p className="text-slate-700 text-lg mb-2">Bu sayfayı görüntülemek için giriş yapmanız gerekmektedir.</p>
+            <p className="text-slate-500 text-sm">Giriş sayfasına yönlendiriliyorsunuz...</p>
         </div>
-    ); 
+      </AppLayout>
+    );
   }
 
   return (
-    <AppLayout title="Genel Bakış - KolayXport Dashboard">
-      {isLoadingResources && !showManualCopyLink && (
+    <AppLayout title={coreSetupComplete ? "Genel Bakış - KolayXport" : "Kurulum - KolayXport"}>
+      {onboardingState === 'loadingSetup' && (
         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
             <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-            <p className="text-slate-700 text-lg font-medium animate-pulse">{resourceStatusMessage || 'Hesap kaynakları hazırlanıyor...'}</p>
-            <p className="text-slate-500 text-sm mt-1">Bu işlem birkaç saniye sürebilir, lütfen bekleyin.</p>
+            <p className="text-slate-700 text-lg font-medium animate-pulse">Kurulum bilgileri hazırlanıyor...</p>
+            <p className="text-slate-500 text-sm mt-1">Bu işlem birkaç saniye sürebilir.</p>
         </div>
       )}
 
-      {showManualCopyLink && !coreSetupComplete && (
-        <div className="p-4 md:p-8 max-w-2xl mx-auto bg-white shadow-lg rounded-lg mt-10">
-          <h2 className="text-2xl font-semibold text-blue-700 mb-4">Kurulum İçin Son Bir Adım!</h2>
-          <p className="text-slate-600 mb-3">
-            KolayXport'u kullanmaya başlamak için lütfen aşağıdaki adımları izleyin:
-          </p>
-          <p className="text-sm text-slate-500 mb-6">
-            Google Drive klasörünüz (<code>{driveFolderIdFromApi || 'KolayXport Kullanıcı Dosyaları'}</code>) hazırlandı.
+      {onboardingState === 'error' && (
+         <div className="p-4 md:p-8 max-w-2xl mx-auto bg-red-50 border-l-4 border-red-500 text-red-700 mt-10 rounded-md shadow-lg">
+          <h2 className="text-2xl font-semibold mb-3">Kurulum Hatası</h2>
+          <p className="mb-2">Otomatik kurulum başlatılırken bir sorun oluştu:</p>
+          <p className="text-sm bg-red-100 p-2 rounded mb-4">{onboardingError}</p>
+          <p className="text-sm">Lütfen sayfayı yenileyerek tekrar deneyin. Sorun devam ederse <Link href="/iletisim" className="font-medium hover:underline">destek ile iletişime geçin</Link>.</p>
+        </div>
+      )}
+
+      {onboardingState === 'promptManualCopy' && !coreSetupComplete && (
+        <div className="p-4 md:p-8 max-w-3xl mx-auto bg-white shadow-lg rounded-lg mt-6 mb-6">
+          <h2 className="text-2xl font-semibold text-blue-700 mb-3">Kurulum Adımları</h2>
+          <p className="text-slate-600 mb-6">
+            KolayXport'u tam olarak kullanmaya başlamak için lütfen aşağıdaki adımları tamamlayın.
+            Bu adımları tamamladıktan sonra bu sayfa otomatik olarak güncellenecektir.
           </p>
           
-          <div className="space-y-4 mb-8">
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-md">
-              <h3 className="text-lg font-medium text-blue-800 mb-2">Adım 1: E-Tablo Şablonunu Kopyalayın</h3>
-              <p className="text-slate-700 mb-3">
-                Aşağıdaki düğmeye tıklayarak KolayXport E-Tablo şablonunun bir kopyasını kendi Google Drive'ınıza oluşturun.
-              </p>
-              <a 
-                href={copySheetUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 w-full md:w-auto transition-colors"
-              >
-                E-Tablo Şablonunu Kopyala
-              </a>
-              <p className="text-sm text-slate-600 mt-3">
-                <strong>Önemli:</strong> Kopyalama sırasında "Klasör" seçeneğini düzenleyerek, bu kopyayı Google Drive'ınızdaki 
-                "<code>KolayXport Kullanıcı Dosyaları - {user?.user_metadata?.name || user?.email}</code>" isimli klasörün içine kaydettiğinizden emin olun.
-              </p>
-            </div>
+          <div className="space-y-6">
+            {googleSheetCopyUrl && (
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-md">
+                <h3 className="text-lg font-medium text-blue-800 mb-2">Adım 1: Google E-Tablo Şablonunu Kopyalayın</h3>
+                <p className="text-slate-700 mb-3">
+                  Kendi Google Drive hesabınıza KolayXport E-Tablo şablonunun bir kopyasını oluşturun.
+                </p>
+                <a 
+                  href={googleSheetCopyUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 transition-colors"
+                >
+                  E-Tabloyu Kopyala <ExternalLink size={16} className="ml-2" />
+                </a>
+              </div>
+            )}
 
-            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-md">
-              <h3 className="text-lg font-medium text-amber-800 mb-2">Adım 2: Ayarları Başlatın</h3>
-              <p className="text-slate-700">
-                Kopyaladığınız yeni E-Tabloyu açın. Üst menüde "KolayXport" seçeneğini bulun, ardından "Ayarları Başlat" (veya "Initialize Settings") komutunu çalıştırın. 
-                Bu işlem, E-Tablonuzu KolayXport hesabınızla eşleştirecektir.
-              </p>
+            {onboardingInstructions && onboardingInstructions.slice(1).map((instruction, index) => (
+                <div key={index} className="bg-sky-50 border-l-4 border-sky-500 p-4 rounded-md">
+                 <h3 className="text-lg font-medium text-sky-800 mb-2">{`Adım ${index + 2}`}</h3>
+                 <p className="text-slate-700 whitespace-pre-line">{instruction.split('. ')[1]}</p> {/* Basic formatting for instruction */}
+               </div>
+            ))}
+             <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-md">
+                 <h3 className="text-lg font-medium text-yellow-800 mb-2">Önemli Not</h3>
+                 <p className="text-slate-700">
+                   Tüm adımları tamamladıktan sonra, oluşturduğunuz yeni Google Sheet ID'sini ve Apps Script Deployment ID'sini <Link href="/app/settings" className="font-medium text-blue-600 hover:underline">Ayarlar</Link> sayfasındaki ilgili alanlara kaydetmeyi unutmayın.
+                 </p>
             </div>
-             <p className="text-sm text-slate-500 mt-4">
-                Bu adımları tamamladıktan sonra, bu sayfa otomatik olarak güncellenecek veya uygulamayı kullanmaya devam etmek için sayfayı yenileyebilirsiniz.
-             </p>
           </div>
           
-          <p className="text-xs text-slate-400">
-            Sorun yaşarsanız veya yardıma ihtiyacınız olursa lütfen <Link href="/iletisim"><a className="underline hover:text-blue-600">destek sayfamızdan</a></Link> bize ulaşın.
+          <p className="text-xs text-slate-400 mt-8">
+            Sorun yaşarsanız veya yardıma ihtiyacınız olursa <Link href="/iletisim" className="underline hover:text-blue-600">destek sayfamızdan</Link> bize ulaşın.
           </p>
         </div>
       )}
 
-      {!isLoadingResources && !showManualCopyLink && coreSetupComplete && (
+      {onboardingState === 'setupComplete' && coreSetupComplete && (
         <DashboardLandingContent />
       )}
       
-      {/* Fallback or initial state if no other condition is met (e.g. still checking session) */}
-      {!isLoadingResources && !showManualCopyLink && !coreSetupComplete && status === 'authenticated' && (
-         <div className="flex items-center justify-center min-h-[calc(100vh-200px)]"> 
-            <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-            <p className="ml-3 text-slate-600">Hesap durumu kontrol ediliyor...</p>
+      {/* Fallback for authenticated but no other state met (should be brief) */}
+      {isAuthenticated && onboardingState !== 'loadingSetup' && onboardingState !== 'promptManualCopy' && onboardingState !== 'setupComplete' && onboardingState !== 'error' && (
+         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]"> 
+            <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-3" />
+            <p className="text-slate-600">Hesap durumu kontrol ediliyor...</p>
          </div>
       )}
-
     </AppLayout>
   );
 } 

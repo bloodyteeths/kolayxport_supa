@@ -76,7 +76,7 @@ export default function AppIndexPage() {
   const [driveFolderIdFromApi, setDriveFolderIdFromApi] = useState('');
 
   // Derived state to check if core setup seems complete from session
-  const coreSetupComplete = !!(session?.user?.googleSheetId && session?.user?.userAppsScriptId);
+  const coreSetupComplete = !!(session?.user?.googleSheetId && session?.user?.googleScriptId);
 
   useEffect(() => {
     console.log('[AppIndexPage Effect] Running effect. Status:', status, 'CoreSetupComplete:', coreSetupComplete, 'showManualCopyLink:', showManualCopyLink, 'Session User ID:', session?.user?.id);

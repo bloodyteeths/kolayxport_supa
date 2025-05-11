@@ -1,7 +1,8 @@
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
-import { getSession } from 'next-auth/react';
 import prisma from '@/lib/prisma';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 
 dotenv.config();
 
@@ -26,123 +27,102 @@ async function getAppsScriptAPI() {
 
 // --- End Helper Functions ---
 
+// Mock function, replace with actual Shippo/Veeqo API calls
+// This is a simplified mock. The actual implementation will involve:
+// 1. Fetching carrier configurations for the user (e.g., Shippo token, Veeqo API key) from the DB.
+// 2. Calling the relevant carrier's API to generate a label.
+// 3. Storing the label PDF (e.g., in Supabase Storage) and tracking info in the DB (LabelJob table).
+// 4. Returning the label URL or tracking info to the client.
+async function generateShippingLabel(labelData, userCarrierConfig) {
+  console.log("Mock generateShippingLabel called with data:", labelData, "and config:", userCarrierConfig);
+  // Simulate API call
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  // Simulate success response
+  return {
+    success: true,
+    trackingNumber: `MOCKTRACK${Date.now()}`,
+    labelUrl: `https://example.com/mocklabel-${Date.now()}.pdf`, // This would be a real URL to the stored label
+    message: "Mock label generated successfully."
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
+    return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  // Get the central deployment ID from environment variables
-  const deploymentId = process.env.NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID;
-  if (!deploymentId) {
-      console.error('/api/generateLabel Error: Missing NEXT_PUBLIC_APPS_SCRIPT_DEPLOYMENT_ID environment variable.');
-      return res.status(500).json({ error: 'Server configuration error.'});
+  const supabase = createRouteHandlerClient({ cookies });
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    console.error('Supabase getSession error in generateLabel:', sessionError);
+    return res.status(500).json({ error: 'Authentication error' });
   }
 
-  // --- Extract Order Data from Request Body ---
-  const orderData = req.body;
-
-  // Basic validation on incoming orderData
-  // TODO: Improve validation based on actual required fields for label generation
-  if (!orderData || typeof orderData !== 'object') {
-      return res.status(400).json({ error: 'Invalid request body.' });
-  }
-  // Example: Check for a few essential fields from the frontend
-  const requiredFrontendFields = ['orderKey', 'recipientName', 'weight', 'recipientStreet', 'recipientCity', 'recipientPostal', 'recipientCountry'];
-  const missingFrontendFields = requiredFrontendFields.filter(field => !(field in orderData));
-  if (missingFrontendFields.length > 0) {
-       return res.status(400).json({ error: `Missing required order data in request: ${missingFrontendFields.join(', ')}.` });
+  if (!session?.user?.id) {
+    return res.status(401).json({ message: 'Unauthorized' });
   }
 
-  let session;
+  const userId = session.user.id;
+  const { orderId, items, carrier, shippingDetails } = req.body;
+
+  if (!orderId || !items || !carrier || !shippingDetails) {
+    return res.status(400).json({ message: 'Missing required label generation data.' });
+  }
+
   try {
-    // Authenticate user via NextAuth
-    session = await getSession({ req });
-    if (!session?.user?.id) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const userId = session.user.id;
+    // TODO: Fetch user's carrier configurations (e.g., API keys for Shippo/Veeqo for the selected carrier)
+    // For now, we'll pass a placeholder or assume mock doesn't need it.
+    const userCarrierConfig = { carrierApiKey: "USER_SPECIFIC_API_KEY_FOR_" + carrier };
 
-    // Fetch user-specific Drive folder ID and FedEx keys from DB
-    const userRecord = await prisma.user.findUnique({
-      where: { id: userId },
-      // Select all necessary fields for the fedexKeys object and the driveFolderId
-      select: { 
-          driveFolderId: true, 
-          fedexAccountNumber: true, 
-          fedexMeterNumber: true, // Include if needed by core library
-          fedexApiKey: true, 
-          fedexSecretKey: true 
+    // Create a LabelJob entry (optional, but good for tracking)
+    const labelJob = await prisma.labelJob.create({
+      data: {
+        order: { connect: { id: orderId } }, // Assuming orderId is the DB id of the Order
+        // If you have individual OrderItem IDs for which labels are being made, you might link them differently
+        // For now, linking to Order. This depends on your exact schema and requirements.
+        // If linking to OrderItem, you'd pass orderItemId and connect to OrderItem.
+        carrier: carrier,
+        status: 'PENDING',
+        // userId: userId, // If LabelJob has a direct relation to User
       },
     });
 
-    // Check if user has completed onboarding and saved necessary keys
-    if (!userRecord?.driveFolderId) {
-      return res.status(400).json({ error: 'User setup incomplete: Drive Folder ID missing.' });
-    }
-    if (!userRecord.fedexApiKey || !userRecord.fedexSecretKey || !userRecord.fedexAccountNumber) {
-      return res.status(400).json({ error: 'FedEx API credentials missing in settings.' });
-    }
-
-    // Prepare the fedexKeys object for Apps Script
-    const fedexKeys = { 
-        FEDEX_ACCOUNT_NUMBER: userRecord.fedexAccountNumber, 
-        FEDEX_METER_NUMBER: userRecord.fedexMeterNumber, // Pass if available and needed
-        FEDEX_API_KEY: userRecord.fedexApiKey, 
-        FEDEX_SECRET_KEY: userRecord.fedexSecretKey 
+    const labelData = { 
+      orderId, 
+      items,       // [{ orderItemId (db id), sku, quantity, name, weight, dimensions, etc.}]
+      carrier, 
+      shippingDetails // { fromAddress, toAddress, packageDetails, serviceLevel, etc. }
     };
-    const driveFolderId = userRecord.driveFolderId;
-
-    const scriptAPI = await getAppsScriptAPI();
-
-    console.log(`Executing Apps Script function 'generateLabelForOrder' via Deployment ID: ${deploymentId} for user ${userId}`);
-    // Avoid logging sensitive keys or full orderData unless necessary for debugging
-    // console.log(`Passing fedexKeys (keys only): ${Object.keys(fedexKeys)}, driveFolderId: ${driveFolderId}, orderData keys: ${Object.keys(orderData)}`);
-
-    const scriptResponse = await scriptAPI.scripts.run({
-      scriptId: deploymentId, // Use the central DEPLOYMENT ID here
-      resource: {
-        function: 'generateLabelForOrder', // Function name in Wrapper Script
-        // Pass parameters in the order expected by the Apps Script function:
-        // function generateLabelForOrder(fedexKeys, driveFolderId, orderData)
-        parameters: [fedexKeys, driveFolderId, orderData], 
-      },
-    });
-
-    console.log('Apps Script execution response (generateLabel):', JSON.stringify(scriptResponse.data, null, 2));
-
-    if (scriptResponse.data.error) {
-      // Handle script execution errors (e.g., script threw an error, API error)
-      console.error('Apps Script Error (generateLabel):', scriptResponse.data.error);
-      const scriptError = scriptResponse.data.error.details?.[0]?.error?.message || scriptResponse.data.error.message || 'Unknown script error';
-      return res.status(500).json({ error: `Script Execution Failed: ${scriptError}` });
-    }
-
-    // Handle potential errors or success messages returned by the generateLabelForOrder function itself
-    const result = scriptResponse.data.response?.result;
-    if (!result) {
-       // This might happen if the script ended unexpectedly without returning
-       console.error('Apps Script Function (generateLabel) returned no result.');
-       return res.status(500).json({ error: 'Label generation script returned no result.' });
-    }
     
-    if (result.success) {
-        console.log('Label generation successful:', result.message);
-        return res.status(200).json({ 
-            success: true, 
-            message: result.message,
-            trackingNumber: result.trackingNumber,
-            labelUrl: result.labelUrl 
-        });
-    } else {
-        // Handle errors returned explicitly by the script function
-        console.error('Apps Script Function Returned Error (generateLabel):', result.message);
-        return res.status(400).json({ error: `Label Generation Failed: ${result.message}` }); // Use 400 or 500 depending on error type
-    }
+    const result = await generateShippingLabel(labelData, userCarrierConfig);
 
-  } catch (err) {
-    // Handle errors in the API route itself (auth, network, db lookup, etc.)
-    console.error('API Route /api/generateLabel Error:', err);
-    return res.status(500).json({ error: err.message || 'Internal Server Error' });
+    if (result.success) {
+      await prisma.labelJob.update({
+        where: { id: labelJob.id },
+        data: {
+          status: 'GENERATED',
+          pdfUrl: result.labelUrl,
+          trackingNumber: result.trackingNumber, // Add trackingNumber to your LabelJob schema if not present
+          // errorMessage: null, // Clear any previous error
+        },
+      });
+      return res.status(200).json(result);
+    } else {
+      await prisma.labelJob.update({
+        where: { id: labelJob.id },
+        data: {
+          status: 'FAILED',
+          errorMessage: result.message,
+        },
+      });
+      return res.status(400).json({ message: result.message || 'Failed to generate label' });
+    }
+  } catch (error) {
+    console.error('Error in /api/generateLabel:', error);
+    // If a labelJob was created, you might want to mark it as FAILED here too
+    // await prisma.labelJob.updateMany({ where: { orderId: orderId, status: 'PENDING' }, data: { status: 'FAILED', errorMessage: error.message }});
+    return res.status(500).json({ message: 'Internal server error generating label.' });
   }
 } 

@@ -6,7 +6,9 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import axios from 'axios';
-import { useSession, signIn } from 'next-auth/react';
+// import { useSession, signIn } from 'next-auth/react'; // REMOVED
+import { useAuth } from '@/lib/auth-context'; // ADDED
+import { supabase } from '@/lib/supabase'; // ADDED for signIn
 // import { useToast } from "@/components/ui/use-toast"; // Need to re-add toast or use alert
 
 // Debug: Verify UI component imports are defined
@@ -15,13 +17,16 @@ if (typeof window !== 'undefined') {
 }
 
 export default function SettingsForm() {
-  // NextAuth session guard
-  const { data: session, status, update } = useSession();
+  // const { data: session, status, update } = useSession(); // REMOVED
+  const { user, session: supabaseSession, isLoading: authLoading } = useAuth(); // ADDED
+
+  // Determine authentication status based on Supabase auth state
+  const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated'); // ADDED
+
   if (status === 'loading') {
     return <p>Loading user info...</p>;
   }
-  if (!session) {
-    // Prompt sign-in if not authenticated
+  if (status === 'unauthenticated' || !user) { // CHANGED: check status and user
     return (
       <Card>
         <CardHeader>
@@ -29,14 +34,19 @@ export default function SettingsForm() {
           <CardDescription>You need to sign in to save your API keys.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={() => signIn('google')}>Sign in with Google</Button>
+          {/* <Button onClick={() => signIn('google')}>Sign in with Google</Button> // REMOVED */}
+          <Button onClick={async () => { // ADDED Supabase sign-in
+            const { error } = await supabase.auth.signInWithOAuth({ 
+              provider: 'google',
+              options: { redirectTo: window.location.href } // Redirect back to settings page
+            });
+            if (error) console.error('Error signing in with Google:', error);
+          }}>Sign in with Google</Button>
         </CardContent>
       </Card>
     );
   }
-  // Now we have a valid session.user.id
-  // const { data: session } = useSession(); // moved above
-  // const { toast } = useToast(); // If using shadcn toast
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null); // For displaying fetch errors
   const [formData, setFormData] = useState({
@@ -54,7 +64,8 @@ export default function SettingsForm() {
 
   // Effect to load existing user properties when the component mounts and session is available
   useEffect(() => {
-    if (status === 'authenticated' && session?.user?.id) {
+    // if (status === 'authenticated' && session?.user?.id) { // REMOVED
+    if (status === 'authenticated' && user?.id) { // CHANGED to use user.id
       const loadProperties = async () => {
         console.log("[SettingsForm Effect] Fetching user properties from /api/gscript/get-all-user-properties");
         setIsLoading(true);
@@ -86,7 +97,8 @@ export default function SettingsForm() {
       };
       loadProperties();
     }
-  }, [status, session]); // Rerun when session status or session data changes
+  // }, [status, session]); // REMOVED session from deps
+  }, [status, user]); // CHANGED to user from deps
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -117,15 +129,15 @@ export default function SettingsForm() {
     }
 
     try {
-      // Use axios to bypass fetch interceptor, include credentials and userId fallback
-      const payload = {
-        userId: session?.user?.id,
-        ...keysToSave,
-      };
+      // const payload = { // REMOVED old payload with userId
+      //   userId: session?.user?.id, // This was session.user.id from next-auth
+      //   ...keysToSave,
+      // };
+      // The /api/setScriptProps endpoint now gets userId from Supabase session on server-side
       const axiosResponse = await axios.post(
         '/api/setScriptProps',
-        payload,
-        { withCredentials: true }
+        keysToSave, // CORRECTED: Send only the keys to save
+        { withCredentials: true } 
       );
       const result = axiosResponse.data;
        

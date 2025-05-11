@@ -26,7 +26,8 @@ import {
   BookOpen,
   Link2
 } from 'lucide-react';
-import { useSession, signOut } from 'next-auth/react';
+import { useAuth } from '@/lib/auth-context'; // Changed from next-auth/react
+import { supabase } from '@/lib/supabase'; // Added for direct Supabase calls if needed for signout
 import useSidebar from '../hooks/useSidebar'; // Import the hook
 import SidebarToggle from './SidebarToggle'; // Import the toggle component
 
@@ -38,7 +39,7 @@ const navItems = [
 ];
 
 const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
-  const { data: session } = useSession();
+  const { user, session, signOut: supabaseSignOut, isLoading } = useAuth(); // Changed from useSession
   const router = useRouter();
   const { isOpen, toggleSidebar, openSidebar, closeSidebar } = useSidebar(); // Use the hook
 
@@ -57,6 +58,11 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
 
   // Check for active link
   const isActive = (href) => router.pathname === href;
+
+  const handleSignOut = async () => {
+    await supabaseSignOut();
+    router.push('/'); // Redirect to homepage after sign out
+  };
 
   return (
     <>
@@ -182,19 +188,21 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
               </button>
               
               {/* User Avatar and Logout Button */}
-              {session?.user && (
+              {user && (
                 <div className="flex items-center space-x-2">
                   <Link href="/app/settings" passHref>
                     <a className="flex items-center text-left p-1 rounded-full hover:bg-slate-100 transition-colors" title="Ayarlar">
-                      {session.user.image ? (
-                        <img src={session.user.image} alt="User avatar" className="w-7 h-7 rounded-full" />
+                      {user.user_metadata?.avatar_url ? (
+                        <img src={user.user_metadata.avatar_url} alt="User avatar" className="w-7 h-7 rounded-full" />
+                      ) : user.user_metadata?.picture ? ( // Fallback for Google OAuth, picture might be directly in user_metadata
+                        <img src={user.user_metadata.picture} alt="User avatar" className="w-7 h-7 rounded-full" />
                       ) : (
                         <UserCircle size={28} className="text-slate-500"/>
                       )}
                     </a>
                   </Link>
                   <button 
-                    onClick={() => signOut({ callbackUrl: '/' })}
+                    onClick={handleSignOut} // Changed to use local handler
                     className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
                     title="Çıkış Yap"
                   >

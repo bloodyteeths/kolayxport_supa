@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { useSession, signIn } from 'next-auth/react';
+import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
 import {
   Table,
   TableBody,
@@ -32,8 +33,10 @@ const renderCellContent = (content) => {
 };
 
 export default function OrdersTable() {
-  // NextAuth session
-  const { data: session, status, update: updateSession } = useSession();
+  const { user, session: supabaseSession, isLoading: authLoading, refreshUser } = useAuth();
+  
+  // Determine authentication status based on Supabase auth state
+  const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
   const isAuthenticated = status === 'authenticated';
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,12 +51,10 @@ export default function OrdersTable() {
   // State for label generation (per row)
   const [labelStates, setLabelStates] = useState({});
 
-  // If session is loading, show loading state
   if (status === 'loading') {
     return <p>Loading session...</p>;
   }
-  // If not authenticated, prompt login
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return (
       <Card>
         <CardHeader>
@@ -61,9 +62,13 @@ export default function OrdersTable() {
           <CardDescription>You need to sign in with Google to continue.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={() => signIn('google')}>
-            Sign in with Google
-          </Button>
+          <Button onClick={async () => {
+            const { error } = await supabase.auth.signInWithOAuth({ 
+              provider: 'google',
+              options: { redirectTo: window.location.href }
+            });
+            if (error) console.error('Error signing in with Google:', error);
+          }}>Sign in with Google</Button>
         </CardContent>
       </Card>
     );
@@ -100,27 +105,23 @@ export default function OrdersTable() {
     }
   }, []);
 
-  // Handler for initial sheet setup (onboarding)
-  const handleSetup = async () => {
+  const handleSetup = useCallback(async () => {
     setSetupLoading(true);
     setSetupError(null);
     try {
       const res = await fetch('/api/onboarding/setup', { method: 'POST' });
       if (res.status === 401) {
-        // Not signed in or session expired
-        return signIn('google');
+        const { error: signInError } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
+        if (signInError) console.error('Redirect to sign-in failed during setup:', signInError);
+        return;
       }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || json.message || 'Setup failed');
-      // On success, fetch orders again
-      await fetchOrders();
+      
       if (json.success) {
-        // Manually update session data or refetch if needed
         console.log('Onboarding setup successful, refetching orders with new IDs...');
-        // Trigger a session update to fetch the new sheet/folder IDs
-        await updateSession(); 
-        // Refetch orders now that setup should be complete
-        fetchOrders(); 
+        if (refreshUser) await refreshUser();
+        await fetchOrders(); 
       } else {
         throw new Error(json.error || 'Failed to setup');
       }
@@ -130,14 +131,12 @@ export default function OrdersTable() {
     } finally {
       setSetupLoading(false);
     }
-  };
+  }, [fetchOrders, refreshUser]);
 
-  // Fetch orders on initial mount
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
-  // When onboarding is required, automatically run setup
   useEffect(() => {
     if (requireSetup && !setupLoading) {
       handleSetup();

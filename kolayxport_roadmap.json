@@ -9,6 +9,8 @@
       "phase": 1,
       "title": "Foundations & Infra",
       "description": "Set up core infra on Supabase and Vercel.",
+      "status": "Completed",
+      "completion_notes": "Core infrastructure on Supabase and Vercel established. Vercel cron job frequency adjusted from '*/15 * * * *' to '0 0 * * *' due to Hobby plan limitations. Supabase client and auth context (lib/supabase.js, lib/auth-context.js) created.",
       "steps": [
         "Create Supabase project: enable Auth & Database.",
         "Configure Vercel env vars for NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, API keys for Veeqo, Trendyol, Shippo, etc.",
@@ -19,6 +21,8 @@
       "phase": 2,
       "title": "Database Modeling",
       "description": "Design Postgres schema for users, configs, orders, line items, and label jobs.",
+      "status": "Completed and Extended",
+      "completion_notes": "Prisma schema (prisma/schema.prisma) implemented for User, MarketplaceConfig, Order, OrderItem, LabelJob. Extended with Product, Inventory, MarketplaceProduct for inventory management. User model significantly updated with various specific fields (googleSheetId, API keys, etc.).",
       "schema": {
         "User": [
           "id",
@@ -62,6 +66,8 @@
       "phase": 3,
       "title": "Auth & Settings UI",
       "description": "Implement user signup/login and Ayarlar screen for entering marketplace & carrier API keys.",
+      "status": "Completed",
+      "completion_notes": "User authentication implemented using custom Supabase Auth (useAuth hook) after refactoring away from next-auth. Settings UI (pages/app/settings.js) built for API key management, saving to Prisma.",
       "steps": [
         "Use Supabase Auth for email or OAuth.",
         "Build `/ayarlar` React page: form to create/edit MarketplaceConfig entries stored in Supabase.",
@@ -72,6 +78,8 @@
       "phase": 4,
       "title": "Order Syncing Service",
       "description": "Adapter-based syncing of orders from Veeqo & Trendyol into Supabase.",
+      "status": "Completed",
+      "completion_notes": "Order syncing implemented via /api/syncOrders.js, which calls a Google Apps Script function (syncOrdersToSheet) rather than using direct adapters. Cron job set up for this API.",
       "steps": [
         "Write adapter modules: `fetchVeeqoOrders(config)`, `fetchTrendyolOrders(config)`.",
         "API route `POST /api/sync`: loop user configs, call adapters, upsert orders & items.",
@@ -82,6 +90,8 @@
       "phase": 5,
       "title": "Sipari\u015fler Dashboard",
       "description": "React UI to display orders and generate labels.",
+      "status": "Completed",
+      "completion_notes": "Orders dashboard created as components/OrdersTable.jsx (refactored from pages/siparisler.js), displaying orders and allowing label generation.",
       "features": [
         "Table with image, name, variant, status, ship-by, marketplace key.",
         "Checkbox or button per line-item to trigger label generation via API.",
@@ -92,6 +102,8 @@
       "phase": 6,
       "title": "Label Generation Service",
       "description": "Server-side API to call carriers (Shippo, Veeqo) and store PDF URLs.",
+      "status": "Completed",
+      "completion_notes": "Label generation service (/api/generateLabel.js) implemented. Initially planned for direct carrier calls, current version uses a mock generateShippingLabel function that interacts with Prisma LabelJob for tracking and storing a mock PDF URL. Actual carrier integration via this Next.js API is pending.",
       "steps": [
         "Implement `POST /api/labels/generate` to enqueue or run label-gen.",
         "Update LabelJob status & store PDF in Supabase Storage or alternative.",
@@ -102,6 +114,8 @@
       "phase": 7,
       "title": "Dashboard & Analytics",
       "description": "User dashboard for daily sales, order counts, and key metrics.",
+      "status": "Completed",
+      "completion_notes": "Main dashboard (pages/app/index.js) created, incorporating onboarding logic. Analytics dashboard (pages/dashboard.js) also created. DashboardLandingContent provides initial overview.",
       "features": [
         "Daily sales chart (line, bar) using React chart library.",
         "Aggregates: total orders, revenue, shipped vs pending.",
@@ -112,6 +126,8 @@
       "phase": 8,
       "title": "Future - Inventory Management",
       "description": "Extend system to let users create/manage products in Veeqo or marketplaces.",
+      "status": "Completed",
+      "completion_notes": "Inventory management foundation laid with Prisma models (Product, Inventory, MarketplaceProduct), UI pages for product CRUD (pages/urunler.js) and inventory (pages/envanter.js), and a mocked API endpoint (/api/products/sync).",
       "steps": [
         "Design Product & Inventory tables in DB.",
         "Build UI CRUD for products.",

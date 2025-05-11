@@ -1,4 +1,4 @@
-import { getSession } from 'next-auth/react';
+// import { getSession } from 'next-auth/react'; // REMOVED
 import prisma from '@/lib/prisma';
 import dotenv from 'dotenv';
 

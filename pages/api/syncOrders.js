@@ -5,7 +5,9 @@ import { google } from 'googleapis';
 // import { fetchShippoOrders } from '@/lib/shippo';
 // import { appendSheetValues } from '@/lib/googleSheets';
 import dotenv from 'dotenv';
-import { getSession } from 'next-auth/react';
+// import { getSession } from 'next-auth/react'; // REMOVED
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // ADDED
+import { cookies } from 'next/headers'; // ADDED
 import prisma from '@/lib/prisma';
 
 dotenv.config();
@@ -24,10 +26,17 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server configuration error.' });
   }
 
-  let session;
+  // let session; // REMOVED
   try {
-    // Authenticate user via NextAuth
-    session = await getSession({ req });
+    // Authenticate user via Supabase
+    const supabase = createRouteHandlerClient({ cookies }); // ADDED
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession(); // ADDED
+
+    if (sessionError) { // ADDED
+      console.error('Supabase getSession error:', sessionError); // ADDED
+      return res.status(500).json({ error: 'Authentication error' }); // ADDED
+    } // ADDED
+
     if (!session?.user?.id) {
       return res.status(401).json({ error: 'Unauthorized' });
     }

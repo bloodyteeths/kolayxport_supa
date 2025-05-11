@@ -2,7 +2,9 @@
 // Purpose: Authenticates user, retrieves their specific script ID from DB.
 // MODIFIED: Cannot use scripts.run effectively due to GCP project restrictions.
 
-import { getSession } from 'next-auth/react';
+// import { getSession } from 'next-auth/react'; // REMOVED
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // ADDED
+import { cookies } from 'next/headers'; // ADDED
 import { google } from 'googleapis'; // Used for type definitions if not for auth client construction
 import prisma from '@/lib/prisma';
 
@@ -27,7 +29,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const session = await getSession({ req });
+  // const session = await getSession({ req }); // REMOVED
+  const supabase = createRouteHandlerClient({ cookies }); // ADDED
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession(); // ADDED
+
+  if (sessionError) { // ADDED
+    console.error('Supabase getSession error in gscript/get-all-user-properties:', sessionError); // ADDED
+    return res.status(500).json({ error: 'Authentication error' }); // ADDED
+  } // ADDED
 
   if (!session || !session.user || !session.user.id) {
     return res.status(401).json({ error: 'User not authenticated' });

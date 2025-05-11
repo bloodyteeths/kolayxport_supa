@@ -8,7 +8,8 @@
     "build": "prisma generate && next build",
     "postbuild": "next-sitemap",
     "start": "next start",
-    "test": "jest --passWithNoTests"
+    "test": "jest --passWithNoTests",
+    "mcp": "dotenv -e .env.local -- supabase-mcp"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.2",
@@ -40,6 +41,7 @@
     "react-dom": "latest",
     "react-hook-form": "^7.56.2",
     "react-hot-toast": "^2.5.2",
+    "supabase-mcp": "^1.5.0",
     "zustand": "^5.0.4"
   },
   "devDependencies": {

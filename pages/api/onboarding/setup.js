@@ -1,4 +1,6 @@
-import { getSession } from 'next-auth/react';
+// import { getSession } from 'next-auth/react'; // REMOVED
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'; // ADDED
+import { cookies } from 'next/headers'; // ADDED
 import { google } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
 import prisma from '@/lib/prisma'; // Your prisma client instance
@@ -40,7 +42,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  const session = await getSession({ req });
+  // const session = await getSession({ req }); // REMOVED
+  const supabase = createRouteHandlerClient({ cookies }); // ADDED
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession(); // ADDED
+
+  if (sessionError) { // ADDED
+    console.error('Supabase getSession error in onboarding/setup:', sessionError); // ADDED
+    return res.status(500).json({ error: 'Authentication error' }); // ADDED
+  } // ADDED
+
   if (!session || !session.user?.id) {
     console.error('Onboarding Error: Unauthorized. No session or user ID.');
     return res.status(401).json({ message: 'Authentication required.' });

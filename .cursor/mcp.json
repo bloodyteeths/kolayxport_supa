@@ -1,16 +1,17 @@
 {
     "mcpServers": {
       "composio": {
-        "url": "https://mcp.composio.dev/http",
+        "url":      "https://mcp.composio.dev/http",
+        "manifest": "https://mcp.composio.dev/.well-known/mcp-manifest",
         "headers": {
           "Authorization": "Bearer 2c2xxx7gnwq0xksa0y0n15"
         }
       },
-      "supabase": {
-        "url": "https://kolayxport.com.supabase.co/rest/v1",
+      "kolayxport-local": {
+        "url":      "http://localhost:3000/http",
+        "manifest": "http://localhost:3000/.well-known/mcp-manifest",
         "headers": {
-          "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRocXl4aXJ0emFhaml1bG1taXF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMDY3NDUsImV4cCI6MjA2MTc4Mjc0NX0.fyjDG2iGVvkEN8EXomnHTo1eWWw89zm81NDOkHjJTJk",
-          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRocXl4aXJ0emFhaml1bG1taXF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMDY3NDUsImV4cCI6MjA2MTc4Mjc0NX0.fyjDG2iGVvkEN8EXomnHTo1eWWw89zm81NDOkHjJTJk"
+          "x-api-key": "548337B7-5BA3-44BA-8106-7E9D11BB3710"
         }
       }
     }

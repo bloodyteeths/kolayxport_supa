@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
 import Link from 'next/link';
@@ -64,28 +64,27 @@ const DashboardLandingContent = () => {
 };
 
 export default function AppIndexPage() {
-  console.log('[AppIndexPage Render] Component rendering...'); // Log component render
-  const { data: session, status, update } = useSession();
+  console.log('[AppIndexPage Render] Component rendering...');
+  const { user, session, isLoading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
-  const [isLoadingResources, setIsLoadingResources] = useState(false); // Renamed from isOnboarding for clarity
-  const [resourceStatusMessage, setResourceStatusMessage] = useState(''); // Renamed from onboardingStatus
+  const [isLoadingResources, setIsLoadingResources] = useState(false);
+  const [resourceStatusMessage, setResourceStatusMessage] = useState('');
   
-  // State for the new manual copy flow
   const [showManualCopyLink, setShowManualCopyLink] = useState(false);
   const [copySheetUrl, setCopySheetUrl] = useState('');
   const [driveFolderIdFromApi, setDriveFolderIdFromApi] = useState('');
 
-  // Derived state to check if core setup seems complete from session
-  const coreSetupComplete = !!(session?.user?.googleSheetId && session?.user?.googleScriptId);
+  const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
+
+  const coreSetupComplete = !!(user?.user_metadata?.googleSheetId && user?.user_metadata?.googleScriptId);
 
   useEffect(() => {
-    console.log('[AppIndexPage Effect] Running effect. Status:', status, 'CoreSetupComplete:', coreSetupComplete, 'showManualCopyLink:', showManualCopyLink, 'Session User ID:', session?.user?.id);
+    console.log('[AppIndexPage Effect] Running effect. Status:', status, 'CoreSetupComplete:', coreSetupComplete, 'showManualCopyLink:', showManualCopyLink, 'User ID:', user?.id);
     
     let pollIntervalId = null;
 
-    // If authenticated, user ID exists, and core setup is NOT complete, and we are NOT already showing the manual copy link
-    if (status === 'authenticated' && session?.user?.id && !coreSetupComplete && !showManualCopyLink) {
-      console.log('[AppIndexPage Effect] Conditions met for initial resource check/creation. Session:', session);
+    if (status === 'authenticated' && user?.id && !coreSetupComplete && !showManualCopyLink) {
+      console.log('[AppIndexPage Effect] Conditions met for initial resource check/creation. User:', user);
       
       const checkAndPrepareManualCopy = async () => {
         console.log('Checking/Preparing for manual sheet copy...');
@@ -116,7 +115,7 @@ export default function AppIndexPage() {
             if (!pollIntervalId) { // Check to prevent multiple intervals if effect re-runs quickly
               pollIntervalId = setInterval(async () => {
                 console.log('[AppIndexPage Polling] Checking session for updates...');
-                await update(); // Force re-fetch of session from NextAuth
+                await refreshUser(); // If we implement a manual refresh in useAuth
               }, 5000); // Poll every 5 seconds
             }
 
@@ -165,7 +164,7 @@ export default function AppIndexPage() {
         clearInterval(pollIntervalId);
       }
     };
-  }, [status, coreSetupComplete, session?.user?.id, showManualCopyLink, isLoadingResources, update]); // Added update to dependencies
+  }, [status, coreSetupComplete, user, showManualCopyLink, isLoadingResources, refreshUser]);
 
   if (status === 'loading') {
     return (
@@ -222,7 +221,7 @@ export default function AppIndexPage() {
               </a>
               <p className="text-sm text-slate-600 mt-3">
                 <strong>Önemli:</strong> Kopyalama sırasında "Klasör" seçeneğini düzenleyerek, bu kopyayı Google Drive'ınızdaki 
-                "<code>KolayXport Kullanıcı Dosyaları - {session?.user?.name || session?.user?.id}</code>" isimli klasörün içine kaydettiğinizden emin olun.
+                "<code>KolayXport Kullanıcı Dosyaları - {user?.user_metadata?.name || user?.email}</code>" isimli klasörün içine kaydettiğinizden emin olun.
               </p>
             </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
 import { Settings, Save, Key, ShoppingCart, Truck, Check, Edit, Info, FileText, Package, UserSquare, FolderCog, ClipboardCopy } from 'lucide-react';
@@ -43,8 +43,10 @@ const ApiSection = ({ title, icon: Icon, children, description }) => (
 );
 
 export default function SettingsPage() {
-  const { data: session, status } = useSession();
+  const { user, session: supabaseSession, isLoading: authLoading } = useAuth();
   const router = useRouter();
+
+  const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
 
   const [trendyolApiKey, setTrendyolApiKey] = useState('');
   const [isTrendyolApiKeyEditing, setIsTrendyolApiKeyEditing] = useState(true);
@@ -269,96 +271,95 @@ export default function SettingsPage() {
   }, [status]);
 
   const handleSaveProperty = async (propertyName, value, setSaveStatus, setIsEditing) => {
+    if (!user?.id) {
+      console.error('Cannot save property: User not authenticated.');
+      setSaveStatus('error');
+      return;
+    }
     setSaveStatus('saving');
     try {
-      console.log(`Saving ${propertyName}: ${value} to user's script properties via Next.js API route`);
-      const response = await fetch('/api/gscript/set-user-property', {
+      const response = await fetch('/api/setScriptProps', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId: session.user.id, propertyName, value }),
+        body: JSON.stringify({ [propertyName]: value }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to save property. Server response not JSON.' }));
-        throw new Error(errorData.message || `Failed to save ${propertyName}. Status: ${response.status}`);
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setSaveStatus('success');
+        setIsEditing(false);
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } else {
+        throw new Error(data.error || 'Failed to save property.');
       }
-      
-      setSaveStatus('success');
-      setIsEditing(false);
-
     } catch (error) {
       console.error(`Error saving ${propertyName}:`, error);
       setSaveStatus('error');
-      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
   const handleSaveImporterOfRecord = async () => {
-    setImporterSectionSaveStatus('saving');
-
-    const importerFields = [
-      importerContactPersonName, importerContactCompanyName, importerContactPhoneNumber, 
-      importerContactEmailAddress, importerAddressStreetLines, importerAddressCity, 
-      importerAddressStateCode, importerAddressPostalCode, importerAddressCountryCode
-    ];
-
-    const anyFieldHasValue = importerFields.some(field => field && String(field).trim() !== '');
-    const allFieldsHaveValue = importerFields.every(field => field && String(field).trim() !== '');
-
-    if (anyFieldHasValue && !allFieldsHaveValue) {
-      alert('İthalatçı Kaydı (Importer of Record) bilgileri için, bir alan doldurulduysa tüm alanların doldurulması zorunludur.');
-      setImporterSectionSaveStatus('error');
-      setTimeout(() => setImporterSectionSaveStatus('idle'), 3000);
-      return;
+    if (!user?.id) { 
+      setImporterSectionSaveStatus('error'); 
+      console.error('User not authenticated for saving importer details.'); 
+      return; 
     }
-    
-    // If no fields have value, we can either save an empty object or not save at all.
-    // For now, let's save an empty object if no fields are filled, or the user can clear them.
-    // Or, we can prevent saving if all are empty unless explicitly intended.
-    // For this implementation, if all are empty, we'll still proceed to save (which might clear the property or save it as empty based on backend).
-
-    const importerJson = {
+    setImporterSectionSaveStatus('saving');
+    const payload = {
       contact: {
-        personName: importerContactPersonName.trim(),
-        companyName: importerContactCompanyName.trim(),
-        phoneNumber: importerContactPhoneNumber.trim(),
-        emailAddress: importerContactEmailAddress.trim(),
+        personName: importerContactPersonName,
+        companyName: importerContactCompanyName,
+        phoneNumber: importerContactPhoneNumber,
+        emailAddress: importerContactEmailAddress,
       },
       address: {
-        streetLines: importerAddressStreetLines.trim().split('\n').map(line => line.trim()).filter(line => line), // Store as array of non-empty strings
-        city: importerAddressCity.trim(),
-        stateOrProvinceCode: importerAddressStateCode.trim(), // Numeric
-        postalCode: importerAddressPostalCode.trim(),
-        countryCode: importerAddressCountryCode.trim().toUpperCase(),
+        streetLines: importerAddressStreetLines.split('\n'),
+        city: importerAddressCity,
+        stateOrProvinceCode: importerAddressStateCode,
+        postalCode: importerAddressPostalCode,
+        countryCode: importerAddressCountryCode,
       }
     };
-
-    await handleSaveProperty('IMPORTER_OF_RECORD', JSON.stringify(importerJson), setImporterSectionSaveStatus, setIsImporterSectionEditing);
+    try {
+      const response = await fetch('/api/setScriptProps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ IMPORTER_OF_RECORD: JSON.stringify(payload) })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setImporterSectionSaveStatus('success');
+        setIsImporterSectionEditing(false);
+        setTimeout(() => setImporterSectionSaveStatus('idle'), 2000);
+      } else {
+        throw new Error(data.error || 'Failed to save Importer of Record.');
+      }
+    } catch (error) {
+      console.error("Error saving Importer of Record:", error);
+      setImporterSectionSaveStatus('error');
+    }
   };
 
   const handleSaveShipperTinNumber = async () => {
-    // First save SHIPPER_TIN_NUMBER
-    await handleSaveProperty('SHIPPER_TIN_NUMBER', shipperTinNumber, setShipperTinNumberSaveStatus, setIsShipperTinNumberEditing);
-    // Then, implicitly save SHIPPER_TIN_TYPE as 'BUSINESS_NATIONAL'
-    // We need a dummy setSaveStatus and setIsEditing for this implicit save, or adjust handleSaveProperty not to require them if not interactive.
-    // For simplicity, let's assume an immediate success/failure for the implicit part or ignore its specific UI feedback for now.
+    if (!user?.id) { setShipperTinNumberSaveStatus('error'); return; }
+    setShipperTinNumberSaveStatus('saving');
     try {
-      console.log(`Implicitly saving SHIPPER_TIN_TYPE: BUSINESS_NATIONAL`);
-      const response = await fetch('/api/gscript/set-user-property', {
+      const response = await fetch('/api/setScriptProps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: session.user.id, propertyName: 'SHIPPER_TIN_TYPE', value: 'BUSINESS_NATIONAL' }),
+        body: JSON.stringify({ SHIPPER_TIN_NUMBER: shipperTinNumber })
       });
-      if (!response.ok) {
-        console.error('Failed to implicitly save SHIPPER_TIN_TYPE');
-        // Optionally, set an error state or notify the user about this partial failure.
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setShipperTinNumberSaveStatus('success');
+        setIsShipperTinNumberEditing(false);
+        setTimeout(() => setShipperTinNumberSaveStatus('idle'), 2000);
       } else {
-        console.log('Successfully saved SHIPPER_TIN_TYPE implicitly');
+        throw new Error(data.error || 'Failed to save Shipper TIN.');
       }
     } catch (error) {
-      console.error('Error implicitly saving SHIPPER_TIN_TYPE:', error);
+      setShipperTinNumberSaveStatus('error');
     }
   };
 

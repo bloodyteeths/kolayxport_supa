@@ -28,7 +28,6 @@ model User {
   googleSheetId   String?   @unique // ID of the user's copied Google Sheet
   driveFolderId   String?             // ID of the user's Drive folder for labels
   userAppsScriptId String?   @unique // ID of the user's copied Wrapper Apps Script
-  googleScriptDeploymentId String?  @unique // New field for the Apps Script deployment ID
 
   // --- User-Specific API Keys & Settings --- 
   // IMPORTANT: Consider encrypting these values before storing in production

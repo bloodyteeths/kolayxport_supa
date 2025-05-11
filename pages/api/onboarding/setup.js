@@ -100,7 +100,7 @@ export default async function handler(req, res) {
 
     const userAuth = getUserGoogleApiClient({ access_token, refresh_token, expires_at });
     const drive = google.drive({ version: 'v3', auth: userAuth });
-    // const sheets = google.sheets({ version: 'v4', auth: userAuth }); // May not be needed if template sheet is fully pre-configured
+    const scriptApi = google.script({ version: 'v1', auth: userAuth }); // Initialize Apps Script API
 
     if (!driveFolderId) {
       console.log(`User ${userId}: Creating Drive folder 'KolayXport Kullanıcı Dosyaları'...`);
@@ -127,7 +127,7 @@ export default async function handler(req, res) {
        console.log(`User ${userId}: Drive folder already exists: ${driveFolderId}`);
     }
     
-    // --- 2. Copy Template Google Sheet (which includes the bound script) --- 
+    let newSheetJustCreated = false;
     if (!googleSheetId) {
       console.log(`User ${userId}: Copying template Google Sheet ID ${TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID}...`);
       const sheetCopyMetadata = {
@@ -177,6 +177,7 @@ export default async function handler(req, res) {
           details: lastError.message 
         });
       }
+      newSheetJustCreated = true; // Flag that we just created this sheet
     } else {
       console.log(`User ${userId}: Sheet already exists: ${googleSheetId}`);
       // If sheet exists, ensure we have its URL
@@ -196,9 +197,88 @@ export default async function handler(req, res) {
       }
     }
 
-    // --- (Section for copying standalone script is REMOVED) ---
-    // The script is now bound to the template sheet and copied with it.
-    // userAppsScriptId remains null here; it will be set via a callback.
+    // --- New Script Handling using Apps Script API ---
+    // This section runs if a sheet was just created OR if an existing sheet was found 
+    // but we don't yet have a userAppsScriptId for it in our DB (as per existingUser check earlier).
+    // However, the initial `if (existingUser?.googleSheetId && existingUser?.driveFolderId)` block
+    // already returns if all resources seem to exist. If we reach here with an existing googleSheetId,
+    // it implies we don't have a script ID yet, or we are in a fresh creation flow.
+
+    // We will always attempt to create/update the script if newSheetJustCreated is true,
+    // or if googleSheetId exists but existingUser.userAppsScriptId was null.
+    // For simplicity, let's assume if we've passed the initial "all resources exist" check,
+    // and we have a googleSheetId, we should ensure its script is set up.
+
+    let scriptContent;
+    try {
+      console.log(`User ${userId}: Fetching script content from master template (script ID: ${TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID})...`);
+      const contentResponse = await scriptApi.projects.getContent({
+        scriptId: TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID,
+      });
+      scriptContent = contentResponse.data;
+      if (!scriptContent || !scriptContent.files || scriptContent.files.length === 0) {
+        throw new Error('Master template script content is empty or invalid.');
+      }
+      console.log(`User ${userId}: Successfully fetched script content from master template. Found ${scriptContent.files.length} files.`);
+    } catch (error) {
+      console.error(`User ${userId}: Failed to get script content from master template (ID: ${TEMPLATE_SHEET_WITH_BOUND_SCRIPT_ID}). Error:`, error.message, error.response?.data?.error);
+      // Potentially clean up created sheet/folder if this fails?
+      return res.status(500).json({
+        error: 'Failed to retrieve master script content for setup.',
+        details: error.message,
+      });
+    }
+
+    try {
+      // Check if user already has a script ID in DB; if so, try to update that.
+      // Otherwise, create a new script project bound to the sheet.
+      // This logic assumes that if existingUser.userAppsScriptId was present, the initial check would have returned.
+      // So, if we are here, we are either creating a new script or userAppsScriptId was null.
+
+      if (existingUser?.userAppsScriptId) {
+         // This case should ideally be handled by the top-level check.
+         // If somehow it's reached, it implies an existing script ID but we're re-running setup.
+         // For safety, we could try to update it, but this flow assumes we create if not fully onboarded.
+         // For now, we'll prioritize creation if `userAppsScriptId` from DB was null.
+         // Let's assume `userAppsScriptId` will be fresh from creation or `null`.
+         console.log(`User ${userId}: Found existing userAppsScriptId ${existingUser.userAppsScriptId} in DB, but proceeding to ensure script content or create new if it was null.`);
+         // If existingUser.userAppsScriptId was not null, the first check should have exited.
+         // So, if we are here and googleSheetId existed, existingUser.userAppsScriptId must have been null.
+      }
+
+      // Create a new script project bound to the newly copied sheet
+      console.log(`User ${userId}: Creating new Apps Script project bound to sheet ID ${googleSheetId}...`);
+      const createRequest = {
+        title: `KolayXport Script - ${session.user.name || userId}`,
+        parentId: googleSheetId, // Bind to the new sheet
+      };
+      const createResponse = await scriptApi.projects.create(createRequest);
+      userAppsScriptId = createResponse.data.scriptId; // This is the ID of the NEW script project
+
+      if (!userAppsScriptId) {
+        throw new Error('Failed to create a new script project for the user.');
+      }
+      console.log(`User ${userId}: Created new bound script project with ID: ${userAppsScriptId}`);
+
+      // Update the new script project with the content from the template
+      console.log(`User ${userId}: Updating content of new script project ${userAppsScriptId}...`);
+      await scriptApi.projects.updateContent({
+        scriptId: userAppsScriptId,
+        // files: scriptContent.files, // This is the correct structure { files: [...] }
+        requestBody: { // requestBody is the correct way to pass parameters for updateContent
+          files: scriptContent.files,
+        }
+      });
+      console.log(`User ${userId}: Successfully updated content for script project ${userAppsScriptId}.`);
+
+    } catch (error) {
+      console.error(`User ${userId}: Failed to create or update user's script project. Error:`, error.message, error.response?.data?.error);
+      // Potentially clean up created sheet/folder/script if this fails?
+      return res.status(500).json({
+        error: 'Failed to set up Apps Script for your account.',
+        details: error.message,
+      });
+    }
 
     // --- Share the new folder with the Service Account (optional, if service account needs access) ---
     // This might be useful if a service account needs to access these files later,
@@ -228,7 +308,7 @@ export default async function handler(req, res) {
 
 
     // --- Update Prisma Database ---
-    console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId} (will be null)`);
+    console.log(`User ${userId}: Updating database with IDs - Sheet: ${googleSheetId}, Folder: ${driveFolderId}, Script: ${userAppsScriptId}`);
     await prisma.user.update({
       where: { id: userId },
       data: {
@@ -246,7 +326,7 @@ export default async function handler(req, res) {
       data: {
         googleSheetId,
         driveFolderId,
-        userAppsScriptId, // Will be null
+        userAppsScriptId, // Now contains the new script ID
         spreadsheetUrl,
         // No scriptWebViewLink here as script is part of the sheet
         // manualScriptCopyRequired is no longer relevant from this API.

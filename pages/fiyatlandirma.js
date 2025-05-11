@@ -21,10 +21,11 @@ const cardHover = {
 
 const plans = [
   {
-    name: 'Başlangıç',
-    id: 'tier-baslangic',
-    priceMonthly: 'Ücretsiz',
-    description: 'E-ticarete yeni başlayanlar ve küçük hacimli satıcılar için ideal.',
+    name: 'Starter',
+    id: 'tier-starter',
+    priceMonthly: '$0',
+    frequency: '/ ay',
+    description: 'Tüm temel entegrasyonlar açıkken, e-ticaretinizi kolayca yönetmeye başlayın.',
     features: [
       'Sınırsız Sipariş İşleme',
       'Tüm Pazaryeri Entegrasyonları',
@@ -37,10 +38,11 @@ const plans = [
     icon: Star,
   },
   {
-    name: 'Profesyonel',
-    id: 'tier-profesyonel',
+    name: 'Growth',
+    id: 'tier-growth',
     priceMonthly: 'Yakında',
-    description: 'Büyüyen işletmeler ve daha fazla otomasyon ihtiyacı olanlar için.',
+    frequency: '/ ay',
+    description: 'İşletmeniz büyürken ihtiyaç duyacağınız ek özellikler ve öncelikli destek.',
     features: [
       'Starter Planındaki Her Şey',
       'Gelişmiş Raporlama Paneli',
@@ -54,7 +56,8 @@ const plans = [
   },
   {
     name: 'Enterprise',
-    price: 'Teklif Al',
+    id: 'tier-enterprise',
+    priceMonthly: 'Teklif Al',
     frequency: '',
     description: 'Büyük ölçekli işletmeler ve özel ihtiyaçlar için kişiselleştirilmiş çözümler.',
     features: [
@@ -65,8 +68,7 @@ const plans = [
       'Sınırsız Kullanıcı',
       'Özel Hesap Yöneticisi',
     ],
-    cta: 'Bize Ulaşın',
-    href: '/iletisim?subject=Enterprise%20Teklif%20Talebi',
+    href_contact: '/iletisim?subject=Enterprise%20Teklif%20Talebi',
     highlight: false,
     icon: ShieldCheck,
   },
@@ -216,7 +218,10 @@ export default function FiyatlandirmaPage() {
                      {React.createElement(plan.icon, { className: `w-8 h-8 mr-3 ${plan.highlight ? 'text-blue-500' : 'text-slate-400' }` })}
                     <h3 className="text-2xl font-bold text-slate-800">{plan.name}</h3>
                   </div>
-                  <p className={`text-4xl font-black text-slate-900 mb-1 ${plan.highlight ? 'text-blue-600' : ''}`}>{plan.priceMonthly} <span className="text-xl font-semibold text-slate-500">{plan.frequency}</span></p>
+                  <p className={`text-4xl font-black text-slate-900 mb-1 ${plan.highlight ? 'text-blue-600' : ''}`}>
+                    {plan.priceMonthly} 
+                    {plan.frequency && <span className="text-xl font-semibold text-slate-500">{plan.frequency}</span>}
+                  </p>
                   <p className="text-sm text-slate-500 mb-6 h-12">{plan.description}</p>
                   <ul className="space-y-3 mb-8">
                     {plan.features.map((feature, i) => (
@@ -227,7 +232,13 @@ export default function FiyatlandirmaPage() {
                     ))}
                   </ul>
                 </div>
-                {plan.priceMonthly === 'Ücretsiz' ? (
+                {plan.href_contact ? (
+                  <Link href={plan.href_contact} legacyBehavior>
+                    <a aria-describedby={plan.id} className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${plan.highlight ? 'text-white bg-gradient-to-r from-orange-500 to-red-500 hover:scale-[1.03]' : 'text-slate-700 bg-slate-100 hover:bg-slate-200 hover:scale-[1.03]'} ${plan.highlight ? 'focus:ring-orange-400' : 'focus:ring-slate-300'}`}>
+                      Bize Ulaşın
+                    </a>
+                  </Link>
+                ) : plan.priceMonthly === 'Ücretsiz' || plan.priceMonthly === 'Yakında' ? (
                   <button
                     onClick={async () => {
                       await supabase.auth.signInWithOAuth({ 
@@ -242,26 +253,9 @@ export default function FiyatlandirmaPage() {
                         : 'text-blue-600 bg-blue-50 hover:bg-blue-100 hover:scale-[1.03]'
                       } ${plan.highlight ? 'focus:ring-blue-400' : 'focus:ring-blue-300'}
                     `}>
-                    Ücretsiz Başla
+                    {plan.priceMonthly === 'Ücretsiz' ? 'Ücretsiz Başla' : 'Çok Yakında'}
                   </button>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      await supabase.auth.signInWithOAuth({ 
-                        provider: 'google',
-                        options: { redirectTo: window.location.origin + '/app' } 
-                      });
-                    }}
-                    aria-describedby={plan.id} 
-                    className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 
-                      ${plan.highlight 
-                        ? 'text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:scale-[1.03]' 
-                        : 'text-blue-600 bg-blue-50 hover:bg-blue-100 hover:scale-[1.03]'
-                      } ${plan.highlight ? 'focus:ring-blue-400' : 'focus:ring-blue-300'}
-                    `}>
-                    Çok Yakında
-                  </button>
-                )}
+                ) : null}
               </motion.div>
             ))}
           </div>
@@ -373,17 +367,11 @@ export default function FiyatlandirmaPage() {
       <div className="mt-16 text-center">
         <h3 className="text-2xl font-semibold text-slate-800 mb-4">Size Özel Bir Plan mı Lazım?</h3>
         <p className="text-slate-600 mb-8">İhtiyaçlarınız doğrultusunda size özel çözümler üretebiliriz. Bizimle iletişime geçin.</p>
-        <button
-          onClick={async () => {
-            await supabase.auth.signInWithOAuth({ 
-              provider: 'google',
-              options: { redirectTo: window.location.origin + '/iletisim' }
-            });
-          }}
-          className="inline-block px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out"
-        >
-          İletişime Geç
-        </button>
+        <Link href="/iletisim" legacyBehavior>
+          <a className="inline-block px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+            İletişime Geç
+          </a>
+        </Link>
       </div>
 
     </PublicLayout>

@@ -101,14 +101,14 @@ export default function AppIndexPage() {
           if (data.success) {
             console.log('Onboarding resource creation successful:', data);
             const { 
-              spreadsheetUrl: returnedSheetUrl, 
-              scriptWebViewLink: returnedCopiedScriptUrl, // Renamed for clarity
-              userAppsScriptId,
-              manualScriptCopyRequired,
-              templateScriptWebViewLinkForManualCopy 
+              spreadsheetUrl: returnedSheetUrl,
+              // scriptWebViewLink: returnedCopiedScriptUrl, // No longer expected
+              // userAppsScriptId, // Still available, can be used for other checks if needed
+              // manualScriptCopyRequired, // No longer relevant from setup API
+              // templateScriptWebViewLinkForManualCopy // No longer relevant from setup API
             } = data.data;
 
-            let finalScriptUrlToShow;
+            // let finalScriptUrlToShow; // No longer setting a script URL here
             let criticalLinkMissing = false;
 
             if (!returnedSheetUrl) {
@@ -116,48 +116,46 @@ export default function AppIndexPage() {
               setOnboardingStatus('Kurulum hatası: E-Tablo bağlantısı alınamadı. Lütfen destek ile iletişime geçin.');
               criticalLinkMissing = true;
             } else {
-              setSheetUrl(returnedSheetUrl);
+              setSheetUrl(returnedSheetUrl); // Store the sheet URL
+              // Update status to guide user to the sheet
+              setOnboardingStatus(
+                <>
+                  Kurulum kaynaklarınız oluşturuldu! Lütfen {' '}
+                  <a href={returnedSheetUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary-600 hover:underline">
+                    Google E-Tablonuzu açın
+                  </a>
+                  {' '} ve "KolayXport" menüsünden "Ayarları Başlat" seçeneğini kullanarak kurulumu tamamlayın.
+                </>
+              );
+              // setOnboardingComplete(true); // This might be premature, onboarding is complete when script is registered.
+                                          // Or, redefine OnboardingComplete for this stage.
+                                          // For now, let's ensure the user knows the next step.
             }
 
-            if (manualScriptCopyRequired) {
-              if (!templateScriptWebViewLinkForManualCopy) {
-                console.error('Onboarding critical error: Manual copy required but templateScriptWebViewLinkForManualCopy is missing:', data.data);
-                setOnboardingStatus('Kurulum hatası: Manuel kurulum için komut dosyası şablon bağlantısı alınamadı. Lütfen destek ile iletişime geçin.');
-                criticalLinkMissing = true;
-              } else {
-                finalScriptUrlToShow = templateScriptWebViewLinkForManualCopy;
-                console.log('Manual script copy required. Using template link:', finalScriptUrlToShow);
-              }
-            } else { // Automatic copy succeeded (or was already done)
-              if (!returnedCopiedScriptUrl) {
-                console.error('Onboarding critical error: Automatic copy succeeded (or implied) but returnedCopiedScriptUrl is missing:', data.data);
-                // This case should ideally not happen if manualScriptCopyRequired is false and userAppsScriptId exists
-                setOnboardingStatus('Kurulum hatası: Komut dosyası bağlantısı alınamadı. Lütfen destek ile iletişime geçin.');
-                criticalLinkMissing = true;
-              } else {
-                finalScriptUrlToShow = returnedCopiedScriptUrl;
-                console.log('Using copied script link:', finalScriptUrlToShow);
-              }
-            }
-            
+            // The logic for manualScriptCopyRequired and returnedCopiedScriptUrl is removed
+            // as the script is now part of the template sheet.
+
             if (criticalLinkMissing) {
               setIsOnboarding(false); // Stop loading animation
+              // No need to call setScriptUrl as it's removed
               return; // Exit if critical links are missing
             }
             
-            setScriptUrl(finalScriptUrlToShow); 
-            
-            setOnboardingStatus(manualScriptCopyRequired 
-              ? 'Temel kaynaklar oluşturuldu! Lütfen aşağıdaki adımları izleyerek komut dosyasını kopyalayın ve kurulumu tamamlayın.'
-              : 'Temel kaynaklar oluşturuldu! Lütfen aşağıdaki adımları izleyerek kurulumu tamamlayın.');
-            setShowManualSetupInstructions(true); 
-            
-            await update(); 
-            if (session.user.googleScriptId !== userAppsScriptId) {
-                 console.log("Session updated with new script ID after onboarding.")
-            }
-            setOnboardingComplete(true); 
-            setIsOnboarding(false); 
+            // setScriptUrl(finalScriptUrlToShow); // Removed, no script URL to set at this stage
+            // The user will be directed to the sheet to initialize the script.
+            // Once the script calls back to /api/gscript/register-script-id, the userAppsScriptId
+            // will be updated in the DB, and the session.user.googleScriptId will reflect this
+            // on subsequent session fetches. This can be used to update UI state.
+
+            // Update UI based on successful sheet creation
+            setSheetUrl(returnedSheetUrl); // Ensure sheetUrl is set for display
+            // setShowManualSetupInstructions(false); // This should already be false or handled by initial state
+
+            // Consider what happens to isOnboarding state here.
+            // If the next step is user action in sheet, maybe keep it true with new message,
+            // or set to false if loading is done. For now, let's assume loading is done.
+            setIsOnboarding(false);
+
           } else {
             console.error('Onboarding resource creation failed as reported by server:', data.error, data.details);
             setOnboardingStatus(`Kurulum sırasında sunucu taraflı bir hata oluştu: ${data.error || 'Bilinmeyen sunucu hatası.'}`);

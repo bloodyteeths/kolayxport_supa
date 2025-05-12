@@ -25,22 +25,23 @@ model User {
   image         String? // User profile image URL
 
   googleAccountId String? @unique // From NextAuth account.providerAccountId - IMPORTANT for linking
-  googleSheetId   String?   @unique // ID of the user's copied Google Sheet
-  driveFolderId   String?             // ID of the user's Drive folder for labels
-  userAppsScriptId String?   @unique // ID of the user's copied Wrapper Apps Script
+  googleSheetId   String?   @unique // ID of the user's copied Google Sheet - RETAINED FOR NOW, POTENTIALLY OBSOLETE
+  driveFolderId   String?             // ID of the user's Drive folder for labels - RETAINED FOR NOW, POTENTIALLY OBSOLETE
+  userAppsScriptId String?   @unique // ID of the user's copied Wrapper Apps Script - RETAINED FOR NOW, POTENTIALLY OBSOLETE
 
   // --- User-Specific API Keys & Settings --- 
-  // IMPORTANT: Consider encrypting these values before storing in production
   veeqoApiKey        String?
   shippoToken        String?
   fedexAccountNumber String?
-  fedexMeterNumber   String? // If needed by your core library
+  fedexMeterNumber   String? 
   fedexApiKey        String?
   fedexSecretKey     String?
-  // Add other keys/settings needed by the core library if applicable (e.g., Trendyol)
-  // trendyolSupplierId      String?
-  // trendyolApiKey          String?
-  // trendyolApiSecret       String?
+  trendyolSupplierId      String? // ADDED
+  trendyolApiKey          String? // ADDED
+  trendyolApiSecret       String? // ADDED
+  hepsiburadaMerchantId   String? // ADDED
+  hepsiburadaApiKey       String? // ADDED
+  // TODO: Add fields for Importer of Record and Shipper details if they are to be stored flat
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -104,48 +105,73 @@ model MarketplaceConfig {
 
 model Order {
   id            String    @id @default(cuid())
-  marketplace   String
-  marketplaceKey String
-  customerName  String
-  status        String
-  shipByDate    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
   userId        String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  marketplace           String    // e.g., "Veeqo", "Trendyol", "Etsy"
+  marketplaceKey        String    // Order ID from the marketplace
+  marketplaceCreatedAt  DateTime? // Timestamp of when the order was created on the marketplace
+  
+  customerName  String?   // Customer name
+  status        String    // e.g., "PENDING_FULFILLMENT", "SHIPPED", "CANCELLED"
+  shipByDate    DateTime?
+  
+  currency        String?   // e.g., TRY, USD
+  totalPrice      Decimal?  @db.Decimal(10, 2)
+  shippingAddress Json?     // Store structured shipping address
+  billingAddress  Json?     // Store structured billing address
+
+  createdAt     DateTime  @default(now()) // Our system's timestamp
+  updatedAt     DateTime  @updatedAt
   
   items         OrderItem[]
+
+  @@unique([userId, marketplace, marketplaceKey])
 }
 
 model OrderItem {
   id            String    @id @default(cuid())
   orderId       String
-  sku           String
-  quantity      Int
-  notes         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
   order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  labelJobs     LabelJob[]
 
-  // Product reference - optional as some orders may have items not in product catalog
+  marketplaceLineId String?   // Line item ID from the marketplace, if available
+  
+  sku           String?   // Product SKU
+  productName   String    // Name of the product as it appeared in the order
+  variantInfo   String?   // Variant information (e.g., size, color)
+  quantity      Int
+  
+  unitPrice     Decimal?  @db.Decimal(10, 2)
+  totalPrice    Decimal?  @db.Decimal(10, 2) // quantity * unitPrice
+  
+  imageUrl      String?   // URL of the product image
+  notes         String?   // Customer notes, internal notes, line item specific details
+
   productId     String?
   product       Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  labelJobs     LabelJob[] // Corrected relation name
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([orderId])
+  @@index([sku])
+  @@index([productId])
 }
 
 model LabelJob {
   id            String    @id @default(cuid())
-  itemId        String
+  orderItemId   String    // Changed from itemId to orderItemId for clarity
   carrier       String
-  status        String
+  status        String    // e.g., PENDING, GENERATED, FAILED
   pdfUrl        String?
+  trackingNumber String?  // ADDED
   errorMessage  String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
-  item          OrderItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  item          OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade) // Changed from itemId
 }
 
 // --- Step 8: Inventory Management Models ---

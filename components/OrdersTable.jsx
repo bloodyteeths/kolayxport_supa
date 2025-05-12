@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, DownloadCloud, Ticket } from 'lucide-react'; // Icons
+import { RefreshCw, DownloadCloud, Ticket, ShoppingCart } from 'lucide-react'; // Icons
 import Link from 'next/link'; // For label link
 
 // Helper to render image formula or plain text
@@ -84,7 +84,7 @@ export default function OrdersTable() {
     setLabelStates({}); // Reset label states when refreshing orders
     console.log('Fetching orders...');
     try {
-      const res = await fetch('/api/getOrders');
+      const res = await fetch('/api/orders');
       const json = await res.json();
       if (res.ok && json.success) {
         setOrders(json.data || []);
@@ -94,11 +94,7 @@ export default function OrdersTable() {
       }
     } catch (err) {
       console.error("Fetch Orders Error:", err);
-      if (err.message.includes('Google Sheet ID missing')) {
-        setRequireSetup(true);
-      } else {
-        setError(err.message);
-      }
+      setError(err.message);
       setOrders([]); // Clear orders on error
     } finally {
       setIsLoading(false);
@@ -106,62 +102,77 @@ export default function OrdersTable() {
   }, []);
 
   const handleSetup = useCallback(async () => {
+    console.warn("handleSetup called, but it's likely obsolete.");
     setSetupLoading(true);
     setSetupError(null);
     try {
-      const res = await fetch('/api/onboarding/setup', { method: 'POST' });
-      if (res.status === 401) {
-        const { error: signInError } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } });
-        if (signInError) console.error('Redirect to sign-in failed during setup:', signInError);
-        return;
-      }
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || json.message || 'Setup failed');
-      
-      if (json.success) {
-        console.log('Onboarding setup successful, refetching orders with new IDs...');
-        if (refreshUser) await refreshUser();
-        await fetchOrders(); 
-      } else {
-        throw new Error(json.error || 'Failed to setup');
-      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSetupLoading(false);
+      setRequireSetup(false); // Assume setup is no longer required if called
     } catch (err) {
       console.error('Onboarding setup error:', err);
       setSetupError(err.message);
-    } finally {
       setSetupLoading(false);
     }
-  }, [fetchOrders, refreshUser]);
+  }, [refreshUser]);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    if (isAuthenticated && user) {
+      fetchOrders();
+    }
+  }, [isAuthenticated, user, fetchOrders]);
 
   useEffect(() => {
     if (requireSetup && !setupLoading) {
-      handleSetup();
+      // Decide if this auto-setup trigger is still needed or should be removed.
+      // For now, let's not auto-trigger it.
     }
   }, [requireSetup, setupLoading]);
 
-  const handleSync = async () => {
+  const handleSync = async (marketplace) => {
+    if (!marketplace) {
+      console.error("Marketplace not specified for sync.");
+      setSyncError("Marketplace not specified.");
+      return;
+    }
     setSyncLoading(true);
     setSyncError(null);
     setSyncMessage('');
     setError(null); // Clear fetch error before sync
-    console.log('Starting order sync...');
+    console.log(`Starting order sync for ${marketplace}...`);
     try {
-      const res = await fetch('/api/syncOrders');
+      const res = await fetch('/api/orders/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ marketplace }),
+      });
       const json = await res.json();
-      if (res.ok && json.success) {
-        console.log("Sync successful:", json.message);
-        setSyncMessage(json.message || 'Sync completed successfully!');
-        // Refresh the orders table after successful sync
+      
+      if (res.ok) { // Status 200-299
+        console.log(`Sync for ${marketplace} initiated:`, json.message, json.details);
+        setSyncMessage(json.message || `Sync for ${marketplace} completed.`);
+        if (json.details) {
+          setSyncMessage(prev => `${prev} New: ${json.details.newOrders}, Updated: ${json.details.updatedOrders}.`);
+          if (json.details.errors && json.details.errors.length > 0) {
+            console.warn(`Sync for ${marketplace} had errors:`, json.details.errors);
+            setSyncError(`Sync for ${marketplace} completed with errors: ${json.details.errors.map(e => Object.values(e)).join(', ')}`);
+          }
+        }
+        await fetchOrders();
+      } else if (res.status === 207) { // Partial success
+        console.warn(`Sync for ${marketplace} completed with some errors:`, json.message, json.details);
+        setSyncMessage(json.message || `Sync for ${marketplace} completed with some issues.`);
+        if (json.details && json.details.errors && json.details.errors.length > 0) {
+          setSyncError(`Errors: ${json.details.errors.map(e => Object.values(e)).join(', ')}`);
+        }
         await fetchOrders();
       } else {
-        throw new Error(json.error || 'Failed to sync orders');
+        throw new Error(json.error || json.message || `Failed to sync ${marketplace} orders`);
       }
     } catch (err) {
-      console.error("Sync Orders Error:", err);
+      console.error(`Sync ${marketplace} Orders Error:`, err);
       setSyncError(err.message);
     } finally {
       setSyncLoading(false);
@@ -171,7 +182,7 @@ export default function OrdersTable() {
   // --- Label Generation Handler ---
   const handleGenerateLabel = async (rowData, rowIndex) => {
     // Use unique key from sheet (index 8) if available, otherwise fallback to row index
-    const orderKey = rowData[8] ? String(rowData[8]) : `row-${rowIndex}`; 
+    const orderKey = rowData[9] ? String(rowData[9]) : (rowData[8] ? String(rowData[8]) : `row-${rowIndex}`);
     
     setLabelStates(prev => ({ ...prev, [orderKey]: { loading: true, error: null, tracking: null, url: null } }));
 
@@ -180,7 +191,8 @@ export default function OrdersTable() {
     // Ensure your sheet has columns for ALL required FedEx data (address parts, weight, phone etc.)
     // Example mapping (ADJUST INDICES AND FIELD NAMES BASED ON YOUR SHEET AND FEDEX REQUIREMENTS):
     const orderDataForApi = {
-       orderKey: rowData[8] || null, // Pass the actual key if present
+       orderId: rowData[9] || null, // Internal Order ID
+       marketplaceOrderKey: rowData[8] || null, // Marketplace Order ID
        recipientName: rowData[1],    // Example: Index 1 = Customer Name
        recipientPhone: "",            // TODO: Get from sheet column index ?
        recipientStreet: "",         // TODO: Get from sheet column index ?
@@ -248,13 +260,15 @@ export default function OrdersTable() {
   // 5: Status, 6: ShipBy, 7: Market, 8: Key
   const columns = [
     { header: 'Image', index: 0 },
-    { header: 'Market', index: 7 },
-    { header: 'Customer Name', index: 1 },
-    { header: 'Variant/Product', index: 2 },
-    { header: 'Status', index: 5 },
-    // { header: 'Order Key', index: 8 }, // Optional: Can display key if needed
-    { header: 'Label', index: -1 }, // Special column, rendered based on labelStates
-    { header: 'Actions', index: -2 }, // Special column for buttons
+    { header: 'Name', index: 1 }, // Customer Name
+    { header: 'Variant', index: 2 }, // Product Name / Variant Info
+    { header: 'Decorsweet Notu', index: 3 }, // Custom notes
+    { header: 'Etsy Notu', index: 4 }, // Custom notes
+    { header: 'Durum', index: 5 }, // Status
+    { header: 'Son Teslim Tarihi', index: 6 }, // ShipByDate
+    { header: 'Pazaryeri', index: 7 }, // Marketplace
+    { header: 'Pazaryeri No', index: 8 } // MarketplaceKey
+    // Add more columns as needed from your Prisma schema for orders
   ];
 
   // Render onboarding or orders table
@@ -277,33 +291,99 @@ export default function OrdersTable() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Synced Orders</CardTitle>
-            <CardDescription>Orders fetched from your Google Sheet.</CardDescription>
-          </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" size="icon" onClick={fetchOrders} disabled={isLoading || syncLoading} title="Refresh Orders">
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
-            <Button onClick={handleSync} disabled={isLoading || syncLoading} title="Sync Orders from Veeqo/Trendyol">
-              <DownloadCloud className={`mr-2 h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
-              {syncLoading ? 'Syncing...' : 'Sync Orders'}
-            </Button>
-          </div>
+        <CardTitle>Siparişler</CardTitle>
+        <CardDescription>
+          Pazaryerlerinden gelen siparişlerinizi buradan yönetebilirsiniz.
+        </CardDescription>
+        <div className="flex items-center space-x-2 mt-4">
+          <Button onClick={() => fetchOrders()} disabled={isLoading || setupLoading}> 
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Yenile
+          </Button>
+          <Button onClick={() => handleSync('veeqo')} disabled={syncLoading || setupLoading}>
+            <ShoppingCart className={`mr-2 h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
+            Veeqo Siparişlerini Senkronize Et
+          </Button>
+          {/* TODO: Add buttons for other marketplaces like Trendyol, Shippo later */}
         </div>
+        {syncLoading && <p className="text-sm text-blue-600 mt-2">Senkronize ediliyor...</p>}
+        {syncMessage && <p className="text-sm text-green-600 mt-2">{syncMessage}</p>}
+        {syncError && <p className="text-sm text-red-600 mt-2">Sync Hatası: {syncError}</p>}
+        {isLoading && <p className="text-sm text-blue-600 mt-2">Siparişler yükleniyor...</p>}
+        {error && <p className="text-sm text-red-600 mt-2">Hata: {error}</p>}
+        {setupError && <p className="text-sm text-red-600 mt-2">Kurulum Hatası: {setupError}</p>}
       </CardHeader>
 
       <CardContent>
-        {(error || syncError) && (
-          <p className="text-red-600 mb-4">Error: {error || syncError}</p>
-        )}
-        {syncMessage && (
-          <p className="text-green-600 mb-4">{syncMessage}</p>
-        )}
-        {isLoading && !orders.length && <p>Loading orders...</p>}
-        {!isLoading && !orders.length && !error && <p>No orders found in the sheet. Try syncing.</p>}
-        {orders.length > 0 && (
+        {requireSetup ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {columns.map((col) => (
+                  <TableHead key={col.header}>{col.header}</TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {orders.length > 0 ? (
+                orders.map((row, rowIndex) => {
+                  const orderKey = row[8] ? String(row[8]) : `row-${rowIndex}`; // Using marketplaceKey as the unique key
+                  const currentLabelState = labelStates[orderKey] || { loading: false, error: null, url: null, tracking: null };
+
+                  // Ensure row is an array and has enough elements before trying to access them
+                  if (!Array.isArray(row) || row.length < columns.length) {
+                    console.warn("Skipping malformed row:", row);
+                    return (
+                      <TableRow key={orderKey || rowIndex}>
+                        <TableCell colSpan={columns.length + 1}> {/* +1 for actions */}
+                          Hatalı satır verisi.
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  
+                  return (
+                    <TableRow key={orderKey || rowIndex}>
+                      {columns.map((col, colIndex) => (
+                        <TableCell key={colIndex}>
+                          {renderCellContent(row[col.index])}
+                        </TableCell>
+                      ))}
+                      <TableCell>
+                        <Button 
+                          onClick={() => handleGenerateLabel(row, rowIndex)} 
+                          disabled={currentLabelState.loading || (!row[8] && !row[9])} // Disable if no marketplace key or internal ID
+                          size="sm"
+                          variant="outline"
+                        >
+                          {currentLabelState.loading ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Ticket className="h-4 w-4" />
+                          )}
+                          <span className="ml-2">Etiket Oluştur</span>
+                        </Button>
+                        {currentLabelState.error && <p className="text-xs text-red-500 mt-1">{currentLabelState.error}</p>}
+                        {currentLabelState.url && (
+                          <Link href={currentLabelState.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline mt-1 block">
+                            Etiketi Görüntüle
+                          </Link>
+                        )}
+                        {currentLabelState.tracking && <p className="text-xs mt-1">Takip No: {currentLabelState.tracking}</p>}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={columns.length + 1} className="text-center">
+                    {isLoading || setupLoading ? 'Yükleniyor...' : (error || setupError || requireSetup) ? 'Siparişler yüklenemedi.' : 'Gösterilecek sipariş bulunmamaktadır.'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>

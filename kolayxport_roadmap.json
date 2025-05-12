@@ -4,6 +4,113 @@
     "generatedAt": "2025-05-11T00:00:00Z",
     "description": "Full roadmap for migrating from Google Scripts/Sheets to a Vercel+Supabase stack with detailed phases, database schema, APIs, UI, and future extensions."
   },
+  "legacyScriptFeaturesToPort": {
+    "script1_VeeqoShippoFedEx": {
+      "name": "Veeqo/Shippo Sync & FedEx Label Workflow (from Google Apps Script)",
+      "description": "Handles fetching orders from Veeqo and Shippo, populating data with specific transformations, and generating FedEx labels with Electronic Trade Documents (ETD) upon a trigger.",
+      "coreFunctionalities": [
+        {
+          "area": "Order Sync (Veeqo)",
+          "details": [
+            "Fetch orders from Veeqo API (using VEEQO_API_KEY, VEEQO_ORDERS_URL).",
+            "Identify new orders by checking against existing order IDs in the database.",
+            "Data Mapping: recipient details, phone number cleaning, commodity description (from line_items[0].sellable.product_title or default), customs value (order.total_price), currency (order.currency_code or default).",
+            "Apply default values for weight, service type, packaging type, country of manufacture, HS code.",
+            "Store/associate necessary data for subsequent FedEx label generation."
+          ]
+        },
+        {
+          "area": "Order Sync (Shippo)",
+          "details": [
+            "Fetch orders from Shippo API (v1/orders, using SHIPPO_TOKEN).",
+            "Identify new orders by checking against existing order IDs.",
+            "Data Mapping: recipient details (name parsing from to_address.name), phone number cleaning, commodity description (from line_items[0].title or default), customs value (order.total_price or order.subtotal_price), currency (order.currency or default).",
+            "Apply default values as per Veeqo sync.",
+            "Store/associate necessary data for subsequent FedEx label generation."
+          ]
+        },
+        {
+          "area": "FedEx Label Generation (with ETD)",
+          "details": [
+            "Trigger mechanism (e.g., UI button per order/item).",
+            "Requires detailed FedEx API credentials and Shipper Information (API Key, Secret, Account Number, Folder ID for Drive - to be Supabase Storage, Shipper Name, Person Name, Phone, Full Address, TIN Number, TIN Type). TIN Type validation against allowed list.",
+            "Duties Payment Type and Default Currency Code configuration.",
+            "Read comprehensive order data (recipient, weight, service, packaging, customs value, commodity desc, country of mfg, HS code, currency).",
+            "Rigorous data validation before API call.",
+            "FedEx OAuth Token management (client_credentials grant).",
+            "Construct FedEx Ship API payload: labelResponseOptions (URL_ONLY), shipDatestamp, serviceType, packagingType, shipper details, recipient details, pickupType, shippingChargesPayment, labelSpecification (PDF, 4x6).",
+            "International Shipments: Include shipmentSpecialServices (ETD), shippingDocumentSpecification (Commercial Invoice PDF), customsClearanceDetail (dutiesPayment, totalCustomsValue, commodities list with detailed descriptions, unit prices, HS codes, weights, commercialInvoice purpose and termsOfSale - e.g., 'DDU').",
+            "Process FedEx Ship API response: handle errors (parse error codes and messages), extract tracking number, label URL (from pieceResponses.packageDocuments, preferring 'label' or 'pdf' content types).",
+            "Store PDF label (e.g., in Supabase Storage) and make URL accessible.",
+            "Update order/item with tracking number and label URL."
+          ]
+        },
+        {
+          "area": "Configuration & Defaults (User-specific)",
+          "details": [
+            "Mechanism to store and retrieve user-specific API keys (Veeqo, Shippo, FedEx) and default values (weight, service types, packaging, phone, country of mfg, HS code, currency, terms of sale, shipper details, FedEx folder ID - now Supabase storage path prefix)."
+          ]
+        }
+      ]
+    },
+    "script2_Kargov2Sync": {
+      "name": "Kargov2 Style Sync (Veeqo & Trendyol) (from Google Apps Script)",
+      "description": "Handles fetching Veeqo and Trendyol orders, focusing on appending new items, specific note handling (order-level and line-item), and image display.",
+      "coreFunctionalities": [
+        {
+          "area": "General Sync Logic",
+          "details": [
+            "Append-only: New orders/items are added, existing ones might be updated (e.g., Trendyol status).",
+            "Unique key generation (e.g., orderId-lineItemId) to prevent duplicates and allow updates.",
+            "Timestamp tracking for sorting and incremental updates.",
+            "Configuration for VEEQO_API_KEY, TRENDYOL_SUPPLIER_ID, TRENDYOL_API_KEY, TRENDYOL_API_SECRET."
+          ]
+        },
+        {
+          "area": "Veeqo Order Processing (Kargov2 specific)",
+          "details": [
+            "Fetch orders (api.veeqo.com/orders, per_page=250, sort_direction=desc).",
+            "Data Mapping: order ID, timestamp (created_at), customer name (deliver_to or customer), ship-by date (multiple fields fallback), channel name (o.channel.name).",
+            "Log Veeqo channel for each order during processing.",
+            "Notes Handling: Extract order-level notes (o.notes). For line items, extract custom text (item.additional_options). Combine line option and order note (e.g., 'lineOpt | orderNote').",
+            "Conditional Note Assignment: Based on marketplace channel (e.g., 'amazon'/'decorsweetart' vs 'etsy'/'bellecouture') assign combined notes to specific fields (e.g., decorsweetNote vs etsyNote).",
+            "Image URL: Prioritize item.image_url, then item.sellable.image_url, then item.sellable.images[0].url. Orders/items without an image URL are skipped.",
+            "Variant Info: item.title, or sellable.name/title, or item.name, or sellable.sku.",
+            "Status field (initially empty for Veeqo new orders in this script's context, but could be mapped from o.status.name)."
+          ]
+        },
+        {
+          "area": "Trendyol Order Processing (Kargov2 specific)",
+          "details": [
+            "Authentication: Basic Auth (Base64 encoded APIKey:APISecret).",
+            "Fetch 'Created' Orders: (apigw.trendyol.com/integration/order/sellers/{supplierId}/orders?status=Created&startDate&endDate&orderByField=createdDate&size=200).",
+            "Data Mapping (Created): order number, timestamp (orderDate), customer name, ship-by date (agreedDeliveryDate). For lines: product name/title/barcode. Image URL initially empty for 'Created' orders in this script flow, relies on later update or different source.",
+            "Fetch 'Ship Update' Orders (Package Updates): (apigw.trendyol.com/integration/order/sellers/{supplierId}/orders?startDate&endDate&orderByField=PackageLastModifiedDate&size=200).",
+            "Data Mapping (Ship Update): package ID/order number, timestamp (packageHistories max createdDate), customer name, status (from packageHistories or pkg.status, mapped to 'çıktı', 'iptal'), ship-by date.",
+            "Status Update: If an order/item key exists, update its status based on 'Ship Update' data.",
+            "Image URL (for new items from Ship Update): Attempt to fetch from Trendyol product API (api.trendyol.com/sapigw/suppliers/{supplierId}/products?barcode={barcode}) if barcode present. Cache image URL per barcode to avoid re-fetching.",
+            "Variant Info: productName/title/barcode."
+          ]
+        },
+        {
+          "area": "Data Presentation (Kargov2 UI)",
+          "details": [
+            "Display orders with a prominent image (e.g., 120x120px).",
+            "Columns for: Image, Name, Variant, DecorsweetNote, EtsyNote, Status, Ship By, Marketplace, Key.",
+            "Sort orders by timestamp."
+          ]
+        },
+        {
+          "area": "Staged Order Processing (General Requirement)",
+          "details": [
+            "To prevent data loss during sync, raw or semi-processed data from marketplace APIs (Veeqo, Trendyol, Shippo) should be temporarily stored (e.g., in a 'StagedOrderData' table in Supabase) upon successful fetch.",
+            "A separate process or subsequent step then transforms and upserts this staged data into the final 'Order' and 'OrderItem' tables.",
+            "Successfully processed staged data should be cleared or marked as processed."
+          ]
+        }
+      ]
+    }
+  },
   "phases": [
     {
       "phase": 1,
@@ -20,9 +127,9 @@
     {
       "phase": 2,
       "title": "Database Modeling",
-      "description": "Design Postgres schema for users, configs, orders, line items, and label jobs.",
+      "description": "Design Postgres schema for users, configs, orders, line items, and label jobs. Includes models for staged orders and detailed shipper profiles.",
       "status": "Completed and Extended",
-      "completion_notes": "Prisma schema (prisma/schema.prisma) implemented for User, MarketplaceConfig, Order, OrderItem, LabelJob. Extended with Product, Inventory, MarketplaceProduct for inventory management. User model significantly updated with various specific fields (googleSheetId, API keys, etc.).",
+      "completion_notes": "Prisma schema (prisma/schema.prisma) implemented for User, MarketplaceConfig, Order, OrderItem, LabelJob. Extended with Product, Inventory, MarketplaceProduct for inventory management. User model significantly updated with various specific fields (googleSheetId, API keys, etc.). Needs further extension for Shippo keys, detailed FedEx shipper profiles, and a StagedOrderData model.",
       "schema": {
         "User": [
           "id",
@@ -49,7 +156,14 @@
           "orderId",
           "sku",
           "quantity",
-          "notes"
+          "notes",
+          "marketplaceLineId",
+          "productName",
+          "variantInfo",
+          "unitPrice",
+          "totalPrice",
+          "imageUrl",
+          "specificMarketplaceNotesJson"
         ],
         "LabelJob": [
           "id",
@@ -60,7 +174,13 @@
           "errorMessage",
           "timestamps"
         ]
-      }
+      },
+      "next_steps": [
+        "Define Prisma model for 'ShipperProfile' to store detailed FedEx shipper information (name, person, phone, address, TIN, TIN type, duties payment type etc.) linked to User.",
+        "Alternatively, add all FedEx shipper fields and Shippo API key to the 'User' model directly if a separate profile is overkill.",
+        "Define Prisma model for 'StagedOrderData' to temporarily hold raw/semi-processed order data from marketplace APIs before final processing. Should include source (Veeqo, Trendyol, Shippo), raw payload, fetchedAt, processedAt, status.",
+        "Review 'Order' and 'OrderItem' models to ensure all fields required by 'legacyScriptFeaturesToPort' (e.g., Veeqo channel name, specific note fields like decorsweetNote/etsyNote, more detailed status history if needed) are present or can be mapped to existing fields (e.g., using a JSON field for specificMarketplaceNotes)."
+      ]
     },
     {
       "phase": 3,
@@ -77,62 +197,98 @@
     {
       "phase": 4,
       "title": "API Endpoints for Core Actions",
-      "description": "Develop APIs for order sync, label generation, and settings.",
-      "status": "Completed and Refactored",
-      "completion_notes": "Initial API endpoints for order sync, label generation, and settings created. Order sync and Google Sheets/Apps Script related endpoints (e.g., /api/syncOrders, /api/getOrders, /api/onboarding/setup, /api/gscript/*) have been REMOVED as part of decoupling from Google Sheets. Label generation (/api/generateLabel) is mocked and interacts with Prisma. Settings (/api/setScriptProps) updates user data in Prisma. All Supabase authentication helpers upgraded from @supabase/auth-helpers-* to @supabase/ssr to resolve cookie issues and use current best practices.",
+      "description": "Develop APIs for order sync (Veeqo, Trendyol, Shippo with staged processing), label generation (FedEx ETD), and settings.",
+      "status": "Partially Completed and Refactored",
+      "completion_notes": "Initial API endpoints for Veeqo order sync (/api/orders/sync.js) and mocked label generation (/api/generateLabel.js) created. Settings API (/api/user/settings.js) created. Google Sheets/Apps Script related endpoints removed. Supabase auth upgraded to @supabase/ssr. Needs expansion for Shippo, full FedEx, Trendyol, and staged processing logic.",
       "steps": [
-        "Implement `POST /api/labels/generate` to enqueue or run label-gen.",
-        "Update LabelJob status & store PDF in Supabase Storage or alternative.",
-        "Return signed URL to front-end."
+        "Enhance `POST /api/orders/sync`: Accept marketplace parameter (Veeqo, Trendyol, Shippo). Fetch raw data from marketplace. Store raw data in 'StagedOrderData' table. Trigger asynchronous processing of staged data (or process synchronously for MVP).",
+        "Implement processor for 'StagedOrderData': Transform and upsert data into 'Order' and 'OrderItem' tables, applying logic from 'legacyScriptFeaturesToPort' (e.g., note handling, field mapping, default values).",
+        "Develop `GET /api/orders` endpoint to fetch processed orders for display, with filtering and pagination.",
+        "Develop `POST /api/labels/fedex/generate`: Takes order/item ID. Retrieves necessary data (order details, shipper profile). Calls FedEx Ship API as per 'legacyScriptFeaturesToPort'. Stores label PDF in Supabase Storage. Updates 'LabelJob' or 'Order' with tracking and PDF URL.",
+        "Ensure all API endpoints are secured using Supabase auth and handle user-specific data correctly.",
+        "Add API endpoint for managing 'ShipperProfile' if created as a separate model."
       ]
     },
     {
       "phase": 5,
       "title": "Sipari\u015fler Dashboard",
-      "description": "React UI to display orders and generate labels.",
-      "status": "Completed",
-      "completion_notes": "Orders dashboard created as components/OrdersTable.jsx (refactored from pages/siparisler.js), displaying orders and allowing label generation.",
+      "description": "React UI to display orders (Kargov2 style), trigger syncs, and generate FedEx labels with advanced filtering.",
+      "status": "Partially Completed",
+      "completion_notes": "Orders dashboard created as components/OrdersTable.jsx. Displays basic order info. Current label generation is mocked. Needs significant UI enhancements based on 'legacyScriptFeaturesToPort' and advanced filtering.",
       "features": [
         "Table with image, name, variant, status, ship-by, marketplace key.",
         "Checkbox or button per line-item to trigger label generation via API.",
-        "Visual feedback & link to PDF."
+        "Visual feedback & link to PDF.",
+        "Button/mechanism to trigger `POST /api/orders/sync` for selected marketplaces (Veeqo, Trendyol, Shippo).",
+        "Display orders incorporating 'Kargov2' style: prominent image, specific note columns (Decorsweet, Etsy), variant info, status, ship-by, marketplace, key.",
+        "Comprehensive filtering capabilities for orders, similar to the provided screenshot, using fields such as: Sipariş No, Durum, Müşteri (İsim veya e-posta), Ödeme Tipi, Mağaza, Stok Kodu, Anlaşmalı Kargo, Ek Değer, Ürün İsmi, Kargo Barkodu, Anlaşmalı Fulfillment, e-Fatura, Sipariş Renk Etiketi, Sevkiyat Ülkesi, Fatura Ülkesi, Muhasebe Sip. No, Kargoya Son Teslim Tarihi, İlk Tarih, Son Tarih, and other relevant data sourced from APIs.",
+        "Sort options for orders (by timestamp, marketplace, status, etc.).",
+        "Per-order/item button to trigger `POST /api/labels/fedex/generate`.",
+        "Display tracking number and link to PDF label once generated.",
+        "User feedback for sync operations (loading, success, errors) and label generation."
       ]
     },
     {
       "phase": 6,
       "title": "Label Generation Service",
-      "description": "Server-side API to call carriers (Shippo, Veeqo) and store PDF URLs.",
-      "status": "Completed",
-      "completion_notes": "Label generation service (/api/generateLabel.js) implemented. Initially planned for direct carrier calls, current version uses a mock generateShippingLabel function that interacts with Prisma LabelJob for tracking and storing a mock PDF URL. Actual carrier integration via this Next.js API is pending.",
+      "description": "Server-side API to call carriers (FedEx with ETD) and store PDF URLs.",
+      "status": "Partially Completed (Mocked)",
+      "completion_notes": "Label generation service (/api/generateLabel.js) is currently mocked. Needs full FedEx integration as per 'legacyScriptFeaturesToPort'.",
       "steps": [
-        "Implement `POST /api/labels/generate` to enqueue or run label-gen.",
-        "Update LabelJob status & store PDF in Supabase Storage or alternative.",
-        "Return signed URL to front-end."
+        "Implement full FedEx label generation logic in `POST /api/labels/fedex/generate` (details in Phase 4 steps and 'legacyScriptFeaturesToPort').",
+        "Ensure secure handling and storage of FedEx credentials and shipper data.",
+        "Robust error handling and logging for FedEx API interactions.",
+        "Store generated label PDFs in Supabase Storage.",
+        "Update 'LabelJob' or 'Order' model with tracking number, PDF URL, and status."
       ]
     },
     {
       "phase": 7,
-      "title": "Dashboard & Analytics",
-      "description": "User dashboard for daily sales, order counts, and key metrics.",
-      "status": "Completed",
-      "completion_notes": "Main dashboard (pages/app/index.js) created, incorporating onboarding logic. Analytics dashboard (pages/dashboard.js) also created. DashboardLandingContent provides initial overview.",
+      "title": "Dashboard, Analytics & Statistics (Turkish Language)",
+      "description": "User dashboard for daily sales, order counts, key metrics, and overall business statistics, presented in Turkish using amCharts.",
+      "status": "Partially Completed / Needs Enhancement",
+      "completion_notes": "Main dashboard (pages/app/index.js) and analytics dashboard (pages/dashboard.js) exist. Needs significant enhancement to become a comprehensive statistics hub using amCharts, fully in Turkish, and reflecting detailed business metrics.",
       "features": [
-        "Daily sales chart (line, bar) using React chart library.",
-        "Aggregates: total orders, revenue, shipped vs pending.",
-        "Filter by date range and marketplace."
+        "Interactive charts and graphs using amCharts (e.g., line, bar, pie) to display key business statistics: turnover (ciro), order values (sipariş değerleri), total orders (toplam sipariş sayısı), average order value, sales by marketplace, etc.",
+        "All dashboard content, labels, and chart elements to be in Turkish.",
+        "Aggregates: total orders, revenue, shipped vs pending, profit margins (if cost data available).",
+        "Filter capabilities for statistics by date range, marketplace, and other relevant dimensions.",
+        "Potentially customizable widgets or views for users to personalize their stats dashboard."
       ]
     },
     {
       "phase": 8,
-      "title": "Deployment & Iteration",
-      "description": "Deploy to Vercel, test thoroughly, gather feedback, and iterate.",
-      "status": "In Progress - Critical Bug Fixing",
-      "completion_notes": "Initial deployment to Vercel. Faced several build/runtime issues. Path alias issues with jsconfig.json resolved. Git history and project structure cleaned up. Next-auth completely removed and replaced with Supabase auth. Ongoing: Resolved Google Apps Script dependencies and runtime cookie errors by migrating to @supabase/ssr. Dashboard UI for old GSheet onboarding removed. Login/redirect flow being actively debugged.",
+      "title": "Advanced Integrations, Notifications & Refinements",
+      "description": "Implement full logic from legacy scripts, add a notifications system, refine error handling, implement background jobs for syncs, and add comprehensive testing.",
+      "status": "Pending",
+      "completion_notes": "Focus will be on fully porting complex logic from Google Apps Scripts, building a notification system, improving robustness, and preparing for production.",
       "steps": [
-        "Deploy to Vercel",
-        "Test thoroughly",
-        "Gather feedback",
-        "Iterate based on feedback"
+        "Fully implement all data mapping, transformations, and specific logic detailed in 'legacyScriptFeaturesToPort' for Veeqo, Shippo, and Trendyol syncs.",
+        "Implement robust image fetching and caching for Trendyol products.",
+        "Refine notes handling (e.g., allow user to view/edit combined notes or source notes).",
+        "Develop a dedicated Notifications Page:",
+        "  - UI to display a list/feed of system and user-relevant notifications.",
+        "  - Source notifications from: API sync successes/failures (with details), label generation statuses, important system alerts, potentially new order alerts based on criteria.",
+        "  - Implement filtering for notifications (e.g., by type, date, read/unread, marketplace).",
+        "  - Mark notifications as read/unread, and potentially allow dismissal.",
+        "Consider moving intensive sync operations to background jobs (e.g., using Vercel cron to trigger a job queue or serverless functions that process staged data) to improve API responsiveness.",
+        "Implement comprehensive error logging and alerting for backend processes.",
+        "Add unit and integration tests for API endpoints and core business logic (sync adapters, label generation, notifications).",
+        "Review and optimize database queries and indexing for performance.",
+        "User documentation for new features (Shippo, FedEx, advanced order display, notifications system)."
+      ]
+    },
+    {
+      "phase": 9,
+      "title": "Deployment & Iteration",
+      "description": "Deploy all new features to Vercel, conduct thorough end-to-end testing, gather user feedback, and iterate.",
+      "status": "Not Started",
+      "steps": [
+        "Deploy updated application to Vercel.",
+        "Perform thorough end-to-end testing of all order sync paths (Veeqo, Shippo, Trendyol) and FedEx label generation.",
+        "Test with various scenarios, including international shipments and different data conditions.",
+        "Gather feedback from stakeholders/users.",
+        "Iterate on features, UI, and performance based on feedback and monitoring."
       ]
     }
   ]

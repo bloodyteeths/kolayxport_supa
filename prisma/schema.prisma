@@ -35,7 +35,7 @@ model User {
   fedexAccountNumber String?
   fedexMeterNumber   String? 
   fedexApiKey        String?
-  fedexSecretKey     String?
+  fedexApiSecret     String?
   trendyolSupplierId      String? // ADDED
   trendyolApiKey          String? // ADDED
   trendyolApiSecret       String? // ADDED

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
@@ -44,8 +44,11 @@ const ApiSection = ({ title, icon: Icon, children, description }) => (
 );
 
 export default function SettingsPage() {
-  const { user, session: supabaseSession, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
+
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
   const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
 
@@ -89,22 +92,19 @@ export default function SettingsPage() {
   const [isFedexApiSecretEditing, setIsFedexApiSecretEditing] = useState(true);
   const [fedexApiSecretSaveStatus, setFedexApiSecretSaveStatus] = useState('idle');
 
-  // IMPORTER_OF_RECORD States (New: Individual fields)
   const [importerContactPersonName, setImporterContactPersonName] = useState('');
   const [importerContactCompanyName, setImporterContactCompanyName] = useState('');
   const [importerContactPhoneNumber, setImporterContactPhoneNumber] = useState('');
   const [importerContactEmailAddress, setImporterContactEmailAddress] = useState('');
   const [importerAddressStreetLines, setImporterAddressStreetLines] = useState('');
   const [importerAddressCity, setImporterAddressCity] = useState('');
-  const [importerAddressStateCode, setImporterAddressStateCode] = useState(''); // Numeric (e.g., 01 for Adana)
+  const [importerAddressStateCode, setImporterAddressStateCode] = useState('');
   const [importerAddressPostalCode, setImporterAddressPostalCode] = useState('');
   const [importerAddressCountryCode, setImporterAddressCountryCode] = useState('');
   
-  // Combined save/edit state for the Importer of Record section
   const [isImporterSectionEditing, setIsImporterSectionEditing] = useState(true);
   const [importerSectionSaveStatus, setImporterSectionSaveStatus] = useState('idle');
 
-  // Shipper Information States (These will be grouped under FedEx section)
   const [shipperCity, setShipperCity] = useState('');
   const [isShipperCityEditing, setIsShipperCityEditing] = useState(true);
   const [shipperCitySaveStatus, setShipperCitySaveStatus] = useState('idle');
@@ -145,131 +145,99 @@ export default function SettingsPage() {
   const [isShipperTinNumberEditing, setIsShipperTinNumberEditing] = useState(true);
   const [shipperTinNumberSaveStatus, setShipperTinNumberSaveStatus] = useState('idle');
 
-  // New System Managed Settings State
   const [fedexFolderId, setFedexFolderId] = useState('');
 
-  useEffect(() => {
-    const fetchUserProperties = async () => {
-      // ACTUAL IMPLEMENTATION: Call Next.js API route that calls Apps Script
-      try {
-        console.log('Fetching user properties from /api/gscript/get-all-user-properties');
-        const response = await fetch('/api/gscript/get-all-user-properties'); 
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to fetch settings. Status: ${response.status}. Response: ${errorText}`);
-        }
-        
-        const data = await response.json();
-        console.log('Fetched user properties:', data);
+  const fetchAndSetUserProperties = useCallback(async () => {
+    if (!user) {
+      setIsLoadingData(false);
+      return;
+    }
+    setIsLoadingData(true);
+    setFetchError(null);
+    try {
+      const response = await fetch('/api/user/settings'); 
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch settings. Status: ${response.status}. Response: ${errorText}`);
+      }
+      
+      const data = await response.json();
 
-        // Set all states based on data from the API
-        // Veeqo
-        if (data.hasOwnProperty('VEEQO_API_KEY')) { 
-          setVeeqoApiKey(data.VEEQO_API_KEY);
-          setIsVeeqoApiKeyEditing(false);
-          setVeeqoApiKeySaveStatus('success');
+      const setDataField = (value, setter, setEditing, setSaveStatus) => {
+        if (value !== undefined && value !== null && value !== '') {
+          setter(value);
+          setEditing(false);
+          setSaveStatus('success');
+        } else {
+          setter('');
+          setEditing(true);
+          setSaveStatus('idle');
         }
-        // General
-        if (data.hasOwnProperty('DEFAULT_CURRENCY_CODE')) {
-          setDefaultCurrencyCode(data.DEFAULT_CURRENCY_CODE);
-          setIsDefaultCurrencyCodeEditing(false);
-          setDefaultCurrencyCodeSaveStatus('success');
-        }
-        // Trendyol
-        if (data.hasOwnProperty('TRENDYOL_API_KEY')) { 
-          setTrendyolApiKey(data.TRENDYOL_API_KEY);
-          setIsTrendyolApiKeyEditing(false);
-          setTrendyolApiKeySaveStatus('success');
-        }
-        if (data.hasOwnProperty('TRENDYOL_API_SECRET')) { 
-          setTrendyolApiSecret(data.TRENDYOL_API_SECRET);
-          setIsTrendyolApiSecretEditing(false);
-          setTrendyolApiSecretSaveStatus('success');
-        }
-        if (data.hasOwnProperty('TRENDYOL_SUPPLIER_ID')) { 
-          setTrendyolSupplierId(data.TRENDYOL_SUPPLIER_ID);
-          setIsTrendyolSupplierIdEditing(false);
-          setTrendyolSupplierIdSaveStatus('success');
-        }
-        // Shippo
-        if (data.hasOwnProperty('SHIPPO_TOKEN')) { 
-          setShippoApiToken(data.SHIPPO_TOKEN);
-          setIsShippoApiTokenEditing(false);
-          setShippoApiTokenSaveStatus('success');
-        }
-        // Customs & Payment
-        if (data.hasOwnProperty('DUTIES_PAYMENT_TYPE')) {
-          setDutiesPaymentType(data.DUTIES_PAYMENT_TYPE);
-          setIsDutiesPaymentTypeEditing(false);
-          setDutiesPaymentTypeSaveStatus('success');
-        }
-        // FedEx API
-        if (data.hasOwnProperty('FEDEX_ACCOUNT_NUMBER')) {
-          setFedexAccountNumber(data.FEDEX_ACCOUNT_NUMBER);
-          setIsFedexAccountNumberEditing(false);
-          setFedexAccountNumberSaveStatus('success');
-        }
-        if (data.hasOwnProperty('FEDEX_API_KEY')) {
-          setFedexApiKey(data.FEDEX_API_KEY);
-          setIsFedexApiKeyEditing(false);
-          setFedexApiKeySaveStatus('success');
-        }
-        if (data.hasOwnProperty('FEDEX_API_SECRET')) {
-          setFedexApiSecret(data.FEDEX_API_SECRET);
-          setIsFedexApiSecretEditing(false);
-          setFedexApiSecretSaveStatus('success');
-        }
-        // Shipper Information (now individual fields for Importer of Record)
-        if (data.hasOwnProperty('IMPORTER_OF_RECORD')) { 
-          try {
-            const importerData = JSON.parse(data.IMPORTER_OF_RECORD);
-            if (importerData && importerData.contact && importerData.address) {
-              setImporterContactPersonName(importerData.contact.personName || '');
-              setImporterContactCompanyName(importerData.contact.companyName || '');
-              setImporterContactPhoneNumber(importerData.contact.phoneNumber || '');
-              setImporterContactEmailAddress(importerData.contact.emailAddress || '');
-              setImporterAddressStreetLines(Array.isArray(importerData.address.streetLines) ? importerData.address.streetLines.join('\n') : importerData.address.streetLines || '');
-              setImporterAddressCity(importerData.address.city || '');
-              setImporterAddressStateCode(importerData.address.stateOrProvinceCode || '');
-              setImporterAddressPostalCode(importerData.address.postalCode || '');
-              setImporterAddressCountryCode(importerData.address.countryCode || '');
-              
-              setIsImporterSectionEditing(false);
-              setImporterSectionSaveStatus('success');
-            } else {
-              // Data is malformed or incomplete, keep editable
-              setIsImporterSectionEditing(true);
-              setImporterSectionSaveStatus('idle');
-            }
-          } catch (e) {
-            console.error("Error parsing IMPORTER_OF_RECORD JSON:", e);
+      };
+
+      setDataField(data.veeqoApiKey, setVeeqoApiKey, setIsVeeqoApiKeyEditing, setVeeqoApiKeySaveStatus);
+      setDataField(data.trendyolApiKey, setTrendyolApiKey, setIsTrendyolApiKeyEditing, setTrendyolApiKeySaveStatus);
+      setDataField(data.trendyolApiSecret, setTrendyolApiSecret, setIsTrendyolApiSecretEditing, setTrendyolApiSecretSaveStatus);
+      setDataField(data.trendyolSupplierId, setTrendyolSupplierId, setIsTrendyolSupplierIdEditing, setTrendyolSupplierIdSaveStatus);
+      setDataField(data.shippoToken, setShippoApiToken, setIsShippoApiTokenEditing, setShippoApiTokenSaveStatus);
+      setDataField(data.fedexAccountNumber, setFedexAccountNumber, setIsFedexAccountNumberEditing, setFedexAccountNumberSaveStatus);
+      setDataField(data.fedexApiKey, setFedexApiKey, setIsFedexApiKeyEditing, setFedexApiKeySaveStatus);
+      setDataField(data.fedexApiSecret, setFedexApiSecret, setIsFedexApiSecretEditing, setFedexApiSecretSaveStatus);
+      setDataField(data.hepsiburadaMerchantId, setHepsiburadaMerchantId, setIsHepsiburadaMerchantIdEditing, setHepsiburadaMerchantIdSaveStatus);
+      setDataField(data.hepsiburadaApiKey, setHepsiburadaApiKey, setIsHepsiburadaApiKeyEditing, setHepsiburadaApiKeySaveStatus);
+
+      if (data.hasOwnProperty('IMPORTER_OF_RECORD')) { 
+        try {
+          const importerData = JSON.parse(data.IMPORTER_OF_RECORD);
+          if (importerData && importerData.contact && importerData.address) {
+            setImporterContactPersonName(importerData.contact.personName || '');
+            setImporterContactCompanyName(importerData.contact.companyName || '');
+            setImporterContactPhoneNumber(importerData.contact.phoneNumber || '');
+            setImporterContactEmailAddress(importerData.contact.emailAddress || '');
+            setImporterAddressStreetLines(Array.isArray(importerData.address.streetLines) ? importerData.address.streetLines.join('\n') : importerData.address.streetLines || '');
+            setImporterAddressCity(importerData.address.city || '');
+            setImporterAddressStateCode(importerData.address.stateOrProvinceCode || '');
+            setImporterAddressPostalCode(importerData.address.postalCode || '');
+            setImporterAddressCountryCode(importerData.address.countryCode || '');
+            
+            setIsImporterSectionEditing(false);
+            setImporterSectionSaveStatus('success');
+          } else {
             setIsImporterSectionEditing(true);
             setImporterSectionSaveStatus('idle');
           }
+        } catch (e) {
+          console.error("Error parsing IMPORTER_OF_RECORD JSON:", e);
+          setIsImporterSectionEditing(true);
+          setImporterSectionSaveStatus('idle');
         }
-        if (data.hasOwnProperty('SHIPPER_CITY')) { setShipperCity(data.SHIPPER_CITY); setIsShipperCityEditing(false); setShipperCitySaveStatus('success'); }
-        if (data.hasOwnProperty('SHIPPER_COUNTRY_CODE')) { setShipperCountryCode(data.SHIPPER_COUNTRY_CODE); setIsShipperCountryCodeEditing(false); setShipperCountryCodeSaveStatus('success'); }
-        if (data.hasOwnProperty('SHIPPER_POSTAL_CODE')) { setShipperPostalCode(data.SHIPPER_POSTAL_CODE); setIsShipperPostalCodeEditing(false); setShipperPostalCodeSaveStatus('success'); }
-        if (data.hasOwnProperty('SHIPPER_STATE_CODE')) { setShipperStateCode(data.SHIPPER_STATE_CODE); setIsShipperStateCodeEditing(false); setShipperStateCodeSaveStatus('success'); }
-        if (data.hasOwnProperty('SHIPPER_TIN_NUMBER')) { setShipperTinNumber(data.SHIPPER_TIN_NUMBER); setIsShipperTinNumberEditing(false); setShipperTinNumberSaveStatus('success'); }
-        
-        // System Managed Settings (FEDEX_FOLDER_ID)
-        if (data.hasOwnProperty('FEDEX_FOLDER_ID')) {
-          setFedexFolderId(data.FEDEX_FOLDER_ID);
-        }
-
-      } catch (error) {
-        console.error("Error fetching user properties:", error);
-        // TODO: Optionally set an error state to display a message to the user
-        // For example: setPageErrorState('Ayarlar yüklenirken bir sorun oluştu.');
       }
-    };
+      if (data.hasOwnProperty('SHIPPER_CITY')) { setShipperCity(data.SHIPPER_CITY); setIsShipperCityEditing(false); setShipperCitySaveStatus('success'); }
+      if (data.hasOwnProperty('SHIPPER_COUNTRY_CODE')) { setShipperCountryCode(data.SHIPPER_COUNTRY_CODE); setIsShipperCountryCodeEditing(false); setShipperCountryCodeSaveStatus('success'); }
+      if (data.hasOwnProperty('SHIPPER_POSTAL_CODE')) { setShipperPostalCode(data.SHIPPER_POSTAL_CODE); setIsShipperPostalCodeEditing(false); setShipperPostalCodeSaveStatus('success'); }
+      if (data.hasOwnProperty('SHIPPER_STATE_CODE')) { setShipperStateCode(data.SHIPPER_STATE_CODE); setIsShipperStateCodeEditing(false); setShipperStateCodeSaveStatus('success'); }
+      if (data.hasOwnProperty('SHIPPER_TIN_NUMBER')) { setShipperTinNumber(data.SHIPPER_TIN_NUMBER); setIsShipperTinNumberEditing(false); setShipperTinNumberSaveStatus('success'); }
+      
+      if (data.hasOwnProperty('FEDEX_FOLDER_ID')) {
+        setFedexFolderId(data.FEDEX_FOLDER_ID);
+      }
 
-    if (status === 'authenticated') {
-      fetchUserProperties();
+    } catch (error) {
+      console.error("Error fetching user settings in component:", error);
+      setFetchError(error.message);
+    } finally {
+      setIsLoadingData(false);
     }
-  }, [status]);
+  }, [user]);
+
+  useEffect(() => {
+    if (status === 'authenticated' && user) {
+      fetchAndSetUserProperties();
+    } else if (status === 'loading') {
+      setIsLoadingData(true);
+    }
+  }, [status, user, fetchAndSetUserProperties]);
 
   const handleSaveProperty = async (propertyName, value, setSaveStatus, setIsEditing) => {
     if (!user?.id) {
@@ -366,15 +334,15 @@ export default function SettingsPage() {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text).then(() => {
-      alert('ID Kopyalandı!'); // Or use a more subtle toast notification
+      alert('ID Kopyalandı!');
     }).catch(err => {
       console.error('Failed to copy text: ', err);
       alert('Kopyalama başarısız oldu.');
     });
   };
 
-  if (status === 'loading') {
-    return <AppLayout title="Ayarlar Yükleniyor..."><div className="flex justify-center items-center h-screen"><p>Yükleniyor...</p></div></AppLayout>;
+  if (authLoading || (status === 'authenticated' && isLoadingData)) {
+    return <AppLayout title="Ayarlar Yükleniyor..."><div className="flex justify-center items-center h-screen"><Loader2 className='animate-spin w-10 h-10 text-blue-500' /> <p className='ml-3 text-slate-500'>Ayarlar yükleniyor...</p></div></AppLayout>;
   }
 
   if (status === 'unauthenticated') {
@@ -382,14 +350,19 @@ export default function SettingsPage() {
       supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.href,
+          redirectTo: window.location.origin + '/app/settings',
         },
       });
     }
+    return <AppLayout title="Yönlendiriliyor..."><div className="flex justify-center items-center h-screen"><p>Giriş sayfasına yönlendiriliyor...</p></div></AppLayout>;
+  }
+
+  if (fetchError) {
     return (
-      <AppLayout title="Giriş Yapın - KolayXport">
-        <div className="flex justify-center items-center h-screen">
-          <p>Giriş sayfasına yönlendiriliyorsunuz...</p>
+      <AppLayout title="Hata - Ayarlar">
+        <div className="p-8 text-center">
+          <p className="text-red-500">Ayarlar yüklenirken bir hata oluştu: {fetchError}</p>
+          <button onClick={fetchAndSetUserProperties} className="mt-4 btn-primary">Tekrar Dene</button>
         </div>
       </AppLayout>
     );
@@ -924,13 +897,11 @@ export default function SettingsPage() {
         </div>
       </ApiSection>
 
-      {/* System Managed Settings Section - NEW */}
       <ApiSection 
         title="Otomatik Ayarlar (Sistem)" 
         icon={FolderCog} 
         description="Bu ayarlar sistem tarafından yönetilir ve onboarding sırasında otomatik olarak oluşturulur."
       >
-        {/* FEDEX_FOLDER_ID - Read-only */}
         <div className="flex items-center space-x-2">
           <div className="flex-grow">
             <label htmlFor="fedexFolderIdDisplay" className="block text-sm font-medium text-slate-700 mb-1">

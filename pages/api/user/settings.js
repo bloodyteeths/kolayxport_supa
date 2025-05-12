@@ -1,4 +1,4 @@
-import { getSupabaseServerClient } from '../../lib/supabase';
+import { getSupabaseServerClient } from '../../../lib/supabase';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req, res) {

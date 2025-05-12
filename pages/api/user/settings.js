@@ -1,95 +1,98 @@
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getSession } from '@auth0/nextjs-auth0';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req, res) {
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError) {
-    console.error('[User Settings API] Supabase getUser auth error:', authError);
-    return res.status(401).json({ error: 'Authentication error', details: authError.message });
-  }
-  
-  if (!user) {
-    console.warn('[User Settings API] Unauthorized: User not authenticated.');
-    return res.status(401).json({ error: 'Unauthorized: User not authenticated' });
-  }
-  const userId = user.id;
-  console.log(`[User Settings API] Authenticated. Attempting to process request for userId: ${userId}, method: ${req.method}`);
-
-  if (req.method === 'GET') {
-    try {
-      console.log(`[User Settings API] Inside GET try block. About to call Prisma for userId: ${userId}`);
-      const userSettings = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          // Select all the fields that are configured on the settings page
-          veeqoApiKey: true,
-          shippoToken: true,
-          fedexApiKey: true,
-          fedexApiSecret: true,
-          fedexAccountNumber: true,
-          fedexMeterNumber: true,
-          trendyolSupplierId: true,
-          trendyolApiKey: true,
-          trendyolApiSecret: true,
-          hepsiburadaMerchantId: true,
-          hepsiburadaApiKey: true,
-          // Add any other fields that were previously fetched from gscript properties
-          // For example, if IMPORTER_OF_RECORD and Shipper TIN were stored as distinct fields:
-          // importerContactPersonName: true, 
-          // importerContactCompanyName: true,
-          // ...etc.
-          // shipperTinNumber: true,
-          
-          // For now, let's assume the main API keys. 
-          // The IMPORTER_OF_RECORD was a JSON string, 
-          // that needs to be decided if it's stored as JSON or individual fields in Prisma.
-          // Based on setScriptProps, they are individual fields.
-        },
-      });
-      console.log(`[User Settings API] Prisma call completed for userId: ${userId}. Found settings: ${!!userSettings}`);
-
-      if (!userSettings) {
-        console.warn(`[User Settings API] User settings not found in database for authenticated userId: ${userId}`);
-        // Return an object with all fields as null/empty so the frontend can show blank fields
-        return res.status(200).json({
-          veeqoApiKey: null,
-          shippoToken: null,
-          fedexApiKey: null,
-          fedexApiSecret: null,
-          fedexAccountNumber: null,
-          fedexMeterNumber: null,
-          trendyolSupplierId: null,
-          trendyolApiKey: null,
-          trendyolApiSecret: null,
-          hepsiburadaMerchantId: null,
-          hepsiburadaApiKey: null
-        });
-      }
-      
-      // Transform to the flat key-value structure the settings page expects
-      // (e.g. VEEQO_API_KEY instead of veeqoApiKey) for compatibility,
-      // or update the settings page to use camelCase.
-      // For now, let's send camelCase and update settings page later if needed.
-      console.log(`[User Settings API] Successfully fetched settings for userId: ${userId}. Returning data.`);
-      return res.status(200).json(userSettings);
-
-    } catch (err) {
-      console.error('[User Settings API] Error in GET try block while fetching settings:', err);
-      // Check if the error is a Prisma known error for better diagnostics
-      if (err.code) { // Prisma errors often have a code
-        console.error(`[User Settings API] Prisma error code: ${err.code}, meta: ${JSON.stringify(err.meta)}`);
-      }
-      return res.status(500).json({ error: 'Internal Server Error fetching settings.', details: err.message });
+  try {
+    const session = await getSession(req, res);
+    if (!session || !session.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-  } else if (req.method === 'POST') {
-    console.log(`[User Settings API] Received POST request for userId: ${userId}. This method is not fully implemented here yet.`);
-    res.setHeader('Allow', ['GET']);
-    return res.status(405).json({ error: `Method ${req.method} not supported yet on this endpoint. Use /api/setScriptProps for saving.` });
-  } else {
-    console.warn(`[User Settings API] Method ${req.method} not allowed for userId: ${userId}.`);
-    res.setHeader('Allow', ['GET']);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+
+    const userId = session.user.sub;
+    console.info(`[User Settings API] Authenticated. Attempting to process request for userId: ${userId}, method: ${req.method}`);
+
+    if (req.method === 'GET') {
+      try {
+        console.info(`[User Settings API] Inside GET try block. About to call Prisma for userId: ${userId}`);
+        const userSettings = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            veeqoApiKey: true,
+            shippoToken: true,
+            fedexApiKey: true,
+            fedexApiSecret: true,
+            fedexAccountNumber: true,
+            fedexMeterNumber: true,
+            trendyolSupplierId: true,
+            trendyolApiKey: true,
+            trendyolApiSecret: true,
+            hepsiburadaMerchantId: true,
+            hepsiburadaApiKey: true,
+            IMPORTER_OF_RECORD: true,
+            SHIPPER_TIN_NUMBER: true,
+            SHIPPER_CITY: true,
+            SHIPPER_COUNTRY_CODE: true,
+            SHIPPER_NAME: true,
+            SHIPPER_PERSON_NAME: true,
+            SHIPPER_PHONE_NUMBER: true,
+            SHIPPER_POSTAL_CODE: true,
+            SHIPPER_STATE_CODE: true,
+            SHIPPER_STREET1: true,
+            SHIPPER_STREET2: true,
+            SHIPPER_TIN_NUMBER: true,
+            FEDEX_FOLDER_ID: true,
+            DEFAULT_CURRENCY_CODE: true,
+            DUTIES_PAYMENT_TYPE: true
+          }
+        });
+
+        console.info(`[User Settings API] Prisma call completed for userId: ${userId}. Found settings: ${!!userSettings}`);
+
+        if (!userSettings) {
+          console.warn(`[User Settings API] User settings not found in database for authenticated userId: ${userId}`);
+          // Return empty settings object instead of 404
+          return res.status(200).json({
+            veeqoApiKey: null,
+            shippoToken: null,
+            fedexApiKey: null,
+            fedexApiSecret: null,
+            fedexAccountNumber: null,
+            fedexMeterNumber: null,
+            trendyolSupplierId: null,
+            trendyolApiKey: null,
+            trendyolApiSecret: null,
+            hepsiburadaMerchantId: null,
+            hepsiburadaApiKey: null,
+            IMPORTER_OF_RECORD: null,
+            SHIPPER_TIN_NUMBER: null,
+            SHIPPER_CITY: null,
+            SHIPPER_COUNTRY_CODE: null,
+            SHIPPER_NAME: null,
+            SHIPPER_PERSON_NAME: null,
+            SHIPPER_PHONE_NUMBER: null,
+            SHIPPER_POSTAL_CODE: null,
+            SHIPPER_STATE_CODE: null,
+            SHIPPER_STREET1: null,
+            SHIPPER_STREET2: null,
+            FEDEX_FOLDER_ID: null,
+            DEFAULT_CURRENCY_CODE: null,
+            DUTIES_PAYMENT_TYPE: null
+          });
+        }
+
+        return res.status(200).json(userSettings);
+      } catch (error) {
+        console.error(`[User Settings API] Error in GET try block while fetching settings:`, error);
+        return res.status(500).json({ error: 'Internal server error while fetching settings' });
+      }
+    } else {
+      res.setHeader('Allow', ['GET']);
+      res.status(405).end(`Method ${req.method} Not Allowed`);
+    }
+  } catch (error) {
+    console.error('[User Settings API] Error in main try block:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    await prisma.$disconnect();
   }
 } 

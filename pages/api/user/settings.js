@@ -24,7 +24,7 @@ export default async function handler(req, res) {
           veeqoApiKey: true,
           shippoToken: true,
           fedexApiKey: true,
-          fedexSecretKey: true,
+          fedexApiSecret: true,
           fedexAccountNumber: true,
           fedexMeterNumber: true,
           trendyolSupplierId: true,

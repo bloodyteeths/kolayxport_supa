@@ -1,14 +1,24 @@
-import { getSession } from '@auth0/nextjs-auth0';
+import { getSupabaseServerClient } from '@/lib/supabase';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req, res) {
   try {
-    const session = await getSession(req, res);
-    if (!session || !session.user) {
+    const supabase = getSupabaseServerClient(req, res);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error('[User Settings API] Supabase auth error:', authError);
+      return res.status(401).json({ error: 'Authentication error', details: authError.message });
+    }
+
+    if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const userId = session.user.sub;
+    const userId = user.id;
     console.info(`[User Settings API] Authenticated. Attempting to process request for userId: ${userId}, method: ${req.method}`);
 
     if (req.method === 'GET') {
@@ -93,6 +103,6 @@ export default async function handler(req, res) {
     console.error('[User Settings API] Error in main try block:', error);
     return res.status(500).json({ error: 'Internal server error' });
   } finally {
-    await prisma.$disconnect();
+    // Do not force disconnect for every invocation in serverless; Prisma will handle.
   }
 } 

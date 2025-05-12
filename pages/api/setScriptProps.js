@@ -1,4 +1,4 @@
-import { getSession } from '@auth0/nextjs-auth0';
+import { getSupabaseServerClient } from '@/lib/supabase';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req, res) {
@@ -8,12 +8,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const session = await getSession(req, res);
-    if (!session || !session.user) {
+    const supabase = getSupabaseServerClient(req, res);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error('[setScriptProps] Supabase auth error:', authError);
+      return res.status(401).json({ error: 'Authentication error', details: authError.message });
+    }
+
+    if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const userId = session.user.sub;
+    const userId = user.id;
     const body = req.body;
 
     if (!body || typeof body !== 'object') {
@@ -67,6 +77,6 @@ export default async function handler(req, res) {
     console.error('[SetScriptProps API] Error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   } finally {
-    await prisma.$disconnect();
+    // No explicit disconnect needed.
   }
 } 

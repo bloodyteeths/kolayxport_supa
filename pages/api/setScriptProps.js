@@ -44,7 +44,6 @@ export default async function handler(req, res) {
     if ('TRENDYOL_API_SECRET' in body) updateData.trendyolApiSecret = body.TRENDYOL_API_SECRET;
     if ('HEPSIBURADA_MERCHANT_ID' in body) updateData.hepsiburadaMerchantId = body.HEPSIBURADA_MERCHANT_ID;
     if ('HEPSIBURADA_API_KEY' in body) updateData.hepsiburadaApiKey = body.HEPSIBURADA_API_KEY;
-    if ('IMPORTER_OF_RECORD' in body) updateData.IMPORTER_OF_RECORD = body.IMPORTER_OF_RECORD;
     if ('SHIPPER_TIN_NUMBER' in body) updateData.SHIPPER_TIN_NUMBER = body.SHIPPER_TIN_NUMBER;
     if ('SHIPPER_CITY' in body) updateData.SHIPPER_CITY = body.SHIPPER_CITY;
     if ('SHIPPER_COUNTRY_CODE' in body) updateData.SHIPPER_COUNTRY_CODE = body.SHIPPER_COUNTRY_CODE;
@@ -55,9 +54,6 @@ export default async function handler(req, res) {
     if ('SHIPPER_STATE_CODE' in body) updateData.SHIPPER_STATE_CODE = body.SHIPPER_STATE_CODE;
     if ('SHIPPER_STREET1' in body) updateData.SHIPPER_STREET1 = body.SHIPPER_STREET1;
     if ('SHIPPER_STREET2' in body) updateData.SHIPPER_STREET2 = body.SHIPPER_STREET2;
-    if ('FEDEX_FOLDER_ID' in body) updateData.FEDEX_FOLDER_ID = body.FEDEX_FOLDER_ID;
-    if ('DEFAULT_CURRENCY_CODE' in body) updateData.DEFAULT_CURRENCY_CODE = body.DEFAULT_CURRENCY_CODE;
-    if ('DUTIES_PAYMENT_TYPE' in body) updateData.DUTIES_PAYMENT_TYPE = body.DUTIES_PAYMENT_TYPE;
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No valid properties to update' });

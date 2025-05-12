@@ -6,17 +6,20 @@ export default async function handler(req, res) {
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
   if (sessionError) {
-    console.error('Supabase getSession error in /api/user/settings:', sessionError);
+    console.error('[User Settings API] Supabase getSession error:', sessionError);
     return res.status(500).json({ error: 'Authentication error' });
   }
 
   if (!session?.user?.id) {
+    console.warn('[User Settings API] Unauthorized: User not authenticated or session.user.id missing.');
     return res.status(401).json({ error: 'Unauthorized: User not authenticated' });
   }
   const userId = session.user.id;
+  console.log(`[User Settings API] Authenticated. Attempting to process request for userId: ${userId}, method: ${req.method}`);
 
   if (req.method === 'GET') {
     try {
+      console.log(`[User Settings API] Inside GET try block. About to call Prisma for userId: ${userId}`);
       const userSettings = await prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -45,10 +48,10 @@ export default async function handler(req, res) {
           // Based on setScriptProps, they are individual fields.
         },
       });
+      console.log(`[User Settings API] Prisma call completed for userId: ${userId}. Found settings: ${!!userSettings}`);
 
       if (!userSettings) {
-        // This case should ideally not happen if the user is authenticated,
-        // as a user record should exist.
+        console.warn(`[User Settings API] User settings not found in database for authenticated userId: ${userId}`);
         return res.status(404).json({ error: 'User settings not found.' });
       }
       
@@ -56,18 +59,23 @@ export default async function handler(req, res) {
       // (e.g. VEEQO_API_KEY instead of veeqoApiKey) for compatibility,
       // or update the settings page to use camelCase.
       // For now, let's send camelCase and update settings page later if needed.
+      console.log(`[User Settings API] Successfully fetched settings for userId: ${userId}. Returning data.`);
       return res.status(200).json(userSettings);
 
     } catch (err) {
-      console.error('Error fetching user settings:', err);
+      console.error('[User Settings API] Error in GET try block while fetching settings:', err);
+      // Check if the error is a Prisma known error for better diagnostics
+      if (err.code) { // Prisma errors often have a code
+        console.error(`[User Settings API] Prisma error code: ${err.code}, meta: ${JSON.stringify(err.meta)}`);
+      }
       return res.status(500).json({ error: 'Internal Server Error fetching settings.', details: err.message });
     }
   } else if (req.method === 'POST') {
-    // TODO: Consolidate POST logic from /api/setScriptProps.js here
-    // For now, just indicate it's not implemented in this specific file yet for POST
-    res.setHeader('Allow', ['GET']); // Only GET is implemented for now
+    console.log(`[User Settings API] Received POST request for userId: ${userId}. This method is not fully implemented here yet.`);
+    res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: `Method ${req.method} not supported yet on this endpoint. Use /api/setScriptProps for saving.` });
   } else {
+    console.warn(`[User Settings API] Method ${req.method} not allowed for userId: ${userId}.`);
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }

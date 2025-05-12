@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
-import { Settings, Save, Key, ShoppingCart, Truck, Check, Edit, Info, FileText, Package, UserSquare, FolderCog, ClipboardCopy } from 'lucide-react';
+import { Settings, Save, Key, ShoppingCart, Truck, Check, Edit, Info, FileText, Package, UserSquare, FolderCog, ClipboardCopy, Loader } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { NextSeo } from 'next-seo';
 import { supabase } from '@/lib/supabase';
@@ -342,7 +342,7 @@ export default function SettingsPage() {
   };
 
   if (authLoading || (status === 'authenticated' && isLoadingData)) {
-    return <AppLayout title="Ayarlar Yükleniyor..."><div className="flex justify-center items-center h-screen"><Loader2 className='animate-spin w-10 h-10 text-blue-500' /> <p className='ml-3 text-slate-500'>Ayarlar yükleniyor...</p></div></AppLayout>;
+    return <AppLayout title="Ayarlar Yükleniyor..."><div className="flex justify-center items-center h-screen"><Loader className='animate-spin w-10 h-10 text-blue-500' /> <p className='ml-3 text-slate-500'>Ayarlar yükleniyor...</p></div></AppLayout>;
   }
 
   if (status === 'unauthenticated') {

@@ -1,8 +1,8 @@
-import { createPagesServerClient } from '@supabase/ssr';
+import * as supabaseSSR from '@supabase/ssr';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req, res) {
-  const supabase = createPagesServerClient({ req, res });
+  const supabase = supabaseSSR.createPagesServerClient({ req, res });
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
   if (sessionError) {

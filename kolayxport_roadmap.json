@@ -76,14 +76,14 @@
     },
     {
       "phase": 4,
-      "title": "Order Syncing Service",
-      "description": "Adapter-based syncing of orders from Veeqo & Trendyol into Supabase.",
-      "status": "Completed",
-      "completion_notes": "Order syncing implemented via /api/syncOrders.js, which calls a Google Apps Script function (syncOrdersToSheet) rather than using direct adapters. Cron job set up for this API.",
+      "title": "API Endpoints for Core Actions",
+      "description": "Develop APIs for order sync, label generation, and settings.",
+      "status": "Completed and Refactored",
+      "completion_notes": "Initial API endpoints for order sync, label generation, and settings created. Order sync and Google Sheets/Apps Script related endpoints (e.g., /api/syncOrders, /api/getOrders, /api/onboarding/setup, /api/gscript/*) have been REMOVED as part of decoupling from Google Sheets. Label generation (/api/generateLabel) is mocked and interacts with Prisma. Settings (/api/setScriptProps) updates user data in Prisma. All Supabase authentication helpers upgraded from @supabase/auth-helpers-* to @supabase/ssr to resolve cookie issues and use current best practices.",
       "steps": [
-        "Write adapter modules: `fetchVeeqoOrders(config)`, `fetchTrendyolOrders(config)`.",
-        "API route `POST /api/sync`: loop user configs, call adapters, upsert orders & items.",
-        "Cron schedule `/api/sync` every 15m."
+        "Implement `POST /api/labels/generate` to enqueue or run label-gen.",
+        "Update LabelJob status & store PDF in Supabase Storage or alternative.",
+        "Return signed URL to front-end."
       ]
     },
     {
@@ -124,14 +124,15 @@
     },
     {
       "phase": 8,
-      "title": "Future - Inventory Management",
-      "description": "Extend system to let users create/manage products in Veeqo or marketplaces.",
-      "status": "Completed",
-      "completion_notes": "Inventory management foundation laid with Prisma models (Product, Inventory, MarketplaceProduct), UI pages for product CRUD (pages/urunler.js) and inventory (pages/envanter.js), and a mocked API endpoint (/api/products/sync).",
+      "title": "Deployment & Iteration",
+      "description": "Deploy to Vercel, test thoroughly, gather feedback, and iterate.",
+      "status": "In Progress - Critical Bug Fixing",
+      "completion_notes": "Initial deployment to Vercel. Faced several build/runtime issues. Path alias issues with jsconfig.json resolved. Git history and project structure cleaned up. Next-auth completely removed and replaced with Supabase auth. Ongoing: Resolved Google Apps Script dependencies and runtime cookie errors by migrating to @supabase/ssr. Dashboard UI for old GSheet onboarding removed. Login/redirect flow being actively debugged.",
       "steps": [
-        "Design Product & Inventory tables in DB.",
-        "Build UI CRUD for products.",
-        "Sync creations/updates to Veeqo and other channels."
+        "Deploy to Vercel",
+        "Test thoroughly",
+        "Gather feedback",
+        "Iterate based on feedback"
       ]
     }
   ]

@@ -1,17 +1,16 @@
+// .cursor/mcp.json
 {
     "mcpServers": {
-      "composio": {
-        "url":       "https://mcp.composio.dev",
-        "manifest":  "https://mcp.composio.dev/.well-known/mcp-manifest",
+      "kolayxport-local": {
+        "url": "http://localhost:3000",
         "headers": {
-          "Authorization": "Bearer 2c2xxx7gnwq0xksa0y0n15"
+          "Authorization": "Bearer 548337B7-5BA3-44BA-8106-7E9D11BB3710"
         }
       },
-      "kolayxport-local": {
-        "url":       "http://localhost:3000",
-        "manifest":  "http://localhost:3000/.well-known/mcp-manifest",
+      "composio": {
+        "url": "https://mcp.composio.dev",
         "headers": {
-          "mcp-api-key": "548337B7-5BA3-44BA-8106-7E9D11BB3710"
+          "Authorization": "Bearer 2c2xxx7gnwq0xksa0y0n15"
         }
       }
     }

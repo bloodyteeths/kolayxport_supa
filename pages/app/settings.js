@@ -147,6 +147,14 @@ export default function SettingsPage() {
 
   const [fedexFolderId, setFedexFolderId] = useState('');
 
+  const [hepsiburadaMerchantId, setHepsiburadaMerchantId] = useState('');
+  const [isHepsiburadaMerchantIdEditing, setIsHepsiburadaMerchantIdEditing] = useState(true);
+  const [hepsiburadaMerchantIdSaveStatus, setHepsiburadaMerchantIdSaveStatus] = useState('idle');
+
+  const [hepsiburadaApiKey, setHepsiburadaApiKey] = useState('');
+  const [isHepsiburadaApiKeyEditing, setIsHepsiburadaApiKeyEditing] = useState(true);
+  const [hepsiburadaApiKeySaveStatus, setHepsiburadaApiKeySaveStatus] = useState('idle');
+
   const fetchAndSetUserProperties = useCallback(async () => {
     if (!user) {
       setIsLoadingData(false);

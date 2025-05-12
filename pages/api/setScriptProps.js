@@ -1,5 +1,5 @@
 // import { getSession } from 'next-auth/react'; // REMOVED
-import { createPagesServerClient } from '@supabase/ssr'; // MODIFIED
+import { getSupabaseServerClient } from '../../lib/supabase'; // Correct import
 // import { cookies } from 'next/headers'; // REMOVED - not directly used with createPagesServerClient
 import prisma from '@/lib/prisma';
 
@@ -10,19 +10,19 @@ export default async function handler(req, res) {
   }
 
   // const supabase = createRouteHandlerClient({ cookies }); // OLD
-  const supabase = createPagesServerClient({ req, res }); // NEW
-  
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const supabase = getSupabaseServerClient(req, res); // Use the new helper
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (sessionError) {
-    console.error('Supabase getSession error in setScriptProps:', sessionError);
-    return res.status(500).json({ error: 'Authentication error' });
+  if (authError) {
+    console.error('Supabase getUser error in setScriptProps:', authError);
+    // Consistent error status for auth issues
+    return res.status(401).json({ error: 'Authentication error', details: authError.message }); 
   }
 
-  if (!session?.user?.id) {
+  if (!user) {
     return res.status(401).json({ error: 'Unauthorized: User not authenticated' });
   }
-  const userId = session.user.id;
+  const userId = user.id;
   
   const body = req.body;
   
@@ -35,7 +35,8 @@ export default async function handler(req, res) {
     if ('VEEQO_API_KEY' in body) updateData.veeqoApiKey = body.VEEQO_API_KEY;
     if ('SHIPPO_TOKEN' in body) updateData.shippoToken = body.SHIPPO_TOKEN;
     if ('FEDEX_API_KEY' in body) updateData.fedexApiKey = body.FEDEX_API_KEY;
-    if ('FEDEX_API_SECRET' in body) updateData.fedexSecretKey = body.FEDEX_API_SECRET;
+    // Ensure this matches your Prisma schema. Assuming it was changed to fedexApiSecret previously.
+    if ('FEDEX_API_SECRET' in body) updateData.fedexApiSecret = body.FEDEX_API_SECRET; 
     if ('FEDEX_ACCOUNT_NUMBER' in body) updateData.fedexAccountNumber = body.FEDEX_ACCOUNT_NUMBER;
     if ('FEDEX_METER_NUMBER' in body) updateData.fedexMeterNumber = body.FEDEX_METER_NUMBER;
     // if ('FEDEX_FOLDER_ID' in body) updateData.driveFolderId = body.FEDEX_FOLDER_ID; // This was likely for GDrive, remove

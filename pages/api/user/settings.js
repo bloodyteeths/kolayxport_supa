@@ -1,20 +1,20 @@
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabaseServerClient } from '../../lib/supabase';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req, res) {
-  const supabase = createPagesServerClient({ req, res });
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const supabase = getSupabaseServerClient(req, res);
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (sessionError) {
-    console.error('[User Settings API] Supabase getSession error:', sessionError);
-    return res.status(500).json({ error: 'Authentication error' });
+  if (authError) {
+    console.error('[User Settings API] Supabase getUser auth error:', authError);
+    return res.status(401).json({ error: 'Authentication error', details: authError.message });
   }
-
-  if (!session?.user?.id) {
-    console.warn('[User Settings API] Unauthorized: User not authenticated or session.user.id missing.');
+  
+  if (!user) {
+    console.warn('[User Settings API] Unauthorized: User not authenticated.');
     return res.status(401).json({ error: 'Unauthorized: User not authenticated' });
   }
-  const userId = session.user.id;
+  const userId = user.id;
   console.log(`[User Settings API] Authenticated. Attempting to process request for userId: ${userId}, method: ${req.method}`);
 
   if (req.method === 'GET') {

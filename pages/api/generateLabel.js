@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
 import prisma from '@/lib/prisma';
-import { createPagesServerClient } from '@supabase/ssr';
+import { getSupabaseServerClient } from '../../lib/supabase';
 
 dotenv.config();
 
@@ -32,23 +32,23 @@ async function generateShippingLabel(labelData, userCarrierConfig) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  // const supabase = createRouteHandlerClient({ cookies }); // OLD
-  const supabase = createPagesServerClient({ req, res }); // NEW
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const supabase = getSupabaseServerClient(req, res);
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (sessionError) {
-    console.error('Supabase getSession error in generateLabel:', sessionError);
-    return res.status(500).json({ error: 'Authentication error' });
+  if (authError) {
+    console.error('Supabase getUser error in generateLabel:', authError);
+    return res.status(401).json({ error: 'Authentication error', details: authError.message });
   }
 
-  if (!session?.user?.id) {
+  if (!user) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
-  const userId = session.user.id; // Keep userId if LabelJob needs it directly
+  const userId = user.id;
   const { orderId, items, carrier, shippingDetails } = req.body;
 
   if (!orderId || !items || !carrier || !shippingDetails) {
@@ -56,14 +56,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const userCarrierConfig = { carrierApiKey: "USER_SPECIFIC_API_KEY_FOR_" + carrier };
+    const userCarrierConfig = { carrierApiKey: "USER_SPECIFIC_API_KEY_FOR_" + carrier, userId };
 
     const labelJob = await prisma.labelJob.create({
       data: {
         order: { connect: { id: orderId } }, 
         carrier: carrier,
         status: 'PENDING',
-        // userId: userId, // Uncomment if LabelJob model has a direct userId field
+        user: { connect: { id: userId } },
       },
     });
 
@@ -98,6 +98,9 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('Error in /api/generateLabel:', error);
-    return res.status(500).json({ message: 'Internal server error generating label.' });
+    if (error.code) {
+        console.error(`Prisma error in generateLabel: ${error.code} - ${error.message}`);
+    }
+    return res.status(500).json({ message: 'Internal server error generating label.', details: error.message });
   }
 } 

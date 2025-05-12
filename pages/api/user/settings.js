@@ -52,7 +52,20 @@ export default async function handler(req, res) {
 
       if (!userSettings) {
         console.warn(`[User Settings API] User settings not found in database for authenticated userId: ${userId}`);
-        return res.status(404).json({ error: 'User settings not found.' });
+        // Return an object with all fields as null/empty so the frontend can show blank fields
+        return res.status(200).json({
+          veeqoApiKey: null,
+          shippoToken: null,
+          fedexApiKey: null,
+          fedexApiSecret: null,
+          fedexAccountNumber: null,
+          fedexMeterNumber: null,
+          trendyolSupplierId: null,
+          trendyolApiKey: null,
+          trendyolApiSecret: null,
+          hepsiburadaMerchantId: null,
+          hepsiburadaApiKey: null
+        });
       }
       
       // Transform to the flat key-value structure the settings page expects

@@ -1,4 +1,4 @@
-import { getServiceSupabase } from '@/lib/supabase';
+import { getSupabaseServerClient } from '@/lib/supabase';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -58,11 +58,12 @@ export default async function handler(req, res) {
   
   try {
     // Authenticate with Supabase
-    const supabase = getServiceSupabase();
-    const { user } = await supabase.auth.getUser();
+    const supabase = getSupabaseServerClient(req, res);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    if (authError) {
+      console.error('Supabase auth error in labels/generate:', authError);
+      return res.status(401).json({ error: 'Authentication error', details: authError.message });
     }
     
     // Get user's marketplace configs

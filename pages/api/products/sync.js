@@ -1,4 +1,4 @@
-import { getServiceSupabase } from '@/lib/supabase';
+import { getSupabaseServerClient } from '../../../lib/supabase';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -42,6 +42,7 @@ const fetchTrendyolProducts = async (config) => {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method not allowed' });
   }
   
@@ -52,10 +53,13 @@ export default async function handler(req, res) {
   }
   
   try {
-    // Authenticate with Supabase
-    const supabase = getServiceSupabase();
-    const { user } = await supabase.auth.getUser();
+    const supabase = getSupabaseServerClient(req, res);
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
+    if (authError) {
+      console.error('Supabase auth error in products/sync:', authError);
+      return res.status(401).json({ error: 'Authentication error', details: authError.message });
+    }
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -69,22 +73,22 @@ export default async function handler(req, res) {
     });
     
     if (!marketplaceConfig) {
-      return res.status(400).json({ error: `No ${marketplaceType} configuration found` });
+      return res.status(400).json({ error: `No ${marketplaceType} configuration found for user` });
     }
     
     // Fetch products from marketplace
     let products = [];
     
-    if (marketplaceType === 'veeqo') {
+    if (marketplaceType.toLowerCase() === 'veeqo') {
       products = await fetchVeeqoProducts(marketplaceConfig.config);
-    } else if (marketplaceType === 'trendyol') {
+    } else if (marketplaceType.toLowerCase() === 'trendyol') {
       products = await fetchTrendyolProducts(marketplaceConfig.config);
     } else {
       return res.status(400).json({ error: 'Unsupported marketplace type' });
     }
     
     if (!products || products.length === 0) {
-      return res.status(200).json({ message: 'No products found to import' });
+      return res.status(200).json({ message: 'No products found to import from ' + marketplaceType });
     }
     
     // Process each product
@@ -189,19 +193,22 @@ export default async function handler(req, res) {
         });
         
       } catch (error) {
-        console.error(`Error processing product ${productData.sku}:`, error);
+        console.error(`Error processing product ${productData.sku} from ${marketplaceType}:`, error);
         results.errors++;
       }
     }
     
     return res.status(200).json({
       success: true,
-      message: `Imported ${results.created + results.updated} products (${results.created} new, ${results.updated} updated)`,
+      message: `Product sync for ${marketplaceType} completed. New: ${results.created}, Updated: ${results.updated}, Errors: ${results.errors}`,
       results
     });
     
   } catch (error) {
-    console.error('Error syncing products:', error);
-    return res.status(500).json({ error: 'Failed to sync products' });
+    console.error(`Error syncing products for ${marketplaceType}:`, error);
+    if (error.code) {
+        console.error(`Prisma error in products/sync: ${error.code} - ${error.message}`);
+    }
+    return res.status(500).json({ error: 'Failed to sync products', details: error.message });
   }
 } 

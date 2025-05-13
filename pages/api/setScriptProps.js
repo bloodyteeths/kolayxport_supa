@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     const supabase = getSupabaseServerClient(req, res);
     const {
-      data: { user },
+      data: { user: authUser },
       error: authError,
     } = await supabase.auth.getUser();
 
@@ -19,58 +19,89 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Authentication error', details: authError.message });
     }
 
-    if (!user) {
+    if (!authUser) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const userId = user.id;
+    const userId = authUser.id;
     const body = req.body;
 
     if (!body || typeof body !== 'object') {
       return res.status(400).json({ error: 'Invalid request body' });
     }
 
-    const updateData = {};
+    const userUpdateData = {};
+    const shipperProfileUpdateData = {};
 
-    // Map the incoming keys to database column names
-    if ('VEEQO_API_KEY' in body) updateData.veeqoApiKey = body.VEEQO_API_KEY;
-    if ('SHIPPO_TOKEN' in body) updateData.shippoToken = body.SHIPPO_TOKEN;
-    if ('FEDEX_API_KEY' in body) updateData.fedexApiKey = body.FEDEX_API_KEY;
-    if ('FEDEX_API_SECRET' in body) updateData.fedexApiSecret = body.FEDEX_API_SECRET;
-    if ('FEDEX_ACCOUNT_NUMBER' in body) updateData.fedexAccountNumber = body.FEDEX_ACCOUNT_NUMBER;
-    if ('FEDEX_METER_NUMBER' in body) updateData.fedexMeterNumber = body.FEDEX_METER_NUMBER;
-    if ('TRENDYOL_SUPPLIER_ID' in body) updateData.trendyolSupplierId = body.TRENDYOL_SUPPLIER_ID;
-    if ('TRENDYOL_API_KEY' in body) updateData.trendyolApiKey = body.TRENDYOL_API_KEY;
-    if ('TRENDYOL_API_SECRET' in body) updateData.trendyolApiSecret = body.TRENDYOL_API_SECRET;
-    if ('HEPSIBURADA_MERCHANT_ID' in body) updateData.hepsiburadaMerchantId = body.HEPSIBURADA_MERCHANT_ID;
-    if ('HEPSIBURADA_API_KEY' in body) updateData.hepsiburadaApiKey = body.HEPSIBURADA_API_KEY;
-    if ('SHIPPER_TIN_NUMBER' in body) updateData.SHIPPER_TIN_NUMBER = body.SHIPPER_TIN_NUMBER;
-    if ('SHIPPER_CITY' in body) updateData.SHIPPER_CITY = body.SHIPPER_CITY;
-    if ('SHIPPER_COUNTRY_CODE' in body) updateData.SHIPPER_COUNTRY_CODE = body.SHIPPER_COUNTRY_CODE;
-    if ('SHIPPER_NAME' in body) updateData.SHIPPER_NAME = body.SHIPPER_NAME;
-    if ('SHIPPER_PERSON_NAME' in body) updateData.SHIPPER_PERSON_NAME = body.SHIPPER_PERSON_NAME;
-    if ('SHIPPER_PHONE_NUMBER' in body) updateData.SHIPPER_PHONE_NUMBER = body.SHIPPER_PHONE_NUMBER;
-    if ('SHIPPER_POSTAL_CODE' in body) updateData.SHIPPER_POSTAL_CODE = body.SHIPPER_POSTAL_CODE;
-    if ('SHIPPER_STATE_CODE' in body) updateData.SHIPPER_STATE_CODE = body.SHIPPER_STATE_CODE;
-    if ('SHIPPER_STREET1' in body) updateData.SHIPPER_STREET1 = body.SHIPPER_STREET1;
-    if ('SHIPPER_STREET2' in body) updateData.SHIPPER_STREET2 = body.SHIPPER_STREET2;
+    // --- Direct User fields (API Keys) ---
+    if ('veeqoApiKey' in body) userUpdateData.veeqoApiKey = body.veeqoApiKey;
+    if ('shippoToken' in body) userUpdateData.shippoToken = body.shippoToken;
+    if ('fedexApiKey' in body) userUpdateData.fedexApiKey = body.fedexApiKey;
+    if ('fedexApiSecret' in body) userUpdateData.fedexApiSecret = body.fedexApiSecret;
+    if ('fedexAccountNumber' in body) userUpdateData.fedexAccountNumber = body.fedexAccountNumber;
+    if ('fedexMeterNumber' in body) userUpdateData.fedexMeterNumber = body.fedexMeterNumber;
+    if ('trendyolSupplierId' in body) userUpdateData.trendyolSupplierId = body.trendyolSupplierId;
+    if ('trendyolApiKey' in body) userUpdateData.trendyolApiKey = body.trendyolApiKey;
+    if ('trendyolApiSecret' in body) userUpdateData.trendyolApiSecret = body.trendyolApiSecret;
+    if ('hepsiburadaMerchantId' in body) userUpdateData.hepsiburadaMerchantId = body.hepsiburadaMerchantId;
+    if ('hepsiburadaApiKey' in body) userUpdateData.hepsiburadaApiKey = body.hepsiburadaApiKey;
 
-    if (Object.keys(updateData).length === 0) {
-      return res.status(400).json({ error: 'No valid properties to update' });
-    }
+    // --- ShipperProfile fields ---
+    // Note: Frontend should send these as camelCase matching ShipperProfile model
+    if ('importerOfRecord' in body) shipperProfileUpdateData.importerOfRecord = body.importerOfRecord;
+    if ('shipperName' in body) shipperProfileUpdateData.shipperName = body.shipperName;
+    if ('shipperPersonName' in body) shipperProfileUpdateData.shipperPersonName = body.shipperPersonName;
+    if ('shipperPhoneNumber' in body) shipperProfileUpdateData.shipperPhoneNumber = body.shipperPhoneNumber;
+    if ('shipperStreet1' in body) shipperProfileUpdateData.shipperStreet1 = body.shipperStreet1;
+    if ('shipperStreet2' in body) shipperProfileUpdateData.shipperStreet2 = body.shipperStreet2;
+    if ('shipperCity' in body) shipperProfileUpdateData.shipperCity = body.shipperCity;
+    if ('shipperStateCode' in body) shipperProfileUpdateData.shipperStateCode = body.shipperStateCode;
+    if ('shipperPostalCode' in body) shipperProfileUpdateData.shipperPostalCode = body.shipperPostalCode;
+    if ('shipperCountryCode' in body) shipperProfileUpdateData.shipperCountryCode = body.shipperCountryCode;
+    if ('shipperTinNumber' in body) shipperProfileUpdateData.shipperTinNumber = body.shipperTinNumber;
+    if ('fedexFolderId' in body) shipperProfileUpdateData.fedexFolderId = body.fedexFolderId;
+    if ('defaultCurrencyCode' in body) shipperProfileUpdateData.defaultCurrencyCode = body.defaultCurrencyCode;
+    if ('dutiesPaymentType' in body) shipperProfileUpdateData.dutiesPaymentType = body.dutiesPaymentType;
 
-    const updatedUser = await prisma.user.upsert({
-      where: { id: userId },
-      update: updateData,
-      create: {
-        id: userId,
-        ...updateData
+    let updatedUser = null;
+    let updatedShipperProfile = null;
+
+    // Start a transaction to update both User and ShipperProfile
+    await prisma.$transaction(async (tx) => {
+      if (Object.keys(userUpdateData).length > 0) {
+        updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: userUpdateData,
+        });
+      }
+
+      if (Object.keys(shipperProfileUpdateData).length > 0) {
+        updatedShipperProfile = await tx.shipperProfile.upsert({
+          where: { userId: userId }, 
+          create: {
+            userId: userId,
+            ...shipperProfileUpdateData,
+          },
+          update: shipperProfileUpdateData,
+        });
       }
     });
 
-    return res.status(200).json({ message: 'Settings updated successfully', data: updatedUser });
+    if (!updatedUser && !updatedShipperProfile) {
+        return res.status(400).json({ error: 'No valid properties to update for User or ShipperProfile' });
+    }
+
+    return res.status(200).json({ 
+      message: 'Settings updated successfully', 
+      user: updatedUser, // Will be null if no user fields were updated
+      shipperProfile: updatedShipperProfile // Will be null if no shipper fields were updated
+    });
+
   } catch (error) {
     console.error('[SetScriptProps API] Error:', error);
+    if (error.code === 'P2002' && error.meta?.target?.includes('userId')) {
+        return res.status(409).json({ error: 'Conflict: Shipper profile already exists for this user.' });
+    } // Added more specific error for unique constraint if upsert logic fails for some reason
     return res.status(500).json({ error: 'Internal server error' });
   } finally {
     // No explicit disconnect needed.

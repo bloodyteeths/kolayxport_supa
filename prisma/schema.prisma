@@ -52,6 +52,7 @@ model User {
   marketplaceConfigs  MarketplaceConfig[]
   orders         Order[]
   products       Product[]
+  shipperProfile ShipperProfile? // Add relation to ShipperProfile
 }
 
 // --- NextAuth Models (Required for PrismaAdapter) --- 
@@ -230,4 +231,34 @@ model MarketplaceProduct {
   product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   
   @@unique([marketplace, marketplaceId])
+}
+
+// --- New Model for Shipper/FedEx Details ---
+model ShipperProfile {
+  id                  String  @id @default(uuid())
+  userId              String  @unique // One-to-one relation with User
+  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Shipper Details
+  shipperName         String?
+  shipperPersonName   String?
+  shipperPhoneNumber  String?
+  shipperStreet1      String?
+  shipperStreet2      String?
+  shipperCity         String?
+  shipperStateCode    String?
+  shipperPostalCode   String?
+  shipperCountryCode  String?
+  shipperTinNumber    String? // Renamed from SHIPPER_TIN_NUMBER in API request
+
+  // Importer of Record (Assuming it's a JSON string for now, adjust if needed)
+  importerOfRecord    String? // JSON string or dedicated fields?
+
+  // FedEx Specific
+  fedexFolderId       String? // For Supabase storage path maybe?
+  defaultCurrencyCode String?
+  dutiesPaymentType   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

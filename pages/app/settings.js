@@ -302,7 +302,7 @@ export default function SettingsPage() {
       const response = await fetch('/api/setScriptProps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ IMPORTER_OF_RECORD: JSON.stringify(payload) })
+        body: JSON.stringify({ importerOfRecord: JSON.stringify(payload) })
       });
       const data = await response.json();
       if (response.ok && data.success) {
@@ -325,7 +325,7 @@ export default function SettingsPage() {
       const response = await fetch('/api/setScriptProps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ SHIPPER_TIN_NUMBER: shipperTinNumber })
+        body: JSON.stringify({ shipperTinNumber: shipperTinNumber })
       });
       const data = await response.json();
       if (response.ok && data.success) {
@@ -411,7 +411,7 @@ export default function SettingsPage() {
           </div>
           {isDefaultCurrencyCodeEditing ? (
             <button
-              onClick={() => handleSaveProperty('DEFAULT_CURRENCY_CODE', defaultCurrencyCode, setDefaultCurrencyCodeSaveStatus, setIsDefaultCurrencyCodeEditing)}
+              onClick={() => handleSaveProperty('defaultCurrencyCode', defaultCurrencyCode, setDefaultCurrencyCodeSaveStatus, setIsDefaultCurrencyCodeEditing)}
               disabled={defaultCurrencyCodeSaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
@@ -452,7 +452,7 @@ export default function SettingsPage() {
           </div>
           {isDutiesPaymentTypeEditing ? (
             <button
-              onClick={() => handleSaveProperty('DUTIES_PAYMENT_TYPE', dutiesPaymentType, setDutiesPaymentTypeSaveStatus, setIsDutiesPaymentTypeEditing)}
+              onClick={() => handleSaveProperty('dutiesPaymentType', dutiesPaymentType, setDutiesPaymentTypeSaveStatus, setIsDutiesPaymentTypeEditing)}
               disabled={dutiesPaymentTypeSaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
@@ -493,7 +493,7 @@ export default function SettingsPage() {
           </div>
           {isTrendyolSupplierIdEditing ? (
             <button
-              onClick={() => handleSaveProperty('TRENDYOL_SUPPLIER_ID', trendyolSupplierId, setTrendyolSupplierIdSaveStatus, setIsTrendyolSupplierIdEditing)}
+              onClick={() => handleSaveProperty('trendyolSupplierId', trendyolSupplierId, setTrendyolSupplierIdSaveStatus, setIsTrendyolSupplierIdEditing)}
               disabled={trendyolSupplierIdSaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
@@ -526,13 +526,13 @@ export default function SettingsPage() {
               label="Trendyol API Anahtarı (API Key)"
               value={trendyolApiKey}
               onChange={(e) => setTrendyolApiKey(e.target.value)}
-              placeholder="ABC123XYZ789..."
+              placeholder="Trendyol API Anahtarınız"
               disabled={!isTrendyolApiKeyEditing}
             />
           </div>
           {isTrendyolApiKeyEditing ? (
             <button
-              onClick={() => handleSaveProperty('TRENDYOL_API_KEY', trendyolApiKey, setTrendyolApiKeySaveStatus, setIsTrendyolApiKeyEditing)}
+              onClick={() => handleSaveProperty('trendyolApiKey', trendyolApiKey, setTrendyolApiKeySaveStatus, setIsTrendyolApiKeyEditing)}
               disabled={trendyolApiKeySaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
@@ -563,16 +563,15 @@ export default function SettingsPage() {
             <InputField
               id="trendyolApiSecret"
               label="Trendyol API Gizli Anahtarı (API Secret)"
-              type="password"
               value={trendyolApiSecret}
               onChange={(e) => setTrendyolApiSecret(e.target.value)}
-              placeholder="••••••••••••••••••••"
+              placeholder="Trendyol API Gizli Anahtarınız"
               disabled={!isTrendyolApiSecretEditing}
             />
           </div>
           {isTrendyolApiSecretEditing ? (
             <button
-              onClick={() => handleSaveProperty('TRENDYOL_API_SECRET', trendyolApiSecret, setTrendyolApiSecretSaveStatus, setIsTrendyolApiSecretEditing)}
+              onClick={() => handleSaveProperty('trendyolApiSecret', trendyolApiSecret, setTrendyolApiSecretSaveStatus, setIsTrendyolApiSecretEditing)}
               disabled={trendyolApiSecretSaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
@@ -604,17 +603,16 @@ export default function SettingsPage() {
           <div className="flex-grow">
             <InputField
               id="shippoApiToken"
-              label="Shippo Özel API Token (Private API Token)"
-              type="password"
+              label="Shippo API Token"
               value={shippoApiToken}
               onChange={(e) => setShippoApiToken(e.target.value)}
-              placeholder="shippo_live_abcdef12345..."
+              placeholder="Shippo API Token'ınız (live veya test)"
               disabled={!isShippoApiTokenEditing}
             />
           </div>
           {isShippoApiTokenEditing ? (
             <button
-              onClick={() => handleSaveProperty('SHIPPO_TOKEN', shippoApiToken, setShippoApiTokenSaveStatus, setIsShippoApiTokenEditing)}
+              onClick={() => handleSaveProperty('shippoToken', shippoApiToken, setShippoApiTokenSaveStatus, setIsShippoApiTokenEditing)}
               disabled={shippoApiTokenSaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
@@ -655,7 +653,7 @@ export default function SettingsPage() {
           </div>
           {isFedexAccountNumberEditing ? (
             <button
-              onClick={() => handleSaveProperty('FEDEX_ACCOUNT_NUMBER', fedexAccountNumber, setFedexAccountNumberSaveStatus, setIsFedexAccountNumberEditing)}
+              onClick={() => handleSaveProperty('fedexAccountNumber', fedexAccountNumber, setFedexAccountNumberSaveStatus, setIsFedexAccountNumberEditing)}
               disabled={fedexAccountNumberSaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
@@ -685,17 +683,16 @@ export default function SettingsPage() {
           <div className="flex-grow">
             <InputField
               id="fedexApiKey"
-              label="FedEx API Anahtarı (API Key)"
-              type="password"
+              label="FedEx API Key"
               value={fedexApiKey}
               onChange={(e) => setFedexApiKey(e.target.value)}
-              placeholder="FedEx API Anahtarınız"
+              placeholder="FedEx API Key"
               disabled={!isFedexApiKeyEditing}
             />
           </div>
           {isFedexApiKeyEditing ? (
             <button
-              onClick={() => handleSaveProperty('FEDEX_API_KEY', fedexApiKey, setFedexApiKeySaveStatus, setIsFedexApiKeyEditing)}
+              onClick={() => handleSaveProperty('fedexApiKey', fedexApiKey, setFedexApiKeySaveStatus, setIsFedexApiKeyEditing)}
               disabled={fedexApiKeySaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
@@ -725,17 +722,16 @@ export default function SettingsPage() {
           <div className="flex-grow">
             <InputField
               id="fedexApiSecret"
-              label="FedEx API Gizli Anahtarı (API Secret)"
-              type="password"
+              label="FedEx API Secret"
               value={fedexApiSecret}
               onChange={(e) => setFedexApiSecret(e.target.value)}
-              placeholder="FedEx API Gizli Anahtarınız"
+              placeholder="FedEx API Secret"
               disabled={!isFedexApiSecretEditing}
             />
           </div>
           {isFedexApiSecretEditing ? (
             <button
-              onClick={() => handleSaveProperty('FEDEX_API_SECRET', fedexApiSecret, setFedexApiSecretSaveStatus, setIsFedexApiSecretEditing)}
+              onClick={() => handleSaveProperty('fedexApiSecret', fedexApiSecret, setFedexApiSecretSaveStatus, setIsFedexApiSecretEditing)}
               disabled={fedexApiSecretSaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >
@@ -869,16 +865,15 @@ export default function SettingsPage() {
             <InputField
               id="veeqoApiKey"
               label="Veeqo API Anahtarı"
-              type="password"
               value={veeqoApiKey}
               onChange={(e) => setVeeqoApiKey(e.target.value)}
-              placeholder="Veeqo API anahtarınız"
+              placeholder="Veeqo API Anahtarınız"
               disabled={!isVeeqoApiKeyEditing}
             />
           </div>
           {isVeeqoApiKeyEditing ? (
             <button
-              onClick={() => handleSaveProperty('VEEQO_API_KEY', veeqoApiKey, setVeeqoApiKeySaveStatus, setIsVeeqoApiKeyEditing)}
+              onClick={() => handleSaveProperty('veeqoApiKey', veeqoApiKey, setVeeqoApiKeySaveStatus, setIsVeeqoApiKeyEditing)}
               disabled={veeqoApiKeySaveStatus === 'saving'}
               className="px-4 py-2 h-[38px] bg-blue-600 text-white font-semibold text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center whitespace-nowrap"
             >

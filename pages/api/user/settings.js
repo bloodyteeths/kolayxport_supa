@@ -45,8 +45,36 @@ export default async function handler(req, res) {
         console.info(`[User Settings API] Prisma call completed for userId: ${userId}. Found user: ${!!userWithProfile}`);
 
         if (!userWithProfile) {
-          console.warn(`[User Settings API] User record not found in database for authenticated userId: ${userId}`);
-          return res.status(404).json({ error: 'User record not found' });
+          console.warn(`[User Settings API] User record not found in database for authenticated userId: ${userId}. Returning default empty settings.`);
+          // Return a default empty structure if user or profile not found
+          return res.status(200).json({
+            veeqoApiKey: null,
+            shippoToken: null,
+            fedexApiKey: null,
+            fedexApiSecret: null,
+            fedexAccountNumber: null,
+            fedexMeterNumber: null,
+            trendyolSupplierId: null,
+            trendyolApiKey: null,
+            trendyolApiSecret: null,
+            hepsiburadaMerchantId: null,
+            hepsiburadaApiKey: null,
+            // Default empty ShipperProfile fields
+            importerOfRecord: null,
+            shipperName: null,
+            shipperPersonName: null,
+            shipperPhoneNumber: null,
+            shipperStreet1: null,
+            shipperStreet2: null,
+            shipperCity: null,
+            shipperStateCode: null,
+            shipperPostalCode: null,
+            shipperCountryCode: null,
+            shipperTinNumber: null,
+            fedexFolderId: null,
+            defaultCurrencyCode: null,
+            dutiesPaymentType: null,
+          });
         }
 
         const settingsResponse = {

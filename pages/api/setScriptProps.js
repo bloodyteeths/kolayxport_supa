@@ -68,22 +68,45 @@ export default async function handler(req, res) {
 
     // Start a transaction to update both User and ShipperProfile
     await prisma.$transaction(async (tx) => {
-      if (Object.keys(userUpdateData).length > 0) {
-        updatedUser = await tx.user.update({
+      // Upsert User: Create if not exists (using Supabase authId as our User.id), else update
+      // Ensure email is included on creation
+      const userDataForCreate = {
+        id: userId, // Use Supabase auth user ID as our User table ID
+        email: authUser.email, // Set email on creation
+        ...userUpdateData,
+      };
+
+      if (Object.keys(userUpdateData).length > 0 || !await tx.user.findUnique({ where: { id: userId } })) {
+        updatedUser = await tx.user.upsert({
           where: { id: userId },
-          data: userUpdateData,
+          create: userDataForCreate,
+          update: userUpdateData,
         });
+      } else {
+        // If user exists but no userUpdateData is provided, we might still want to fetch them
+        // to return in the response, or just leave updatedUser as null if no update occurred.
+        // For now, if no user fields to update for an existing user, updatedUser remains null.
       }
 
       if (Object.keys(shipperProfileUpdateData).length > 0) {
-        updatedShipperProfile = await tx.shipperProfile.upsert({
-          where: { userId: userId }, 
-          create: {
-            userId: userId,
-            ...shipperProfileUpdateData,
-          },
-          update: shipperProfileUpdateData,
-        });
+        // Check if user exists before trying to upsert shipper profile
+        // This ensures ShipperProfile is only created/updated if its parent User record exists or is created.
+        const userExists = updatedUser || await tx.user.findUnique({ where: { id: userId } });
+        if (userExists) {
+          updatedShipperProfile = await tx.shipperProfile.upsert({
+            where: { userId: userId }, 
+            create: {
+              userId: userId, // Explicitly set relation scalar field
+              ...shipperProfileUpdateData,
+            },
+            update: shipperProfileUpdateData,
+          });
+        } else {
+          // This case should ideally not be reached if user upsert logic is correct.
+          // If it is, it means a new user with no userUpdateData was processed, 
+          // and we are trying to create a shipper profile for a non-existent user.
+          console.warn(`[SetScriptProps API] User with id ${userId} not found and not created, cannot upsert shipper profile.`);
+        }
       }
     });
 

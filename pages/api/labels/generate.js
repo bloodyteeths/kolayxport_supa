@@ -1,4 +1,4 @@
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getSupabaseServerClient } from '../../../lib/supabase';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();

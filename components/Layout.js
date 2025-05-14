@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import * as React from 'react'
-import { Home, CreditCard, Bell, LogIn, LogOut } from 'lucide-react'
+import { Home, CreditCard, Bell, LogIn, LogOut, Settings } from 'lucide-react'
 import { useAuth } from "@/lib/auth-context"
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -29,13 +29,17 @@ export default function Layout({ children }) {
           </div>
           {session && (
             <nav className="flex-1 px-4 space-y-2">
-              <Link href="/app" className="flex items-center p-2 rounded hover:bg-gray-100 text-gray-700">
+              <Link href="/app" className={`flex items-center p-2 rounded hover:bg-gray-100 text-gray-700 ${router.pathname.startsWith('/app') ? 'bg-gray-100' : ''}`} aria-current={router.pathname.startsWith('/app') ? 'page' : undefined}>
                 <Home className="w-5 h-5 mr-3" />
                 Kontrol Paneli
               </Link>
-              <Link href="/subscribe" className="flex items-center p-2 rounded hover:bg-gray-100 text-gray-700">
+              <Link href="/subscribe" className={`flex items-center p-2 rounded hover:bg-gray-100 text-gray-700 ${router.pathname.startsWith('/subscribe') ? 'bg-gray-100' : ''}`} aria-current={router.pathname.startsWith('/subscribe') ? 'page' : undefined}>
                 <CreditCard className="w-5 h-5 mr-3" />
                 Abonelik
+              </Link>
+              <Link href="/ayarlar" className={`flex items-center p-2 rounded hover:bg-gray-100 text-gray-700 ${router.pathname.startsWith('/ayarlar') ? 'bg-gray-100' : ''}`} aria-current={router.pathname.startsWith('/ayarlar') ? 'page' : undefined}>
+                <Settings className="w-5 h-5 mr-3" />
+                Ayarlar
               </Link>
             </nav>
           )}

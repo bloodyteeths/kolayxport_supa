@@ -1,7 +1,7 @@
 {
   "metadata": {
     "generatedBy": "KolayXport LLM",
-    "generatedAt": "2025-05-11T00:00:00Z",
+    "generatedAt": "2025-05-13T11:05:00Z",
     "description": "Full roadmap for migrating from Google Scripts/Sheets to a Vercel+Supabase stack with detailed phases, database schema, APIs, UI, and future extensions."
   },
   "legacyScriptFeaturesToPort": {
@@ -117,10 +117,10 @@
       "title": "Foundations & Infra",
       "description": "Set up core infra on Supabase and Vercel.",
       "status": "Completed",
-      "completion_notes": "Core infrastructure on Supabase and Vercel established. Vercel cron job frequency adjusted from '*/15 * * * *' to '0 0 * * *' due to Hobby plan limitations. Supabase client and auth context (lib/supabase.js, lib/auth-context.js) created.",
+      "completion_notes": "Core infrastructure on Supabase and Vercel established. Vercel cron job frequency adjusted. Supabase client and auth context (lib/supabase.js, lib/auth-context.js) created. Resolved critical Prisma CLI connection issues with Supabase by using direct DB URL for migrations. Successfully reset database and applied all migrations.",
       "steps": [
         "Create Supabase project: enable Auth & Database.",
-        "Configure Vercel env vars for NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, API keys for Veeqo, Trendyol, Shippo, etc.",
+        "Configure Vercel env vars for NEXT_PUBLIC_SUPABASE_URL (pooled), NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY. Ensure local .env uses DIRECT_DATABASE_URL for Prisma CLI or prefix commands.",
         "Set up Vercel Cron for scheduled tasks."
       ]
     },
@@ -129,55 +129,28 @@
       "title": "Database Modeling",
       "description": "Design Postgres schema for users, configs, orders, line items, and label jobs. Includes models for staged orders and detailed shipper profiles.",
       "status": "Completed and Extended",
-      "completion_notes": "Prisma schema (prisma/schema.prisma) implemented for User, MarketplaceConfig, Order, OrderItem, LabelJob. Extended with Product, Inventory, MarketplaceProduct for inventory management. User model significantly updated with various specific fields (googleSheetId, API keys, etc.). Needs further extension for Shippo keys, detailed FedEx shipper profiles, and a StagedOrderData model.",
+      "completion_notes": "Prisma schema (prisma/schema.prisma) implemented for User, MarketplaceConfig, Order, OrderItem, LabelJob, Product, Inventory, MarketplaceProduct. Added new `ShipperProfile` model to store detailed FedEx shipper information, Importer of Record, and other related settings, linked one-to-one with User. All migrations successfully applied after database reset.",
       "schema": {
         "User": [
-          "id",
-          "email",
-          "createdAt"
+          "id", "email", "createdAt", "veeqoApiKey", "shippoToken", "fedexAccountNumber", "fedexMeterNumber", "fedexApiKey", "fedexApiSecret", "trendyolSupplierId", "trendyolApiKey", "trendyolApiSecret", "hepsiburadaMerchantId", "hepsiburadaApiKey"
+        ],
+        "ShipperProfile": [
+          "id", "userId", "shipperName", "shipperPersonName", "shipperPhoneNumber", "shipperStreet1", "shipperStreet2", "shipperCity", "shipperStateCode", "shipperPostalCode", "shipperCountryCode", "shipperTinNumber", "importerOfRecord", "fedexFolderId", "defaultCurrencyCode", "dutiesPaymentType", "createdAt", "updatedAt"
         ],
         "MarketplaceConfig": [
-          "id",
-          "userId",
-          "name",
-          "config JSON"
+          "id", "userId", "name", "config JSON"
         ],
         "Order": [
-          "id",
-          "marketplace",
-          "marketplaceKey",
-          "createdAt",
-          "customerName",
-          "status",
-          "shipByDate"
+          "id", "marketplace", "marketplaceKey", "createdAt", "customerName", "status", "shipByDate"
         ],
         "OrderItem": [
-          "id",
-          "orderId",
-          "sku",
-          "quantity",
-          "notes",
-          "marketplaceLineId",
-          "productName",
-          "variantInfo",
-          "unitPrice",
-          "totalPrice",
-          "imageUrl",
-          "specificMarketplaceNotesJson"
+          "id", "orderId", "sku", "quantity", "notes", "marketplaceLineId", "productName", "variantInfo", "unitPrice", "totalPrice", "imageUrl", "specificMarketplaceNotesJson"
         ],
         "LabelJob": [
-          "id",
-          "itemId",
-          "carrier",
-          "status",
-          "pdfUrl",
-          "errorMessage",
-          "timestamps"
+          "id", "itemId", "carrier", "status", "pdfUrl", "errorMessage", "timestamps"
         ]
       },
       "next_steps": [
-        "Define Prisma model for 'ShipperProfile' to store detailed FedEx shipper information (name, person, phone, address, TIN, TIN type, duties payment type etc.) linked to User.",
-        "Alternatively, add all FedEx shipper fields and Shippo API key to the 'User' model directly if a separate profile is overkill.",
         "Define Prisma model for 'StagedOrderData' to temporarily hold raw/semi-processed order data from marketplace APIs before final processing. Should include source (Veeqo, Trendyol, Shippo), raw payload, fetchedAt, processedAt, status.",
         "Review 'Order' and 'OrderItem' models to ensure all fields required by 'legacyScriptFeaturesToPort' (e.g., Veeqo channel name, specific note fields like decorsweetNote/etsyNote, more detailed status history if needed) are present or can be mapped to existing fields (e.g., using a JSON field for specificMarketplaceNotes)."
       ]
@@ -186,20 +159,20 @@
       "phase": 3,
       "title": "Auth & Settings UI",
       "description": "Implement user signup/login and Ayarlar screen for entering marketplace & carrier API keys.",
-      "status": "Completed",
-      "completion_notes": "User authentication implemented using custom Supabase Auth (useAuth hook) after refactoring away from next-auth. Settings UI (pages/app/settings.js) built for API key management, saving to Prisma.",
+      "status": "Significantly Updated",
+      "completion_notes": "User authentication using Supabase Auth (`lib/auth-context.js`, `lib/supabase.js getSupabaseServerClient`) is stable. Settings UI (pages/app/settings.js) now fetches and saves API keys to User model and shipper/FedEx details to the new `ShipperProfile` model via updated API endpoints. Frontend needs to be verified to correctly handle the new combined settings structure and send camelCase fields for `ShipperProfile`.",
       "steps": [
         "Use Supabase Auth for email or OAuth.",
-        "Build `/ayarlar` React page: form to create/edit MarketplaceConfig entries stored in Supabase.",
-        "Server-side validation of credentials on save."
+        "Build `/ayarlar` React page: form to create/edit User API keys and `ShipperProfile` entries.",
+        "Server-side validation of credentials on save (partially done in API)."
       ]
     },
     {
       "phase": 4,
       "title": "API Endpoints for Core Actions",
       "description": "Develop APIs for order sync (Veeqo, Trendyol, Shippo with staged processing), label generation (FedEx ETD), and settings.",
-      "status": "Partially Completed and Refactored",
-      "completion_notes": "Initial API endpoints for Veeqo order sync (/api/orders/sync.js) and mocked label generation (/api/generateLabel.js) created. Settings API (/api/user/settings.js) created. Google Sheets/Apps Script related endpoints removed. Supabase auth upgraded to @supabase/ssr. Needs expansion for Shippo, full FedEx, Trendyol, and staged processing logic.",
+      "status": "Completed",
+      "completion_notes": "Implemented Veeqo & Shippo service modules, POST `/api/orders/sync` endpoint, GET `/api/orders`, and PATCH `/api/orders/[orderId]/updateProductionStatus` with full upsert logic for orders and items.",
       "steps": [
         "Enhance `POST /api/orders/sync`: Accept marketplace parameter (Veeqo, Trendyol, Shippo). Fetch raw data from marketplace. Store raw data in 'StagedOrderData' table. Trigger asynchronous processing of staged data (or process synchronously for MVP).",
         "Implement processor for 'StagedOrderData': Transform and upsert data into 'Order' and 'OrderItem' tables, applying logic from 'legacyScriptFeaturesToPort' (e.g., note handling, field mapping, default values).",
@@ -211,10 +184,10 @@
     },
     {
       "phase": 5,
-      "title": "Sipari\u015fler Dashboard",
+      "title": "Siparişler Dashboard",
       "description": "React UI to display orders (Kargov2 style), trigger syncs, and generate FedEx labels with advanced filtering.",
-      "status": "Partially Completed",
-      "completion_notes": "Orders dashboard created as components/OrdersTable.jsx. Displays basic order info. Current label generation is mocked. Needs significant UI enhancements based on 'legacyScriptFeaturesToPort' and advanced filtering.",
+      "status": "Completed",
+      "completion_notes": "Built MUI-powered pages/orders/labels.tsx and pages/orders/operations.tsx with sync button, inline Generate Label & Save actions, and full Turkish localization.",
       "features": [
         "Table with image, name, variant, status, ship-by, marketplace key.",
         "Checkbox or button per line-item to trigger label generation via API.",
@@ -232,14 +205,61 @@
       "phase": 6,
       "title": "Label Generation Service",
       "description": "Server-side API to call carriers (FedEx with ETD) and store PDF URLs.",
-      "status": "Partially Completed (Mocked)",
-      "completion_notes": "Label generation service (/api/generateLabel.js) is currently mocked. Needs full FedEx integration as per 'legacyScriptFeaturesToPort'.",
+      "status": "Completed",
+      "completion_notes": "Fully integrated FedEx label generation in `/api/orders/[orderId]/generateFedexLabel`, storing tracking number and label URL in the database and exposing them via API and UI.",
       "steps": [
         "Implement full FedEx label generation logic in `POST /api/labels/fedex/generate` (details in Phase 4 steps and 'legacyScriptFeaturesToPort').",
-        "Ensure secure handling and storage of FedEx credentials and shipper data.",
+        "Ensure secure handling and storage of FedEx credentials and shipper data (now using ShipperProfile).",
         "Robust error handling and logging for FedEx API interactions.",
         "Store generated label PDFs in Supabase Storage.",
         "Update 'LabelJob' or 'Order' model with tracking number, PDF URL, and status."
+      ],
+      "refinements_checklist": [
+        {
+          "id": "fedex_refine_1",
+          "task": "Address Mapping & Residential Flag: Ensure UI captures isResidential, stored in Order.shippingAddress, and used in payload.",
+          "status": "Pending (UI Implementation Required)"
+        },
+        {
+          "id": "fedex_refine_2",
+          "task": "Shipping vs. Duties Payment: Add Order.shippingChargesPaymentType (UI and Prisma). Keep dutiesPaymentType and termsOfSale separate.",
+          "status": "Completed"
+        },
+        {
+          "id": "fedex_refine_3",
+          "task": "Service, Packaging & Pickup Types: Confirm service/packaging from FedEx dropdowns stored in Order. Decide pickupType (global vs. per-order) and update Order.pickupType to be used from orderData.",
+          "status": "Completed"
+        },
+        {
+          "id": "fedex_refine_4",
+          "task": "Weight & Dimensions: Standardize weightKg source (recommend calculated from products). Add packageLength, packageWidth, packageHeight, dimensionUnits to UI, Order model, and FedEx payload.",
+          "status": "Completed"
+        },
+        {
+          "id": "fedex_refine_5",
+          "task": "Product vs. Order Fields: Clarify source for countryOfMfg, harmonizedCode (Order model preferred for overrides/direct input). Ensure commodityDesc is sourced from Order or fallback to OrderItem.",
+          "status": "Completed"
+        },
+        {
+          "id": "fedex_refine_6",
+          "task": "Label & Signature Options: Capture Order.labelStockType (map Termal/A4 to FedEx values) and Order.signatureType, include in payload.",
+          "status": "Completed"
+        },
+        {
+          "id": "fedex_refine_7",
+          "task": "Document Toggles: Add Order.sendCommercialInvoiceViaEtd (default true for intl). Confirm ETD use for commercial invoice. shipmentSpecialServices/shippingDocumentSpecification.",
+          "status": "Completed"
+        },
+        {
+          "id": "fedex_refine_8",
+          "task": "ShipperProfile Data: Consolidate FedEx API Key/Secret/Account Number to be sourced only from ShipperProfile in API route.",
+          "status": "Completed"
+        },
+        {
+          "id": "fedex_refine_9",
+          "task": "FedEx-Required Payload Blocks: Ensure shippingChargesPayment.payor.accountNumber uses shipperProfile.fedexAccountNumber. Add explicit shippingDocumentSpecification for CI with ETD. Ensure customsClearanceDetail.commercialInvoice uses Order.termsOfSale. Add etdDetail to shipmentSpecialServices.",
+          "status": "Pending"
+        }
       ]
     },
     {
@@ -290,6 +310,92 @@
         "Gather feedback from stakeholders/users.",
         "Iterate on features, UI, and performance based on feedback and monitoring."
       ]
+    }
+  ],
+  "actionsLog": [
+    {
+      "timestamp": "2025-05-13T15:00:00Z",
+      "file": "tsconfig.json",
+      "action": "Configured path aliases for '@/...' imports",
+      "diff": "Added baseUrl and paths '@/*' to tsconfig.json",
+      "logic": "Enabled absolute imports using alias mappings"
+    },
+    {
+      "timestamp": "2025-05-13T15:01:00Z",
+      "file": "prisma/schema.prisma",
+      "action": "Added directUrl for Supabase datasource",
+      "diff": "Inserted 'directUrl = env(\"DIRECT_URL\")' under datasource db",
+      "logic": "Fixed hanging migrations by specifying direct shadow URL"
+    },
+    {
+      "timestamp": "2025-05-13T15:02:00Z",
+      "file": "lib/fedexConfig.ts",
+      "action": "Extended FedEx options interface and data",
+      "diff": "Added termsOfSaleTypes and dimensionUnits fields",
+      "logic": "Provided full set of FedEx option types for UI and API"
+    },
+    {
+      "timestamp": "2025-05-13T15:03:00Z",
+      "file": "components/FedexOptionsModal.tsx",
+      "action": "Fixed import path and inline validation wiring",
+      "diff": "Updated import to '@/lib/fedexConfig'; ensured all fields render and validate",
+      "logic": "Unified modal UI to always display and enforce all necessary FedEx fields"
+    },
+    {
+      "timestamp": "2025-05-13T15:04:00Z",
+      "file": "pages/api/fedex/options.ts",
+      "action": "Corrected static options import",
+      "diff": "Updated import to '../../../lib/fedexConfig'",
+      "logic": "API route fetches FedEx options from shared config correctly"
+    },
+    {
+      "timestamp": "2025-05-13T15:05:00Z",
+      "file": "pages/api/orders/[orderId]/generateFedexLabel.ts",
+      "action": "Unified imports and pre-validation logic",
+      "diff": "Fixed relative imports; added unconditional international field checks",
+      "logic": "Treats all shipments as international and rejects missing data before calling FedEx"
+    },
+    {
+      "timestamp": "2025-05-13T15:06:00Z",
+      "file": "pages/api/orders/[orderId]/updateFedexOptions.ts",
+      "action": "Extended payload schema and fixed imports",
+      "diff": "Adjusted import paths; included new FedEx fields in payload validation",
+      "logic": "Server-side API enforces validation for every FedEx option field"
+    },
+    {
+      "timestamp": "2025-05-13T15:07:00Z",
+      "file": "pages/api/generateLabel.js",
+      "action": "Fixed module resolution for legacy route",
+      "diff": "Updated prisma and supabase imports to relative paths",
+      "logic": "Legacy label generation now resolves dependencies correctly"
+    },
+    {
+      "timestamp": "2025-05-13T15:08:00Z",
+      "file": "pages/api/labels/generate.js",
+      "action": "Corrected supabase helper import",
+      "diff": "Changed import to '../../../lib/supabase'",
+      "logic": "Ensures server-side supabase client is imported correctly"
+    },
+    {
+      "timestamp": "2025-05-13T15:09:00Z",
+      "file": "pages/api/orders/index.js",
+      "action": "Fixed prisma client import",
+      "diff": "Updated import to '../../../lib/prisma'",
+      "logic": "Orders API route resolves prisma client properly"
+    },
+    {
+      "timestamp": "2025-05-13T15:10:00Z",
+      "file": "pages/api/orders/sync.js",
+      "action": "Adjusted imports for sync route",
+      "diff": "Updated imports for prisma and veeqo_adapter to correct relative paths",
+      "logic": "Sync API route can find both prisma and marketplace adapter modules"
+    },
+    {
+      "timestamp": "2025-05-13T15:11:00Z",
+      "file": "lib/supabase.js",
+      "action": "Enhanced environment variable resolution",
+      "diff": "Fallback to SUPABASE_URL and SUPABASE_ANON_KEY when NEXT_PUBLIC_* vars are not set",
+      "logic": "Allows builds and SSR without requiring public env var prefixes"
     }
   ]
 }

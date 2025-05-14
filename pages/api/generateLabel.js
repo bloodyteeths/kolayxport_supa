@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
-import prisma from '@/lib/prisma';
+import prisma from '../../lib/prisma';
 import { getSupabaseServerClient } from '../../lib/supabase';
 
 dotenv.config();

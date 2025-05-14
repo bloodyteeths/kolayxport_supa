@@ -13,7 +13,11 @@
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.5.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
     "@headlessui/react": "^2.2.2",
+    "@mui/material": "^7.1.0",
+    "@mui/x-data-grid": "^8.3.0",
     "@prisma/client": "^6.7.0",
     "@radix-ui/react-label": "^2.1.4",
     "@shadcn/ui": "latest",

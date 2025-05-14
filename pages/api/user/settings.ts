@@ -52,7 +52,7 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      // Ensure a settings row exists for every user
+      // ensure a settings row exists for every user
       await prisma.userIntegrationSettings.upsert({
         where: { userId },
         create: { userId },
@@ -64,6 +64,7 @@ export default async function handler(
         update: {},
       });
 
+      // now fetch from the new tables only
       const integrationSettings = await prisma.userIntegrationSettings.findUnique({
         where: { userId },
       });

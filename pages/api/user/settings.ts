@@ -16,7 +16,7 @@ interface UserSettingsResponse {
     trendyolApiSecret?: string | null;
     hepsiburadaMerchantId?: string | null;
     hepsiburadaApiKey?: string | null;
-  };
+  } | null;
   shipperProfile?: {
     shipperName?: string | null;
     shipperPersonName?: string | null;
@@ -29,11 +29,11 @@ interface UserSettingsResponse {
     shipperCountryCode?: string | null;
     shipperTinNumber?: string | null;
     shipperTinType?: string | null;
-    importerOfRecord?: string | null;
+    importerOfRecord?: any;
     fedexFolderId?: string | null;
     defaultCurrencyCode?: string | null;
     dutiesPaymentType?: string | null;
-  };
+  } | null;
 }
 
 interface ErrorResponse {
@@ -56,76 +56,65 @@ export default async function handler(
   }
   const userId = user.id;
 
+  try {
+    // Ensure records exist
+    await prisma.userIntegrationSettings.upsert({
+      where: { userId },
+      create: { userId },
+      update: {},
+    });
+    await prisma.shipperProfile.upsert({
+      where: { userId },
+      create: { userId },
+      update: {},
+    });
+  } catch (e) {
+    console.error('Initialization error:', e);
+    return res.status(500).json({ error: 'Initialization failed' });
+  }
+
   if (req.method === 'GET') {
     try {
-      // Ensure per-user records exist
-      await prisma.userIntegrationSettings.upsert({
-        where: { userId },
-        create: { userId },
-        update: {},
-      });
-      await prisma.shipperProfile.upsert({
-        where: { userId },
-        create: { userId },
-        update: {},
-      });
-
-      // Fetch user-specific settings
       const integrationSettings = await prisma.userIntegrationSettings.findUnique({ where: { userId } });
       const shipperProfile = await prisma.shipperProfile.findUnique({ where: { userId } });
-
-      return res.status(200).json({
-        integrationSettings: integrationSettings || undefined,
-        shipperProfile: shipperProfile || undefined,
-      });
+      return res.status(200).json({ integrationSettings, shipperProfile });
     } catch (error: any) {
-      console.error('[User Settings API] Error in GET:', error);
-      return res.status(500).json({ error: 'Internal server error while fetching settings' });
+      console.error('[User Settings API] GET error:', error);
+      if (error.code === 'P2022') {
+        return res.status(500).json({ error: 'Schema mismatch: legacy User column still referenced' });
+      }
+      return res.status(500).json({ error: 'Failed to fetch settings', details: error.message });
     }
-  } else if (req.method === 'PATCH') {
-    try {
-      const { integrationSettings: intData, shipperProfile: spData } = req.body as UserSettingsResponse;
-
-      // Sanitize and upsert integration settings
-      if (intData) {
-        const sanitized = Object.fromEntries(
-          Object.entries(intData).map(([k, v]) => [k, v === undefined ? null : v])
-        );
-        await prisma.userIntegrationSettings.upsert({
-          where: { userId },
-          create: { userId, ...sanitized },
-          update: sanitized,
-        });
-      }
-
-      // Sanitize and upsert shipper profile
-      if (spData) {
-        const sanitized = Object.fromEntries(
-          Object.entries(spData).map(([k, v]) => [k, v === undefined ? null : v])
-        );
-        await prisma.shipperProfile.upsert({
-          where: { userId },
-          create: { userId, ...sanitized },
-          update: sanitized,
-        });
-      }
-
-      // Return updated data
-      const updatedIntegrationSettings = await prisma.userIntegrationSettings.findUnique({ where: { userId } });
-      const updatedShipperProfile = await prisma.shipperProfile.findUnique({ where: { userId } });
-      return res.status(200).json({
-        integrationSettings: updatedIntegrationSettings || undefined,
-        shipperProfile: updatedShipperProfile || undefined,
-      });
-    } catch (error: any) {
-      console.error('[User Settings API] Error in PATCH:', error);
-      if (error.code === 'P2002' || error.code === 'P2003' || (error.message && error.message.includes('validation failed'))) {
-        return res.status(400).json({ error: 'Validation failed or constraint violation.', details: error.message });
-      }
-      return res.status(500).json({ error: 'Internal server error while updating settings', details: error.message });
-    }
-  } else {
-    res.setHeader('Allow', ['GET', 'PATCH']);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
+
+  if (req.method === 'PATCH') {
+    try {
+      const { integrationSettings: intBody, shipperProfile: spBody } = req.body as UserSettingsResponse;
+      const sanitize = (data: any) =>
+        Object.fromEntries(
+          Object.entries(data || {}).map(([k, v]) => [k, v === undefined ? null : v])
+        );
+
+      if (intBody) {
+        await prisma.userIntegrationSettings.update({ where: { userId }, data: sanitize(intBody) });
+      }
+      if (spBody) {
+        await prisma.shipperProfile.update({ where: { userId }, data: sanitize(spBody) });
+      }
+
+      const integrationSettings = await prisma.userIntegrationSettings.findUnique({ where: { userId } });
+      const shipperProfile = await prisma.shipperProfile.findUnique({ where: { userId } });
+      return res.status(200).json({ integrationSettings, shipperProfile });
+    } catch (error: any) {
+      console.error('[User Settings API] PATCH error:', error);
+      if (error.code === 'P2022') {
+        return res.status(500).json({ error: 'Schema mismatch: legacy User column still referenced' });
+      }
+      const isValidation = ['P2002', 'P2003'].includes(error.code) || /validation failed/.test(error.message);
+      return res.status(isValidation ? 400 : 500).json({ error: error.message, details: error.meta });
+    }
+  }
+
+  res.setHeader('Allow', ['GET', 'PATCH']);
+  return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 } 

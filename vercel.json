@@ -8,5 +8,11 @@
       "path": "/api/sync",
       "schedule": "0 0 * * *"
     }
-  ]
+  ],
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  },
+  "cache": false
 } 

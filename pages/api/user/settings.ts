@@ -1,120 +1,194 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../../lib/prisma';
 import { getSupabaseServerClient } from '../../../lib/supabase';
+import prisma from '../../../lib/prisma';
+import { Prisma } from '@prisma/client';
 
-// Response shapes
+// Response types
 interface UserSettingsResponse {
-  integrationSettings?: {
-    veeqoApiKey?: string | null;
-    shippoToken?: string | null;
-    fedexApiKey?: string | null;
-    fedexApiSecret?: string | null;
-    fedexAccountNumber?: string | null;
-    fedexMeterNumber?: string | null;
-    trendyolSupplierId?: string | null;
-    trendyolApiKey?: string | null;
-    trendyolApiSecret?: string | null;
-    hepsiburadaMerchantId?: string | null;
-    hepsiburadaApiKey?: string | null;
+  integrationSettings: {
+    veeqoApiKey: string | null;
+    shippoToken: string | null;
+    fedexApiKey: string | null;
+    fedexApiSecret: string | null;
+    fedexAccountNumber: string | null;
   } | null;
-  shipperProfile?: {
-    shipperName?: string | null;
-    shipperPersonName?: string | null;
-    shipperPhoneNumber?: string | null;
-    shipperStreet1?: string | null;
-    shipperStreet2?: string | null;
-    shipperCity?: string | null;
-    shipperStateCode?: string | null;
-    shipperPostalCode?: string | null;
-    shipperCountryCode?: string | null;
-    shipperTinNumber?: string | null;
-    shipperTinType?: string | null;
-    importerOfRecord?: any;
-    fedexFolderId?: string | null;
-    defaultCurrencyCode?: string | null;
-    dutiesPaymentType?: string | null;
+  shipperProfile: {
+    shipperName: string | null;
+    shipperPersonName: string | null;
+    shipperPhoneNumber: string | null;
+    shipperStreet1: string | null;
+    shipperStreet2: string | null;
+    shipperCity: string | null;
+    shipperStateCode: string | null;
+    shipperPostalCode: string | null;
+    shipperCountryCode: string | null;
+    shipperTinNumber: string | null;
+    importerOfRecord: string | null;
+    fedexFolderId: string | null;
+    defaultCurrencyCode: string | null;
+    dutiesPaymentType: string | null;
   } | null;
 }
 
 interface ErrorResponse {
   error: string;
-  details?: any;
+  details?: string;
 }
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<UserSettingsResponse | ErrorResponse>
 ) {
-  const supabase = getSupabaseServerClient(req, res);
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-  const userId = user.id;
-
   try {
-    // Ensure records exist
-    await prisma.userIntegrationSettings.upsert({
-      where: { userId },
-      create: { userId },
-      update: {},
-    });
-    await prisma.shipperProfile.upsert({
-      where: { userId },
-      create: { userId },
-      update: {},
-    });
-  } catch (e) {
-    console.error('Initialization error:', e);
-    return res.status(500).json({ error: 'Initialization failed' });
-  }
+    // Get authenticated user
+    const supabase = getSupabaseServerClient();
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
 
-  if (req.method === 'GET') {
-    try {
-      const integrationSettings = await prisma.userIntegrationSettings.findUnique({ where: { userId } });
-      const shipperProfile = await prisma.shipperProfile.findUnique({ where: { userId } });
-      return res.status(200).json({ integrationSettings, shipperProfile });
-    } catch (error: any) {
-      console.error('[User Settings API] GET error:', error);
-      if (error.code === 'P2022') {
-        return res.status(500).json({ error: 'Schema mismatch: legacy User column still referenced' });
-      }
-      return res.status(500).json({ error: 'Failed to fetch settings', details: error.message });
+    if (authError || !session?.user) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-  }
 
-  if (req.method === 'PATCH') {
-    try {
-      const { integrationSettings: intBody, shipperProfile: spBody } = req.body as UserSettingsResponse;
-      const sanitize = (data: any) =>
-        Object.fromEntries(
-          Object.entries(data || {}).map(([k, v]) => [k, v === undefined ? null : v])
-        );
+    const userId = session.user.id;
 
-      if (intBody) {
-        await prisma.userIntegrationSettings.update({ where: { userId }, data: sanitize(intBody) });
-      }
-      if (spBody) {
-        await prisma.shipperProfile.update({ where: { userId }, data: sanitize(spBody) });
-      }
+    if (req.method === 'GET') {
+      // Fetch user settings from new tables
+      const [integrationSettings, shipperProfile] = await Promise.all([
+        prisma.userIntegrationSettings.findUnique({
+          where: { userId },
+          select: {
+            veeqoApiKey: true,
+            shippoToken: true,
+            fedexApiKey: true,
+            fedexApiSecret: true,
+            fedexAccountNumber: true,
+          },
+        }),
+        prisma.shipperProfile.findUnique({
+          where: { userId },
+          select: {
+            shipperName: true,
+            shipperPersonName: true,
+            shipperPhoneNumber: true,
+            shipperStreet1: true,
+            shipperStreet2: true,
+            shipperCity: true,
+            shipperStateCode: true,
+            shipperPostalCode: true,
+            shipperCountryCode: true,
+            shipperTinNumber: true,
+            importerOfRecord: true,
+            fedexFolderId: true,
+            defaultCurrencyCode: true,
+            dutiesPaymentType: true,
+          },
+        }),
+      ]);
 
-      const integrationSettings = await prisma.userIntegrationSettings.findUnique({ where: { userId } });
-      const shipperProfile = await prisma.shipperProfile.findUnique({ where: { userId } });
-      return res.status(200).json({ integrationSettings, shipperProfile });
-    } catch (error: any) {
-      console.error('[User Settings API] PATCH error:', error);
-      if (error.code === 'P2022') {
-        return res.status(500).json({ error: 'Schema mismatch: legacy User column still referenced' });
-      }
-      const isValidation = ['P2002', 'P2003'].includes(error.code) || /validation failed/.test(error.message);
-      return res.status(isValidation ? 400 : 500).json({ error: error.message, details: error.meta });
+      return res.status(200).json({
+        integrationSettings,
+        shipperProfile,
+      });
     }
-  }
 
-  res.setHeader('Allow', ['GET', 'PATCH']);
-  return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    if (req.method === 'PATCH') {
+      const { integrationSettings, shipperProfile } = req.body;
+
+      // Validate request body
+      if (!integrationSettings && !shipperProfile) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          details: 'At least one of integrationSettings or shipperProfile must be provided',
+        });
+      }
+
+      // Update integration settings if provided
+      let updatedIntegrationSettings = null;
+      if (integrationSettings) {
+        updatedIntegrationSettings = await prisma.userIntegrationSettings.upsert({
+          where: { userId },
+          create: {
+            userId,
+            ...integrationSettings,
+          },
+          update: integrationSettings,
+          select: {
+            veeqoApiKey: true,
+            shippoToken: true,
+            fedexApiKey: true,
+            fedexApiSecret: true,
+            fedexAccountNumber: true,
+          },
+        });
+      }
+
+      // Update shipper profile if provided
+      let updatedShipperProfile = null;
+      if (shipperProfile) {
+        updatedShipperProfile = await prisma.shipperProfile.upsert({
+          where: { userId },
+          create: {
+            userId,
+            ...shipperProfile,
+          },
+          update: shipperProfile,
+          select: {
+            shipperName: true,
+            shipperPersonName: true,
+            shipperPhoneNumber: true,
+            shipperStreet1: true,
+            shipperStreet2: true,
+            shipperCity: true,
+            shipperStateCode: true,
+            shipperPostalCode: true,
+            shipperCountryCode: true,
+            shipperTinNumber: true,
+            importerOfRecord: true,
+            fedexFolderId: true,
+            defaultCurrencyCode: true,
+            dutiesPaymentType: true,
+          },
+        });
+      }
+
+      return res.status(200).json({
+        integrationSettings: updatedIntegrationSettings,
+        shipperProfile: updatedShipperProfile,
+      });
+    }
+
+    res.setHeader('Allow', ['GET', 'PATCH']);
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  } catch (error) {
+    console.error('[Settings API Error]:', error);
+
+    // Handle Prisma column not found errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022') {
+      return res.status(500).json({
+        error: 'Database Schema Error',
+        details: 'The database schema is out of sync with the application. Please contact support.',
+      });
+    }
+
+    // Handle other Prisma errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return res.status(400).json({
+        error: 'Database Error',
+        details: error.message,
+      });
+    }
+
+    // Handle validation errors
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: error.message,
+      });
+    }
+
+    // Handle all other errors
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      details: 'An unexpected error occurred',
+    });
+  }
 } 

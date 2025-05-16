@@ -25,7 +25,7 @@ const socialLinks = [
 
 const ListItem = ({ href, children }) => (
   <li>
-    <Link href={href} legacyBehavior>
+    <Link href={href}>
       <a className="text-slate-300 hover:text-white hover:translate-x-1 inline-block transition-all duration-200 ease-out">
         {children}
       </a>
@@ -42,7 +42,7 @@ const PublicFooter = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
           {/* Column 1: Brand & Social */}
           <div className="space-y-4">
-            <Link href="/" legacyBehavior>
+            <Link href="/">
               <a className="text-3xl font-bold text-white hover:opacity-80 transition-opacity">
                 {brandName}
               </a>
@@ -52,7 +52,7 @@ const PublicFooter = () => {
             </p>
             <div className="flex space-x-4">
               {socialLinks.map((social) => (
-                <Link href={social.href} key={social.name} legacyBehavior>
+                <Link href={social.href} key={social.name}>
                   <a target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors">
                     <social.icon size={22} />
                     <span className="sr-only">{social.name}</span>

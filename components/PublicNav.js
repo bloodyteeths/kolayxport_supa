@@ -73,7 +73,7 @@ const PublicNav = ({ ctaAction = defaultCtaAction, ctaLabel = "Giriş Yap / Ücr
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
           {/* Logo Placeholder */}
           <motion.div variants={linkVariants}>
-            <Link href="/" legacyBehavior>
+            <Link href="/">
               <a className="text-2xl font-bold text-gray-800 hover:text-blue-600 transition-colors">
                 KolayXport
               </a>
@@ -84,7 +84,7 @@ const PublicNav = ({ ctaAction = defaultCtaAction, ctaLabel = "Giriş Yap / Ücr
           <nav className="hidden md:flex items-center gap-x-6 lg:gap-x-8">
             {navLinks.map((link) => (
               <motion.div variants={linkVariants} key={link.name}>
-                <Link href={link.href} legacyBehavior>
+                <Link href={link.href}>
                   <a className="text-gray-600 hover:text-blue-600 transition-colors font-medium">
                     {link.name}
                   </a>
@@ -129,7 +129,7 @@ const PublicNav = ({ ctaAction = defaultCtaAction, ctaLabel = "Giriş Yap / Ücr
             <nav className="flex flex-col items-center space-y-6 text-center">
               {navLinks.map((link) => (
                 <motion.div variants={linkVariants} key={link.name}>
-                  <Link href={link.href} legacyBehavior>
+                  <Link href={link.href}>
                     <a 
                       onClick={toggleMenu}
                       className="text-xl font-medium text-gray-700 hover:text-blue-600 transition-colors"

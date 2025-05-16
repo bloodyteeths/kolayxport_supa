@@ -177,11 +177,7 @@ export default function NasilKullanirimPage() {
             <p className="max-w-xl mx-auto text-lg text-slate-600 mb-10">
               Detaylı kullanım kılavuzlarımız, API referanslarımız ve sıkça sorulan sorular bölümümüzle KolayXport'u derinlemesine keşfedin.
             </p>
-            <Link href="/docs" legacyBehavior>
-              <a className="px-10 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
-                Belgeleri Oku
-              </a>
-            </Link>
+            <Link href="/docs" className="px-10 py-4 text-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">Belgeleri Oku</Link>
           </div>
         </section>
 

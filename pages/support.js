@@ -66,11 +66,7 @@ export default function SupportPage() {
               <p className="text-slate-600 mb-4">
                 Detaylı talepleriniz veya proje özelinde görüşmek için iletişim formumuzu doldurabilirsiniz.
               </p>
-              <Link href="/iletisim" legacyBehavior>
-                <a className="font-medium text-blue-600 hover:text-blue-700 transition-colors">
-                  İletişim Sayfasına Git
-                </a>
-              </Link>
+              <Link href="/iletisim" className="font-medium text-blue-600 hover:text-blue-700 transition-colors">İletişim Sayfasına Git</Link>
             </div>
           </div>
 

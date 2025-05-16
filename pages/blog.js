@@ -43,16 +43,12 @@ export default function BlogPage() {
           {posts.map((post) => (
             <article key={post.slug} className="prose prose-slate lg:prose-lg">
               <h2 className="text-2xl font-semibold text-blue-600 hover:underline">
-                <Link href={`/blog/${post.slug}`} legacyBehavior>
-                  <a>{post.title}</a>
-                </Link>
+                <Link href={`/blog/${post.slug}`} className="text-blue-600 hover:underline">{post.title}</Link>
               </h2>
               <p className="text-sm text-slate-500">Yayın Tarihi: {post.date}</p>
               <p>{post.excerpt}</p>
               <p>
-                <Link href={`/blog/${post.slug}`} legacyBehavior>
-                  <a className="text-blue-600 hover:underline">Devamını Oku →</a>
-                </Link>
+                <Link href={`/blog/${post.slug}`} className="text-blue-600 hover:underline">Devamını Oku →</Link>
               </p>
             </article>
           ))}

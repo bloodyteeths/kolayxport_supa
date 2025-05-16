@@ -24,12 +24,26 @@ export default function Orders() {
   const fetchOrders = async () => {
     setIsLoadingOrders(true);
     try {
-      // Fetch orders with their items
+      // Fetch orders with their items (include all required fields)
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
-          *,
-          items:order_items(*)
+          id,
+          customerName,
+          notes,
+          status,
+          shipByDate,
+          marketplace,
+          marketplaceKey,
+          items:order_items(
+            id,
+            image,
+            variantInfo,
+            notes,
+            status,
+            shipBy,
+            marketplaceKey
+          )
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -216,87 +230,52 @@ export default function Orders() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Seç
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Pazar Yeri
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Sipariş No
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Müşteri
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ürün
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Adet
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Durum
-                </th>
+                <th>Görsel</th>
+                <th>Müşteri Adı</th>
+                <th>Varyant</th>
+                <th>Not</th>
+                <th>Durum</th>
+                <th>Ship-by</th>
+                <th>Marketplace</th>
+                <th>Sipariş No</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Etiket
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {orders.flatMap(order => 
-                order.items.map(item => (
-                  <tr key={item.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedItems.includes(item.id)}
-                        onChange={() => handleItemSelection(item.id)}
-                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="capitalize">{order.marketplace}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {order.marketplace_key}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {order.customer_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {item.sku}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {item.quantity}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded-full text-xs
-                        ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-600' : ''}
-                        ${order.status === 'shipped' ? 'bg-green-100 text-green-600' : ''}
-                        ${order.status === 'cancelled' ? 'bg-red-100 text-red-600' : ''}
-                      `}>
-                        {order.status === 'pending' ? 'Bekliyor' : 
-                         order.status === 'shipped' ? 'Gönderildi' : 
-                         order.status === 'cancelled' ? 'İptal Edildi' : order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getLabelStatusBadge(item)}
-                      {item.labelJobs && item.labelJobs.length > 0 && 
-                       item.labelJobs.some(job => job.status === 'completed' && job.pdf_url) && (
-                        <a 
-                          href={item.labelJobs.find(job => job.status === 'completed' && job.pdf_url).pdf_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 ml-2 text-xs underline"
-                        >
-                          PDF
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
+              {orders.map(order => (
+                <tr key={order.id}>
+                  <td>
+                    {order.items && order.items[0]?.image ? (
+                      <img src={order.items[0].image} alt="Görsel" className="w-12 h-12 object-cover" />
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td>{order.customerName || '-'}</td>
+                  <td>{order.items && order.items[0]?.variantInfo || '-'}</td>
+                  <td>{order.notes || '-'}</td>
+                  <td>{order.status || '-'}</td>
+                  <td>{order.shipByDate ? new Date(order.shipByDate).toLocaleDateString() : '-'}</td>
+                  <td>{order.marketplace || '-'}</td>
+                  <td>{order.marketplaceKey || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getLabelStatusBadge(order.items && order.items[0])}
+                    {order.items && order.items[0]?.labelJobs && order.items[0].labelJobs.length > 0 && 
+                     order.items[0].labelJobs.some(job => job.status === 'completed' && job.pdf_url) && (
+                      <a 
+                        href={order.items[0].labelJobs.find(job => job.status === 'completed' && job.pdf_url).pdf_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 ml-2 text-xs underline"
+                      >
+                        PDF
+                      </a>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

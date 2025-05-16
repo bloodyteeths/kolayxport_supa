@@ -32,11 +32,9 @@ const DashboardLandingContent = () => {
         <p className="mb-4">
           Lansmanımıza özel olarak, KolayXport'un tüm temel özelliklerini ve entegrasyonlarını hiçbir ücret ödemeden kullanabilirsiniz. Bu fırsatı kaçırmayın, hemen tüm özelliklerimizi keşfedin!
         </p>
-        <Link href="/ozellikler" legacyBehavior>
-          <a className="inline-block px-6 py-2 text-sm font-semibold bg-white text-blue-600 rounded-md hover:bg-blue-50 transition-colors">
-            Özellikleri Keşfet
-          </a>
-        </Link>
+        <Link href="/ozellikler" className="inline-block px-6 py-2 text-sm font-semibold bg-white text-blue-600 rounded-md hover:bg-blue-50 transition-colors">
+  Özellikleri Keşfet
+</Link>
       </div>
       
       <div className="bg-white p-6 md:p-8 rounded-lg shadow-md">
@@ -65,7 +63,7 @@ const DashboardLandingContent = () => {
   );
 };
 
-export default function AppIndexPage() {
+function AppIndexPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -117,3 +115,7 @@ export default function AppIndexPage() {
       </AppLayout>
   );
 } 
+
+
+
+export default AppIndexPage; 

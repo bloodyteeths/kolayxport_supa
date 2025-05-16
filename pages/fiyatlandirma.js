@@ -172,12 +172,12 @@ export default function FiyatlandirmaPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
           >
-            <Link href="/api/auth/signin" legacyBehavior>
+            <Link href="/api/auth/signin">
               <a className="px-8 py-3.5 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400">
                 Hemen Başla
               </a>
             </Link>
-            <Link href="/iletisim?subject=Telefonla%20Bilgi%20Almak%20İstiyorum" legacyBehavior>
+            <Link href="/iletisim?subject=Telefonla%20Bilgi%20Almak%20İstiyorum">
               <a className="px-8 py-3.5 text-lg font-semibold text-blue-600 bg-white rounded-lg shadow-lg hover:scale-105 hover:bg-slate-50 transform transition-all duration-200 ease-out border border-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400">
                 Bizi Arayın
               </a>
@@ -233,7 +233,7 @@ export default function FiyatlandirmaPage() {
                   </ul>
                 </div>
                 {plan.href_contact ? (
-                  <Link href={plan.href_contact} legacyBehavior>
+                  <Link href={plan.href_contact}>
                     <a aria-describedby={plan.id} className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${plan.highlight ? 'text-white bg-gradient-to-r from-orange-500 to-red-500 hover:scale-[1.03]' : 'text-slate-700 bg-slate-100 hover:bg-slate-200 hover:scale-[1.03]'} ${plan.highlight ? 'focus:ring-orange-400' : 'focus:ring-slate-300'}`}>
                       Bize Ulaşın
                     </a>
@@ -367,7 +367,7 @@ export default function FiyatlandirmaPage() {
       <div className="mt-16 text-center">
         <h3 className="text-2xl font-semibold text-slate-800 mb-4">Size Özel Bir Plan mı Lazım?</h3>
         <p className="text-slate-600 mb-8">İhtiyaçlarınız doğrultusunda size özel çözümler üretebiliriz. Bizimle iletişime geçin.</p>
-        <Link href="/iletisim" legacyBehavior>
+        <Link href="/iletisim">
           <a className="inline-block px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
             İletişime Geç
           </a>

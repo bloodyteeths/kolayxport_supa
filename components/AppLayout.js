@@ -39,7 +39,7 @@ const navItems = [
 ];
 
 const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
-  const { user, session, signOut: supabaseSignOut, isLoading } = useAuth(); // Changed from useSession
+  const { user, session, supabaseSignOut, isLoading } = useAuth(); // Fixed: use supabaseSignOut
   const router = useRouter();
   const { isOpen, toggleSidebar, openSidebar, closeSidebar } = useSidebar(); // Use the hook
 
@@ -61,8 +61,9 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
 
   const handleSignOut = async () => {
     await supabaseSignOut();
-    router.push('/'); // Redirect to homepage after sign out
+    // router.push('/') is already handled in supabaseSignOut
   };
+
 
   return (
     <>
@@ -94,10 +95,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
               className="fixed top-0 left-0 h-full w-64 bg-slate-800 text-slate-100 flex flex-col z-40 shadow-lg"
             >
               <div className="flex items-center justify-between h-14 px-4 border-b border-slate-800">
-                <Link href="/app" className="text-xl font-bold text-white flex items-center">
-                  {/* <Zap size={24} className="mr-2 text-sky-400" /> Temporary logo */}
-                  KolayXport
-                </Link>
+
                 <button 
                     onClick={closeSidebar} 
                     className="text-slate-400 hover:text-slate-200 lg:hidden"
@@ -112,19 +110,18 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                     const IconComponent = item.icon;
                     return (
                       <li key={item.label} className="px-3 py-1">
-                        <Link href={item.href} legacyBehavior>
-                          <a
-                            className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150
-                              ${
-                                isActive(item.href)
-                                  ? 'bg-slate-700 text-white shadow-inner'
-                                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                              }`}
-                          >
-                            <IconComponent size={18} className="mr-3 flex-shrink-0" />
-                            {item.label}
-                          </a>
-                        </Link>
+                        <Link 
+  href={item.href} 
+  className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150
+    ${
+      isActive(item.href)
+        ? 'bg-slate-700 text-white shadow-inner'
+        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+    }`}
+>
+  <IconComponent size={18} className="mr-3 flex-shrink-0" />
+  {item.label}
+</Link>
                       </li>
                     );
                   })}
@@ -140,14 +137,13 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           <header className="sticky top-0 z-20 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16 border-b border-gray-200">
             <div className="flex items-center">
               <div className="md:hidden mr-2">
-                <SidebarToggle /> {/* Use the SidebarToggle component */}
+                <SidebarToggle />
               </div>
               <div className="hidden md:block">
-                <SidebarToggle /> {/* Also use for larger screens to allow collapsing */}
+                <SidebarToggle />
               </div>
               <h1 className="text-lg font-semibold text-slate-800 ml-2 hidden sm:block">{title}</h1>
             </div>
-
             {/* Center: Search */}
             <div className="flex-1 max-w-md mx-auto">
               <div className="relative">
@@ -163,54 +159,31 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 />
               </div>
             </div>
-
             {/* Right: Actions */}
             <div className="flex items-center space-x-3 sm:space-x-4">
               <div className="relative">
                 <button 
-                  onClick={() => alert('Yeni bildiriminiz yok.')} // Basic alert for now, can be a dropdown
+                  onClick={() => alert('Yeni bildiriminiz yok.')} 
                   className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
                 >
                   <Bell size={20} />
                   <span className="sr-only">Bildirimler</span>
                 </button>
-                {/* Basic popover idea - can be expanded with Headless UI Popover or similar
-                {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg p-4 text-sm text-slate-700">
-                    Yeni bildiriminiz yok.
-                  </div>
-                )}
-                */}
               </div>
-              <button className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors">
-                <Globe size={20} />
-                <span className="sr-only">Dil Seçimi</span>
+              <button
+                onClick={() => router.push('/app/settings')}
+                className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <Settings size={20} />
+                <span className="sr-only">Ayarlar</span>
               </button>
-              
-              {/* User Avatar and Logout Button */}
-              {user && (
-                <div className="flex items-center space-x-2">
-                  <Link href="/app/settings" passHref>
-                    <a className="flex items-center text-left p-1 rounded-full hover:bg-slate-100 transition-colors" title="Ayarlar">
-                      {user.user_metadata?.avatar_url ? (
-                        <img src={user.user_metadata.avatar_url} alt="User avatar" className="w-7 h-7 rounded-full" />
-                      ) : user.user_metadata?.picture ? ( // Fallback for Google OAuth, picture might be directly in user_metadata
-                        <img src={user.user_metadata.picture} alt="User avatar" className="w-7 h-7 rounded-full" />
-                      ) : (
-                        <UserCircle size={28} className="text-slate-500"/>
-                      )}
-                    </a>
-                  </Link>
-                  <button 
-                    onClick={handleSignOut} // Changed to use local handler
-                    className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
-                    title="Çıkış Yap"
-                  >
-                    <LogOutIcon size={20} />
-                    <span className="sr-only">Çıkış Yap</span>
-                  </button>
-                </div>
-              )}
+              <button
+                onClick={handleSignOut}
+                className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
+              >
+                <LogOutIcon size={20} />
+                <span className="sr-only">Çıkış Yap</span>
+              </button>
             </div>
           </header>
 

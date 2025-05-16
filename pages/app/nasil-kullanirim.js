@@ -66,7 +66,7 @@ export default function HowToUsePage() {
           <p className="mt-1 text-sm text-slate-500">Veeqo arayüzü zamanla değişebilir. En güncel bilgi için Veeqo'nun kendi yardım dokümanlarına başvurmanız önerilir.</p>
         </Step>
         <Step number="2" title="KolayXport Ayarlar Sayfasına Gidin">
-          <p>KolayXport uygulamasında, sol menüden veya profilinizden <Link href="/app/settings"><a className="text-blue-600 hover:underline">Ayarlar</a></Link> sayfasına gidin.</p>
+          <p>KolayXport uygulamasında, sol menüden veya profilinizden <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> sayfasına gidin.</p>
         </Step>
         <Step number="3" title="Veeqo API Bilgilerini Girin">
           <p>Ayarlar sayfasındaki "Veeqo API Bilgileri" bölümünü bulun. İlgili alana Veeqo API Anahtarınızı girin.</p>
@@ -78,7 +78,7 @@ export default function HowToUsePage() {
           <p>"Veeqo Ayarlarını Kaydet" butonuna tıklayın. Bağlantı başarılı olduğunda, Veeqo verileriniz KolayXport ile senkronize olmaya başlayacaktır. Bu işlem veri miktarına bağlı olarak biraz zaman alabilir.</p>
         </Step>
         <p className="mt-4 text-sm text-slate-500">
-          Sorun yaşarsanız, API anahtarınızın doğru olduğundan ve Veeqo hesabınızda API erişim izinlerinin aktif olduğundan emin olun. Gerekirse <Link href="/destek"><a className="text-blue-600 hover:underline">destek</a></Link> alın.
+          Sorun yaşarsanız, API anahtarınızın doğru olduğundan ve Veeqo hesabınızda API erişim izinlerinin aktif olduğundan emin olun. Gerekirse <Link href="/destek" className="text-blue-600 hover:underline">destek</Link> alın.
         </p>
       </GuideSection>
 
@@ -91,7 +91,7 @@ export default function HowToUsePage() {
           <p className="mt-1 text-sm text-slate-500">Shippo arayüzü zamanla değişebilir. En güncel bilgi için Shippo'nun kendi yardım dokümanlarına başvurmanız önerilir.</p>
         </Step>
         <Step number="2" title="KolayXport Ayarlar Sayfasına Gidin">
-          <p>KolayXport uygulamasında, sol menüden veya profilinizden <Link href="/app/settings"><a className="text-blue-600 hover:underline">Ayarlar</a></Link> sayfasına gidin.</p>
+          <p>KolayXport uygulamasında, sol menüden veya profilinizden <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> sayfasına gidin.</p>
         </Step>
         <Step number="3" title="Shippo API Bilgilerini Girin">
           <p>Ayarlar sayfasındaki "Shippo API Bilgileri" bölümünü bulun. İlgili alana Shippo Özel API Token'ınızı girin.</p>
@@ -103,7 +103,7 @@ export default function HowToUsePage() {
           <p>"Shippo Ayarlarını Kaydet" butonuna tıklayın. Bağlantı başarılı olduğunda, Shippo verileriniz KolayXport ile senkronize olmaya başlayacaktır.</p>
         </Step>
         <p className="mt-4 text-sm text-slate-500">
-          Sorun yaşarsanız, API token'ınızın doğru olduğundan ve Shippo hesabınızda gerekli izinlerin bulunduğundan emin olun. Gerekirse <Link href="/destek"><a className="text-blue-600 hover:underline">destek</a></Link> alın.
+          Sorun yaşarsanız, API token'ınızın doğru olduğundan ve Shippo hesabınızda gerekli izinlerin bulunduğundan emin olun. Gerekirse <Link href="/destek" className="text-blue-600 hover:underline">destek</Link> alın.
         </p>
       </GuideSection>
 
@@ -112,7 +112,7 @@ export default function HowToUsePage() {
           Trendyol ve Hepsiburada gibi doğrudan entegrasyonlarımızın kurulumu, FedEx ile kargo yönetimi, ürün ve sipariş yönetimi gibi KolayXport'un diğer özelliklerinin nasıl kullanılacağına dair detaylı rehberler yakında bu sayfada yer alacaktır.
         </p>
         <p className="mt-2">
-          Trendyol entegrasyonu hakkında bilgi için <Link href="/app/entegrasyonlar-ve-rehberler#trendyol-guide"><a className="text-blue-600 hover:underline">Entegrasyonlar ve Rehberler sayfasındaki Trendyol bölümüne</a></Link> göz atabilirsiniz.
+          Trendyol entegrasyonu hakkında bilgi için <Link href="/app/entegrasyonlar-ve-rehberler#trendyol-guide" className="text-blue-600 hover:underline">Entegrasyonlar ve Rehberler sayfasındaki Trendyol bölümüne</Link> göz atabilirsiniz.
         </p>
       </GuideSection>
 

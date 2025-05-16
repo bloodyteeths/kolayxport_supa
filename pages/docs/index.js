@@ -163,17 +163,15 @@ export default function DocsIndexPage() {
                   key={guide.title}
                   variants={{ hidden: { opacity:0, y:20 }, visible: { opacity:1, y:0, transition: {delay: index * 0.05}} }}
                 >
-                  <Link href={guide.href} legacyBehavior>
-                    <a className="block bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300 hover:ring-2 hover:ring-sky-200/70 transition-all duration-200 h-full group">
-                      <div className="flex items-center mb-3">
-                        <guide.icon className="w-7 h-7 mr-3 text-sky-500 group-hover:text-sky-600" />
-                        <h3 className="text-lg font-semibold text-slate-800 group-hover:text-sky-700">{guide.title}</h3>
-                      </div>
-                      <p className="text-sm text-slate-500 group-hover:text-slate-600 leading-relaxed">{guide.description}</p>
-                      <div className="mt-4 text-sm font-medium text-sky-600 group-hover:text-sky-700 flex items-center">
-                        Rehberi Oku <ArrowRight size={16} className="ml-1 group-hover:translate-x-0.5 transition-transform"/>
-                      </div>
-                    </a>
+                  <Link href={guide.href} className="block bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-slate-300 hover:ring-2 hover:ring-sky-200/70 transition-all duration-200 h-full group">
+                    <div className="flex items-center mb-3">
+                      <guide.icon className="w-7 h-7 mr-3 text-sky-500 group-hover:text-sky-600" />
+                      <h3 className="text-lg font-semibold text-slate-800 group-hover:text-sky-700">{guide.title}</h3>
+                    </div>
+                    <p className="text-sm text-slate-500 group-hover:text-slate-600 leading-relaxed">{guide.description}</p>
+                    <div className="mt-4 text-sm font-medium text-sky-600 group-hover:text-sky-700 flex items-center">
+                      Rehberi Oku <ArrowRight size={16} className="ml-1 group-hover:translate-x-0.5 transition-transform"/>
+                    </div>
                   </Link>
                 </motion.div>
               ))}

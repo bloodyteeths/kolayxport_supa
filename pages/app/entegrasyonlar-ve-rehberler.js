@@ -85,7 +85,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
           KolayXport üzerinden oluşturulan gönderileriniz için ise şu anda <strong>FedEx</strong> kargo entegrasyonumuzu kullanmaktayız.
         </p>
         <p className="mt-3">
-          Aşağıda, desteklediğimiz doğrudan entegrasyonları ve Veeqo/Shippo aracılığıyla erişebileceğiniz platform türlerini bulabilirsiniz. API anahtarlarınızı yönetmek ve bağlantıları kurmak için <Link href="/app/settings"><a className="text-blue-600 hover:underline">Ayarlar</a></Link> sayfanızı ziyaret edebilirsiniz.
+          Aşağıda, desteklediğimiz doğrudan entegrasyonları ve Veeqo/Shippo aracılığıyla erişebileceğiniz platform türlerini bulabilirsiniz. API anahtarlarınızı yönetmek ve bağlantıları kurmak için <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> sayfanızı ziyaret edebilirsiniz.
         </p>
       </Section>
 
@@ -94,7 +94,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
         <div className="space-y-6">
           <div>
             <h3 className="text-xl font-semibold text-slate-700 mb-2">Trendyol</h3>
-            <p className="mb-3">Trendyol mağaza verilerinizi KolayXport'a bağlamak için <Link href="#trendyol-guide"><a className="text-blue-600 hover:underline">Trendyol Entegrasyon Rehberi</a></Link> bölümündeki adımları takip edebilirsiniz.</p>
+            <p className="mb-3">Trendyol mağaza verilerinizi KolayXport'a bağlamak için <Link href="#trendyol-guide" className="text-blue-600 hover:underline">Trendyol Entegrasyon Rehberi</Link> bölümündeki adımları takip edebilirsiniz.</p>
           </div>
           <div>
             <h3 className="text-xl font-semibold text-slate-700 mb-2">Hepsiburada</h3>
@@ -131,7 +131,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
       
       <Section title="Kargo Entegrasyonumuz" icon={Truck}>
         <p>KolayXport üzerinden yapacağınız gönderiler için şu anda <strong>FedEx</strong> altyapısını kullanmaktayız. Siparişlerinizi hazırlayıp kargoya hazır hale getirdiğinizde, gönderi süreçleri FedEx üzerinden yönetilecektir.</p>
-        <p className="mt-2 text-sm text-slate-500">FedEx entegrasyonumuzla ilgili ayar veya seçenekler (eğer kullanıcı tarafından yönetilebilir ise) <Link href="/app/settings"><a className="text-blue-600 hover:underline">Ayarlar</a></Link> sayfasında veya "Nasıl Kullanırım?" bölümünde detaylandırılacaktır.</p>
+        <p className="mt-2 text-sm text-slate-500">FedEx entegrasyonumuzla ilgili ayar veya seçenekler (eğer kullanıcı tarafından yönetilebilir ise) <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> sayfasında veya "Nasıl Kullanırım?" bölümünde detaylandırılacaktır.</p>
       </Section>
 
       <Section title="Trendyol Entegrasyon Rehberi" icon={HelpCircle} id="trendyol-guide">
@@ -152,14 +152,14 @@ export default function EntegrasyonlarVeRehberlerPage() {
           <p className="mt-1 text-xs text-slate-500">Trendyol paneli arayüzü zaman zaman güncellenebilir. API bilgilerinizi bulmakta zorlanırsanız, Trendyol Satıcı Destek Hattı'ndan yardım alabilirsiniz.</p>
         </Step>
         <Step number="3" title="API Bilgilerini KolayXport'a Girin">
-          <p>Elde ettiğiniz Satıcı ID ve API Anahtarı bilgilerinizi KolayXport dashboard'unuzdaki <Link href="/app/settings"><a className="text-blue-600 hover:underline">Ayarlar</a></Link> bölümünde ilgili Trendyol entegrasyon alanlarına girin ve kaydedin.</p>
+          <p>Elde ettiğiniz Satıcı ID ve API Anahtarı bilgilerinizi KolayXport dashboard'unuzdaki <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> bölümünde ilgili Trendyol entegrasyon alanlarına girin ve kaydedin.</p>
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
             <p><Settings size={16} className="inline mr-1"/> API anahtarlarınızı girerken kopyala-yapıştır yöntemini kullanmanız, olası yazım hatalarını engelleyecektir.</p>
           </div>
         </Step>
         <Step number="4" title="Entegrasyonu Test Edin">
           <p>Bilgileri kaydettikten sonra, sistemimiz Trendyol mağazanızla bağlantıyı test edecektir. Birkaç dakika içinde siparişlerinizin akmaya başladığını görmelisiniz.</p>
-          <p className="mt-1 text-xs text-slate-500">Sorun yaşamanız durumunda <Link href="/destek"><a className="text-blue-600 hover:underline">Destek sayfamızdan</a></Link> bize ulaşabilirsiniz. (Not: /support linki /destek olarak güncellendi.)</p>
+          <p className="mt-1 text-xs text-slate-500">Sorun yaşamanız durumunda <Link href="/destek" className="text-blue-600 hover:underline">Destek sayfamızdan</Link> bize ulaşabilirsiniz. (Not: /support linki /destek olarak güncellendi.)</p>
         </Step>
       </Section>
 

@@ -133,11 +133,7 @@ export default function KurumsalPage() {
             <p className="max-w-xl mx-auto text-lg text-blue-100 mb-10">
               E-ticaretin geleceğini şekillendiren dinamik bir ekibin parçası olmak ister misiniz? Açık pozisyonlarımızı inceleyin.
             </p>
-            <Link href="/kariyer" legacyBehavior>
-              <a className="px-10 py-4 text-lg font-semibold text-blue-600 bg-white rounded-full shadow-lg hover:scale-105 hover:bg-slate-50 transform transition-all duration-200 ease-out">
-                Kariyerler
-              </a>
-            </Link>
+            <Link href="/kariyer" className="px-10 py-4 text-lg font-semibold text-blue-600 bg-white rounded-full shadow-lg hover:scale-105 hover:bg-slate-50 transform transition-all duration-200 ease-out">Kariyerler</Link>
           </div>
         </section>
       </div>

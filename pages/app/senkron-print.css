@@ -1,0 +1,32 @@
+@media print {
+  /* Hide everything except the table container */
+  body * {
+    visibility: hidden !important;
+  }
+  .MuiTableContainer-root, .MuiTableContainer-root * {
+    visibility: visible !important;
+  }
+  .MuiTableContainer-root {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100vw !important;
+    background: white !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  /* Hide the print and sync buttons */
+  button, .MuiButton-root {
+    display: none !important;
+  }
+  /* Hide filters and header rows above the table */
+  .flex.items-center.justify-between.mb-8,
+  .flex.flex-wrap.gap-4.justify-between.items-center.mb-6 {
+    display: none !important;
+  }
+  /* Remove background color from the page */
+  body {
+    background: white !important;
+  }
+}

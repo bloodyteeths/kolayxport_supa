@@ -1,13 +1,7 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  output        = "../node_modules/.prisma/client"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
-  output = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -16,50 +10,42 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// --- User Model --- 
 model User {
-  id            String    @id
-  name          String?
-  email         String?   @unique // Email is often unique, provided by Google
-  emailVerified DateTime? // Useful field from NextAuth adapter
-  image         String? // User profile image URL
-
-  googleAccountId String? @unique // From NextAuth account.providerAccountId - IMPORTANT for linking
-  googleSheetId   String?   @unique // ID of the user's copied Google Sheet - RETAINED FOR NOW, POTENTIALLY OBSOLETE
-  driveFolderId   String?             // ID of the user's Drive folder for labels - RETAINED FOR NOW, POTENTIALLY OBSOLETE
-  userAppsScriptId String?   @unique // ID of the user's copied Wrapper Apps Script - RETAINED FOR NOW, POTENTIALLY OBSOLETE
-  // legacy API keys migrated to UserIntegrationSettings
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // --- Relationships ---
-  accounts       Account[]
-  sessions       Session[]
+  id                  String                   @id
+  name                String?
+  email               String?                  @unique
+  emailVerified       DateTime?
+  image               String?
+  googleAccountId     String?                  @unique
+  googleSheetId       String?                  @unique
+  driveFolderId       String?
+  userAppsScriptId    String?                  @unique
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  accounts            Account[]
   marketplaceConfigs  MarketplaceConfig[]
-  orders         Order[]
-  products       Product[]
-  shipperProfile ShipperProfile? // Add relation to ShipperProfile
-  integrationSettings UserIntegrationSettings? // Relation to new settings model
+  orders              Order[]
+  products            Product[]
+  sessions            Session[]
+  shipperProfile      ShipperProfile?
+  integrationSettings UserIntegrationSettings?
 }
 
-// --- NextAuth Models (Required for PrismaAdapter) --- 
 model Account {
   id                       String  @id @default(cuid())
   userId                   String
   type                     String
   provider                 String
   providerAccountId        String
-  refresh_token            String? // Store refresh token securely!
+  refresh_token            String?
   access_token             String?
   expires_at               Int?
   token_type               String?
   scope                    String?
   id_token                 String?
   session_state            String?
-  refresh_token_expires_in Int? // Add field for Google OAuth
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh_token_expires_in Int?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -80,211 +66,140 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// --- New Models from Roadmap ---
 model MarketplaceConfig {
-  id            String    @id @default(cuid())
-  userId        String
-  name          String
-  config        Json
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  config    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Order {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String      @id @default(cuid())
+  userId            String
+  marketplace       String
+  marketplaceKey    String
+  orderNumber       String?
+  marketplaceCreatedAt DateTime?
+  customerName      String?
+  status            String
+  shipByDate        DateTime?
+  currency          String?
+  totalPrice        Decimal?    @db.Decimal(10, 2)
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  items             OrderItem[] @relation("OrderToOrderItem")
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  marketplace           String    // e.g., "Veeqo", "Shippo"
-  marketplaceKey        String    // Order ID from the marketplace
-  marketplaceCreatedAt  DateTime? // Timestamp of when the order was created on the marketplace
-  syncedAt             DateTime? // last successful sync
-  syncStatus           String?   // "ok" or error message
-  images               String[]  // line-item image URLs
-  notes                Json?     // array of line-item + order-level notes
-  
-  customerName  String?   // Customer name
-  status        String    // e.g., "PENDING_FULFILLMENT", "SHIPPED", "CANCELLED"
-  shipByDate    DateTime?
-  
-  currency        String?   // e.g., TRY, USD
-  totalPrice      Decimal?  @db.Decimal(10, 2)
-  shippingAddress Json?     // Store structured shipping address
-  billingAddress  Json?     // Store structured billing address
-
-  // --- Shipping/Label Information ---
-  trackingNumber    String?   // Tracking number from the carrier
-  shippingLabelUrl  String?   // URL to the shipping label PDF
-  fedexMasterFormId String?   // FedEx Master Form ID for ETD
-  shipmentStatus    String?   // e.g., LABEL_GENERATED, IN_TRANSIT, DELIVERED
-  shippedAt         DateTime? // when FedEx label was generated
-
-  // New production fields
-  packingStatus        String?
-  productionNotes      String?
-  rawData              Json?
-  rawFetchedAt         DateTime?
-  packingEditedAt      DateTime?
-  productionEditedAt   DateTime?
-
-  createdAt     DateTime  @default(now()) // Our system's timestamp
-  updatedAt     DateTime  @updatedAt
-  
-  items         OrderItem[]
-
-  termsOfSale        String
-  shippingChargesPaymentType String?
-  packageLength              Float?
-  packageWidth               Float?
-  packageHeight              Float?
-  dimensionUnits             String?
-  commodityDesc              String?
-  countryOfMfg               String?
-  harmonizedCode             String?
-  labelStockType             String?
-  signatureType              String?
-  sendCommercialInvoiceViaEtd Boolean? @default(true)
-
-  @@unique([userId, marketplace, marketplaceKey])
+  @@unique([userId, orderNumber])
 }
 
 model OrderItem {
-  id            String    @id @default(cuid())
-  orderId       String
-  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  remoteLineId   String?   // marketplace line id
-  sku           String?   // Product SKU
-  productName   String    // Name of the product as it appeared in the order
-  variantInfo   String?   // Variant information (e.g., size, color)
-  quantity      Int
-  
-  unitPrice     Decimal?  @db.Decimal(10, 2)
-  totalPrice    Decimal?  @db.Decimal(10, 2) // quantity * unitPrice
-  
-  image         String?   // URL of the product image
-  notes         String?   // Customer notes, internal notes, line item specific details
-
-  productId     String?
-  product       Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
-
-  labelJobs     LabelJob[]
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String     @id @default(cuid())
+  orderId        String
+  sku            String?
+  productName    String?
+  variantInfo    String?
+  quantity       Int
+  unitPrice      Decimal?   @db.Decimal(10, 2)
+  totalPrice     Decimal?   @db.Decimal(10, 2)
+  notes          String?
+  image          String?
+  shipBy         DateTime?
+  marketplaceKey String?
+  orderNumber    String?
+  uniqueLineKey  String?
+  order          Order      @relation("OrderToOrderItem", fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([sku])
-  @@index([productId])
 }
 
 model LabelJob {
-  id            String    @id @default(cuid())
-  orderItemId   String    // Changed from itemId to orderItemId for clarity
-  carrier       String
-  status        String    // e.g., PENDING, GENERATED, FAILED
-  pdfUrl        String?
-  trackingNumber String?  // ADDED
-  errorMessage  String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  item          OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade) // Changed from itemId
+  id             String    @id @default(cuid())
+  orderItemId    String
+  carrier        String
+  status         String
+  pdfUrl         String?
+  trackingNumber String?
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  // Removed relation to OrderItem since orderItemId is not present in OrderItem
 }
 
-// --- Step 8: Inventory Management Models ---
-
 model Product {
-  id            String    @id @default(cuid())
-  sku           String
-  name          String
-  description   String?
-  price         Decimal   @db.Decimal(10, 2)
-  cost          Decimal?  @db.Decimal(10, 2)
-  weight        Float?
-  dimensions    Json?     // e.g. {"length": 10, "width": 5, "height": 2}
-  imageUrl      String?
-  active        Boolean   @default(true)
-  
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  // Relationships
-  inventories   Inventory[]
-  orderItems    OrderItem[]
+  id                  String               @id @default(cuid())
+  sku                 String
+  name                String
+  description         String?
+  price               Decimal              @db.Decimal(10, 2)
+  cost                Decimal?             @db.Decimal(10, 2)
+  weight              Float?
+  dimensions          Json?
+  imageUrl            String?
+  active              Boolean              @default(true)
+  userId              String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  inventories         Inventory[]
   marketplaceProducts MarketplaceProduct[]
-  
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, sku])
 }
 
 model Inventory {
-  id            String    @id @default(cuid())
-  productId     String
-  location      String    @default("default") // e.g. warehouse name or "default"
-  quantity      Int       @default(0)
-  reorderLevel  Int?      // when to reorder
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
+  id           String   @id @default(cuid())
+  productId    String
+  location     String   @default("default")
+  quantity     Int      @default(0)
+  reorderLevel Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
   @@unique([productId, location])
 }
 
 model MarketplaceProduct {
-  id                String  @id @default(cuid())
-  productId         String
-  marketplace       String  // e.g., "veeqo", "trendyol"
-  marketplaceId     String  // ID of the product in the marketplace
-  marketplaceData   Json?   // Additional marketplace-specific data
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  
+  id              String   @id @default(cuid())
+  productId       String
+  marketplace     String
+  marketplaceId   String
+  marketplaceData Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
   @@unique([marketplace, marketplaceId])
 }
 
-// --- New Model for User Integration API Keys ---
 model UserIntegrationSettings {
-  id        String @id @default(cuid())
-  userId    String @unique
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id                 String   @id @default(cuid())
+  userId             String   @unique
   veeqoApiKey        String?
   shippoToken        String?
-
   fedexApiKey        String?
   fedexApiSecret     String?
   fedexAccountNumber String?
-  // fedexFolderId is in ShipperProfile as it relates more to storage/file paths than API auth
-  // Other per-user shipper details (name, address, TIN) are in ShipperProfile
-
-  // You can add other marketplace keys here as needed, e.g.:
-  // trendyolSupplierId      String?
-  // trendyolApiKey          String?
-  // trendyolApiSecret       String?
-  // hepsiburadaMerchantId   String?
-  // hepsiburadaApiKey       String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  fedexMeterNumber   String?
+  trendyolSupplierId String?
+  trendyolApiKey     String?
+  trendyolApiSecret  String?
+  hepsiburadaMerchantId String?
+  hepsiburadaApiKey  String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// --- New Model for Shipper/FedEx Details ---
 model ShipperProfile {
-  id                  String  @id @default(uuid())
-  userId              String  @unique // One-to-one relation with User
-  user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Shipper Details
+  id                  String   @id @default(uuid())
+  userId              String   @unique
   shipperName         String?
   shipperPersonName   String?
   shipperPhoneNumber  String?
@@ -294,16 +209,12 @@ model ShipperProfile {
   shipperStateCode    String?
   shipperPostalCode   String?
   shipperCountryCode  String?
-  shipperTinNumber    String? // Renamed from SHIPPER_TIN_NUMBER in API request
-
-  // Importer of Record (Assuming it's a JSON string for now, adjust if needed)
-  importerOfRecord    String? // JSON string or dedicated fields?
-
-  // FedEx Specific
-  fedexFolderId       String? // For Supabase storage path maybe?
+  shipperTinNumber    String?
+  importerOfRecord    String?
+  fedexFolderId       String?
   defaultCurrencyCode String?
   dutiesPaymentType   String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

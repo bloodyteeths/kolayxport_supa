@@ -63,7 +63,7 @@ export default async function handler(
       return res.status(400).json({ error: `Unsupported marketplace: ${marketplace}` });
     }
 
-    const record = records.find(r => r.order.marketplaceKey === marketplaceKey);
+    const record = records.find(r => String(r.order.marketplaceKey) === String(marketplaceKey));
     if (!record) {
       return res.status(404).json({ error: 'Order data not found in marketplace' });
     }
@@ -71,8 +71,8 @@ export default async function handler(
     const now = new Date();
 
     // Prepare audit fields
-    const dataToCreate = { ...order, rawData: order, rawFetchedAt: now, userId, syncedAt: now, syncStatus: 'ok' };
-    const dataToUpdate = { ...order, rawData: order, rawFetchedAt: now, syncedAt: now, syncStatus: 'ok' };
+    const dataToCreate = { ...order, marketplaceKey: String(order.marketplaceKey), userId, syncedAt: now, syncStatus: 'ok' };
+    const dataToUpdate = { ...order, marketplaceKey: String(order.marketplaceKey), syncedAt: now, syncStatus: 'ok' };
     // Never overwrite user edits
     delete (dataToUpdate as any).packingStatus;
     delete (dataToUpdate as any).productionNotes;
@@ -82,7 +82,7 @@ export default async function handler(
     // Upsert order
     const dbOrder = await prisma.order.upsert({
       where: {
-        userId_marketplace_marketplaceKey: { userId, marketplace, marketplaceKey },
+        userId_marketplace_marketplaceKey: { userId, marketplace, marketplaceKey: String(marketplaceKey) },
       },
       create: dataToCreate,
       update: dataToUpdate,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import axios, { AxiosError } from 'axios'; // Import AxiosError
-import Grid from '@mui/material/Grid';
+import { Grid } from '@mui/material';
 import {
   Container, TextField, Button, Typography, Paper, CircularProgress, Select, MenuItem, FormControl, InputLabel, FormHelperText, Box, Snackbar, Alert, AlertColor, SelectChangeEvent
 } from '@mui/material';
@@ -81,6 +81,23 @@ const currencyCodes = [
 ];
 
 const AyarlarPage = () => {
+  const [loadingFullSync, setLoadingFullSync] = useState(false);
+  const [fullSyncStarted, setFullSyncStarted] = useState(false);
+
+  // Full sync handler
+  const handleFullSync = async () => {
+    setLoadingFullSync(true);
+    setFullSyncStarted(false);
+    try {
+      await axios.post('/api/orders/full-sync');
+      setFullSyncStarted(true);
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Senkronizasyon başlatılamadı.', severity: 'error' });
+    } finally {
+      setLoadingFullSync(false);
+    }
+  };
+
   const [formData, setFormData] = useState<UserSettingsResponse>(initialFormData);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,7 +111,7 @@ const AyarlarPage = () => {
       setIsLoading(true);
       setFetchError(null); // Reset fetch error on new attempt
       try {
-        const response = await axios.get<UserSettingsResponse>('/api/user/settings');
+        const response = await axios.get<UserSettingsResponse>('/api/user/settings', { withCredentials: true });
         setFormData({
           integrationSettings: response.data.integrationSettings || initialFormData.integrationSettings,
           shipperProfile: response.data.shipperProfile || initialFormData.shipperProfile,
@@ -142,7 +159,7 @@ const AyarlarPage = () => {
     }
     setIsSubmitting(true);
     try {
-      await axios.patch('/api/user/settings', formData);
+      await axios.patch('/api/user/settings', formData, { withCredentials: true });
       setSnackbar({ open: true, message: 'Ayarlar başarıyla kaydedildi!', severity: 'success' });
     } catch (error: any) {
       console.error('Ayarlar kaydedilirken hata:', error);
@@ -188,19 +205,42 @@ const AyarlarPage = () => {
               API Entegrasyonları
             </Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
+              <Grid xs={12} md={4}>
                 <TextField fullWidth label="Veeqo API Key" name="veeqoApiKey" type="password" value={formData.integrationSettings?.veeqoApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
-              <Grid item xs={12} md={6}>
+
+              {/* Veeqo Full Sync Section */}
+              {formData.integrationSettings?.veeqoApiKey && (
+                <Grid xs={12} md={12}>
+                  <Paper elevation={2} sx={{ p: 2, mt: 2, background: '#e3f2fd', border: '1px solid #90caf9' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#1976d2' }}>Tüm siparişleri senkronize et</Typography>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      disabled={loadingFullSync || isSubmitting}
+                      onClick={handleFullSync}
+                      sx={{ mt: 1 }}
+                    >
+                      {loadingFullSync ? 'Senkronizasyon Başlatılıyor...' : 'Başla'}
+                    </Button>
+                    {fullSyncStarted && (
+                      <Typography color="success.main" sx={{ mt: 1 }}>
+                        Senkronizasyon başlatıldı, bu sayfadan ayrılabilirsiniz
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+              )}
+              <Grid xs={12} md={6}>
                 <TextField fullWidth label="Shippo Token" name="shippoToken" type="password" value={formData.integrationSettings?.shippoToken || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <TextField fullWidth label="FedEx API Key" name="fedexApiKey" type="password" value={formData.integrationSettings?.fedexApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <TextField fullWidth label="FedEx API Secret" name="fedexApiSecret" type="password" value={formData.integrationSettings?.fedexApiSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <TextField fullWidth label="FedEx Account Number" name="fedexAccountNumber" value={formData.integrationSettings?.fedexAccountNumber || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
             </Grid>
@@ -211,35 +251,35 @@ const AyarlarPage = () => {
               Gönderici Profili
             </Typography>
             <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
+              <Grid xs={12} md={6}>
                 <TextField fullWidth label="Şirket Adı" name="shipperName" value={formData.shipperProfile?.shipperName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid xs={12} md={6}>
                 <TextField fullWidth label="Yetkili Kişi" name="shipperPersonName" value={formData.shipperProfile?.shipperPersonName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid xs={12} md={6}>
                 <TextField fullWidth label="Telefon" name="shipperPhoneNumber" value={formData.shipperProfile?.shipperPhoneNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid xs={12} md={6}>
                 <TextField fullWidth label="FedEx Klasör ID" name="fedexFolderId" value={formData.shipperProfile?.fedexFolderId || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
               </Grid>
-              <Grid item xs={12}>
+              <Grid xs={12}>
                 <TextField fullWidth label="Adres 1" name="shipperStreet1" value={formData.shipperProfile?.shipperStreet1 || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid item xs={12}>
+              <Grid xs={12}>
                 <TextField fullWidth label="Adres 2" name="shipperStreet2" value={formData.shipperProfile?.shipperStreet2 || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <TextField fullWidth label="Şehir" name="shipperCity" value={formData.shipperProfile?.shipperCity || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <TextField fullWidth label="Eyalet/Bölge Kodu" name="shipperStateCode" value={formData.shipperProfile?.shipperStateCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <TextField fullWidth label="Posta Kodu" name="shipperPostalCode" value={formData.shipperProfile?.shipperPostalCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
               
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <FormControl fullWidth required>
                   <InputLabel id="shipperCountryCode-label">Ülke Kodu</InputLabel>
                   <Select
@@ -253,10 +293,10 @@ const AyarlarPage = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <TextField fullWidth label="Vergi No" name="shipperTinNumber" value={formData.shipperProfile?.shipperTinNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <FormControl fullWidth required>
                   <InputLabel id="shipperTinType-label">Vergi Tipi</InputLabel>
                   <Select
@@ -271,7 +311,7 @@ const AyarlarPage = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <FormControl fullWidth required>
                   <InputLabel id="defaultCurrencyCode-label">Varsayılan Para Birimi</InputLabel>
                   <Select
@@ -285,7 +325,7 @@ const AyarlarPage = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid xs={12} md={4}>
                 <FormControl fullWidth required>
                   <InputLabel id="dutiesPaymentType-label">Gümrük Ödeme Tipi</InputLabel>
                   <Select
@@ -300,7 +340,7 @@ const AyarlarPage = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12}>
+              <Grid xs={12}>
                 <TextField
                   fullWidth
                   label="Importer of Record (JSON)"

@@ -3,6 +3,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from '../lib/theme';
 import "../styles/globals.css";
+import './app/senkron-print.css';
 import Layout from '@/components/Layout';
 import { Toaster } from 'react-hot-toast';
 import { DefaultSeo, LogoJsonLd } from 'next-seo';
@@ -20,7 +21,7 @@ type AppPropsWithLayout = AppProps & {
 };
 
 export default function MyApp({ Component, pageProps }: AppPropsWithLayout) {
-  const getLayout = Component.getLayout || ((page) => <Layout>{page}</Layout>);
+  const getLayout = Component.getLayout || ((page) => page);
 
   return (
     <ThemeProvider theme={theme}>

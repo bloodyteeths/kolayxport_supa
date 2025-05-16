@@ -5,8 +5,11 @@ import { useAuth } from "@/lib/auth-context"
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/router'
+import useSidebar from '../hooks/useSidebar';
+import SidebarToggle from './SidebarToggle';
 
 export default function Layout({ children }) {
+  const { isOpen, toggleSidebar, closeSidebar } = useSidebar();
   const { user, session, isLoading, signIn: supabaseSignIn, signOut: supabaseSignOut } = useAuth();
   const router = useRouter();
 
@@ -19,54 +22,83 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar - Hide for the new public homepage and generic public pages */}
+      {/* Sidebar toggle button */}
       {!isHomePage && !isGenericPublicPage && session && (
-        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200">
-          <div className="p-6">
-            <Link href="/app">
-              <h1 className="text-2xl font-bold text-blue-600 cursor-pointer">KolayXport</h1>
-            </Link>
-          </div>
-          {session && (
-            <nav className="flex-1 px-4 space-y-2">
-              <Link href="/app" className={`flex items-center p-2 rounded hover:bg-gray-100 text-gray-700 ${router.pathname.startsWith('/app') ? 'bg-gray-100' : ''}`} aria-current={router.pathname.startsWith('/app') ? 'page' : undefined}>
-                <Home className="w-5 h-5 mr-3" />
-                Kontrol Paneli
-              </Link>
-              <Link href="/subscribe" className={`flex items-center p-2 rounded hover:bg-gray-100 text-gray-700 ${router.pathname.startsWith('/subscribe') ? 'bg-gray-100' : ''}`} aria-current={router.pathname.startsWith('/subscribe') ? 'page' : undefined}>
-                <CreditCard className="w-5 h-5 mr-3" />
-                Abonelik
-              </Link>
-              <Link href="/ayarlar" className={`flex items-center p-2 rounded hover:bg-gray-100 text-gray-700 ${router.pathname.startsWith('/ayarlar') ? 'bg-gray-100' : ''}`} aria-current={router.pathname.startsWith('/ayarlar') ? 'page' : undefined}>
-                <Settings className="w-5 h-5 mr-3" />
-                Ayarlar
-              </Link>
-            </nav>
-          )}
-          <div className="p-4 mt-auto">
-             {!user && !isLoading && (
-                <Button onClick={async () => {
-                  const { error } = await supabase.auth.signInWithOAuth({ 
-                    provider: 'google',
-                    options: { redirectTo: window.location.origin + '/app' } 
-                  });
-                  if (error) console.error('Error signing in with Google:', error);
-                }} className="w-full flex items-center justify-center">
-                    <LogIn className="w-4 h-4 mr-2" /> Google ile Giriş Yap
-                </Button>
-             )}
-             {user && (
-                <div className="flex flex-col items-center space-y-2">
-                    <span className="text-sm text-gray-600 truncate" title={user.email}>{user.name || user.email}</span>
-                    <Button onClick={async () => await supabaseSignOut()} variant="outline" className="w-full flex items-center justify-center">
-                       <LogOut className="w-4 h-4 mr-2" /> Çıkış Yap
-                    </Button>
-                </div>
-             )}
-          </div>
-        </aside>
+        <div className="absolute top-4 left-4 z-50">
+          <SidebarToggle />
+        </div>
       )}
+      {/* Sidebar - Hide for the new public homepage and generic public pages */}
+      {/* Collapsible dark sidebar for dashboard (authenticated views) */}
+      {!isHomePage && !isGenericPublicPage && session && (
+        <>
+          {/* Sidebar Overlay for mobile - click to close */}
+          {isOpen && (
+            <div
+              onClick={closeSidebar}
+              className="fixed inset-0 bg-black/30 z-30 md:hidden"
+            />
+          )}
 
+          {/* Sidebar */}
+          {isOpen && (
+            <aside className="fixed top-0 left-0 h-full w-64 bg-slate-800 text-slate-100 flex flex-col z-40 shadow-lg">
+              <div className="flex items-center justify-between h-14 px-4 border-b border-slate-800">
+                <Link href="/app" className="text-xl font-bold text-white flex items-center">
+                  KolayXport
+                </Link>
+                <button 
+                  onClick={closeSidebar} 
+                  className="text-slate-400 hover:text-slate-200 lg:hidden"
+                  aria-label="Kenar çubuğunu kapat"
+                >
+                  ×
+                </button>
+              </div>
+              <nav className="py-4">
+                <ul>
+                  <li className="px-3 py-1">
+                    <Link href="/app" className="flex items-center p-2 rounded hover:bg-slate-700 text-white">
+                      <Home className="w-5 h-5 mr-3" /> Kontrol Paneli
+                    </Link>
+                  </li>
+                  <li className="px-3 py-1">
+                    <Link href="/subscribe" className="flex items-center p-2 rounded hover:bg-slate-700 text-white">
+                      <CreditCard className="w-5 h-5 mr-3" /> Abonelik
+                    </Link>
+                  </li>
+                  <li className="px-3 py-1">
+                    <Link href="/ayarlar" className="flex items-center p-2 rounded hover:bg-slate-700 text-white">
+                      <Settings className="w-5 h-5 mr-3" /> Ayarlar
+                    </Link>
+                  </li>
+                </ul>
+              </nav>
+              <div className="p-4 mt-auto">
+                {!user && !isLoading && (
+                  <Button onClick={async () => {
+                    const { error } = await supabase.auth.signInWithOAuth({ 
+                      provider: 'google',
+                      options: { redirectTo: window.location.origin + '/app' } 
+                    });
+                    if (error) console.error('Error signing in with Google:', error);
+                  }} className="w-full flex items-center justify-center">
+                    <LogIn className="w-4 h-4 mr-2" /> Google ile Giriş Yap
+                  </Button>
+                )}
+                {user && (
+                  <div className="flex flex-col items-center space-y-2">
+                    <span className="text-sm text-gray-200 truncate" title={user.email}>{user.name || user.email}</span>
+                    <Button onClick={async () => await supabaseSignOut()} variant="outline" className="w-full flex items-center justify-center">
+                      <LogOut className="w-4 h-4 mr-2" /> Çıkış Yap
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </aside>
+          )}
+        </>
+      )}
       {/* Main Content */}
       <div className={`flex-1 flex flex-col ${isHomePage || isGenericPublicPage ? 'w-full' : ''}`}>
         {/* Header - Hide for new public homepage and generic public pages, or show a different public nav */}

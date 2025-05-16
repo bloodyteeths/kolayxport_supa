@@ -59,36 +59,45 @@ export async function fetchShippoOrders(userId: string, token: string): Promise<
   if (!response.ok) throw new Error(`Shippo API error ${response.status}`);
 
   const data = (await response.json()) as ShippoResponse;
+  console.debug('SYNC DEBUG Shippo API response:', JSON.stringify(data, null, 2));
   return data.results.map(o => {
+    console.debug('SYNC DEBUG Shippo order:', JSON.stringify(o, null, 2));
+    // Safely construct customer name
+    const customerName = o.shipping_address?.name || 'Unknown Customer';
+    
     const order = {
       userId,
       marketplace: 'Shippo',
       marketplaceKey: o.object_id,
       marketplaceCreatedAt: new Date(o.placed_at),
-      customerName: o.shipping_address.name,
+      customerName,
       status: o.order_status,
       currency: o.currency,
       totalPrice: parseFloat(o.total_price),
       shippingAddress: {
-        street1: o.shipping_address.street1,
-        street2: o.shipping_address.street2,
-        city: o.shipping_address.city,
-        state: o.shipping_address.state,
-        country: o.shipping_address.country,
-        postalCode: o.shipping_address.zip,
-        phone: o.shipping_address.phone,
+        name: customerName,
+        street1: o.shipping_address?.street1 ?? '',
+        street2: o.shipping_address?.street2 ?? null,
+        city: o.shipping_address?.city ?? '',
+        state: o.shipping_address?.state ?? '',
+        country: o.shipping_address?.country ?? '',
+        postalCode: o.shipping_address?.zip ?? '',
+        phone: o.shipping_address?.phone ?? null,
       },
       notes: o.metadata?.notes ? [o.metadata.notes] : [],
       images: [],
+      termsOfSale: 'Unknown',
     };
-    const items = o.line_items.map(li => ({
-      remoteLineId: li.object_id,
-      sku: li.sku,
-      productName: li.title,
+    
+    const items = (o.line_items ?? []).map(li => ({
+      remoteLineId: String(li.object_id),
+      sku: li.sku ?? 'UNKNOWN',
+      productName: li.title ?? 'Unknown Product',
       quantity: li.quantity,
       unitPrice: parseFloat(li.total_price) / li.quantity,
       totalPrice: parseFloat(li.total_price),
       image: null,
+      variantInfo: null,
       notes: null,
     }));
     return { order, items };

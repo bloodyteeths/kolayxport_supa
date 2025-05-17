@@ -31,6 +31,25 @@ model User {
   integrationSettings UserIntegrationSettings?
 }
 
+model OrderShipping {
+  id           String   @id @default(cuid())
+  orderId      String   @unique
+  firstName    String
+  lastName     String?
+  company      String?
+  street1      String
+  street2      String?
+  city         String
+  state        String?
+  postalCode   String
+  countryCode  String
+  phone        String
+  insertedAt   DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
 model Account {
   id                       String  @id @default(cuid())
   userId                   String
@@ -93,6 +112,7 @@ model Order {
   updatedAt         DateTime    @updatedAt
   items             OrderItem[] @relation("OrderToOrderItem")
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shipping          OrderShipping?
 
   @@unique([userId, orderNumber])
 }

@@ -21,6 +21,7 @@ import axios from 'axios';
 import InputAdornment from '@mui/material/InputAdornment';
 import SearchIcon from '@mui/icons-material/Search';
 import SyncIcon from '@mui/icons-material/Sync';
+import PrintIcon from '@mui/icons-material/Print';
 
 const DURUM_OPTIONS = ['Çıkmadı', 'Çıktı'];
 
@@ -214,6 +215,14 @@ export default function SenkronPage() {
                 sx={{ minWidth: 220, fontWeight: 600 }}
               >
                 {syncing ? 'Senkronize Ediliyor...' : 'Siparişleri Senkronize Et'}
+              </Button>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={() => window.print()}
+                sx={{ minWidth: 56, fontWeight: 600 }}
+              >
+                <PrintIcon />
               </Button>
               {syncMessage && <Alert severity={syncMessage.startsWith('Siparişler') ? 'success' : 'error'} sx={{ ml: 2 }}>{syncMessage}</Alert>}
             </div>

@@ -1,4 +1,4 @@
-// Supabase Edge Function: sync-shipping-info
+// Trigger redeploy: minor change // Supabase Edge Function: sync-shipping-info
 // @ts-ignore: Deno/Edge runtime import
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { PrismaClient } from '@prisma/client';

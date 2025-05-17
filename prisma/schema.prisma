@@ -115,6 +115,7 @@ model Order {
   shipping          OrderShipping?
 
   @@unique([userId, orderNumber])
+  @@unique([userId, marketplace, marketplaceKey])
 }
 
 model OrderItem {

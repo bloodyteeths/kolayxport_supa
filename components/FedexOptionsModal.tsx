@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FedExOptions, FedExOption } from '@/lib/fedexConfig';
+import { FedExOptions, FedExOption } from '@/lib/fedex/fedex.config';
 
 interface FedexOptionsModalProps {
   orderId: string;

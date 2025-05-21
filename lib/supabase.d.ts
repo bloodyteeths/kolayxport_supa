@@ -1,0 +1,1 @@
+export function getSupabaseServerClient(...args: any[]): any; 

@@ -1,204 +1,76 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../../lib/prisma';
-import { getSupabaseServerClient } from '../../../lib/supabase';
-import { fetchVeeqoOrders } from '../../../lib/veeqoService';
-import { VEEQO_API_KEY as GLOBAL_VEEQO_API_KEY } from '../../../lib/config';
-
-interface SyncResult {
-  added: number;
-  updated: number;
-  total: number;
-}
+import { NextApiRequest, NextApiResponse } from 'next';
+import prisma from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { syncAllOrders } from '@/lib/orderSync';
+import { getSupabaseServerClient } from '@/lib/supabase';
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<SyncResult | { error: string }>
+  res: NextApiResponse
 ) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    console.log('[SYNC DEBUG] Method not allowed:', req.method);
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Get user via Supabase client
   const supabase = getSupabaseServerClient(req, res);
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
   if (authError || !user) {
-    return res.status(401).json({ error: 'Not authenticated' });
+    console.log('[SYNC DEBUG] Unauthorized sync attempt', { authError });
+    logger.warn('Unauthorized sync attempt', { authError });
+    return res.status(401).json({ error: 'Unauthorized', details: authError?.message });
   }
   const userId = user.id;
 
-  // Ensure the user exists in the User table (create if not)
-  await prisma.user.upsert({
-    where: { id: userId },
-    create: {
-      id: userId,
-      email: user.email ?? undefined,
-      name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? undefined,
-      // Add other required fields with defaults if needed
-    },
-    update: {},
-  });
-
   try {
-    // Fetch UserIntegrationSettings
-    const userSettings = await prisma.userIntegrationSettings.findUnique({
-      where: { userId },
-    });
+    // Get credentials from request body
+    const { veeqoApiKey, shippoToken, syncType } = req.body;
 
-    // Resolve Veeqo API Key
-    const veeqoApiKey = userSettings?.veeqoApiKey || GLOBAL_VEEQO_API_KEY;
-    console.log('[VEEQO SYNC] API Key resolution:', {
-      hasUserKey: !!userSettings?.veeqoApiKey,
-      hasGlobalKey: !!GLOBAL_VEEQO_API_KEY,
-      resolvedKey: veeqoApiKey ? 'present' : 'missing'
-    });
+    // Fetch UserIntegrationSettings as fallback
+    const userSettings = await prisma.userIntegrationSettings.findUnique({ where: { userId } });
 
-    if (!veeqoApiKey) {
-      console.error(`Veeqo API Key missing for user ${userId} and no global fallback.`);
-      return res.status(400).json({ error: 'Veeqo integration is not configured. Please check your settings.' });
+    // Use provided credentials or fall back to user settings
+    const finalVeeqoApiKey = veeqoApiKey || userSettings?.veeqoApiKey;
+    const finalShippoToken = shippoToken || userSettings?.shippoToken;
+
+    console.log('[SYNC DEBUG] Using Veeqo API Key:', !!finalVeeqoApiKey);
+    console.log('[SYNC DEBUG] Using Shippo Token:', !!finalShippoToken);
+
+    if (!finalVeeqoApiKey && !finalShippoToken) {
+      logger.error('No integration credentials found', undefined, { userId, operation: 'order-sync' });
+      return res.status(400).json({ error: 'No integration credentials found. Please check your settings.' });
     }
 
-    // 1. Fetch Veeqo orders
-    const veeqoData = await fetchVeeqoOrders(userId, veeqoApiKey);
-
-    let added = 0;
-    let updated = 0;
-
-    for (const { order, items } of veeqoData) {
-      try {
-        // 2. Check if order exists
-        const existing = await prisma.order.findUnique({
-          where: {
-            userId_orderNumber: {
-              userId,
-              orderNumber: order.orderNumber ?? 'Unknown',
-            },
-          },
-        });
-
-        // 3. Delete old items if order exists
-        if (existing) {
-          await prisma.orderItem.deleteMany({ where: { orderId: existing.id } });
-        }
-
-        // 4. Debug log before upsert
-        console.debug('[SYNC] Processing order:', {
-          orderNumber: order.orderNumber,
-          marketplaceKey: order.marketplaceKey,
-          customerName: order.customerName,
-          status: order.status,
-          totalPrice: order.totalPrice,
-          itemsCount: items.length
-        });
-        console.debug('Order DTO:', order);
-        console.debug('Items DTO:', items);
-        console.log('[VEEQO SYNC] Items being upserted:', JSON.stringify(items, null, 2));
-
-        // 5. Upsert order with guarded non-nullable fields
-        await prisma.order.upsert({
-          where: {
-            userId_orderNumber: {
-              userId,
-              orderNumber: order.orderNumber ?? 'Unknown',
-            },
-          },
-          create: {
-            userId,
-            marketplace: order.marketplace ?? 'Unknown',
-            marketplaceKey: order.marketplaceKey ?? 'Unknown',
-            orderNumber: order.orderNumber ?? null,
-            marketplaceCreatedAt: order.marketplaceCreatedAt ? new Date(order.marketplaceCreatedAt) : null,
-            customerName: order.customerName ?? null,
-            status: order.status ?? 'Unknown',
-            shipByDate: order.shipByDate ? new Date(order.shipByDate) : null,
-            currency: order.currency ?? null,
-            totalPrice: order.totalPrice ?? null,
-            notes: order.notes ?? null,
-            items: {
-              create: items.map(item => ({
-                image: item.image,
-                sku: item.sku,
-                productName: item.productName,
-                unitPrice: item.unitPrice,
-                totalPrice: item.totalPrice,
-                variantInfo: item.variantInfo,
-                notes: item.notes,
-                quantity: item.quantity,
-                shipBy: item.shipBy ? new Date(item.shipBy) : null,
-                marketplaceKey: item.marketplaceKey,
-                orderNumber: item.orderNumber ?? null,
-                uniqueLineKey: item.uniqueLineKey ?? null,
-              })),
-            },
-          },
-          update: {
-            marketplace: order.marketplace ?? 'Unknown',
-            marketplaceKey: order.marketplaceKey ?? 'Unknown',
-            orderNumber: order.orderNumber ?? null,
-            marketplaceCreatedAt: order.marketplaceCreatedAt ? new Date(order.marketplaceCreatedAt) : null,
-            customerName: order.customerName ?? null,
-            status: existing?.status ?? 'Unknown', // Preserve status
-            shipByDate: order.shipByDate ? new Date(order.shipByDate) : null,
-            currency: order.currency ?? null,
-            totalPrice: order.totalPrice ?? null,
-            notes: existing?.notes ?? null, // Preserve notes
-            items: {
-              deleteMany: {},
-              create: items.map(item => {
-                // Try to find a matching existing item by uniqueLineKey or sku
-                const existingItem = existing?.items?.find(ei =>
-                  (item.uniqueLineKey && ei.uniqueLineKey === item.uniqueLineKey) ||
-                  (item.sku && ei.sku === item.sku)
-                );
-                return {
-                  image: item.image,
-                  sku: item.sku,
-                  productName: item.productName,
-                  unitPrice: item.unitPrice,
-                  totalPrice: item.totalPrice,
-                  variantInfo: item.variantInfo,
-                  notes: existingItem ? existingItem.notes : item.notes, // Preserve notes for all items
-                  quantity: item.quantity,
-                  shipBy: item.shipBy ? new Date(item.shipBy) : null,
-                  marketplaceKey: item.marketplaceKey,
-                  orderNumber: item.orderNumber ?? null,
-                  uniqueLineKey: item.uniqueLineKey ?? null,
-                };
-              }),
-            },
-          },
-          include: { items: true },
-        });
-        if (existing) {
-          updated++;
-          console.info(`[SYNC] Updated order:`, {
-            orderNumber: order.orderNumber,
-            marketplaceKey: order.marketplaceKey,
-            id: existing.id
-          });
-        } else {
-          added++;
-          console.info(`[SYNC] Added order:`, {
-            orderNumber: order.orderNumber,
-            marketplaceKey: order.marketplaceKey
-          });
-        }
-      } catch (error: any) {
-        console.error('[SYNC ERROR] upsert failed:', error.message, {
-          orderNumber: order.orderNumber,
-          marketplaceKey: order.marketplaceKey,
-          order,
-          items
-        });
-        continue;
-      }
+    let startDate: Date | undefined = undefined;
+    if (syncType !== 'full') {
+      // Default to recent sync: use last completed sync date
+      const lastSync = await prisma.syncOperation.findFirst({
+        where: {
+          userId,
+          type: 'recent',
+          status: 'completed'
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      startDate = lastSync?.createdAt;
     }
 
-    return res.status(200).json({ added, updated, total: veeqoData.length });
+    // Perform sync using centralized logic
+    const result = await syncAllOrders(userId, {
+      veeqoApiKey: finalVeeqoApiKey,
+      shippoToken: finalShippoToken,
+      startDate
+    });
+    return res.status(200).json(result);
+
   } catch (error: any) {
-    console.error('Sync error:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('[SYNC DEBUG] Sync failed:', error);
+    logger.error('Sync failed', error, { userId });
+    return res.status(500).json({ 
+      error: 'Failed to sync orders',
+      details: error.message 
+    });
   }
 } 

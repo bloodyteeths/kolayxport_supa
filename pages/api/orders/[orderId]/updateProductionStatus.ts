@@ -51,7 +51,6 @@ export default async function handler(
       select: {
         id: true,
         customerName: true,
-        images: true,
         fedexServiceType: true,
         fedexPackagingType: true,
         fedexPickupType: true,

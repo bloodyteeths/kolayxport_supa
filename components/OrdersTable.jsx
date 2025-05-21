@@ -33,11 +33,8 @@ const renderCellContent = (content) => {
 };
 
 export default function OrdersTable() {
+  // All hooks must run unconditionally at the top level
   const { user, session: supabaseSession, isLoading: authLoading, refreshUser } = useAuth();
-  
-  // Determine authentication status based on Supabase auth state
-  const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
-  const isAuthenticated = status === 'authenticated';
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -47,32 +44,19 @@ export default function OrdersTable() {
   const [requireSetup, setRequireSetup] = useState(false);
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupError, setSetupError] = useState(null);
-
-  // State for label generation (per row)
   const [labelStates, setLabelStates] = useState({});
+  // Editable state for each row
+  const [editRows, setEditRows] = useState({}); // { [orderId]: { ...fields } }
 
-  if (status === 'loading') {
-    return <p>Loading session...</p>;
-  }
-  if (!isAuthenticated || !user) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Please Sign In</CardTitle>
-          <CardDescription>You need to sign in with Google to continue.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={async () => {
-            const { error } = await supabase.auth.signInWithOAuth({ 
-              provider: 'google',
-              options: { redirectTo: window.location.href }
-            });
-            if (error) console.error('Error signing in with Google:', error);
-          }}>Sign in with Google</Button>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Derived variables for auth state
+  const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
+  const isAuthenticated = status === 'authenticated';
+
+  // Conditional render variables (single declaration only)
+  const shouldShowLoading = status === 'loading';
+  const shouldShowSignIn = !isAuthenticated || !user;
+
+  // Render logic (never call hooks after this)
 
   const fetchOrders = useCallback(async () => {
     setRequireSetup(false);
@@ -84,7 +68,7 @@ export default function OrdersTable() {
     setLabelStates({}); // Reset label states when refreshing orders
     console.log('Fetching orders...');
     try {
-      const res = await fetch('/api/orders');
+      const res = await fetch('/api/orders', { cache: 'no-store' });
       const json = await res.json();
       if (res.ok && json.success) {
         setOrders(json.data || []);
@@ -120,7 +104,7 @@ export default function OrdersTable() {
     if (isAuthenticated && user) {
       fetchOrders();
     }
-  }, [isAuthenticated, user, fetchOrders]);
+  }, [isAuthenticated, user, fetchOrders]); // Only one useEffect for fetching orders
 
   useEffect(() => {
     if (requireSetup && !setupLoading) {
@@ -128,6 +112,31 @@ export default function OrdersTable() {
       // For now, let's not auto-trigger it.
     }
   }, [requireSetup, setupLoading]);
+
+  // --- End of hooks section ---
+
+  if (shouldShowLoading) {
+    return <p>Loading session...</p>;
+  }
+  if (shouldShowSignIn) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Please Sign In</CardTitle>
+          <CardDescription>You need to sign in with Google to continue.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={async () => {
+            const { error } = await supabase.auth.signInWithOAuth({ 
+              provider: 'google',
+              options: { redirectTo: window.location.href }
+            });
+            if (error) console.error('Error signing in with Google:', error);
+          }}>Sign in with Google</Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const handleSync = async (marketplace) => {
     if (!marketplace) {
@@ -181,28 +190,24 @@ export default function OrdersTable() {
 
   // --- Label Generation Handler ---
   const handleGenerateLabel = async (rowData, rowIndex) => {
-    // Use unique key from sheet (index 8) if available, otherwise fallback to row index
-    const orderKey = rowData[9] ? String(rowData[9]) : (rowData[8] ? String(rowData[8]) : `row-${rowIndex}`);
-    
+    // Use orderNumber or id as unique key
+    const orderKey = rowData.orderNumber || rowData.id || `row-${rowIndex}`;
     setLabelStates(prev => ({ ...prev, [orderKey]: { loading: true, error: null, tracking: null, url: null } }));
 
-    // **CRITICAL TODO:** Map rowData columns to the structure expected by generateLabelForOrder
-    // This depends HEAVILY on your Sheet's column order and the required fields for FedEx.
-    // Ensure your sheet has columns for ALL required FedEx data (address parts, weight, phone etc.)
-    // Example mapping (ADJUST INDICES AND FIELD NAMES BASED ON YOUR SHEET AND FEDEX REQUIREMENTS):
+    // Map object fields to the structure expected by generateLabelForOrder
+    const firstItem = rowData.items?.[0] || {};
     const orderDataForApi = {
-       orderId: rowData[9] || null, // Internal Order ID
-       marketplaceOrderKey: rowData[8] || null, // Marketplace Order ID
-       recipientName: rowData[1],    // Example: Index 1 = Customer Name
-       recipientPhone: "",            // TODO: Get from sheet column index ?
-       recipientStreet: "",         // TODO: Get from sheet column index ?
-       recipientCity: "",           // TODO: Get from sheet column index ?
-       recipientState: "",          // TODO: Get from sheet column index ? (State/Province Code)
-       recipientPostal: "",         // TODO: Get from sheet column index ?
-       recipientCountry: "",        // TODO: Get from sheet column index ? (Country Code, e.g., 'US', 'TR')
-       weight: 1,                  // TODO: Get from sheet column index ? or use a default?
-       // Add other necessary fields required by FedEx API & your `generateLabelForOrder` function
-       // e.g., serviceType: "FEDEX_GROUND", dimensions: { length: 10, width: 10, height: 10, units: "CM" }
+      orderId: rowData.id || null, // Internal Order ID
+      marketplaceOrderKey: rowData.orderNumber || null, // Marketplace Order ID
+      recipientName: rowData.customerName || '',
+      recipientPhone: firstItem.recipientPhone || '', // Add mapping if available
+      recipientStreet: firstItem.recipientStreet || '', // Add mapping if available
+      recipientCity: firstItem.recipientCity || '', // Add mapping if available
+      recipientState: firstItem.recipientState || '', // Add mapping if available
+      recipientPostal: firstItem.recipientPostal || '', // Add mapping if available
+      recipientCountry: firstItem.recipientCountry || '', // Add mapping if available
+      weight: firstItem.weight || 1, // Add mapping if available
+      // Add other necessary fields required by FedEx API & your `generateLabelForOrder` function
     };
 
     console.log(`Generating label for order key: ${orderKey}`, orderDataForApi);
@@ -254,24 +259,57 @@ export default function OrdersTable() {
     }
   };
 
-  // Define table columns
-  // Indices reference columns from the getOrdersFromSheet Apps Script function
-  // 0: Image, 1: Name, 2: Variant, 3: DecorNote, 4: EtsyNote,
-  // 5: Status, 6: ShipBy, 7: Market, 8: Key
+  // --- Editable Orders Table Columns ---
+  // Fallback settings stub (replace with real settings fetch if needed)
+  const userSettingsFallback = {
+    COL_RECIPIENT_FNAME: '',
+    COL_RECIPIENT_LNAME: '',
+    COL_RECIPIENT_COMPANY: '',
+    COL_RECIPIENT_STREET1: '',
+    COL_RECIPIENT_STREET2: '',
+    COL_RECIPIENT_CITY: '',
+    COL_RECIPIENT_STATE: '',
+    COL_RECIPIENT_POSTAL: '',
+    COL_RECIPIENT_COUNTRY: '',
+    COL_RECIPIENT_PHONE: '',
+    COL_WEIGHT: '',
+    COL_SERVICE_TYPE: '',
+    COL_PACKAGING_TYPE: '',
+    COL_CUSTOMS_VALUE: '',
+    COL_LABEL_TRIGGER: '',
+    COL_LABEL_URL: '',
+    COL_COMMODITY_DESC: '',
+    COL_COUNTRY_OF_MFG: '',
+    COL_HARMONIZED_CODE: '',
+    COL_CURRENCY: '',
+  };
+
+
+  // Column definitions
   const columns = [
-    { header: 'Image', index: 0 },
-    { header: 'Name', index: 1 }, // Customer Name
-    { header: 'Variant', index: 2 }, // Product Name / Variant Info
-    { header: 'Decorsweet Notu', index: 3 }, // Custom notes
-    { header: 'Etsy Notu', index: 4 }, // Custom notes
-    { header: 'Durum', index: 5 }, // Status
-    { header: 'Son Teslim Tarihi', index: 6 }, // ShipByDate
-    { header: 'Pazaryeri', index: 7 }, // Marketplace
-    { header: 'Pazaryeri No', index: 8 } // MarketplaceKey
-    // Add more columns as needed from your Prisma schema for orders
+    { header: 'Sipariş Kimliği', key: 'COL_ORDER_ID', get: row => row.id || '' },
+    { header: 'Alıcı Adı', key: 'COL_RECIPIENT_FNAME', get: row => row.recipientFirstName || userSettingsFallback.COL_RECIPIENT_FNAME },
+    { header: 'Alıcı Soyadı', key: 'COL_RECIPIENT_LNAME', get: row => row.recipientLastName || userSettingsFallback.COL_RECIPIENT_LNAME },
+    { header: 'Alıcı Şirketi', key: 'COL_RECIPIENT_COMPANY', get: row => row.recipientCompany || userSettingsFallback.COL_RECIPIENT_COMPANY },
+    { header: 'Adres Satırı 1', key: 'COL_RECIPIENT_STREET1', get: row => row.recipientStreet1 || userSettingsFallback.COL_RECIPIENT_STREET1 },
+    { header: 'Adres Satırı 2', key: 'COL_RECIPIENT_STREET2', get: row => row.recipientStreet2 || userSettingsFallback.COL_RECIPIENT_STREET2 },
+    { header: 'Şehir', key: 'COL_RECIPIENT_CITY', get: row => row.recipientCity || userSettingsFallback.COL_RECIPIENT_CITY },
+    { header: 'Eyalet / İl', key: 'COL_RECIPIENT_STATE', get: row => row.recipientState || userSettingsFallback.COL_RECIPIENT_STATE },
+    { header: 'Posta Kodu', key: 'COL_RECIPIENT_POSTAL', get: row => row.recipientPostal || userSettingsFallback.COL_RECIPIENT_POSTAL },
+    { header: 'Ülke', key: 'COL_RECIPIENT_COUNTRY', get: row => row.recipientCountry || userSettingsFallback.COL_RECIPIENT_COUNTRY },
+    { header: 'Telefon', key: 'COL_RECIPIENT_PHONE', get: row => row.recipientPhone || userSettingsFallback.COL_RECIPIENT_PHONE },
+    { header: 'Ağırlık (kg)', key: 'COL_WEIGHT', get: row => row.weight || userSettingsFallback.COL_WEIGHT },
+    { header: 'Servis Türü', key: 'COL_SERVICE_TYPE', get: row => row.serviceType || userSettingsFallback.COL_SERVICE_TYPE },
+    { header: 'Paket Türü', key: 'COL_PACKAGING_TYPE', get: row => row.packagingType || userSettingsFallback.COL_PACKAGING_TYPE },
+    { header: 'Gümrük Değeri', key: 'COL_CUSTOMS_VALUE', get: row => row.customsValue || userSettingsFallback.COL_CUSTOMS_VALUE },
+    { header: 'Etiket Oluşturma Onay', key: 'COL_LABEL_TRIGGER', get: row => row.labelTrigger || userSettingsFallback.COL_LABEL_TRIGGER },
+    { header: 'Etiket URL', key: 'COL_LABEL_URL', get: row => row.labelUrl || userSettingsFallback.COL_LABEL_URL },
+    { header: 'Eşya Açıklaması', key: 'COL_COMMODITY_DESC', get: row => row.commodityDesc || userSettingsFallback.COL_COMMODITY_DESC },
+    { header: 'Üretim Ülkesi', key: 'COL_COUNTRY_OF_MFG', get: row => row.countryOfMfg || userSettingsFallback.COL_COUNTRY_OF_MFG },
+    { header: 'Harmonize Kodu', key: 'COL_HARMONIZED_CODE', get: row => row.harmonizedCode || userSettingsFallback.COL_HARMONIZED_CODE },
+    { header: 'Para Birimi', key: 'COL_CURRENCY', get: row => row.currency || userSettingsFallback.COL_CURRENCY },
   ];
 
-  // Render onboarding or orders table
   if (requireSetup) {
     return (
       <Card>
@@ -304,7 +342,10 @@ export default function OrdersTable() {
             <ShoppingCart className={`mr-2 h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
             Veeqo Siparişlerini Senkronize Et
           </Button>
-          {/* TODO: Add buttons for other marketplaces like Trendyol, Shippo later */}
+          <Button onClick={() => handleSync('shippo')} disabled={syncLoading || setupLoading}>
+            <ShoppingCart className={`mr-2 h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
+            Shippo Siparişlerini Senkronize Et
+          </Button>
         </div>
         {syncLoading && <p className="text-sm text-blue-600 mt-2">Senkronize ediliyor...</p>}
         {syncMessage && <p className="text-sm text-green-600 mt-2">{syncMessage}</p>}
@@ -315,138 +356,88 @@ export default function OrdersTable() {
       </CardHeader>
 
       <CardContent>
-        {requireSetup ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {columns.map((col) => (
-                  <TableHead key={col.header}>{col.header}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.length > 0 ? (
-                orders.map((row, rowIndex) => {
-                  const orderKey = row[8] ? String(row[8]) : `row-${rowIndex}`; // Using marketplaceKey as the unique key
-                  const currentLabelState = labelStates[orderKey] || { loading: false, error: null, url: null, tracking: null };
-
-                  // Ensure row is an array and has enough elements before trying to access them
-                  if (!Array.isArray(row) || row.length < columns.length) {
-                    console.warn("Skipping malformed row:", row);
-                    return (
-                      <TableRow key={orderKey || rowIndex}>
-                        <TableCell colSpan={columns.length + 1}> {/* +1 for actions */}
-                          Hatalı satır verisi.
-                        </TableCell>
-                      </TableRow>
-                    );
-                  }
-                  
-                  return (
-                    <TableRow key={orderKey || rowIndex}>
-                      {columns.map((col, colIndex) => (
-                        <TableCell key={colIndex}>
-                          {renderCellContent(row[col.index])}
-                        </TableCell>
-                      ))}
-                      <TableCell>
-                        <Button 
-                          onClick={() => handleGenerateLabel(row, rowIndex)} 
-                          disabled={currentLabelState.loading || (!row[8] && !row[9])} // Disable if no marketplace key or internal ID
-                          size="sm"
-                          variant="outline"
-                        >
-                          {currentLabelState.loading ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Ticket className="h-4 w-4" />
-                          )}
-                          <span className="ml-2">Etiket Oluştur</span>
-                        </Button>
-                        {currentLabelState.error && <p className="text-xs text-red-500 mt-1">{currentLabelState.error}</p>}
-                        {currentLabelState.url && (
-                          <Link href={currentLabelState.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline mt-1 block">
-                            Etiketi Görüntüle
-                          </Link>
-                        )}
-                        {currentLabelState.tracking && <p className="text-xs mt-1">Takip No: {currentLabelState.tracking}</p>}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={columns.length + 1} className="text-center">
-                    {isLoading || setupLoading ? 'Yükleniyor...' : (error || setupError || requireSetup) ? 'Siparişler yüklenemedi.' : 'Gösterilecek sipariş bulunmamaktadır.'}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {columns.map((col) => (
-                  <TableHead key={col.header}>{col.header}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.map((row, rowIndex) => {
-                const orderKey = row[8] ? String(row[8]) : `row-${rowIndex}`;
+        {/* Orders Table (Unified) */}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {columns.map((col) => (
+                <TableHead key={col.header}>{col.header}</TableHead>
+              ))}
+              <TableHead>Aksiyonlar</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {orders.length > 0 ? (
+              orders.map((row, rowIndex) => {
+                // Log the first order for debugging the API shape
+                if (rowIndex === 0) {
+                  console.log('one order from DB:', row);
+                }
+                const orderKey = row.orderNumber || row.id || `row-${rowIndex}`;
                 const currentLabelState = labelStates[orderKey] || { loading: false, error: null, tracking: null, url: null };
-
                 return (
                   <TableRow key={orderKey}>
-                    {columns.map((col) => {
-                      if (col.header === 'Label') {
-                        return (
-                          <TableCell key={`${col.header}-${orderKey}`} className="text-xs w-[150px]">
-                            {currentLabelState.loading && "Generating..."}
-                            {currentLabelState.error && <span className="text-red-600">Error: {currentLabelState.error.substring(0, 100)}{currentLabelState.error.length > 100 ? '...' : ''}</span>}
-                            {currentLabelState.url && (
-                              <Link href={currentLabelState.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                View Label (PDF)
-                              </Link>
-                            )}
-                            {currentLabelState.tracking && (
-                              <span className="block mt-1">Tracking: {currentLabelState.tracking}</span>
-                            )}
-                            {!currentLabelState.loading && !currentLabelState.error && !currentLabelState.url && !currentLabelState.tracking && "-"}
-                          </TableCell>
-                        );
-                      }
-
-                      if (col.header === 'Actions') {
-                        return (
-                          <TableCell key={`${col.header}-${orderKey}`} className="w-[80px]">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleGenerateLabel(row, rowIndex)}
-                              disabled={currentLabelState.loading}
-                              title="Generate FedEx Label"
-                            >
-                              <Ticket className="mr-1 h-4 w-4" />
-                              {currentLabelState.loading ? '...' : 'Label'}
-                            </Button>
-                          </TableCell>
-                        );
-                      }
-
+                    {columns.map((col, colIndex) => {
+                      const orderId = row.id || row.orderNumber || `row-${rowIndex}`;
+                      const editValue =
+                        editRows[orderId]?.[col.key] !== undefined
+                          ? editRows[orderId][col.key]
+                          : col.get(row);
                       return (
-                        <TableCell key={`${col.header}-${orderKey}`}>
-                          {renderCellContent(row[col.index])}
+                        <TableCell key={col.key}>
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={e => {
+                              const value = e.target.value;
+                              setEditRows(prev => ({
+                                ...prev,
+                                [orderId]: {
+                                  ...(prev[orderId] || {}),
+                                  [col.key]: value,
+                                },
+                              }));
+                            }}
+                            className="border rounded px-2 py-1 w-full text-sm"
+                            style={{ minWidth: 80 }}
+                          />
                         </TableCell>
                       );
                     })}
+                    <TableCell>
+                      <Button 
+                        onClick={() => handleGenerateLabel(row, rowIndex)} 
+                        disabled={currentLabelState.loading} 
+                        size="sm"
+                        variant="outline"
+                      >
+                        {currentLabelState.loading ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Ticket className="h-4 w-4" />
+                        )}
+                        <span className="ml-2">Etiket Oluştur</span>
+                      </Button>
+                      {currentLabelState.error && <p className="text-xs text-red-500 mt-1">{currentLabelState.error}</p>}
+                      {currentLabelState.url && (
+                        <Link href={currentLabelState.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline mt-1 block">
+                          Etiketi Görüntüle
+                        </Link>
+                      )}
+                      {currentLabelState.tracking && <p className="text-xs mt-1">Takip No: {currentLabelState.tracking}</p>}
+                    </TableCell>
                   </TableRow>
                 );
-              })}
-            </TableBody>
-          </Table>
-        )}
+              })
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length + 1} className="text-center">
+                  {isLoading || setupLoading ? 'Yükleniyor...' : (error || setupError || requireSetup) ? 'Siparişler yüklenemedi.' : 'Gösterilecek sipariş bulunmamaktadır.'}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );

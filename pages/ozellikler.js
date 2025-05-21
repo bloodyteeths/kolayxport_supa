@@ -71,17 +71,9 @@ const CallToActionSection = () => {
         <p className="text-blue-100 text-lg mb-8 max-w-2xl mx-auto">
           E-ticaret operasyonlarınızı bir üst seviyeye taşıyın. Hemen ücretsiz başlayın ve farkı görün.
         </p>
-        <button
-          onClick={async () => {
-            await supabase.auth.signInWithOAuth({ 
-              provider: 'google',
-              options: { redirectTo: window.location.origin + '/app' } 
-            });
-          }}
-          className="bg-white text-blue-600 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-50 transition-colors text-lg"
-        >
+        <Link href="/login" className="bg-white text-blue-600 font-semibold px-8 py-3 rounded-lg shadow-md hover:bg-blue-50 transition-colors text-lg">
           Hemen Ücretsiz Başla
-        </button>
+        </Link>
       </div>
     </section>
   );

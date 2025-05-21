@@ -41,13 +41,13 @@ export default function LabelsPage() {
   const syncOrders = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/orders/sync', { method: 'POST' });
+      const res = await fetch('/api/orders/label-shippo-sync', { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Sync failed');
-      toast.success('Senkronizasyon tamamlandı');
+      if (!res.ok) throw new Error(data.error || 'Shippo Sync failed');
+      toast.success('Yalnızca Shippo siparişleri senkronize edildi');
       await mutate(); 
     } catch (err: any) {
-      toast.error(`Senkronizasyon hatası: ${err.message}`);
+      toast.error(`Shippo Senkronizasyon hatası: ${err.message}`);
     } finally {
       setSyncing(false);
     }
@@ -252,7 +252,7 @@ export default function LabelsPage() {
           disabled={syncing || healthChecking}
           startIcon={syncing ? <Spinner size={16} /> : null}
         >
-          {syncing ? 'Senkronize ediliyor...' : 'Siparişleri Senkronize Et'}
+          {syncing ? 'Shippo senkronize ediliyor...' : 'Yalnızca Shippo Siparişlerini Senkronize Et'}
         </Button>
         <Button
           variant="contained"

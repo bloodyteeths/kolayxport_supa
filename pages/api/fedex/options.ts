@@ -1,14 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { FedExOptions, fedexOptionsData } from '../../../lib/fedexConfig'; // Import from shared config
+import { fedexOptionsData } from '../../../lib/fedex/fedex.config';
 
-export default function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<FedExOptions | { error: string }>
-) {
-  if (req.method === 'GET') {
-    res.status(200).json(fedexOptionsData);
-  } else {
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
-    res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
+  return res.status(200).json(fedexOptionsData);
 } 

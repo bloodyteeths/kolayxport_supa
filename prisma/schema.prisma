@@ -5,9 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DIRECT_URL")
 }
 
 model User {
@@ -28,26 +27,9 @@ model User {
   products            Product[]
   sessions            Session[]
   shipperProfile      ShipperProfile?
+  syncLogs            SyncLog[]
+  syncOperations      SyncOperation[]
   integrationSettings UserIntegrationSettings?
-}
-
-model OrderShipping {
-  id           String   @id @default(cuid())
-  orderId      String   @unique
-  firstName    String
-  lastName     String?
-  company      String?
-  street1      String
-  street2      String?
-  city         String
-  state        String?
-  postalCode   String
-  countryCode  String
-  phone        String
-  insertedAt   DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
 
 model Account {
@@ -96,23 +78,48 @@ model MarketplaceConfig {
 }
 
 model Order {
-  id                String      @id @default(cuid())
-  userId            String
-  marketplace       String
-  marketplaceKey    String
-  orderNumber       String?
-  marketplaceCreatedAt DateTime?
-  customerName      String?
-  status            String
-  shipByDate        DateTime?
-  currency          String?
-  totalPrice        Decimal?    @db.Decimal(10, 2)
-  notes             String?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  items             OrderItem[] @relation("OrderToOrderItem")
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shipping          OrderShipping?
+  id                          String      @id @default(cuid())
+  userId                      String
+  marketplace                 String
+  marketplaceKey              String
+  marketplaceCreatedAt        DateTime?
+  customerName                String?
+  status                      String
+  shipByDate                  DateTime?
+  currency                    String?     @default("USD")
+  totalPrice                  Decimal?    @db.Decimal(10, 2)
+  createdAt                   DateTime    @default(now())
+  updatedAt                   DateTime    @updatedAt
+  notes                       String?
+  orderNumber                 String?
+  weightKg                    Float?      @default(0.5)
+  serviceType                 String?     @default("FEDEX_GROUND")
+  packagingType               String?     @default("YOUR_PACKAGING")
+  shippingAddress             Json?
+  shippingLabelUrl            String?
+  trackingNumber              String?
+  rawData                     Json?
+  fedexServiceType            String?
+  fedexPackagingType          String?
+  fedexPickupType             String?
+  fedexDutiesPaymentType      String?
+  packageLength               Float?
+  packageWidth                Float?
+  packageHeight               Float?
+  dimensionUnits              String?
+  commodityDesc               String?
+  countryOfMfg                String?
+  harmonizedCode              String?
+  labelStockType              String?
+  signatureType               String?
+  sendCommercialInvoiceViaEtd Boolean?
+  termsOfSale                 String?
+  items                       OrderItem[] @relation("OrderToOrderItem")
+  shipments                   Shipment[]
+  user                        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shipmentStatus              String?
+  shippedAt                   DateTime?
+  shipping                    OrderShipping?
 
   @@unique([userId, orderNumber])
   @@unique([userId, marketplace, marketplaceKey])
@@ -124,32 +131,28 @@ model OrderItem {
   sku            String?
   productName    String?
   variantInfo    String?
-  quantity       Int
+  quantity       Int        @default(1)
   unitPrice      Decimal?   @db.Decimal(10, 2)
   totalPrice     Decimal?   @db.Decimal(10, 2)
+  weightKg       Float?     @default(0.5)
+  harmonizedCode String?
+  countryOfMfg   String?
   notes          String?
   image          String?
-  shipBy         DateTime?
   marketplaceKey String?
+  shipBy         DateTime?
   orderNumber    String?
   uniqueLineKey  String?
+  productId      String?
+  remoteLineId   String?
+  labelJobs      LabelJob[]
   order          Order      @relation("OrderToOrderItem", fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product?   @relation(fields: [productId], references: [id])
+  shipments      Shipment[]
 
+  @@unique([remoteLineId, orderId], name: "remoteLineId_orderId")
   @@index([orderId])
   @@index([sku])
-}
-
-model LabelJob {
-  id             String    @id @default(cuid())
-  orderItemId    String
-  carrier        String
-  status         String
-  pdfUrl         String?
-  trackingNumber String?
-  errorMessage   String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  // Removed relation to OrderItem since orderItemId is not present in OrderItem
 }
 
 model Product {
@@ -166,8 +169,11 @@ model Product {
   userId              String
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+  countryOfMfg        String?
+  harmonizedCode      String?
   inventories         Inventory[]
   marketplaceProducts MarketplaceProduct[]
+  orderItems          OrderItem[]
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, sku])
@@ -200,42 +206,134 @@ model MarketplaceProduct {
 }
 
 model UserIntegrationSettings {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  veeqoApiKey        String?
-  shippoToken        String?
-  fedexApiKey        String?
-  fedexApiSecret     String?
-  fedexAccountNumber String?
-  fedexMeterNumber   String?
-  trendyolSupplierId String?
-  trendyolApiKey     String?
-  trendyolApiSecret  String?
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  veeqoApiKey           String?
+  shippoToken           String?
+  fedexApiKey           String?
+  fedexApiSecret        String?
+  fedexAccountNumber    String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  fedexMeterNumber      String?
+  hepsiburadaApiKey     String?
   hepsiburadaMerchantId String?
-  hepsiburadaApiKey  String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trendyolApiKey        String?
+  trendyolApiSecret     String?
+  trendyolSupplierId    String?
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ShipperProfile {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  shipperName         String?
-  shipperPersonName   String?
-  shipperPhoneNumber  String?
-  shipperStreet1      String?
-  shipperStreet2      String?
-  shipperCity         String?
-  shipperStateCode    String?
-  shipperPostalCode   String?
-  shipperCountryCode  String?
-  shipperTinNumber    String?
-  importerOfRecord    String?
-  fedexFolderId       String?
-  defaultCurrencyCode String?
-  dutiesPaymentType   String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                                String   @id @default(uuid())
+  userId                            String   @unique
+  shipperName                       String?
+  shipperPersonName                 String?
+  shipperPhoneNumber                String?
+  shipperStreet1                    String?
+  shipperStreet2                    String?
+  shipperCity                       String?
+  shipperStateCode                  String?
+  shipperPostalCode                 String?
+  shipperCountryCode                String?
+  shipperTinNumber                  String?
+  shipperTinType                    String?
+  importerOfRecord                  String?
+  fedexFolderId                     String?
+  defaultCurrencyCode               String?  @default("USD")
+  dutiesPaymentType                 String?  @default("SENDER")
+  defaultShippingChargesPaymentType String?  @default("SENDER")
+  createdAt                         DateTime @default(now())
+  updatedAt                         DateTime @updatedAt
+  defaultCountryOfMfg               String?
+  defaultHarmonizedCode             String?
+  defaultPackagingType              String?
+  defaultServiceType                String?
+  defaultWeightKg                   Float?
+  user                              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LabelJob {
+  id             String    @id @default(cuid())
+  orderItemId    String
+  carrier        String
+  status         String
+  pdfUrl         String?
+  trackingNumber String?
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  orderItem      OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderItemId])
+}
+
+model Shipment {
+  id             String     @id @default(cuid())
+  orderId        String
+  orderItemId    String?
+  carrier        String
+  status         String
+  pdfUrl         String?
+  trackingNumber String?
+  errorMessage   String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  serviceType    String?
+  order          Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem      OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([orderItemId])
+}
+
+model SyncLog {
+  id        String   @id @default(cuid())
+  level     String
+  message   String
+  userId    String?
+  operation String?
+  details   Json?
+  error     String?
+  timestamp DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([timestamp])
+  @@index([level])
+}
+
+model SyncOperation {
+  id        String          @id @default(cuid())
+  userId    String
+  type      String
+  status    String
+  metrics   Json
+  retryOf   String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  retryFrom SyncOperation?  @relation("RetryRelation", fields: [retryOf], references: [id])
+  retries   SyncOperation[] @relation("RetryRelation")
+  user      User            @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}
+
+model OrderShipping {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  firstName   String
+  lastName    String?
+  company     String?
+  street1     String
+  street2     String?
+  city        String
+  state       String?
+  postalCode  String
+  countryCode String
+  phone       String
+  insertedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }

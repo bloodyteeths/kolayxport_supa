@@ -45,7 +45,7 @@ const defaultCtaAction = async () => { // ADDED helper for default action
   });
 };
 
-const PublicNav = ({ ctaAction = defaultCtaAction, ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => { // MODIFIED: ctaLink prop changed to ctaAction (function) and ctaLabel
+const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
@@ -73,10 +73,8 @@ const PublicNav = ({ ctaAction = defaultCtaAction, ctaLabel = "Giriş Yap / Ücr
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
           {/* Logo Placeholder */}
           <motion.div variants={linkVariants}>
-            <Link href="/">
-              <a className="text-2xl font-bold text-gray-800 hover:text-blue-600 transition-colors">
+            <Link href="/" className="text-2xl font-bold text-gray-800 hover:text-blue-600 transition-colors">
                 KolayXport
-              </a>
             </Link>
           </motion.div>
 
@@ -84,20 +82,17 @@ const PublicNav = ({ ctaAction = defaultCtaAction, ctaLabel = "Giriş Yap / Ücr
           <nav className="hidden md:flex items-center gap-x-6 lg:gap-x-8">
             {navLinks.map((link) => (
               <motion.div variants={linkVariants} key={link.name}>
-                <Link href={link.href}>
-                  <a className="text-gray-600 hover:text-blue-600 transition-colors font-medium">
+                <Link href={link.href} className="text-gray-600 hover:text-blue-600 transition-colors font-medium">
                     {link.name}
-                  </a>
                 </Link>
               </motion.div>
             ))}
             <motion.div variants={linkVariants}>
-              <button
-                onClick={ctaAction}
-                className="btn-primary"
-              >
-                {ctaLabel}
-              </button>
+              <Link href="/login" passHref legacyBehavior>
+                <a>
+                  <button className="btn-primary">{ctaLabel}</button>
+                </a>
+              </Link>
             </motion.div>
           </nav>
 
@@ -129,23 +124,23 @@ const PublicNav = ({ ctaAction = defaultCtaAction, ctaLabel = "Giriş Yap / Ücr
             <nav className="flex flex-col items-center space-y-6 text-center">
               {navLinks.map((link) => (
                 <motion.div variants={linkVariants} key={link.name}>
-                  <Link href={link.href}>
-                    <a 
+                  <Link 
+                      href={link.href} 
                       onClick={toggleMenu}
                       className="text-xl font-medium text-gray-700 hover:text-blue-600 transition-colors"
                     >
                       {link.name}
-                    </a>
                   </Link>
                 </motion.div>
               ))}
               <motion.div variants={linkVariants} className="mt-8 space-y-4 flex flex-col items-center">
-                <button
-                  onClick={ctaAction}
-                  className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-slate-900 hover:bg-slate-50 w-full text-left"
-                >
+                <Link href="/login" passHref legacyBehavior>
+                  <a>
+                    <button className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-slate-900 hover:bg-slate-50 w-full text-left">
                   {ctaLabel}
                 </button>
+                  </a>
+                </Link>
               </motion.div>
             </nav>
           </motion.div>
@@ -156,7 +151,6 @@ const PublicNav = ({ ctaAction = defaultCtaAction, ctaLabel = "Giriş Yap / Ücr
 };
 
 PublicNav.propTypes = {
-  ctaAction: PropTypes.func,
   ctaLabel: PropTypes.string,
 };
 

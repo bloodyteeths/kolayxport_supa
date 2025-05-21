@@ -5,6 +5,8 @@ export interface UIOrder {
   id: string;
   marketplace: string;
   marketplaceKey: string;
+  orderNumber?: string;
+  labelOverrides?: Record<string, any>;
   customerName?: string;
   images?: string[];
   fedexServiceType?: string;
@@ -40,10 +42,13 @@ export interface UIOrder {
   billingAddress?: any;
   createdAt?: string;
   updatedAt?: string;
+  items?: any[];
+  marketplaceOrderDate?: string;
 }
 
 interface OrdersApiResponse {
-  orders: UIOrder[];
+  orders?: UIOrder[];
+  data?: UIOrder[];
   total: number;
   page: number;
   pageSize: number;
@@ -55,13 +60,24 @@ const fetcher = (url: string) => fetch(url).then(res => {
   return res.json();
 });
 
-export function useOrders(page: number = 1, pageSize: number = 20) {
+export function useOrders(page: number = 1, pageSize: number = 20, filters: Record<string, any> = {}, context?: string) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(pageSize),
+    ...filters,
+  });
+  
+  // Add context parameter if provided
+  if (context) {
+    params.append('context', context);
+  }
+  
   const { data, error, isLoading, mutate } = useSWR<OrdersApiResponse>(
-    `/api/orders?page=${page}&limit=${pageSize}`,
+    `/api/orders?${params.toString()}`,
     fetcher
   );
   return {
-    orders: data?.orders || [],
+    orders: data?.orders || data?.data || [],
     total: data?.total || 0,
     page: data?.page || page,
     pageSize: data?.pageSize || pageSize,

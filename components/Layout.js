@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/router'
 import useSidebar from '../hooks/useSidebar';
 import SidebarToggle from './SidebarToggle';
+import AuthForm from './AuthForm';
 
+/**
+ * Layout: Generic wrapper for both authenticated and public pages.
+ * Used for pages that do not fit strictly into AppLayout or PublicLayout.
+ * TODO: Review usage and consider merging with AppLayout or PublicLayout if redundant.
+ */
 export default function Layout({ children }) {
   const { isOpen, toggleSidebar, closeSidebar } = useSidebar();
   const { user, session, isLoading, signIn: supabaseSignIn, signOut: supabaseSignOut } = useAuth();
@@ -118,18 +124,10 @@ export default function Layout({ children }) {
         {/* Page Content Area */}
         <main className={`flex-1 overflow-auto ${isHomePage || isGenericPublicPage ? '' : 'p-8 bg-gray-100'}`}>
           {isLoading && !isHomePage && !isGenericPublicPage && <p>Yükleniyor...</p>}
-          {!isHomePage && !isGenericPublicPage && !user && !isLoading && (
+          {!user && !isLoading && (
             <div className="text-center">
               <p className="mb-4">Bu sayfayı görüntülemek için giriş yapmanız gerekiyor.</p>
-              <Button onClick={async () => {
-                  const { error } = await supabase.auth.signInWithOAuth({ 
-                    provider: 'google',
-                    options: { redirectTo: window.location.origin + '/app' } 
-                  });
-                  if (error) console.error('Error signing in with Google:', error);
-                }} className="w-auto flex items-center justify-center mx-auto">
-                  <LogIn className="w-4 h-4 mr-2" /> Google ile Giriş Yap
-              </Button>
+              <AuthForm />
             </div>
           )}
           {(user || isHomePage || isGenericPublicPage) && children}
@@ -144,7 +142,7 @@ export default function Layout({ children }) {
             {user && (
               <>
                 <span className="mx-2">|</span>
-                <Link href="#" onClick={async (e) => { e.preventDefault(); await supabaseSignOut(); }} className="hover:underline">Logout</Link>
+                <a href="#" onClick={async (e) => { e.preventDefault(); await supabaseSignOut(); }} className="hover:underline">Logout</a>
               </>
             )}
             <div className="mt-2">

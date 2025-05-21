@@ -23,12 +23,11 @@ export async function syncShippingInfo() {
       // 3. Find corresponding Order row
       const order = await prisma.order.findUnique({
         where: {
-          userId_marketplace_marketplaceKey: {
+          userId_marketplaceKey: {
             userId: user.id,
-            marketplace: o.source,
-            marketplaceKey: o.id
-          }
-        }
+            marketplaceKey: o.id,
+          },
+        },
       });
       if (!order) continue;
 

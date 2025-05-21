@@ -125,17 +125,9 @@ const HeroSection = () => (
       </p>
 
       <div className="mt-10 flex items-center justify-center gap-x-6">
-        <button 
-          onClick={async () => {
-            await supabase.auth.signInWithOAuth({ 
-              provider: 'google',
-              options: { redirectTo: window.location.origin + '/app' } 
-            });
-          }}
-          className="btn-primary"
-        >
+        <Link href="/login" className="btn-primary">
           Ücretsiz Dene
-        </button>
+        </Link>
         <Link href="/hakkimizda" className="btn-secondary">Daha Fazla Bilgi <span aria-hidden="true">→</span></Link>
       </div>
 
@@ -337,17 +329,14 @@ export default function HomePage() {
           <p className="max-w-xl mx-auto text-lg text-blue-100 mb-10">
             KolayXport\'un gücünü keşfedin ve e-ticaret operasyonlarınızı bir üst seviyeye taşıyın.
           </p>
-          <button
-            onClick={async () => {
-              await supabase.auth.signInWithOAuth({ 
-                provider: 'google',
-                options: { redirectTo: window.location.origin + '/app' } 
-              });
-            }}
-            className="px-10 py-4 text-lg font-semibold text-blue-600 bg-white rounded-full shadow-lg hover:scale-105 hover:bg-slate-50 transform transition-all duration-200 ease-out"
-          >
-            Ücretsiz Dene
-          </button>
+          <div className="mt-8">
+            <Link href="/login" className="px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+              Hemen Kayıt Ol
+            </Link>
+            <p className="mt-6 text-sm text-slate-500">
+              Sorularınız mı var? <Link href="/iletisim" className="text-blue-600 hover:underline">Bize Ulaşın</Link>.
+            </p>
+          </div>
         </div>
       </motion.section>
 
@@ -413,17 +402,9 @@ export default function HomePage() {
             Sadece birkaç adımda e-ticaretinizi yeni bir seviyeye taşıyın. Kaydolun ve potansiyeli keşfedin.
           </p>
           <div className="mt-8">
-            <button
-              onClick={async () => {
-                await supabase.auth.signInWithOAuth({ 
-                  provider: 'google',
-                  options: { redirectTo: window.location.origin + '/app' } 
-                });
-              }}
-              className="px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out"
-            >
+            <Link href="/login" className="px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
               Hemen Kayıt Ol
-            </button>
+            </Link>
             <p className="mt-6 text-sm text-slate-500">
               Sorularınız mı var? <Link href="/iletisim" className="text-blue-600 hover:underline">Bize Ulaşın</Link>.
             </p>

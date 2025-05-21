@@ -1,5 +1,6 @@
 import { getSupabaseServerClient } from '@/lib/supabase';
 import prisma from '@/lib/prisma';
+import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -8,22 +9,28 @@ export default async function handler(req, res) {
   }
 
   try {
+    let user, authError;
     const supabase = getSupabaseServerClient(req, res);
-    const {
-      data: { user: authUser },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError) {
-      console.error('[setScriptProps] Supabase auth error:', authError);
-      return res.status(401).json({ error: 'Authentication error', details: authError.message });
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+    authError = result.error;
+    if (authError || !user) {
+      // Try Authorization header fallback
+      const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
+      let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
+      const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (token) {
+        const supabaseDirect = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+        const { data, error } = await supabaseDirect.auth.getUser(token);
+        user = data.user;
+        authError = error;
+    }
+    }
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    if (!authUser) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const userId = authUser.id;
+    const userId = user.id;
     const body = req.body;
 
     console.info(`[SetScriptProps API] Received request for userId: ${userId}. Body:`, JSON.stringify(body));
@@ -87,7 +94,7 @@ export default async function handler(req, res) {
         // Create user with only allowed fields
         const userDataForCreate = {
           id: userId,
-          email: authUser.email,
+          email: user.email,
           ...(userUpdateData.name ? { name: userUpdateData.name } : {}),
         };
         updatedUser = await tx.user.create({

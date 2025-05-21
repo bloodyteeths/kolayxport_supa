@@ -18,5 +18,6 @@ jobs:
         run: npm ci
       - name: Run auto-sync script
         env:
+          # Ensure this secret is set in your repository settings under Settings > Secrets
           KOLAYXPORT_BASE_URL: ${{ secrets.KOLAYXPORT_BASE_URL }}
         run: node scripts/auto-sync-all-users.js

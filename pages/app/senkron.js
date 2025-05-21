@@ -22,6 +22,8 @@ import InputAdornment from '@mui/material/InputAdornment';
 import SearchIcon from '@mui/icons-material/Search';
 import SyncIcon from '@mui/icons-material/Sync';
 import PrintIcon from '@mui/icons-material/Print';
+import Pagination from '@mui/material/Pagination';
+import Stack from '@mui/material/Stack';
 
 const DURUM_OPTIONS = ['Çıkmadı', 'Çıktı'];
 
@@ -33,12 +35,7 @@ export default function SenkronPage() {
   const [search, setSearch] = useState('');
   const [filterDurum, setFilterDurum] = useState('');
   const [filterMarketplace, setFilterMarketplace] = useState('');
-  const [filterStartDate, setFilterStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().slice(0, 10);
-  });
-  const [filterEndDate, setFilterEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [filterVariant, setFilterVariant] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState(null);
@@ -46,6 +43,21 @@ export default function SenkronPage() {
   const [pageSize, setPageSize] = useState(15);
   const [total, setTotal] = useState(0);
   const [marketplaceOptions, setMarketplaceOptions] = useState([]);
+
+  // Set default filter to last 7 days in Turkish time
+  const getTodayTR = () => {
+    const now = new Date();
+    now.setHours(now.getHours() + 3); // UTC+3 for Turkey
+    return now.toISOString().slice(0, 10);
+  };
+  const get7DaysAgoTR = () => {
+    const now = new Date();
+    now.setHours(now.getHours() + 3);
+    now.setDate(now.getDate() - 7);
+    return now.toISOString().slice(0, 10);
+  };
+  const [filterStartDate, setFilterStartDate] = useState(get7DaysAgoTR());
+  const [filterEndDate, setFilterEndDate] = useState(getTodayTR());
 
   // Fetch orders with all filters
   useEffect(() => {
@@ -63,10 +75,10 @@ export default function SenkronPage() {
       },
     })
       .then(res => {
-        setOrders(res.data.orders || []);
+        setOrders(res.data.data || []);
         setTotal(res.data.total || 0);
         // Auto-populate marketplace options
-        const uniqueMarketplaces = Array.from(new Set((res.data.orders || []).map(o => o.marketplace).filter(Boolean)));
+        const uniqueMarketplaces = Array.from(new Set((res.data.data || []).map(o => o.marketplace).filter(Boolean)));
         setMarketplaceOptions(uniqueMarketplaces);
       })
       .catch(err => {
@@ -93,7 +105,7 @@ export default function SenkronPage() {
       await axios.post(`/api/orders/${orderId}/updateNoteAndStatus`, { not, durum });
       // Refetch orders
       const res = await axios.get('/api/orders', { params: { page, limit: pageSize } });
-      setOrders(res.data.orders || []);
+      setOrders(res.data.data || []);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
@@ -109,7 +121,7 @@ export default function SenkronPage() {
       setSyncMessage('Son 7 günün siparişleri başarıyla senkronize edildi!');
       // Refetch orders
       const res = await axios.get('/api/orders', { params: { page, limit: pageSize } });
-      setOrders(res.data.orders || []);
+      setOrders(res.data.data || []);
     } catch (err) {
       setSyncMessage('Senkronizasyon sırasında hata oluştu: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -267,6 +279,18 @@ export default function SenkronPage() {
                 <MenuItem key={opt} value={opt}>{opt}</MenuItem>
               ))}
             </Select>
+            <Select
+              value={filterVariant || ''}
+              onChange={e => { setFilterVariant(e.target.value); setPage(1); }}
+              displayEmpty
+              size="small"
+              sx={{ minWidth: 160 }}
+            >
+              <MenuItem value="">Tüm Varyantlar</MenuItem>
+              {[...new Set(orders.flatMap(o => o.items?.map(i => i.variantInfo).filter(Boolean) || []))].map(opt => (
+                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+              ))}
+            </Select>
             <TextField
               label="Başlangıç Tarihi"
               type="date"
@@ -301,6 +325,7 @@ export default function SenkronPage() {
                 setSearch('');
                 setFilterDurum('');
                 setFilterMarketplace('');
+                setFilterVariant('');
                 const d = new Date();
                 d.setDate(d.getDate() - 7);
                 setFilterStartDate(d.toISOString().slice(0, 10));
@@ -342,6 +367,7 @@ export default function SenkronPage() {
                   <TableRow>
                     <TableCell>Görsel</TableCell>
                     <TableCell>Müşteri Adı</TableCell>
+                    <TableCell>Sipariş Tarihi</TableCell>
                     <TableCell>Varyant</TableCell>
                     <TableCell>Not</TableCell>
                     <TableCell>Durum</TableCell>
@@ -361,18 +387,28 @@ export default function SenkronPage() {
                     filteredOrders.map(order => {
                       const item = order.items?.[0] || {};
                       const edit = editState[order.id] || {};
+                      // Format order date and ship-by date in Turkish time
+                      const orderDate = order.marketplaceCreatedAt || order.createdAt;
+                      const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                      const shipByDateTR = order.shipByDate ? new Date(order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                      // When mapping items for display, ensure image is included from OrderItem.image
+                      const mappedItems = (order.items || []).map(item => ({
+                        ...item,
+                        image: item.image || '',
+                      }));
                       return (
                         <TableRow key={order.id} sx={{ height: 120 }}>
                           <TableCell sx={{ p: 2, width: 200, verticalAlign: 'middle' }}>
-                            {item.image
-                              ? <img src={item.image} width={180} height={180} style={{ objectFit:'cover', borderRadius: 12, display: 'block', margin: '0 auto' }} />
+                            {mappedItems[0].image
+                              ? <img src={mappedItems[0].image} width={180} height={180} style={{ objectFit:'cover', borderRadius: 12, display: 'block', margin: '0 auto' }} />
                               : '—'}
                           </TableCell>
                           <TableCell sx={{ p: 2, fontSize: 16 }}>{order.customerName || '—'}</TableCell>
-                          <TableCell sx={{ p: 2, minWidth: 340, fontSize: 16 }}>{item.variantInfo || '—'}</TableCell>
+                          <TableCell sx={{ p: 2, fontSize: 16 }}>{orderDateTR}</TableCell>
+                          <TableCell sx={{ p: 2, minWidth: 340, fontSize: 16 }}>{mappedItems[0].variantInfo || '—'}</TableCell>
                           <TableCell sx={{ p: 2, minWidth: 340, fontSize: 16 }}>
                             <TextField
-                              value={edit.not ?? item.notes ?? ''}
+                              value={edit.not ?? mappedItems[0].notes ?? ''}
                               onChange={e => handleEditChange(order.id, 'not', e.target.value)}
                               variant="outlined"
                               fullWidth
@@ -382,7 +418,7 @@ export default function SenkronPage() {
                               inputProps={{ style: { fontSize: 16, padding: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
                               sx={{ minWidth: 320 }}
                             />
-                            {(edit.not !== undefined && edit.not !== item.notes) || (edit.durum !== undefined && edit.durum !== order.status) ? (
+                            {(edit.not !== undefined && edit.not !== mappedItems[0].notes) || (edit.durum !== undefined && edit.durum !== order.status) ? (
                               <Button
                                 variant="contained"
                                 color="success"
@@ -406,7 +442,7 @@ export default function SenkronPage() {
                               ))}
                             </Select>
                           </TableCell>
-                          <TableCell sx={{ p: 2, fontSize: 16 }}>{order.shipByDate ? new Date(order.shipByDate).toLocaleDateString('tr-TR') : '—'}</TableCell>
+                          <TableCell sx={{ p: 2, fontSize: 16 }}>{shipByDateTR}</TableCell>
                           <TableCell sx={{ p: 2, fontSize: 16 }}>{order.marketplace || '—'}</TableCell>
                           <TableCell sx={{ p: 2, fontSize: 16 }}>
                             {order.orderNumber
@@ -425,29 +461,22 @@ export default function SenkronPage() {
             </TableContainer>
           </div>
           {/* Pagination Controls */}
-          <div className="flex flex-row flex-wrap items-center justify-center gap-2 mt-4">
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPage(page - 1)}
-              disabled={page === 1}
-            >Önceki</Button>
-            {Array.from({ length: Math.ceil(total / pageSize) }, (_, i) => (
-              <Button
-                key={i + 1}
-                variant={page === i + 1 ? 'contained' : 'outlined'}
-                size="small"
-                onClick={() => setPage(i + 1)}
-                sx={{ mb: 1 }}
-              >{i + 1}</Button>
-            ))}
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPage(page + 1)}
-              disabled={page === Math.ceil(total / pageSize)}
-            >Sonraki</Button>
-          </div>
+          <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ mt: 4 }}>
+            <Pagination
+              count={Math.ceil(total / pageSize)}
+              page={page}
+              onChange={(e, value) => setPage(value)}
+              color="primary"
+              shape="rounded"
+              siblingCount={1}
+              boundaryCount={1}
+              showFirstButton
+              showLastButton
+            />
+            <Typography sx={{ ml: 2, minWidth: 100 }}>
+              {`${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)}/${total}`}
+            </Typography>
+          </Stack>
         </div>
       </motion.section>
     </AppLayout>

@@ -1,11 +1,15 @@
 import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
-import axios, { AxiosError } from 'axios'; // Import AxiosError
+// @ts-ignore
+import axios from 'axios';
 import { Grid } from '@mui/material';
 import {
-  Container, TextField, Button, Typography, Paper, CircularProgress, Select, MenuItem, FormControl, InputLabel, FormHelperText, Box, Snackbar, Alert, AlertColor, SelectChangeEvent
+  Container, TextField, Button, Typography, Paper, CircularProgress, Select, MenuItem, FormControl, InputLabel, FormHelperText, Box, Snackbar, Alert, AlertColor, SelectChangeEvent, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton
 } from '@mui/material';
-import { fedexOptionsData, FedExOption } from '../lib/fedexConfig'; // For dutiesPaymentTypes
+import { fedexOptionsData, FedExOption } from '../lib/fedex/fedex.config'; // For dutiesPaymentTypes
 import Layout from '../components/Layout'; // Assuming you have a Layout component
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ReplayIcon from '@mui/icons-material/Replay';
 
 // Mirrored from API route
 interface UserSettingsResponse {
@@ -32,6 +36,7 @@ interface UserSettingsResponse {
     fedexFolderId?: string | null;
     defaultCurrencyCode?: string | null;
     dutiesPaymentType?: string | null;
+    defaultShippingChargesPaymentType?: string | null;
   } | null; // Allow null for the whole object
 }
 
@@ -59,6 +64,7 @@ const initialFormData: UserSettingsResponse = {
     fedexFolderId: '',
     defaultCurrencyCode: 'USD',
     dutiesPaymentType: 'SENDER',
+    defaultShippingChargesPaymentType: 'SENDER',
   },
 };
 
@@ -83,18 +89,62 @@ const currencyCodes = [
 const AyarlarPage = () => {
   const [loadingFullSync, setLoadingFullSync] = useState(false);
   const [fullSyncStarted, setFullSyncStarted] = useState(false);
+  const [loadingShippoSync, setLoadingShippoSync] = useState(false);
+  const [shippoSyncStarted, setShippoSyncStarted] = useState(false);
+  const [loadingRecentSync, setLoadingRecentSync] = useState(false);
 
   // Full sync handler
   const handleFullSync = async () => {
     setLoadingFullSync(true);
     setFullSyncStarted(false);
     try {
-      await axios.post('/api/orders/full-sync');
-      setFullSyncStarted(true);
-    } catch (err) {
-      setSnackbar({ open: true, message: 'Senkronizasyon başlatılamadı.', severity: 'error' });
+      const response = await fetch('/api/orders/full-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Senkronizasyon başlatılamadı');
+      }
+
+      const result = await response.json();
+      // Show success message or handle the response
+      alert('Senkronizasyon başlatıldı. Bu işlem arka planda devam edecek.');
+    } catch (error) {
+      console.error('Full sync error:', error);
+      alert(error instanceof Error ? error.message : 'Senkronizasyon başlatılamadı');
     } finally {
       setLoadingFullSync(false);
+    }
+  };
+
+  // Shippo sync handler
+  const handleShippoSync = async () => {
+    setLoadingShippoSync(true);
+    setShippoSyncStarted(false);
+    try {
+      const response = await fetch('/api/orders/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Shippo senkronizasyonu başlatılamadı');
+      }
+
+      const result = await response.json();
+      alert('Shippo senkronizasyonu başlatıldı. Bu işlem arka planda devam edecek.');
+    } catch (error) {
+      console.error('Shippo sync error:', error);
+      alert(error instanceof Error ? error.message : 'Shippo senkronizasyonu başlatılamadı');
+    } finally {
+      setLoadingShippoSync(false);
     }
   };
 
@@ -105,6 +155,45 @@ const AyarlarPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [importerJsonError, setImporterJsonError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: AlertColor }>({ open: false, message: '', severity: 'success' });
+
+  // --- Sync History State ---
+  const [syncHistory, setSyncHistory] = useState<any[]>([]);
+  const [syncHistoryLoading, setSyncHistoryLoading] = useState(false);
+  const [syncHistoryError, setSyncHistoryError] = useState<string | null>(null);
+  const [syncHistoryCursor, setSyncHistoryCursor] = useState<string | null>(null);
+  const [syncHistoryEnd, setSyncHistoryEnd] = useState(false);
+  const [retryingSyncId, setRetryingSyncId] = useState<string | null>(null);
+
+  const fetchSyncHistory = async (opts: { append?: boolean } = {}) => {
+    setSyncHistoryLoading(true);
+    setSyncHistoryError(null);
+    try {
+      const params = new URLSearchParams();
+      if (syncHistoryCursor) params.append('cursor', syncHistoryCursor);
+      const res = await fetch(`/api/sync/history?${params.toString()}`);
+      const data = await res.json();
+      if (res.ok) {
+        if (opts.append) {
+          setSyncHistory(prev => [...prev, ...data.syncs]);
+        } else {
+          setSyncHistory(data.syncs);
+        }
+        setSyncHistoryCursor(data.nextCursor);
+        setSyncHistoryEnd(!data.nextCursor || data.syncs.length === 0);
+      } else {
+        setSyncHistoryError(data.error || 'Senkron geçmişi alınamadı.');
+      }
+    } catch (err: any) {
+      setSyncHistoryError(err.message || 'Senkron geçmişi alınamadı.');
+    } finally {
+      setSyncHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSyncHistory();
+    // eslint-disable-next-line
+  }, []);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -175,6 +264,21 @@ const AyarlarPage = () => {
     }
   };
 
+  const handleRetrySync = async (syncId: string) => {
+    if (!window.confirm('Bu senkronizasyonu yeniden başlatmak istediğinize emin misiniz?')) return;
+    setRetryingSyncId(syncId);
+    try {
+      const res = await fetch(`/api/sync/retry?id=${encodeURIComponent(syncId)}`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Tekrar başlatılamadı');
+      fetchSyncHistory();
+    } catch (err: any) {
+      alert(err.message || 'Tekrar başlatılamadı');
+    } finally {
+      setRetryingSyncId(null);
+    }
+  };
+
   if (isLoading && !initialDataLoaded) {
     return (
       <Layout>
@@ -205,42 +309,94 @@ const AyarlarPage = () => {
               API Entegrasyonları
             </Typography>
             <Grid container spacing={3}>
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <TextField fullWidth label="Veeqo API Key" name="veeqoApiKey" type="password" value={formData.integrationSettings?.veeqoApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
 
-              {/* Veeqo Full Sync Section */}
+              {/* Veeqo Full & Recent Sync Section */}
               {formData.integrationSettings?.veeqoApiKey && (
-                <Grid xs={12} md={12}>
-                  <Paper elevation={2} sx={{ p: 2, mt: 2, background: '#e3f2fd', border: '1px solid #90caf9' }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#1976d2' }}>Tüm siparişleri senkronize et</Typography>
+                <Grid item xs={12}>
+                  <Paper elevation={1} sx={{ p: 2, bgcolor: 'info.light', color: 'info.contrastText' }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Veeqo Siparişlerini Senkronize Et
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      Veeqo'dan siparişleri senkronize etmek için aşağıdaki butonları kullanın. "Yakın Tarihli" sadece son güncellenenleri, "Tüm Siparişler" ise tüm siparişleri çeker.
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
                     <Button
                       variant="contained"
                       color="primary"
-                      disabled={loadingFullSync || isSubmitting}
                       onClick={handleFullSync}
-                      sx={{ mt: 1 }}
+                        disabled={loadingFullSync || isLoading}
+                        startIcon={loadingFullSync ? <CircularProgress size={20} color="inherit" /> : null}
                     >
-                      {loadingFullSync ? 'Senkronizasyon Başlatılıyor...' : 'Başla'}
+                        {loadingFullSync ? 'Tüm Siparişler Senkronize Ediliyor...' : 'Tüm Siparişleri Senkron Et'}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="secondary"
+                        onClick={async () => {
+                          setLoadingRecentSync(true);
+                          try {
+                            const response = await fetch('/api/orders/sync', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                            });
+                            if (!response.ok) {
+                              const error = await response.json();
+                              throw new Error(error.message || 'Yakın tarihli senkronizasyon başlatılamadı');
+                            }
+                            await response.json();
+                            alert('Yakın tarihli siparişler senkronize edildi.');
+                          } catch (error) {
+                            console.error('Recent sync error:', error);
+                            alert(error instanceof Error ? error.message : 'Yakın tarihli senkronizasyon başlatılamadı');
+                          } finally {
+                            setLoadingRecentSync(false);
+                          }
+                        }}
+                        disabled={loadingRecentSync || isLoading}
+                        startIcon={loadingRecentSync ? <CircularProgress size={20} color="inherit" /> : null}
+                      >
+                        {loadingRecentSync ? 'Yakın Tarihli Senkronize Ediliyor...' : 'Yakın Tarihli Siparişleri Senkron Et'}
                     </Button>
-                    {fullSyncStarted && (
-                      <Typography color="success.main" sx={{ mt: 1 }}>
-                        Senkronizasyon başlatıldı, bu sayfadan ayrılabilirsiniz
-                      </Typography>
-                    )}
+                    </Box>
                   </Paper>
                 </Grid>
               )}
-              <Grid xs={12} md={6}>
+              <Grid item xs={12} md={6}>
                 <TextField fullWidth label="Shippo Token" name="shippoToken" type="password" value={formData.integrationSettings?.shippoToken || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
-              <Grid xs={12} md={4}>
+              {/* Shippo Full Sync Section */}
+              {formData.integrationSettings?.shippoToken && (
+                <Grid item xs={12}>
+                  <Paper elevation={1} sx={{ p: 2, bgcolor: 'info.light', color: 'info.contrastText', mt: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Shippo siparişlerini senkronize et
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2 }}>
+                      Shippo'dan tüm siparişleri tek seferde senkronize etmek için bu butonu kullanın. Bu işlem biraz zaman alabilir.
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      onClick={handleShippoSync}
+                      disabled={loadingShippoSync}
+                      startIcon={loadingShippoSync ? <CircularProgress size={20} color="inherit" /> : null}
+                    >
+                      {loadingShippoSync ? 'Shippo Senkronizasyonu Başlatılıyor...' : 'Shippo Senkronizasyonu'}
+                    </Button>
+                  </Paper>
+                </Grid>
+              )}
+              <Grid item xs={12} md={4}>
                 <TextField fullWidth label="FedEx API Key" name="fedexApiKey" type="password" value={formData.integrationSettings?.fedexApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <TextField fullWidth label="FedEx API Secret" name="fedexApiSecret" type="password" value={formData.integrationSettings?.fedexApiSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <TextField fullWidth label="FedEx Account Number" name="fedexAccountNumber" value={formData.integrationSettings?.fedexAccountNumber || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
             </Grid>
@@ -251,35 +407,35 @@ const AyarlarPage = () => {
               Gönderici Profili
             </Typography>
             <Grid container spacing={3}>
-              <Grid xs={12} md={6}>
+              <Grid item xs={12} md={6}>
                 <TextField fullWidth label="Şirket Adı" name="shipperName" value={formData.shipperProfile?.shipperName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid xs={12} md={6}>
+              <Grid item xs={12} md={6}>
                 <TextField fullWidth label="Yetkili Kişi" name="shipperPersonName" value={formData.shipperProfile?.shipperPersonName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid xs={12} md={6}>
+              <Grid item xs={12} md={6}>
                 <TextField fullWidth label="Telefon" name="shipperPhoneNumber" value={formData.shipperProfile?.shipperPhoneNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid xs={12} md={6}>
+              <Grid item xs={12} md={6}>
                 <TextField fullWidth label="FedEx Klasör ID" name="fedexFolderId" value={formData.shipperProfile?.fedexFolderId || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
               </Grid>
-              <Grid xs={12}>
+              <Grid item xs={12}>
                 <TextField fullWidth label="Adres 1" name="shipperStreet1" value={formData.shipperProfile?.shipperStreet1 || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid xs={12}>
+              <Grid item xs={12}>
                 <TextField fullWidth label="Adres 2" name="shipperStreet2" value={formData.shipperProfile?.shipperStreet2 || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
               </Grid>
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <TextField fullWidth label="Şehir" name="shipperCity" value={formData.shipperProfile?.shipperCity || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <TextField fullWidth label="Eyalet/Bölge Kodu" name="shipperStateCode" value={formData.shipperProfile?.shipperStateCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
               </Grid>
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <TextField fullWidth label="Posta Kodu" name="shipperPostalCode" value={formData.shipperProfile?.shipperPostalCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
               
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <FormControl fullWidth required>
                   <InputLabel id="shipperCountryCode-label">Ülke Kodu</InputLabel>
                   <Select
@@ -293,10 +449,10 @@ const AyarlarPage = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <TextField fullWidth label="Vergi No" name="shipperTinNumber" value={formData.shipperProfile?.shipperTinNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
               </Grid>
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <FormControl fullWidth required>
                   <InputLabel id="shipperTinType-label">Vergi Tipi</InputLabel>
                   <Select
@@ -311,7 +467,7 @@ const AyarlarPage = () => {
                 </FormControl>
               </Grid>
 
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <FormControl fullWidth required>
                   <InputLabel id="defaultCurrencyCode-label">Varsayılan Para Birimi</InputLabel>
                   <Select
@@ -325,7 +481,7 @@ const AyarlarPage = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid xs={12} md={4}>
+              <Grid item xs={12} md={4}>
                 <FormControl fullWidth required>
                   <InputLabel id="dutiesPaymentType-label">Gümrük Ödeme Tipi</InputLabel>
                   <Select
@@ -340,7 +496,24 @@ const AyarlarPage = () => {
                 </FormControl>
               </Grid>
 
-              <Grid xs={12}>
+              <Grid item xs={12} md={4}>
+                <FormControl fullWidth required>
+                  <InputLabel id="defaultShippingChargesPaymentType-label">Default Shipping Charges Payment Type</InputLabel>
+                  <Select
+                    labelId="defaultShippingChargesPaymentType-label"
+                    name="defaultShippingChargesPaymentType"
+                    label="Default Shipping Charges Payment Type"
+                    value={formData.shipperProfile?.defaultShippingChargesPaymentType || 'SENDER'}
+                    onChange={(e: SelectChangeEvent<string>) => handleInputChange('shipperProfile', e.target.name as string, e.target.value as string)}
+                  >
+                    {(fedexOptionsData.shippingChargesPaymentTypes as FedExOption[]).map(opt => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Importer of Record (JSON)"
@@ -355,6 +528,99 @@ const AyarlarPage = () => {
                 />
               </Grid>
             </Grid>
+          </Paper>
+
+          {/* --- Sync History Section --- */}
+          <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', flex: 1 }}>
+                Senkron Geçmişi
+              </Typography>
+              <IconButton onClick={() => { setSyncHistoryCursor(null); setSyncHistoryEnd(false); fetchSyncHistory(); }} disabled={syncHistoryLoading}>
+                <RefreshIcon />
+              </IconButton>
+            </Box>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Eşitleme Türü</TableCell>
+                    <TableCell>Durum</TableCell>
+                    <TableCell>Başlangıç</TableCell>
+                    <TableCell>Bitiş</TableCell>
+                    <TableCell>İşlenen</TableCell>
+                    <TableCell>Başarılı</TableCell>
+                    <TableCell>Başarısız</TableCell>
+                    <TableCell>Hatalar</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {syncHistory.length === 0 && !syncHistoryLoading && (
+                    <TableRow>
+                      <TableCell colSpan={9} align="center">
+                        Henüz senkron geçmişi bulunmamaktadır.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {syncHistory.map((row, idx) => {
+                    let statusColor = 'text.primary';
+                    let statusLabel = row.status;
+                    if (row.status === 'completed') { statusColor = 'success.main'; statusLabel = 'Tamamlandı'; }
+                    else if (row.status === 'failed') { statusColor = 'error.main'; statusLabel = 'Başarısız'; }
+                    else if (row.status === 'in_progress') { statusColor = 'info.main'; statusLabel = 'Devam Ediyor'; }
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell>{row.type}</TableCell>
+                        <TableCell sx={{ color: statusColor, fontWeight: 'bold' }}>{statusLabel}</TableCell>
+                        <TableCell>{row.startedAt ? new Date(row.startedAt).toLocaleString('tr-TR') : '-'}</TableCell>
+                        <TableCell>{row.endedAt ? new Date(row.endedAt).toLocaleString('tr-TR') : '-'}</TableCell>
+                        <TableCell>{row.processedOrders}</TableCell>
+                        <TableCell>{row.successfulOrders}</TableCell>
+                        <TableCell>{row.failedOrders}</TableCell>
+                        <TableCell>
+                          {row.errors && row.errors.length > 0 ? (
+                            <Tooltip title="Hata detaylarını görmek için tıklayın">
+                              <Button size="small" color="error" onClick={() => alert(JSON.stringify(row.errors, null, 2))}>
+                                {row.errors.length}
+                              </Button>
+                            </Tooltip>
+                          ) : 0}
+                        </TableCell>
+                        <TableCell>
+                          {row.status === 'failed' && (
+                            <Tooltip title="Tekrar Dene">
+                              <span>
+                                <IconButton
+                                  color="primary"
+                                  onClick={() => handleRetrySync(row.id)}
+                                  disabled={retryingSyncId === row.id}
+                                >
+                                  <ReplayIcon />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              {syncHistoryLoading && <CircularProgress size={24} />}
+              {!syncHistoryLoading && syncHistory.length > 0 && !syncHistoryEnd && (
+                <Button variant="outlined" onClick={() => fetchSyncHistory({ append: true })} startIcon={<ExpandMoreIcon />}>
+                  Daha Fazla Yükle
+                </Button>
+              )}
+              {!syncHistoryLoading && syncHistoryEnd && syncHistory.length > 0 && (
+                <Typography sx={{ color: 'text.secondary', ml: 2 }}>
+                  Daha fazla kayıt bulunamadı.
+                </Typography>
+              )}
+            </Box>
           </Paper>
 
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>

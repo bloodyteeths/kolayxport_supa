@@ -31,8 +31,14 @@ import { supabase } from '@/lib/supabase'; // Added for direct Supabase calls if
 import useSidebar from '../hooks/useSidebar'; // Import the hook
 import SidebarToggle from './SidebarToggle'; // Import the toggle component
 
+/**
+ * AppLayout: For authenticated application routes (e.g., /app/*)
+ * Provides sidebar, topbar, and dashboard navigation for logged-in users.
+ */
+
 const navItems = [
   { href: '/app', icon: LayoutDashboard, label: 'Genel Bakış' },
+  { href: '/app/labels', icon: FileText, label: 'Label' },
   { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: 'Entegrasyonlar' },
   { href: '/app/settings', icon: Settings, label: 'Ayarlar' },
   { href: '/app/senkron', icon: ShoppingCart, label: 'Senkron' },

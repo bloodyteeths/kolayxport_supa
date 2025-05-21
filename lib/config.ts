@@ -1,4 +1,37 @@
 // lib/config.ts
+import prisma from './prisma';
+
+/**
+ * Configuration and integration credential management.
+ *
+ * For user-specific integrations (Veeqo, Shippo, FedEx, etc.), credentials are fetched strictly from the database (UserIntegrationSettings, ShipperProfile).
+ * There is NO fallback to process.env for user operations. If credentials are missing, an error is thrown or null is returned.
+ * process.env is only used for system-wide, non-user-specific config.
+ */
+
+// System-wide config (for app-level integrations only)
+export const SYSTEM_API_KEY = process.env.SYSTEM_API_KEY;
+
+export async function getIntegrationCreds(userId: string) {
+  if (!userId) throw new Error('No userId provided to getIntegrationCreds');
+  // Fetch from UserIntegrationSettings
+  const integration = await prisma.userIntegrationSettings.findUnique({ where: { userId } });
+  // Fetch from ShipperProfile
+  const shipper = await prisma.shipperProfile.findUnique({ where: { userId } });
+  if (!integration && !shipper) {
+    throw new Error('No integration credentials found for user');
+  }
+  return {
+    veeqoApiKey: integration?.veeqoApiKey || null,
+    shippoToken: integration?.shippoToken || null,
+    fedexApiKey: integration?.fedexApiKey || null,
+    fedexApiSecret: integration?.fedexApiSecret || null,
+    fedexAccountNumber: integration?.fedexAccountNumber || null,
+    // Add any other user-specific fields as needed
+    ...shipper
+  };
+}
+
 
 // Veeqo
 export const VEEQO_API_KEY = process.env.VEEQO_API_KEY;

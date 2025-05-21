@@ -1,5 +1,8 @@
 import { getSupabaseServerClient } from '../../../lib/supabase';
 import { PrismaClient } from '@prisma/client';
+import { startSync, updateSyncProgress, completeSync } from '../../../lib/sync-status';
+import { logger } from '../../../lib/logger';
+import { createClient } from '@supabase/supabase-js';
 
 const prisma = new PrismaClient();
 
@@ -53,15 +56,37 @@ export default async function handler(req, res) {
   }
   
   try {
+    let user, authError;
     const supabase = getSupabaseServerClient(req, res);
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError) {
-      console.error('Supabase auth error in products/sync:', authError);
-      return res.status(401).json({ error: 'Authentication error', details: authError.message });
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+    authError = result.error;
+    if (authError || !user) {
+      // Try Authorization header fallback
+      const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
+      let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
+      const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (token) {
+        const supabaseDirect = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+        const { data, error } = await supabaseDirect.auth.getUser(token);
+        user = data.user;
+        authError = error;
+      }
     }
-    if (!user) {
-      return res.status(401).json({ error: 'Unauthorized' });
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    // Prevent overlapping syncs
+    const inProgress = await prisma.syncOperation.findFirst({
+      where: {
+        userId: user.id,
+        type: 'product',
+        status: 'in_progress',
+      },
+    });
+    if (inProgress) {
+      return res.status(429).json({ error: 'Sync already in progress for this user.' });
     }
     
     // Get marketplace config
@@ -91,15 +116,25 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: 'No products found to import from ' + marketplaceType });
     }
     
-    // Process each product
-    const results = {
-      created: 0,
-      updated: 0,
-      errors: 0,
-      products: []
-    };
-    
+    let syncId = null;
+    let processedProducts = 0;
+    let created = 0;
+    let updated = 0;
+    let failedProducts = 0;
+    let errors = [];
+    let totalProducts = 0;
+    totalProducts = products.length;
+    syncId = await startSync(user.id, 'product');
+    await updateSyncProgress(syncId, {
+      totalOrders: totalProducts,
+      processedOrders: 0,
+      successfulOrders: 0,
+      failedOrders: 0,
+      errors: [],
+    });
+    logger.info('Product sync started', { userId: user.id, syncId, source: marketplaceType, totalProducts });
     for (const productData of products) {
+      processedProducts++;
       try {
         // Check if we already have this marketplace product mapped
         const existingMapping = await prisma.marketplaceProduct.findFirst({
@@ -127,7 +162,7 @@ export default async function handler(req, res) {
             }
           });
           
-          results.updated++;
+          updated++;
         } else {
           // Check if we have a product with this SKU already
           const existingProduct = await prisma.product.findFirst({
@@ -149,7 +184,7 @@ export default async function handler(req, res) {
             });
             
             product = existingProduct;
-            results.updated++;
+            updated++;
           } else {
             // Create new product and mapping
             product = await prisma.product.create({
@@ -182,33 +217,51 @@ export default async function handler(req, res) {
               });
             }
             
-            results.created++;
+            created++;
           }
         }
         
-        results.products.push({
-          id: product.id,
-          sku: product.sku,
-          name: product.name
+        await updateSyncProgress(syncId, {
+          processedOrders: processedProducts,
+          successfulOrders: created + updated,
+          failedOrders: failedProducts,
         });
-        
       } catch (error) {
-        console.error(`Error processing product ${productData.sku} from ${marketplaceType}:`, error);
-        results.errors++;
+        failedProducts++;
+        errors.push({ orderId: productData.sku ?? productData.marketplaceId ?? 'Unknown', error: error.message });
+        logger.error('Product upsert failed', error, {
+          userId: user.id,
+          operation: 'product-upsert',
+          sku: productData.sku,
+          marketplace: marketplaceType,
+          marketplaceId: productData.marketplaceId,
+        });
+        await updateSyncProgress(syncId, {
+          processedOrders: processedProducts,
+          successfulOrders: created + updated,
+          failedOrders: failedProducts,
+          errors,
+        });
+        continue;
       }
     }
-    
-    return res.status(200).json({
-      success: true,
-      message: `Product sync for ${marketplaceType} completed. New: ${results.created}, Updated: ${results.updated}, Errors: ${results.errors}`,
-      results
+    const success = failedProducts === 0;
+    await completeSync(syncId, success, {
+      processedOrders: processedProducts,
+      successfulOrders: created + updated,
+      failedOrders: failedProducts,
+      errors,
     });
-    
+    logger.info('Product sync completed', { userId: user.id, syncId, created, updated, failedProducts, totalProducts });
+    return res.status(200).json({ created, updated, total: totalProducts });
   } catch (error) {
-    console.error(`Error syncing products for ${marketplaceType}:`, error);
-    if (error.code) {
-        console.error(`Prisma error in products/sync: ${error.code} - ${error.message}`);
-    }
-    return res.status(500).json({ error: 'Failed to sync products', details: error.message });
+    logger.error('Product sync failed', error, { userId: user?.id, syncId, operation: 'product-sync', source: marketplaceType });
+    await completeSync(syncId, false, {
+      processedOrders: processedProducts,
+      successfulOrders: created + updated,
+      failedOrders: failedProducts + 1,
+      errors: [...errors, { orderId: 'sync', error: error.message }],
+    });
+    return res.status(500).json({ error: error.message });
   }
 } 

@@ -5,6 +5,11 @@ import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/router';
 
+/**
+ * PublicLayout: For marketing/publicly accessible pages (e.g., homepage, /ozellikler, etc.)
+ * Provides a public-facing layout without requiring authentication.
+ */
+
 const pageVariants = {
   initial: {
     opacity: 0,

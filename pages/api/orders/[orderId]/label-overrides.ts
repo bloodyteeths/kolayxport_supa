@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const order = await prisma.order.update({
       where: { id: orderId, userId: user.id },
-      data: { labelOverrides },
+      data: { rawData: labelOverrides },
     });
     return res.status(200).json({ success: true, order });
   } catch (error: any) {

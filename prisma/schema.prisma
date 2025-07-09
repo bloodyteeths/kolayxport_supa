@@ -5,22 +5,24 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DIRECT_URL")
+  provider     = "postgresql"
+  url          = env("DIRECT_URL")
+  directUrl    = env("DIRECT_URL")
+  relationMode = "prisma"
 }
 
 model User {
-  id                  String                   @id
+  id                  String              @id
   name                String?
-  email               String?                  @unique
+  email               String?             @unique
   emailVerified       DateTime?
   image               String?
-  googleAccountId     String?                  @unique
-  googleSheetId       String?                  @unique
+  googleAccountId     String?             @unique
+  googleSheetId       String?             @unique
   driveFolderId       String?
-  userAppsScriptId    String?                  @unique
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
+  userAppsScriptId    String?             @unique
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
   accounts            Account[]
   marketplaceConfigs  MarketplaceConfig[]
   orders              Order[]
@@ -29,7 +31,7 @@ model User {
   shipperProfile      ShipperProfile?
   syncLogs            SyncLog[]
   syncOperations      SyncOperation[]
-  integrationSettings UserIntegrationSettings?
+  integrationSettings Credential?
 }
 
 model Account {
@@ -78,51 +80,51 @@ model MarketplaceConfig {
 }
 
 model Order {
-  id                          String      @id @default(cuid())
+  id                          String         @id @default(cuid())
   userId                      String
   marketplace                 String
   marketplaceKey              String
-  marketplaceCreatedAt        DateTime?
   customerName                String?
-  status                      String
-  shipByDate                  DateTime?
-  currency                    String?     @default("USD")
-  totalPrice                  Decimal?    @db.Decimal(10, 2)
-  createdAt                   DateTime    @default(now())
-  updatedAt                   DateTime    @updatedAt
-  notes                       String?
-  orderNumber                 String?
-  weightKg                    Float?      @default(0.5)
-  serviceType                 String?     @default("FEDEX_GROUND")
-  packagingType               String?     @default("YOUR_PACKAGING")
+  status                      String?
+  externalStatus              String? // True status from Veeqo/Shippo
+  currency                    String?
+  totalPrice                  Float?
+  createdAt                   DateTime       @default(now())
+  updatedAt                   DateTime       @updatedAt
+  orderNumber                 String
   shippingAddress             Json?
-  shippingLabelUrl            String?
-  trackingNumber              String?
   rawData                     Json?
-  fedexServiceType            String?
-  fedexPackagingType          String?
-  fedexPickupType             String?
-  fedexDutiesPaymentType      String?
-  packageLength               Float?
-  packageWidth                Float?
-  packageHeight               Float?
-  dimensionUnits              String?
+  labelStatus                 String?
   commodityDesc               String?
   countryOfMfg                String?
+  dimensionUnits              String?
+  fedexDutiesPaymentType      String?
+  fedexPackagingType          String?
+  fedexPickupType             String?
+  fedexServiceType            String?
   harmonizedCode              String?
   labelStockType              String?
-  signatureType               String?
-  sendCommercialInvoiceViaEtd Boolean?
-  termsOfSale                 String?
-  items                       OrderItem[] @relation("OrderToOrderItem")
-  shipments                   Shipment[]
-  user                        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packageHeight               Float?
+  packageLength               Float?
+  packageWidth                Float?
+  sendCommercialInvoiceViaEtd Boolean?       @default(true)
   shipmentStatus              String?
   shippedAt                   DateTime?
-  shipping                    OrderShipping?
+  shippingChargesPaymentType  String?
+  shippingLabelUrl            String?
+  signatureType               String?
+  termsOfSale                 String?        @default("DDU")
+  trackingNumber              String?
+  weightKg                    Float?         @default(0.5)
+  uiOrderDate                 DateTime?
+  items                       OrderItem[]    @relation("OrderToOrderItem")
+  user                        User           @relation(fields: [userId], references: [id])
+  shipments                   Shipment[]     @relation("OrderToShipment")
+  shipping                    OrderShipping? @relation("OrderToOrderShipping")
 
-  @@unique([userId, orderNumber])
   @@unique([userId, marketplace, marketplaceKey])
+  @@index([userId])
+  @@index([marketplace, marketplaceKey])
 }
 
 model OrderItem {
@@ -134,17 +136,17 @@ model OrderItem {
   quantity       Int        @default(1)
   unitPrice      Decimal?   @db.Decimal(10, 2)
   totalPrice     Decimal?   @db.Decimal(10, 2)
-  weightKg       Float?     @default(0.5)
-  harmonizedCode String?
-  countryOfMfg   String?
   notes          String?
-  image          String?
+  image          String     @default("")
   marketplaceKey String?
   shipBy         DateTime?
   orderNumber    String?
   uniqueLineKey  String?
   productId      String?
   remoteLineId   String?
+  countryOfMfg   String?
+  harmonizedCode String?
+  weightKg       Float?     @default(0.5)
   labelJobs      LabelJob[]
   order          Order      @relation("OrderToOrderItem", fields: [orderId], references: [id], onDelete: Cascade)
   product        Product?   @relation(fields: [productId], references: [id])
@@ -205,7 +207,7 @@ model MarketplaceProduct {
   @@unique([marketplace, marketplaceId])
 }
 
-model UserIntegrationSettings {
+model Credential {
   id                    String   @id @default(cuid())
   userId                String   @unique
   veeqoApiKey           String?
@@ -213,6 +215,9 @@ model UserIntegrationSettings {
   fedexApiKey           String?
   fedexApiSecret        String?
   fedexAccountNumber    String?
+  upsApiKey             String?
+  upsApiSecret          String?
+  upsAccountNumber      String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   fedexMeterNumber      String?
@@ -237,12 +242,10 @@ model ShipperProfile {
   shipperPostalCode                 String?
   shipperCountryCode                String?
   shipperTinNumber                  String?
-  shipperTinType                    String?
   importerOfRecord                  String?
   fedexFolderId                     String?
   defaultCurrencyCode               String?  @default("USD")
   dutiesPaymentType                 String?  @default("SENDER")
-  defaultShippingChargesPaymentType String?  @default("SENDER")
   createdAt                         DateTime @default(now())
   updatedAt                         DateTime @updatedAt
   defaultCountryOfMfg               String?
@@ -250,6 +253,8 @@ model ShipperProfile {
   defaultPackagingType              String?
   defaultServiceType                String?
   defaultWeightKg                   Float?
+  shipperTinType                    String?
+  defaultShippingChargesPaymentType String?  @default("SENDER")
   user                              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -270,7 +275,7 @@ model LabelJob {
 
 model Shipment {
   id             String     @id @default(cuid())
-  orderId        String
+  orderId        String     @unique
   orderItemId    String?
   carrier        String
   status         String
@@ -280,7 +285,11 @@ model Shipment {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   serviceType    String?
-  order          Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  packageType    String?
+  signatureOption String?
+  iossNumber     String?
+  isEdi          Boolean?   @default(true)
+  order          Order      @relation("OrderToShipment", fields: [orderId], references: [id], onDelete: Cascade)
   orderItem      OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
@@ -312,7 +321,7 @@ model SyncOperation {
   retryOf   String?
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
-  retryFrom SyncOperation?  @relation("RetryRelation", fields: [retryOf], references: [id])
+  retryFrom SyncOperation?  @relation("RetryRelation", fields: [retryOf], references: [id], onDelete: Restrict, onUpdate: Restrict)
   retries   SyncOperation[] @relation("RetryRelation")
   user      User            @relation(fields: [userId], references: [id])
 
@@ -335,5 +344,5 @@ model OrderShipping {
   phone       String
   insertedAt  DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order       Order    @relation("OrderToOrderShipping", fields: [orderId], references: [id], onDelete: Cascade)
 }

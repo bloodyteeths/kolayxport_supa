@@ -9,6 +9,7 @@ import {
   OrderRowItem
 } from './fedex.types';
 import { logger } from '../logger';
+import { retrieveAsyncShipment, extractShipmentDetails, FedexShipResponse, FedexAsyncError } from './fedex.async';
 
 const DEFAULT_PHONE_NUMBER_TS   = '0000000000';
 const DEFAULT_TERMS_OF_SALE_TS  = 'DDU';
@@ -55,8 +56,33 @@ async function getFedExOAuthToken(
   }
 }
 
+// Allowed labelStockType values when imageType is PDF or PNG (per FedEx Ship v1)
+const ALLOWED_LABEL_STOCK_TYPES = [
+  'PAPER_4X6',
+  'PAPER_4X8',
+  'PAPER_4X9',
+  'PAPER_4X675',
+  'PAPER_85X11_BOTTOM_HALF_LABEL',
+  'PAPER_85X11_TOP_HALF_LABEL',
+  'PAPER_LETTER',
+] as const;
+
+type FedexLabelStockType = typeof ALLOWED_LABEL_STOCK_TYPES[number];
+
+const STOCK_FOR_LABEL: Record<string, FedexLabelStockType> = {
+  FEDEX_PAK:              'PAPER_4X6',
+  FEDEX_ENVELOPE:         'PAPER_4X6',
+  FEDEX_BOX:              'PAPER_4X6',
+  FEDEX_SMALL_BOX:        'PAPER_4X6',
+  FEDEX_MEDIUM_BOX:       'PAPER_4X6',
+  FEDEX_LARGE_BOX:        'PAPER_4X6',
+  FEDEX_EXTRA_LARGE_BOX:  'PAPER_4X6',
+  FEDEX_TUBE:             'PAPER_4X6',
+  YOUR_PACKAGING:         'PAPER_LETTER',
+};
+
 export async function createFedexShipment(
-  orderData: OrderRow,
+  orderData: any,
   shipper: ShipperProfileData
 ): Promise<FedexShipmentResult> {
   logger.info(`[FedEx Service] createFedexShipment called for orderId: ${orderData.orderId}`, { orderNumber: orderData.orderNumber });
@@ -79,9 +105,9 @@ export async function createFedexShipment(
       throw new Error(`Configuration Error: Invalid ShipperProfile.shipperTinType: '${shipper.shipperTinType}'`);
   }
 
-  // --- Rigorous validation for OrderRow fields ---
+  // --- Rigorous validation for OrderData fields (adapted for new structure) ---
   const validationErrors: string[] = [];
-  if (!orderData.orderId) validationErrors.push("Order ID missing");
+  if (!orderData.orderId) validationErrors.push("Internal Order ID (orderData.orderId) missing");
 
   const recipientFullName = `${orderData.recipientFname || ''} ${orderData.recipientLname || ''}`.trim();
   if (!recipientFullName) validationErrors.push("Recipient Name (fname/lname) missing or empty");
@@ -95,7 +121,7 @@ export async function createFedexShipment(
       validationErrors.push("Recipient Phone missing or invalid (was empty after cleaning)");
   }
 
-  if (typeof orderData.weightKg !== 'number' || orderData.weightKg <= 0) validationErrors.push("weightKg must be a positive number");
+  if (typeof orderData.weightKg !== 'number' || orderData.weightKg <= 0) validationErrors.push("Top-level weightKg (for package) must be a positive number");
   if (!orderData.serviceType || !fedexOptionsData.serviceTypes.some(o => o.value === orderData.serviceType)) validationErrors.push("serviceType is required and must be valid");
   if (!orderData.packagingType || !fedexOptionsData.packagingTypes.some(o => o.value === orderData.packagingType)) validationErrors.push("packagingType is required and must be valid");
   if (!orderData.pickupType || !fedexOptionsData.pickupTypes.some(o => o.value === orderData.pickupType)) validationErrors.push("pickupType is required and must be valid");
@@ -105,27 +131,42 @@ export async function createFedexShipment(
   const isShipmentInternational = shipper.shipperCountryCode.toUpperCase() !== orderData.recipientCountry?.toUpperCase();
 
   if (isShipmentInternational) {
-    if (typeof orderData.customsValue !== 'number' || orderData.customsValue < 0) validationErrors.push("customsValue must be a number >= 0 for international shipments");
-    if (!orderData.currency || !fedexOptionsData.currencyCodes.some(c => c.value === orderData.currency)) validationErrors.push("currency is required and must be valid for international shipments");
-    if (!orderData.items || orderData.items.length === 0) {
-        validationErrors.push("`items` array is required and must not be empty for international ETD shipments.");
+    if (!orderData.customsClearanceDetail || typeof orderData.customsClearanceDetail !== 'object') {
+        validationErrors.push("customsClearanceDetail object is required for international shipments.");
     } else {
-        orderData.items.forEach((item, index) => {
-            if (!item.description || String(item.description).trim() === '') validationErrors.push(`Item ${index+1}: description is required`);
-            if (typeof item.quantity !== 'number' || item.quantity <= 0) validationErrors.push(`Item ${index+1}: quantity must be a positive number`);
-            if (typeof item.unitPrice !== 'number' || item.unitPrice < 0) validationErrors.push(`Item ${index+1}: unitPrice must be a number >= 0`);
-            if (typeof item.weightKg !== 'number' || item.weightKg <= 0) validationErrors.push(`Item ${index+1}: weightKg must be a positive number`);
-            if (!item.countryOfMfg || String(item.countryOfMfg).trim() === '') validationErrors.push(`Item ${index+1}: countryOfMfg is required`);
-            if (!item.harmonizedCode || String(item.harmonizedCode).trim() === '') validationErrors.push(`Item ${index+1}: harmonizedCode is required`);
-        });
+        const ccd = orderData.customsClearanceDetail;
+        if (!ccd.totalCustomsValue || typeof ccd.totalCustomsValue.amount !== 'number' || ccd.totalCustomsValue.amount < 0) {
+            validationErrors.push("customsClearanceDetail.totalCustomsValue.amount must be a number >= 0.");
+        }
+        if (!ccd.totalCustomsValue.currency || !fedexOptionsData.currencyCodes.some(c => c.value === ccd.totalCustomsValue.currency)) {
+            validationErrors.push("customsClearanceDetail.totalCustomsValue.currency is required and must be valid.");
+        }
+        if (!ccd.commodities || !Array.isArray(ccd.commodities) || ccd.commodities.length === 0) {
+            validationErrors.push("customsClearanceDetail.commodities array is required and must not be empty.");
+        } else {
+            ccd.commodities.forEach((item: any, index: number) => {
+                if (!item.description || String(item.description).trim() === '') validationErrors.push(`Commodity ${index+1}: description is required`);
+                if (typeof item.quantity !== 'number' || item.quantity <= 0) validationErrors.push(`Commodity ${index+1}: quantity must be a positive number`);
+                if (!item.quantityUnits || item.quantityUnits !== 'EA') validationErrors.push(`Commodity ${index+1}: quantityUnits must be 'EA'`);
+                if (!item.unitPrice || typeof item.unitPrice.amount !== 'number' || item.unitPrice.amount < 0) validationErrors.push(`Commodity ${index+1}: unitPrice.amount must be a number >= 0`);
+                if (!item.unitPrice.currency) validationErrors.push(`Commodity ${index+1}: unitPrice.currency is required`);
+                if (!item.customsValue || typeof item.customsValue.amount !== 'number' || item.customsValue.amount < 0) validationErrors.push(`Commodity ${index+1}: customsValue.amount must be a number >= 0`);
+                if (!item.customsValue.currency) validationErrors.push(`Commodity ${index+1}: customsValue.currency is required`);
+                if (!item.weight || typeof item.weight.value !== 'number' || item.weight.value <= 0) validationErrors.push(`Commodity ${index+1}: weight.value must be a positive number`);
+                if (!item.weight.units || item.weight.units !== 'KG') validationErrors.push(`Commodity ${index+1}: weight.units must be 'KG'`);
+                if (!item.countryOfManufacture || String(item.countryOfManufacture).trim() === '') validationErrors.push(`Commodity ${index+1}: countryOfManufacture is required`);
+            });
+        }
     }
-  } else { // Domestic
-    if (typeof orderData.customsValue !== 'number') validationErrors.push("customsValue must be a number (can be 0 for domestic if API allows)");
-    if (!orderData.currency || !fedexOptionsData.currencyCodes.some(c => c.value === orderData.currency)) validationErrors.push("currency is required (e.g., shipper's defaultCurrencyCode)");
+  } else { // Domestic (customsClearanceDetail might not be strictly needed by FedEx but good to have basic structure if sent)
+    if (orderData.customsClearanceDetail?.totalCustomsValue?.currency && 
+        !fedexOptionsData.currencyCodes.some(c => c.value === orderData.customsClearanceDetail.totalCustomsValue.currency)) {
+      validationErrors.push("Domestic: If customsClearanceDetail.totalCustomsValue.currency is provided, it must be valid.");
+    }
   }
 
   if (validationErrors.length > 0) {
-    const errorString = `OrderRow/Shipper data validation failed for orderId ${orderData.orderId}: ${validationErrors.join('; ')}.`;
+    const errorString = `Order data validation failed for orderId ${orderData.orderId}: ${validationErrors.join('; ')}.`;
     logger.error(`[FedEx Service] ${errorString}`);
     throw new Error(errorString);
   }
@@ -136,6 +177,7 @@ export async function createFedexShipment(
 
   let dimensionsPayload: any = null;
   if (
+    orderData.packagingType === 'YOUR_PACKAGING' &&
     orderData.packageLength && orderData.packageLength > 0 &&
     orderData.packageWidth && orderData.packageWidth > 0 &&
     orderData.packageHeight && orderData.packageHeight > 0 &&
@@ -149,28 +191,29 @@ export async function createFedexShipment(
     };
   }
 
-  const specialServiceTypes: string[] = [];
-  if (isShipmentInternational && (orderData.sendCommercialInvoiceViaEtd === undefined || orderData.sendCommercialInvoiceViaEtd === true) ) {
-    specialServiceTypes.push("ELECTRONIC_TRADE_DOCUMENTS");
-  }
   let signatureOptionDetailPayload: any = null;
   if (orderData.signatureType && orderData.signatureType !== 'NO_SIGNATURE_REQUIRED' && orderData.signatureType !== 'SERVICE_DEFAULT') {
     if (fedexOptionsData.signatureTypes.some(s => s.value === orderData.signatureType)) {
-     specialServiceTypes.push("SIGNATURE_OPTION");
      signatureOptionDetailPayload = { optionType: orderData.signatureType };
     } else {
      logger.warn(`[FedEx Service] Invalid signatureType '${orderData.signatureType}' provided for order ${orderData.orderId}. Ignoring.`);
     }
   }
 
-  const commodities = orderData.items.map(item => ({
-    description: item.description,
-    quantity: item.quantity,
-    unitPrice: item.unitPrice,
-    weightKg: item.weightKg,
-    countryOfMfg: item.countryOfMfg,
-    harmonizedCode: item.harmonizedCode,
-  }));
+  const effectivePackagingType = orderData.packagingType;
+  let labelStockType: FedexLabelStockType = STOCK_FOR_LABEL[effectivePackagingType] ?? 'PAPER_4X6';
+  // If the user provided a labelStockType and it's allowed, use it for YOUR_PACKAGING
+  if (
+    effectivePackagingType === 'YOUR_PACKAGING' &&
+    orderData.labelStockType &&
+    ALLOWED_LABEL_STOCK_TYPES.includes(orderData.labelStockType as FedexLabelStockType)
+  ) {
+    labelStockType = orderData.labelStockType as FedexLabelStockType;
+  }
+  // Always validate the final labelStockType
+  if (!ALLOWED_LABEL_STOCK_TYPES.includes(labelStockType)) {
+    labelStockType = 'PAPER_4X6'; // safest fallback
+  }
 
   const requestPayload: any = {
     labelResponseOptions: "URL_ONLY",
@@ -226,153 +269,177 @@ export async function createFedexShipment(
       labelSpecification: {
         labelFormatType: "COMMON2D",
         imageType: "PDF",
-        labelStockType: orderData.labelStockType,
+        labelStockType,
       },
-      requestedPackageLineItems: [{
-        weight: { units: "KG", value: parseFloat(orderData.weightKg.toFixed(2)) },
-        ...(dimensionsPayload && { dimensions: dimensionsPayload }),
-        ...(orderData.declaredValue && orderData.declaredValue > 0 && {
-         declaredValue: { amount: parseFloat(orderData.declaredValue.toFixed(2)), currency: orderData.currency }
-        })
-      }],
+      requestedPackageLineItems: (() => {
+        let declaredValuePayload: any = null;
+        if (orderData.customsClearanceDetail?.totalCustomsValue?.amount > 0) {
+          let amount = parseFloat(orderData.customsClearanceDetail.totalCustomsValue.amount.toFixed(2));
+          const currency = orderData.customsClearanceDetail.totalCustomsValue.currency;
+
+          if (orderData.packagingType === 'FEDEX_PAK' && amount > 100) {
+            logger.warn(`[FedEx Service] Declared value ${amount} ${currency} for FEDEX_PAK exceeds 100 USD limit. Capping at 100 ${currency}. Order ID: ${orderData.orderId}`);
+            amount = 100;
+          }
+          declaredValuePayload = { amount, currency };
+        }
+
+        return [{
+          weight: { units: "KG", value: parseFloat(orderData.weightKg.toFixed(2)) },
+          ...(dimensionsPayload && { dimensions: dimensionsPayload }),
+          ...(declaredValuePayload && { declaredValue: declaredValuePayload })
+        }];
+      })(),
+      ...(isShipmentInternational && orderData.customsClearanceDetail && { 
+        customsClearanceDetail: orderData.customsClearanceDetail 
+      }),
+      ...(orderData.shipmentSpecialServices && { 
+        shipmentSpecialServices: orderData.shipmentSpecialServices 
+      }),
     },
     accountNumber: { value: shipper.fedexAccountNumber }
   };
 
-  if (specialServiceTypes.length > 0) {
-    requestPayload.requestedShipment.shipmentSpecialServices = { specialServiceTypes };
-    if (signatureOptionDetailPayload) {
-      requestPayload.requestedShipment.shipmentSpecialServices.signatureOptionDetail = signatureOptionDetailPayload;
+  // Handle shippingDocumentSpecification, especially for ETD Commercial Invoice
+  if (
+    orderData.shipmentSpecialServices?.specialServiceTypes?.includes("ELECTRONIC_TRADE_DOCUMENTS") &&
+    orderData.shippingDocumentSpecification // Check if it exists in input
+  ) {
+    // Deep clone to avoid modifying the input orderData object.
+    let spec = JSON.parse(JSON.stringify(orderData.shippingDocumentSpecification));
+
+    // If FedEx is to generate the Commercial Invoice via ETD
+    if (spec.shippingDocumentTypes?.includes("COMMERCIAL_INVOICE")) {
+      if (!spec.commercialInvoiceDetail) {
+        spec.commercialInvoiceDetail = {};
+      }
+      if (!spec.commercialInvoiceDetail.documentFormat) {
+        spec.commercialInvoiceDetail.documentFormat = {};
+      }
+      // Set the docType to PDF for the Commercial Invoice to be generated by FedEx
+      spec.commercialInvoiceDetail.documentFormat.docType = 'PDF';
+      // Add the required stockType for the CI document
+      spec.commercialInvoiceDetail.documentFormat.stockType = 'PAPER_LETTER';
+      logger.info('[FedEx Service] Ensured commercialInvoiceDetail.documentFormat.docType is PDF and stockType is PAPER_LETTER for ETD CI.');
     }
-    if (specialServiceTypes.includes("ELECTRONIC_TRADE_DOCUMENTS")) {
-      requestPayload.requestedShipment.shipmentSpecialServices.etdDetail = {
-        requestedDocumentCopies: "COMMERCIAL_INVOICE",
-      };
-      requestPayload.requestedShipment.shippingDocumentSpecification = {
-        shippingDocumentTypes: ["COMMERCIAL_INVOICE"],
-        commercialInvoiceDetail: {
-          documentFormat: { docType: "PDF", stockType: "PAPER_LETTER" }
-        }
-      };
+    requestPayload.requestedShipment.shippingDocumentSpecification = spec;
+  }
+  
+  if (signatureOptionDetailPayload) {
+    if (!requestPayload.requestedShipment.shipmentSpecialServices) {
+      requestPayload.requestedShipment.shipmentSpecialServices = { specialServiceTypes: [] };
     }
+    if (!requestPayload.requestedShipment.shipmentSpecialServices.specialServiceTypes) {
+      requestPayload.requestedShipment.shipmentSpecialServices.specialServiceTypes = [];
+    }
+    if (!requestPayload.requestedShipment.shipmentSpecialServices.specialServiceTypes.includes("SIGNATURE_OPTION")) {
+      requestPayload.requestedShipment.shipmentSpecialServices.specialServiceTypes.push("SIGNATURE_OPTION");
+    }
+    requestPayload.requestedShipment.shipmentSpecialServices.signatureOptionDetail = signatureOptionDetailPayload;
   }
 
-  if (isShipmentInternational) {
-    let parsedImporterOfRecord: ImporterOfRecordPayload | null = null;
-    if (shipper.importerOfRecord) {
-      try {
-        parsedImporterOfRecord = JSON.parse(shipper.importerOfRecord);
-      } catch (e: any) {
-        logger.warn(`[FedEx Service] Could not parse ShipperProfile.importerOfRecord JSON for order ${orderData.orderId}: ${e.message}.`);
-      }
-    }
-
-    requestPayload.requestedShipment.customsClearanceDetail = {
-      isDocumentOnly: false,
-      dutiesPayment: {
-        paymentType: shipper.dutiesPaymentType,
-        payor: {
-          responsibleParty: {
-            accountNumber: { value: shipper.fedexAccountNumber },
-            ...(shipper.dutiesPaymentType === 'SENDER' && shipper.shipperTinNumber && shipper.shipperTinType && {
-              tins: [{
-                number: shipper.shipperTinNumber,
-                tinType: shipper.shipperTinType.toUpperCase(),
-              }]
-            }),
-          }
-        }
-      },
-      totalCustomsValue: { amount: parseFloat(orderData.customsValue.toFixed(2)), currency: orderData.currency },
-      commodities: commodities,
-      commercialInvoice: {
-        purpose: "SOLD",
-        termsOfSale: orderData.termsOfSale || DEFAULT_TERMS_OF_SALE_TS,
-      },
-      ...(parsedImporterOfRecord && { importerOfRecord: parsedImporterOfRecord })
-    };
-
-    requestPayload.shipmentSpecialServices = {
-      etdDetail: { documentContent: 'ALL_DOCUMENTS' }
-    };
-    requestPayload.shippingDocumentSpecification = {
-      commercialInvoiceDetail: {
-        documentFormat: { stockType: 'PAPER_LETTER' }
-      }
-    };
+  // Guard: ensure no labelStockType leaks into CI section
+  if (requestPayload.requestedShipment.shippingDocumentSpecification &&
+      requestPayload.requestedShipment.shippingDocumentSpecification.labelStockType) {
+    delete requestPayload.requestedShipment.shippingDocumentSpecification.labelStockType;
   }
 
-  const shipApiUrl = 'https://apis.fedex.com/ship/v1/shipments';
-  logger.info(`[FedEx Service] Sending FedEx Ship API request for orderId: ${orderData.orderId}`, { payloadSummary: { service: orderData.serviceType, recipientCountry: orderData.recipientCountry }});
+  logger.info('[FedEx Service] Sending FedEx Ship API request for orderId: ' + orderData.orderId, { payloadSummary: { service: orderData.serviceType, recipientCountry: orderData.recipientCountry }});
 
   try {
-    const shipResponse = await axios.post(shipApiUrl, requestPayload, {
+    const shipApiUrl = 'https://apis.fedex.com/ship/v1/shipments';
+    const apiResponse = await axios.post(shipApiUrl, requestPayload, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
-        'X-locale': 'en_US'
+        'X-locale': 'en_US',
       },
     });
 
-    logger.info(`[FedEx Service] FedEx Ship API response status: ${shipResponse.status} for orderId: ${orderData.orderId}`);
-
-    if (shipResponse.status === 200 && shipResponse.data.output?.transactionShipments?.[0]) {
-      const transaction = shipResponse.data.output.transactionShipments[0];
-      const trackingNumber = transaction.masterTrackingNumber;
-      let labelUrl: string | null = null;
-
-      if (transaction.pieceResponses?.[0]?.packageDocuments) {
-        const docs = transaction.pieceResponses[0].packageDocuments;
-        let foundDoc = docs.find((d: any) => /label/i.test(d.contentType || '') || /label/i.test(d.docType || ''));
-        if (foundDoc && foundDoc.url) labelUrl = foundDoc.url;
-        else {
-            foundDoc = docs.find((d: any) => /pdf/i.test(d.contentType || '') || /pdf/i.test(d.docType || ''));
-            if (foundDoc && foundDoc.url) labelUrl = foundDoc.url;
+    // Handle async response (202 or has jobId)
+    if (apiResponse.status === 202 || apiResponse.data?.output?.jobId) {
+      const jobId = apiResponse.data.output.jobId;
+      logger.info(`[FedEx Service] Shipment queued asynchronously. jobId=${jobId}`);
+      
+      try {
+        const asyncResponse = await retrieveAsyncShipment(jobId, shipper.fedexAccountNumber, accessToken);
+        const { trackingNumber, labelUrl } = extractShipmentDetails(asyncResponse);
+        const alerts = asyncResponse.output.alerts || [];
+        
+        logger.info(`[FedEx Service] Label created for orderId ${orderData.orderId}. Tracking: ${trackingNumber}`);
+        return { trackingNumber, labelUrl, alerts };
+      } catch (error) {
+        if (error instanceof FedexAsyncError) {
+          throw error;
         }
-        if (!labelUrl && docs.length > 0 && docs[0].url) labelUrl = docs[0].url;
+        throw new Error(`FedEx async shipment error: ${error.message}`);
       }
-
-      const apiAlerts = shipResponse.data.output.alerts;
-      if (apiAlerts?.length > 0) {
-        logger.warn(`[FedEx Service] FedEx Alerts for Order ${orderData.orderId}:`, { alerts: apiAlerts });
-      }
-      if (!trackingNumber) {
-         logger.error(`[FedEx Service] FedEx response successful but masterTrackingNumber missing for order ${orderData.orderId}`, new Error(JSON.stringify(shipResponse.data)));
-         throw new Error('FedEx response successful but masterTrackingNumber missing.');
-      }
-      if (!labelUrl) {
-         logger.error(`[FedEx Service] FedEx response successful but label URL could not be extracted for order ${orderData.orderId}`, new Error(JSON.stringify(shipResponse.data)));
-         throw new Error('FedEx response successful but label URL could not be extracted.');
-      }
-
-      const masterFormId = transaction.shipmentDocuments?.find((doc: any) => doc.type === "FEDEX_MASTER_FORM")?.docId;
-
-      logger.info(`[FedEx Service] FedEx Label Success for Order ${orderData.orderId}. Tracking: ${trackingNumber}`);
-      return {
-         trackingNumber,
-         labelUrl,
-         masterFormId,
-         alerts: apiAlerts,
-         errors: []
-      };
-    } else {
-      const errorDetail = shipResponse.data?.errors?.[0];
-      const errorMessage = `FedEx Ship API Error (${errorDetail?.code || shipResponse.status}): ${errorDetail?.message || 'Unknown API error'}`;
-      logger.error(`[FedEx Service] ${errorMessage} for order ${orderData.orderId}`, new Error(JSON.stringify(shipResponse.data)));
-      throw new Error(errorMessage);
     }
+
+    // Handle synchronous response
+    if (apiResponse.status === 200 && apiResponse.data?.output?.transactionShipments?.[0]) {
+      const shipmentOutput = apiResponse.data.output.transactionShipments[0];
+      const trackingNumber = shipmentOutput.masterTrackingNumber;
+      const labelUrl = shipmentOutput.pieceResponses?.[0]?.packageDocuments?.find(
+        (doc: any) =>
+          doc.url &&
+          (
+            doc.contentType === 'LABEL' ||
+            doc.docType === 'SHIPPING_LABEL' ||
+            doc.docType === 'PDF'
+          )
+      )?.url
+        // fallback: just take the first url if none match above
+        || shipmentOutput.pieceResponses?.[0]?.packageDocuments?.[0]?.url;
+      const alerts = shipmentOutput.alerts || [];
+
+      if (!trackingNumber || !labelUrl) {
+        logger.error('[FedEx Service] FedEx response missing tracking number or label URL. Full response:', apiResponse.data);
+        // Try to extract using extractShipmentDetails as fallback
+        try {
+          const fallback = extractShipmentDetails(apiResponse.data);
+          logger.warn('[FedEx Service] Fallback extraction succeeded for tracking/label.', fallback);
+          return { ...fallback, alerts };
+        } catch (fallbackErr) {
+          logger.error('[FedEx Service] Fallback extraction failed.', fallbackErr);
+          throw new Error('FedEx response missing tracking number or label URL.');
+        }
+      }
+      logger.info(`[FedEx Service] Label created for orderId ${orderData.orderId}. Tracking: ${trackingNumber}`);
+      return { trackingNumber, labelUrl, alerts };
+    }
+
+    // Handle unexpected response structure
+    const errorDetail = apiResponse.data?.errors?.[0] || { message: 'Unknown API error after successful status.' };
+    logger.error(`[FedEx Service] Unexpected FedEx API response structure for order ${orderData.orderId}:`, new Error(JSON.stringify(apiResponse.data)));
+    throw new Error(`FedEx API Error (${apiResponse.status}): ${errorDetail.message || 'Unexpected response structure.'}`);
   } catch (error: any) {
-    const responseData = error.response?.data;
-    const errorDetail = responseData?.errors?.[0];
-    let errorMessage = error.message;
+    const errorResponse = error.response;
+    const errorData = errorResponse?.data;
+    const fedExErrors = errorData?.errors;
 
-    if (!errorMessage.startsWith('OrderRow/Shipper data validation failed') && !errorMessage.startsWith('Configuration Error: Invalid ShipperProfile.shipperTinType')) {
-         errorMessage = `FedEx Ship API Exception (${errorDetail?.code || error.response?.status || 'Exception'}): ${errorDetail?.message || responseData?.message || error.message}`;
+    let errorMessage = `FedEx Ship API Exception: ${error.message}`;
+    if (fedExErrors && Array.isArray(fedExErrors) && fedExErrors.length > 0) {
+        errorMessage = `FedEx Ship API Exception (${fedExErrors[0].code}): ${fedExErrors[0].message}`;
+        if (fedExErrors.length > 1) {
+            logger.error(`[FedEx Service] Multiple FedEx API error details for order ${orderData.orderId}: ${JSON.stringify(fedExErrors)}`);
+        }
     }
-    logger.error(`[FedEx Service] ${errorMessage} for order ${orderData.orderId}`, new Error(JSON.stringify({ error, responseData })));
-    throw {
-         message: errorMessage,
-         responseErrors: responseData?.errors
-    };
+    
+    logger.error(`[FedEx Service] Processed error message for order ${orderData.orderId}: ${errorMessage}`);
+    
+    if (errorData) {
+      logger.error(`[FedEx Service] Raw FedEx error response data for order ${orderData.orderId}:`, errorData);
+    }
+    
+    if (error !== errorData) {
+        logger.error(`[FedEx Service] Original caught exception object for order ${orderData.orderId}:`, error);
+    }
+    
+    const errToThrow: any = new Error(errorMessage);
+    if (fedExErrors) {
+      errToThrow.responseErrors = fedExErrors;
+    }
+    throw errToThrow;
   }
 } 

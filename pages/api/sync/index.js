@@ -1,7 +1,5 @@
 import { getSupabaseServerClient } from '@/lib/supabase';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+const prisma = require('../../../lib/prisma').default;
 
 // This would be imported from actual adapter files
 const fetchVeeqoOrders = async (config) => {

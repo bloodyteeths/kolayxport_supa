@@ -19,6 +19,9 @@ interface UserSettingsResponse {
     fedexApiKey?: string | null;
     fedexApiSecret?: string | null;
     fedexAccountNumber?: string | null;
+    upsApiKey?: string | null;
+    upsApiSecret?: string | null;
+    upsAccountNumber?: string | null;
   } | null; // Allow null for the whole object
   shipperProfile?: {
     shipperName?: string | null;
@@ -47,6 +50,9 @@ const initialFormData: UserSettingsResponse = {
     fedexApiKey: '',
     fedexApiSecret: '',
     fedexAccountNumber: '',
+    upsApiKey: '',
+    upsApiSecret: '',
+    upsAccountNumber: '',
   },
   shipperProfile: {
     shipperName: '',
@@ -87,66 +93,9 @@ const currencyCodes = [
 ];
 
 const AyarlarPage = () => {
-  const [loadingFullSync, setLoadingFullSync] = useState(false);
-  const [fullSyncStarted, setFullSyncStarted] = useState(false);
-  const [loadingShippoSync, setLoadingShippoSync] = useState(false);
-  const [shippoSyncStarted, setShippoSyncStarted] = useState(false);
-  const [loadingRecentSync, setLoadingRecentSync] = useState(false);
 
-  // Full sync handler
-  const handleFullSync = async () => {
-    setLoadingFullSync(true);
-    setFullSyncStarted(false);
-    try {
-      const response = await fetch('/api/orders/full-sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Senkronizasyon başlatılamadı');
-      }
-
-      const result = await response.json();
-      // Show success message or handle the response
-      alert('Senkronizasyon başlatıldı. Bu işlem arka planda devam edecek.');
-    } catch (error) {
-      console.error('Full sync error:', error);
-      alert(error instanceof Error ? error.message : 'Senkronizasyon başlatılamadı');
-    } finally {
-      setLoadingFullSync(false);
-    }
-  };
-
-  // Shippo sync handler
-  const handleShippoSync = async () => {
-    setLoadingShippoSync(true);
-    setShippoSyncStarted(false);
-    try {
-      const response = await fetch('/api/orders/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Shippo senkronizasyonu başlatılamadı');
-      }
-
-      const result = await response.json();
-      alert('Shippo senkronizasyonu başlatıldı. Bu işlem arka planda devam edecek.');
-    } catch (error) {
-      console.error('Shippo sync error:', error);
-      alert(error instanceof Error ? error.message : 'Shippo senkronizasyonu başlatılamadı');
-    } finally {
-      setLoadingShippoSync(false);
-    }
-  };
+  // --- Full Sync State ---
+  const [isFullSyncLoading, setIsFullSyncLoading] = useState(false);
 
   const [formData, setFormData] = useState<UserSettingsResponse>(initialFormData);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
@@ -158,6 +107,24 @@ const AyarlarPage = () => {
 
   // --- Sync History State ---
   const [syncHistory, setSyncHistory] = useState<any[]>([]);
+
+  // --- Full Sync Handler ---
+  const handleFullSync = async () => {
+    if (!window.confirm('Tüm siparişleri tekrar senkronize etmek istediğinize emin misiniz? Bu işlem uzun sürebilir.')) return;
+    setIsFullSyncLoading(true);
+    try {
+      const res = await fetch('/api/orders/fullSync', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Tam senkronizasyon başlatılamadı');
+      setSnackbar({ open: true, message: 'Tam senkronizasyon başlatıldı. Senkron geçmişinden ilerlemeyi takip edebilirsiniz.', severity: 'success' });
+      fetchSyncHistory();
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.message || 'Tam senkronizasyon başlatılamadı', severity: 'error' });
+    } finally {
+      setIsFullSyncLoading(false);
+    }
+  };
+
   const [syncHistoryLoading, setSyncHistoryLoading] = useState(false);
   const [syncHistoryError, setSyncHistoryError] = useState<string | null>(null);
   const [syncHistoryCursor, setSyncHistoryCursor] = useState<string | null>(null);
@@ -313,83 +280,11 @@ const AyarlarPage = () => {
                 <TextField fullWidth label="Veeqo API Key" name="veeqoApiKey" type="password" value={formData.integrationSettings?.veeqoApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
 
-              {/* Veeqo Full & Recent Sync Section */}
-              {formData.integrationSettings?.veeqoApiKey && (
-                <Grid item xs={12}>
-                  <Paper elevation={1} sx={{ p: 2, bgcolor: 'info.light', color: 'info.contrastText' }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Veeqo Siparişlerini Senkronize Et
-                    </Typography>
-                    <Typography variant="body2" sx={{ mb: 2 }}>
-                      Veeqo'dan siparişleri senkronize etmek için aşağıdaki butonları kullanın. "Yakın Tarihli" sadece son güncellenenleri, "Tüm Siparişler" ise tüm siparişleri çeker.
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={handleFullSync}
-                        disabled={loadingFullSync || isLoading}
-                        startIcon={loadingFullSync ? <CircularProgress size={20} color="inherit" /> : null}
-                    >
-                        {loadingFullSync ? 'Tüm Siparişler Senkronize Ediliyor...' : 'Tüm Siparişleri Senkron Et'}
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        color="secondary"
-                        onClick={async () => {
-                          setLoadingRecentSync(true);
-                          try {
-                            const response = await fetch('/api/orders/sync', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                            });
-                            if (!response.ok) {
-                              const error = await response.json();
-                              throw new Error(error.message || 'Yakın tarihli senkronizasyon başlatılamadı');
-                            }
-                            await response.json();
-                            alert('Yakın tarihli siparişler senkronize edildi.');
-                          } catch (error) {
-                            console.error('Recent sync error:', error);
-                            alert(error instanceof Error ? error.message : 'Yakın tarihli senkronizasyon başlatılamadı');
-                          } finally {
-                            setLoadingRecentSync(false);
-                          }
-                        }}
-                        disabled={loadingRecentSync || isLoading}
-                        startIcon={loadingRecentSync ? <CircularProgress size={20} color="inherit" /> : null}
-                      >
-                        {loadingRecentSync ? 'Yakın Tarihli Senkronize Ediliyor...' : 'Yakın Tarihli Siparişleri Senkron Et'}
-                    </Button>
-                    </Box>
-                  </Paper>
-                </Grid>
-              )}
+
               <Grid item xs={12} md={6}>
                 <TextField fullWidth label="Shippo Token" name="shippoToken" type="password" value={formData.integrationSettings?.shippoToken || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
-              {/* Shippo Full Sync Section */}
-              {formData.integrationSettings?.shippoToken && (
-                <Grid item xs={12}>
-                  <Paper elevation={1} sx={{ p: 2, bgcolor: 'info.light', color: 'info.contrastText', mt: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Shippo siparişlerini senkronize et
-                    </Typography>
-                    <Typography variant="body2" sx={{ mb: 2 }}>
-                      Shippo'dan tüm siparişleri tek seferde senkronize etmek için bu butonu kullanın. Bu işlem biraz zaman alabilir.
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      color="secondary"
-                      onClick={handleShippoSync}
-                      disabled={loadingShippoSync}
-                      startIcon={loadingShippoSync ? <CircularProgress size={20} color="inherit" /> : null}
-                    >
-                      {loadingShippoSync ? 'Shippo Senkronizasyonu Başlatılıyor...' : 'Shippo Senkronizasyonu'}
-                    </Button>
-                  </Paper>
-                </Grid>
-              )}
+
               <Grid item xs={12} md={4}>
                 <TextField fullWidth label="FedEx API Key" name="fedexApiKey" type="password" value={formData.integrationSettings?.fedexApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
@@ -398,6 +293,16 @@ const AyarlarPage = () => {
               </Grid>
               <Grid item xs={12} md={4}>
                 <TextField fullWidth label="FedEx Account Number" name="fedexAccountNumber" value={formData.integrationSettings?.fedexAccountNumber || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+              </Grid>
+
+              <Grid item xs={12} md={4}>
+                <TextField fullWidth label="UPS API Key" name="upsApiKey" type="password" value={formData.integrationSettings?.upsApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField fullWidth label="UPS API Secret" name="upsApiSecret" type="password" value={formData.integrationSettings?.upsApiSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField fullWidth label="UPS Account Number" name="upsAccountNumber" value={formData.integrationSettings?.upsAccountNumber || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
               </Grid>
             </Grid>
           </Paper>
@@ -622,6 +527,19 @@ const AyarlarPage = () => {
               )}
             </Box>
           </Paper>
+
+          {/* --- Full Sync Button --- */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <Button
+              variant="contained"
+              color="secondary"
+              disabled={isFullSyncLoading}
+              onClick={handleFullSync}
+              startIcon={isFullSyncLoading ? <CircularProgress size={20} color="inherit" /> : <ReplayIcon />}
+            >
+              {isFullSyncLoading ? 'Tam Senkronizasyon Başlatılıyor...' : 'Tam Senkronizasyon (Full Sync)'}
+            </Button>
+          </Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
             <Button type="submit" variant="contained" color="primary" disabled={isSubmitting || isLoading || !!importerJsonError} size="large">

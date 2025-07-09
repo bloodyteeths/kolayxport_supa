@@ -1,14 +1,39 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
-  Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, Fade, List, ListItem, ListItemIcon, ListItemText
+  Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, Fade, List, ListItem, ListItemIcon, ListItemText, ToggleButton, ToggleButtonGroup
 } from '@mui/material';
-import { DataGrid, GridColDef, GridPaginationModel, GridRenderCellParams } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridPaginationModel, GridRenderCellParams, GridValueGetter } from '@mui/x-data-grid';
 import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, Edit as EditIcon, Check as CheckIcon, Warning as WarningIcon, Error as ErrorIcon, Info as InfoIcon, Lock as LockIcon } from '@mui/icons-material';
-import { toast, Toaster } from 'react-hot-toast';
-import { useOrders } from '../../lib/hooks/useOrders';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import { toast, Toaster, Toast } from 'react-hot-toast';
+import { useOrders } from '@/lib/hooks/useOrders';
 import Layout from '@/components/Layout';
 import AppLayout from '@/components/AppLayout';
-import { OrderSource, OrderChannel, UIOrder, NormalizedLineItem } from '@/lib/types';
+import CircleIcon from '@mui/icons-material/Circle';
+import UPSLabelDrawer from '@/components/UPSLabelDrawer';
+
+// Minimal UIOrder type for UPS drawer
+interface UIOrder {
+  orderId: string;
+  orderNumber: string;
+  recipientFirstName?: string;
+  recipientLastName?: string;
+  recipientStreet1?: string;
+  recipientStreet2?: string;
+  recipientCity?: string;
+  recipientState?: string;
+  recipientPostal?: string;
+  recipientCountry?: string;
+  recipientPhone?: string;
+  orderTotalPrice?: number;
+  currency?: string;
+  title?: string;
+  weight?: number;
+  hsCode?: string;
+  countryOfOrigin?: string;
+}
 
 // --- Constants for FedEx Dropdowns ---
 const FEDEX_SERVICE_TYPES = [
@@ -27,6 +52,28 @@ const FEDEX_PACKAGING_TYPES = [
   { value: 'YOUR_PACKAGING', label: 'Your Packaging' },
 ];
 
+const FEDEX_PREDEFINED_CONTAINERS = [
+  'FEDEX_PAK',
+  'FEDEX_ENVELOPE',
+  'FEDEX_BOX',
+  'FEDEX_SMALL_BOX',
+  'FEDEX_MEDIUM_BOX',
+  'FEDEX_LARGE_BOX',
+  'FEDEX_EXTRA_LARGE_BOX',
+  'FEDEX_TUBE'
+];
+
+// Allowed label stock types for PDF/PNG labels per FedEx Ship API
+const ALLOWED_LABEL_STOCK_TYPES = [
+  { value: 'PAPER_4X6',  label: '4 × 6 in' },
+  { value: 'PAPER_4X8',  label: '4 × 8 in' },
+  { value: 'PAPER_4X9',  label: '4 × 9 in' },
+  { value: 'PAPER_4X675', label: '4 × 6.75 in' },
+  { value: 'PAPER_85X11_TOP_HALF_LABEL',   label: 'Letter – top ½' },
+  { value: 'PAPER_85X11_BOTTOM_HALF_LABEL',label: 'Letter – bottom ½' },
+  { value: 'PAPER_LETTER',                 label: 'Letter – full page' },
+] as const;
+
 function formatDate(iso?: string): string {
   if (!iso) return '—';
   try {
@@ -39,6 +86,147 @@ function formatDate(iso?: string): string {
     return '—';
   }
 }
+
+// Turkish date formatter: dd/MM/yy
+function formatDateTr(iso?: string): string {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)}`;
+  } catch (e) {
+    console.error('Error formatting date:', e);
+    return '—';
+  }
+}
+
+// --- Type for API order structure (before flattening) ---
+interface LocalUIOrder {
+  id: string;
+  customerName?: string; // Made optional as it can be derived
+  marketplaceOrderDate?: string; // Made optional to reflect potential missing data before syncTimestamp fallback
+  orderTotalPrice?: number;
+  marketplace?: string;
+  marketplaceOrderNumber?: string; // Added this field based on toLabelRows
+  orderNumber?: string; // Keep for compatibility if used elsewhere, or consolidate
+  customsValue?: number;
+  status?: string;
+  shippingAddress?: any;
+  recipientFirstName?: string; // Already in LocalUIOrder
+  recipientLastName?: string;  // Already in LocalUIOrder
+  shipByDate?: string;
+  fedexServiceType?: string;
+  fedexPackagingType?: string;
+  imageUrl?: string;
+  rawData?: any; // For extractAddress and Shippo notes
+  source?: string; // e.g., 'veeqo', 'shippo'
+  channel?: string; // e.g., 'etsy'
+  currency?: string; // For drawer display
+  weightKg?: number; // For label generation
+  harmonizedCode?: string; // For label generation
+  countryOfMfg?: string; // For label generation
+  commodityDesc?: string; // For label generation
+  termsOfSale?: string; // For label generation
+  sendCommercialInvoiceViaEtd?: boolean; // For label generation
+  fedexPickupType?: string; // For label generation
+  fedexDutiesPaymentType?: string; // For label generation
+  packageLength?: number; // For label generation
+  packageWidth?: number; // For label generation
+  packageHeight?: number; // For label generation
+  dimensionUnits?: string; // For label generation
+  labelStockType?: string; // For label generation
+  signatureType?: string; // For label generation
+  to_address?: any; // For shippo notes
+  syncTimestamp?: string; // Added syncTimestamp
+  lastShipmentCarrier?: string; // Added for last carrier information
+  line_items: Array<{
+    sellable?: {
+      full_title?: string;
+      // You can add more fields if needed in the future
+    };
+
+    id: string;
+    title?: string;
+    value?: number; // This becomes unitPrice in LabelRow
+    unitPrice?: number; // Ensure this is present if API sends it
+    quantity?: number;
+    variantInfo?: string;
+    image?: string;
+    weight?: number;
+    hs_code?: string;
+    country_of_origin?: string;
+    sku?: string;
+    labelJobStatus?: string;
+    trackingNumber?: string;
+    shipBy?: string;
+    labelJobs?: Array<{
+      id: string;
+      status: string;
+      createdAt: string;
+      trackingNumber?: string;
+      pdfUrl?: string;
+      errorMessage?: string;
+      carrier?: string;
+    }>;
+  }>;
+}
+
+// --- Canonical Row Model ---
+export interface LabelRow {
+  // order-level
+  orderId: string;
+  marketplace: string;
+  orderNumber: string;
+  orderTotalPrice: number;
+  orderDate: string;          // ISO
+  status?: string; // Added from LocalUIOrder
+  customsValue?: number; // Added
+  currency?: string; // Added
+  source?: string;
+  channel?: string;
+  shippingLabelUrl?: string; // Added from previous logic
+  createdAt?: string; // Added for sorting
+  labelCreated?: boolean; // Added
+  lastCarrier?: string; // Added lastCarrier
+
+
+  // item-level
+  itemId: string;
+  sku: string;
+  title: string; // Added title for display
+  quantity: number;
+  unitPrice: number;
+  weight: number;
+  hsCode: string;
+  itemImageUrl: string; // Added for product image
+
+  // flattened address
+  recipientFirstName: string;
+  recipientLastName: string;
+  recipientStreet1: string;
+  recipientStreet2?: string;
+  recipientCity: string;
+  recipientState?: string;
+  recipientPostal: string;
+  recipientCountry: string;
+  recipientPhone?: string;
+
+  // For label generation form & actions (can be duplicated from above if needed, or extended)
+  fedexServiceType?: string;
+  fedexPackagingType?: string;
+  countryOfOrigin?: string; // From item.country_of_origin
+  labelJobStatus?: string; // From item
+  trackingNumber?: string; // From item
+  shipByDate?: string; // Effective ship by date
+
+  // Reference to the original full LocalUIOrder if complex data needed for actions not covered by LabelRow
+  originalOrder?: LocalUIOrder; 
+
+  // Add labelStockType for UI editing
+  labelStockType?: string;
+}
+
 
 const statusColors: Record<string, {bg: string, text: string}> = {
   UNSHIPPED: { bg: '#FFD700', text: '#000' }, // Gold
@@ -59,7 +247,7 @@ const labelStatusOptions = [
   { value: '', label: 'Tümü (Etiket)' },
   { value: 'created', label: 'Oluşturuldu' },
   { value: 'not_created', label: 'Oluşturulmadı' },
-  { value: 'failed', label: 'Hata Alındı' }, // Assuming shipmentStatus might indicate this
+  { value: 'failed', label: 'Hata Alındı' },
 ];
 
 const integrationOptions = [
@@ -68,7 +256,6 @@ const integrationOptions = [
   { value: 'Shippo', label: 'Shippo' },
   { value: 'Trendyol', label: 'Trendyol' },
   { value: 'Hepsiburada', label: 'Hepsiburada' },
-  // Add other marketplaces as they become relevant
 ];
 
 const orderStatusOptions = [
@@ -86,13 +273,6 @@ const orderStatusOptions = [
   { value: 'FAILED', label: 'Başarısız Oldu' },
 ];
 
-// --- Define a type for the flattened order item rows ---
-type LabelOrderItem = UIOrder & {
-  orderId: string;
-  _debugShippingAddress?: string;
-  _debugMappedAddress?: Record<string, string>;
-};
-
 // --- Debounce utility ---
 function useDebouncedValue<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -103,53 +283,74 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   return debounced;
 }
 
-// --- Address mapping utility ---
-function extractAddress(order) {
+// --- Address mapping utility (already defined in the file) ---
+function extractAddress(order: LocalUIOrder) { // Ensure input type matches LocalUIOrder
   let addr = order.shippingAddress;
   if (typeof addr === 'string') {
     try { addr = JSON.parse(addr); } catch { addr = {}; }
+  } else if (addr === null || typeof addr !== 'object') { // Handle null or non-object addr
+    addr = {};
   }
+
   let raw = order.rawData;
   if (typeof raw === 'string') {
     try { raw = JSON.parse(raw); } catch { raw = {}; }
+  } else if (raw === null || typeof raw !== 'object') { // Handle null or non-object raw
+    raw = {};
   }
+  
   const deliverTo = raw?.deliver_to || {};
   const billing = raw?.billing_address || {};
 
-  // Only treat actual anonymized strings as anonymized
-  const isAnonymized = (value) => {
+  const isAnonymized = (value: any) => { // Added type annotation
     if (typeof value !== 'string') return false;
     return value === 'Anonymized by Amazon' || value === 'Anonymized By Amazon' || value.includes('Anonymized');
   };
 
-  // Helper to get the first non-empty, non-anonymized value
-  const getValue = (...values) => {
+  const getValue = (...values: any[]) => { // Added type annotation
     for (const v of values) {
-      if (typeof v === 'string' && v.trim() && !isAnonymized(v)) return v;
+      if (v && typeof v === 'string' && v.trim() && !isAnonymized(v)) return v.trim();
     }
-    return '';
+    return ''; // Return empty string if no valid value found
   };
 
-  // Fallback: try all possible keys in addr/raw
-  const fallback = (keys) => {
+  const fallback = (keys: string[]) => { // Added type annotation
     for (const k of keys) {
-      if (addr && addr[k] && !isAnonymized(addr[k])) return addr[k];
-      if (raw && raw[k] && !isAnonymized(raw[k])) return raw[k];
+      if (addr && addr[k] && !isAnonymized(addr[k]) && typeof addr[k] === 'string') return addr[k].trim();
+      if (raw && raw[k] && !isAnonymized(raw[k]) && typeof raw[k] === 'string') return raw[k].trim();
     }
     return '';
   };
 
-  return {
-    recipientFirstName: getValue(
-      addr?.recipientFirstName, addr?.recipient_first_name, addr?.first_name, addr?.name,
-      deliverTo.first_name, billing.first_name, raw?.first_name, raw?.name,
-      fallback(['recipientFirstName','recipient_first_name','first_name','name'])
-    ),
-    recipientLastName: getValue(
+  // Attempt to construct full name if only combined name is present
+  let recipientFirstName = getValue(
+    addr?.recipientFirstName, addr?.recipient_first_name, addr?.first_name, 
+    deliverTo.first_name, billing.first_name, raw?.first_name,
+    fallback(['recipientFirstName','recipient_first_name','first_name'])
+  );
+  let recipientLastName = getValue(
       addr?.recipientLastName, addr?.recipient_last_name, addr?.last_name,
       deliverTo.last_name, billing.last_name, raw?.last_name,
       fallback(['recipientLastName','recipient_last_name','last_name'])
-    ),
+  );
+
+  if (!recipientFirstName && !recipientLastName) {
+    const fullName = getValue(addr?.name, raw?.name, fallback(['name']));
+    if (fullName) {
+      const nameParts = fullName.split(/\s+/);
+      recipientFirstName = nameParts[0] || '';
+      recipientLastName = nameParts.slice(1).join(' ') || '';
+    }
+  }
+  
+  // If order has direct recipient fields, prioritize them if extractAddress couldn't find better
+  recipientFirstName = recipientFirstName || order.recipientFirstName || '';
+  recipientLastName = recipientLastName || order.recipientLastName || '';
+
+
+  return {
+    recipientFirstName,
+    recipientLastName,
     recipientStreet1: getValue(
       addr?.recipientStreet1, addr?.recipient_street1, addr?.address1, addr?.street1,
       deliverTo.address1, deliverTo.street1, billing.address1, raw?.address1, raw?.street1,
@@ -188,142 +389,254 @@ function extractAddress(order) {
   };
 }
 
-// Add source/channel badge components
-function SourceBadge({ source }: { source?: OrderSource }) {
-  if (!source) return null;
-  const color = source === 'shippo' ? 'primary' : 'default';
-  return <Chip label={source.toUpperCase()} color={color} size="small" />;
-}
 
-function ChannelBadge({ channel }: { channel?: OrderChannel }) {
-  if (!channel) return null;
-  const color = channel === 'etsy' ? 'secondary' : 'default';
-  return <Chip label={channel.toUpperCase()} color={color} size="small" />;
-}
+// --- Data Transformation ---
+/** convert the API payload (LocalUIOrder[]) into grid-ready rows (LabelRow[]) */
+function getProductTitle(item: any, order: any) {
+  const isMissing = (val: any) => !val || val === 'Unknown Product';
 
-// Add validation status helper
-function getValidationStatus(order: UIOrder): { status: 'valid' | 'warning' | 'error'; message: string } {
-  const { valid, errors } = validateOrderForLabel(order);
-  if (valid) return { status: 'valid', message: 'Ready for label' };
-  
-  // Categorize errors
-  const addressErrors = errors.filter(e => e.startsWith('Missing'));
-  const lineItemErrors = errors.filter(e => e.includes('Line item'));
-  
-  if (addressErrors.length > 0 && lineItemErrors.length > 0) {
-    return { 
-      status: 'error', 
-      message: `${addressErrors.length} address fields and ${lineItemErrors.length} line items missing` 
-    };
-  }
-  if (addressErrors.length > 0) {
-    return { status: 'error', message: `${addressErrors.length} address fields missing` };
-  }
-  if (lineItemErrors.length > 0) {
-    return { status: 'warning', message: `${lineItemErrors.length} line items need attention` };
-  }
-  return { status: 'error', message: 'Validation failed' };
-}
-
-// Add validation status chip component
-function ValidationStatusChip({ status, message }: { status: 'valid' | 'warning' | 'error'; message: string }) {
-  const color = status === 'valid' ? 'success' : status === 'warning' ? 'warning' : 'error';
-  return (
-    <Tooltip title={message}>
-      <Chip 
-        label={status === 'valid' ? 'Ready' : status === 'warning' ? 'Warning' : 'Error'} 
-        color={color} 
-        size="small" 
-        icon={status === 'valid' ? <CheckIcon /> : status === 'warning' ? <WarningIcon /> : <ErrorIcon />}
-      />
-    </Tooltip>
-  );
-}
-
-// Validation helper function
-function validateOrderForLabel(order: UIOrder): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  
-  // Validate address fields with more specific messages
-  const addressFields = [
-    { field: 'recipientFirstName', label: 'First Name', type: 'name' },
-    { field: 'recipientLastName', label: 'Last Name', type: 'name' },
-    { field: 'recipientPhone', label: 'Phone', type: 'contact' },
-    { field: 'recipientStreet1', label: 'Street Address', type: 'address' },
-    { field: 'recipientCity', label: 'City', type: 'address' },
-    { field: 'recipientState', label: 'State', type: 'address' },
-    { field: 'recipientPostal', label: 'Postal Code', type: 'address' },
-    { field: 'recipientCountry', label: 'Country', type: 'address' }
-  ];
-
-  const missingFields = addressFields.filter(({ field }) => !order[field] || order[field].trim() === '');
-  if (missingFields.length > 0) {
-    const groupedByType = missingFields.reduce((acc, { label, type }) => {
-      acc[type] = acc[type] || [];
-      acc[type].push(label);
-      return acc;
-    }, {} as Record<string, string[]>);
-
-    Object.entries(groupedByType).forEach(([type, fields]) => {
-      errors.push(`Missing ${type} information: ${fields.join(', ')}`);
-    });
-  }
-
-  // Validate line items with more specific messages
-  if (!order.line_items || order.line_items.length === 0) {
-    errors.push('No line items found - at least one item is required');
+  let result;
+  if (!isMissing(item.title)) {
+    result = item.title;
+  } else if (!isMissing(order.commodityDesc)) {
+    result = order.commodityDesc;
+  } else if (!isMissing(item.sellable?.full_title)) {
+    result = item.sellable.full_title;
   } else {
-    order.line_items.forEach((item, index) => {
-      const itemErrors = [];
-      if (!item.title || item.title.trim() === '') {
-        itemErrors.push('missing title');
-      }
-      if (!item.value || item.value <= 0) {
-        itemErrors.push('invalid value');
-      }
-      if (!item.quantity || item.quantity <= 0) {
-        itemErrors.push('invalid quantity');
-      }
-      if (itemErrors.length > 0) {
-        errors.push(`Item ${index + 1}: ${itemErrors.join(', ')}`);
-      }
+    result = 'N/A';
+  }
+ 
+  return result;
+}
+
+export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
+  if (!orders) return [];
+
+  return orders.flatMap(order => {
+    const addr = extractAddress(order);
+    // Safe: Parse rawData ONLY for date mapping, do not mutate or affect other columns
+    let safeRaw = order.rawData;
+    if (typeof safeRaw === 'string') {
+      try { safeRaw = JSON.parse(safeRaw); } catch { safeRaw = {}; }
+    }
+    let finalOrderDate = safeRaw?.created_at
+      || safeRaw?.to_address?.object_created
+      || safeRaw?.placed_at
+      || safeRaw?.to_address?.object_updated
+      || order.marketplaceOrderDate
+      || order.syncTimestamp
+      || new Date(0).toISOString();
+
+    // If no line items, create a single row for the order
+    if (!order.line_items || order.line_items.length === 0) {
+      return [{
+        orderId: order.id,
+        marketplace: order.marketplace ?? '—',
+        orderNumber: order.marketplaceOrderNumber || order.orderNumber || '—',
+        orderTotalPrice: order.orderTotalPrice ?? 0,
+        orderDate: finalOrderDate,
+        status: order.status ?? 'N/A',
+        customsValue: order.customsValue ?? order.orderTotalPrice ?? 0,
+        currency: order.currency || 'USD',
+        source: order.source,
+        channel: order.channel,
+        createdAt: order.marketplaceOrderDate,
+        lastCarrier: order.lastShipmentCarrier || order.rawData?.delivery_method?.name || '—',
+
+        itemId: `${order.id}-noitem`,
+        sku: '—',
+        title: order.commodityDesc || 'N/A (Order Level)',
+        quantity: 1,
+        unitPrice: order.orderTotalPrice ?? 0,
+        weight: order.weightKg ?? 0.5,
+        hsCode: order.harmonizedCode ?? '—',
+        itemImageUrl: order.imageUrl || '/placeholder.png',
+
+        recipientFirstName: addr.recipientFirstName || '—',
+        recipientLastName: addr.recipientLastName || '—',
+        recipientStreet1: addr.recipientStreet1 || '—',
+        recipientStreet2: addr.recipientStreet2 || '',
+        recipientCity: addr.recipientCity || '—',
+        recipientState: addr.recipientState || '',
+        recipientPostal: addr.recipientPostal || '—',
+        recipientCountry: addr.recipientCountry || '—',
+        recipientPhone: addr.recipientPhone || '',
+
+        fedexServiceType: order.fedexServiceType,
+        fedexPackagingType: order.fedexPackagingType,
+        countryOfOrigin: order.countryOfMfg,
+        labelJobStatus: undefined,
+        trackingNumber: undefined,
+        shipByDate: order.shipByDate,
+        originalOrder: order,
+        labelCreated: false,
+        shippingLabelUrl: undefined,
+        labelStockType: order.labelStockType,
+      }];
+    }
+
+    // Map each line item to a row
+    return order.line_items.map(item => {
+      // Get the latest label job for this item
+      const latestLabelJob = item.labelJobs && item.labelJobs.length > 0
+        ? item.labelJobs.reduce<typeof item.labelJobs[0] | undefined>((latest, job) => 
+            !latest || new Date(job.createdAt) > new Date(latest.createdAt) ? job : latest
+          , undefined)
+        : null;
+
+     
+
+      return {
+        orderId: order.id,
+        marketplace: order.marketplace ?? '—',
+        orderNumber: order.marketplaceOrderNumber || order.orderNumber || '—',
+        orderTotalPrice: order.orderTotalPrice ?? 0,
+        orderDate: finalOrderDate,
+        status: order.status ?? 'N/A',
+        customsValue: order.customsValue ?? order.orderTotalPrice ?? 0,
+        currency: order.currency || 'USD',
+        source: order.source,
+        channel: order.channel,
+        createdAt: order.marketplaceOrderDate,
+        lastCarrier: order.lastShipmentCarrier || order.rawData?.delivery_method?.name || '—',
+
+        itemId: item.id,
+        sku: item.sku ?? '—',
+        title: getProductTitle(item, order),
+        quantity: item.quantity ?? 0,
+        unitPrice: item.unitPrice ?? item.value ?? 0,
+        weight: item.weight ?? 0.5,
+        hsCode: item.hs_code ?? order.harmonizedCode ?? '—',
+        itemImageUrl: item.image || order.imageUrl || '/placeholder.png',
+
+        recipientFirstName: addr.recipientFirstName || '—',
+        recipientLastName: addr.recipientLastName || '—',
+        recipientStreet1: addr.recipientStreet1 || '—',
+        recipientStreet2: addr.recipientStreet2 || '',
+        recipientCity: addr.recipientCity || '—',
+        recipientState: addr.recipientState || '',
+        recipientPostal: addr.recipientPostal || '—',
+        recipientCountry: addr.recipientCountry || '—',
+        recipientPhone: addr.recipientPhone || '',
+
+        fedexServiceType: order.fedexServiceType,
+        fedexPackagingType: order.fedexPackagingType,
+        countryOfOrigin: item.country_of_origin || order.countryOfMfg,
+        labelJobStatus: latestLabelJob?.status,
+        trackingNumber: latestLabelJob?.trackingNumber,
+        shipByDate: item.shipBy || order.shipByDate,
+        originalOrder: order,
+        labelCreated: latestLabelJob?.status === 'created' && !!latestLabelJob?.trackingNumber,
+        shippingLabelUrl: latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined,
+        labelStockType: order.labelStockType,
+      };
     });
+  });
+}
+
+
+// --- Utility Functions Updated for LabelRow ---
+/** default values for the "Create Label" form */
+export function getDefaultValues(row: LabelRow) {
+  // Access properties directly from LabelRow
+  const effectiveCustomsValue = row.customsValue ?? row.orderTotalPrice ?? 0;
+  const effectiveQuantity = (row.quantity && row.quantity > 0) ? row.quantity : 1;
+  // Ensure calculatedUnitPrice is not NaN if effectiveQuantity somehow ends up 0, though it's defaulted to 1.
+  const calculatedUnitPrice = effectiveQuantity > 0 ? effectiveCustomsValue / effectiveQuantity : 0;
+
+  return {
+    weightKg: row.weight || row.originalOrder?.weightKg || 0.5, // Use row.weight (item weight) first
+    hsCode: row.hsCode === '—' ? (row.originalOrder?.harmonizedCode || '') : row.hsCode, // HS Code can be optional, default to empty
+    countryOfOrigin: row.countryOfOrigin || row.originalOrder?.countryOfMfg || 'TR',
+    serviceType: row.fedexServiceType || row.originalOrder?.fedexServiceType || 'FEDEX_INTERNATIONAL_PRIORITY', // Ensure default
+    packagingType: row.fedexPackagingType || row.originalOrder?.fedexPackagingType || 'FEDEX_PAK', // Ensure default
+    recipientFirstName: row.recipientFirstName === '—' ? '' : row.recipientFirstName,
+    recipientLastName: row.recipientLastName === '—' ? '' : row.recipientLastName,
+    recipientStreet1: row.recipientStreet1 === '—' ? '' : row.recipientStreet1,
+    recipientStreet2: row.recipientStreet2,
+    recipientCity: row.recipientCity === '—' ? '' : row.recipientCity,
+    recipientState: row.recipientState,
+    recipientPostal: row.recipientPostal === '—' ? '' : row.recipientPostal,
+    recipientCountry: row.recipientCountry === '—' ? '' : row.recipientCountry,
+    recipientPhone: row.recipientPhone,
+    // Fields from originalOrder for label generation payload
+    commodityDesc: row.title === 'N/A' ? (row.originalOrder?.commodityDesc || row.title) : row.title,
+    termsOfSale: row.originalOrder?.termsOfSale || 'DDP',
+    sendCommercialInvoiceViaEtd: row.originalOrder?.sendCommercialInvoiceViaEtd ?? true,
+    fedexPickupType: row.originalOrder?.fedexPickupType || 'DROP_BOX',
+    fedexDutiesPaymentType: row.originalOrder?.fedexDutiesPaymentType || 'SENDER',
+    packageLength: row.originalOrder?.packageLength,
+    packageWidth: row.originalOrder?.packageWidth,
+    packageHeight: row.originalOrder?.packageHeight,
+    dimensionUnits: row.originalOrder?.dimensionUnits || 'CM',
+    labelStockType: row.originalOrder?.labelStockType || 'PAPER_LETTER',
+    signatureType: row.originalOrder?.signatureType || 'NO_SIGNATURE_REQUIRED',
+    currency: row.currency || row.originalOrder?.currency || 'USD',
+    customsValue: effectiveCustomsValue, // Use the determined effective customs value
+    line_items: [{ // Construct a single line item for the label based on the current LabelRow
+      id: row.itemId,
+      title: row.title === 'N/A' ? (row.originalOrder?.commodityDesc || 'Product') : row.title,
+      quantity: effectiveQuantity,
+      unitPrice: calculatedUnitPrice, // Use calculated unit price
+      weight: row.weight,
+      hs_code: row.hsCode === '—' ? (row.originalOrder?.harmonizedCode || '') : row.hsCode,
+      country_of_origin: row.countryOfOrigin || row.originalOrder?.countryOfMfg || '',
+      sku: row.sku,
+    }]
+  };
+}
+
+/** returns an array of missing-field messages (empty ⇒ row is OK) */
+export function validateRowForLabel(row: LabelRow): string[] { // Renamed
+  const errors: string[] = [];
+  const defaults = getDefaultValues(row); // Use 'defaults'
+
+  // FedEx specific from originalOrder (if available and needed for validation before API call)
+  if (!defaults.serviceType || !defaults.packagingType) {
+    errors.push('FedEx service / packaging missing');
   }
 
-  return {
-    valid: errors.length === 0,
-    errors
-  };
+  // Item details
+  if (!row.weight || row.weight <= 0) errors.push('Item Weight is missing or invalid');
+  if (!row.title || row.title === 'N/A' || row.title === '—') errors.push('Item Title is missing');
+  if (!row.quantity || row.quantity <= 0) errors.push('Item Quantity is missing or invalid');
+  // HS Code is now optional, so do not push error for missing HS Code
+
+  // Address details (check for '—' as well as empty)
+  if (!row.recipientFirstName || row.recipientFirstName === '—') errors.push('Recipient First Name is missing');
+  if (!row.recipientLastName || row.recipientLastName === '—') errors.push('Recipient Last Name is missing');
+  if (!row.recipientStreet1 || row.recipientStreet1 === '—') errors.push('Recipient Street address is missing');
+  if (!row.recipientCity || row.recipientCity === '—') errors.push('Recipient City is missing');
+  if (!row.recipientPostal || row.recipientPostal === '—') errors.push('Recipient Postal code is missing');
+  if (!row.recipientCountry || row.recipientCountry === '—') errors.push('Recipient Country is missing');
+  // Phone is often optional, so not validating it strictly here unless required by FedEx later
+  // if (!row.recipientPhone || row.recipientPhone === '—') errors.push('Recipient Phone is missing');
+  
+  return errors;
 }
 
-// Auto-fill helper function
-function getDefaultValues(order: UIOrder) {
-  return {
-    weight: order.weight || 0.5,
-    hsCode: order.hsCode || '620449506',
-    countryOfOrigin: order.countryOfOrigin || 'TR',
-    serviceType: order.serviceType || 'INTERNATIONAL_PRIORITY',
-    packagingType: order.packagingType || 'FEDEX_PAK',
-    // Include address fields with defaults from order
-    recipientFirstName: order.recipientFirstName || '',
-    recipientLastName: order.recipientLastName || '',
-    recipientStreet1: order.recipientStreet1 || '',
-    recipientStreet2: order.recipientStreet2 || '',
-    recipientCity: order.recipientCity || '',
-    recipientState: order.recipientState || '',
-    recipientPostal: order.recipientPostal || '',
-    recipientCountry: order.recipientCountry || '',
-    recipientPhone: order.recipientPhone || ''
-  };
+function getValidationStatus(row: LabelRow): { status: 'valid' | 'warning' | 'error'; message: string } {
+  const errors = validateRowForLabel(row);
+  if (errors.length === 0) return { status: 'valid', message: 'Ready for label' };
+  
+  const criticalErrors = errors.filter(e => 
+    e.includes('Street address') || e.includes('City') || e.includes('Postal code') || e.includes('Country') ||
+    e.includes('Weight') || e.includes('HS code') || e.includes('Service Type') || e.includes('Packaging Type')
+  );
+  
+  if (criticalErrors.length > 0) {
+    return { status: 'error', message: `Critical: ${criticalErrors.join(', ')}` };
+  }
+  return { status: 'warning', message: `Warnings: ${errors.join(', ')}` };
 }
 
-// Add Shippo notes parser helper
+
+// Add Shippo notes parser helper (already defined in the file, ensure it's kept)
 function parseShippoNotes(notes: string): { to_address?: any; success: boolean } {
   try {
-    // Look for Shippo-style JSON in notes
     const shippoMatch = notes.match(/to_address\s*:\s*({[^}]+})/);
     if (shippoMatch) {
-      const addressJson = shippoMatch[1].replace(/'/g, '"'); // Replace single quotes with double quotes
+      const addressJson = shippoMatch[1].replace(/'/g, '"');
       const toAddress = JSON.parse(addressJson);
       return { to_address: toAddress, success: true };
     }
@@ -334,47 +647,136 @@ function parseShippoNotes(notes: string): { to_address?: any; success: boolean }
   }
 }
 
-function LabelsPage(props) {
+// Add this before the LabelsPage component
+interface LabelFormData {
+  fedexPackagingType: string;
+  labelStockType: string;
+  // Add other fields as needed for the form, e.g. recipientFirstName, etc.
+}
+
+// --- UI deduplication helper ---
+function dedupeLabelRows(rows: LabelRow[]): LabelRow[] {
+  const seen = new Map<string, LabelRow>();
+  for (const row of rows) {
+    const key = `${(row.marketplace || '').toLowerCase().trim()}-${(row.orderNumber || '').toString().trim().toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.set(key, row);
+    }
+  }
+  return Array.from(seen.values());
+}
+
+function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 100 });
+  // --- UPS Drawer State ---
+  const [upsDrawerOpen, setUpsDrawerOpen] = useState(false);
+  const [selectedOrderForUPS, setSelectedOrderForUPS] = useState<UIOrder | null>(null);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [marketplaceFilter, setMarketplaceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [labelStatusFilter, setLabelStatusFilter] = useState('');
-  
-  const [serviceTypeOverrides, setServiceTypeOverrides] = useState<Record<string, string>>({});
-  const [packagingTypeOverrides, setPackagingTypeOverrides] = useState<Record<string, string>>({});
-  
   const [generatingLabelId, setGeneratingLabelId] = useState<string | null>(null);
   const [syncingOrders, setSyncingOrders] = useState(false);
-
   const [rawOrderDataModalOpen, setRawOrderDataModalOpen] = useState(false);
   const [currentRawData, setCurrentRawData] = useState<Record<string, any> | null>(null);
-
-  // Placeholder for FedEx credentials check - replace with actual logic
-  const [hasFedexCredentials, setHasFedexCredentials] = useState(false); // Default to false
+  const [hasFedexCredentials, setHasFedexCredentials] = useState(false);
   const [checkingFedexCredentials, setCheckingFedexCredentials] = useState(true);
-  // TODO: Fetch user settings to determine if FedEx credentials are set
-
-  const [unlabeledOnly, setUnlabeledOnly] = useState(false);
-  // Debounced filters
-  const debouncedSearch = useDebouncedValue(searchTerm, 300);
-  const debouncedMarketplace = useDebouncedValue(marketplaceFilter, 300);
-  const debouncedStatus = useDebouncedValue(statusFilter, 300);
-  const debouncedLabelStatus = useDebouncedValue(labelStatusFilter, 300);
-
+  const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
   const [filterStartDate, setFilterStartDate] = useState(() => {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     return sevenDaysAgo.toISOString().slice(0, 10);
   });
   const [filterEndDate, setFilterEndDate] = useState(() => new Date().toISOString().slice(0, 10));
-
-  const [drawerErrors, setDrawerErrors] = useState<string[]>([]);
-  const [drawerFieldErrors, setDrawerFieldErrors] = useState<Record<string, boolean>>({});
-
-  // Add state for address source
   const [addressSource, setAddressSource] = useState<'default' | 'shippo'>('default');
   const [readOnlyAddress, setReadOnlyAddress] = useState(true);
+  const [formData, setFormData] = useState<LabelFormData>({
+    fedexPackagingType: '',
+    labelStockType: 'PAPER_4X6',
+  });
+
+  const debouncedSearch = useDebouncedValue(searchTerm, 300);
+
+  const { 
+    orders: fetchedOrders, 
+    total, 
+    isLoading, 
+    isError, 
+    mutate 
+  } = useOrders(
+    1, // page
+    500, // pageSize
+    {},
+    'labelsPage'
+  );
+
+  const labelRows: LabelRow[] = useMemo(() => {
+    if (!fetchedOrders || !Array.isArray(fetchedOrders)) return [];
+    return toLabelRows(fetchedOrders as LocalUIOrder[]);
+  }, [fetchedOrders]);
+
+  // Restore label filter tab interactivity
+  const handleLabelFilter = (_event: React.MouseEvent<HTMLElement>, value: 'all' | 'unlabeled' | 'labeled' | null) => {
+    if (value) setLabelFilter(value);
+  };
+
+  const filteredAndPaginatedItems: LabelRow[] = useMemo(() => {
+    let rows = labelRows;
+    console.log('[Filter Debug] Initial:', rows.length);
+
+    // Label filter
+    if (labelFilter === 'unlabeled') {
+      rows = rows.filter(r => !r.trackingNumber);
+      console.log('[Filter Debug] After labelFilter "unlabeled":', rows.length);
+    } else if (labelFilter === 'labeled') {
+      rows = rows.filter(r => !!r.trackingNumber);
+      console.log('[Filter Debug] After labelFilter "labeled":', rows.length);
+    }
+
+    // Date filter
+    if (filterStartDate || filterEndDate) {
+      rows = rows.filter(r => {
+        if (!r.orderDate) return false;
+        const orderDateStr = new Date(r.orderDate).toISOString().slice(0, 10);
+        if (filterStartDate && orderDateStr < filterStartDate) return false;
+        if (filterEndDate && orderDateStr > filterEndDate) return false;
+        return true;
+      });
+      console.log('[Filter Debug] After date filter:', rows.length);
+    }
+
+
+    // Label status filter
+    if (labelStatusFilter) {
+      rows = rows.filter(r => {
+        const match = (r.labelJobStatus || '').toLowerCase().includes(labelStatusFilter.toLowerCase());
+        if (!match && labelStatusFilter === 'oluşturulmadı') {
+          console.log('[LabelStatusFilter Debug] Not matched:', r.labelJobStatus, 'Expected:', labelStatusFilter);
+        }
+        return match;
+      });
+      console.log('[Filter Debug] After labelStatusFilter:', rows.length);
+    }
+
+    // Search filter
+    if (debouncedSearch) {
+      const search = debouncedSearch.toLowerCase();
+      rows = rows.filter(r =>
+        (r.orderNumber && r.orderNumber.toLowerCase().includes(search)) ||
+        (r.recipientFirstName && r.recipientFirstName.toLowerCase().includes(search)) ||
+        (r.recipientLastName && r.recipientLastName.toLowerCase().includes(search)) ||
+        (r.title && r.title.toLowerCase().includes(search))
+      );
+      console.log('[Filter Debug] After debouncedSearch:', rows.length);
+    }
+
+    return rows;
+  }, [labelRows, labelFilter, filterStartDate, filterEndDate, marketplaceFilter, statusFilter, labelStatusFilter, debouncedSearch]);
+
+  useEffect(() => {
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
+  }, [debouncedSearch, marketplaceFilter, statusFilter, labelStatusFilter, filterStartDate, filterEndDate]);
 
   useEffect(() => {
     const fetchUserSettings = async () => {
@@ -388,492 +790,274 @@ function LabelsPage(props) {
         }
         const data = await response.json();
         if (data.integrationSettings) {
-          // Check FedEx credentials
           const hasFedex = data.integrationSettings.fedexApiKey &&
             data.integrationSettings.fedexApiSecret &&
                           data.integrationSettings.fedexAccountNumber;
           setHasFedexCredentials(hasFedex);
-
-          // Check Veeqo and Shippo credentials
-          const hasVeeqo = !!data.integrationSettings.veeqoApiKey;
-          const hasShippo = !!data.integrationSettings.shippoToken;
-
-          if (!hasVeeqo && !hasShippo) {
-            toast.error('Lütfen Veeqo veya Shippo entegrasyon ayarlarınızı tamamlayın.');
-          }
         } else {
           setHasFedexCredentials(false);
-          toast.error('Lütfen entegrasyon ayarlarınızı tamamlayın.');
+          // toast.error('Lütfen entegrasyon ayarlarınızı tamamlayın.'); // Consider if this toast is too aggressive on load
         }
       } catch (error) {
         console.error('Error fetching user settings for labels page:', error);
         setHasFedexCredentials(false);
-        toast.error('Kullanıcı ayarları alınırken bir hata oluştu.');
+        // toast.error('Kullanıcı ayarları alınırken bir hata oluştu.');
       } finally {
         setCheckingFedexCredentials(false);
       }
     };
     fetchUserSettings();
-  }, []); // Empty dependency array to run once on mount
+  }, []);
 
   useEffect(() => {
-    setPaginationModel(prev => ({ ...prev, page: 0 }));
-  }, [debouncedSearch]);
+    console.log('[LabelsPage] fetchedOrders:', fetchedOrders);
+    console.log('[LabelsPage] isLoading:', isLoading);
+    console.log('[LabelsPage] labelRows:', labelRows);
+    console.log('[LabelsPage] DataGrid rows prop:', filteredAndPaginatedItems);
+    console.log('[LabelsPage] DataGrid row IDs:', filteredAndPaginatedItems.map(r => r.itemId || r.orderId));
+    console.log('[LabelsPage] labelFilter:', labelFilter);
+    console.log('[LabelsPage] filterStartDate:', filterStartDate);
+    console.log('[LabelsPage] filterEndDate:', filterEndDate);
+    console.log('[LabelsPage] marketplaceFilter:', marketplaceFilter);
+    console.log('[LabelsPage] statusFilter:', statusFilter);
+    console.log('[LabelsPage] labelStatusFilter:', labelStatusFilter);
+    console.log('[LabelsPage] debouncedSearch:', debouncedSearch);
+  }, [fetchedOrders, isLoading, labelRows, filteredAndPaginatedItems, labelFilter, filterStartDate, filterEndDate, marketplaceFilter, statusFilter, labelStatusFilter, debouncedSearch]);
 
-  const { orders, total, page, pageSize, isLoading, isError, mutate } = useOrders(
-    paginationModel.page,
-    paginationModel.pageSize,
-    {
-      search: debouncedSearch,
-      source: props.source,
-      channel: props.channel,
-      status: props.status,
-      marketplace: props.marketplace,
-      startDate: filterStartDate,
-      endDate: filterEndDate,
-      sort: 'desc'  // Sort by createdAt in descending order
-    },
-    'labelsPage' // Add context parameter for Labels page
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOrder, setDrawerOrder] = useState<LabelRow | null>(null);
+
+  const drawerErrors = useMemo(
+    () => (drawerOrder ? validateRowForLabel(drawerOrder) : ['no-row']), // Add 'no-row' or similar to ensure button disabled if no row
+    [drawerOrder]
   );
 
-  // Handle error state
-  if (isError) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">
-          An error occurred while loading orders. Please try again.
-        </Alert>
-      </Box>
-    );
-  }
+  const openDrawer = (row: LabelRow) => {
+    console.log('Opening drawer with LabelRow:', row);
+    let currentDrawerData = { ...row }; 
+    const defaultsFromRow = getDefaultValues(row);
 
-  // Debug: print all unique marketplaces in fetched orders
-  if (orders && orders.length) {
-    console.log('Marketplaces in fetched orders:', [...new Set(orders.map(o => o.marketplace))]);
-  }
-
-  // DIAGNOSTIC LOGGING
-  console.log('ORDERS:', orders as any);
-  if (orders && orders.length) {
-    console.log('First order:', orders[0] as any);
-  }
-
-  const handleServiceTypeChange = (orderId: string, value: string) => {
-    setServiceTypeOverrides(prev => ({ ...prev, [orderId]: value }));
-  };
-
-  const handlePackagingTypeChange = (orderId: string, value: string) => {
-    setPackagingTypeOverrides(prev => ({ ...prev, [orderId]: value }));
-  };
-
-  // --- Flatten orders to order items with parent order info ---
-  const orderItems: LabelOrderItem[] = useMemo(() => {
-    if (!orders || orders.length === 0) return [];
-    return orders.flatMap(uiOrder => {
-      // Ensure correct mapping for marketplaceOrderDate and commodityDesc
-      const gridRowMarketplaceOrderDate = uiOrder.marketplaceOrderDate || uiOrder.createdAt || '';
-      // TypeScript: line_items is present from backend, but not in UIOrder type, so cast to any
-      const lineItems = (uiOrder as any).line_items || [];
-      let gridRowCommodityDesc = '---';
-      if (lineItems.length > 0) {
-        gridRowCommodityDesc = lineItems[0].title || lineItems[0].productName || '---';
-      }
-      const gridRow: LabelOrderItem = {
-        ...(uiOrder as any),
-        orderId: uiOrder.id,
-        id: uiOrder.id,
-        marketplaceOrderDate: gridRowMarketplaceOrderDate,
-        createdAt: gridRowMarketplaceOrderDate,
-        commodityDesc: gridRowCommodityDesc,
-      };
-      return [gridRow];
-    });
-  }, [orders]);
-
-  // Debug log for createdAt values
-  if (orderItems.length) {
-    console.log('[createdAt debug]', orderItems.slice(0, 5).map(o => o.createdAt));
-  }
-
-  // --- Filtering ---
-  const filteredItems = useMemo(() => {
-    const result = orderItems.filter(row => {
-      if (debouncedMarketplace && row.marketplace !== debouncedMarketplace) return false;
-      if (debouncedStatus && row.status !== debouncedStatus) return false;
-      if (debouncedLabelStatus) {
-        if (debouncedLabelStatus === 'created' && !row.shippingLabelUrl) return false;
-        if (debouncedLabelStatus === 'not_created' && row.shippingLabelUrl) return false;
-        if (debouncedLabelStatus === 'failed' && row.status !== 'FAILED' && row.status !== 'ERROR') return false;
-      }
-      if (unlabeledOnly && row.shippingLabelUrl) return false;
-      return true;
-    });
-    // Debug: print all unique marketplaces in filteredItems
-    if (result.length) {
-      console.log('Marketplaces in filteredItems:', [...new Set(result.map(o => o.marketplace))]);
-    }
-    return result;
-  }, [orderItems, debouncedMarketplace, debouncedStatus, debouncedLabelStatus, unlabeledOnly]);
-
-  // --- Date filter now handled by backend ---
-  const filteredByDate = filteredItems;
-
-  // --- Pagination ---
-  const pagedItems = useMemo(() => {
-    const start = paginationModel.page * paginationModel.pageSize;
-    return filteredItems.slice(start, start + paginationModel.pageSize);
-  }, [filteredItems, paginationModel]);
-
-  // --- In-row editing ---
-  const [itemEdits, setItemEdits] = useState<Record<string, any>>({});
-  const handleEditField = (itemId: string, field: string, value: any) => {
-    setItemEdits(prev => ({ ...prev, [itemId]: { ...prev[itemId], [field]: value } }));
-  };
-
-  // --- Responsive: show table on desktop, card/accordion on mobile ---
-  const [expandedMobile, setExpandedMobile] = useState<string | null>(null);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-
-  // --- Group OrderItems by Order ---
-  const groupedOrders = useMemo(() => {
-    const map: Record<string, { order: LabelOrderItem, items: LabelOrderItem[] }> = {};
-    orderItems.forEach(item => {
-      if (!map[item.orderId]) {
-        map[item.orderId] = { order: item, items: [] };
-      }
-      map[item.orderId].items.push(item);
-    });
-    return Object.values(map);
-  }, [orderItems]);
-
-  // --- Status badge helper ---
-  function getLabelStatusChip(labelCreated: boolean, status?: string) {
-    if (status === 'FAILED' || status === 'ERROR') return <Chip label="Failed" color="error" size="small" />;
-    if (labelCreated) return <Chip label="Labeled" color="success" size="small" />;
-    return <Chip label="Not Labeled" color="default" size="small" />;
-  }
-  function getOrderStatusChip(status?: string) {
-    if (!status) return null;
-    let color: 'default' | 'primary' | 'success' | 'error' | 'warning' = 'default';
-    if (status === 'SHIPPED' || status === 'DELIVERED' || status === 'COMPLETED') color = 'success';
-    else if (status === 'FAILED' || status === 'CANCELLED') color = 'error';
-    else if (status === 'PENDING' || status === 'ON_HOLD') color = 'warning';
-    else color = 'primary';
-    return <Chip label={status} color={color} size="small" />;
-  }
-
-  // --- Hover-to-edit logic ---
-  const [editField, setEditField] = useState<{ [itemId: string]: string | null }>({});
-  const handleEditStart = (itemId: string, field: string) => setEditField(prev => ({ ...prev, [itemId]: field }));
-  const handleEditEnd = (itemId: string) => setEditField(prev => ({ ...prev, [itemId]: null }));
-
-  // --- Sidebar Drawer logic ---
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerOrder, setDrawerOrder] = useState<LabelOrderItem | null>(null);
-  const openDrawer = (order: LabelOrderItem) => {
-    console.log('Opening drawer with order:', order);
+    currentDrawerData = {
+      ...currentDrawerData,
+      ...defaultsFromRow,
+      recipientFirstName: row.recipientFirstName === '—' ? '' : row.recipientFirstName,
+      recipientLastName: row.recipientLastName === '—' ? '' : row.recipientLastName,
+      recipientStreet1: row.recipientStreet1 === '—' ? '' : row.recipientStreet1,
+      recipientCity: row.recipientCity === '—' ? '' : row.recipientCity,
+      recipientPostal: row.recipientPostal === '—' ? '' : row.recipientPostal,
+      recipientCountry: row.recipientCountry === '—' ? '' : row.recipientCountry,
+      labelStockType: row.labelStockType || 'PAPER_4X6',
+      // Ensure line_items for the payload is correctly formed by getDefaultValues
+    };
     
-    // Get the full order from orders array
-    const originalOrder = orders.find(o => o.id === order.orderId) as any;
-    if (!originalOrder) {
-      console.error('Original order not found:', order.orderId);
-      return;
-    }
-    
-    // Ensure line items are properly initialized from the original order
-    const normalizedLineItems = ((originalOrder.line_items || []) as any[]).map(item => ({
-      id: item.id || String(Math.random()),
-      title: item.title || '',
-      value: typeof item.value === 'number' ? item.value : parseFloat(String(item.value)) || 0,
-      quantity: item.quantity || 1,
-      weight: typeof item.weight === 'number' ? item.weight : parseFloat(String(item.weight)) || 0.5,
-      hs_code: item.hs_code || '',
-      country_of_origin: item.country_of_origin || 'TR',
-      sku: item.sku || '',
-      image: item.image || '',
-      variantInfo: item.variantInfo || ''
-    }));
-    
-    const defaults = getDefaultValues(originalOrder) as any;
-    let addressSource: 'default' | 'shippo' = 'default';
-    
-    // Check for Shippo notes in Etsy orders from Veeqo
-    if (originalOrder.source === 'veeqo' && originalOrder.channel === 'etsy' && originalOrder.rawData?.notes) {
-      const { to_address, success } = parseShippoNotes(originalOrder.rawData.notes);
+    let newAddressSource: 'default' | 'shippo' = 'default';
+    if (row.originalOrder?.source === 'veeqo' && row.originalOrder?.channel === 'etsy' && row.originalOrder?.rawData?.notes) {
+      const { to_address, success } = parseShippoNotes(row.originalOrder.rawData.notes);
       if (success && to_address) {
-        console.log(`[Shippo Fallback] Found address in notes for order ${originalOrder.id}`);
-        // Update address fields from Shippo data
-        defaults.recipientFirstName = to_address.name?.split(' ')[0] || defaults.recipientFirstName;
-        defaults.recipientLastName = to_address.name?.split(' ').slice(1).join(' ') || defaults.recipientLastName;
-        defaults.recipientStreet1 = to_address.street1 || defaults.recipientStreet1;
-        defaults.recipientStreet2 = to_address.street2 || defaults.recipientStreet2;
-        defaults.recipientCity = to_address.city || defaults.recipientCity;
-        defaults.recipientState = to_address.state || defaults.recipientState;
-        defaults.recipientPostal = to_address.zip || defaults.recipientPostal;
-        defaults.recipientCountry = to_address.country || defaults.recipientCountry;
-        defaults.recipientPhone = to_address.phone || defaults.recipientPhone;
-        addressSource = 'shippo';
-        setReadOnlyAddress(true); // Start in read-only mode for Shippo addresses
+        currentDrawerData.recipientFirstName = to_address.name?.split(' ')[0] || currentDrawerData.recipientFirstName;
+        currentDrawerData.recipientLastName = to_address.name?.split(' ').slice(1).join(' ') || currentDrawerData.recipientLastName;
+        currentDrawerData.recipientStreet1 = to_address.street1 || currentDrawerData.recipientStreet1;
+        currentDrawerData.recipientStreet2 = to_address.street2 || currentDrawerData.recipientStreet2 || '';
+        currentDrawerData.recipientCity = to_address.city || currentDrawerData.recipientCity;
+        currentDrawerData.recipientState = to_address.state || currentDrawerData.recipientState || '';
+        currentDrawerData.recipientPostal = to_address.zip || currentDrawerData.recipientPostal;
+        currentDrawerData.recipientCountry = to_address.country || currentDrawerData.recipientCountry;
+        currentDrawerData.recipientPhone = to_address.phone || currentDrawerData.recipientPhone || '';
+        newAddressSource = 'shippo';
+        setReadOnlyAddress(true);
       }
     }
-
-    setDrawerOrder({ 
-      ...originalOrder, 
-      ...defaults,
-      line_items: normalizedLineItems,
-      marketplaceOrderDate: originalOrder.marketplaceOrderDate || originalOrder.marketplaceCreatedAt
-    } as any);
+    
+    setDrawerOrder(currentDrawerData);
     setDrawerOpen(true);
-    
-    // Run initial validation
-    const { errors } = validateOrderForLabel({ ...originalOrder, ...defaults, line_items: normalizedLineItems } as any);
-    setDrawerErrors(errors);
-    
-    // Set field-level errors
-    const fieldErrors: Record<string, boolean> = {};
-    if (!defaults.recipientFirstName) fieldErrors.recipientFirstName = true;
-    if (!defaults.recipientLastName) fieldErrors.recipientLastName = true;
-    if (!defaults.recipientPhone) fieldErrors.recipientPhone = true;
-    if (!defaults.recipientStreet1) fieldErrors.recipientStreet1 = true;
-    if (!defaults.recipientCity) fieldErrors.recipientCity = true;
-    if (!defaults.recipientState) fieldErrors.recipientState = true;
-    if (!defaults.recipientPostal) fieldErrors.recipientPostal = true;
-    if (!defaults.recipientCountry) fieldErrors.recipientCountry = true;
-    if (!normalizedLineItems.length) fieldErrors.line_items = true;
-    
-    setDrawerFieldErrors(fieldErrors);
-    setAddressSource(addressSource);
+    setAddressSource(newAddressSource);
   };
+
   const closeDrawer = () => {
     setDrawerOpen(false);
-    setReadOnlyAddress(true); // Reset read-only state when closing
+    setReadOnlyAddress(true);
   };
 
-  // --- Columns for DataGrid ---
-  const columns: GridColDef<LabelOrderItem>[] = [
+  const columns: GridColDef<LabelRow>[] = [
     {
-      field: 'marketplaceOrderDate',
-      headerName: 'Sipariş Tarihi',
-      width: 180,
-      valueFormatter: (params: { value: string | undefined }) => formatDate(params.value),
-      sortable: true
+      field: 'labelStatus',
+      headerName: 'Etiket',
+      width: 110,
+      sortable: false,
+      valueGetter: (_value, row) => {
+        if (!row) return '—'; // Defensive check
+        if (row.trackingNumber) return 'Alındı';
+        if (row.labelJobStatus === 'failed') return 'Hata';
+        if (row.labelJobStatus === 'created') return 'Alındı';
+        if (row.labelJobStatus === 'pending') return 'Bekliyor';
+        return 'Etiketsiz';
+      },
+      renderCell: (params: GridRenderCellParams<LabelRow, string>) => {
+        const status = params.value;
+        if (status === 'Alındı') {
+          const trackingNumber = params.row.trackingNumber;
+          return (
+            <Tooltip title="Etiket Alındı">
+              <span
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (trackingNumber) {
+                    await navigator.clipboard.writeText(trackingNumber);
+                    toast.success('takip numarası kopyalandı.', { duration: 1500 });
+                  }
+                }}
+              >
+                <CheckCircleIcon color="success" />
+              </span>
+            </Tooltip>
+          );
+        }
+        if (status === 'Hata')     return <Tooltip title="Etiketleme Hatası"><CancelIcon color="error" /></Tooltip>;
+        if (status === 'Bekliyor') return <Tooltip title="Etiket İşleniyor/Bekliyor"><HourglassEmptyIcon color="warning" /></Tooltip>;
+        return <Tooltip title="Etiket Oluşturulmadı"><CircleIcon color="disabled" /></Tooltip>;
+      },
     },
     {
-      field: 'orderNumber',
-      headerName: 'Sipariş No',
-      width: 150,
-      renderCell: (params: GridRenderCellParams<LabelOrderItem>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2">{params.value}</Typography>
-          <SourceBadge source={params.row.source} />
-          <ChannelBadge channel={params.row.channel} />
-        </Box>
+      field: 'itemImageUrl',
+      headerName: 'Ürün Görseli',
+      width: 70,
+      sortable: false,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => (
+        <img
+          src={params.value as string || '/placeholder.png'} 
+          alt="Ürün Görseli"
+          style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8 }}
+          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
+        />
       )
     },
+    { field: 'marketplace', headerName: 'Mağaza', width: 110 },
     {
-      field: 'customerName',
-      headerName: 'Müşteri',
-      width: 200,
-      valueGetter: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        return order.customerName || `${order.recipientFirstName} ${order.recipientLastName}`.trim() || '—';
-      }
+      field: 'orderDate', 
+      headerName: 'Sipariş Tarihi', 
+      width: 130,
+      valueFormatter: (value: string | undefined) => formatDateTr(value), // Turkish style
+      sortable: true,
+      sortComparator: (v1, v2) => new Date(v1).getTime() - new Date(v2).getTime(), // newest to oldest
     },
+    { field: 'orderNumber', headerName: 'Sipariş No', width: 110 },
     {
-      field: 'commodityDesc',
-      headerName: 'Ürün',
-      width: 200,
-      valueGetter: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        return order.commodityDesc || order.line_items[0]?.title || '—';
-      }
+      field: 'customerSevk',
+      headerName: 'Müşteri Sevk',
+      width: 160,
+      valueGetter: (_value, row) => `${row.recipientFirstName || ''} ${row.recipientLastName || ''}`.trim() || row.originalOrder?.customerName || '—'
     },
-    {
-      field: 'recipientPostal',
-      headerName: 'Posta Kodu',
-      width: 120,
-      valueGetter: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        return order.recipientPostal || order.to_address?.postal || '—';
-      }
+    { 
+      field: 'orderTotalPrice', 
+      headerName: 'Toplam', 
+      width: 80, 
+      type: 'number',
+      renderCell: (params: GridRenderCellParams<LabelRow>) => (
+        <Typography variant="body2">
+          {params.value != null && params.value > 0 ? `${(params.value as number).toFixed(2)} ${params.row.currency || ''}`.trim() : '—'}
+        </Typography>
+      )
     },
-    {
-      field: 'recipientCountry',
-      headerName: 'Ülke',
-      width: 100,
-      valueGetter: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        return order.recipientCountry || order.to_address?.country || '—';
-      }
+    { field: 'title', headerName: 'Ürün Adı', width: 180 },
+    { field: 'quantity', headerName: 'Adet', width: 60, type: 'number' },
+    { 
+      field: 'shipByDate', 
+      headerName: 'Son Kargo Tarihi',
+      width: 130,
+      valueFormatter: (value: string | undefined) => value ? formatDate(value) : '—',
     },
-    {
-      field: 'weightKg',
-      headerName: 'Ağırlık (kg)',
-      width: 120,
-      valueGetter: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        return order.weightKg || order.line_items[0]?.weight || 0.5;
-      }
-    },
-    {
-      field: 'harmonizedCode',
-      headerName: 'HS Kodu',
-      width: 120,
-      valueGetter: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        return order.harmonizedCode || order.line_items[0]?.hs_code || '—';
-      }
-    },
-    {
-      field: 'countryOfMfg',
-      headerName: 'Menşei',
-      width: 120,
-      valueGetter: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        return order.countryOfMfg || order.line_items[0]?.country_of_origin || '—';
-      }
-    },
-    {
-      field: 'fedexServiceType',
-      headerName: 'Kargo Tipi',
-      width: 180,
-      renderCell: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        const value = order.fedexServiceType || order.serviceType || 'FEDEX_GROUND';
-        const option = FEDEX_SERVICE_TYPES.find(opt => opt.value === value);
-        return (
-          <FormControl size="small" fullWidth>
-            <Select
-              value={value}
-              onChange={(e) => handleServiceTypeChange(order.id, e.target.value)}
-              size="small"
-              sx={{ minWidth: 150 }}
-            >
-              {FEDEX_SERVICE_TYPES.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        );
-      }
-    },
-    {
-      field: 'fedexPackagingType',
-      headerName: 'Paket Tipi',
-      width: 150,
-      renderCell: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        const value = order.fedexPackagingType || order.packagingType || 'YOUR_PACKAGING';
-        const option = FEDEX_PACKAGING_TYPES.find(opt => opt.value === value);
-        return (
-          <FormControl size="small" fullWidth>
-            <Select
-              value={value}
-              onChange={(e) => handlePackagingTypeChange(order.id, e.target.value)}
-              size="small"
-              sx={{ minWidth: 120 }}
-            >
-              {FEDEX_PACKAGING_TYPES.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        );
-      }
-    },
-    {
-      field: 'validation',
-      headerName: 'Durum',
-      width: 120,
-      renderCell: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        const { status, message } = getValidationStatus(order);
-        return <ValidationStatusChip status={status} message={message} />;
+    { 
+      field: 'lastCarrier', 
+      headerName: 'Kargo Firması', 
+      width: 140, 
+      renderCell: (params: GridRenderCellParams<LabelRow>) => {
+        // Try to get the latest label job's carrier
+        const labelJobs = params.row.originalOrder?.line_items?.find(i => i.id === params.row.itemId)?.labelJobs || [];
+        const latestLabelJob = labelJobs.length > 0 ? labelJobs[0] : null;
+        const carrier = latestLabelJob?.carrier || params.row.lastCarrier;
+        if (carrier === 'FEDEX') {
+          if (latestLabelJob?.pdfUrl) {
+            return (
+              <a
+                href={latestLabelJob.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-block' }}
+                title="Etiketi aç"
+              >
+                <img src="/images/FedEx-Logo-PNG-Transparent.png" alt="FedEx" style={{ height: 16, marginLeft: 2, cursor: 'pointer' }} />
+              </a>
+            );
+          }
+          return <img src="/images/FedEx-Logo-PNG-Transparent.png" alt="FedEx" style={{ height: 16, marginLeft: 2 }} title="FedEx" />;
+        }
+        if (carrier === 'UPS') {
+          if (latestLabelJob?.pdfUrl) {
+            return (
+              <a
+                href={latestLabelJob.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-block' }}
+                title="Etiketi aç"
+              >
+                <img src="/images/United_Parcel_Service_logo_2014.svg.png" alt="UPS" style={{ height: 16, marginLeft: 2, cursor: 'pointer' }} />
+              </a>
+            );
+          }
+          return <img src="/images/United_Parcel_Service_logo_2014.svg.png" alt="UPS" style={{ height: 16, marginLeft: 2 }} title="UPS" />;
+        }
+        return carrier || '—';
       }
     },
     {
       field: 'actions',
-      headerName: 'İşlemler',
-      width: 120,
-      renderCell: (params: GridRenderCellParams<LabelOrderItem>) => {
-        const order = params.row;
-        const { valid } = validateOrderForLabel(order);
-        return (
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant="contained"
-              size="small"
-              onClick={() => openDrawer(order)}
-              startIcon={<EditIcon />}
-            >
-              Düzenle
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              onClick={() => handleGenerateLabel(order)}
-              disabled={!valid}
-              startIcon={<CheckIcon />}
-            >
-              Etiket
-            </Button>
-          </Box>
-        );
-      }
-    }
+      headerName: 'Detaylar',
+      width: 140,
+      minWidth: 120,
+      sortable: false,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => (
+        <>
+          <IconButton onClick={() => openDrawer(params.row as LabelRow)} size="small">
+            <EditIcon fontSize="small"/>
+          </IconButton>
+          <Button size="small" variant="outlined" sx={{ml:1}} onClick={() => { 
+            console.log('[UPS DEBUG] UPS button clicked', params.row);
+            setSelectedOrderForUPS(params.row); 
+            setUpsDrawerOpen(true); 
+          }}>
+            UPS
+          </Button>
+        </>
+      )
+    },
   ];
-
-  // --- Debug log for DataGrid rows ---
-  if (typeof window !== 'undefined') {
-    console.log('[DataGrid] First 3 rows:', filteredByDate.slice(0, 3));
-  }
 
   const handleSync = async () => {
     setSyncingOrders(true);
     const toastId = toast.loading('Siparişler senkronize ediliyor...');
     try {
-      // First fetch user settings to get both Veeqo and Shippo credentials
-      const settingsRes = await fetch('/api/user/settings');
-      if (!settingsRes.ok) {
-        throw new Error('Kullanıcı ayarları alınamadı');
-      }
-      const settings = await settingsRes.json();
-      
-      // Then call sync endpoint with both credentials
-      const res = await fetch('/api/orders/sync', { 
+      // Fast sync: only first page from Shippo and Veeqo
+      const res = await fetch('/api/orders/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          veeqoApiKey: settings.integrationSettings?.veeqoApiKey,
-          shippoToken: settings.integrationSettings?.shippoToken
-        })
+        body: JSON.stringify({ syncType: 'fast' })
       });
-      console.log('[SYNC DEBUG] Sync response status:', res.status);
-      const text = await res.text();
-      console.log('[SYNC DEBUG] Sync response text:', text);
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        console.error('[SYNC DEBUG] Failed to parse sync response as JSON:', e, text);
-        throw new Error('Sync response is not valid JSON');
-      }
       if (!res.ok) {
-        throw new Error(result.error || 'Bilinmeyen bir hata oluştu.');
+        const data = await res.json();
+        throw new Error(data.error || 'Bilinmeyen hata');
       }
-      toast.success(`Senkronizasyon tamamlandı! ${Number(result.successfulOrders) || 0} sipariş işlendi.`, { id: toastId });
-      await mutate(); // Refetch orders
+      toast.success('Siparişler başarıyla senkronize edildi!', { id: toastId });
+      // Optionally refresh data after sync
+      mutate && mutate();
     } catch (e: any) {
       toast.error(`Senkronizasyon hatası: ${e.message}`, { id: toastId });
     } finally {
       setSyncingOrders(false);
     }
   };
+
 
   const handleRefresh = () => {
     const toastId = toast.loading('Siparişler yenileniyor...');
@@ -884,127 +1068,198 @@ function LabelsPage(props) {
     });
   };
   
-  const handleGenerateLabel = async (orderDataFromDrawer: UIOrder) => {
+  const handleGenerateLabel = async (rowForLabel: LabelRow) => {
     if (!hasFedexCredentials) {
       toast.error('Etiket oluşturmak için FedEx ayarlarınızı tamamlamanız gerekmektedir.');
       return;
     }
-
-    // Client-side validation based on current drawer state
-    const { valid, errors: validationErrors } = validateOrderForLabel(orderDataFromDrawer);
-    if (!valid) {
-      setDrawerErrors(validationErrors);
+    const currentFormValues = drawerOpen && drawerOrder ? drawerOrder : rowForLabel;
+    
+    const validationErrors = validateRowForLabel(currentFormValues);
+    if (validationErrors.length > 0) {
       toast.error(`Lütfen eksik alanları doldurun: ${validationErrors.join(', ')}`);
       return;
     }
 
-    setGeneratingLabelId(orderDataFromDrawer.id);
-    const toastLabelId = toast.loading(`'${orderDataFromDrawer.orderNumber}' için etiket oluşturuluyor...`);
-
+    setGeneratingLabelId(currentFormValues.itemId);
+    const toastLabelId = toast.loading(`'${currentFormValues.orderNumber}' için etiket ve DB güncelleme işlemi başlatılıyor...`);
+    
     try {
-      // Prepare the payload with all required fields
-      const payloadToSave = {
-        ...orderDataFromDrawer,
-        // Ensure all ETD fields are included
-        weightKg: orderDataFromDrawer.weightKg || orderDataFromDrawer.line_items[0]?.weight || 0.5,
-        harmonizedCode: orderDataFromDrawer.harmonizedCode || orderDataFromDrawer.line_items[0]?.hs_code || '',
-        countryOfMfg: orderDataFromDrawer.countryOfMfg || orderDataFromDrawer.line_items[0]?.country_of_origin || '',
-        commodityDesc: orderDataFromDrawer.commodityDesc || orderDataFromDrawer.line_items[0]?.title || '',
-        termsOfSale: orderDataFromDrawer.termsOfSale || 'DDP',
-        sendCommercialInvoiceViaEtd: orderDataFromDrawer.sendCommercialInvoiceViaEtd ?? true,
-        fedexServiceType: orderDataFromDrawer.fedexServiceType || 'FEDEX_GROUND',
-        fedexPackagingType: orderDataFromDrawer.fedexPackagingType || 'YOUR_PACKAGING',
-        fedexPickupType: orderDataFromDrawer.fedexPickupType || 'DROP_BOX',
-        fedexDutiesPaymentType: orderDataFromDrawer.fedexDutiesPaymentType || 'SENDER',
-        packageLength: orderDataFromDrawer.packageLength,
-        packageWidth: orderDataFromDrawer.packageWidth,
-        packageHeight: orderDataFromDrawer.packageHeight,
-        dimensionUnits: orderDataFromDrawer.dimensionUnits || 'CM',
-        labelStockType: orderDataFromDrawer.labelStockType || 'PAPER_LETTER',
-        signatureType: orderDataFromDrawer.signatureType || 'NO_SIGNATURE_REQUIRED',
-        // Include shipping address
+      // Step 1: Update order details in DB via /api/orders/update
+      // Patch: Map UI model to backend schema fields for DB update
+      // - Always use id (not orderId)
+      // - Group address fields into shippingAddress as required by backend
+      // - Prevents data loss and Prisma errors
+      const {
+        orderId,
+        recipientFirstName,
+        recipientLastName,
+        recipientStreet1,
+        recipientStreet2,
+        recipientCity,
+        recipientState,
+        recipientPostal,
+        recipientCountry,
+        recipientPhone,
+        ...rest
+      } = currentFormValues;
+      const dbUpdatePayload = {
+        id: orderId,
         shippingAddress: {
-          recipientFirstName: orderDataFromDrawer.recipientFirstName || orderDataFromDrawer.to_address?.name?.split(' ')[0] || '',
-          recipientLastName: orderDataFromDrawer.recipientLastName || orderDataFromDrawer.to_address?.name?.split(' ').slice(1).join(' ') || '',
-          recipientStreet1: orderDataFromDrawer.recipientStreet1 || orderDataFromDrawer.to_address?.street1 || '',
-          recipientStreet2: orderDataFromDrawer.recipientStreet2 || orderDataFromDrawer.to_address?.street2 || '',
-          recipientCity: orderDataFromDrawer.recipientCity || orderDataFromDrawer.to_address?.city || '',
-          recipientState: orderDataFromDrawer.recipientState || orderDataFromDrawer.to_address?.state || '',
-          recipientPostal: orderDataFromDrawer.recipientPostal || orderDataFromDrawer.to_address?.postal || '',
-          recipientCountry: orderDataFromDrawer.recipientCountry || orderDataFromDrawer.to_address?.country || '',
-          recipientPhone: orderDataFromDrawer.recipientPhone || orderDataFromDrawer.to_address?.phone || '',
-        }
+          firstName: recipientFirstName,
+          lastName: recipientLastName,
+          street1: recipientStreet1,
+          street2: recipientStreet2,
+          city: recipientCity,
+          state: recipientState,
+          postal: recipientPostal,
+          country: recipientCountry,
+          phone: recipientPhone,
+        },
+        ...rest,
+        commodityDesc: getDefaultValues(currentFormValues).commodityDesc // preserve logic for commodityDesc
       };
 
-      // Save the updated order data
-      const saveResponse = await fetch(`/api/orders/${orderDataFromDrawer.id}/update-options`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadToSave)
-      });
-
-      if (!saveResponse.ok) {
-        const errData = await saveResponse.json();
-        throw new Error(errData.error || 'Failed to save order data');
-      }
-
-      toast.success(`'${orderDataFromDrawer.orderNumber}' için değişiklikler kaydedildi!`);
-
-      // After successful save, generate the label
-      const labelResponse = await fetch(`/api/orders/${orderDataFromDrawer.id}/generate-label`, {
+      const dbUpdateResponse = await fetch('/api/orders/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadToSave)
+        body: JSON.stringify(dbUpdatePayload),
+      });
+
+      if (!dbUpdateResponse.ok) {
+        const errorData = await dbUpdateResponse.json().catch(() => ({ error: 'Veritabanı güncelleme sırasında bir hata oluştu.' }));
+        toast.error(errorData.error || errorData.details || `Veritabanı güncellemesi başarısız: ${dbUpdateResponse.statusText || dbUpdateResponse.status}`, { id: toastLabelId });
+        setGeneratingLabelId(null);
+        return; // Stop if DB update fails
+      }
+      toast.success('Sipariş detayları kaydedildi.', { id: toastLabelId, duration: 2000 });
+      toast.loading(`'${currentFormValues.orderNumber}' için etiket oluşturuluyor...`, { id: toastLabelId }); // Update toast message
+
+      // Step 2: Prepare payload for /update-options (FedEx specific options)
+      const defaultsForFedexPayload = getDefaultValues(currentFormValues);
+      const fedexOptionsPayload = {
+        orderId: currentFormValues.orderId, // Not strictly needed in body if in URL, but good for consistency
+        shippingAddress: {
+          firstName: currentFormValues.recipientFirstName,
+          lastName: currentFormValues.recipientLastName,
+          street1: currentFormValues.recipientStreet1,
+          street2: currentFormValues.recipientStreet2,
+          city: currentFormValues.recipientCity,
+          state: currentFormValues.recipientState,
+          postal: currentFormValues.recipientPostal,
+          country: currentFormValues.recipientCountry,
+          phone: currentFormValues.recipientPhone,
+        },
+        line_items: defaultsForFedexPayload.line_items,
+        weightKg: defaultsForFedexPayload.weightKg,
+        harmonizedCode: defaultsForFedexPayload.hsCode,
+        countryOfMfg: defaultsForFedexPayload.countryOfOrigin,
+        commodityDesc: defaultsForFedexPayload.commodityDesc,
+        termsOfSale: defaultsForFedexPayload.termsOfSale,
+        sendCommercialInvoiceViaEtd: defaultsForFedexPayload.sendCommercialInvoiceViaEtd,
+        fedexServiceType: defaultsForFedexPayload.serviceType,
+        fedexPackagingType: defaultsForFedexPayload.packagingType,
+        fedexPickupType: defaultsForFedexPayload.fedexPickupType,
+        fedexDutiesPaymentType: defaultsForFedexPayload.fedexDutiesPaymentType,
+        packageLength: defaultsForFedexPayload.packageLength,
+        packageWidth: defaultsForFedexPayload.packageWidth,
+        packageHeight: defaultsForFedexPayload.packageHeight,
+        dimensionUnits: defaultsForFedexPayload.dimensionUnits,
+        labelStockType: defaultsForFedexPayload.labelStockType,
+        signatureType: defaultsForFedexPayload.signatureType,
+        customsValue: defaultsForFedexPayload.customsValue, 
+        currency: defaultsForFedexPayload.currency,
+      };
+
+      const saveOptionsResponse = await fetch(`/api/orders/${currentFormValues.orderId}/update-options`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fedexOptionsPayload)
+      });
+
+      if (!saveOptionsResponse.ok) {
+        const errData = await saveOptionsResponse.json().catch(() => ({ error: 'FedEx seçenekleri kaydedilemedi.'}));
+        // Surface the error message from the API if it's a 400 (validation error)
+        throw new Error(errData.error || `FedEx seçenekleri kaydedilemedi: ${saveOptionsResponse.status}`);
+      }
+      // toast.success('FedEx seçenekleri kaydedildi.', { id: toastLabelId, duration: 2000 }); // Optional success toast
+
+      // Step 3: Generate Label
+      const bodyForGenerateLabel = {
+        // Fields from fedexOptionsPayload that generate-label might expect
+        line_items: fedexOptionsPayload.line_items,
+        weightKg: fedexOptionsPayload.weightKg,
+        harmonizedCode: fedexOptionsPayload.harmonizedCode,
+        countryOfMfg: fedexOptionsPayload.countryOfMfg,
+        commodityDesc: fedexOptionsPayload.commodityDesc,
+        termsOfSale: fedexOptionsPayload.termsOfSale,
+        sendCommercialInvoiceViaEtd: fedexOptionsPayload.sendCommercialInvoiceViaEtd,
+        // Use serviceType and packagingType from defaultsForFedexPayload for these specific fields
+        fedexServiceType: defaultsForFedexPayload.serviceType, 
+        fedexPackagingType: defaultsForFedexPayload.packagingType,
+        // Other fedex options come from fedexOptionsPayload which uses the full names
+        fedexPickupType: fedexOptionsPayload.fedexPickupType,
+        fedexDutiesPaymentType: fedexOptionsPayload.fedexDutiesPaymentType,
+        packageLength: fedexOptionsPayload.packageLength,
+        packageWidth: fedexOptionsPayload.packageWidth,
+        packageHeight: fedexOptionsPayload.packageHeight,
+        dimensionUnits: fedexOptionsPayload.dimensionUnits,
+        labelStockType: fedexOptionsPayload.labelStockType,
+        signatureType: fedexOptionsPayload.signatureType,
+        customsValue: fedexOptionsPayload.customsValue,
+        currency: fedexOptionsPayload.currency,
+
+        // Explicitly add address fields from defaultsForFedexPayload (which is getDefaultValues(currentFormValues))
+        recipientFirstName: defaultsForFedexPayload.recipientFirstName,
+        recipientLastName: defaultsForFedexPayload.recipientLastName,
+        recipientStreet1: defaultsForFedexPayload.recipientStreet1,
+        recipientStreet2: defaultsForFedexPayload.recipientStreet2,
+        recipientCity: defaultsForFedexPayload.recipientCity,
+        recipientState: defaultsForFedexPayload.recipientState,
+        recipientPostal: defaultsForFedexPayload.recipientPostal,
+        recipientCountry: defaultsForFedexPayload.recipientCountry,
+        recipientPhone: defaultsForFedexPayload.recipientPhone,
+
+        // And orderId / orderItemId
+        orderId: currentFormValues.orderId, // Ensure orderId is at top level
+        orderItemId: currentFormValues.itemId
+      };
+
+      const labelResponse = await fetch(`/api/orders/${currentFormValues.orderId}/generate-label`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyForGenerateLabel) 
       });
 
       if (!labelResponse.ok) {
         let errorMsg = `Etiket oluşturma hatası (HTTP ${labelResponse.status})`;
-        let errorDetailsFromServer;
         try {
           const errorData = await labelResponse.json();
           errorMsg = errorData.error || errorData.message || errorMsg;
-          errorDetailsFromServer = errorData.details;
-          if (errorDetailsFromServer) console.error('Error details from server:', errorDetailsFromServer);
         } catch (jsonError) {
           const textError = await labelResponse.text();
-          console.error('Non-JSON error response from generate-label:', textError.substring(0, 500));
-          if (labelResponse.status === 404) errorMsg = 'Etiket oluşturma servisi bulunamadı (404).';
-          else if (textError.toLowerCase().includes('doctype')) errorMsg = 'Sunucudan beklenmeyen bir yanıt alındı (HTML).';
-        }
-        if (errorDetailsFromServer && Array.isArray(errorDetailsFromServer) && errorDetailsFromServer.some((err: any) => err.code === 'PHONENUMBER.TOO.LONG')) {
-          errorMsg += ' Telefon numarası çok uzun. Lütfen düzeltip tekrar deneyin.';
+            errorMsg = textError.substring(0,200) || 'Etiket oluşturulurken bilinmeyen bir sunucu hatası oluştu.'; 
         }
         throw new Error(errorMsg);
       }
-
       const labelData = await labelResponse.json();
-      
-      // Show success message
-      toast.success(`'${orderDataFromDrawer.orderNumber}' için etiket oluşturuldu! Takip No: ${labelData.trackingNumber}`, { id: toastLabelId, duration: 6000 });
-      
-      if (labelData.labelUrl) {
-        window.open(labelData.labelUrl, '_blank', 'noopener,noreferrer');
-      }
-      
+      toast.success(`'${currentFormValues.orderNumber}' için etiket oluşturuldu! Takip No: ${labelData.trackingNumber}`, { id: toastLabelId, duration: 6000 });
+      if (labelData.labelUrl) window.open(labelData.labelUrl, '_blank', 'noopener,noreferrer');
       if (labelData.alerts && labelData.alerts.length > 0) {
-        labelData.alerts.forEach((alert: any) => toast.custom((t) => (
-          <Alert severity={alert.type?.toLowerCase() || 'warning'} onClose={() => toast.dismiss(t.id)}>
-            {alert.message || JSON.stringify(alert)}
-          </Alert>
-        ), { duration: 8000 }));
+        labelData.alerts.forEach((alert: any) => {
+          toast.custom(
+            <Alert severity={alert.type?.toLowerCase() || 'warning'} onClose={() => toast.dismiss()}>
+              {alert.message || JSON.stringify(alert)}
+            </Alert>,
+            { duration: 8000 }
+          );
+        });
       }
-      
-      // Refresh the orders list
-      if (mutate) await mutate();
-      
-      // Close the drawer
-      if (drawerOpen && closeDrawer) closeDrawer();
-      
-      return labelData;
+      await mutate();
+      if (drawerOpen) closeDrawer();
     } catch (error: any) {
-      console.error('Error generating label:', error);
-      toast.error(error.message, { id: toastLabelId, duration: 8000 });
-      throw error;
+      console.error('Error in handleGenerateLabel process:', error);
+      toast.error(error.message || 'İşlem sırasında bilinmeyen bir hata oluştu.', { id: toastLabelId, duration: 8000 });
     } finally {
       setGeneratingLabelId(null);
     }
@@ -1015,596 +1270,225 @@ function LabelsPage(props) {
     setRawOrderDataModalOpen(true);
   };
 
-  // --- Render ---
   return (
-    <Box sx={{ m: 2, p: 2, backgroundColor: 'background.paper', borderRadius: 2, boxShadow: 3 }}>
+    <Box sx={{ height: 'calc(100vh - 64px - 48px)', display: 'flex', flexDirection: 'column', p: 2 }}>
+  {/* ...content... */}
+
       <Toaster position="top-right" reverseOrder={false} />
       <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
         Etiket Yönetimi
       </Typography>
-      {/* --- Toolbar --- */}
-      <Paper elevation={1} sx={{ p: 2, mb: 2, display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<SyncIcon />}
-          onClick={handleSync}
-          disabled={syncingOrders}
-          sx={{ textTransform: 'none', height: '40px' }}
-        >
+      <Box sx={{ display:'flex', flexDirection:'column', gap:1, mb:2 }}>
+        <Paper elevation={1} sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 2 }}>
+          <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} sx={{ textTransform: 'none', height: '40px', minWidth: 180, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>
           {syncingOrders ? 'Senkronize Ediliyor...' : 'Siparişleri Senkron Et'}
         </Button>
-        <TextField
-          size="small"
-          label="Sipariş ID / Müşteri Adı Ara"
-          variant="outlined"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          InputProps={{ endAdornment: <SearchIcon fontSize="small" /> }}
-          sx={{ minWidth: '250px', height: '40px' }}
-        />
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 180, height: '40px' }}>
-          <InputLabel>Marketplace</InputLabel>
-          <Select value={marketplaceFilter} label="Marketplace" onChange={e => setMarketplaceFilter(e.target.value)}>
+          <TextField size="small" label="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" /> }} sx={{ minWidth: 200, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}/>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
+            <InputLabel shrink={true}>Marketplace</InputLabel>
+            <Select value={marketplaceFilter} label="Marketplace" onChange={e => setMarketplaceFilter(e.target.value)} displayEmpty>
             {integrationOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 180, height: '40px' }}>
-          <InputLabel>Sipariş Durumu</InputLabel>
-          <Select value={statusFilter} label="Sipariş Durumu" onChange={e => setStatusFilter(e.target.value)}>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
+            <InputLabel shrink={true}>Sipariş Durumu</InputLabel>
+            <Select value={statusFilter} label="Sipariş Durumu" onChange={e => setStatusFilter(e.target.value)} displayEmpty>
             {orderStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 180, height: '40px' }}>
-          <InputLabel>Etiket Durumu</InputLabel>
-          <Select value={labelStatusFilter} label="Etiket Durumu" onChange={e => setLabelStatusFilter(e.target.value)}>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
+            <InputLabel shrink={true}>Etiket Durumu</InputLabel>
+            <Select value={labelStatusFilter} label="Etiket Durumu" onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty>
             {labelStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 180, height: '40px' }}>
-          <InputLabel>Yalnızca Etiketsiz</InputLabel>
-          <Select value={unlabeledOnly ? 'yes' : ''} label="Yalnızca Etiketsiz" onChange={e => setUnlabeledOnly(e.target.value === 'yes')}>
-            <MenuItem value="">Tümü</MenuItem>
-            <MenuItem value="yes">Yalnızca Etiketsiz</MenuItem>
-          </Select>
-        </FormControl>
-        <TextField
-          label="Başlangıç Tarihi"
-          type="date"
-          value={filterStartDate}
-          onChange={e => { setFilterStartDate(e.target.value); setPaginationModel(prev => ({ ...prev, page: 0 })); }}
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          sx={{ minWidth: 160, height: '40px' }}
-        />
-        <TextField
-          label="Bitiş Tarihi"
-          type="date"
-          value={filterEndDate}
-          onChange={e => { setFilterEndDate(e.target.value); setPaginationModel(prev => ({ ...prev, page: 0 })); }}
-          size="small"
-          InputLabelProps={{ shrink: true }}
-          sx={{ minWidth: 160, height: '40px' }}
-        />
-        <Button onClick={() => {
-          setSearchTerm(''); setMarketplaceFilter(''); setStatusFilter(''); setLabelStatusFilter(''); setUnlabeledOnly(false);
-        }} variant="outlined" sx={{ ml: 2 }}>Filtreleri Sıfırla</Button>
+          <TextField label="Başlangıç Tarihi" type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: 150, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }} />
+          <TextField label="Bitiş Tarihi" type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: 150, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }} />
+          <Button onClick={() => { setSearchTerm(''); setMarketplaceFilter(''); setStatusFilter(''); setLabelStatusFilter(''); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="outlined" sx={{ ml: 'auto', height: '40px', minWidth: 100, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>Sıfırla</Button>
         <Tooltip title="Sipariş Listesini Yenile">
-          <span>
-            <IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" sx={{ height: '40px', width: '40px' }}>
-              <RefreshIcon />
-            </IconButton>
-          </span>
+            <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" sx={{ height: '40px', width: '40px', mb: { xs: 1, sm: 0 } }}><RefreshIcon /></IconButton></span>
         </Tooltip>
       </Paper>
-      {/* --- Desktop: DataGrid Table --- */}
-      {!isMobile && (
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={labelFilter}
+            onChange={handleLabelFilter}
+            aria-label="Etiket filtresi"
+          >
+            <ToggleButton value="all" aria-label="Tümü">Tümü</ToggleButton>
+            <ToggleButton value="unlabeled" aria-label="Etiketsiz">Etiketsiz</ToggleButton>
+            <ToggleButton value="labeled" aria-label="Etiket Alındı">Alındı</ToggleButton>
+          </ToggleButtonGroup>
+          {/* Placeholder for any other controls on the right if needed */}
+        </Box>
+      </Box>
+
+      <Box sx={{ flexGrow: 1, width: '100%', overflow: 'hidden' }}>
         <DataGrid
-          rows={[...filteredByDate].sort((a, b) => {
-            if (!a.createdAt && !b.createdAt) return 0;
-            if (!a.createdAt) return 1;
-            if (!b.createdAt) return -1;
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          })}
+          rows={filteredAndPaginatedItems}
           columns={columns}
-          autoHeight
-          pageSizeOptions={[10, 20, 50, 100]}
+          pageSizeOptions={[20, 50, 100]}
           pagination
           paginationModel={paginationModel}
           onPaginationModelChange={setPaginationModel}
-          getRowId={(row) => row.id}
-          initialState={{
-            sorting: { sortModel: [{ field: 'marketplaceOrderDate', sort: 'desc' }] }
-          }}
-          sortingOrder={['desc','asc']}
-          sx={{
-            backgroundColor: 'white',
-            borderRadius: 2,
-            boxShadow: 1,
-            '& .MuiDataGrid-columnHeaders': { position: 'sticky', top: 0, background: '#f7f7fa', zIndex: 1 },
-            '& .MuiDataGrid-row:nth-of-type(even)': { background: '#fafbfc' },
-            '& .MuiDataGrid-row:hover': { background: '#f5faff' },
-            fontSize: 15,
-          }}
+          paginationMode="client"
+          loading={isLoading}
+          getRowId={(row: LabelRow) => row.itemId || row.orderId}
+          initialState={{ sorting: { sortModel: [{ field: 'orderDate', sort: 'desc' }] } }}
+          sortingMode="client"
+          sx={{ backgroundColor: 'white', borderRadius: 2, boxShadow: 1, border: 'none', '& .MuiDataGrid-columnHeaders': { position: 'sticky', top: 0, background: '#f7f7fa', zIndex: 1 }, '& .MuiDataGrid-row:nth-of-type(even)': { background: '#fafbfc' }, '& .MuiDataGrid-row:hover': { background: '#f5faff' }, fontSize: '0.875rem', height: '100%' }}
+          density="compact"
         />
-      )}
-      {/* --- Mobile: Accordion Cards --- */}
-      {isMobile && groupedOrders.map(({ order, items }) => (
-        <Accordion key={order.orderId} sx={{ mb: 2, borderRadius: 2, boxShadow: 1 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography fontWeight={600}>#{order.orderNumber}</Typography>
-                <Typography>{order.customerName}</Typography>
-                {getOrderStatusChip(order.status)}
-                {getLabelStatusChip(order.labelCreated, order.status)}
-              </Box>
-              <Button size="small" variant="outlined" onClick={e => { e.stopPropagation(); openDrawer(order); }}>Detay</Button>
+      </Box>
+
+      {drawerOrder && (
+        <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer} PaperProps={{ sx: { width: {xs: '90%', sm: 450, md: 500}, p: {xs: 1, sm: 2} } }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={1} p={1} sx={{borderBottom: '1px solid', borderColor: 'divider'}}>
+              <Typography variant="h6">Sipariş Detayları</Typography>
+              <IconButton onClick={closeDrawer} size="small"><CloseIcon /></IconButton>
             </Box>
-          </AccordionSummary>
-          <AccordionDetails sx={{ p: 0 }}>
-            {items.map(row => (
-              <Paper key={row.id} sx={{ mb: 2, p: 2 }}>
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                  <Typography fontWeight={600}>{row.commodityDesc}</Typography>
-                  <Button variant="contained" size="small" color="primary"
-                    disabled={generatingLabelId === row.id || !hasFedexCredentials || checkingFedexCredentials}
-                    onClick={() => handleGenerateLabel({ ...row, ...itemEdits[row.id] })}>
-                    {generatingLabelId === row.id ? <CircularProgress size={16} color="inherit" /> : 'Etiket Oluştur'}
-                  </Button>
-                </Box>
-                <Box mt={1}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                    <Select size="small" value={itemEdits[row.id]?.serviceType || row.serviceType}
-                      onChange={e => handleEditField(row.id, 'serviceType', e.target.value)}>
-                      {FEDEX_SERVICE_TYPES.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-                    </Select>
-                    <Select size="small" value={itemEdits[row.id]?.packagingType || row.packagingType}
-                      onChange={e => handleEditField(row.id, 'packagingType', e.target.value)}>
-                      {FEDEX_PACKAGING_TYPES.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-                    </Select>
-                    {['weight', 'customsValue', 'hsCode', 'countryOfOrigin', 'currency'].map(field => (
-                      <Box key={field} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {editField[row.id] === field ? (
-                          <Fade in={true}><Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <TextField
-                              size="small"
-                              type={field === 'weight' || field === 'customsValue' ? 'number' : 'text'}
-                              value={itemEdits[row.id]?.[field] || row[field] || ''}
-                              onChange={e => handleEditField(row.id, field, e.target.value)}
-                              onBlur={() => handleEditEnd(row.id)}
-                              autoFocus
-                              sx={{ width: 80 }}
-                            />
-                            <IconButton size="small" onClick={() => handleEditEnd(row.id)}><CheckIcon fontSize="small" /></IconButton>
-                          </Box></Fade>
-                        ) : (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography>{itemEdits[row.id]?.[field] || row[field]}</Typography>
-                            <IconButton size="small" onClick={() => handleEditStart(row.id, field)}><EditIcon fontSize="small" /></IconButton>
-                          </Box>
-                        )}
-                      </Box>
-                    ))}
-                  </Box>
-                  <Typography variant="body2" mt={1}>Takip No: {row.trackingNumber || '—'}</Typography>
-                  <Typography variant="body2" mt={1}>
-                    {row.shippingLabelUrl ? <Button component="a" href={row.shippingLabelUrl} target="_blank" rel="noopener noreferrer" size="small" variant="outlined">PDF</Button> : '—'}
-                  </Typography>
-                </Box>
-              </Paper>
-            ))}
-          </AccordionDetails>
-        </Accordion>
-      ))}
-      {/* --- Drawer for expanded order details --- */}
-      <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer} PaperProps={{ sx: { width: 400 } }}>
-        <Box sx={{ p: 3 }}>
-          <Box display="flex" alignItems="center" justifyContent="space-between">
-            <Typography variant="h6">Sipariş Detayları</Typography>
-            <IconButton onClick={closeDrawer}><CloseIcon /></IconButton>
-          </Box>
-          {drawerOrder && (
-            <Box mt={2}>
-              {/* Error Summary */}
-              {drawerErrors.length > 0 && (
+            <Box sx={{ overflowY: 'auto', p: {xs: 1, sm: 2}, flexGrow: 1 }}>
+              {drawerErrors.length > 0 && drawerErrors[0] !== 'no-row' && (
                 <Alert severity="error" sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>Validation Issues:</Typography>
-                  <List dense>
+                  <Typography variant="subtitle2" gutterBottom>Düzeltilmesi Gerekenler:</Typography>
+                  <List dense sx={{pl:1}}>
                     {drawerErrors.map((error, index) => (
-                      <ListItem key={index}>
-                        <ListItemIcon>
-                          <ErrorIcon color="error" fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary={error}
-                          primaryTypographyProps={{ 
-                            variant: 'body2',
-                            sx: { 
-                              color: error.includes('Warning') ? 'warning.main' : 'error.main',
-                              fontWeight: error.includes('Warning') ? 'normal' : 'medium'
-                            }
-                          }}
-                        />
+                      <ListItem key={index} sx={{py:0}}>
+                        <ListItemIcon sx={{minWidth: 20}}><ErrorIcon color="error" fontSize="inherit" /></ListItemIcon>
+                        <ListItemText primary={error} primaryTypographyProps={{ variant: 'caption', color: 'error.main' }}/>
                       </ListItem>
                     ))}
                   </List>
                 </Alert>
               )}
+              <Typography variant="overline" display="block" gutterBottom>
+                Sipariş No: {drawerOrder.orderNumber} (Ürün SKU: {drawerOrder.sku || 'N/A'})
+              </Typography>
+              <Accordion defaultExpanded>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography variant="subtitle2">Alıcı Bilgileri</Typography></AccordionSummary>
+                <AccordionDetails sx={{p:1}}>
+                  <TextField fullWidth margin="dense" size="small" label="Ad" name="recipientFirstName" value={drawerOrder.recipientFirstName || ''} error={drawerErrors.some(e => e.toLowerCase().includes('first name'))} helperText={drawerErrors.some(e => e.toLowerCase().includes('first name')) ? 'Gerekli' : ''} disabled={addressSource === 'shippo' && readOnlyAddress} onChange={(e) => { const { name, value } = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }} />
+                  <TextField fullWidth margin="dense" size="small" label="Soyad" name="recipientLastName" value={drawerOrder.recipientLastName || ''} error={drawerErrors.some(e => e.toLowerCase().includes('last name'))} helperText={drawerErrors.some(e => e.toLowerCase().includes('last name')) ? 'Gerekli değil ama önerilir' : ''} disabled={addressSource === 'shippo' && readOnlyAddress} onChange={(e) => { const { name, value } = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }} />
+                  <TextField fullWidth margin="dense" size="small" label="Telefon" name="recipientPhone" value={drawerOrder.recipientPhone || ''} disabled={addressSource === 'shippo' && readOnlyAddress} onChange={(e) => { const {name, value} = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }} />
+                  <TextField fullWidth margin="dense" size="small" label="Adres Satırı 1" name="recipientStreet1" value={drawerOrder.recipientStreet1 || ''} error={drawerErrors.some(e => e.toLowerCase().includes('street address'))} helperText={drawerErrors.some(e => e.toLowerCase().includes('street address')) ? 'Gerekli' : ''} disabled={addressSource === 'shippo' && readOnlyAddress} onChange={(e) => { const { name, value } = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }} />
+                  <TextField fullWidth margin="dense" size="small" label="Adres Satırı 2" name="recipientStreet2" value={drawerOrder.recipientStreet2 || ''} disabled={addressSource === 'shippo' && readOnlyAddress} onChange={(e) => { const {name, value} = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }} />
+                  <TextField fullWidth margin="dense" size="small" label="Şehir" name="recipientCity" value={drawerOrder.recipientCity || ''} error={drawerErrors.some(e => e.toLowerCase().includes('city'))} helperText={drawerErrors.some(e => e.toLowerCase().includes('city')) ? 'Gerekli' : ''} disabled={addressSource === 'shippo' && readOnlyAddress} onChange={(e) => { const { name, value } = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }} />
+                  <TextField fullWidth margin="dense" size="small" label="Eyalet/Bölge" name="recipientState" value={drawerOrder.recipientState || ''} disabled={addressSource === 'shippo' && readOnlyAddress} onChange={(e) => { const {name, value} = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }} />
+                  <TextField fullWidth margin="dense" size="small" label="Posta Kodu" name="recipientPostal" value={drawerOrder.recipientPostal || ''} error={drawerErrors.some(e => e.toLowerCase().includes('postal code'))} helperText={drawerErrors.some(e => e.toLowerCase().includes('postal code')) ? 'Gerekli' : ''} disabled={addressSource === 'shippo' && readOnlyAddress} onChange={(e) => { const { name, value } = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }} />
+                  <TextField fullWidth margin="dense" size="small" label="Ülke" name="recipientCountry" value={drawerOrder.recipientCountry || ''} error={drawerErrors.some(e => e.toLowerCase().includes('country'))} helperText={drawerErrors.some(e => e.toLowerCase().includes('country')) ? 'Gerekli' : ''} disabled={addressSource === 'shippo' && readOnlyAddress} onChange={(e) => { const { name, value } = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }} />
+                  {addressSource === 'shippo' && <Button size="small" onClick={() => setReadOnlyAddress(!readOnlyAddress)} sx={{mt:1}}>{readOnlyAddress ? 'Adresi Düzenle' : 'Değişiklikleri Kilitle'}</Button>}
+                </AccordionDetails>
+              </Accordion>
 
-              {/* Order Details */}
-              <Typography fontWeight={600}>Order: #{drawerOrder.orderNumber}</Typography>
-              <Typography>Müşteri: {drawerOrder.customerName}</Typography>
-              <Typography>Marketplace: {drawerOrder.marketplace}</Typography>
-              <Typography>Durum: {drawerOrder.status}</Typography>
-              <Typography>Toplam: {drawerOrder.customsValue} {drawerOrder.currency}</Typography>
+              <TextField
+                label="Toplam (Order Total)"
+                fullWidth
+                margin="dense"
+                size="small" 
+                value={drawerOrder.orderTotalPrice?.toFixed(2) + (drawerOrder.currency ? ' ' + drawerOrder.currency : '') || '0.00'}
+                InputProps={{ readOnly: true }}
+                InputLabelProps={{ shrink: true }}
+              />
 
-              {/* Address Fields with Source Indicator and Edit Toggle */}
-              <Box mt={3}>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Typography variant="subtitle1" fontWeight={600}>Shipping Address</Typography>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    {addressSource === 'shippo' && (
-                      <>
-                        <Chip 
-                          size="small" 
-                          color="info" 
-                          label="Address from Shippo notes" 
-                          icon={<InfoIcon fontSize="small" />}
-                        />
-                        <Tooltip title={readOnlyAddress ? "Enable editing" : "Disable editing"}>
-                          <IconButton 
-                            size="small" 
-                            onClick={() => setReadOnlyAddress(!readOnlyAddress)}
-                            color={readOnlyAddress ? "default" : "primary"}
-                          >
-                            {readOnlyAddress ? <LockIcon fontSize="small" /> : <EditIcon fontSize="small" />}
-                          </IconButton>
-                        </Tooltip>
-                      </>
-                    )}
-                  </Box>
-                </Box>
-                <FormControl fullWidth margin="dense" error={drawerFieldErrors.recipientFirstName}>
-                  <TextField
-                    id="recipientFirstName"
-                    name="recipientFirstName"
-                    label="First Name"
-                    value={drawerOrder.recipientFirstName || ''}
-                    onChange={(e) => {
-                      setDrawerOrder(prev => ({ ...prev, recipientFirstName: e.target.value }));
-                      setDrawerFieldErrors(prev => ({ ...prev, recipientFirstName: false }));
-                    }}
-                    error={drawerFieldErrors.recipientFirstName}
-                    helperText={drawerFieldErrors.recipientFirstName ? 'Required' : ''}
-                    disabled={addressSource === 'shippo' && readOnlyAddress}
-                    sx={addressSource === 'shippo' && readOnlyAddress ? { 
-                      '& .MuiInputBase-input': { color: 'text.disabled' },
-                      '& .MuiOutlinedInput-root': { backgroundColor: 'action.hover' }
-                    } : {}}
-                  />
-                </FormControl>
-                <FormControl fullWidth margin="dense" error={drawerFieldErrors.recipientLastName}>
-                  <TextField
-                    id="recipientLastName"
-                    name="recipientLastName"
-                    label="Last Name"
-                    value={drawerOrder.recipientLastName || ''}
-                    onChange={(e) => {
-                      setDrawerOrder(prev => ({ ...prev, recipientLastName: e.target.value }));
-                      setDrawerFieldErrors(prev => ({ ...prev, recipientLastName: false }));
-                    }}
-                    error={drawerFieldErrors.recipientLastName}
-                    helperText={drawerFieldErrors.recipientLastName ? 'Required' : ''}
-                    disabled={addressSource === 'shippo' && readOnlyAddress}
-                    sx={addressSource === 'shippo' && readOnlyAddress ? { 
-                      '& .MuiInputBase-input': { color: 'text.disabled' },
-                      '& .MuiOutlinedInput-root': { backgroundColor: 'action.hover' }
-                    } : {}}
-                  />
-                </FormControl>
-                <FormControl fullWidth margin="dense" error={drawerFieldErrors.recipientPhone}>
-                  <TextField
-                    id="recipientPhone"
-                    name="recipientPhone"
-                    label="Phone"
-                    value={drawerOrder.recipientPhone || ''}
-                    onChange={(e) => {
-                      setDrawerOrder(prev => ({ ...prev, recipientPhone: e.target.value }));
-                      setDrawerFieldErrors(prev => ({ ...prev, recipientPhone: false }));
-                    }}
-                    error={drawerFieldErrors.recipientPhone}
-                    helperText={drawerFieldErrors.recipientPhone ? 'Required' : ''}
-                    disabled={addressSource === 'shippo' && readOnlyAddress}
-                    sx={addressSource === 'shippo' && readOnlyAddress ? { 
-                      '& .MuiInputBase-input': { color: 'text.disabled' },
-                      '& .MuiOutlinedInput-root': { backgroundColor: 'action.hover' }
-                    } : {}}
-                  />
-                </FormControl>
-                <FormControl fullWidth margin="dense" error={drawerFieldErrors.recipientStreet1}>
-                  <TextField
-                    id="recipientStreet1"
-                    name="recipientStreet1"
-                    label="Street Address"
-                    value={drawerOrder.recipientStreet1 || ''}
-                    onChange={(e) => {
-                      setDrawerOrder(prev => ({ ...prev, recipientStreet1: e.target.value }));
-                      setDrawerFieldErrors(prev => ({ ...prev, recipientStreet1: false }));
-                    }}
-                    error={drawerFieldErrors.recipientStreet1}
-                    helperText={drawerFieldErrors.recipientStreet1 ? 'Required' : ''}
-                    disabled={addressSource === 'shippo' && readOnlyAddress}
-                    sx={addressSource === 'shippo' && readOnlyAddress ? { 
-                      '& .MuiInputBase-input': { color: 'text.disabled' },
-                      '& .MuiOutlinedInput-root': { backgroundColor: 'action.hover' }
-                    } : {}}
-                  />
-                </FormControl>
-                <FormControl fullWidth margin="dense" error={drawerFieldErrors.recipientCity}>
-                  <TextField
-                    id="recipientCity"
-                    name="recipientCity"
-                    label="City"
-                    value={drawerOrder.recipientCity || ''}
-                    onChange={(e) => {
-                      setDrawerOrder(prev => ({ ...prev, recipientCity: e.target.value }));
-                      setDrawerFieldErrors(prev => ({ ...prev, recipientCity: false }));
-                    }}
-                    error={drawerFieldErrors.recipientCity}
-                    helperText={drawerFieldErrors.recipientCity ? 'Required' : ''}
-                    disabled={addressSource === 'shippo' && readOnlyAddress}
-                    sx={addressSource === 'shippo' && readOnlyAddress ? { 
-                      '& .MuiInputBase-input': { color: 'text.disabled' },
-                      '& .MuiOutlinedInput-root': { backgroundColor: 'action.hover' }
-                    } : {}}
-                  />
-                </FormControl>
-                <FormControl fullWidth margin="dense" error={drawerFieldErrors.recipientState}>
-                  <TextField
-                    id="recipientState"
-                    name="recipientState"
-                    label="State"
-                    value={drawerOrder.recipientState || ''}
-                    onChange={(e) => {
-                      setDrawerOrder(prev => ({ ...prev, recipientState: e.target.value }));
-                      setDrawerFieldErrors(prev => ({ ...prev, recipientState: false }));
-                    }}
-                    error={drawerFieldErrors.recipientState}
-                    helperText={drawerFieldErrors.recipientState ? 'Required' : ''}
-                    disabled={addressSource === 'shippo' && readOnlyAddress}
-                    sx={addressSource === 'shippo' && readOnlyAddress ? { 
-                      '& .MuiInputBase-input': { color: 'text.disabled' },
-                      '& .MuiOutlinedInput-root': { backgroundColor: 'action.hover' }
-                    } : {}}
-                  />
-                </FormControl>
-                <FormControl fullWidth margin="dense" error={drawerFieldErrors.recipientPostal}>
-                  <TextField
-                    id="recipientPostal"
-                    name="recipientPostal"
-                    label="Postal Code"
-                    value={drawerOrder.recipientPostal || ''}
-                    onChange={(e) => {
-                      setDrawerOrder(prev => ({ ...prev, recipientPostal: e.target.value }));
-                      setDrawerFieldErrors(prev => ({ ...prev, recipientPostal: false }));
-                    }}
-                    error={drawerFieldErrors.recipientPostal}
-                    helperText={drawerFieldErrors.recipientPostal ? 'Required' : ''}
-                    disabled={addressSource === 'shippo' && readOnlyAddress}
-                    sx={addressSource === 'shippo' && readOnlyAddress ? { 
-                      '& .MuiInputBase-input': { color: 'text.disabled' },
-                      '& .MuiOutlinedInput-root': { backgroundColor: 'action.hover' }
-                    } : {}}
-                  />
-                </FormControl>
-                <FormControl fullWidth margin="dense" error={drawerFieldErrors.recipientCountry}>
-                  <TextField
-                    id="recipientCountry"
-                    name="recipientCountry"
-                    label="Country"
-                    value={drawerOrder.recipientCountry || ''}
-                    onChange={(e) => {
-                      setDrawerOrder(prev => ({ ...prev, recipientCountry: e.target.value }));
-                      setDrawerFieldErrors(prev => ({ ...prev, recipientCountry: false }));
-                    }}
-                    error={drawerFieldErrors.recipientCountry}
-                    helperText={drawerFieldErrors.recipientCountry ? 'Required' : ''}
-                    disabled={addressSource === 'shippo' && readOnlyAddress}
-                    sx={addressSource === 'shippo' && readOnlyAddress ? { 
-                      '& .MuiInputBase-input': { color: 'text.disabled' },
-                      '& .MuiOutlinedInput-root': { backgroundColor: 'action.hover' }
-                    } : {}}
-                  />
-                </FormControl>
-              </Box>
-
-              {/* Line Items */}
-              <Box mt={3}>
-                <Typography variant="subtitle1" fontWeight={600}>Line Items</Typography>
-                {(drawerOrder.line_items || []).map((item: NormalizedLineItem, index) => (
-                  <Paper key={index} sx={{ p: 2, mt: 1 }}>
-                    <Typography variant="subtitle2">Item {index + 1}</Typography>
-                    <TextField
-                      fullWidth
-                      margin="dense"
-                      label="Title"
-                      value={item.title || ''}
+              <Accordion defaultExpanded>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography variant="subtitle2">Ürün ve Kargo Detayları</Typography></AccordionSummary>
+                <AccordionDetails sx={{p:1}}>
+                  <TextField label="Ürün Adı (Beyan için)" fullWidth margin="dense" size="small" name="title" value={drawerOrder.title || ''} 
                       onChange={(e) => {
-                        const updatedItems = [...(drawerOrder.line_items || [])] as NormalizedLineItem[];
-                        updatedItems[index] = { ...item, title: e.target.value };
-                        setDrawerOrder(prev => ({ ...prev, line_items: updatedItems }));
-                        setDrawerFieldErrors(prev => ({ ...prev, [`line_items.${index}.title`]: !e.target.value }));
-                      }}
-                      error={!item.title}
-                      helperText={!item.title ? 'Required' : ''}
-                    />
-                    <TextField
-                      fullWidth
-                      margin="dense"
-                      label="Value"
-                      type="number"
-                      value={item.value || ''}
-                      onChange={(e) => {
-                        const updatedItems = [...(drawerOrder.line_items || [])] as NormalizedLineItem[];
-                        updatedItems[index] = { ...item, value: parseFloat(e.target.value) };
-                        setDrawerOrder(prev => ({ ...prev, line_items: updatedItems }));
-                        setDrawerFieldErrors(prev => ({ ...prev, [`line_items.${index}.value`]: !e.target.value || parseFloat(e.target.value) <= 0 }));
-                      }}
-                      error={!item.value || item.value <= 0}
-                      helperText={(!item.value || item.value <= 0) ? 'Required and must be greater than 0' : ''}
-                    />
-                    <TextField
-                      fullWidth
-                      margin="dense"
-                      label="Quantity"
-                      type="number"
-                      value={item.quantity || ''}
-                      onChange={(e) => {
-                        const updatedItems = [...(drawerOrder.line_items || [])] as NormalizedLineItem[];
-                        updatedItems[index] = { ...item, quantity: parseInt(e.target.value) };
-                        setDrawerOrder(prev => ({ ...prev, line_items: updatedItems }));
-                        setDrawerFieldErrors(prev => ({ ...prev, [`line_items.${index}.quantity`]: !e.target.value || parseInt(e.target.value) <= 0 }));
-                      }}
-                      error={!item.quantity || item.quantity <= 0}
-                      helperText={(!item.quantity || item.quantity <= 0) ? 'Required and must be greater than 0' : ''}
-                    />
-                  </Paper>
-                ))}
-                {(!drawerOrder.line_items || drawerOrder.line_items.length === 0) && (
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    onClick={() => {
-                      const newItem: NormalizedLineItem = {
-                        id: `new-${Date.now()}`,
-                        title: '',
-                        value: 0,
-                        quantity: 1,
-                        sku: '',
-                        weight: 0
-                      };
-                      setDrawerOrder(prev => ({
-                        ...prev,
-                        line_items: [...(prev.line_items || []), newItem]
-                      }));
-                    }}
-                    sx={{ mt: 1 }}
+                      const {name, value} = e.target; 
+                      setDrawerOrder(prev => prev ? { 
+                        ...prev, 
+                        title: value, // Update title on LabelRow
+                        originalOrder: prev.originalOrder ? {...prev.originalOrder, commodityDesc: value } : undefined // Also update originalOrder.commodityDesc if exists
+                      } : null);
+                    }} 
+                    InputLabelProps={{ shrink: true }}
+                    error={drawerErrors.some(e => e.toLowerCase().includes('title'))} 
+                    helperText={drawerErrors.some(e => e.toLowerCase().includes('title')) ? 'Gerekli' : ''}
+                  />
+                  <TextField label="Ağırlık (kg)" type="number" fullWidth margin="dense" size="small" name="weight" value={drawerOrder.weight || 0} error={drawerErrors.some(e => e.toLowerCase().includes('weight'))} helperText={drawerErrors.some(e => e.toLowerCase().includes('weight')) ? 'Gerekli' : ''} onChange={(e) => { const value = parseFloat(e.target.value) || 0; setDrawerOrder(prev => prev ? { ...prev, weight: value } : null);}} InputLabelProps={{ shrink: true }}/>
+                  <TextField label="HS Kodu" fullWidth margin="dense" size="small" name="hsCode" value={drawerOrder.hsCode || ''} 
+                    error={drawerErrors.some(e => e.toLowerCase().includes('hs code'))} 
+                    helperText={drawerErrors.some(e => e.toLowerCase().includes('hs code')) ? 'Gerekli değil ama önerilir' : ''} 
+                    onChange={(e) => { const { name, value } = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }}
+                  />
+                  <TextField label="Menşei Ülke (Örn: TR)" fullWidth margin="dense" size="small" name="countryOfOrigin" value={drawerOrder.countryOfOrigin || ''} onChange={(e) => { const {name, value} = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value } : null);}} InputLabelProps={{ shrink: true }}/>
+                  <FormControl fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.toLowerCase().includes('service type'))}>
+                    <InputLabel>Servis Tipi</InputLabel>
+                    <Select name="fedexServiceType" 
+                      value={drawerOrder.fedexServiceType || ''} 
+                      defaultValue={drawerOrder.fedexServiceType || 'FEDEX_INTERNATIONAL_PRIORITY'}
+                      label="Servis Tipi" 
+                      onChange={(e) => { const {name, value} = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value as string } : null);}} 
                   >
-                    Add Line Item
-                  </Button>
-                )}
-              </Box>
-
-              {/* Label Options */}
-              <Box mt={3}>
-                <Typography variant="subtitle1" fontWeight={600}>Label Options</Typography>
-                <FormControl fullWidth margin="dense">
-                  <InputLabel>Service Type</InputLabel>
+                    {FEDEX_SERVICE_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
+                  </Select>
+                  {drawerErrors.some(e => e.toLowerCase().includes('service type')) && <Typography variant="caption" color="error" sx={{pl:2}}>Gerekli</Typography>}
+                </FormControl>
+                  <FormControl fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.toLowerCase().includes('packaging type'))}>
+                    <InputLabel>Paket Tipi</InputLabel>
+                    <Select name="fedexPackagingType" 
+                      value={drawerOrder.fedexPackagingType || ''} 
+                      defaultValue={drawerOrder.fedexPackagingType || 'FEDEX_PAK'}
+                      label="Paket Tipi" 
+                      onChange={(e) => { const {name, value} = e.target; setDrawerOrder(prev => prev ? { ...prev, [name]: value as string } : null);}}
+                  >
+                    {FEDEX_PACKAGING_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
+                  </Select>
+                  {drawerErrors.some(e => e.toLowerCase().includes('packaging type')) && <Typography variant="caption" color="error" sx={{pl:2}}>Gerekli</Typography>}
+                </FormControl>
+                {/* Label Stock Type Dropdown */}
+                <FormControl fullWidth margin="dense" size="small">
+                  <InputLabel>Etiket Boyutu</InputLabel>
                   <Select
-                    value={drawerOrder.serviceType || 'INTERNATIONAL_PRIORITY'}
-                    label="Service Type"
-                    onChange={(e) => setDrawerOrder(prev => ({ ...prev, serviceType: e.target.value }))}
+                    name="labelStockType"
+                    value={drawerOrder.labelStockType || 'PAPER_4X6'}
+                    label="Etiket Boyutu"
+                    onChange={e => {
+                      const { name, value } = e.target;
+                      setDrawerOrder(prev => prev ? { ...prev, [name]: value as string } : null);
+                    }}
                   >
-                    {FEDEX_SERVICE_TYPES.map(opt => (
+                    {ALLOWED_LABEL_STOCK_TYPES.map(opt => (
                       <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
-                <FormControl fullWidth margin="dense">
-                  <InputLabel>Packaging Type</InputLabel>
-                  <Select
-                    value={drawerOrder.packagingType || 'FEDEX_PAK'}
-                    label="Packaging Type"
-                    onChange={(e) => setDrawerOrder(prev => ({ ...prev, packagingType: e.target.value }))}
-                  >
-                    {FEDEX_PACKAGING_TYPES.map(opt => (
-                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <TextField
-                  fullWidth
-                  margin="dense"
-                  label="Weight (kg)"
-                  type="number"
-                  value={drawerOrder.weight || 0.5}
-                  onChange={(e) => setDrawerOrder(prev => ({ ...prev, weight: parseFloat(e.target.value) }))}
-                />
-                <TextField
-                  fullWidth
-                  margin="dense"
-                  label="HS Code"
-                  value={drawerOrder.hsCode || '620449506'}
-                  onChange={(e) => setDrawerOrder(prev => ({ ...prev, hsCode: e.target.value }))}
-                />
-                <TextField
-                  fullWidth
-                  margin="dense"
-                  label="Country of Origin"
-                  value={drawerOrder.countryOfOrigin || 'TR'}
-                  onChange={(e) => setDrawerOrder(prev => ({ ...prev, countryOfOrigin: e.target.value }))}
-                />
-              </Box>
+                </AccordionDetails>
+              </Accordion>
 
-              {/* Action Buttons */}
-              <Box mt={3} display="flex" gap={2}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  color="primary"
-                  onClick={() => handleGenerateLabel(drawerOrder)}
-                  disabled={drawerErrors.length > 0 || generatingLabelId === drawerOrder.id}
+              <Box sx={{ p: {xs:1, sm:2}, borderTop: '1px solid', borderColor: 'divider', mt: 'auto' }}> {/* Sticky footer for actions */}
+                <Button fullWidth variant="contained" color="primary" 
+                  onClick={() => drawerOrder && handleGenerateLabel(drawerOrder)} 
+                  disabled={drawerErrors.length > 0 || generatingLabelId === drawerOrder?.itemId || checkingFedexCredentials || !hasFedexCredentials}
                 >
-                  {generatingLabelId === drawerOrder.id ? (
-                    <CircularProgress size={24} color="inherit" />
-                  ) : (
-                    'Generate Label'
-                  )}
+                  {generatingLabelId === drawerOrder?.itemId ? <CircularProgress size={24} color="inherit" /> : (checkingFedexCredentials ? 'Ayarlar Kontrol Ediliyor...': (!hasFedexCredentials ? 'FedEx Ayarları Eksik' : 'ETİKET OLUŞTUR'))}
                 </Button>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={closeDrawer}
-                >
-                  Cancel
-                </Button>
+                <Button fullWidth variant="text" onClick={closeDrawer} sx={{mt:1}}>İptal</Button>
               </Box>
             </Box>
-          )}
-        </Box>
-      </Drawer>
-      {/* --- Loading/Error/Empty States --- */}
-      {isLoading && <Box textAlign="center" py={4}><CircularProgress /></Box>}
-      {isError && <Alert severity="error">Siparişler yüklenemedi.</Alert>}
-      {!isLoading && !isError && filteredItems.length === 0 && <Alert severity="info">Gösterilecek sipariş yok.</Alert>}
+          </Box>
+        </Drawer>
+      )}
 
-      {/* --- Raw Data Modal --- */}
-      <Dialog open={rawOrderDataModalOpen} onClose={() => setRawOrderDataModalOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>
-          Ham Sipariş Verisi
-          <IconButton onClick={() => setRawOrderDataModalOpen(false)} sx={{ position: 'absolute', right: 8, top: 8 }}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          {currentRawData ? (
-            <pre style={{ maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '0.8rem', margin: 0 }}>
-              {JSON.stringify(currentRawData, null, 2)}
-            </pre>
-          ) : (
-            <Typography>Veri bulunamadı.</Typography>
-          )}
-        </DialogContent>
-        <Box sx={{ p:2, display:'flex', justifyContent:'flex-end' }}>
-             <Button onClick={() => setRawOrderDataModalOpen(false)} variant="outlined">Kapat</Button>
-        </Box>
-      </Dialog>
-    </Box>
+{/* UPS Drawer mount (outside all Grids, Drawers, Accordions, etc.) */}
+{selectedOrderForUPS && (
+  <UPSLabelDrawer
+    open={upsDrawerOpen}
+    onClose={() => setUpsDrawerOpen(false)}
+    order={selectedOrderForUPS}
+    onSaved={mutate}
+  />
+)}
+</Box>
   );
 }
 
-export default function LabelsPageWithLayout(props) {
+export default function LabelsPageWithLayout(props: any): JSX.Element {
   return (
     <AppLayout title="Etiket Yönetimi">
       <LabelsPage {...props} />

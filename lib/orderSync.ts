@@ -1,13 +1,16 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { logger } from './logger';
-import { startSync, updateSyncProgress, completeSync, SyncType } from './sync-status';
+import { startSync, updateSyncProgress, completeSync } from './sync-status';
+import { SyncType } from './types';
 import fetch from 'node-fetch';
 import { UIOrder, OrderSource, OrderChannel, NormalizedAddress, NormalizedLineItem } from './types';
-import { fetchVeeqoOrders } from './integrations/veeqo';
+import { getIntegrationCreds } from './config';
+import { fetchAllVeeqoOrders, fetchVeeqoOrders, processOrdersInBatches } from './integrations/veeqo';
 import { fetchShippoOrders } from './integrations/shippo';
-import type { VeeqoOrder } from './integrations/veeqo';
+import type { VeeqoOrder } from './types';
 
-const prisma = new PrismaClient();
+const TRANSACTION_TIMEOUT = 10000; // 10 second timeout for transactions
 
 interface SyncResult {
   success: boolean;
@@ -29,6 +32,7 @@ interface VeeqoSellable {
   name?: string;
   title?: string;
   sku?: string;
+  full_title?: string;
 }
 
 interface VeeqoProduct {
@@ -42,19 +46,51 @@ interface VeeqoProduct {
 
 interface VeeqoLineItem {
   id: string;
-  quantity: number;
-  price_per_unit: number;
-  total_price: number;
-  title: string;
-  notes: string | null;
-  image_url: string | null;
-  line_item_id?: string;
   product_title?: string;
-  sku?: string;
-  sellable: VeeqoSellable;
-  product?: VeeqoProduct;
+  variation_sku?: string;
+  price?: number;
+  quantity: number;
+  notes?: string;
+  product_image?: string | {
+    small_thumbnail_url?: string;
+    medium_thumbnail_url?: string;
+    large_thumbnail_url?: string;
+    original_url?: string;
+  };
+  variation_title?: string;
+  image_url?: string;
+  sellable?: {
+    id?: string;
+    image_url?: string;
+    main_thumbnail_url?: string;
+    small_thumbnail_url?: string;
+    medium_thumbnail_url?: string;
+    large_thumbnail_url?: string;
+    original_url?: string;
+    images?: Array<{ url: string }>;
+    full_title?: string;
+  };
+  product?: {
+    id?: string;
+    image_url?: string;
+    main_thumbnail_url?: string;
+    small_thumbnail_url?: string;
+    medium_thumbnail_url?: string;
+    large_thumbnail_url?: string;
+    original_url?: string;
+    images?: Array<{ url: string }>;
+  };
+  title?: string;
   name?: string;
   additional_options?: string;
+  line_item_id?: string;
+  weight?: number;
+  harmonized_code?: string;
+  country_of_manufacture?: string;
+  product_id?: string;
+  variant_options_string?: string;
+  sku?: string;
+  full_title?: string;
 }
 
 // Add Shippo types
@@ -186,7 +222,8 @@ function extractAddress(order: any): NormalizedAddress | undefined {
           toAddress = normalizeVeeqoAddress(parsed.to_address);
         }
       } catch (e) {
-        console.warn('Failed to parse order.notes:', order.notes);
+        // Removed verbose order.notes parse log as requested
+// console.warn('Failed to parse order.notes:', order.notes);
       }
     }
     
@@ -198,32 +235,126 @@ function extractAddress(order: any): NormalizedAddress | undefined {
 
   // Log if address is still undefined
   if (!toAddress) {
-    console.warn('Failed to extract address:', {
-      source: order.source,
-      marketplace: order.marketplace,
-      notes: order.notes,
-      rawData: order.rawData
-    });
-    }
+  }
 
   return toAddress;
 }
 
-function normalizeVeeqoLineItems(order: any): NormalizedLineItem[] {
-  return (order.line_items || []).map((item: any) => ({
-    id: String(item.id),
-    title: item.product_title || '',
-    value: item.price || 0,
-    quantity: item.quantity || 1,
-    weight: item.weight,
-    hs_code: item.harmonized_code,
-    country_of_origin: item.country_of_manufacture,
-    sku: item.variation_sku,
-    image: item.product_image,
-    variantInfo: item.variation_title
-  }));
+// Create a Veeqo client
+function createVeeqoClient(apiKey: string) {
+  return {
+    get: async (path: string) => {
+      const url = `https://api.veeqo.com${path}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'x-api-key': apiKey,
+        },
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Veeqo API ${res.status}: ${await res.text()}`);
+      }
+      
+      return res.json();
     }
+  };
+}
 
+async function resolveVeeqoImageUrl(item: VeeqoLineItem, veeqoClient: any): Promise<string> {
+  // Try all possible image sources in order of preference
+  const imageSources = [
+    item.image_url,
+    typeof item.product_image === 'string' ? item.product_image : undefined,
+    item.sellable?.image_url,
+    item.sellable?.images?.[0]?.url,
+    item.sellable?.main_thumbnail_url,
+    item.sellable?.original_url,
+    item.sellable?.large_thumbnail_url,
+    item.sellable?.medium_thumbnail_url,
+    item.sellable?.small_thumbnail_url,
+    item.product?.image_url,
+    item.product?.images?.[0]?.url,
+    item.product?.main_thumbnail_url,
+    item.product?.original_url,
+    item.product?.large_thumbnail_url,
+    item.product?.medium_thumbnail_url,
+    item.product?.small_thumbnail_url,
+    typeof item.product_image === 'object' ? item.product_image.original_url : undefined,
+    typeof item.product_image === 'object' ? item.product_image.large_thumbnail_url : undefined,
+    typeof item.product_image === 'object' ? item.product_image.medium_thumbnail_url : undefined,
+    typeof item.product_image === 'object' ? item.product_image.small_thumbnail_url : undefined
+  ];
+
+  // Find first non-empty image URL
+  let imageUrl = imageSources.find(url => url && typeof url === 'string') || '';
+
+  // If no image found and we have a product_id, try to fetch the product
+  if (!imageUrl && item?.product_id) {
+    try {
+      const product = await veeqoClient.get(`/products/${item.product_id}`);
+      imageUrl = product?.images?.[0]?.url || 
+                product?.image_url || 
+                product?.main_thumbnail_url || 
+                product?.original_url ||
+                product?.large_thumbnail_url ||
+                product?.medium_thumbnail_url ||
+                product?.small_thumbnail_url || 
+                '';
+    } catch (error) {
+      // Removed verbose product image fetch log as requested
+// console.warn(`Failed to fetch product image for product_id ${item.product_id}:`, error);
+    }
+  }
+
+  // If still no image and we have a sellable_id, try to fetch the sellable
+  if (!imageUrl && item?.sellable?.id) {
+    try {
+      const sellable = await veeqoClient.get(`/sellables/${item.sellable.id}`);
+      imageUrl = sellable?.images?.[0]?.url || 
+                sellable?.image_url || 
+                sellable?.main_thumbnail_url || 
+                sellable?.original_url ||
+                sellable?.large_thumbnail_url ||
+                sellable?.medium_thumbnail_url ||
+                sellable?.small_thumbnail_url || 
+                '';
+    } catch (error) {
+      // Removed verbose sellable image fetch log as requested
+// console.warn(`Failed to fetch sellable image for sellable_id ${item.sellable.id}:`, error);
+    }
+  }
+  
+  return imageUrl;
+}
+
+function normalizeVeeqoLineItems(order: any): NormalizedLineItem[] {
+  return (order.line_items || []).map((item: VeeqoLineItem) => {
+    const title = item.product_title || item.title || item.name || '';
+    const image = item.product_image || item.image_url || '';
+    const variantInfo = item.variation_title || item.variant_options_string || item.additional_options || '';
+
+    return {
+      id: item.id || item.line_item_id || '',
+      title,
+      value: item.price || 0,
+      quantity: item.quantity || 1,
+      weight: item.weight || 0.5,
+      hs_code: item.harmonized_code || '',
+      country_of_origin: item.country_of_manufacture || '',
+      sku: item.variation_sku || item.sku || '',
+      image,
+      variantInfo,
+      sellable: {
+        full_title:
+          item.sellable?.full_title ||
+          item.full_title ||
+          title
+      }
+    };
+  });
+}
 function normalizeShippoLineItems(order: any): NormalizedLineItem[] {
   return (order.line_items || []).map((item: any) => ({
     id: item.object_id || String(Math.random()),
@@ -235,11 +366,14 @@ function normalizeShippoLineItems(order: any): NormalizedLineItem[] {
     country_of_origin: item.country_of_origin,
     sku: item.sku,
     image: item.product_image,
-    variantInfo: item.product_variant
+    variantInfo: item.product_variant,
+    sellable: {
+      full_title: item.full_title || undefined
+    }
   }));
 }
 
-function validateAndMapOrder(order: VeeqoOrder) {
+async function validateAndMapOrder(order: VeeqoOrder, veeqoClient: any): Promise<UIOrder> {
   // Get address from any available source
   const addr = order.deliver_to || order.shipping_address || order.billing_address;
   
@@ -273,107 +407,54 @@ function validateAndMapOrder(order: VeeqoOrder) {
     order.country ?? 
     ''
   ).trim() || '—';
+  // No filtering for missing fields here; UI will handle it.
 
-  // Validate critical address fields
-  if (!recipientStreet1 || !recipientCity || !recipientCountry) {
-    logger.warn('Missing shipping address', { 
-      orderId: order.id,
-      hasAddress: !!addr,
-      hasStreet: !!recipientStreet1,
-      hasCity: !!recipientCity,
-      hasCountry: !!recipientCountry,
-      addressFields: {
-        street: recipientStreet1,
-        city: recipientCity,
-        country: recipientCountry
-      }
-    });
-    return null;
-  }
 
-  // Map order items
-  const items = (order.line_items || []).map((item, liIdx) => {
-    const sell = item.image_url 
-      ? { image_url: item.image_url } 
-      : item.sellable || item.product || { product_title: '', sku_code: '' } as VeeqoSellable;
-    
-    const imgUrl = sell.image_url || (sell.images?.[0]?.url) || '';
-    const variantInfo = item.title 
-      || sell.name 
-      || sell.title 
-      || item.name 
-      || sell.sku 
-      || '';
-    
-    const lineOpt = typeof item.additional_options === 'string' ? item.additional_options : '';
-    const notes = [lineOpt, order.notes].filter(Boolean).join(' | ');
-    
-    const oid = order.id || order.number || order.order_number;
-    const lid = item.id || item.line_item_id || `li_${liIdx}`;
-    const uniqueLineKey = `${oid}-${lid}`;
-    
-    const productName = item.product_title || item.title || item.name || '—';
-    
-    if (!productName) {
-      logger.warn('[ORDER VALIDATION] Missing product name', {
-        orderId: order.id,
-        itemId: item.id
-      });
-      return null;
-    }
-
+  // Map line items with image URLs
+  const lineItems = await Promise.all((order.line_items || []).map(async (item: VeeqoLineItem) => {
+    const imageUrl = await resolveVeeqoImageUrl(item, veeqoClient);
     return {
-      remoteLineId: String(item.id),
-      image: imgUrl,
-      sku: item.sku || item.sellable?.sku_code || '',
-      productName,
-      unitPrice: item.price_per_unit ?? 0,
-      totalPrice: item.total_price ?? 0,
-      variantInfo,
-      notes,
-      quantity: item.quantity ?? 1,
-      shipBy: order.ship_by_date ? new Date(order.ship_by_date).toISOString().split('T')[0] : null,
-      marketplaceKey: String(order.id),
-      orderNumber: order.order_number || order.number || '',
-      uniqueLineKey,
+      id: String(item.id),
+      title: item.product_title || '',
+      value: item.price || 0,
+      quantity: item.quantity || 1,
+      weight: item.weight || 0.5,
+      hs_code: item.harmonized_code,
+      country_of_origin: item.country_of_manufacture,
+      sku: item.variation_sku || '',
+      image: imageUrl,
+      variantInfo: item.variation_title
     };
-  }).filter(Boolean);
+  }));
 
-  if (!items.length) {
-    logger.warn('[ORDER VALIDATION] No valid items in order', { orderId: order.id });
-    return null;
-  }
+  const address = {
+    name: `${recipientFirstName} ${recipientLastName}`.trim(),
+    phone: '',
+    street1: recipientStreet1,
+    street2: '',
+    city: recipientCity,
+    state: '',
+    postal: '',
+    country: recipientCountry,
+    isResidential: false
+  };
 
-  // Extract marketplace order date
-  const marketplaceOrderDate = order.created_at || order.order_date || order.ordered_at;
-
-  // Map order data
   return {
-    order: {
-      marketplace: order.channel?.name?.toLowerCase() || 'Veeqo',
-      marketplaceKey: String(order.id),
-      orderNumber: String(order.order_number || order.number || ''),
-      customerName: [recipientFirstName, recipientLastName].filter(Boolean).join(' ') || order.customer?.full_name || '—',
-      status: order.status || '',
-      totalPrice: order.total_price,
-      currency: order.currency_code,
-      shipByDate: order.ship_by_date ? new Date(order.ship_by_date).toISOString().split('T')[0] : null,
-      marketplaceCreatedAt: marketplaceOrderDate ? new Date(marketplaceOrderDate) : null,
-      notes: Array.isArray(order.notes) ? order.notes.join(' | ') : (order.notes || ''),
-      shippingAddress: {
-        recipientFirstName,
-        recipientLastName,
-        recipientStreet1,
-        recipientStreet2: (addr?.address2 || '').trim(),
-        recipientCity,
-        recipientState: (addr?.state || '').trim(),
-        recipientCountry,
-        recipientPostal: (addr?.zip || '').trim(),
-        recipientPhone: (addr?.phone || '').trim(),
-      },
-      rawData: order
-    },
-    items
+    id: String(order.id),
+    source: 'veeqo' as OrderSource,
+    channel: determineChannel(order),
+    marketplace: order.channel?.name || 'Veeqo',
+    marketplaceKey: String(order.id),
+    orderNumber: order.number || String(order.id),
+    customerName: `${recipientFirstName} ${recipientLastName}`.trim(),
+    status: order.status || 'pending',
+    currency: order.currency_code || 'USD',
+    totalPrice: order.total_price || 0,
+    to_address: address,
+    line_items: lineItems,
+    marketplaceOrderDate: order.created_at || order.order_date || order.ordered_at,
+    rawData: order,
+    commodityDesc: lineItems.length > 0 ? lineItems[0].title || '' : ''
   };
 }
 
@@ -395,238 +476,658 @@ function splitName(fullName: string) {
   };
 }
 
+// Compute uiOrderDate using same logic as frontend
+function getUiOrderDate(order: any): string {
+  let safeRaw = order.rawData;
+  if (typeof safeRaw === 'string') {
+    try { safeRaw = JSON.parse(safeRaw); } catch { safeRaw = {}; }
+  }
+  return (
+    safeRaw?.created_at ||
+    safeRaw?.to_address?.object_created ||
+    safeRaw?.placed_at ||
+    safeRaw?.to_address?.object_updated ||
+    order.created_at ||
+    order.order_date ||
+    order.ordered_at ||
+    order.marketplaceOrderDate ||
+    order.syncTimestamp ||
+    new Date(0).toISOString()
+  );
+}
+
 // Update syncAllOrders to handle Veeqo order mapping correctly
 export async function syncAllOrders(userId: string, options: {
+  syncType?: 'fast' | 'full' | 'recent';
   veeqoApiKey?: string;
   shippoToken?: string;
   startDate?: Date;
   endDate?: Date;
   source?: OrderSource;
   channel?: OrderChannel;
-} = {}): Promise<any> {
-  const { veeqoApiKey, shippoToken, startDate, endDate, source, channel } = options;
-
-  // Fetch orders from all sources in parallel
-  const fetchPromises: Promise<UIOrder[]>[] = [];
-
-  // Fetch Veeqo orders if source is not specified or is 'veeqo'
-  if ((!source || source === 'veeqo') && veeqoApiKey) {
-    fetchPromises.push(
-      fetchVeeqoOrders({ apiKey: veeqoApiKey })
-        .then(orders => orders.map(order => {
-          const normalized = validateAndMapOrder(order);
-          if (!normalized) return null;
-          
-          const address = {
-            name: `${normalized.order.shippingAddress.recipientFirstName} ${normalized.order.shippingAddress.recipientLastName}`.trim(),
-            phone: normalized.order.shippingAddress.recipientPhone || '',
-            street1: normalized.order.shippingAddress.recipientStreet1,
-            street2: normalized.order.shippingAddress.recipientStreet2 || '',
-            city: normalized.order.shippingAddress.recipientCity,
-            state: normalized.order.shippingAddress.recipientState || '',
-            postal: normalized.order.shippingAddress.recipientPostal || '',
-            country: normalized.order.shippingAddress.recipientCountry,
-            isResidential: false
-          };
-          
-          const mappedOrder: UIOrder = {
-            id: String(order.id),
-            source: 'veeqo' as OrderSource,
-            channel: determineChannel(order),
-            marketplace: normalized.order.marketplace,
-            marketplaceKey: String(order.id),
-            orderNumber: normalized.order.orderNumber,
-            customerName: normalized.order.customerName,
-            status: normalized.order.status,
-            currency: normalized.order.currency,
-            totalPrice: normalized.order.totalPrice,
-            to_address: address,
-            line_items: normalized.items.map(item => ({
-              id: item.remoteLineId,
-              title: item.productName,
-              value: item.totalPrice,
-              quantity: item.quantity,
-              weight: 0.5, // Default weight if not provided
-              sku: item.sku,
-            })),
-            marketplaceOrderDate: normalized.order.marketplaceCreatedAt?.toISOString(),
-            rawData: order
-          };
-          
-          return mappedOrder;
-        }).filter((order): order is UIOrder => order !== null))
-    );
+} = {}): Promise<{
+  newOrders: number;
+  updatedOrders: number;
+  skippedOrders: number;
+  failedOrders: number;
+  errors: { orderId: string; error: string }[];
+}> {
+  // Always fetch from DB if not provided
+  if (!options.veeqoApiKey || !options.shippoToken) {
+    const creds = await getIntegrationCreds(userId);
+    if (!options.veeqoApiKey) options.veeqoApiKey = creds.veeqoApiKey ?? undefined;
+    if (!options.shippoToken) options.shippoToken = creds.shippoToken ?? undefined;
   }
-  
-  // Fetch Shippo orders if source is not specified or is 'shippo'
-  if ((!source || source === 'shippo') && shippoToken) {
-    const etdDefaults = await getEtdDefaults(userId);
-    fetchPromises.push(
-      fetchShippoOrders(shippoToken).then(orders => orders.map(order => {
-        const addr = order.to_address || order.shipping_address || {};
-        const nameParts = splitName(addr.name || '');
-        // Build full shipping address JSON
-        const shippingAddress = {
-          recipientFirstName: nameParts.first,
-          recipientLastName: nameParts.last,
-          recipientStreet1: addr.street1 || '',
-          recipientStreet2: addr.street2 || '',
-          recipientCity: addr.city || '',
-          recipientState: addr.state || '',
-          recipientPostal: addr.zip || '',
-          recipientCountry: addr.country || '',
-          recipientPhone: addr.phone || '',
-          name: addr.name || '',
-          phone: addr.phone || '',
-          street1: addr.street1 || '',
-          street2: addr.street2 || '',
-          city: addr.city || '',
-          state: addr.state || '',
-          postal: addr.zip || '',
-          country: addr.country || '',
-          isResidential: false
-        };
-        // Map line items with ETD fields
-        const lineItems = (order.line_items || []).map(item => ({
-          id: item.object_id,
-          title: item.title || 'Unknown Product',
-          value: parseFloat(item.total_price) || 0,
-          quantity: item.quantity || 1,
-          weight: parseFloat(item.weight) || etdDefaults.weightKg,
-          sku: item.sku || '',
-          hs_code: etdDefaults.harmonizedCode,
-          country_of_origin: etdDefaults.countryOfMfg,
-        }));
-        return {
-          id: order.object_id,
-          source: 'shippo',
-          channel: 'etsy',
-          marketplace: 'Etsy',
-          marketplaceKey: order.object_id,
-          orderNumber: order.order_number || order.object_id,
-          customerName: addr.name || 'Unknown Customer',
-          status: order.order_status,
-          currency: order.currency,
-          totalPrice: parseFloat(order.total_price) || 0,
-          to_address: shippingAddress,
-          line_items: lineItems,
-          marketplaceOrderDate: order.placed_at,
-          rawData: order,
-          weightKg: etdDefaults.weightKg,
-          harmonizedCode: etdDefaults.harmonizedCode,
-          countryOfMfg: etdDefaults.countryOfMfg,
-          commodityDesc: lineItems[0]?.title || '',
-          termsOfSale: 'DDP',
-          sendCommercialInvoiceViaEtd: true
-        };
-      }))
-    );
-  }
-  
-  // Wait for all fetches to complete
-  const results = await Promise.all(fetchPromises);
-  
-  // Flatten and deduplicate orders
-  const allOrders = results.flat();
-  const uniqueOrders = new Map<string, UIOrder>();
-  
-  allOrders.forEach(order => {
-    const key = `${order.source}-${order.marketplaceKey}`;
-    if (!uniqueOrders.has(key)) {
-      uniqueOrders.set(key, order);
-              }
+  let syncId: string | undefined;
+  let processed = 0;
+  let successful = 0;
+  let failed = 0;
+  let errors: Array<{ orderId: string; error: string }> = [];
+
+  try {
+    const { veeqoApiKey, shippoToken, startDate, endDate, source, channel } = options;
+    syncId = await startSync(userId, 'full');
+    
+    // Fetch orders from all sources in parallel
+    const fetchPromises: Promise<UIOrder[]>[] = [];
+
+    if ((typeof source === 'undefined' || source === 'veeqo') && veeqoApiKey) {
+      if (options.syncType === 'fast') {
+        logger.info(`[FastSync] Triggering Veeqo fetch (first page only). Options:`, { userId, source, veeqoApiKey: !!veeqoApiKey });
+        const veeqoClient = createVeeqoClient(veeqoApiKey);
+        fetchPromises.push(
+          (async () => {
+            const orders = await fetchVeeqoOrders({ apiKey: veeqoApiKey, page: 1, perPage: 100 });
+            logger.info(`[FastSync] Veeqo fetch returned ${orders.length} orders.`, { userId });
+            const processedOrders = await Promise.all(orders.map(async order => {
+              return await validateAndMapOrder(order, veeqoClient);
+            }));
+            logger.info(`[FastSync] Veeqo processedOrders after mapping: ${processedOrders.length}`);
+            return processedOrders.filter((order): order is UIOrder => order !== null);
+          })()
+        );
+      } else {
+        logger.info(`[FullSync] Triggering Veeqo fetch with API key present. Options:`, { userId, source, veeqoApiKey: !!veeqoApiKey });
+        const veeqoClient = createVeeqoClient(veeqoApiKey);
+        fetchPromises.push(
+          (async () => {
+            const orders = await fetchAllVeeqoOrders({ apiKey: veeqoApiKey });
+            logger.info(`[FullSync] Veeqo fetch returned ${orders.length} orders.`, { userId });
+            const processedOrders = await Promise.all(orders.map(async order => {
+              return await validateAndMapOrder(order, veeqoClient);
+            }));
+            logger.info(`[FullSync] Veeqo processedOrders after mapping: ${processedOrders.length}`);
+            return processedOrders.filter((order): order is UIOrder => order !== null);
+          })()
+        );
+      }
+    } else if ((typeof source === 'undefined' || source === 'shippo') && shippoToken) {
+      if (options.syncType === 'fast') {
+        logger.info(`[FastSync] Triggering Shippo fetch (first page only). Options:`, { userId, source, shippoToken: !!shippoToken });
+        const etdDefaults = await getEtdDefaults(userId);
+        fetchPromises.push(
+          fetchShippoOrders(shippoToken, { page: '1', results: '100' }).then(orders => {
+            logger.info(`[FastSync] Shippo fetch returned ${orders.length} orders.`, { userId });
+            return orders.map(order => {
+              const addr = order.to_address || order.shipping_address || {};
+              const nameParts = splitName(addr.name || '');
+              // Build full shipping address JSON
+              const shippingAddress = {
+                recipientFirstName: nameParts.first,
+                recipientLastName: nameParts.last,
+                recipientStreet1: addr.street1 || '',
+                recipientStreet2: addr.street2 || '',
+                recipientCity: addr.city || '',
+                recipientState: addr.state || '',
+                recipientPostal: addr.zip || '',
+                recipientCountry: addr.country || '',
+                recipientPhone: addr.phone || '',
+                name: addr.name || '',
+                phone: addr.phone || '',
+                street1: addr.street1 || '',
+                street2: addr.street2 || '',
+                city: addr.city || '',
+                state: addr.state || '',
+                postal: addr.zip || '',
+                country: addr.country || '',
+                isResidential: false
+              };
+              // Map line items with ETD fields
+              const lineItems = (order.line_items || []).map(item => ({
+                id: item.object_id,
+                title: item.title || 'Unknown Product',
+                value: parseFloat(item.total_price) || 0,
+                quantity: item.quantity || 1,
+                weight: parseFloat(item.weight) || etdDefaults.weightKg,
+                sku: item.sku || '',
+                hs_code: etdDefaults.harmonizedCode,
+                country_of_origin: etdDefaults.countryOfMfg,
+              }));
+              // Ensure all UIOrder fields are present
+              return {
+                id: order.object_id,
+                source: 'shippo',
+                channel: 'etsy',
+                marketplace: order.shop_app || 'Etsy',
+                marketplaceKey: order.object_id,
+                orderNumber: order.order_number || order.object_id,
+                customerName: addr.name || 'Unknown Customer',
+                status: order.order_status,
+                externalStatus: order.order_status, // Shippo order status
+                currency: order.currency || 'USD',
+                totalPrice: parseFloat(order.total_price) || 0,
+                to_address: shippingAddress,
+                line_items: lineItems,
+                marketplaceOrderDate: order.placed_at,
+                rawData: order
+              };
             });
+          })
+        );
+      } else {
+        logger.info(`[FullSync] Triggering Shippo fetch with token present. Options:`, { userId, source, shippoToken: !!shippoToken });
+        const etdDefaults = await getEtdDefaults(userId);
+        fetchPromises.push(
+          fetchShippoOrders(shippoToken).then(orders => {
+            logger.info(`[FullSync] Shippo fetch returned ${orders.length} orders.`, { userId });
+            return orders.map(order => {
+              const addr = order.to_address || order.shipping_address || {};
+              const nameParts = splitName(addr.name || '');
+              // Build full shipping address JSON
+              const shippingAddress = {
+                recipientFirstName: nameParts.first,
+                recipientLastName: nameParts.last,
+                recipientStreet1: addr.street1 || '',
+                recipientStreet2: addr.street2 || '',
+                recipientCity: addr.city || '',
+                recipientState: addr.state || '',
+                recipientPostal: addr.zip || '',
+                recipientCountry: addr.country || '',
+                recipientPhone: addr.phone || '',
+                name: addr.name || '',
+                phone: addr.phone || '',
+                street1: addr.street1 || '',
+                street2: addr.street2 || '',
+                city: addr.city || '',
+                state: addr.state || '',
+                postal: addr.zip || '',
+                country: addr.country || '',
+                isResidential: false
+              };
+              // Map line items with ETD fields
+              const lineItems = (order.line_items || []).map(item => ({
+                id: item.object_id,
+                title: item.title || 'Unknown Product',
+                value: parseFloat(item.total_price) || 0,
+                quantity: item.quantity || 1,
+                weight: parseFloat(item.weight) || etdDefaults.weightKg,
+                sku: item.sku || '',
+                hs_code: etdDefaults.harmonizedCode,
+                country_of_origin: etdDefaults.countryOfMfg,
+              }));
+              // Ensure all UIOrder fields are present
+              return {
+                id: order.object_id,
+                source: 'shippo',
+                channel: 'etsy',
+                marketplace: order.shop_app || 'Etsy',
+                marketplaceKey: order.object_id,
+                orderNumber: order.order_number || order.object_id,
+                customerName: addr.name || 'Unknown Customer',
+                status: order.order_status,
+                externalStatus: order.order_status, // Shippo order status
+                currency: order.currency || 'USD',
+                totalPrice: parseFloat(order.total_price) || 0,
+                to_address: shippingAddress,
+                line_items: lineItems,
+                marketplaceOrderDate: order.placed_at,
+                rawData: order
+              };
+            });
+          })
+        );
+      }
+    }
 
-  // Apply filters
-  let filteredOrders = Array.from(uniqueOrders.values());
-  
-  if (startDate) {
-    filteredOrders = filteredOrders.filter(order => 
-      new Date(order.marketplaceOrderDate || '') >= startDate
-    );
-  }
-  
-  if (endDate) {
-    filteredOrders = filteredOrders.filter(order => 
-      new Date(order.marketplaceOrderDate || '') <= endDate
-    );
-  }
-  
-  if (channel) {
-    filteredOrders = filteredOrders.filter(order => order.channel === channel);
+    // Wait for all fetch promises to resolve
+    const allOrders = await Promise.all(fetchPromises);
+    logger.info(`[FullSync] All sources fetched. Arrays: ${allOrders.map(arr => arr.length).join(', ')}`);
+
+    // Build a map of Veeqo orderNumber to due_date (shipBy)
+    const veeqoShipByMap = new Map<string, string>();
+    for (const orders of allOrders) {
+      for (const order of orders) {
+        if (order.source === 'veeqo' && order.rawData && order.orderNumber && order.rawData.due_date) {
+          veeqoShipByMap.set(order.orderNumber, order.rawData.due_date);
         }
+      }
+    }
 
-  // Store orders in database using Promise.allSettled
-  const upsertResults = await Promise.allSettled(filteredOrders.map(async (order) => {
-    try {
-      const { id, to_address, line_items, ...orderData } = order;
-      const dbOrder = {
-        id: order.id,
+    // Flatten the array of arrays into a single array of orders
+    const uniqueOrders = new Map<string, UIOrder>();
+    // Build a map of Veeqo image and shipBy by orderNumber (first available line item only)
+    const veeqoOrderDataMap = new Map<string, { image?: string; shipBy?: string }>();
+    for (const orders of allOrders) {
+      for (const order of orders) {
+        if (order.source === 'veeqo' && order.orderNumber && order.line_items.length > 0) {
+          const firstItem = order.line_items[0];
+          veeqoOrderDataMap.set(order.orderNumber, {
+            image: firstItem.image,
+            shipBy: firstItem.shipBy
+          });
+        }
+      }
+    }
+    for (const orders of allOrders) {
+      for (const order of orders) {
+        // For Shippo orders, inject shipBy and image from Veeqo if available
+        if (order.source === 'shippo' && order.orderNumber) {
+          const veeqoData = veeqoOrderDataMap.get(order.orderNumber);
+          if (veeqoData) {
+            order.line_items = order.line_items.map(item => ({
+              ...item,
+              shipBy: item.shipBy || veeqoData.shipBy,
+              image: item.image || veeqoData.image
+            }));
+          }
+        }
+        const key = `${order.source}_${order.marketplaceKey}`;
+        if (!uniqueOrders.has(key)) {
+          uniqueOrders.set(key, order);
+        }
+      }
+    }
+    logger.info(`[FullSync] Unique orders after deduplication: ${uniqueOrders.size}`);
+
+    // Apply filters
+    let filteredOrders = Array.from(uniqueOrders.values());
+    logger.info(`[FullSync] Orders before filters: ${filteredOrders.length}`);
+    
+    if (startDate) {
+      filteredOrders = filteredOrders.filter(order => 
+        new Date(order.marketplaceOrderDate || '') >= startDate
+      );
+      logger.info(`[FullSync] Orders after startDate filter: ${filteredOrders.length}`);
+    }
+    
+    if (endDate) {
+      filteredOrders = filteredOrders.filter(order => 
+        new Date(order.marketplaceOrderDate || '') <= endDate
+      );
+      logger.info(`[FullSync] Orders after endDate filter: ${filteredOrders.length}`);
+    }
+    
+    if (channel) {
+      filteredOrders = filteredOrders.filter(order => order.channel === channel);
+      logger.info(`[FullSync] Orders after channel filter: ${filteredOrders.length}`);
+    }
+    if (filteredOrders.length === 0) {
+      logger.info(`[FullSync] No orders to process after filtering.`, { userId });
+    }
+
+    // Bulk prefetch all relevant existing orders
+    const existingOrders = await prisma.order.findMany({
+      where: {
+        userId,
+        marketplace: { in: filteredOrders.map(o => o.marketplace) },
+        marketplaceKey: { in: filteredOrders.map(o => o.marketplaceKey) },
+      },
+    });
+    const existingOrderMap = new Map(existingOrders.map(o => [o.marketplaceKey, o]));
+
+    // Filter to only orders that are new or changed
+    const ordersToProcess: UIOrder[] = [];
+    const skippedOrderIds: string[] = [];
+    const skippedOrderMarketplaceKeys: string[] = [];
+
+    // Helper: Retry async function with exponential backoff
+    async function retry<T>(fn: () => Promise<T>, retries = 3, baseDelay = 300): Promise<T> {
+      let attempt = 0;
+      while (true) {
+        try {
+          return await fn();
+        } catch (err: any) {
+          attempt++;
+          // Only retry for Prisma transaction timeout (P2028)
+          if (attempt > retries || err?.code !== 'P2028') throw err;
+          const delay = baseDelay * Math.pow(2, attempt - 1);
+          logger.warn(`[Order Sync] Transaction failed with P2028. Retrying attempt ${attempt}/${retries} after ${delay}ms...`, { error: err.message });
+        }
+      }
+    }
+
+    for (const order of filteredOrders) {
+      // For Veeqo orders, ensure commodityDesc is mapped from first line item title
+      if (order.source === 'veeqo' && (!order.commodityDesc || order.commodityDesc === '')) {
+        if (order.line_items && order.line_items.length > 0) {
+          order.commodityDesc = order.line_items[0].title || '';
+        }
+      }
+      const existing = existingOrderMap.get(order.marketplaceKey) as UIOrder | undefined;
+      const prismaOrderData: { [key: string]: any } = {
         userId,
         marketplace: order.marketplace,
         marketplaceKey: order.marketplaceKey,
         orderNumber: order.orderNumber,
-        customerName: order.customerName || '',
-        status: order.status || '',
-        currency: order.currency || '',
-        totalPrice: order.totalPrice || 0,
-        shippingAddress: to_address ? JSON.stringify(to_address) : null,
+        customerName: order.customerName,
+        status: order.status,
+        externalStatus: order.externalStatus,
+        currency: order.currency,
+        totalPrice: order.totalPrice,
+        shippingAddress: order.to_address ? JSON.stringify(order.to_address) : null,
         rawData: order.rawData ? JSON.stringify(order.rawData) : null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      // Validate critical fields
-      if (!order.orderNumber || !order.marketplaceKey) {
-        logger.warn('Order missing critical unique fields', { orderId: order.id, orderNumber: order.orderNumber, marketplaceKey: order.marketplaceKey });
-      }
-      if (!to_address?.postal) {
-        logger.warn('Order missing recipientPostal', { orderId: order.id, orderNumber: order.orderNumber });
-      }
-      // Upsert order
-      const savedOrder = await prisma.order.upsert({
-        where: {
-          userId_marketplace_marketplaceKey: {
-            userId,
-            marketplace: order.marketplace,
-            marketplaceKey: order.marketplaceKey
-          }
-        },
-        create: dbOrder,
-        update: {
-          ...dbOrder,
-          id: undefined // Remove id from update
+        createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
+        updatedAt: new Date(),
+        uiOrderDate: getUiOrderDate(order),
+        commodityDesc: order.commodityDesc || '',
+      };  
+      if (!existing) {
+        ordersToProcess.push(order);
+      } else {
+        const hasChanged = (
+          ((existing?.externalStatus ?? undefined) !== (prismaOrderData.externalStatus ?? undefined)) ||
+          (existing?.totalPrice !== prismaOrderData.totalPrice) ||
+          (existing?.customerName !== prismaOrderData.customerName) ||
+          ((existing?.shippingAddress ?? '') !== (prismaOrderData.shippingAddress ?? ''))
+        );
+        const missingStatus = ((existing?.externalStatus ?? null) === null && prismaOrderData.externalStatus);
+
+        const missingUiOrderDate = !(existing?.uiOrderDate);
+        if (hasChanged || missingStatus || missingUiOrderDate) {
+          ordersToProcess.push(order);
+        } else {
+          if (existing) {
+          skippedOrderIds.push(existing.id);
+          skippedOrderMarketplaceKeys.push(existing.marketplaceKey);
         }
-      });
-      // Handle line items
-      if (line_items?.length > 0) {
-        await prisma.orderItem.deleteMany({ where: { orderId: savedOrder.id } });
-        await prisma.orderItem.createMany({
-          data: line_items.map(item => ({
-            orderId: savedOrder.id,
-            productName: item.title,
-            quantity: item.quantity,
-            unitPrice: item.value / (item.quantity || 1),
-            totalPrice: item.value,
-            weightKg: item.weight,
-            harmonizedCode: item.hs_code,
-            countryOfMfg: item.country_of_origin,
-            sku: item.sku,
-            remoteLineId: item.id,
-            marketplaceKey: order.marketplaceKey,
-            orderNumber: order.orderNumber
-          }))
-        });
+        }
       }
-      return { orderId: savedOrder.id, marketplaceKey: order.marketplaceKey, status: 'success' };
-    } catch (error: any) {
-      logger.error('Failed to store order', error, { orderId: order.id, marketplaceKey: order.marketplaceKey });
-      return { orderId: order.id, marketplaceKey: order.marketplaceKey, status: 'failed', errorMsg: error.message };
     }
-  }));
-  // Summarize results
-  const newOrders = upsertResults.filter(r => r.status === 'fulfilled' && (r as PromiseFulfilledResult<any>).value?.status === 'success').length;
-  const failedOrders = upsertResults.filter(r => r.status === 'fulfilled' && (r as PromiseFulfilledResult<any>).value?.status === 'failed').length;
-  const errors = upsertResults.filter(r => r.status === 'fulfilled' && (r as PromiseFulfilledResult<any>).value?.status === 'failed').map(r => (r as PromiseFulfilledResult<any>).value);
-  // Optionally update SyncOperation metrics here
-  return { newOrders, failedOrders, errors };
-} 
+
+    // Batch summary logs for skipped orders and line items
+    if (skippedOrderIds.length > 0) {
+      logger.info(`[Order Sync] Skipped ${skippedOrderIds.length} unchanged orders. Sample IDs: ${skippedOrderIds.slice(0, 10).join(', ')}${skippedOrderIds.length > 10 ? ', ...' : ''}`);
+      logger.info(`[Order Sync] Skipped line items for ${skippedOrderIds.length} unchanged orders. Sample marketplaceKeys: ${skippedOrderMarketplaceKeys.slice(0, 10).join(', ')}${skippedOrderMarketplaceKeys.length > 10 ? ', ...' : ''}`);
+    }
+
+    // Process all new orders, and only update existing orders if status is cancelled/canceled or tracked fields have changed
+    const BATCH_SIZE = 5; // Reduced batch size
+    const batches: UIOrder[][] = [];
+    for (let i = 0; i < ordersToProcess.length; i += BATCH_SIZE) {
+      batches.push(ordersToProcess.slice(i, i + BATCH_SIZE));
+    }
+
+    // Summary counters
+    let ordersCreated = 0, ordersUpdated = 0, ordersSkipped = filteredOrders.length - ordersToProcess.length, itemsTotalUpserted = 0;
+
+    logger.info(`[Order Sync] Starting sync: ${ordersToProcess.length} orders to process in ${batches.length} batches (batch size ${BATCH_SIZE})`);
+
+    for (const batch of batches) {
+      // Process each order in the batch sequentially
+      for (const order of batch) {
+        let orderAction: 'created' | 'updated' | 'skipped' = 'skipped';
+        try {
+          const { line_items, ...orderData } = order;
+          // Prepare prismaOrderData for this order
+          const prismaOrderData = {
+            userId,
+            marketplace: orderData.marketplace,
+            marketplaceKey: orderData.marketplaceKey,
+            orderNumber: orderData.orderNumber,
+            customerName: orderData.customerName,
+            status: orderData.status,
+            externalStatus: orderData.externalStatus,
+            currency: orderData.currency,
+            totalPrice: orderData.totalPrice,
+            shippingAddress: orderData.to_address ?? undefined,
+            rawData: orderData.rawData ?? undefined,
+            createdAt: orderData.createdAt ? new Date(orderData.createdAt) : new Date(),
+            updatedAt: new Date(),
+            uiOrderDate: getUiOrderDate(order),
+          };
+
+          // Wrap the transaction in retry logic
+          const savedOrder = await retry(() => prisma.$transaction(async tx => {
+            const existingOrder = await tx.order.findFirst({
+              where: {
+                userId,
+                marketplace: prismaOrderData.marketplace,
+                marketplaceKey: prismaOrderData.marketplaceKey,
+              },
+            });
+
+            let savedOrder;
+            let orderAction: 'created' | 'updated' | 'skipped' = 'skipped';
+            if (existingOrder) {
+              // Only update if status is cancelled/canceled or tracked fields have changed
+              const status = (prismaOrderData.status || '').toLowerCase();
+              const isCancelled = status === 'cancelled' || status === 'canceled';
+              const hasChanged = (
+                ((existingOrder as any).externalStatus ?? undefined) !== (prismaOrderData.externalStatus ?? undefined) ||
+                existingOrder.totalPrice !== prismaOrderData.totalPrice ||
+                existingOrder.customerName !== prismaOrderData.customerName ||
+                (existingOrder.shippingAddress ?? '') !== (prismaOrderData.shippingAddress ?? '')
+              );
+              const missingStatus = ((existingOrder as any).externalStatus ?? null) === null && prismaOrderData.externalStatus;
+
+              const missingUiOrderDate = !(existingOrder as any).uiOrderDate;
+
+              const existingOrderItems = await tx.orderItem.findMany({
+                where: { orderId: existingOrder.id },
+                select: { remoteLineId: true, shipBy: true, image: true, variantInfo: true }
+              });
+              const missingShipBy = existingOrderItems.some(dbItem => {
+                const newItem = line_items.find(li => String(li.id) === String(dbItem.remoteLineId));
+                return dbItem.shipBy == null && newItem && newItem.shipBy;
+              });
+              // Check for missing image or variantInfo in any order item
+              const missingImage = existingOrderItems.some(dbItem => {
+                const newItem = line_items.find(li => String(li.id) === String(dbItem.remoteLineId));
+                return (dbItem.image == null || dbItem.image === '') && newItem && newItem.image && newItem.image !== '';
+              });
+              const missingVariantInfo = existingOrderItems.some(dbItem => {
+                const newItem = line_items.find(li => String(li.id) === String(dbItem.remoteLineId));
+                return (dbItem.variantInfo == null || dbItem.variantInfo === '') && newItem && newItem.variantInfo && newItem.variantInfo !== '';
+              });
+              // Check for missing commodityDesc in Order
+              const missingCommodityDesc = !(existingOrder as any).commodityDesc && (prismaOrderData as any).commodityDesc;
+
+              if (isCancelled || hasChanged || missingStatus || missingUiOrderDate || missingShipBy || missingImage || missingVariantInfo || missingCommodityDesc) {
+                savedOrder = await tx.order.update({
+                  where: { id: existingOrder.id },
+                  data: {
+                    ...prismaOrderData,
+                    status: "Synced",
+                    labelStatus: null,
+                    updatedAt: new Date()
+                  },
+                });
+                orderAction = 'updated';
+                logger.info(`[Order Sync] Updated order: ${savedOrder.id} (${savedOrder.marketplaceKey})`);
+              } else {
+                // No change, skip update
+                savedOrder = existingOrder;
+                orderAction = 'skipped';
+                logger.info(`[Order Sync] Skipped order (no changes): ${savedOrder.id} (${savedOrder.marketplaceKey})`);
+              }
+            } else {
+              savedOrder = await tx.order.create({
+                data: {
+                  ...prismaOrderData,
+                  status: "Synced",
+                  labelStatus: null,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                },
+              });
+              orderAction = 'created';
+              logger.info(`[Order Sync] Created new order: ${savedOrder.id} (${savedOrder.marketplaceKey})`);
+            }
+
+            // Only update/create shipment if order was created or updated
+            if (orderAction === 'created' || orderAction === 'updated') {
+              const existingShipment = await tx.shipment.findFirst({
+                where: { orderId: savedOrder.id }
+              });
+
+              if (existingShipment) {
+                await tx.shipment.update({
+                  where: { id: existingShipment.id },
+                  data: {
+                    status: "pending",
+                    updatedAt: new Date()
+                  }
+                });
+              } else {
+                await tx.shipment.create({
+                  data: {
+                    orderId: savedOrder.id,
+                    status: "pending",
+                    serviceType: "FEDEX_GROUND",
+                    carrier: "FEDEX",
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                  }
+                });
+              }
+            }
+
+            // Only upsert line items if order was created or updated
+            let itemsUpserted = 0;
+            if ((orderAction === 'created' || orderAction === 'updated') && line_items?.length > 0) {
+              for (const item of line_items) {
+                await tx.orderItem.upsert({
+                  where: {
+                    remoteLineId_orderId: {
+                      remoteLineId: String(item.id),
+                      orderId: savedOrder.id,
+                    }
+                  },
+                  create: {
+                    orderId: savedOrder.id,
+                    productName: String(item.title || ''),
+                    quantity: Number(item.quantity),
+                    unitPrice: Number(((item["total_price"] ?? (item["price"] * item["quantity"])) ?? 0) / (item.quantity || 1)),
+                    totalPrice: Number((item["total_price"] ?? (item["price"] * item["quantity"])) ?? 0),
+                    weightKg: Number(typeof item["weight"] === 'number' ? item["weight"] : 0.5),
+                    sku: String(item["sku"] || ''),
+                    remoteLineId: String(item.id),
+                    marketplaceKey: String(prismaOrderData.marketplaceKey),
+                    orderNumber: String(prismaOrderData.orderNumber),
+                    // For Shippo orders, if image is empty, try to fallback to Veeqo or resolveVeeqoImageUrl
+image: item.image || (order.source === 'shippo' && veeqoOrderDataMap?.get(order.orderNumber)?.image) || '',
+                    shipBy: item.shipBy ? new Date(item.shipBy) : undefined,
+                    variantInfo: item.variantInfo || item.variant_title || (item.product_variant ? item.product_variant.title : undefined) || '',
+                  },
+                  update: {
+                    productName: String(item.title || ''),
+                    quantity: Number(item.quantity),
+                    unitPrice: Number(((item["total_price"] ?? (item["price"] * item["quantity"])) ?? 0) / (item.quantity || 1)),
+                    totalPrice: Number((item["total_price"] ?? (item["price"] * item["quantity"])) ?? 0),
+                    weightKg: Number(typeof item["weight"] === 'number' ? item["weight"] : 0.5),
+                    sku: String(item["sku"] || ''),
+                    marketplaceKey: String(prismaOrderData.marketplaceKey),
+                    orderNumber: String(prismaOrderData.orderNumber),
+                    // For Shippo orders, if image is empty, try to fallback to Veeqo or resolveVeeqoImageUrl
+image: item.image || (order.source === 'shippo' && veeqoOrderDataMap?.get(order.orderNumber)?.image) || '',
+                    variantInfo: item.variantInfo || item.variant_title || (item.product_variant ? item.product_variant.title : undefined) || '',
+                    // If the existing OrderItem has no shipBy, but the new item does, update it
+                    ...(item.shipBy ? { shipBy: new Date(item.shipBy) } : {}),
+                  },
+                });
+                itemsUpserted++;
+              }
+              logger.info(`[Order Sync] Upserted ${itemsUpserted} item(s) for order ${savedOrder.id}`);
+            } else if (orderAction === 'skipped') {
+              logger.info(`[Order Sync] Skipped line items for order ${savedOrder.id} (order unchanged)`);
+            }
+
+          }, {
+            timeout: 30000 // Increased timeout to 30 seconds
+          }));
+          processed++;
+          if (orderAction === ('created' as typeof orderAction)) {
+            successful++;
+            ordersCreated++;
+          } else if (orderAction === ('updated' as typeof orderAction)) {
+            successful++;
+            ordersUpdated++;
+          } else {
+            // Only possible remaining value is 'skipped'
+            ordersSkipped++;
+          }
+        } catch (error: any) {
+          processed++;
+          failed++;
+          const errorMsg = error.message || 'Unknown error';
+          errors.push({ orderId: String(order.id), error: errorMsg });
+          logger.error('Failed to store order', error, { orderId: order.id, marketplaceKey: order.marketplaceKey, orderAction });
+        }
+
+        // Add a small delay between processing each order
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Update sync progress after each batch
+      await updateSyncProgress(syncId!, {
+        processedOrders: processed,
+        successfulOrders: successful,
+        failedOrders: failed,
+        totalOrders: filteredOrders.length,
+        errors,
+      });
+
+      // Add a delay between batches
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // Complete the sync
+    if (syncId) {
+      await completeSync(syncId, failed === 0, {
+        processedOrders: processed ?? 0,
+        successfulOrders: successful ?? 0,
+        failedOrders: failed ?? 0,
+        totalOrders: filteredOrders.length,
+        errors,
+      });
+    }
+
+    return {
+      newOrders: ordersCreated,
+      updatedOrders: ordersUpdated,
+      skippedOrders: ordersSkipped,
+      failedOrders: failed,
+      errors
+    };
+  } catch (error: any) {
+    logger.error('Sync failed', error instanceof Error ? error : new Error(String(error)));
+    if (syncId) {
+      await completeSync(syncId, false, {
+        processedOrders: typeof processed === 'number' ? processed : 0,
+        successfulOrders: typeof successful === 'number' ? successful : 0,
+        failedOrders: typeof failed === 'number' ? failed : 0,
+        totalOrders: 0,
+        errors: [...errors, { orderId: 'sync_process', error: error && typeof error.message === 'string' ? error.message : String(error) }],
+      });
+    }
+    throw error;
+  } finally {
+    // Clean up any resources if needed
+    if (syncId) {
+      try {
+        await completeSync(syncId, failed === 0, {
+          processedOrders: typeof processed === 'number' ? processed : 0,
+          successfulOrders: typeof successful === 'number' ? successful : 0,
+          failedOrders: typeof failed === 'number' ? failed : 0,
+          totalOrders: 0,
+          errors,
+        });
+      } catch (cleanupError) {
+        logger.error('Error during sync cleanup', cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
+      }
+    }
+  }
+}
+
+// Alias for API compatibility
+export { syncAllOrders as fullSyncAllOrders };

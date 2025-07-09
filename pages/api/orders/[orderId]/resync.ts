@@ -29,8 +29,8 @@ export default async function handler(
   const userId = user.id;
 
   try {
-    // Fetch UserIntegrationSettings
-    const userSettings = await prisma.userIntegrationSettings.findUnique({
+    // Fetch Credential
+    const userSettings = await prisma.credential.findUnique({
       where: { userId },
     });
     const veeqoApiKey = userSettings?.veeqoApiKey || GLOBAL_VEEQO_API_KEY;
@@ -40,7 +40,7 @@ export default async function handler(
     }
 
     // Perform resync for specific order using centralized logic
-    const result = await syncAllOrders(userId, veeqoApiKey);
+    const result = await syncAllOrders(userId, { veeqoApiKey });
     return res.status(200).json(result);
 
   } catch (error: any) {

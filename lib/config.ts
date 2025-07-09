@@ -4,7 +4,7 @@ import prisma from './prisma';
 /**
  * Configuration and integration credential management.
  *
- * For user-specific integrations (Veeqo, Shippo, FedEx, etc.), credentials are fetched strictly from the database (UserIntegrationSettings, ShipperProfile).
+ * For user-specific integrations (Veeqo, Shippo, FedEx, etc.), credentials are fetched strictly from the database (Credential, ShipperProfile).
  * There is NO fallback to process.env for user operations. If credentials are missing, an error is thrown or null is returned.
  * process.env is only used for system-wide, non-user-specific config.
  */
@@ -13,22 +13,19 @@ import prisma from './prisma';
 export const SYSTEM_API_KEY = process.env.SYSTEM_API_KEY;
 
 export async function getIntegrationCreds(userId: string) {
-  if (!userId) throw new Error('No userId provided to getIntegrationCreds');
-  // Fetch from UserIntegrationSettings
-  const integration = await prisma.userIntegrationSettings.findUnique({ where: { userId } });
-  // Fetch from ShipperProfile
-  const shipper = await prisma.shipperProfile.findUnique({ where: { userId } });
-  if (!integration && !shipper) {
-    throw new Error('No integration credentials found for user');
-  }
+  if (!userId) throw new Error('Missing userId');
+
+  // Fetch from Credential
+  const integration = await prisma.credential.findUnique({ where: { userId } });
+  if (!integration) throw new Error('No integration settings found');
+
   return {
-    veeqoApiKey: integration?.veeqoApiKey || null,
-    shippoToken: integration?.shippoToken || null,
-    fedexApiKey: integration?.fedexApiKey || null,
-    fedexApiSecret: integration?.fedexApiSecret || null,
-    fedexAccountNumber: integration?.fedexAccountNumber || null,
-    // Add any other user-specific fields as needed
-    ...shipper
+    veeqoApiKey: integration.veeqoApiKey,
+    shippoToken: integration.shippoToken,
+    fedexApiKey: integration.fedexApiKey,
+    fedexApiSecret: integration.fedexApiSecret,
+    fedexAccountNumber: integration.fedexAccountNumber,
+    fedexMeterNumber: integration.fedexMeterNumber,
   };
 }
 

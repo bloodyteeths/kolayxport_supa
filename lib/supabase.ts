@@ -1,19 +1,19 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createBrowserClient, createServerClient } from '@supabase/ssr';
 
 // Support both NEXT_PUBLIC_ prefixed and unprefixed env vars
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
 
-console.log('[DEBUG] Supabase URL:', URL);
-console.log('[DEBUG] Supabase ANON KEY:', ANON);
-
 // Client-side accessible keys check is disabled to allow build without env variables.
+if (!URL || !ANON) {
+  throw new Error('Missing Supabase URL or Anon Key for browser client. Check your .env file and NEXT_PUBLIC_ prefixes.');
+}
 
 // Client-side (browser) Supabase client
 export const supabase = createBrowserClient(URL, ANON);
 
-let adminInstance = null;
+let adminInstance: SupabaseClient | null = null;
 
 // 1) service-role client for server-only logic (lazy initialization)
 export const supabaseAdmin = () => {
@@ -43,6 +43,9 @@ export function getSupabaseServerClient(req, res) {
     // This function should not be called on the client.
     // If it is, it's a programming error.
     throw new Error('getSupabaseServerClient should not be called on the client-side.');
+  }
+  if (!URL || !ANON) {
+    throw new Error('Missing Supabase URL or Anon Key for server client. Check your .env file.');
   }
   // URL and ANON are confirmed to exist by the module-level check
   return createServerClient(

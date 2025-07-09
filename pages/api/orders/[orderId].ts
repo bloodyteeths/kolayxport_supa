@@ -31,12 +31,7 @@ export default async function handler(
           userId: user.id
         },
         include: {
-          items: true,
-          shipperProfile: {
-            where: {
-              isDefault: true
-            }
-          }
+          items: true
         }
       });
 
@@ -71,9 +66,6 @@ export default async function handler(
             userId: user.id
           },
           data: {
-            weightKg,
-            serviceType,
-            packagingType,
             shippingAddress: shippingAddress ? JSON.stringify(shippingAddress) : undefined
           }
         });
@@ -111,12 +103,7 @@ export default async function handler(
             userId: user.id
           },
           include: {
-            items: true,
-            shipperProfile: {
-              where: {
-                isDefault: true
-              }
-            }
+            items: true
           }
         });
       });

@@ -1,6 +1,6 @@
 // Trigger redeploy2: minor change // Supabase Edge Function: sync-shipping-info
 // @ts-ignore: Deno/Edge runtime import
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -62,8 +62,14 @@ serve(async (req) => {
       }
     }
     return new Response(JSON.stringify({ status: 'ok', message: 'Shipping info sync complete.' }), { status: 200 });
-  } catch (err) {
-    return new Response(JSON.stringify({ status: 'error', message: (err as Error).message }), { status: 500 });
+  } catch (error) {
+    console.error('Error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } finally {
+    await prisma.$disconnect();
   }
 });
 

@@ -1,0 +1,23 @@
+-- AlterTable
+ALTER TABLE "Order" 
+ADD COLUMN "commodityDesc" TEXT,
+ADD COLUMN "countryOfMfg" TEXT,
+ADD COLUMN "dimensionUnits" TEXT,
+ADD COLUMN "fedexDutiesPaymentType" TEXT,
+ADD COLUMN "fedexPackagingType" TEXT,
+ADD COLUMN "fedexPickupType" TEXT,
+ADD COLUMN "fedexServiceType" TEXT,
+ADD COLUMN "harmonizedCode" TEXT,
+ADD COLUMN "labelStockType" TEXT,
+ADD COLUMN "packageHeight" DOUBLE PRECISION,
+ADD COLUMN "packageLength" DOUBLE PRECISION,
+ADD COLUMN "packageWidth" DOUBLE PRECISION,
+ADD COLUMN "sendCommercialInvoiceViaEtd" BOOLEAN DEFAULT true,
+ADD COLUMN "shipmentStatus" TEXT,
+ADD COLUMN "shippedAt" TIMESTAMP(3),
+ADD COLUMN "shippingChargesPaymentType" TEXT,
+ADD COLUMN "shippingLabelUrl" TEXT,
+ADD COLUMN "signatureType" TEXT,
+ADD COLUMN "termsOfSale" TEXT DEFAULT 'DDU',
+ADD COLUMN "trackingNumber" TEXT,
+ADD COLUMN "weightKg" DOUBLE PRECISION DEFAULT 0.5; 

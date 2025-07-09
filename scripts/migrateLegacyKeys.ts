@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 const legacyKeys = [
   'veeqoApiKey',
@@ -37,7 +35,7 @@ async function main() {
 
   for (const u of users) {
     try {
-      await prisma.userIntegrationSettings.upsert({
+      await prisma.credential.upsert({
         where: { userId: u.id },
         create: { userId: u.id, ...u },
         update: { ...u },

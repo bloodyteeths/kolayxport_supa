@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, Select, MenuItem, FormControl, InputLabel, CircularProgress, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import { DataGrid, GridColDef, GridPaginationModel } from '@mui/x-data-grid';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { useOrders, UIOrder } from '../../lib/hooks/useOrders';
 import { CircularProgress as Spinner } from '@mui/material';
 
@@ -16,8 +16,8 @@ function formatDate(iso?: string): string {
 export default function OperationsPage() {
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 20 });
   const { orders, total, isLoading, isError, mutate } = useOrders(
-    paginationModel.page + 1, // API is 1-indexed
-    paginationModel.pageSize
+    undefined, // fetch all orders (no pagination)
+    undefined
   );
   const [editing, setEditing] = useState<Record<string, { packingStatus?: string; productionNotes?: string }>>({}); // Made fields optional
   const [savingIds, setSavingIds] = useState<string[]>([]);

@@ -24,10 +24,15 @@ export default async function handler(
     let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
     const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (token) {
-      const supabaseDirect = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-      const { data, error } = await supabaseDirect.auth.getUser(token);
-      user = data.user;
-      authError = error;
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        console.error('[API sync/history] Missing Supabase environment variables for direct client init.');
+        // Potentially return an error or rely on the outer auth check to fail
+      } else {
+        const supabaseDirect = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+        const { data, error } = await supabaseDirect.auth.getUser(token);
+        user = data.user;
+        authError = error;
+      }
     }
   }
   if (authError || !user) {
@@ -52,7 +57,14 @@ export default async function handler(
 
   // Format response
   const resultSyncs = syncs.map(sync => {
-    const metrics = sync.metrics || {};
+    let metrics: any = sync.metrics || {};
+    if (typeof metrics === 'string') {
+      try {
+        metrics = JSON.parse(metrics);
+      } catch {
+        metrics = {};
+      }
+    }
     return {
       id: sync.id,
       type: sync.type,

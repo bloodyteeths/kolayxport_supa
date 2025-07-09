@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { getSupabaseServerClient } from '../../../lib/supabase';
 import { logger } from '../../../lib/logger';
-import { SyncType, retryFailedSync } from '../../../lib/sync-status';
+import { retryFailedSync } from '../../../lib/sync-status';
+import { SyncType } from '../../../lib/types';
 
 // Functions imported from auto-sync-all-users.js (or similar refactored location)
 // These functions are expected to handle their own startSync, updateSyncProgress, completeSync calls.
@@ -127,7 +128,7 @@ export default async function handler(
     newSyncRetryRecordId = await retryFailedSync(originalSyncId); // This creates the new SyncOperation entry
     logger.info(`[Retry] Initiated retry for original sync ${originalSyncId}. New SyncOperation record ID for retry: ${newSyncRetryRecordId}. Type: ${originalSync.type}`);
     
-    const userDBSettings = await prisma.userIntegrationSettings.findUnique({ where: { userId: authUser.id } });
+    const userDBSettings = await prisma.credential.findUnique({ where: { userId: authUser.id } });
     if (!userDBSettings) {
         throw new Error ('User integration settings not found for retry execution.');
     }

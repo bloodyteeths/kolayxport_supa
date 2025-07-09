@@ -65,27 +65,26 @@ export default function SenkronPage() {
     axios.get('/api/orders', {
       params: {
         page,
-        limit: pageSize,
-        startDate: filterStartDate,
-        endDate: filterEndDate,
-        status: filterDurum,
-        marketplace: filterMarketplace,
-        search,
-        sort: sortOrder,
+        limit: pageSize
       },
     })
       .then(res => {
-        setOrders(res.data.data || []);
+        console.log('[Senkron] Raw API Response:', res.data);
+        // Handle both data formats for backward compatibility
+        const ordersData = res.data.data || res.data.orders || [];
+        console.log('[Senkron] Orders from API:', ordersData);
+        setOrders(ordersData);
         setTotal(res.data.total || 0);
         // Auto-populate marketplace options
-        const uniqueMarketplaces = Array.from(new Set((res.data.data || []).map(o => o.marketplace).filter(Boolean)));
+        const uniqueMarketplaces = Array.from(new Set(ordersData.map(o => o.marketplace).filter(Boolean)));
         setMarketplaceOptions(uniqueMarketplaces);
       })
       .catch(err => {
+        console.error('[Senkron] API Error:', err);
         setError(err.response?.data?.error || err.message);
       })
       .finally(() => setLoading(false));
-  }, [page, pageSize, filterStartDate, filterEndDate, filterDurum, filterMarketplace, search, sortOrder]);
+  }, [page, pageSize]);
 
   const handleEditChange = (orderId, field, value) => {
     setEditState(prev => ({
@@ -117,11 +116,8 @@ export default function SenkronPage() {
     setSyncing(true);
     setSyncMessage(null);
     try {
-      await axios.post('/api/orders/sync-recent');
-      setSyncMessage('Son 7 günün siparişleri başarıyla senkronize edildi!');
-      // Refetch orders
-      const res = await axios.get('/api/orders', { params: { page, limit: pageSize } });
-      setOrders(res.data.data || []);
+      await axios.post('/api/orders/sync');
+      setSyncMessage('Siparişler başarıyla senkronize edildi');
     } catch (err) {
       setSyncMessage('Senkronizasyon sırasında hata oluştu: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -385,75 +381,107 @@ export default function SenkronPage() {
                     </TableRow>
                   ) : (
                     filteredOrders.map(order => {
-                      const item = order.items?.[0] || {};
-                      const edit = editState[order.id] || {};
-                      // Format order date and ship-by date in Turkish time
-                      const orderDate = order.marketplaceCreatedAt || order.createdAt;
-                      const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
-                      const shipByDateTR = order.shipByDate ? new Date(order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
-                      // When mapping items for display, ensure image is included from OrderItem.image
-                      const mappedItems = (order.items || []).map(item => ({
-                        ...item,
-                        image: item.image || '',
-                      }));
-                      return (
-                        <TableRow key={order.id} sx={{ height: 120 }}>
-                          <TableCell sx={{ p: 2, width: 200, verticalAlign: 'middle' }}>
-                            {mappedItems[0].image
-                              ? <img src={mappedItems[0].image} width={180} height={180} style={{ objectFit:'cover', borderRadius: 12, display: 'block', margin: '0 auto' }} />
-                              : '—'}
-                          </TableCell>
-                          <TableCell sx={{ p: 2, fontSize: 16 }}>{order.customerName || '—'}</TableCell>
-                          <TableCell sx={{ p: 2, fontSize: 16 }}>{orderDateTR}</TableCell>
-                          <TableCell sx={{ p: 2, minWidth: 340, fontSize: 16 }}>{mappedItems[0].variantInfo || '—'}</TableCell>
-                          <TableCell sx={{ p: 2, minWidth: 340, fontSize: 16 }}>
-                            <TextField
-                              value={edit.not ?? mappedItems[0].notes ?? ''}
-                              onChange={e => handleEditChange(order.id, 'not', e.target.value)}
-                              variant="outlined"
-                              fullWidth
-                              multiline
-                              minRows={4}
-                              maxRows={6}
-                              inputProps={{ style: { fontSize: 16, padding: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' } }}
-                              sx={{ minWidth: 320 }}
-                            />
-                            {(edit.not !== undefined && edit.not !== mappedItems[0].notes) || (edit.durum !== undefined && edit.durum !== order.status) ? (
-                              <Button
-                                variant="contained"
-                                color="success"
+                      console.log('[Senkron] Processing order:', order);
+                      // Use line_items for mapping, fallback to items for backward compatibility
+                      const lineItems = order.line_items && order.line_items.length > 0 
+                        ? order.line_items 
+                        : (order.items || []);
+                      console.log('[Senkron] Line items for order:', lineItems);
+                      
+                      // If no line items, create a single row for the order
+                      if (lineItems.length === 0) {
+                        console.log('[Senkron] No line items found for order:', order.id);
+                        const orderDate = order.marketplaceOrderDate || order.createdAt;
+                        const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                        const shipByDateTR = order.shipByDate ? new Date(order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                        
+                        return (
+                          <TableRow key={order.id} sx={{ height: 120 }}>
+                            <TableCell sx={{ p: 2, width: 200, verticalAlign: 'middle' }}>—</TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>{order.customerName || '—'}</TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>{orderDateTR}</TableCell>
+                            <TableCell sx={{ p: 2, minWidth: 340, fontSize: 16 }}>—</TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>
+                              <TextField
+                                defaultValue=""
+                                variant="outlined"
                                 size="small"
-                                sx={{ mt: 1, fontWeight: 600 }}
-                                onClick={() => handleSave(order.id)}
-                                disabled={loading}
+                                onChange={e => handleEditChange(order.id, 'not', e.target.value)}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ p: 2, minWidth: 180, fontSize: 20, fontWeight: 600, textAlign: 'center' }}>
+                              <Select
+                                value={editState[order.id]?.durum ?? order.status ?? 'Çıkmadı'}
+                                onChange={e => handleEditChange(order.id, 'durum', e.target.value)}
+                                size="small"
                               >
-                                Kaydet
-                              </Button>
-                            ) : null}
-                          </TableCell>
-                          <TableCell sx={{ p: 2, minWidth: 180, fontSize: 20, fontWeight: 600, textAlign: 'center' }}>
-                            <Select
-                              value={edit.durum ?? order.status ?? 'Çıkmadı'}
-                              onChange={e => handleEditChange(order.id, 'durum', e.target.value)}
-                              size="small"
-                            >
-                              {DURUM_OPTIONS.map(opt => (
-                                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-                              ))}
-                            </Select>
-                          </TableCell>
-                          <TableCell sx={{ p: 2, fontSize: 16 }}>{shipByDateTR}</TableCell>
-                          <TableCell sx={{ p: 2, fontSize: 16 }}>{order.marketplace || '—'}</TableCell>
-                          <TableCell sx={{ p: 2, fontSize: 16 }}>
-                            {order.orderNumber
-                              ? order.orderNumber
-                              : <span style={{ color: 'red', fontWeight: 'bold' }}>
-                                  Eksik <span style={{ background: '#ffe0e0', color: '#b71c1c', borderRadius: 4, padding: '2px 6px', marginLeft: 4, fontSize: 11 }}>Order No</span>
-                                </span>
-                            }
-                          </TableCell>
-                        </TableRow>
-                      );
+                                {DURUM_OPTIONS.map(opt => (
+                                  <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                                ))}
+                              </Select>
+                            </TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>{shipByDateTR}</TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>{order.marketplace || '—'}</TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>
+                              {order.orderNumber
+                                ? order.orderNumber
+                                : <span style={{ color: 'red', fontWeight: 'bold' }}>
+                                    Eksik <span style={{ background: '#ffe0e0', color: '#b71c1c', borderRadius: 4, padding: '2px 6px', marginLeft: 4, fontSize: 11 }}>Order No</span>
+                                  </span>
+                              }
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      // Map each line item to a row
+                      return lineItems.map((item, index) => {
+                        const orderDate = order.marketplaceOrderDate || order.createdAt;
+                        const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                        const shipByDateTR = order.shipByDate ? new Date(order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                        
+                        return (
+                          <TableRow key={`${order.id}-${item.id || index}`} sx={{ height: 120 }}>
+                            <TableCell sx={{ p: 2, width: 200, verticalAlign: 'middle' }}>
+                              {item.image
+                                ? <img src={item.image} width={180} height={180} style={{ objectFit:'cover', borderRadius: 12, display: 'block', margin: '0 auto' }} />
+                                : '—'}
+                            </TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>{order.customerName || '—'}</TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>{orderDateTR}</TableCell>
+                            <TableCell sx={{ p: 2, minWidth: 340, fontSize: 16 }}>{item.variantInfo || '—'}</TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>
+                              <TextField
+                                defaultValue={item.notes || ''}
+                                variant="outlined"
+                                size="small"
+                                onChange={e => handleEditChange(order.id, 'not', e.target.value)}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ p: 2, minWidth: 180, fontSize: 20, fontWeight: 600, textAlign: 'center' }}>
+                              <Select
+                                value={editState[order.id]?.durum ?? order.status ?? 'Çıkmadı'}
+                                onChange={e => handleEditChange(order.id, 'durum', e.target.value)}
+                                size="small"
+                              >
+                                {DURUM_OPTIONS.map(opt => (
+                                  <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                                ))}
+                              </Select>
+                            </TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>{shipByDateTR}</TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>{order.marketplace || '—'}</TableCell>
+                            <TableCell sx={{ p: 2, fontSize: 16 }}>
+                              {order.orderNumber
+                                ? order.orderNumber
+                                : <span style={{ color: 'red', fontWeight: 'bold' }}>
+                                    Eksik <span style={{ background: '#ffe0e0', color: '#b71c1c', borderRadius: 4, padding: '2px 6px', marginLeft: 4, fontSize: 11 }}>Order No</span>
+                                  </span>
+                              }
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
                     })
                   )}
                 </TableBody>

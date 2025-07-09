@@ -1,0 +1,1 @@
+SELECT DISTINCT "userId" FROM "Order"; 

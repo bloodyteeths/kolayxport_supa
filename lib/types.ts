@@ -19,58 +19,67 @@ export interface NormalizedLineItem {
   title: string;
   value: number;
   quantity: number;
-  weight?: number;
+  weight: number;
+  sku: string;
   hs_code?: string;
   country_of_origin?: string;
-  sku?: string;
   image?: string;
   variantInfo?: string;
+  variant_title?: string;
+  product_variant?: { title?: string };
+  shipBy?: string;
 }
 
 export interface UIOrder {
+  shippingAddress?: string | null;
+  uiOrderDate?: string;
+
+  commodityDesc?: string;
+  externalStatus?: string;
   id: string;
   source: OrderSource;
   channel: OrderChannel;
   marketplace: string;
   marketplaceKey: string;
   orderNumber: string;
-  customerName?: string;
-  status?: string;
-  currency?: string;
-  totalPrice?: number;
-  
-  // Normalized address fields
-  to_address: NormalizedAddress;
-  
-  // Normalized line items
-  line_items: NormalizedLineItem[];
-  
-  // Label generation fields
-  labelOverrides?: {
-    serviceType?: string;
-    packagingType?: string;
-    weight?: number;
-    customsValue?: number;
-    commodityDesc?: string;
-    hsCode?: string;
-    countryOfOrigin?: string;
+  customerName: string;
+  status: string;
+  currency: string;
+  totalPrice: number;
+  to_address: {
+    name: string;
+    phone: string;
+    street1: string;
+    street2?: string;
+    city: string;
+    state: string;
+    postal: string;
+    country: string;
+    isResidential: boolean;
   };
-  
-  // Tracking and status
-  trackingNumber?: string;
-  shippingLabelUrl?: string;
-  shipmentStatus?: string;
-  shippedAt?: string;
-  
-  // Timestamps
-  createdAt?: string;
-  updatedAt?: string;
+  line_items: Array<{
+    id: string;
+    title: string;
+    value: number;
+    quantity: number;
+    weight: number;
+    sku: string;
+    hs_code?: string;
+    country_of_origin?: string;
+    image?: string;
+    variantInfo?: string;
+    variant_title?: string;
+    product_variant?: { title?: string };
+    shipBy?: string;
+  }>;
   marketplaceOrderDate?: string;
-  
-  // Raw data for debugging
-  rawData?: Record<string, any>;
-
-  // Legacy fields for backward compatibility
+  rawData: any;
+  // Optional fields for label/fulfillment
+  weight?: number;
+  hsCode?: string;
+  countryOfOrigin?: string;
+  serviceType?: string;
+  packagingType?: string;
   recipientFirstName?: string;
   recipientLastName?: string;
   recipientStreet1?: string;
@@ -80,16 +89,6 @@ export interface UIOrder {
   recipientPostal?: string;
   recipientCountry?: string;
   recipientPhone?: string;
-  weight?: number;
-  serviceType?: string;
-  packagingType?: string;
-  customsValue?: number;
-  hsCode?: string;
-  countryOfOrigin?: string;
-  commodityDesc?: string;
-  labelCreated?: boolean;
-
-  // ETD-specific fields
   weightKg?: number;
   harmonizedCode?: string;
   countryOfMfg?: string;
@@ -105,4 +104,86 @@ export interface UIOrder {
   dimensionUnits?: string;
   labelStockType?: string;
   signatureType?: string;
+  trackingNumber?: string;
+  shippingLabelUrl?: string;
+  labelCreated?: boolean;
+  createdAt?: string;
+  customsValue?: number;
+}
+
+export interface VeeqoOrder {
+  id: string | number;
+  number?: string;
+  status?: string;
+  currency_code?: string;
+  total_price?: number;
+  deliver_to?: {
+    first_name?: string;
+    last_name?: string;
+  };
+  line_items?: Array<{
+    id: string;
+    product_title?: string;
+    variation_sku?: string;
+    price?: number;
+    quantity: number;
+    notes?: string;
+    product_image?: string;
+    variation_title?: string;
+    image_url?: string;
+    sellable?: any;
+    product?: any;
+    title?: string;
+    name?: string;
+    additional_options?: string;
+    line_item_id?: string;
+  }>;
+  [key: string]: any;
+}
+
+export interface VeeqoLineItem {
+  id: string;
+  product_title?: string;
+  variation_sku?: string;
+  price?: number;
+  quantity: number;
+  notes?: string;
+  product_image?: string | {
+    small_thumbnail_url?: string;
+    medium_thumbnail_url?: string;
+    large_thumbnail_url?: string;
+  };
+  variation_title?: string;
+  image_url?: string;
+  sellable?: {
+    id?: string;
+    image_url?: string;
+    main_thumbnail_url?: string;
+    small_thumbnail_url?: string;
+    images?: Array<{ url: string }>;
+    full_title?: string;
+  };
+  product?: {
+    id?: string;
+    image_url?: string;
+    main_thumbnail_url?: string;
+    small_thumbnail_url?: string;
+    images?: Array<{ url: string }>;
+  };
+  full_title?: string;
+  sellable_title?: string;
+  title?: string;
+  name?: string;
+  additional_options?: string;
+  line_item_id?: string;
+  weight?: number;
+  harmonized_code?: string;
+  country_of_manufacture?: string;
+  product_id?: string;
+}
+
+export enum SyncType {
+  ORDERS = 'ORDERS',
+  PRODUCTS = 'PRODUCTS',
+  INVENTORY = 'INVENTORY'
 } 

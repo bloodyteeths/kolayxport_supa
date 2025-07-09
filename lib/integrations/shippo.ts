@@ -4,6 +4,13 @@
  * Exports fetchShippoOrders and types for ShippoOrder, ShippoAddress, etc.
  */
 import fetch from 'node-fetch';
+import { sleep } from '../utils'; // Fix: Import sleep utility as in veeqo.ts
+
+// --- Robust fetch config ---
+const SHIPPO_MAX_RETRIES = 7; // Allow more retries for large datasets
+const SHIPPO_MIN_DELAY = 1000; // ms between pages (normal)
+const SHIPPO_MAX_DELAY = 60000; // ms (max wait on repeated rate limits)
+
 
 export interface ShippoAddress {
   name: string;
@@ -63,15 +70,45 @@ export async function fetchShippoOrders(
   const headers = { Authorization: `ShippoToken ${token}` };
   const all: ShippoOrder[] = [];
   let nextUrl: string | null = base.toString();
+  let page = 1;
   while (nextUrl) {
-    const res = await fetch(nextUrl, { headers });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Shippo fetch error HTTP ${res.status}: ${text}`);
+    let retries = 0;
+    let delay = SHIPPO_MIN_DELAY;
+    let lastError: any = null;
+    while (retries < SHIPPO_MAX_RETRIES) {
+      try {
+        // Fix: nextUrl is always a string here; the while condition ensures it
+        const res = await fetch(nextUrl as string, { headers });
+        if (res.status === 429) {
+          delay = Math.min(SHIPPO_MIN_DELAY * Math.pow(2, retries), SHIPPO_MAX_DELAY);
+          console.warn(`[Shippo] Rate limited on page ${page}, retrying in ${delay / 1000}s (retry ${retries + 1}/${SHIPPO_MAX_RETRIES})`);
+          await sleep(delay);
+          retries++;
+          continue;
+        }
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Shippo fetch error HTTP ${res.status}: ${text}`);
+        }
+        const json = (await res.json()) as ShippoResponse;
+        all.push(...json.results);
+        nextUrl = json.next || null;
+        break; // Success, break retry loop
+      } catch (error) {
+        lastError = error;
+        delay = Math.min(SHIPPO_MIN_DELAY * Math.pow(2, retries), SHIPPO_MAX_DELAY);
+        console.warn(`[Shippo] Error fetching page ${page}: ${error?.message || error}. Retrying in ${delay / 1000}s (retry ${retries + 1}/${SHIPPO_MAX_RETRIES})`);
+        await sleep(delay);
+        retries++;
+        if (retries >= SHIPPO_MAX_RETRIES) {
+          console.error(`[Shippo] Failed to fetch page ${page} after ${SHIPPO_MAX_RETRIES} retries: ${lastError?.message || lastError}`);
+          // Give up on this page, abort sync
+          nextUrl = null;
+        }
+      }
     }
-    const json = (await res.json()) as ShippoResponse;
-    all.push(...json.results);
-    nextUrl = json.next || null;
+    page++;
   }
   return all;
 }
+

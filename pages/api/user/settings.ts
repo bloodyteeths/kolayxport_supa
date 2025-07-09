@@ -54,10 +54,22 @@ export default async function handler(
         }
       });
 
-      // Upsert IntegrationSettings
+      // Update integration settings
       if (integrationSettings) {
-        await prisma.userIntegrationSettings.upsert({
-          where: { userId: userId },
+        await prisma.credential.upsert({
+          where: { userId: authUser.id },
+          create: {
+            userId: authUser.id,
+            veeqoApiKey: integrationSettings.veeqoApiKey,
+            shippoToken: integrationSettings.shippoToken,
+            fedexApiKey: integrationSettings.fedexApiKey,
+            fedexApiSecret: integrationSettings.fedexApiSecret,
+            fedexAccountNumber: integrationSettings.fedexAccountNumber,
+            fedexMeterNumber: integrationSettings.fedexMeterNumber,
+            upsApiKey: integrationSettings.upsApiKey,
+            upsApiSecret: integrationSettings.upsApiSecret,
+            upsAccountNumber: integrationSettings.upsAccountNumber,
+          },
           update: {
             veeqoApiKey: integrationSettings.veeqoApiKey,
             shippoToken: integrationSettings.shippoToken,
@@ -65,26 +77,9 @@ export default async function handler(
             fedexApiSecret: integrationSettings.fedexApiSecret,
             fedexAccountNumber: integrationSettings.fedexAccountNumber,
             fedexMeterNumber: integrationSettings.fedexMeterNumber,
-            hepsiburadaApiKey: integrationSettings.hepsiburadaApiKey,
-            hepsiburadaMerchantId: integrationSettings.hepsiburadaMerchantId,
-            trendyolApiKey: integrationSettings.trendyolApiKey,
-            trendyolApiSecret: integrationSettings.trendyolApiSecret,
-            trendyolSupplierId: integrationSettings.trendyolSupplierId,
-            updatedAt: new Date(),
-          },
-          create: {
-            userId: userId,
-            veeqoApiKey: integrationSettings.veeqoApiKey,
-            shippoToken: integrationSettings.shippoToken,
-            fedexApiKey: integrationSettings.fedexApiKey,
-            fedexApiSecret: integrationSettings.fedexApiSecret,
-            fedexAccountNumber: integrationSettings.fedexAccountNumber,
-            fedexMeterNumber: integrationSettings.fedexMeterNumber,
-            hepsiburadaApiKey: integrationSettings.hepsiburadaApiKey,
-            hepsiburadaMerchantId: integrationSettings.hepsiburadaMerchantId,
-            trendyolApiKey: integrationSettings.trendyolApiKey,
-            trendyolApiSecret: integrationSettings.trendyolApiSecret,
-            trendyolSupplierId: integrationSettings.trendyolSupplierId,
+            upsApiKey: integrationSettings.upsApiKey,
+            upsApiSecret: integrationSettings.upsApiSecret,
+            upsAccountNumber: integrationSettings.upsAccountNumber,
           },
         });
       }
@@ -112,11 +107,8 @@ export default async function handler(
             defaultWeightKg: shipperProfile.defaultWeightKg ? parseFloat(shipperProfile.defaultWeightKg) : null,
             defaultServiceType: shipperProfile.defaultServiceType,
             defaultPackagingType: shipperProfile.defaultPackagingType,
-            defaultPickupType: shipperProfile.defaultPickupType,
             defaultHarmonizedCode: shipperProfile.defaultHarmonizedCode,
             defaultCountryOfMfg: shipperProfile.defaultCountryOfMfg,
-            defaultLabelStockType: shipperProfile.defaultLabelStockType,
-            defaultTermsOfSale: shipperProfile.defaultTermsOfSale,
             updatedAt: new Date(),
           },
           create: {
@@ -140,11 +132,8 @@ export default async function handler(
             defaultWeightKg: shipperProfile.defaultWeightKg ? parseFloat(shipperProfile.defaultWeightKg) : null,
             defaultServiceType: shipperProfile.defaultServiceType,
             defaultPackagingType: shipperProfile.defaultPackagingType,
-            defaultPickupType: shipperProfile.defaultPickupType,
             defaultHarmonizedCode: shipperProfile.defaultHarmonizedCode,
             defaultCountryOfMfg: shipperProfile.defaultCountryOfMfg,
-            defaultLabelStockType: shipperProfile.defaultLabelStockType,
-            defaultTermsOfSale: shipperProfile.defaultTermsOfSale,
           },
         });
       }

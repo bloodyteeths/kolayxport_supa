@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import prisma from './prisma';
 
 /**
  * Syncs shipping info for all users from external sources (Veeqo, Shippo, etc.)
@@ -21,12 +20,11 @@ export async function syncShippingInfo() {
     const ordersJson = await fetchLatestOrders(user.integrationSettings);
     for (const o of ordersJson) {
       // 3. Find corresponding Order row
-      const order = await prisma.order.findUnique({
+      const order = await prisma.order.findFirst({
         where: {
-          userId_marketplaceKey: {
-            userId: user.id,
-            marketplaceKey: o.id,
-          },
+          userId: user.id,
+          marketplace: o.marketplace,
+          marketplaceKey: o.id,
         },
       });
       if (!order) continue;

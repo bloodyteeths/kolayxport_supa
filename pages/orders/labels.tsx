@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Checkbox, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert } from '@mui/material';
 import { DataGrid, GridColDef, GridPaginationModel } from '@mui/x-data-grid';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 import { useOrders, UIOrder } from '../../lib/hooks/useOrders';
 import { CircularProgress as Spinner } from '@mui/material';
 
@@ -27,8 +27,8 @@ interface HealthCheckResult {
 export default function LabelsPage() {
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 20 });
   const { orders, total, isLoading, isError, mutate } = useOrders(
-    paginationModel.page + 1, // API is 1-indexed
-    paginationModel.pageSize
+    undefined, // fetch all orders (no pagination)
+    undefined
   );
   const [loadingIds, setLoadingIds] = useState<string[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -41,17 +41,18 @@ export default function LabelsPage() {
   const syncOrders = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/orders/label-shippo-sync', { method: 'POST' });
+      const res = await fetch('/api/orders/sync', { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Shippo Sync failed');
-      toast.success('Yalnızca Shippo siparişleri senkronize edildi');
+      if (!res.ok) throw new Error(data.error || 'Sync failed');
+      toast.success('Siparişler başarıyla senkronize edildi');
       await mutate(); 
     } catch (err: any) {
-      toast.error(`Shippo Senkronizasyon hatası: ${err.message}`);
+      toast.error(`Senkronizasyon hatası: ${err.message}`);
     } finally {
       setSyncing(false);
     }
   };
+
 
   const handleHealthCheck = async () => {
     setHealthChecking(true);

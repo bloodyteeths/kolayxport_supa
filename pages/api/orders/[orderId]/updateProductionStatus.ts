@@ -17,12 +17,7 @@ export default async function handler(
   }
 
   const { packingStatus, productionNotes } = req.body;
-  if (typeof packingStatus !== 'string') {
-    return res.status(400).json({ error: 'packingStatus must be a string' });
-  }
-  if (typeof productionNotes !== 'string') {
-    return res.status(400).json({ error: 'productionNotes must be a string' });
-  }
+  // Remove validation for these fields since they no longer exist
 
   const supabase = getSupabaseServerClient(req, res);
   const {
@@ -34,40 +29,12 @@ export default async function handler(
   }
 
   try {
-    // prepare update data with edited timestamps
-    const dataToUpdate: any = { packingStatus, productionNotes };
-    dataToUpdate.packingEditedAt = new Date();
-    dataToUpdate.productionEditedAt = new Date();
-    const updateResult = await prisma.order.updateMany({
-      where: { id: orderId, userId: user.id },
-      data: dataToUpdate,
-    });
-    if (updateResult.count === 0) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-
-    const updatedOrder = await prisma.order.findUnique({
-      where: { id: orderId },
-      select: {
-        id: true,
-        customerName: true,
-        fedexServiceType: true,
-        fedexPackagingType: true,
-        fedexPickupType: true,
-        fedexDutiesPaymentType: true,
-        commodityDesc: true,
-        harmonizedCode: true,
-        sendCommercialInvoiceViaEtd: true,
-        trackingNumber: true,
-        shippingLabelUrl: true,
-        packingStatus: true,
-        productionNotes: true,
-        packingEditedAt: true,
-        productionEditedAt: true,
-      }
-    });
-
-    return res.status(200).json({ order: updatedOrder });
+    // No longer update these fields
+    // const dataToUpdate: any = { packingStatus, productionNotes };
+    // dataToUpdate.packingEditedAt = new Date();
+    // dataToUpdate.productionEditedAt = new Date();
+    // Instead, just return 400
+    return res.status(400).json({ error: 'Packing/production status fields have been removed from the Order model.' });
   } catch (error: any) {
     console.error('Error updating production status:', error);
     return res.status(500).json({ error: 'Failed to update order', details: error.message });

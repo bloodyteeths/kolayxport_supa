@@ -2,11 +2,12 @@
 // It assumes your site is deployed and accessible at the given BASE_URL.
 // You must provide a way to authenticate as each user (e.g. service tokens, or trigger per-user from your backend).
 
-const prisma = require('../lib/prisma').default;
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 const { startSync, updateSyncProgress, completeSync } = require('../lib/sync-status');
 const { fetchVeeqoOrders } = require('../lib/integrations/veeqo');
 const { fetchShippoOrders } = require('../lib/integrations/shippo');
-const { fetchCreatedOrders } = require('../lib/trendyol');
+const { fetchCreatedOrders } = require('../lib/integrations/trendyol');
 // Stub for Hepsiburada integration
 async function fetchHepsiburadaOrders(settings) {
   // TODO: Implement real fetch logic for Hepsiburada
@@ -95,6 +96,22 @@ function mapVeeqoItemToPrisma(veeqoLineItem, orderPrismaData) {
     itemTotalPrice = unitPrice * quantity;
   }
 
+  let shipByDate = null;
+  const dispatchDate = veeqoLineItem.dispatch_date || orderPrismaData.rawData?.dispatch_date; // Check line item then order
+  const dueDate = orderPrismaData.rawData?.due_date;
+  
+  // Updated shipBy logic
+  const effectiveDate = veeqoLineItem.dispatch_date || orderPrismaData.rawData?.dispatch_date || orderPrismaData.rawData?.due_date;
+  if (effectiveDate) {
+    try {
+      shipByDate = new Date(effectiveDate).toISOString();
+    } catch (e) {
+      logger.warn(`[VEEQO ITEM MAPPER] Invalid date format for shipBy: ${effectiveDate}`, e);
+      shipByDate = null;
+    }
+  } else {
+    shipByDate = null;
+  }
 
   return {
     // orderId will be connected by Prisma during nested create
@@ -107,7 +124,7 @@ function mapVeeqoItemToPrisma(veeqoLineItem, orderPrismaData) {
     notes: null, // Veeqo line items don't typically have separate notes
     image: veeqoLineItem.image_url || null,
     marketplaceKey: String(veeqoLineItem.id), // Veeqo line item ID
-    shipBy: null, // Veeqo line items don't have individual shipBy dates
+    shipBy: shipByDate, // Updated shipBy mapping
     orderNumber: orderPrismaData.orderNumber, // From parent order
     uniqueLineKey: String(veeqoLineItem.id), // Use Veeqo line item ID for uniqueness within the order
     remoteLineId: String(veeqoLineItem.id), // Use Veeqo line item ID

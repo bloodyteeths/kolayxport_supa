@@ -16,8 +16,6 @@ export default async function handler(
       .json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  console.debug('🛠️ DATABASE_URL:', process.env.DATABASE_URL);
-
   let user, authError;
   const supabase = getSupabaseServerClient(req, res);
   const result = await supabase.auth.getUser();
@@ -29,20 +27,24 @@ export default async function handler(
     let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
     const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (token) {
-      const supabaseDirect = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-      const { data, error } = await supabaseDirect.auth.getUser(token);
-      user = data.user;
-      authError = error;
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        // Keep essential error logging
+        console.error('[API orders/index] Missing Supabase environment variables for Authorization header fallback.');
+      } else {
+        // Environment variables are now guaranteed to be strings here due to the check above.
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        
+        const supabaseDirect = createClient(supabaseUrl, supabaseAnonKey);
+        const { data, error: userError } = await supabaseDirect.auth.getUser(token);
+        user = data.user;
+        authError = userError; // Assign to the outer authError
+      }
     }
   }
   if (authError || !user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-
-  console.debug('🛠️ Authenticated user ID:', user.id);
-  // Quick connectivity check: count rows in the Order table
-  const { rows: countRows } = await pool.query('SELECT COUNT(*)::int AS count FROM "Order"');
-  console.debug('🛠️ Total rows in "Order" table:', countRows[0].count);
 
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.limit as string) || 20;
@@ -57,19 +59,37 @@ export default async function handler(
     endDate,
     status,
     marketplace,
+    labelStatus,
+    serviceType,
+    packagingType,
+    pickupType,
+    dutiesPaymentType,
+    signatureType,
+    labelStockType,
   } = req.query;
 
   // Only apply createdAt filter if at least one date is provided
-  let marketplaceCreatedAtFilter: any = {};
+  let createdAtFilter: any = {};
   if (startDate || endDate) {
-    if (startDate) marketplaceCreatedAtFilter.gte = new Date(startDate as string);
-    if (endDate) marketplaceCreatedAtFilter.lte = new Date(endDate as string);
+    if (startDate) createdAtFilter.gte = new Date(startDate as string);
+    if (endDate) createdAtFilter.lte = new Date(endDate as string);
   }
 
   // Build where clause
   const where: any = { userId: user.id };
-  if (Object.keys(marketplaceCreatedAtFilter).length > 0) where.marketplaceCreatedAt = marketplaceCreatedAtFilter;
+  if (Object.keys(createdAtFilter).length > 0) where.createdAt = createdAtFilter;
   if (status) where.status = status;
+  if (marketplace) where.marketplace = marketplace;
+  if (labelStatus) where.labelStatus = labelStatus;
+  if (serviceType) where.fedexServiceType = serviceType;
+  if (packagingType) where.fedexPackagingType = packagingType;
+  if (pickupType) where.fedexPickupType = pickupType;
+  if (dutiesPaymentType) where.fedexDutiesPaymentType = dutiesPaymentType;
+  if (signatureType) where.signatureType = signatureType;
+  if (labelStockType) where.labelStockType = labelStockType;
+
+  // Add debug log for userId and query
+  // console.log('[ORDERS API] Fetching orders for userId:', user.id, 'Query:', req.query);
 
   try {
     let whereClause = 'WHERE o."userId" = $1';
@@ -86,18 +106,6 @@ export default async function handler(
       paramIndex++;
     }
 
-    if (source) {
-      whereClause += ` AND o."source" = $${paramIndex}`;
-      params.push(source);
-      paramIndex++;
-    }
-
-    if (channel) {
-      whereClause += ` AND o."channel" = $${paramIndex}`;
-      params.push(channel);
-      paramIndex++;
-    }
-
     if (status) {
       whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."status" = $${paramIndex}`;
       params.push(status);
@@ -106,6 +114,41 @@ export default async function handler(
     if (marketplace) {
       whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."marketplace" = $${paramIndex}`;
       params.push(marketplace);
+      paramIndex++;
+    }
+    if (labelStatus) {
+      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."labelStatus" = $${paramIndex}`;
+      params.push(labelStatus);
+      paramIndex++;
+    }
+    if (serviceType) {
+      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."fedexServiceType" = $${paramIndex}`;
+      params.push(serviceType);
+      paramIndex++;
+    }
+    if (packagingType) {
+      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."fedexPackagingType" = $${paramIndex}`;
+      params.push(packagingType);
+      paramIndex++;
+    }
+    if (pickupType) {
+      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."fedexPickupType" = $${paramIndex}`;
+      params.push(pickupType);
+      paramIndex++;
+    }
+    if (dutiesPaymentType) {
+      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."fedexDutiesPaymentType" = $${paramIndex}`;
+      params.push(dutiesPaymentType);
+      paramIndex++;
+    }
+    if (signatureType) {
+      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."signatureType" = $${paramIndex}`;
+      params.push(signatureType);
+      paramIndex++;
+    }
+    if (labelStockType) {
+      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."labelStockType" = $${paramIndex}`;
+      params.push(labelStockType);
       paramIndex++;
     }
 
@@ -126,22 +169,7 @@ export default async function handler(
         o.*,
         o."shippingAddress" as "shippingAddress",
         o."rawData" as "rawData",
-        o."marketplaceCreatedAt" as "marketplaceOrderDate",
-        o."weightKg",
-        o."harmonizedCode",
-        o."countryOfMfg",
-        o."termsOfSale",
-        o."sendCommercialInvoiceViaEtd",
-        o."fedexServiceType",
-        o."fedexPackagingType",
-        o."fedexPickupType",
-        o."fedexDutiesPaymentType",
-        o."packageLength",
-        o."packageWidth",
-        o."packageHeight",
-        o."dimensionUnits",
-        o."labelStockType",
-        o."signatureType",
+        o."createdAt" as "marketplaceOrderDate",
         COALESCE(
           json_agg(
             json_build_object(
@@ -162,7 +190,9 @@ export default async function handler(
               'orderNumber', oi."orderNumber",
               'uniqueLineKey', oi."uniqueLineKey",
               'productId', oi."productId",
-              'remoteLineId', oi."remoteLineId"
+              'remoteLineId', oi."remoteLineId",
+              'labelJobStatus', lj.status,
+              'trackingNumber', lj."trackingNumber"
             )
           ) FILTER (WHERE oi.id IS NOT NULL),
           '[]'
@@ -179,36 +209,30 @@ export default async function handler(
               'shipperCity', sp."shipperCity",
               'shipperStateCode', sp."shipperStateCode",
               'shipperPostalCode', sp."shipperPostalCode",
-              'shipperCountryCode', sp."shipperCountryCode",
-              'shipperTinNumber', sp."shipperTinNumber",
-              'shipperTinType', sp."shipperTinType",
-              'importerOfRecord', sp."importerOfRecord",
-              'fedexFolderId', sp."fedexFolderId",
-              'defaultCurrencyCode', sp."defaultCurrencyCode",
-              'dutiesPaymentType', sp."dutiesPaymentType",
-              'defaultShippingChargesPaymentType', sp."defaultShippingChargesPaymentType",
-              'createdAt', sp."createdAt",
-              'updatedAt', sp."updatedAt",
-              'defaultCountryOfMfg', sp."defaultCountryOfMfg",
-              'defaultHarmonizedCode', sp."defaultHarmonizedCode",
-              'defaultPackagingType', sp."defaultPackagingType",
-              'defaultServiceType', sp."defaultServiceType",
-              'defaultWeightKg', sp."defaultWeightKg"
+              'shipperCountryCode', sp."shipperCountryCode"
             )
           ) FILTER (WHERE sp.id IS NOT NULL),
           '[]'
-        ) as profiles,
-        COUNT(*) OVER() as total_count
+        ) as shipperProfiles
       FROM "Order" o
-      LEFT JOIN "OrderItem" oi ON o.id = oi."orderId"
+      LEFT JOIN "OrderItem" oi ON oi."orderId" = o.id
+      LEFT JOIN "LabelJob" lj ON lj."orderItemId" = oi.id
       LEFT JOIN "ShipperProfile" sp ON sp."userId" = o."userId"
       ${whereClause}
       GROUP BY o.id
-      ORDER BY o."marketplaceCreatedAt" ${sort === 'desc' ? 'DESC' : 'ASC'}
+      ORDER BY COALESCE(o."uiOrderDate", o."createdAt") ${sort === 'asc' ? 'ASC' : 'DESC'}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     params.push(limit, offset);
-    const { rows: orders } = await pool.query(ordersQuery, params);
+
+    // Debug logs
+    // console.log('SQL Query:', ordersQuery);
+    // console.log('SQL Params:', params);
+
+    const result = await pool.query(ordersQuery, params);
+    console.log('[API Orders] Raw Result Rows:', result.rows.length);
+    console.log('[API Orders] Sample Order:', result.rows[0]);
+
     // Query total count
     const countQuery = `
       SELECT COUNT(*) as total
@@ -218,11 +242,14 @@ export default async function handler(
     const { rows: countRows2 } = await pool.query(countQuery, params.slice(0, paramIndex - 1));
     const total = parseInt(countRows2[0]?.total || '0', 10);
     // Debug log for raw order
-    orders.forEach((rawOrder: any) => {
-      console.debug('rawOrder:', JSON.stringify(rawOrder, null, 2));
-      console.debug('Order ID:', rawOrder.id, 'marketplaceCreatedAt:', rawOrder.marketplaceCreatedAt, 'createdAt:', rawOrder.createdAt);
-    });
-    let processedOrders = orders.map((rawOrder: any) => {
+    // result.rows.forEach((rawOrder: any) => {
+    //   console.debug('rawOrder:', JSON.stringify(rawOrder, null, 2));
+    //   console.debug('Order ID:', rawOrder.id, 'createdAt:', rawOrder.createdAt);
+    // });
+    let processedOrders = await Promise.all(result.rows.map(async (rawOrder: any) => {
+      console.log('[API Orders] Processing order:', rawOrder.id);
+      console.log('[API Orders] Order items:', rawOrder.items);
+      
       // --- Address Extraction ---
       let primaryAddressSource: any = {};
       if (rawOrder.shippingAddress) {
@@ -269,18 +296,55 @@ export default async function handler(
       const recipientStreet2 = effectiveAddress.street2 || effectiveAddress.recipientStreet2 || '';
       const recipientCity    = effectiveAddress.city    || effectiveAddress.recipientCity    || '';
       const recipientState   = effectiveAddress.state   || effectiveAddress.recipientState   || effectiveAddress.province || '';
-      const recipientPostal  = effectiveAddress.zip     || effectiveAddress.recipientPostal  || effectiveAddress.postcode || '';
+      const recipientPostal  = effectiveAddress.postal  || effectiveAddress.recipientPostal  || effectiveAddress.zip || effectiveAddress.postcode || '';
       const recipientCountry = effectiveAddress.country || effectiveAddress.recipientCountry || '';
       const recipientPhone   = effectiveAddress.phone   || effectiveAddress.recipientPhone   || '';
+
+      // Skip orders with anonymized addresses
+      if (recipientStreet1 === '—' || recipientCity === '—' || recipientCountry === '—') {
+        // Remove verbose warning logging
+        // console.warn(`Skipping order ${String(rawOrder.id)} due to anonymized address`, {
+        //   street1: recipientStreet1,
+        //   city: recipientCity,
+        //   country: recipientCountry
+        // });
+        return null;
+      }
+
       // --- Line Items Mapping ---
       let itemsFromDb: any[] = [];
       try {
         itemsFromDb = Array.isArray(rawOrder.items) ? rawOrder.items : JSON.parse(rawOrder.items);
       } catch (e) { itemsFromDb = []; }
+      // Fetch all label jobs for items in this order
+      let labelJobsByItemId: Record<string, any[]> = {};
+      if (itemsFromDb.length > 0) {
+        const itemIds = itemsFromDb.map(item => `'${item.id}'`).join(',');
+        if (itemIds.length > 0) {
+          const labelJobsQuery = `SELECT * FROM "LabelJob" WHERE "orderItemId" IN (${itemIds}) ORDER BY "createdAt" DESC`;
+          try {
+            const { rows: labelJobsRows } = await pool.query(labelJobsQuery);
+            labelJobsRows.forEach(job => {
+              if (!labelJobsByItemId[job.orderItemId]) labelJobsByItemId[job.orderItemId] = [];
+              labelJobsByItemId[job.orderItemId].push({
+                id: job.id,
+                status: job.status,
+                createdAt: job.createdAt,
+                trackingNumber: job.trackingNumber,
+                pdfUrl: job.pdfUrl,
+                errorMessage: job.errorMessage,
+                carrier: job.carrier
+              });
+            });
+          } catch (e) {
+            console.error('Error fetching label jobs for items:', e);
+          }
+        }
+      }
       const line_items_for_ui = itemsFromDb.map(item => ({
         id: item.id,
         title: item.productName || item.title || 'Unknown Product',
-        value: parseFloat(String(item.totalPrice)) || (parseFloat(String(item.unitPrice)) * (item.quantity || 1)) || 0,
+        value: parseFloat(String(item.unitPrice)) || 0,
         quantity: item.quantity || 1,
         weight: item.weightKg || 0.01,
         hs_code: item.harmonizedCode || '',
@@ -288,24 +352,22 @@ export default async function handler(
         sku: item.sku || '',
         image: item.image || '',
         variantInfo: item.variantInfo || '',
+        labelJobStatus: item.labelJobStatus || '',
+        trackingNumber: item.trackingNumber || '',
+        shipBy: item.shipBy || '',
+        labelJobs: labelJobsByItemId[item.id] || [],
       }));
       // --- Order Date ---
-      let marketplaceOrderDate = rawOrder.marketplaceOrderDate || rawOrder.marketplaceCreatedAt;
+      let marketplaceOrderDate = rawOrder.uiOrderDate || rawOrder.createdAt;
       if (!marketplaceOrderDate && rawOrder.rawData) {
         try {
           const rawData = typeof rawOrder.rawData === 'string' ? JSON.parse(rawOrder.rawData) : rawOrder.rawData;
           marketplaceOrderDate = rawData.created_at || rawData.order_date || rawData.ordered_at || rawData.placed_at;
         } catch (e) {
+          // Keep essential error logging
           console.error('Error parsing rawData for order date:', e);
         }
       }
-      // --- Debug logs ---
-      console.debug('Order ID:', rawOrder.id, 'Effective Address:', effectiveAddress);
-      console.debug('Order ID:', rawOrder.id, 'Final recipient fields:', {
-        finalRecipientFirstName, finalRecipientLastName, recipientStreet1, recipientStreet2, recipientCity, recipientState, recipientPostal, recipientCountry, recipientPhone
-      });
-      console.debug('Order ID:', rawOrder.id, 'Line items for UI:', line_items_for_ui);
-      console.debug('Order ID:', rawOrder.id, 'marketplaceOrderDate:', marketplaceOrderDate);
       return {
         ...rawOrder,
         customerName: fullName || `${finalRecipientFirstName} ${finalRecipientLastName}`.trim(),
@@ -320,42 +382,108 @@ export default async function handler(
         recipientPhone,
         line_items: line_items_for_ui,
         marketplaceOrderDate,
+        orderTotalPrice: rawOrder.totalPrice,
+        source: rawOrder.source || '',
+        channel: '',
+        marketplaceOrderId: rawOrder.marketplaceOrderId || rawOrder.orderNumber || rawOrder.id || '',
+        orderNumber: rawOrder.orderNumber || rawOrder.marketplaceOrderId || rawOrder.id || '',
       };
-    });
+    }));
 
     // Filter orders for Labels page
     const context = req.query.context as string;
-    if (context === 'labelsPage') {
-      processedOrders = processedOrders.filter(order => {
-        // Always include Shippo orders
-        if (order.source === 'shippo') return true;
-        
-        // For Veeqo orders, check if they have valid shipping address
-        if (order.source === 'veeqo') {
-          const shippingAddress = order.shippingAddress;
-          if (!shippingAddress) return false;
-          
-          // Parse shipping address if it's a string
-          const address = typeof shippingAddress === 'string' 
-            ? JSON.parse(shippingAddress) 
-            : shippingAddress;
-            
-          // Check for required address fields
-          return !!(
-            address.street1 && 
-            address.city && 
-            address.postal && 
-            address.country
-          );
+    // REMOVE the filter that excludes orders with missing address fields
+    // Always return all processedOrders
+    // if (context === 'labelsPage') {
+    //   processedOrders = processedOrders.filter(order => {
+    //     // Always include Shippo orders
+    //     if (order.source === 'shippo') return true;
+    //     // For Veeqo orders, check if they have valid shipping address
+    //     if (order.source === 'veeqo') {
+    //       const shippingAddress = order.shippingAddress;
+    //       if (!shippingAddress) return false;
+    //       // Parse shipping address if it's a string
+    //       const address = typeof shippingAddress === 'string' 
+    //         ? JSON.parse(shippingAddress) 
+    //         : shippingAddress;
+    //       // Check for required address fields
+    //       return !!(
+    //         address.street1 && 
+    //         address.city && 
+    //         address.postal && 
+    //         address.country
+    //       );
+    //     }
+    //     return false;
+    //   });
+    // }
+
+    // --- Helper utils for deduplication and address filtering ---
+
+    /**
+     * UIOrder type extension for dedupe/filter helpers
+     */
+    type UIOrder = {
+      source: string; // 'shippo' | 'veeqo'
+      marketplace: string;
+      marketplaceOrderId?: string;
+      orderNumber?: string;
+      shippingAddress?: {
+        recipientStreet1?: string;
+        recipientCity?: string;
+        // ...other fields
+      };
+      recipientStreet1?: string;
+      recipientCity?: string;
+      [key: string]: any;
+    };
+
+    const hasAddress = (o: UIOrder) =>
+      !!(
+        (o.shippingAddress?.recipientStreet1 || o.recipientStreet1) &&
+        (o.shippingAddress?.recipientCity || o.recipientCity)
+      );
+
+    const makeKey = (o: UIOrder) =>
+      `${o.marketplace}-${o.marketplaceOrderId ?? o.orderNumber}`;
+
+    async function dedupeAndFilter(raw: UIOrder[]): Promise<UIOrder[]> {
+      const map = new Map<string, UIOrder>();
+      for (const order of raw) {
+        // 3-A. Skip Veeqo Etsy/Amazon rows with no address
+        if (
+          order.source === 'veeqo' &&
+          ['Etsy', 'Amazon'].includes(order.marketplace) &&
+          !hasAddress(order)
+        ) {
+          continue;
         }
-        
-        return false;
-      });
+        // 3-B. De-duplicate by marketplace+orderNumber
+        const key = makeKey(order);
+        const existing = map.get(key);
+        if (!existing) {
+          map.set(key, order);
+          continue;
+        }
+        // Preference rules
+        const existingHasAddr = hasAddress(existing);
+        const candidateHasAddr = hasAddress(order);
+        if (!existingHasAddr && candidateHasAddr) {
+          map.set(key, order); // replace blank with filled
+        } else if (existingHasAddr === candidateHasAddr) {
+          // both have / both lack address → prefer Shippo
+          if (existing.source !== 'shippo' && order.source === 'shippo') {
+            map.set(key, order);
+          }
+        }
+      }
+      return Array.from(map.values());
     }
 
+    const cleanedOrders = await dedupeAndFilter(processedOrders.filter(Boolean));
     return res.status(200).json({
-      orders: processedOrders,
-      total,
+      orders: cleanedOrders,
+      total, // Use the correct total count from the count query
       page,
       pageSize
     });

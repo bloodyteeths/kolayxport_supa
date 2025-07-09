@@ -1,7 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import prisma from '../lib/prisma';
 
 dotenv.config();
 
@@ -11,7 +12,6 @@ console.log('TEST_USER_EMAIL:', process.env.TEST_USER_EMAIL);
 console.log('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
 console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Present' : 'Missing');
 
-const prisma = new PrismaClient();
 const TEST_USER_ID = '16347b7d-ed21-444c-bed3-db433871140c';
 const TEST_EMAIL = process.env.TEST_USER_EMAIL || 'test@example.com';
 const TEST_PASSWORD = process.env.TEST_USER_PASSWORD || 'testpassword123';
@@ -124,7 +124,7 @@ async function verifySyncOperation(syncId: string) {
   `;
 
   console.log('\nRecent Sync Logs:');
-  logs.forEach(log => {
+  logs.forEach((log: SyncLog) => {
     console.log(`[${log.level}] ${log.message}`);
     if (log.error) console.log('Error:', log.error);
     if (log.details) console.log('Details:', JSON.stringify(log.details, null, 2));

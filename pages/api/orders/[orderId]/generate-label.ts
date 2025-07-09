@@ -14,17 +14,17 @@ interface ResponseData extends Partial<FedexShipmentResult> {
 }
 
 interface ShippingAddressParsed {
-  recipientFirstName?: string;
-  recipientLastName?: string;
-  recipientCompany?: string;
-  recipientStreet1: string;
-  recipientStreet2?: string;
-  recipientCity: string;
-  recipientState?: string;
-  recipientPostal: string;
-  recipientCountry: string;
-  recipientPhone?: string;
-  recipientEmail?: string;
+  firstName?: string;
+  lastName?: string;
+  company?: string;
+  street1: string;
+  street2?: string;
+  city: string;
+  state?: string;
+  postal: string;
+  country: string;
+  phone?: string;
+  email?: string;
   isResidential?: boolean;
 }
 
@@ -32,7 +32,8 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseData>
 ) {
-  logger.info(`[API generate-label] Received request for orderId: ${req.query.orderId}`, { body: req.body });
+  // Remove initial request logging
+  // logger.info(`[API generate-label] Received request for orderId: ${req.query.orderId}`, { body: req.body });
 
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
@@ -52,12 +53,30 @@ export default async function handler(
     return res.status(400).json({ error: 'Order ID is required.' });
   }
 
-  // --- Get Overrides from Request Body (sent from LabelsPage drawer if any quick edits) ---
+  // --- Extract data from request body ---
   const {
-    serviceType: serviceTypeOverride,
-    packagingType: packagingTypeOverride,
+    line_items: lineItemsFromRequest, // Renamed for clarity
+    harmonizedCode: harmonizedCodeOverride,
+    countryOfMfg: countryOfMfgOverride,
     weightKg: weightKgOverride,
+    commodityDesc: commodityDescOverride,
+    termsOfSale: termsOfSaleOverride,
+    sendCommercialInvoiceViaEtd: sendCommercialInvoiceViaEtdOverride,
+    fedexServiceType: serviceTypeOverride, // Ensure this is correctly named if used for override
+    fedexPackagingType: packagingTypeOverride, // Ensure this is correctly named if used for override
+    // Destructure package dimensions and units
+    packageLength,
+    packageWidth,
+    packageHeight,
+    dimensionUnits: dimensionUnitsOverride,
+    // ... any other specific overrides from body
   } = req.body;
+
+  // Validate that lineItemsFromRequest exists and is an array
+  if (!lineItemsFromRequest || !Array.isArray(lineItemsFromRequest) || lineItemsFromRequest.length === 0) {
+    logger.error(`[API generate-label] line_items missing or invalid in request body for order ${orderId}.`);
+    return res.status(400).json({ error: 'Request body must contain a valid line_items array.' });
+  }
 
   try {
     const orderRecord = await prisma.order.findUnique({
@@ -97,7 +116,21 @@ export default async function handler(
     const shipperProfileDb = userDb.shipperProfile;
     const integrationSettingsDb = userDb.integrationSettings;
 
+    if (!integrationSettingsDb) {
+      logger.error(`[API generate-label] Critical: integrationSettingsDb is null for user ${authUser.id}. This should have been caught by earlier checks. Order ${orderId}.`);
+      return res.status(500).json({ error: 'Integration settings are missing. Please contact support.' });
+    }
+    if (!shipperProfileDb) {
+      logger.error(`[API generate-label] Critical: shipperProfileDb is null for user ${authUser.id}. This should have been caught by earlier checks. Order ${orderId}.`);
+      return res.status(500).json({ error: 'Shipper profile data is missing. Please contact support.' });
+    }
+
     // --- Construct ShipperProfileData ---
+    if (!integrationSettingsDb.fedexApiKey || !integrationSettingsDb.fedexApiSecret || !integrationSettingsDb.fedexAccountNumber) {
+      logger.error(`[API generate-label] Critical: FedEx API credentials missing or null in DB for user ${authUser.id}. Order ${orderId}.`);
+      return res.status(500).json({ error: 'FedEx API credentials are not correctly configured. Please contact support.' });
+    }
+
     const shipperData: ShipperProfileData = {
       fedexApiKey: integrationSettingsDb.fedexApiKey,
       fedexApiSecret: integrationSettingsDb.fedexApiSecret,
@@ -113,7 +146,7 @@ export default async function handler(
       shipperCountryCode: shipperProfileDb.shipperCountryCode || '',
       shipperTinNumber: shipperProfileDb.shipperTinNumber || '',
       shipperTinType: shipperProfileDb.shipperTinType || '',
-      dutiesPaymentType: orderRecord.fedexDutiesPaymentType || shipperProfileDb.dutiesPaymentType || 'SENDER',
+      dutiesPaymentType: shipperProfileDb.dutiesPaymentType || 'SENDER',
       defaultCurrencyCode: shipperProfileDb.defaultCurrencyCode || 'USD',
       importerOfRecord: shipperProfileDb.importerOfRecord || undefined,
     };
@@ -121,7 +154,11 @@ export default async function handler(
     // --- Parse Shipping Address from Order ---
     let parsedShippingAddress: ShippingAddressParsed;
     if (orderRecord.shippingAddress && typeof orderRecord.shippingAddress === 'object') {
-        parsedShippingAddress = orderRecord.shippingAddress as ShippingAddressParsed;
+        if (Array.isArray(orderRecord.shippingAddress)) {
+            logger.error(`[API generate-label] shippingAddress is an array, which is invalid for order ${orderId}.`);
+            return res.status(400).json({ error: 'Shipping address format is invalid (array).' });
+        }
+        parsedShippingAddress = orderRecord.shippingAddress as unknown as ShippingAddressParsed;
     } else if (typeof orderRecord.shippingAddress === 'string') {
         try {
             parsedShippingAddress = JSON.parse(orderRecord.shippingAddress);
@@ -133,38 +170,44 @@ export default async function handler(
         logger.error(`[API generate-label] shippingAddress missing or invalid for order ${orderId}.`);
         return res.status(400).json({ error: 'Shipping address is missing or invalid on order.' });
     }
-     if (!parsedShippingAddress.recipientStreet1 || !parsedShippingAddress.recipientCity || !parsedShippingAddress.recipientPostal || !parsedShippingAddress.recipientCountry) {
-         return res.status(400).json({ error: 'Shipping address is incomplete (street, city, postal, country required).' });
+     if (!parsedShippingAddress.street1 || !parsedShippingAddress.city || !parsedShippingAddress.postal || !parsedShippingAddress.country) {
+         logger.warn('[API generate-label] Shipping address from DB is incomplete.', { parsedShippingAddress });
+         return res.status(400).json({ error: 'Shipping address is incomplete (street, city, postal, country required). Details from DB: street1=' + parsedShippingAddress.street1 + ', city=' + parsedShippingAddress.city + ', postal=' + parsedShippingAddress.postal + ', country=' + parsedShippingAddress.country });
      }
 
     // --- Determine Effective Values (Overrides > Order DB > Shipper Profile Default > Hardcoded Default) ---
     const effectiveWeightKg =
       (typeof weightKgOverride === 'number' && weightKgOverride > 0) ? weightKgOverride :
-      (orderRecord.weightKg && orderRecord.weightKg > 0) ? orderRecord.weightKg :
       (shipperProfileDb.defaultWeightKg && shipperProfileDb.defaultWeightKg > 0) ? shipperProfileDb.defaultWeightKg :
       0.5;
 
-    const effectiveServiceType =
-      serviceTypeOverride ||
-      orderRecord.fedexServiceType ||
-      shipperProfileDb.defaultServiceType ||
-      fedexOptionsData.serviceTypes[0].value;
+    // Simplified service type logic: always international
+    let chosenServiceType = serviceTypeOverride || shipperProfileDb.defaultServiceType;
+    const validInternationalServices = fedexOptionsData.serviceTypes
+        .filter(s => s.value.toUpperCase().includes('INTERNATIONAL') || s.label.toUpperCase().includes('INTERNATIONAL'))
+        .map(s => s.value);
+    
+    if (!chosenServiceType || !validInternationalServices.includes(chosenServiceType.toUpperCase())) {
+        if (chosenServiceType) {
+            logger.warn(`[API generate-label] Order ${orderId}: Service '${chosenServiceType}' is not a recognized international service. Defaulting to INTERNATIONAL_PRIORITY.`);
+        } else {
+            // Remove debug logging
+            // logger.info(`[API generate-label] Order ${orderId}: No service type specified. Defaulting to INTERNATIONAL_PRIORITY.`);
+        }
+        chosenServiceType = 'INTERNATIONAL_PRIORITY'; // Default international service
+    }
+    const effectiveServiceType = chosenServiceType;
 
     const effectivePackagingType =
       packagingTypeOverride ||
-      orderRecord.fedexPackagingType ||
       shipperProfileDb.defaultPackagingType ||
       fedexOptionsData.packagingTypes.find(p => p.value === 'YOUR_PACKAGING')?.value ||
       fedexOptionsData.packagingTypes[0].value;
 
     const effectivePickupType =
-      orderRecord.fedexPickupType ||
-      shipperProfileDb.defaultPickupType ||
       'DROPOFF_AT_FEDEX_LOCATION';
 
     const effectiveLabelStockType =
-      orderRecord.labelStockType ||
-      shipperProfileDb.defaultLabelStockType ||
       'PAPER_4X6';
 
     const effectiveCurrency = orderRecord.currency || shipperProfileDb.defaultCurrencyCode || 'USD';
@@ -175,117 +218,225 @@ export default async function handler(
         ? shipperProfileDb.defaultShippingChargesPaymentType
         : 'SENDER';
 
+    // --- HS-code sanitation (for overrides and defaults) ---
+    const sanitizeAndValidateHsCode = (rawHs: string | undefined | null): string | undefined => {
+      if (!rawHs) return undefined;
+      const cleanedHs = String(rawHs).replace(/\D/g, ''); // keep digits only
+      return cleanedHs.length >= 6 && cleanedHs.length <= 10 ? cleanedHs : undefined;
+    };
+
+    const sanitizeDescription = (desc: string | undefined | null): string => {
+      if (!desc) return 'Product';
+      let sanitized = String(desc).replace(/&#39;/g, "'");
+      if (sanitized.length > 40) {
+        sanitized = sanitized.substring(0, 37) + '...';
+      }
+      return sanitized;
+    };
+
+    const validGlobalHsOverride = sanitizeAndValidateHsCode(harmonizedCodeOverride);
+    const DEFAULT_FALLBACK_HS_CODE_FOR_TYPE_CHECKER = '000000';
+
     // --- Prepare OrderRowItems for ETD ---
     const etdDefaults = shipperProfileDb ? {
       weightKg: shipperProfileDb.defaultWeightKg || 0.5,
-      harmonizedCode: shipperProfileDb.defaultHarmonizedCode || '610910',
-      countryOfMfg: shipperProfileDb.defaultCountryOfMfg || 'TR',
-    } : { weightKg: 0.5, harmonizedCode: '610910', countryOfMfg: 'TR' };
-    const orderRowItems: OrderRowItem[] = orderRecord.items.map(item => ({
-      description: item.productName || 'Product',
-      quantity: item.quantity || 1,
-      unitPrice: item.unitPrice || 1,
-      weightKg: item.weightKg || etdDefaults.weightKg,
-      countryOfMfg: item.countryOfMfg || etdDefaults.countryOfMfg,
-      harmonizedCode: item.harmonizedCode || etdDefaults.harmonizedCode,
-    }));
+      harmonizedCode: shipperProfileDb.defaultHarmonizedCode || '000000', // Fallback HS if all else fails
+      countryOfMfg: shipperProfileDb.defaultCountryOfMfg || 'CN',     // Fallback CoM if all else fails
+    } : { weightKg: 0.5, harmonizedCode: '000000', countryOfMfg: 'CN' };
 
-    if (orderRowItems.length === 0 && shipperData.shipperCountryCode.toUpperCase() !== parsedShippingAddress.recipientCountry.toUpperCase()) {
-        orderRowItems.push({
-            description: orderRecord.commodityDesc || 'General Goods',
+    // Use line_items from request body to construct items for FedEx - MAPPING TO FEDEX 'COMMODITIES' STRUCTURE
+    const commodities: any[] = lineItemsFromRequest.map((item: any) => {
+      const itemHs = sanitizeAndValidateHsCode(item.hs_code);
+      const orderRecordHs = sanitizeAndValidateHsCode(orderRecord.harmonizedCode);
+      const shipperProfileHs = sanitizeAndValidateHsCode(shipperProfileDb.defaultHarmonizedCode);
+      const effectiveItemHs = itemHs || validGlobalHsOverride || orderRecordHs || shipperProfileHs;
+
+      const itemWeightKg = item.weight || weightKgOverride || orderRecord.weightKg || etdDefaults.weightKg;
+      const itemUnitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : 0;
+
+      return {
+        description: sanitizeDescription(item.title || commodityDescOverride || orderRecord.commodityDesc || 'Product'),
+        quantity: item.quantity || 1,
+        quantityUnits: 'EA', // Added quantityUnits
+        unitPrice: { amount: itemUnitPrice, currency: effectiveCurrency }, // Nested unitPrice
+        customsValue: { amount: itemUnitPrice * (item.quantity || 1), currency: effectiveCurrency }, // Nested customsValue per item
+        weight: { units: 'KG', value: itemWeightKg }, // Nested weight
+        countryOfManufacture: item.country_of_origin || countryOfMfgOverride || orderRecord.countryOfMfg || etdDefaults.countryOfMfg,
+        ...(effectiveItemHs && { harmonizedCode: effectiveItemHs }), // Uses correct type now
+        // sku: item.sku || undefined // SKU is not typically part of FedEx commodities array
+      };
+    });
+
+    if (commodities.length === 0) {
+        // Remove debug warning
+        // logger.warn(`[API generate-label] Order ${orderId}: commodities array is empty. Adding a fallback item.`);
+        commodities.push({
+            description: sanitizeDescription(commodityDescOverride || orderRecord.commodityDesc || 'General Goods'),
             quantity: 1,
-            unitPrice: parseFloat(String(orderRecord.totalPrice)) || 0,
-            totalPrice: parseFloat(String(orderRecord.totalPrice)) || 0,
-            weightKg: effectiveWeightKg,
-            harmonizedCode: orderRecord.harmonizedCode || shipperProfileDb.defaultHarmonizedCode || '000000',
-            countryOfMfg: orderRecord.countryOfMfg || shipperProfileDb.defaultCountryOfMfg || 'CN',
+            quantityUnits: 'EA',
+            unitPrice: { amount: 0, currency: effectiveCurrency },
+            customsValue: { amount: 0, currency: effectiveCurrency },
+            weight: { units: 'KG', value: effectiveWeightKg },
+            countryOfManufacture: countryOfMfgOverride || orderRecord.countryOfMfg || etdDefaults.countryOfMfg,
+            ...( (validGlobalHsOverride || sanitizeAndValidateHsCode(orderRecord.harmonizedCode) || sanitizeAndValidateHsCode(etdDefaults.harmonizedCode)) && 
+               { harmonizedCode: validGlobalHsOverride || sanitizeAndValidateHsCode(orderRecord.harmonizedCode) || sanitizeAndValidateHsCode(etdDefaults.harmonizedCode) }
+            )
         });
     }
+    
+    const totalCustomsAmount = commodities.reduce((sum, item) => sum + (item.customsValue?.amount || 0), 0);
 
-    // --- Construct OrderRow ---
-    const orderDataForFedex: OrderRow = {
-      orderId: orderRecord.id,
-      orderNumber: orderRecord.orderNumber || orderRecord.id,
-      recipientFname: parsedShippingAddress.recipientFirstName || orderRecord.customerName?.split(' ')[0] || 'N/A',
-      recipientLname: parsedShippingAddress.recipientLastName || orderRecord.customerName?.split(' ').slice(1).join(' ') || 'N/A',
-      recipientCompany: parsedShippingAddress.recipientCompany || undefined,
-      recipientStreet1: parsedShippingAddress.recipientStreet1,
-      recipientStreet2: parsedShippingAddress.recipientStreet2 || undefined,
-      recipientCity: parsedShippingAddress.recipientCity,
-      recipientState: parsedShippingAddress.recipientState || undefined,
-      recipientPostal: parsedShippingAddress.recipientPostal,
-      recipientCountry: parsedShippingAddress.recipientCountry,
-      recipientPhone: parsedShippingAddress.recipientPhone || '0000000000',
-      recipientEmail: parsedShippingAddress.recipientEmail || undefined,
+    // --- Construct OrderRow (which maps to FedEx requestedShipment) ---
+    const orderDataForFedex: any = { // Changed to any to allow dynamic structure for FedEx
+      orderId: orderRecord.id, // Internal reference, not for FedEx payload directly at this level
+      orderNumber: orderRecord.orderNumber || orderRecord.id, // Internal reference
+
+      // Recipient Details (These will be mapped to shipper.contact, recipient.contact, recipient.address by createFedexShipment)
+      recipientFname: parsedShippingAddress.firstName || orderRecord.customerName?.split(' ')[0] || 'N/A',
+      recipientLname: parsedShippingAddress.lastName || orderRecord.customerName?.split(' ').slice(1).join(' ') || 'N/A',
+      recipientCompany: parsedShippingAddress.company || undefined,
+      recipientStreet1: parsedShippingAddress.street1,
+      recipientStreet2: parsedShippingAddress.street2 || undefined,
+      recipientCity: parsedShippingAddress.city,
+      recipientState: parsedShippingAddress.state || undefined,
+      recipientPostal: parsedShippingAddress.postal,
+      recipientCountry: parsedShippingAddress.country,
+      recipientPhone: parsedShippingAddress.phone || '0000000000',
+      recipientEmail: parsedShippingAddress.email || undefined,
       isResidential: parsedShippingAddress.isResidential === true,
-      weightKg: effectiveWeightKg,
+      
+      // Shipment Details (These will be mapped to requestedShipment by createFedexShipment)
       serviceType: effectiveServiceType,
       packagingType: effectivePackagingType,
-      pickupType: effectivePickupType,
-      customsValue: parseFloat(String(orderRecord.totalPrice)) || 0,
-      currency: effectiveCurrency,
-      shippingChargesPaymentType: effectiveShippingChargesPaymentType,
-      commodityDesc: orderRecord.commodityDesc || orderRowItems[0]?.description || 'Goods',
-      countryOfMfg: orderRecord.countryOfMfg || orderRowItems[0]?.countryOfMfg || shipperProfileDb.defaultCountryOfMfg || 'CN',
-      harmonizedCode: orderRecord.harmonizedCode || orderRowItems[0]?.harmonizedCode || shipperProfileDb.defaultHarmonizedCode || '000000',
-      declaredValue: parseFloat(String(orderRecord.totalPrice)) || undefined,
-      packageLength: orderRecord.packageLength || undefined,
-      packageWidth: orderRecord.packageWidth || undefined,
-      packageHeight: orderRecord.packageHeight || undefined,
-      dimensionUnits: orderRecord.dimensionUnits as 'CM' | 'IN' || undefined,
-      labelStockType: effectiveLabelStockType,
-      signatureType: orderRecord.signatureType || undefined,
-      sendCommercialInvoiceViaEtd: orderRecord.sendCommercialInvoiceViaEtd === undefined ? true : orderRecord.sendCommercialInvoiceViaEtd,
-      termsOfSale: orderRecord.termsOfSale || shipperProfileDb.defaultTermsOfSale || 'DDU',
-      items: orderRowItems,
+      pickupType: 'USE_SCHEDULED_PICKUP', // Changed as per suggestion
+      
+      // Dimensions - logic for YOUR_PACKAGING remains, but these are part of requestedShipment.requestedPackageLineItems[0]
+      // The createFedexShipment service should handle placing these correctly.
+      // This top-level structure is for data collection.
+      packageLength: (effectivePackagingType === 'YOUR_PACKAGING' && typeof packageLength === 'number' && packageLength > 0) ? packageLength : undefined,
+      packageWidth: (effectivePackagingType === 'YOUR_PACKAGING' && typeof packageWidth === 'number' && packageWidth > 0) ? packageWidth : undefined,
+      packageHeight: (effectivePackagingType === 'YOUR_PACKAGING' && typeof packageHeight === 'number' && packageHeight > 0) ? packageHeight : undefined,
+      dimensionUnits: (effectivePackagingType === 'YOUR_PACKAGING') ? (dimensionUnitsOverride || 'CM') : undefined,
+      
+      // Weight - This becomes requestedShipment.requestedPackageLineItems[0].weight
+      weightKg: effectiveWeightKg, // The createFedexShipment service will map this to { units: 'KG', value: effectiveWeightKg }
+
+      // Customs Clearance Detail
+      customsClearanceDetail: {
+        commercialInvoice: {
+          // Usecase: generate CI if not provided by customer. But ETD is preferred.
+          // For ETD, specific document content might be needed here or handled by FedEx.
+        },
+        dutiesPayment: {
+          paymentType: shipperProfileDb.dutiesPaymentType || 'SENDER', // Matches shipperData
+          // payor.responsibleParty will be set up by createFedexShipment based on shipperData/recipientData
+        },
+        totalCustomsValue: { amount: totalCustomsAmount, currency: effectiveCurrency },
+        commodities: commodities, // Use the refactored commodities array
+        isDocumentOnly: false, // Assuming not just documents
+        // importerOfRecord: shipperData.importerOfRecord // TODO: Confirm if this should be here or handled by shipperData only
+      },
+
+      shippingChargesPaymentType: effectiveShippingChargesPaymentType, // Becomes requestedShipment.shippingChargesPayment
+      
+      labelStockType: effectiveLabelStockType, // Becomes requestedShipment.labelSpecification.labelStockType
+      // Removed top-level harmonizedCode, countryOfMfg, commodityDesc, customsValue, declaredValue
+      // These are now primarily handled within the commodities.
+      // Top-level commodityDesc in createFedexShipment can use the first item's description as a fallback if needed.
+
+      // ETD Setup
+      ...( (sendCommercialInvoiceViaEtdOverride ?? true) && { // Default to true if not specified in request
+        shipmentSpecialServices: {
+          specialServiceTypes: ["ELECTRONIC_TRADE_DOCUMENTS"],
+          etdDetail: { "requestedDocumentTypes": ["COMMERCIAL_INVOICE"] }
+        },
+        shippingDocumentSpecification: { // This section tells FedEx what docs you want (e.g., its generated CI)
+          shippingDocumentTypes: ["COMMERCIAL_INVOICE"], // Request FedEx to generate CI if ETD is used.
+          // commercialInvoiceDetail for providing specific data for the CI can be added here if needed.
+          // For now, letting FedEx generate based on commodity data.
+        }
+      }),
+      
+      // The 'items' field here is a bit ambiguous now that we have 'commodities'.
+      // It was used by orderDataForFedex: OrderRow type.
+      // For createFedexShipment, the 'commodities' array is the source of truth for customs.
+      // We'll keep 'items' if the OrderRow type expects it for other purposes, but ensure createFedexShipment uses 'commodities'.
+      // Let's remove it from this direct payload construction for FedEx if it's redundant with `customsClearanceDetail.commodities`
+      // items: orderRowItems, // OrderRowItems was the old structure. Commodities is the new.
     };
 
-    logger.info(`[API generate-label] FedEx request payload for ETD debug:`, { payload: orderDataForFedex });
+    // Clean up undefined dimension fields if not YOUR_PACKAGING
+    if (orderDataForFedex.packagingType !== 'YOUR_PACKAGING') {
+      delete orderDataForFedex.packageLength;
+      delete orderDataForFedex.packageWidth;
+      delete orderDataForFedex.packageHeight;
+      delete orderDataForFedex.dimensionUnits;
+    }
+    
+    // The `createFedexShipment` function will take `orderDataForFedex` (now `any`)
+    // and `shipperData` and construct the final nested FedEx JSON payload.
+    // It needs to be aware of these structural changes, especially:
+    // - `customsClearanceDetail` object
+    // - `commodities` array structure
+    // - `shipmentSpecialServices` and `shippingDocumentSpecification` for ETD
+    // - Mapping `weightKg` to the nested weight object in requestedPackageLineItems
+    // - Mapping recipient and shipper details to their correct places.
+
+    // Remove intermediate data logging
+    // logger.info(`[API generate-label] Data prepared for createFedexShipment (intermediate structure):`, { payload: orderDataForFedex });
 
     // --- Call the unified FedEx service ---
     const fedexResult: FedexShipmentResult = await createFedexShipment(orderDataForFedex, shipperData);
 
-    // --- Update order with tracking info on success ---
-    const updatedOrder = await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        trackingNumber: fedexResult.trackingNumber,
-        shippingLabelUrl: fedexResult.labelUrl,
-        shipmentStatus: 'LABEL_GENERATED',
-        shippedAt: new Date(),
-        fedexServiceType: effectiveServiceType,
-        fedexPackagingType: effectivePackagingType,
-        weightKg: effectiveWeightKg,
-      },
-    });
+    // --- Create LabelJob record for each line item (tracking info, label URL, etc) ---
+    const labelJobs = await Promise.all(
+      lineItemsFromRequest.map(async (item) => {
+        return prisma.labelJob.create({
+          data: {
+            orderItemId: item.id,
+            carrier: 'FEDEX',
+            status: 'created',
+            pdfUrl: fedexResult.labelUrl,
+            trackingNumber: fedexResult.trackingNumber,
+          },
+        });
+      })
+    );
 
+    // Keep only essential success logging
     logger.info(`[API generate-label] Label generated successfully for order ${orderId}. Tracking: ${fedexResult.trackingNumber}`);
     return res.status(200).json({
-      trackingNumber: updatedOrder.trackingNumber || undefined,
-      labelUrl: updatedOrder.shippingLabelUrl || undefined,
-      shipmentStatus: updatedOrder.shipmentStatus || undefined,
-      shippedAt: updatedOrder.shippedAt?.toISOString() || undefined,
+      trackingNumber: fedexResult.trackingNumber,
+      labelUrl: fedexResult.labelUrl,
+      shipmentStatus: 'LABEL_GENERATED',
+      shippedAt: new Date().toISOString(),
       alerts: fedexResult.alerts,
     });
 
   } catch (error: any) {
-    logger.error(`[API generate-label] Error generating label for order ${orderId}:`, new Error(JSON.stringify({ message: error.message, stack: error.stack, details: error.responseErrors })));
-    let statusCode = 500;
-    const message = error.message || 'Failed to generate FedEx label.';
+    logger.error(`[API generate-label] Error generating label for order ${orderId}:`, error);
 
-    if (message.includes('validation failed') ||
-        message.includes('Invalid') ||
-        message.includes('Missing') ||
-        message.includes('not found') ||
-        message.includes('incomplete')) {
-      statusCode = 400;
-    } else if (message.startsWith('FedEx')) {
-      statusCode = 502;
+    // Create failed LabelJob records for each line item
+    try {
+      await Promise.all(
+        lineItemsFromRequest.map(async (item) => {
+          return prisma.labelJob.create({
+            data: {
+              orderItemId: item.id,
+              carrier: 'FEDEX',
+              status: 'failed',
+              errorMessage: error.message || 'Unknown error during label generation',
+            },
+          });
+        })
+      );
+    } catch (dbError) {
+      logger.error(`[API generate-label] Failed to create error LabelJob records:`, dbError);
     }
 
-    return res.status(statusCode).json({
-        error: message,
-        details: error.responseErrors || error.stack?.substring(0, 500)
+    return res.status(500).json({
+      error: error.message || 'Failed to generate label',
+      details: error.details || error,
     });
   }
 } 

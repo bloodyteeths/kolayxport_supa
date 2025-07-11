@@ -2,6 +2,15 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 
 // Define the shape of the order data we expect from the API
+export interface Shipment {
+  id: string;
+  status: string;
+  trackingNumber?: string;
+  pdfUrl?: string;
+  createdAt?: string;
+  [key: string]: any; // For any additional properties
+}
+
 export interface UIOrder {
   id: string;
   marketplace: string;
@@ -49,6 +58,7 @@ export interface UIOrder {
   source?: string;
   channel?: string;
   line_items?: any[];
+  shipments?: Shipment[];
 }
 
 interface OrdersApiResponse {
@@ -121,8 +131,34 @@ export function useOrders(page: number = 1, pageSize: number = 20, filters: Reco
         const source = order.source || (isEtsy ? 'shippo' : 'veeqo');
         const channel = order.channel || (isEtsy ? 'etsy' : 'other');
 
-        // Set labelStatus based on shippingLabelUrl
-        const labelStatus = order.shippingLabelUrl ? 'created' : 'not_created';
+        // Set labelStatus based on shippingLabelUrl, trackingNumber, shipments, or existing labelStatus
+        const hasShipments = order.shipments && Array.isArray(order.shipments) && order.shipments.length > 0;
+        const hasValidShipment = hasShipments && 
+          order.shipments?.some(s => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
+          
+        const hasLabel = order.shippingLabelUrl || 
+                        order.trackingNumber || 
+                        order.labelStatus === 'created' ||
+                        hasValidShipment;
+        
+        const labelStatus = hasLabel ? 'created' : 'not_created';
+        
+        // Debug log for label status determination
+        if (typeof window !== 'undefined' && labelStatus === 'created') {
+          console.log(`[useOrders] Order ${order.orderNumber} label status set to 'created' because of:`, {
+            hasShippingLabelUrl: !!order.shippingLabelUrl,
+            hasTrackingNumber: !!order.trackingNumber,
+            hasShipments,
+            hasValidShipment,
+            existingLabelStatus: order.labelStatus,
+            shipments: order.shipments?.map(s => ({
+              id: s?.id,
+              status: s?.status,
+              trackingNumber: s?.trackingNumber,
+              pdfUrl: s?.pdfUrl
+            }))
+          });
+        }
 
         // Use marketplaceOrderDate or createdAt for order date
         const orderDate = order.marketplaceOrderDate || order.createdAt || '';

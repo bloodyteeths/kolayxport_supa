@@ -12,18 +12,40 @@ export interface LogEntry {
   timestamp: Date;
 }
 
+// Helper function to serialize errors properly
+function serializeError(error: any): any {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: (error as any).code,
+      ...(error as any)
+    };
+  }
+  return error;
+}
+
+// Custom JSON replacer that handles Error objects
+function jsonReplacer(key: string, value: any): any {
+  if (value instanceof Error) {
+    return serializeError(value);
+  }
+  return value;
+}
+
 export async function log(entry: Omit<LogEntry, 'timestamp'>) {
   const logEntry: LogEntry = {
     ...entry,
     timestamp: new Date(),
   };
 
-  // Console logging for development
+  // Console logging for development with proper error serialization
   if (process.env.NODE_ENV !== 'production') {
     const consoleMethod = entry.level === 'error' ? 'error' : 
                          entry.level === 'warn' ? 'warn' : 
                          entry.level === 'debug' ? 'debug' : 'log';
-    console[consoleMethod](JSON.stringify(logEntry, null, 2));
+    console[consoleMethod](JSON.stringify(logEntry, jsonReplacer, 2));
   }
 
   // Store in database
@@ -41,7 +63,7 @@ export async function log(entry: Omit<LogEntry, 'timestamp'>) {
     });
   } catch (error) {
     // Fallback to console if DB logging fails
-    console.error('Failed to store log entry:', error);
+    console.error('Failed to store log entry:', serializeError(error));
   }
 }
 

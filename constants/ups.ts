@@ -1,12 +1,12 @@
 // UPS Service Types (International)
 export const UPS_SERVICE_TYPES = [
-  { value: 'UPS_SAVER', label: 'UPS Saver' },
-  { value: 'UPS_EXPRESS', label: 'UPS Express' },
-  { value: 'UPS_EXPRESS_PLUS', label: 'UPS Express Plus' },
-  { value: 'UPS_EXPEDITED', label: 'UPS Expedited' },
-  { value: 'UPS_STANDARD', label: 'UPS Standard' },
-  { value: 'UPS_WORLDWIDE_EXPRESS', label: 'UPS Worldwide Express' },
-  { value: 'UPS_WORLDWIDE_EXPRESS_PLUS', label: 'UPS Worldwide Express Plus' },
+  { value: '65', label: 'UPS Saver' },                // UPS Saver
+  { value: '07', label: 'UPS Express' },              // UPS Express
+  { value: '54', label: 'UPS Express Plus' },         // UPS Express Plus
+  { value: '08', label: 'UPS Expedited' },            // UPS Expedited
+  { value: '11', label: 'UPS Standard' },             // UPS Standard
+  { value: '07', label: 'UPS Worldwide Express' },    // UPS Worldwide Express (same as Express)
+  { value: '54', label: 'UPS Worldwide Express Plus' } // UPS Worldwide Express Plus (same as Express Plus)
 ];
 
 // UPS Package Types

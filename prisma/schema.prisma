@@ -275,7 +275,7 @@ model LabelJob {
 
 model Shipment {
   id             String     @id @default(cuid())
-  orderId        String     @unique
+  orderId        String
   orderItemId    String?
   carrier        String
   status         String

@@ -7,7 +7,6 @@ on:
 jobs:
   auto-sync-orders:
     runs-on: ubuntu-latest
-    environment: production # Add environment for better secret management
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -20,9 +19,9 @@ jobs:
       - name: Run auto-sync script
         env:
           # These secrets must be configured in the repository settings
-          # Settings > Secrets and variables > Actions > Environment secrets
-          KOLAYXPORT_BASE_URL: ${{ vars.KOLAYXPORT_BASE_URL }}
+          # Settings > Secrets and variables > Actions > Repository secrets
+          KOLAYXPORT_BASE_URL: ${{ secrets.KOLAYXPORT_BASE_URL }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          NEXTAUTH_URL: ${{ vars.NEXTAUTH_URL }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
         run: node scripts/auto-sync-all-users.js

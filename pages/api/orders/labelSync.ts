@@ -3,7 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import prisma from '../../../lib/prisma';
 import { getIntegrationCreds } from '../../../lib/config';
 import { fetchVeeqoOrders, VeeqoOrder } from '@integrations/veeqo';
-import { fetchShippoOrders, ShippoOrder } from '@integrations/shippo';
+import { fetchShippoOrders } from '@integrations/shippo';
+import { ShippoOrder } from '../../../lib/types';
 
 type Normalised = {
   externalId: string;
@@ -143,7 +144,7 @@ export default async function handler(
           customerName: raw.to_address?.name ?? null,
           status: 'imported',
           currency: raw.currency ?? null,
-          totalPrice: raw.total_price ? parseFloat(raw.total_price) : raw.subtotal_price ? parseFloat(raw.subtotal_price) : null,
+          totalPrice: raw.total_price ? parseFloat(raw.total_price) : null,
         };
 
         itemsDTO =

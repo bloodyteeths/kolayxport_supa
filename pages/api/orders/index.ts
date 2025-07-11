@@ -152,6 +152,20 @@ export default async function handler(
       paramIndex++;
     }
 
+    if (startDate) {
+      whereClause += ` AND o."createdAt" >= $${paramIndex}`;
+      params.push(startDate as string);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      const endOfDay = new Date(endDate as string);
+      endOfDay.setHours(23, 59, 59, 999);
+      whereClause += ` AND o."createdAt" <= $${paramIndex}`;
+      params.push(endOfDay.toISOString());
+      paramIndex++;
+    }
+
     // Pagination
     const offset = (page - 1) * pageSize;
     const limit = pageSize;
@@ -170,9 +184,11 @@ export default async function handler(
         o."shippingAddress" as "shippingAddress",
         o."rawData" as "rawData",
         o."createdAt" as "marketplaceOrderDate",
+        o."trackingNumber" as "trackingNumber",
+        o."labelStatus" as "labelStatus",
         COALESCE(
-          json_agg(
-            json_build_object(
+          json_agg(DISTINCT
+            jsonb_build_object(
               'id', oi.id,
               'sku', oi.sku,
               'productName', oi."productName",
@@ -195,29 +211,24 @@ export default async function handler(
               'trackingNumber', lj."trackingNumber"
             )
           ) FILTER (WHERE oi.id IS NOT NULL),
-          '[]'
+          '[]'::json
         ) as items,
         COALESCE(
-          json_agg(
-            json_build_object(
-              'id', sp.id,
-              'shipperName', sp."shipperName",
-              'shipperPersonName', sp."shipperPersonName",
-              'shipperPhoneNumber', sp."shipperPhoneNumber",
-              'shipperStreet1', sp."shipperStreet1",
-              'shipperStreet2', sp."shipperStreet2",
-              'shipperCity', sp."shipperCity",
-              'shipperStateCode', sp."shipperStateCode",
-              'shipperPostalCode', sp."shipperPostalCode",
-              'shipperCountryCode', sp."shipperCountryCode"
+          json_agg(DISTINCT
+            jsonb_build_object(
+              'id', s.id,
+              'status', s.status,
+              'trackingNumber', s."trackingNumber",
+              'pdfUrl', s."pdfUrl",
+              'createdAt', s."createdAt"
             )
-          ) FILTER (WHERE sp.id IS NOT NULL),
-          '[]'
-        ) as shipperProfiles
+          ) FILTER (WHERE s.id IS NOT NULL),
+          '[]'::json
+        ) as shipments
       FROM "Order" o
       LEFT JOIN "OrderItem" oi ON oi."orderId" = o.id
       LEFT JOIN "LabelJob" lj ON lj."orderItemId" = oi.id
-      LEFT JOIN "ShipperProfile" sp ON sp."userId" = o."userId"
+      LEFT JOIN "Shipment" s ON s."orderId" = o.id
       ${whereClause}
       GROUP BY o.id
       ORDER BY COALESCE(o."uiOrderDate", o."createdAt") ${sort === 'asc' ? 'ASC' : 'DESC'}
@@ -230,25 +241,16 @@ export default async function handler(
     // console.log('SQL Params:', params);
 
     const result = await pool.query(ordersQuery, params);
-    console.log('[API Orders] Raw Result Rows:', result.rows.length);
-    console.log('[API Orders] Sample Order:', result.rows[0]);
-
-    // Query total count
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM "Order" o
-      ${whereClause}
-    `;
-    const { rows: countRows2 } = await pool.query(countQuery, params.slice(0, paramIndex - 1));
-    const total = parseInt(countRows2[0]?.total || '0', 10);
-    // Debug log for raw order
-    // result.rows.forEach((rawOrder: any) => {
-    //   console.debug('rawOrder:', JSON.stringify(rawOrder, null, 2));
-    //   console.debug('Order ID:', rawOrder.id, 'createdAt:', rawOrder.createdAt);
-    // });
+    // To re-enable order debug logs, set ORDERS_DEBUG=1 in your environment and uncomment the lines below.
+    // if (process.env.ORDERS_DEBUG === '1') {
+    //   console.log('[API Orders] Raw Result Rows:', result.rows.length);
+    //   console.log('[API Orders] Sample Order:', result.rows[0]);
+    // }
     let processedOrders = await Promise.all(result.rows.map(async (rawOrder: any) => {
-      console.log('[API Orders] Processing order:', rawOrder.id);
-      console.log('[API Orders] Order items:', rawOrder.items);
+      // if (process.env.ORDERS_DEBUG === '1') {
+      //   console.log('[API Orders] Processing order:', rawOrder.id);
+      //   console.log('[API Orders] Order items:', rawOrder.items);
+      // }
       
       // --- Address Extraction ---
       let primaryAddressSource: any = {};
@@ -299,17 +301,6 @@ export default async function handler(
       const recipientPostal  = effectiveAddress.postal  || effectiveAddress.recipientPostal  || effectiveAddress.zip || effectiveAddress.postcode || '';
       const recipientCountry = effectiveAddress.country || effectiveAddress.recipientCountry || '';
       const recipientPhone   = effectiveAddress.phone   || effectiveAddress.recipientPhone   || '';
-
-      // Skip orders with anonymized addresses
-      if (recipientStreet1 === '—' || recipientCity === '—' || recipientCountry === '—') {
-        // Remove verbose warning logging
-        // console.warn(`Skipping order ${String(rawOrder.id)} due to anonymized address`, {
-        //   street1: recipientStreet1,
-        //   city: recipientCity,
-        //   country: recipientCountry
-        // });
-        return null;
-      }
 
       // --- Line Items Mapping ---
       let itemsFromDb: any[] = [];
@@ -387,6 +378,8 @@ export default async function handler(
         channel: '',
         marketplaceOrderId: rawOrder.marketplaceOrderId || rawOrder.orderNumber || rawOrder.id || '',
         orderNumber: rawOrder.orderNumber || rawOrder.marketplaceOrderId || rawOrder.id || '',
+        trackingNumber: rawOrder.trackingNumber || null,
+        labelStatus: rawOrder.labelStatus || null,
       };
     }));
 
@@ -450,14 +443,6 @@ export default async function handler(
     async function dedupeAndFilter(raw: UIOrder[]): Promise<UIOrder[]> {
       const map = new Map<string, UIOrder>();
       for (const order of raw) {
-        // 3-A. Skip Veeqo Etsy/Amazon rows with no address
-        if (
-          order.source === 'veeqo' &&
-          ['Etsy', 'Amazon'].includes(order.marketplace) &&
-          !hasAddress(order)
-        ) {
-          continue;
-        }
         // 3-B. De-duplicate by marketplace+orderNumber
         const key = makeKey(order);
         const existing = map.get(key);
@@ -479,6 +464,15 @@ export default async function handler(
       }
       return Array.from(map.values());
     }
+
+    // Restore total count query
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM "Order" o
+      ${whereClause}
+    `;
+    const { rows: countRows2 } = await pool.query(countQuery, params.slice(0, paramIndex - 1));
+    const total = parseInt(countRows2[0]?.total || '0', 10);
 
     const cleanedOrders = await dedupeAndFilter(processedOrders.filter(Boolean));
     return res.status(200).json({

@@ -138,6 +138,16 @@ export interface VeeqoOrder {
     additional_options?: string;
     line_item_id?: string;
   }>;
+  allocations?: Array<{
+    id: number;
+    line_items?: Array<{
+      id: number;
+      quantity: number;
+      sellable?: any;
+      [key: string]: any;
+    }>;
+    [key: string]: any;
+  }>;
   [key: string]: any;
 }
 
@@ -186,4 +196,56 @@ export enum SyncType {
   ORDERS = 'ORDERS',
   PRODUCTS = 'PRODUCTS',
   INVENTORY = 'INVENTORY'
+}
+
+export interface ShippoOrder {
+  object_id: string;
+  order_status: string;
+  placed_at: string;
+  total_price: string;
+  currency: string;
+  shipping_address: {
+    name: string;
+    street1: string;
+    street2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+    phone: string | null;
+    email: string | null;
+  };
+  line_items: Array<{
+    object_id: string;
+    title: string;
+    quantity: number;
+    total_price: string;
+    currency: string;
+    weight: string;
+    sku: string | null;
+  }>;
+  metadata?: { notes?: string };
+  order_number?: string;
+  shop_app?: string; // Add shop_app for channel detection
+  to_address?: any; // Add to_address for address extraction
+}
+
+export interface ShippoResponse {
+  results: ShippoOrder[];
+  count: number;
+  has_more: boolean;
+}
+
+export interface ShippoAddress {
+  name?: string;
+  phone?: string;
+  street1?: string;
+  street2?: string;
+  city?: string;
+  state?: string;
+  postal?: string;
+  country?: string;
+  email?: string;
+  isResidential?: boolean;
+  company?: string;
 } 

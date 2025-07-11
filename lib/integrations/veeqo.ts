@@ -4,6 +4,8 @@
 import fetch from 'node-fetch';
 import { VeeqoOrder } from '../types';
 import { sleep } from '../utils';
+import prisma from '@/lib/prisma';
+import { logger } from '../logger';
 
 export type { VeeqoOrder };
 
@@ -23,45 +25,39 @@ const VEEQO_MAX_DELAY = 60000; // ms (max wait on repeated rate limits)
  * @param page Page number (default 1)
  * @param perPage Orders per page (default 100)
  */
-export async function fetchVeeqoOrders({ apiKey, page = 1, perPage = 100 }: { apiKey: string; page?: number; perPage?: number }): Promise<VeeqoOrder[]> {
-  if (!apiKey) throw new Error('Missing Veeqo API key');
-  const url = `https://api.veeqo.com/orders?page=${page}&per_page=${perPage}&sort_direction=desc`;
-  let retries = 0;
-  let delay = VEEQO_MIN_DELAY;
-  let lastError: any = null;
+export async function fetchVeeqoOrders(options: { apiKey: string; page?: number, perPage?: number, lastSync?: Date }): Promise<VeeqoOrder[]> {
+  const { apiKey, page = 1, perPage = 100, lastSync } = options;
+  try {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: perPage.toString(),
+    });
 
-  while (retries < VEEQO_MAX_RETRIES) {
-    try {
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          'x-api-key': apiKey,
-        },
-      });
-      if (res.status === 429) {
-        // Rate limited, back off and retry
-        delay = Math.min(VEEQO_MIN_DELAY * Math.pow(2, retries), VEEQO_MAX_DELAY);
-        console.warn(`[Veeqo] Rate limited on page ${page}, retrying in ${delay / 1000}s (retry ${retries + 1}/${VEEQO_MAX_RETRIES})`);
-        await sleep(delay);
-        retries++;
-        continue;
-      }
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Veeqo API ${res.status}: ${text}`);
-      }
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    } catch (error) {
-      lastError = error;
-      delay = Math.min(VEEQO_MIN_DELAY * Math.pow(2, retries), VEEQO_MAX_DELAY);
-      console.warn(`[Veeqo] Error fetching page ${page}: ${error?.message || error}. Retrying in ${delay / 1000}s (retry ${retries + 1}/${VEEQO_MAX_RETRIES})`);
-      await sleep(delay);
-      retries++;
+    if (lastSync) {
+      // Veeqo expects 'YYYY-MM-DD HH:MM:SS'
+      const formattedDate = lastSync.toISOString().replace('T', ' ').substring(0, 19);
+      params.append('updated_at_min', formattedDate);
     }
+
+    const url = `https://api.veeqo.com/orders?${params.toString()}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'x-api-key': apiKey
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Veeqo API error: ${response.status} ${await response.text()}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    logger.error('Failed to fetch Veeqo orders', error);
+    return [];
   }
-  throw new Error(`Failed to fetch Veeqo orders for page ${page} after ${VEEQO_MAX_RETRIES} retries: ${lastError?.message || lastError}`);
 }
 
 
@@ -71,30 +67,53 @@ export async function fetchVeeqoOrders({ apiKey, page = 1, perPage = 100 }: { ap
  * @param perPage Orders per page (default 100)
  * @returns All orders
  */
-export async function fetchAllVeeqoOrders({ apiKey, perPage = 10 }: { apiKey: string; perPage?: number }): Promise<VeeqoOrder[]> {
+export async function fetchAllVeeqoOrders(options: { apiKey: string, lastSync?: Date }): Promise<VeeqoOrder[]> {
+  const { apiKey, lastSync } = options;
   let allOrders: VeeqoOrder[] = [];
   let page = 1;
-  let totalPages = 0;
-  while (true) {
-    console.log(`[Veeqo] Fetching page ${page}...`);
+  const perPage = 100;
+  let hasMore = true;
+
+  while (hasMore) {
     try {
-      const orders = await fetchVeeqoOrders({ apiKey, page, perPage });
-      if (!orders.length) break;
-      if (page === 1) {
-        // Log the first 2 raw orders for debugging
-        console.log('[Veeqo] First 2 raw orders:', JSON.stringify(orders.slice(0, 2), null, 2));
+      const params = new URLSearchParams({
+        page: page.toString(),
+        page_size: perPage.toString(),
+      });
+      
+      if (lastSync) {
+        // Veeqo expects 'YYYY-MM-DD HH:MM:SS'
+        const formattedDate = lastSync.toISOString().replace('T', ' ').substring(0, 19);
+        params.append('updated_at_min', formattedDate);
       }
-      allOrders = allOrders.concat(orders);
-      if (orders.length < perPage) break; // Last page
-      page++;
-      await sleep(VEEQO_MIN_DELAY); // Normal delay between pages
+
+      const url = `https://api.veeqo.com/orders?${params.toString()}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'x-api-key': apiKey
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Veeqo API error: ${response.status} ${await response.text()}`);
+      }
+      
+      const orders: VeeqoOrder[] = await response.json();
+      
+      if (orders.length > 0) {
+        allOrders = allOrders.concat(orders);
+        page++;
+      } else {
+        hasMore = false;
+      }
     } catch (error) {
-      console.error(`[Veeqo] Failed to fetch page ${page}: ${error?.message || error}`);
-      // If one page fails after all retries, abort sync
-      break;
+      logger.error('Failed to fetch Veeqo orders', error);
+      hasMore = false; // Stop on error
     }
   }
-  console.log(`[Veeqo] Fetched total ${allOrders.length} orders.`);
   return allOrders;
 }
 

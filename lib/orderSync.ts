@@ -1,16 +1,26 @@
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { logger } from './logger';
-import { startSync, updateSyncProgress, completeSync } from './sync-status';
+import { startSync, updateSyncProgress as updateSyncStatus, completeSync } from './sync-status';
 import { SyncType } from './types';
 import fetch from 'node-fetch';
 import { UIOrder, OrderSource, OrderChannel, NormalizedAddress, NormalizedLineItem } from './types';
 import { getIntegrationCreds } from './config';
-import { fetchAllVeeqoOrders, fetchVeeqoOrders, processOrdersInBatches } from './integrations/veeqo';
+import { fetchVeeqoOrders, processOrdersInBatches } from './integrations/veeqo';
 import { fetchShippoOrders } from './integrations/shippo';
 import type { VeeqoOrder } from './types';
 
+function splitName(fullName: string) {
+  const parts = (fullName || '').trim().split(/\\s+/);
+  const firstName = parts.shift() || '';
+  const lastName = parts.join(' ');
+  return { first: firstName, last: lastName };
+}
+
 const TRANSACTION_TIMEOUT = 10000; // 10 second timeout for transactions
+const VEEQO_MAX_RETRIES = 5; // Total attempts
+const VEEQO_INITIAL_DELAY = 2000; // ms
+const VEEQO_MAX_DELAY = 60000; // ms (max wait on repeated rate limits)
 
 interface SyncResult {
   success: boolean;
@@ -516,7 +526,8 @@ async function validateAndMapOrder(order: VeeqoOrder, veeqoClient: any): Promise
     line_items: lineItems,
     marketplaceOrderDate: order.created_at || order.order_date || order.ordered_at,
     rawData: order,
-    commodityDesc: lineItems.length > 0 ? lineItems[0].title || '' : ''
+    commodityDesc: lineItems.length > 0 ? lineItems[0].title || '' : '',
+    shipByDate: order.due_date // Add the missing order-level shipByDate from Veeqo's due_date
   };
 }
 
@@ -527,14 +538,6 @@ async function getEtdDefaults(userId: string) {
     weightKg: shipper?.defaultWeightKg || 0.5,
     harmonizedCode: shipper?.defaultHarmonizedCode || '610910',
     countryOfMfg: shipper?.defaultCountryOfMfg || 'TR',
-  };
-}
-
-function splitName(fullName: string) {
-  const parts = (fullName || '').split(' ');
-  return {
-    first: parts[0] || '',
-    last: parts.slice(1).join(' ') || '',
   };
 }
 
@@ -584,7 +587,9 @@ export async function syncAllOrders(userId: string, options: {
   let processed = 0;
   let successful = 0;
   let failed = 0;
-  let errors: Array<{ orderId: string; error: string }> = [];
+  let ordersCreated = 0;
+  let ordersUpdated = 0;
+  const errors: Array<{ orderId: string; error: string }> = [];
 
   try {
     const { veeqoApiKey, shippoToken, startDate, endDate, source, channel } = options;
@@ -611,7 +616,7 @@ export async function syncAllOrders(userId: string, options: {
         const veeqoClient = createVeeqoClient(veeqoApiKey);
         fetchPromises.push(
           (async () => {
-            const orders = await fetchVeeqoOrders({ apiKey: veeqoApiKey, page: 1, perPage: 100, lastSync: lastSyncTime });
+            const orders = await fetchVeeqoOrders({ apiKey: veeqoApiKey, page: 1, perPage: 100, updatedAtMin: lastSyncTime?.toISOString(), isFullSync: false });
             logger.info(`[FastSync] Veeqo fetch returned ${orders.length} orders.`, { userId });
             const processedOrders = await Promise.all(orders.map(async order => {
               return await validateAndMapOrder(order, veeqoClient);
@@ -625,7 +630,7 @@ export async function syncAllOrders(userId: string, options: {
         const veeqoClient = createVeeqoClient(veeqoApiKey);
         fetchPromises.push(
           (async () => {
-            const orders = await fetchAllVeeqoOrders({ apiKey: veeqoApiKey, lastSync: lastSyncTime });
+            const orders = await fetchVeeqoOrders({ apiKey: veeqoApiKey, updatedAtMin: lastSyncTime?.toISOString(), isFullSync: true });
             logger.info(`[FullSync] Veeqo fetch returned ${orders.length} orders.`, { userId });
             const processedOrders = await Promise.all(orders.map(async order => {
               return await validateAndMapOrder(order, veeqoClient);
@@ -679,6 +684,7 @@ export async function syncAllOrders(userId: string, options: {
                 sku: item.sku || '',
                 hs_code: etdDefaults.harmonizedCode,
                 country_of_origin: etdDefaults.countryOfMfg,
+                // shipBy: undefined // Shippo orders don't have shipping deadlines - this comes from merged Veeqo data
               }));
               // Ensure all UIOrder fields are present
               return {
@@ -698,6 +704,7 @@ export async function syncAllOrders(userId: string, options: {
                 marketplaceOrderDate: order.placed_at,
                 rawData: order,
                 commodityDesc: lineItems.length > 0 ? lineItems[0].title || '' : ''
+                // shipByDate: undefined // Shippo orders don't have shipping deadlines - this comes from merged Veeqo data
               };
             });
           })
@@ -742,6 +749,7 @@ export async function syncAllOrders(userId: string, options: {
                 sku: item.sku || '',
                 hs_code: etdDefaults.harmonizedCode,
                 country_of_origin: etdDefaults.countryOfMfg,
+                // shipBy: undefined // Shippo orders don't have shipping deadlines - this comes from merged Veeqo data
               }));
               // Ensure all UIOrder fields are present
               return {
@@ -761,6 +769,7 @@ export async function syncAllOrders(userId: string, options: {
                 marketplaceOrderDate: order.placed_at,
                 rawData: order,
                 commodityDesc: lineItems.length > 0 ? lineItems[0].title || '' : ''
+                // shipByDate: undefined // Shippo orders don't have shipping deadlines - this comes from merged Veeqo data
               };
             });
           })
@@ -790,6 +799,8 @@ export async function syncAllOrders(userId: string, options: {
           to_address: order.source === 'shippo' && order.to_address ? order.to_address : existing.to_address,
           // Prioritize Veeqo for richer line item data (like images)
           line_items: existing.source === 'veeqo' && existing.line_items.length > 0 ? existing.line_items : order.line_items,
+          // Prioritize Veeqo for shipByDate as it has the real due_date data
+          shipByDate: existing.source === 'veeqo' && existing.shipByDate ? existing.shipByDate : order.shipByDate,
           // Combine rawData from both sources
           rawData: { ...(existing.rawData || {}), ...(order.rawData || {}) },
           // Mark as merged and use the most definitive source
@@ -884,8 +895,8 @@ export async function syncAllOrders(userId: string, options: {
         externalStatus: order.externalStatus,
         currency: order.currency,
         totalPrice: order.totalPrice,
-        shippingAddress: order.to_address ? JSON.stringify(order.to_address) : null,
-        rawData: order.rawData ? JSON.stringify(order.rawData) : null,
+        shippingAddress: order.to_address ? JSON.stringify(order.to_address) : Prisma.JsonNull,
+        rawData: order.rawData ? JSON.stringify(order.rawData) : Prisma.JsonNull,
         createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
         updatedAt: new Date(),
         uiOrderDate: getUiOrderDate(order),
@@ -921,250 +932,141 @@ export async function syncAllOrders(userId: string, options: {
     }
 
     // Process all new orders, and only update existing orders if status is cancelled/canceled or tracked fields have changed
-    const BATCH_SIZE = 5; // Reduced batch size
+    const BATCH_SIZE = 25; // Reduced batch size to prevent statement timeouts
     const batches: UIOrder[][] = [];
     for (let i = 0; i < ordersToProcess.length; i += BATCH_SIZE) {
       batches.push(ordersToProcess.slice(i, i + BATCH_SIZE));
     }
 
-    // Summary counters
-    let ordersCreated = 0, ordersUpdated = 0, ordersSkipped = filteredOrders.length - ordersToProcess.length, itemsTotalUpserted = 0;
-
-    logger.info(`[Order Sync] Starting sync: ${ordersToProcess.length} orders to process in ${batches.length} batches (batch size ${BATCH_SIZE})`);
-
     for (const batch of batches) {
-      // Process each order in the batch sequentially
-      for (const order of batch) {
-        let orderAction: 'created' | 'updated' | 'skipped' = 'skipped';
-        try {
-          const { line_items, ...orderData } = order;
-          // Prepare prismaOrderData for this order
-          const prismaOrderData = {
-            userId,
-            marketplace: orderData.marketplace,
-            marketplaceKey: orderData.marketplaceKey,
-            orderNumber: orderData.orderNumber,
-            customerName: orderData.customerName,
-            status: orderData.status,
-            externalStatus: orderData.externalStatus,
-            currency: orderData.currency,
-            totalPrice: orderData.totalPrice,
-            shippingAddress: orderData.to_address ?? undefined,
-            rawData: orderData.rawData ?? undefined,
-            createdAt: orderData.createdAt ? new Date(orderData.createdAt) : new Date(),
-            updatedAt: new Date(),
-            uiOrderDate: getUiOrderDate(order),
-            commodityDesc: order.commodityDesc || '',
+      // Process each order in the batch
+      try {
+        const orderMarketplaceKeys = batch.map(o => o.marketplaceKey);
+        
+        // Bulk fetch existing orders for the current batch (smaller query)
+        const existingOrdersInDb = await prisma.order.findMany({
+          where: { 
+            userId, 
+            marketplaceKey: { in: orderMarketplaceKeys }
+          }
+        });
+        const existingOrdersMap = new Map(existingOrdersInDb.map(o => [o.marketplaceKey, o]));
+        
+        const ordersToCreate: Prisma.OrderCreateManyInput[] = [];
+        const ordersToUpdate: { where: Prisma.OrderWhereUniqueInput; data: Prisma.OrderUpdateInput }[] = [];
+
+        for (const order of batch) {
+          const existingOrder = existingOrdersMap.get(order.marketplaceKey);
+          
+          // Create the base order data (without userId for updates)
+          const baseOrderData = {
+            marketplace: order.marketplace,
+            marketplaceKey: order.marketplaceKey,
+            orderNumber: order.orderNumber,
+            customerName: order.customerName,
+            status: order.status,
+            externalStatus: order.externalStatus,
+            currency: order.currency,
+            totalPrice: order.totalPrice,
+            shippingAddress: order.shippingAddress ? order.shippingAddress : Prisma.JsonNull,
+            rawData: order.rawData ? order.rawData : Prisma.JsonNull,
+            uiOrderDate: order.uiOrderDate,
+            commodityDesc: order.commodityDesc,
+            // shipByDate, channel, and source are UI-only fields, not stored in database
           };
 
-          // Wrap the transaction in retry logic
-          const savedOrder = await retry(() => prisma.$transaction(async tx => {
-            const existingOrder = await tx.order.findFirst({
-              where: {
-                userId,
-                marketplace: prismaOrderData.marketplace,
-                marketplaceKey: prismaOrderData.marketplaceKey,
-              },
+          if (existingOrder) {
+            // Add to update list
+            ordersToUpdate.push({
+              where: { id: existingOrder.id },
+              data: baseOrderData,
             });
-
-            let savedOrder;
-            let orderAction: 'created' | 'updated' | 'skipped' = 'skipped';
-            if (existingOrder) {
-              // Only update if status is cancelled/canceled or tracked fields have changed
-              const status = (prismaOrderData.status || '').toLowerCase();
-              const isCancelled = status === 'cancelled' || status === 'canceled';
-              const hasChanged = (
-                ((existingOrder as any).externalStatus ?? undefined) !== (prismaOrderData.externalStatus ?? undefined) ||
-                existingOrder.totalPrice !== prismaOrderData.totalPrice ||
-                existingOrder.customerName !== prismaOrderData.customerName ||
-                (existingOrder.shippingAddress ?? '') !== (prismaOrderData.shippingAddress ?? '')
-              );
-              const missingStatus = ((existingOrder as any).externalStatus ?? null) === null && prismaOrderData.externalStatus;
-
-              const missingUiOrderDate = !(existingOrder as any).uiOrderDate;
-
-              const existingOrderItems = await tx.orderItem.findMany({
-                where: { orderId: existingOrder.id },
-                select: { remoteLineId: true, shipBy: true, image: true, variantInfo: true }
-              });
-              const missingShipBy = existingOrderItems.some(dbItem => {
-                const newItem = line_items.find(li => String(li.id) === String(dbItem.remoteLineId));
-                return dbItem.shipBy == null && newItem && newItem.shipBy;
-              });
-              // Check for missing image or variantInfo in any order item
-              const missingImage = existingOrderItems.some(dbItem => {
-                const newItem = line_items.find(li => String(li.id) === String(dbItem.remoteLineId));
-                return (dbItem.image == null || dbItem.image === '') && newItem && newItem.image && newItem.image !== '';
-              });
-              const missingVariantInfo = existingOrderItems.some(dbItem => {
-                const newItem = line_items.find(li => String(li.id) === String(dbItem.remoteLineId));
-                return (dbItem.variantInfo == null || dbItem.variantInfo === '') && newItem && newItem.variantInfo && newItem.variantInfo !== '';
-              });
-              // Check for missing commodityDesc in Order
-              const missingCommodityDesc = !(existingOrder as any).commodityDesc && (prismaOrderData as any).commodityDesc;
-
-              if (isCancelled || hasChanged || missingStatus || missingUiOrderDate || missingShipBy || missingImage || missingVariantInfo || missingCommodityDesc) {
-                savedOrder = await tx.order.update({
-                  where: { id: existingOrder.id },
-                  data: {
-                    ...prismaOrderData,
-                    status: "Synced",
-                    labelStatus: null,
-                    updatedAt: new Date()
-                  },
-                });
-                orderAction = 'updated';
-                logger.info(`[Order Sync] Updated order: ${savedOrder.id} (${savedOrder.marketplaceKey})`);
-              } else {
-                // No change, skip update
-                savedOrder = existingOrder;
-                orderAction = 'skipped';
-                logger.info(`[Order Sync] Skipped order (no changes): ${savedOrder.id} (${savedOrder.marketplaceKey})`);
-              }
-            } else {
-              savedOrder = await tx.order.create({
-                data: {
-                  ...prismaOrderData,
-                  status: "Synced",
-                  labelStatus: null,
-                  createdAt: new Date(),
-                  updatedAt: new Date()
-                },
-              });
-              orderAction = 'created';
-              logger.info(`[Order Sync] Created new order: ${savedOrder.id} (${savedOrder.marketplaceKey})`);
-            }
-
-            // Only update/create shipment if order was created or updated
-            if (orderAction === 'created' || orderAction === 'updated') {
-              const existingShipment = await tx.shipment.findFirst({
-                where: { orderId: savedOrder.id }
-              });
-
-              if (existingShipment) {
-                await tx.shipment.update({
-                  where: { id: existingShipment.id },
-                  data: {
-                    status: "pending",
-                    updatedAt: new Date()
-                  }
-                });
-              } else {
-                await tx.shipment.create({
-                  data: {
-                    orderId: savedOrder.id,
-                    status: "pending",
-                    serviceType: "FEDEX_GROUND",
-                    carrier: "FEDEX",
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                  }
-                });
-              }
-            }
-
-            // Only upsert line items if order was created or updated
-            let itemsUpserted = 0;
-            if ((orderAction === 'created' || orderAction === 'updated') && line_items?.length > 0) {
-              for (const item of line_items) {
-                await tx.orderItem.upsert({
-                  where: {
-                    remoteLineId_orderId: {
-                      remoteLineId: String(item.id),
-                      orderId: savedOrder.id,
-                    }
-                  },
-                  create: {
-                    orderId: savedOrder.id,
-                    productName: String(item.title || ''),
-                    quantity: Number(item.quantity),
-                    unitPrice: Number(((item["total_price"] ?? (item["price"] * item["quantity"])) ?? 0) / (item.quantity || 1)),
-                    totalPrice: Number((item["total_price"] ?? (item["price"] * item["quantity"])) ?? 0),
-                    weightKg: Number(typeof item["weight"] === 'number' ? item["weight"] : 0.5),
-                    sku: String(item["sku"] || ''),
-                    remoteLineId: String(item.id),
-                    marketplaceKey: String(prismaOrderData.marketplaceKey),
-                    orderNumber: String(prismaOrderData.orderNumber),
-                    image: item.image || '',
-                    shipBy: item.shipBy ? new Date(item.shipBy) : undefined,
-                    variantInfo: item.variantInfo || (item as any).variant_title || ((item as any).product_variant ? (item as any).product_variant.title : undefined) || '',
-                  },
-                  update: {
-                    productName: String(item.title || ''),
-                    quantity: Number(item.quantity),
-                    unitPrice: Number(((item["total_price"] ?? (item["price"] * item["quantity"])) ?? 0) / (item.quantity || 1)),
-                    totalPrice: Number((item["total_price"] ?? (item["price"] * item["quantity"])) ?? 0),
-                    weightKg: Number(typeof item["weight"] === 'number' ? item["weight"] : 0.5),
-                    sku: String(item["sku"] || ''),
-                    marketplaceKey: String(prismaOrderData.marketplaceKey),
-                    orderNumber: String(prismaOrderData.orderNumber),
-                    image: item.image || '',
-                    variantInfo: item.variantInfo || (item as any).variant_title || ((item as any).product_variant ? (item as any).product_variant.title : undefined) || '',
-                    // If the existing OrderItem has no shipBy, but the new item does, update it
-                    ...(item.shipBy ? { shipBy: new Date(item.shipBy) } : {}),
-                  },
-                });
-                itemsUpserted++;
-              }
-              logger.info(`[Order Sync] Upserted ${itemsUpserted} item(s) for order ${savedOrder.id}`);
-            } else if (orderAction === 'skipped') {
-              logger.info(`[Order Sync] Skipped line items for order ${savedOrder.id} (order unchanged)`);
-            }
-
-          }, {
-            timeout: 30000 // Increased timeout to 30 seconds
-          }));
-          processed++;
-          if (orderAction === ('created' as typeof orderAction)) {
-            successful++;
-            ordersCreated++;
-          } else if (orderAction === ('updated' as typeof orderAction)) {
-            successful++;
-            ordersUpdated++;
           } else {
-            // Only possible remaining value is 'skipped'
-            ordersSkipped++;
+            // Add to create list (include userId for new orders)
+            ordersToCreate.push({
+              ...baseOrderData,
+              userId, // Only include userId for new orders
+            });
           }
-        } catch (error: any) {
-          processed++;
-          failed++;
-          const errorMsg = error.message || 'Unknown error';
-          errors.push({ orderId: String(order.id), error: errorMsg });
-          logger.error('Failed to store order', error, { orderId: order.id, marketplaceKey: order.marketplaceKey, orderAction });
         }
 
-        // Add a small delay between processing each order
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Bulk create new orders
+        if (ordersToCreate.length > 0) {
+          logger.info(`[Order Sync] Creating ${ordersToCreate.length} new orders in the database.`);
+          await prisma.order.createMany({
+            data: ordersToCreate,
+            skipDuplicates: true,
+          });
+          ordersCreated += ordersToCreate.length;
+        }
+
+        // Process orders to update in smaller chunks to avoid overwhelming the connection pool
+        if (ordersToUpdate.length > 0) {
+          logger.info(`[Order Sync] Updating ${ordersToUpdate.length} orders in the database.`);
+          
+          const updateChunkSize = 5; // Even smaller chunks for updates
+          for (let i = 0; i < ordersToUpdate.length; i += updateChunkSize) {
+            const chunk = ordersToUpdate.slice(i, i + updateChunkSize);
+            await prisma.$transaction(
+              chunk.map(({ where, data }) => prisma.order.update({ where, data }))
+            );
+          }
+          ordersUpdated += ordersToUpdate.length;
+        }
+
+        processed += batch.length;
+        successful += batch.length;
+        logger.info(`[Order Sync] Processed batch: ${batch.length} orders (${processed}/${ordersToProcess.length} total)`);
+
+      } catch (error) {
+        logger.error(`[Order Sync] Batch failed:`, error);
+        failed += batch.length;
+        processed += batch.length;
+        errors.push({ 
+          orderId: `batch_${batches.indexOf(batch)}`, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
       }
 
       // Update sync progress after each batch
-      await updateSyncProgress(syncId!, {
+      await updateSyncStatus(syncId!, {
         processedOrders: processed,
         successfulOrders: successful,
         failedOrders: failed,
-        totalOrders: filteredOrders.length,
-        errors,
+        totalOrders: ordersToProcess.length,
       });
 
-      // Add a delay between batches
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Small delay between batches to prevent overwhelming the database
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
+
+    logger.info(`[Order Sync] Completed processing ${ordersToProcess.length} orders`);
+    logger.info(`[Order Sync] Summary: ${ordersCreated} created, ${ordersUpdated} updated, ${failed} failed`);
 
     // Complete the sync
     if (syncId) {
       await completeSync(syncId, failed === 0, {
-        processedOrders: processed ?? 0,
-        successfulOrders: successful ?? 0,
-        failedOrders: failed ?? 0,
-        totalOrders: filteredOrders.length,
+        processedOrders: processed,
+        successfulOrders: successful,
+        failedOrders: failed,
+        totalOrders: ordersToProcess.length,
         errors,
       });
+    }
+
+    // Update user's lastSyncedAt timestamp on successful sync
+    if (successful > 0 && failed === 0) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { lastSyncedAt: new Date() },
+      });
+      logger.info(`[Order Sync] Updated user lastSyncedAt timestamp`);
     }
 
     return {
       newOrders: ordersCreated,
       updatedOrders: ordersUpdated,
-      skippedOrders: ordersSkipped,
+      skippedOrders: filteredOrders.length - ordersToProcess.length,
       failedOrders: failed,
       errors
     };

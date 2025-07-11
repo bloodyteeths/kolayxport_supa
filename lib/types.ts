@@ -73,6 +73,7 @@ export interface UIOrder {
     shipBy?: string;
   }>;
   marketplaceOrderDate?: string;
+  shipByDate?: string; // Ship-by deadline date for the order (comes from Veeqo due_date)
   rawData: any;
   // Optional fields for label/fulfillment
   weight?: number;

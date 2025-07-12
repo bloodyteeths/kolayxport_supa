@@ -26,6 +26,9 @@ export async function getIntegrationCreds(userId: string) {
     fedexApiSecret: integration.fedexApiSecret,
     fedexAccountNumber: integration.fedexAccountNumber,
     fedexMeterNumber: integration.fedexMeterNumber,
+    trendyolSupplierId: integration.trendyolSupplierId,
+    trendyolApiKey: integration.trendyolApiKey,
+    trendyolApiSecret: integration.trendyolApiSecret,
   };
 }
 
@@ -36,6 +39,24 @@ export const VEEQO_ORDERS_URL = process.env.VEEQO_ORDERS_URL;
 
 // Shippo
 export const SHIPPO_TOKEN = process.env.SHIPPO_TOKEN;
+
+// Trendyol Marketplace Integration
+export const MARKETPLACE_TRENDYOL = process.env.MARKETPLACE_TRENDYOL === 'true';
+export const TRENDYOL_SUPPLIER_ID = process.env.TRENDYOL_SUPPLIER_ID;
+export const TRENDYOL_API_KEY = process.env.TRENDYOL_API_KEY;
+export const TRENDYOL_API_SECRET = process.env.TRENDYOL_API_SECRET;
+export const ALLOW_TRENDYOL_USERS = process.env.ALLOW_TRENDYOL_USERS?.split(',').map(id => id.trim()) || [];
+
+// Helper function to check if Trendyol is enabled for a specific user
+export function isTrendyolEnabled(userId?: string): boolean {
+  if (!MARKETPLACE_TRENDYOL) return false;
+  
+  // If no user restrictions, allow all users
+  if (ALLOW_TRENDYOL_USERS.length === 0) return true;
+  
+  // Check if user is in the allowed list
+  return userId ? ALLOW_TRENDYOL_USERS.includes(userId) : false;
+}
 
 // FedEx & Global Shipper Details
 export const FEDEX_API_KEY = process.env.FEDEX_API_KEY;

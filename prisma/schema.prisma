@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   provider     = "postgresql"
-  url          = env("DIRECT_URL")
+  url          = env("DATABASE_URL")
   directUrl    = env("DIRECT_URL")
   relationMode = "prisma"
 }
@@ -23,6 +23,20 @@ model User {
   userAppsScriptId    String?             @unique
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
+  lastSyncedAt        DateTime?
+  onboardingStep      Int?                @default(0)
+  shippingSettings    Json?
+
+  // Stripe Billing Fields
+  stripeCustomerId    String?             @unique
+  subscriptionPlan    String?             // e.g., 'starter', 'growth', 'enterprise'
+  billingInterval     String?             // 'month' or 'year'
+  subscriptionStatus  String?             // e.g., 'trialing', 'active', 'canceled', 'past_due'
+  orderSyncCount      Int                 @default(0)
+  labelCount          Int                 @default(0)
+  trialExpiresAt      DateTime?
+  usageResetAt        DateTime?
+
   accounts            Account[]
   marketplaceConfigs  MarketplaceConfig[]
   orders              Order[]
@@ -86,7 +100,7 @@ model Order {
   marketplaceKey              String
   customerName                String?
   status                      String?
-  externalStatus              String? // True status from Veeqo/Shippo
+  externalStatus              String?
   currency                    String?
   totalPrice                  Float?
   createdAt                   DateTime       @default(now())
@@ -117,6 +131,8 @@ model Order {
   trackingNumber              String?
   weightKg                    Float?         @default(0.5)
   uiOrderDate                 DateTime?
+  // source                      String?  // TODO: Uncomment after migration
+  // channel                     String?  // TODO: Uncomment after migration
   items                       OrderItem[]    @relation("OrderToOrderItem")
   user                        User           @relation(fields: [userId], references: [id])
   shipments                   Shipment[]     @relation("OrderToShipment")
@@ -215,9 +231,6 @@ model Credential {
   fedexApiKey           String?
   fedexApiSecret        String?
   fedexAccountNumber    String?
-  upsApiKey             String?
-  upsApiSecret          String?
-  upsAccountNumber      String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   fedexMeterNumber      String?
@@ -226,6 +239,9 @@ model Credential {
   trendyolApiKey        String?
   trendyolApiSecret     String?
   trendyolSupplierId    String?
+  upsAccountNumber      String?
+  upsApiKey             String?
+  upsApiSecret          String?
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -274,23 +290,23 @@ model LabelJob {
 }
 
 model Shipment {
-  id             String     @id @default(cuid())
-  orderId        String
-  orderItemId    String?
-  carrier        String
-  status         String
-  pdfUrl         String?
-  trackingNumber String?
-  errorMessage   String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  serviceType    String?
-  packageType    String?
+  id              String     @id @default(cuid())
+  orderId         String
+  orderItemId     String?
+  carrier         String
+  status          String
+  pdfUrl          String?
+  trackingNumber  String?
+  errorMessage    String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  serviceType     String?
+  iossNumber      String?
+  isEdi           Boolean?   @default(true)
+  packageType     String?
   signatureOption String?
-  iossNumber     String?
-  isEdi          Boolean?   @default(true)
-  order          Order      @relation("OrderToShipment", fields: [orderId], references: [id], onDelete: Cascade)
-  orderItem      OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  order           Order      @relation("OrderToShipment", fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem       OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([orderItemId])

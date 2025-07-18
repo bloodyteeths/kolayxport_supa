@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "usageResetAt" TIMESTAMP(3) DEFAULT NOW(); 

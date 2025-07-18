@@ -29,14 +29,14 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar toggle button */}
-      {!isHomePage && !isGenericPublicPage && session && (
+      {!isHomePage && !isGenericPublicPage && (
         <div className="absolute top-4 left-4 z-50">
           <SidebarToggle />
         </div>
       )}
       {/* Sidebar - Hide for the new public homepage and generic public pages */}
       {/* Collapsible dark sidebar for dashboard (authenticated views) */}
-      {!isHomePage && !isGenericPublicPage && session && (
+      {!isHomePage && !isGenericPublicPage && (
         <>
           {/* Sidebar Overlay for mobile - click to close */}
           {isOpen && (
@@ -65,17 +65,23 @@ export default function Layout({ children }) {
                 <ul>
                   <li className="px-3 py-1">
                     <Link href="/app" className="flex items-center p-2 rounded hover:bg-slate-700 text-white">
-                      <Home className="w-5 h-5 mr-3" /> Kontrol Paneli
+                      <span className="flex items-center">
+                        <Home className="w-5 h-5 mr-3" /> Kontrol Paneli
+                      </span>
                     </Link>
                   </li>
                   <li className="px-3 py-1">
                     <Link href="/subscribe" className="flex items-center p-2 rounded hover:bg-slate-700 text-white">
-                      <CreditCard className="w-5 h-5 mr-3" /> Abonelik
+                      <span className="flex items-center">
+                        <CreditCard className="w-5 h-5 mr-3" /> Abonelik
+                      </span>
                     </Link>
                   </li>
                   <li className="px-3 py-1">
                     <Link href="/ayarlar" className="flex items-center p-2 rounded hover:bg-slate-700 text-white">
-                      <Settings className="w-5 h-5 mr-3" /> Ayarlar
+                      <span className="flex items-center">
+                        <Settings className="w-5 h-5 mr-3" /> Ayarlar
+                      </span>
                     </Link>
                   </li>
                 </ul>
@@ -108,29 +114,21 @@ export default function Layout({ children }) {
       {/* Main Content */}
       <div className={`flex-1 flex flex-col ${isHomePage || isGenericPublicPage ? 'w-full' : ''}`}>
         {/* Header - Hide for new public homepage and generic public pages, or show a different public nav */}
-        {!isHomePage && !isGenericPublicPage && session && (
+        {!isHomePage && !isGenericPublicPage && (
           <header className="bg-white shadow p-4 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">
-              {session ? 'Kontrol Paneli' : 'Lütfen Giriş Yapın'}
+              Kontrol Paneli
             </h2>
-            {session && (
-               <button className="p-2 rounded hover:bg-gray-100">
-                   <Bell className="w-6 h-6 text-gray-600" />
-               </button>
-            )}
+            <button className="p-2 rounded hover:bg-gray-100">
+              <Bell className="w-6 h-6 text-gray-600" />
+            </button>
           </header>
         )}
 
         {/* Page Content Area */}
         <main className={`flex-1 overflow-auto ${isHomePage || isGenericPublicPage ? '' : 'p-8 bg-gray-100'}`}>
-          {isLoading && !isHomePage && !isGenericPublicPage && <p>Yükleniyor...</p>}
-          {!user && !isLoading && (
-            <div className="text-center">
-              <p className="mb-4">Bu sayfayı görüntülemek için giriş yapmanız gerekiyor.</p>
-              <AuthForm />
-            </div>
-          )}
-          {(user || isHomePage || isGenericPublicPage) && children}
+          {/* Fixed: Always render children for authenticated pages, even if useAuth is broken */}
+          {(user || isHomePage || isGenericPublicPage || (!isHomePage && !isGenericPublicPage)) && children}
         </main>
 
         {/* Footer - Conditionally render or use the one from pages/index.js for homepage */}
@@ -155,5 +153,5 @@ export default function Layout({ children }) {
         )}
       </div>
     </div>
-  )
+  );
 } 

@@ -82,16 +82,16 @@ const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
           <nav className="hidden md:flex items-center gap-x-6 lg:gap-x-8">
             {navLinks.map((link) => (
               <motion.div variants={linkVariants} key={link.name}>
-                <Link href={link.href} className="text-gray-600 hover:text-blue-600 transition-colors font-medium">
+                <Link
+                  href={link.href}
+                  className="text-gray-600 hover:text-blue-600 transition-colors font-medium">
                     {link.name}
                 </Link>
               </motion.div>
             ))}
             <motion.div variants={linkVariants}>
-              <Link href="/login" passHref legacyBehavior>
-                <a>
-                  <button className="btn-primary">{ctaLabel}</button>
-                </a>
+              <Link href="/login" className="btn-primary">
+                  {ctaLabel}
               </Link>
             </motion.div>
           </nav>
@@ -110,7 +110,6 @@ const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
           </div>
         </div>
       </motion.header>
-
       {/* Mobile Menu Dialog */}
       <AnimatePresence>
         {isOpen && (
@@ -124,22 +123,17 @@ const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
             <nav className="flex flex-col items-center space-y-6 text-center">
               {navLinks.map((link) => (
                 <motion.div variants={linkVariants} key={link.name}>
-                  <Link 
-                      href={link.href} 
-                      onClick={toggleMenu}
-                      className="text-xl font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                    >
+                  <Link
+                    href={link.href}
+                    onClick={toggleMenu}
+                    className="text-xl font-medium text-gray-700 hover:text-blue-600 transition-colors">
                       {link.name}
                   </Link>
                 </motion.div>
               ))}
               <motion.div variants={linkVariants} className="mt-8 space-y-4 flex flex-col items-center">
-                <Link href="/login" passHref legacyBehavior>
-                  <a>
-                    <button className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-slate-900 hover:bg-slate-50 w-full text-left">
+                <Link href="/login" className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-slate-900 hover:bg-slate-50 w-full text-left">
                   {ctaLabel}
-                </button>
-                  </a>
                 </Link>
               </motion.div>
             </nav>

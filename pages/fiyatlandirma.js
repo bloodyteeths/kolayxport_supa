@@ -1,11 +1,16 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useState } from 'react';
 import Link from 'next/link';
+import { loadStripe } from '@stripe/stripe-js';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { Disclosure, Transition } from '@headlessui/react';
 import { CheckCircle, ChevronDown, Zap, ShieldCheck, Star, MessageSquare, TrendingUp } from 'lucide-react';
 import { NextSeo } from 'next-seo';
 import { supabase } from '@/lib/supabase';
+
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  : null;
 
 const sectionVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -19,60 +24,100 @@ const cardHover = {
   transition: { type: 'spring', stiffness: 300 },
 };
 
-const plans = [
-  {
-    name: 'Starter',
-    id: 'tier-starter',
-    priceMonthly: '$0',
-    frequency: '/ ay',
-    description: 'Tüm temel entegrasyonlar açıkken, e-ticaretinizi kolayca yönetmeye başlayın.',
-    features: [
-      'Sınırsız Sipariş İşleme',
-      'Tüm Pazaryeri Entegrasyonları',
-      'Temel Kargo Entegrasyonları',
-      'Stok Yönetimi',
-      '1 Kullanıcı',
-      'Topluluk Desteği',
-    ],
-    highlight: false,
-    icon: Star,
-  },
-  {
-    name: 'Growth',
-    id: 'tier-growth',
-    priceMonthly: 'Yakında',
-    frequency: '/ ay',
-    description: 'İşletmeniz büyürken ihtiyaç duyacağınız ek özellikler ve öncelikli destek.',
-    features: [
-      'Starter Planındaki Her Şey',
-      'Gelişmiş Raporlama Paneli',
-      'API Erişimi (Beta)',
-      'Otomasyon Kuralları',
-      '5 Kullanıcı',
-      'E-posta Desteği',
-    ],
-    highlight: true,
-    icon: TrendingUp,
-  },
-  {
-    name: 'Enterprise',
-    id: 'tier-enterprise',
-    priceMonthly: 'Teklif Al',
-    frequency: '',
-    description: 'Büyük ölçekli işletmeler ve özel ihtiyaçlar için kişiselleştirilmiş çözümler.',
-    features: [
-      'Growth Planındaki Her Şey',
-      'Özel Entegrasyon Geliştirme',
-      'SLA (Servis Seviyesi Anlaşması)',
-      'Öncelikli Telefon Desteği',
-      'Sınırsız Kullanıcı',
-      'Özel Hesap Yöneticisi',
-    ],
-    href_contact: '/iletisim?subject=Enterprise%20Teklif%20Talebi',
-    highlight: false,
-    icon: ShieldCheck,
-  },
-];
+const plansData = {
+  month: [
+    {
+      name: 'Başlangıç',
+      id: 'tier-starter-month',
+      priceMonthly: '₺449',
+      planKey: 'starter',
+      frequency: '/ ay',
+      description: 'Küçük ve orta ölçekli işletmeler için ideal başlangıç paketi.',
+      features: [
+        '200 Sipariş/Ay',
+        '100 Kargo Etiketi/Ay',
+        'Tüm Pazaryeri Entegrasyonları',
+        'Standart Destek',
+        '1 Kullanıcı',
+      ],
+      highlight: false,
+      icon: Star,
+    },
+    {
+      name: 'Büyüme',
+      id: 'tier-growth-month',
+      priceMonthly: '₺999',
+      planKey: 'growth',
+      frequency: '/ ay',
+      description: 'Büyüyen işletmeler için daha yüksek limitler ve öncelikli destek.',
+      features: [
+        '2000 Sipariş/Ay',
+        '500 Kargo Etiketi/Ay',
+        'Starter Planındaki Her Şey',
+        'Öncelikli Destek',
+        '5 Kullanıcı',
+      ],
+      highlight: true,
+      icon: TrendingUp,
+    },
+  ],
+  year: [
+    {
+      name: 'Başlangıç',
+      id: 'tier-starter-year',
+      priceMonthly: '₺4,490',
+      planKey: 'starter',
+      frequency: '/ yıl',
+      description: 'Yıllık ödemede %15 indirim kazanın.',
+      features: [
+        '200 Sipariş/Ay',
+        '100 Kargo Etiketi/Ay',
+        'Tüm Pazaryeri Entegrasyonları',
+        'Standart Destek',
+        '1 Kullanıcı',
+      ],
+      highlight: false,
+      icon: Star,
+    },
+    {
+      name: 'Büyüme',
+      id: 'tier-growth-year',
+      priceMonthly: '₺9,990',
+      planKey: 'growth',
+      frequency: '/ yıl',
+      description: 'Yıllık ödemede %15 indirim kazanın.',
+      features: [
+        '2000 Sipariş/Ay',
+        '500 Kargo Etiketi/Ay',
+        'Starter Planındaki Her Şey',
+        'Öncelikli Destek',
+        '5 Kullanıcı',
+      ],
+      highlight: true,
+      icon: TrendingUp,
+    },
+  ],
+};
+
+const enterprisePlan = {
+  name: 'Kurumsal',
+  id: 'tier-enterprise',
+  priceMonthly: 'Teklif Al',
+  frequency: '',
+  description: 'Büyük ölçekli işletmeler ve özel ihtiyaçlar için kişiselleştirilmiş çözümler.',
+  features: [
+    'Limitsiz Sipariş & Etiket',
+    'Özel Entegrasyon Geliştirme',
+    'SLA (Servis Seviyesi Anlaşması)',
+    'Öncelikli Telefon Desteği',
+    'Sınırsız Kullanıcı',
+    'Özel Hesap Yöneticisi',
+  ],
+  href_contact: '/iletisim?subject=Kurumsal%20Teklif%20Talebi',
+  highlight: false,
+  icon: ShieldCheck,
+};
+
 
 const comparisonData = {
   headers: ['Özellik', 'KolayXport (Ücretsiz)', 'Rakip A (XYZ CRM)', 'Rakip B (ABC Sync)'],
@@ -113,6 +158,53 @@ const faqItems = [
 ];
 
 export default function FiyatlandirmaPage() {
+  const [billingInterval, setBillingInterval] = useState('month');
+
+  const handleCheckout = async (plan, interval) => {
+    try {
+      if (!stripePromise) {
+        throw new Error('Stripe is not configured');
+      }
+
+      // Get current session from Supabase
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        // Redirect to sign in instead of showing error
+        await supabase.auth.signInWithOAuth({ 
+          provider: 'google',
+          options: { redirectTo: window.location.origin + '/fiyatlandirma' } 
+        });
+        return;
+      }
+
+      const res = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ plan, interval }),
+      });
+
+      const { sessionId, error } = await res.json();
+      if (error) {
+        throw new Error(error);
+      }
+      if (!sessionId) {
+        throw new Error('Could not create checkout session');
+      }
+
+      const stripe = await stripePromise;
+      await stripe.redirectToCheckout({ sessionId });
+    } catch (error) {
+      console.error('Error during checkout:', error);
+      alert(`Bir hata oluştu: ${error.message}`);
+    }
+  };
+
+  const plans = [...plansData[billingInterval], enterprisePlan];
+
+
   return (
     <PublicLayout
       title="KolayXport | Fiyatlandırma"
@@ -172,15 +264,11 @@ export default function FiyatlandirmaPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
           >
-            <Link href="/api/auth/signin">
-              <a className="px-8 py-3.5 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400">
+            <Link href="/api/auth/signin" className="px-8 py-3.5 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400">
                 Hemen Başla
-              </a>
             </Link>
-            <Link href="/iletisim?subject=Telefonla%20Bilgi%20Almak%20İstiyorum">
-              <a className="px-8 py-3.5 text-lg font-semibold text-blue-600 bg-white rounded-lg shadow-lg hover:scale-105 hover:bg-slate-50 transform transition-all duration-200 ease-out border border-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400">
+            <Link href="/iletisim?subject=Telefonla%20Bilgi%20Almak%20İstiyorum" className="px-8 py-3.5 text-lg font-semibold text-blue-600 bg-white rounded-lg shadow-lg hover:scale-105 hover:bg-slate-50 transform transition-all duration-200 ease-out border border-slate-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400">
                 Bizi Arayın
-              </a>
             </Link>
           </motion.div>
         </div>
@@ -198,8 +286,25 @@ export default function FiyatlandirmaPage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Size Uygun Planı Seçin</h2>
             <p className="max-w-xl mx-auto text-lg text-slate-600">
-              Şeffaf, esnek ve işletmenizin büyümesine ayak uyduran fiyatlandırma.
+              Şeffaf, esnek ve işletmenizin büyümesine ayak uyduran fiyatlandırma. Tüm planlar 30 gün ücretsiz deneme içerir.
             </p>
+          </div>
+          <div className="flex justify-center mb-8">
+            <button
+              onClick={() => setBillingInterval('month')}
+              className={`px-6 py-2 text-lg font-semibold rounded-l-full transition-colors duration-300 ${billingInterval === 'month' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-r-0 border-slate-300'}`}
+            >
+              Aylık
+            </button>
+            <button
+              onClick={() => setBillingInterval('year')}
+              className={`px-6 py-2 text-lg font-semibold rounded-r-full transition-colors duration-300 relative ${billingInterval === 'year' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-300'}`}
+            >
+              Yıllık
+              <span className="absolute -top-2 -right-3 bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full transform rotate-12">
+                %15 İNDİRİM
+              </span>
+            </button>
           </div>
           <div className="grid lg:grid-cols-3 gap-8 items-stretch">
             {plans.map((plan, index) => (
@@ -233,19 +338,12 @@ export default function FiyatlandirmaPage() {
                   </ul>
                 </div>
                 {plan.href_contact ? (
-                  <Link href={plan.href_contact}>
-                    <a aria-describedby={plan.id} className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${plan.highlight ? 'text-white bg-gradient-to-r from-orange-500 to-red-500 hover:scale-[1.03]' : 'text-slate-700 bg-slate-100 hover:bg-slate-200 hover:scale-[1.03]'} ${plan.highlight ? 'focus:ring-orange-400' : 'focus:ring-slate-300'}`}>
+                  <Link href={plan.href_contact} aria-describedby={plan.id} className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${plan.highlight ? 'text-white bg-gradient-to-r from-orange-500 to-red-500 hover:scale-[1.03]' : 'text-slate-700 bg-slate-100 hover:bg-slate-200 hover:scale-[1.03]'} ${plan.highlight ? 'focus:ring-orange-400' : 'focus:ring-slate-300'}`}>
                       Bize Ulaşın
-                    </a>
                   </Link>
-                ) : plan.priceMonthly === 'Ücretsiz' || plan.priceMonthly === 'Yakında' ? (
+                ) : (
                   <button
-                    onClick={async () => {
-                      await supabase.auth.signInWithOAuth({ 
-                        provider: 'google',
-                        options: { redirectTo: window.location.origin + '/app' } 
-                      });
-                    }}
+                    onClick={() => handleCheckout(plan.planKey, billingInterval)}
                     aria-describedby={plan.id} 
                     className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 
                       ${plan.highlight 
@@ -253,9 +351,9 @@ export default function FiyatlandirmaPage() {
                         : 'text-blue-600 bg-blue-50 hover:bg-blue-100 hover:scale-[1.03]'
                       } ${plan.highlight ? 'focus:ring-blue-400' : 'focus:ring-blue-300'}
                     `}>
-                    {plan.priceMonthly === 'Ücretsiz' ? 'Ücretsiz Başla' : 'Çok Yakında'}
+                    30 Gün Ücretsiz Dene
                   </button>
-                ) : null}
+                )}
               </motion.div>
             ))}
           </div>
@@ -367,10 +465,8 @@ export default function FiyatlandirmaPage() {
       <div className="mt-16 text-center">
         <h3 className="text-2xl font-semibold text-slate-800 mb-4">Size Özel Bir Plan mı Lazım?</h3>
         <p className="text-slate-600 mb-8">İhtiyaçlarınız doğrultusunda size özel çözümler üretebiliriz. Bizimle iletişime geçin.</p>
-        <Link href="/iletisim">
-          <a className="inline-block px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+        <Link href="/iletisim" className="inline-block px-8 py-3 text-lg font-semibold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
             İletişime Geç
-          </a>
         </Link>
       </div>
 

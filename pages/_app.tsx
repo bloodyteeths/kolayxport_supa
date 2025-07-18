@@ -11,6 +11,8 @@ import SEO from '../next-seo.config';
 import { AuthProvider } from '@/lib/auth-context';
 import { ReactElement, ReactNode } from 'react';
 import { NextPage } from 'next';
+import { useRouter } from 'next/router';
+import { useEffect } from 'react';
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
@@ -20,21 +22,31 @@ type AppPropsWithLayout = AppProps & {
   Component: NextPageWithLayout;
 };
 
-export default function MyApp({ Component, pageProps }: AppPropsWithLayout) {
-  const getLayout = Component.getLayout || ((page) => page);
+function MyApp({ Component, pageProps }: AppProps) {
+  const router = useRouter();
+
+  useEffect(() => {
+    const { session_id } = router.query;
+    if (session_id) {
+      // clear query param then redirect dashboard to refresh subscription
+      router.replace('/app', undefined, { shallow: false });
+    }
+  }, [router.query]);
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
         <DefaultSeo {...SEO} />
         <LogoJsonLd
+          logo="https://kolayxport.com/logo.png"
           url="https://kolayxport.com"
-          logo="https://kolayxport.com/kolayxport-logo.png"
         />
-        <Toaster position="bottom-right" />
-        {getLayout(<Component {...pageProps} />)}
-      </AuthProvider>
-    </ThemeProvider>
+        <Component {...pageProps} />
+        <Toaster position="top-center" />
+      </ThemeProvider>
+    </AuthProvider>
   );
-} 
+}
+
+export default MyApp; 

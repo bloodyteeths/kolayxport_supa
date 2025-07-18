@@ -1,15 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 
 const prismaClientSingleton = () => {
+  // Ensure we have proper PgBouncer parameters to avoid prepared statement conflicts
+  const databaseUrl = process.env.DATABASE_URL;
+  const finalUrl = databaseUrl?.includes('statement_cache_size=0') 
+    ? databaseUrl 
+    : `${databaseUrl}${databaseUrl?.includes('?') ? '&' : '?'}statement_cache_size=0`;
+
   return new PrismaClient({
     log: ['error', 'warn'],
-    // Don't override the DATABASE_URL - use the one from environment
-    // Your DATABASE_URL already has the correct pgbouncer configuration
     errorFormat: 'pretty',
-    // Add connection timeout and pool settings
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: finalUrl,
       },
     },
   });

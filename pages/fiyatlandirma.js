@@ -343,14 +343,14 @@ export default function FiyatlandirmaPage() {
                   </ul>
                 </div>
                 {plan.href_contact ? (
-                  <Link href={plan.href_contact} aria-describedby={plan.id} className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${plan.highlight ? 'text-white bg-gradient-to-r from-orange-500 to-red-500 hover:scale-[1.03]' : 'text-slate-700 bg-slate-100 hover:bg-slate-200 hover:scale-[1.03]'} ${plan.highlight ? 'focus:ring-orange-400' : 'focus:ring-slate-300'}`}>
+                  <Link href={plan.href_contact} aria-describedby={plan.id} className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer ${plan.highlight ? 'text-white bg-gradient-to-r from-orange-500 to-red-500 hover:scale-[1.03]' : 'text-slate-700 bg-slate-100 hover:bg-slate-200 hover:scale-[1.03]'} ${plan.highlight ? 'focus:ring-orange-400' : 'focus:ring-slate-300'}`}>
                       Bize Ulaşın
                   </Link>
                 ) : (
                   <button
                     onClick={() => handleCheckout(plan.planKey, billingInterval)}
                     aria-describedby={plan.id} 
-                    className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 
+                    className={`w-full block text-center px-6 py-3.5 text-base font-semibold rounded-lg shadow-md transform transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer
                       ${plan.highlight 
                         ? 'text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:scale-[1.03]' 
                         : 'text-blue-600 bg-blue-50 hover:bg-blue-100 hover:scale-[1.03]'

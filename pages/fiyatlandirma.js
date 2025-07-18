@@ -163,7 +163,7 @@ export default function FiyatlandirmaPage() {
   const handleCheckout = async (plan, interval) => {
     try {
       if (!stripePromise) {
-        throw new Error('Stripe is not configured');
+        throw new Error('Stripe publishable key is not configured. Please check NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable.');
       }
 
       // Get current session from Supabase

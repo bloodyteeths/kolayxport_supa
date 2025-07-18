@@ -616,7 +616,7 @@ export async function syncAllOrders(userId: string, options: {
         const veeqoClient = createVeeqoClient(veeqoApiKey);
         fetchPromises.push(
           (async () => {
-            const orders = await fetchVeeqoOrders({ apiKey: veeqoApiKey, page: 1, perPage: 100, updatedAtMin: lastSyncTime?.toISOString(), isFullSync: false });
+            const orders = await fetchVeeqoOrders({ apiKey: veeqoApiKey, page: 1, perPage: 100, lastSync: lastSyncTime });
             logger.info(`[FastSync] Veeqo fetch returned ${orders.length} orders.`, { userId });
             const processedOrders = await Promise.all(orders.map(async order => {
               return await validateAndMapOrder(order, veeqoClient);

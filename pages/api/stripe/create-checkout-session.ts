@@ -50,9 +50,10 @@ export default async function handler(req, res) {
 
     console.log('Using price ID:', priceId);
 
-    // Find or create user in database with timeout protection
+    // Smart user lookup: first by ID, then by email if needed
     let dbUser;
     try {
+      // First, try to find user by Supabase ID
       dbUser = await prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -62,6 +63,35 @@ export default async function handler(req, res) {
           stripeCustomerId: true,
         }
       });
+
+      // If not found by ID, try to find by email (for existing users with different IDs)
+      if (!dbUser && user.email) {
+        console.log('User not found by ID, searching by email:', user.email);
+        dbUser = await prisma.user.findUnique({
+          where: { email: user.email },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            stripeCustomerId: true,
+          }
+        });
+
+        // If found by email but with different ID, update the ID to match Supabase
+        if (dbUser && dbUser.id !== userId) {
+          console.log('Found user by email with different ID, updating:', { oldId: dbUser.id, newId: userId });
+          dbUser = await prisma.user.update({
+            where: { email: user.email },
+            data: { id: userId },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              stripeCustomerId: true,
+            }
+          });
+        }
+      }
     } catch (dbError: any) {
       console.error('Database query error:', dbError);
       if (dbError.code === 'P2024') {
@@ -70,9 +100,10 @@ export default async function handler(req, res) {
       throw dbError;
     }
 
+    // Create user only if not found by either ID or email
     if (!dbUser) {
-      // Create user in database if they don't exist
       try {
+        console.log('Creating new user for:', user.email);
         dbUser = await prisma.user.create({
           data: {
             id: userId,
@@ -96,6 +127,9 @@ export default async function handler(req, res) {
         console.error('User creation error:', createError);
         if (createError.code === 'P2024') {
           return res.status(503).json({ error: 'Database temporarily unavailable. Please try again.' });
+        }
+        if (createError.code === 'P2002') {
+          return res.status(409).json({ error: 'User account conflict. Please try again or contact support.' });
         }
         throw createError;
       }
@@ -153,6 +187,10 @@ export default async function handler(req, res) {
     // Better error handling based on error type
     if (error.code === 'P2024') {
       return res.status(503).json({ error: 'Database connection timeout. Please try again.' });
+    }
+    
+    if (error.code === 'P2002') {
+      return res.status(409).json({ error: 'User account conflict. Please try again or contact support.' });
     }
     
     if (error.type === 'StripeCardError' || error.type === 'StripeInvalidRequestError') {

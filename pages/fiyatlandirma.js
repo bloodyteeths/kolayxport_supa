@@ -168,7 +168,10 @@ export default function FiyatlandirmaPage() {
 
       // Get current session from Supabase
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('Auth check:', { session: !!session, error: sessionError, user: session?.user?.email });
+      
       if (sessionError || !session) {
+        console.log('No session, redirecting to auth');
         // Redirect to sign in instead of showing error
         await supabase.auth.signInWithOAuth({ 
           provider: 'google',
@@ -176,6 +179,8 @@ export default function FiyatlandirmaPage() {
         });
         return;
       }
+
+      console.log('Session found, proceeding to checkout for plan:', plan, 'interval:', interval);
 
       const res = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',

@@ -20,11 +20,15 @@ export default async function handler(req, res) {
   
   // Verify the token with Supabase
   const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+  console.log('API auth check:', { user: user?.email, error: error?.message });
+  
   if (error || !user) {
+    console.log('API: Unauthorized user');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const userId = user.id;
+  console.log('API: Creating checkout for user:', user.email, 'plan:', req.body.plan);
 
   const { plan, interval } = req.body as { plan: 'starter' | 'growth' | 'kurumsal'; interval: 'month' | 'year' };
 

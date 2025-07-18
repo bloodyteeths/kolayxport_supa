@@ -137,7 +137,7 @@ export default async function handler(req, res) {
 
     let stripeCustomerId = (dbUser as any).stripeCustomerId as string | null;
 
-    // Create a new Stripe customer if one doesn't exist
+    // Create a new Stripe customer if one doesn't exist or if there's a mode mismatch
     if (!stripeCustomerId) {
       console.log('Creating new Stripe customer for user:', dbUser.email);
       const customer = await stripe.customers.create({
@@ -157,6 +157,33 @@ export default async function handler(req, res) {
       } catch (updateError: any) {
         console.error('Stripe customer ID update error:', updateError);
         // Continue with checkout even if update fails - customer is created in Stripe
+      }
+    } else {
+      // Verify the customer exists in current Stripe mode (test/live)
+      try {
+        await stripe.customers.retrieve(stripeCustomerId);
+        console.log('Existing Stripe customer found:', stripeCustomerId);
+      } catch (customerError: any) {
+        console.log('Stripe customer not found in current mode, creating new one:', customerError.message);
+        // Customer exists in different mode (live vs test), create a new one
+        const customer = await stripe.customers.create({
+          email: dbUser.email ?? undefined,
+          name: dbUser.name ?? undefined,
+          metadata: {
+            userId: dbUser.id,
+          },
+        });
+        stripeCustomerId = customer.id;
+
+        try {
+          await prisma.user.update({
+            where: { id: dbUser.id },
+            data: { stripeCustomerId } as any,
+          });
+        } catch (updateError: any) {
+          console.error('Stripe customer ID update error:', updateError);
+          // Continue with checkout even if update fails - customer is created in Stripe
+        }
       }
     }
 

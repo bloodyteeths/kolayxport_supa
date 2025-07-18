@@ -1,16 +1,17 @@
 import { PrismaClient } from '@prisma/client';
 
 const prismaClientSingleton = () => {
-  // Add connection parameters to handle PgBouncer and prepared statements
-  const connectionUrl = `${process.env.DATABASE_URL}?pgbouncer=true&connection_limit=1&pool_timeout=20&idle_timeout=20&connect_timeout=20&statement_cache_size=0`;
-  
   return new PrismaClient({
+    log: ['error', 'warn'],
+    // Don't override the DATABASE_URL - use the one from environment
+    // Your DATABASE_URL already has the correct pgbouncer configuration
+    errorFormat: 'pretty',
+    // Add connection timeout and pool settings
     datasources: {
       db: {
-        url: connectionUrl,
+        url: process.env.DATABASE_URL,
       },
     },
-    log: ['error', 'warn'],
   });
 };
 
@@ -24,8 +25,43 @@ if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma;
 
 // Add cleanup on process termination
 process.on('beforeExit', async () => {
-  await prisma.$disconnect();
+  try {
+    await prisma.$disconnect();
+  } catch (error) {
+    console.error('Error disconnecting Prisma:', error);
+  }
 });
+
+process.on('SIGINT', async () => {
+  try {
+    await prisma.$disconnect();
+    process.exit(0);
+  } catch (error) {
+    console.error('Error disconnecting Prisma on SIGINT:', error);
+    process.exit(1);
+  }
+});
+
+process.on('SIGTERM', async () => {
+  try {
+    await prisma.$disconnect();
+    process.exit(0);
+  } catch (error) {
+    console.error('Error disconnecting Prisma on SIGTERM:', error);
+    process.exit(1);
+  }
+});
+
+// Connection health check function
+export async function checkDatabaseConnection() {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch (error) {
+    console.error('Database connection check failed:', error);
+    return false;
+  }
+}
 
 // --- LabelJob delete logging patch ---
 if (prisma && prisma.labelJob) {

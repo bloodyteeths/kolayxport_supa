@@ -41,32 +41,71 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Find or create user in database
-    let dbUser = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    // Validate price configuration first
+    const priceId = STRIPE_PRICES[plan as 'starter' | 'growth'][interval];
+    if (!priceId) {
+      console.error('Missing price ID for plan:', plan, 'interval:', interval);
+      return res.status(400).json({ error: 'Price configuration missing for selected plan' });
+    }
+
+    console.log('Using price ID:', priceId);
+
+    // Find or create user in database with timeout protection
+    let dbUser;
+    try {
+      dbUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          stripeCustomerId: true,
+        }
+      });
+    } catch (dbError: any) {
+      console.error('Database query error:', dbError);
+      if (dbError.code === 'P2024') {
+        return res.status(503).json({ error: 'Database temporarily unavailable. Please try again.' });
+      }
+      throw dbError;
+    }
 
     if (!dbUser) {
       // Create user in database if they don't exist
-      dbUser = await prisma.user.create({
-        data: {
-          id: userId,
-          email: user.email || '',
-          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-          // Initialize billing fields
-          subscriptionPlan: 'trial',
-          subscriptionStatus: 'trialing',
-          orderSyncCount: 0,
-          labelCount: 0,
-          usageResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        },
-      });
+      try {
+        dbUser = await prisma.user.create({
+          data: {
+            id: userId,
+            email: user.email || '',
+            name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            // Initialize billing fields
+            subscriptionPlan: 'trial',
+            subscriptionStatus: 'trialing',
+            orderSyncCount: 0,
+            labelCount: 0,
+            usageResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+          },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            stripeCustomerId: true,
+          }
+        });
+      } catch (createError: any) {
+        console.error('User creation error:', createError);
+        if (createError.code === 'P2024') {
+          return res.status(503).json({ error: 'Database temporarily unavailable. Please try again.' });
+        }
+        throw createError;
+      }
     }
 
     let stripeCustomerId = (dbUser as any).stripeCustomerId as string | null;
 
     // Create a new Stripe customer if one doesn't exist
     if (!stripeCustomerId) {
+      console.log('Creating new Stripe customer for user:', dbUser.email);
       const customer = await stripe.customers.create({
         email: dbUser.email ?? undefined,
         name: dbUser.name ?? undefined,
@@ -76,13 +115,18 @@ export default async function handler(req, res) {
       });
       stripeCustomerId = customer.id;
 
-      await prisma.user.update({
-        where: { id: dbUser.id },
-        data: { stripeCustomerId } as any,
-      });
+      try {
+        await prisma.user.update({
+          where: { id: dbUser.id },
+          data: { stripeCustomerId } as any,
+        });
+      } catch (updateError: any) {
+        console.error('Stripe customer ID update error:', updateError);
+        // Continue with checkout even if update fails - customer is created in Stripe
+      }
     }
 
-    const priceId = STRIPE_PRICES[plan as 'starter' | 'growth'][interval];
+    console.log('Creating checkout session for customer:', stripeCustomerId);
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       billing_address_collection: 'required',
@@ -101,9 +145,20 @@ export default async function handler(req, res) {
       cancel_url: `${req.headers.origin || 'http://localhost:3000'}/fiyatlandirma`,
     });
 
+    console.log('Checkout session created:', checkoutSession.id);
     res.status(200).json({ sessionId: checkoutSession.id });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Stripe Checkout Error:', error);
+    
+    // Better error handling based on error type
+    if (error.code === 'P2024') {
+      return res.status(503).json({ error: 'Database connection timeout. Please try again.' });
+    }
+    
+    if (error.type === 'StripeCardError' || error.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({ error: `Stripe error: ${error.message}` });
+    }
+    
     res.status(500).json({ error: 'Internal Server Error' });
   }
 } 

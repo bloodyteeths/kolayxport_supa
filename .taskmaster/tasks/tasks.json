@@ -1,0 +1,138 @@
+{
+  "project": {
+    "name": "Trendyol Marketplace Integration", 
+    "description": "Integrate Trendyol marketplace into the existing shipping and order sync platform using a minimal-impact, feature-flagged approach."
+  },
+  "tags": {
+    "master": {
+      "name": "master",
+      "description": "Main development context for Trendyol integration",
+      "createdAt": "2025-01-12T00:00:00Z"
+    }
+  },
+  "tasks": {
+    "master": [
+      {
+        "id": "1",
+        "title": "Snapshot & Feature Flag",
+        "description": "Freeze current working app and create a reversible feature flag MARKETPLACE_TRENDYOL",
+        "status": "done",
+        "priority": "high",
+        "dependencies": [],
+        "details": "Create feature branch and implement feature flag system to enable/disable Trendyol functionality without affecting existing features. Steps:\n- git checkout -b feature/trendyol\n- add env flag to .env.example; default false\n- wrap any new Trendyol calls behind if (process.env.MARKETPLACE_TRENDYOL === 'true')",
+        "testStrategy": "Verify build passes; no functional change when flag is false",
+        "subtasks": []
+      },
+      {
+        "id": "2", 
+        "title": "Audit Existing Marketplace Paths",
+        "description": "Map how shippo/veeqo flows traverse the codebase so we can piggy-back on existing patterns",
+        "status": "done",
+        "priority": "high",
+        "dependencies": ["1"],
+        "details": "Analyze current marketplace integration patterns to understand the flow from request to service to database to UI. Steps:\n- search marketplace enum usages in /lib /pages/api /prisma\n- list shared service helpers (e.g. order sync, label creation)\n- output a diagram of request → service → db → UI for one existing marketplace",
+        "testStrategy": "Markdown diagram committed to docs/architecture/marketplace-flow.md",
+        "subtasks": []
+      },
+      {
+        "id": "3",
+        "title": "SDK & Auth Layer", 
+        "description": "Create a thin Trendyol REST client without new external dependencies",
+        "status": "done",
+        "priority": "high",
+        "dependencies": ["2"],
+        "details": "Build Trendyol API client with authentication. Steps:\n- add lib/clients/trendyolClient.ts (axios wrapper)\n- read TRENDYOL_SUPPLIER_ID, TRENDYOL_API_KEY, TRENDYOL_API_SECRET from env\n- implement signed request helper similar to current Etsy OAuth util",
+        "testStrategy": "Unit test hits /suppliers/{id}/products in sandbox mode via nock",
+        "subtasks": []
+      },
+      {
+        "id": "4",
+        "title": "DTO Alignment (no new tables)",
+        "description": "Adapt Trendyol payloads to existing Order, OrderItem, ShippingAddress shapes",
+        "status": "pending", 
+        "priority": "high",
+        "dependencies": ["3"],
+        "details": "Create data mappers for Trendyol API responses. Steps:\n- in lib/mappers/trendyol.ts, write toOrder(), toOrderItem() converters\n- map Trendyol status → existing OrderStatus enum\n- store trendyolOrderNumber in Order.marketplaceOrderId string field",
+        "testStrategy": "Mapper unit test converts sample JSON without undefined fields",
+        "subtasks": []
+      },
+      {
+        "id": "5",
+        "title": "Sync Command",
+        "description": "Implement incremental order synchronization",
+        "status": "completed",
+        "priority": "high",
+        "dependencies": ["4"],
+        "details": "Add Trendyol to existing sync endpoints. Steps:\n- update /api/orders/sync to accept trendyolApiKey, trendyolApiSecret, trendyolSupplierId\n- ensure syncAllOrders() calls fetchTrendyolOrders() when credentials present\n- test incremental sync with updatedAfter parameter",
+        "testStrategy": "POST /api/orders/sync with Trendyol credentials returns orders",
+        "subtasks": []
+      },
+      {
+        "id": "6",
+        "title": "Background Job Wiring",
+        "description": "Schedule periodic sync without new infrastructure",
+        "status": "completed",
+        "priority": "medium",
+        "dependencies": ["5"],
+        "details": "Integrate with existing job queue system. Steps:\n- extend existing Bull queue orderSync with type: 'trendyol'\n- job processor selects the correct sync function",
+        "testStrategy": "Dev queue dashboard shows Trendyol jobs enqueue & complete",
+        "subtasks": []
+      },
+      {
+        "id": "7",
+        "title": "UI Surface",
+        "description": "Show Trendyol in filters and icons only, no new pages",
+        "status": "completed",
+        "priority": "medium",
+        "dependencies": ["6"],
+        "details": "Add Trendyol to existing UI components. Steps:\n- append 'Trendyol' to OrderSource enum & shared badge component\n- ensure labels page renders orders when order.source === 'TRENDYOL'",
+        "testStrategy": "UI renders new badge; other sources unchanged",
+        "subtasks": []
+      },
+      {
+        "id": "8",
+        "title": "Shipping Label Flow Re-use",
+        "description": "Prepare address mapping for future shipping integrations (no labels yet)",
+        "status": "completed",
+        "priority": "medium",
+        "dependencies": ["7"],
+        "details": "Validate address mapping for future Turkish cargo company integration. Steps:\n- confirm address mapper populates required fields\n- document shipping limitations (domestic only)\n- Note: No shipping label generation for now since Trendyol requires Turkish cargo companies",
+        "testStrategy": "Address validation unit tests pass; documentation updated",
+        "subtasks": []
+      },
+      {
+        "id": "9",
+        "title": "End-to-End Smoke Test",
+        "description": "Test complete flow from API to UI with real credentials",
+        "status": "completed",
+        "priority": "high",
+        "dependencies": ["8"],
+        "details": "Validate complete Trendyol integration flow. Steps:\n- test with real Trendyol API credentials\n- verify orders appear in UI with correct marketplace badge\n- confirm sync works with feature flag enabled/disabled\n- test incremental sync with updatedAfter parameter\n- Added Trendyol credential fields to settings page (/ayarlar)\n- Updated API endpoint to handle Trendyol credentials",
+        "testStrategy": "Real API test passes; orders display correctly in UI; settings page allows credential entry",
+        "subtasks": []
+      },
+      {
+        "id": "10",
+        "title": "Rollout & Monitoring",
+        "description": "Deploy safely with gradual user rollout",
+        "status": "pending",
+        "priority": "medium",
+        "dependencies": ["9"],
+        "details": "Safe production deployment. Steps:\n- deploy flag default off → production\n- enable for internal user id list via ALLOW_TRENDYOL_USERS env\n- add Sentry breadcrumb in trendyolClient for error tracking",
+        "testStrategy": "24-hour error-free window before public rollout",
+        "subtasks": []
+      },
+      {
+        "id": "11",
+        "title": "Documentation & Support",
+        "description": "Update README & support documentation",
+        "status": "pending",
+        "priority": "low",
+        "dependencies": ["10"],
+        "details": "Complete documentation. Steps:\n- README marketplace table: add Trendyol ✔ order sync, ✔ future label support\n- write onboarding guide: how to obtain API keys\n- document shipping limitations (domestic only, Turkish cargo companies planned)",
+        "testStrategy": "Docs merged; customer success notified",
+        "subtasks": []
+      }
+    ]
+  }
+} 

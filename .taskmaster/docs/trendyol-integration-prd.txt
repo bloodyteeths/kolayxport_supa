@@ -1,0 +1,290 @@
+<context>
+# Overview  
+Integrate Trendyol marketplace into the existing shipping and order sync platform to enable users to sync orders from Trendyol and manage their fulfillment through the unified dashboard. This integration follows a minimal-impact rollout approach with feature flags to ensure zero disruption to existing marketplace integrations (Veeqo, Shippo, etc.).
+
+# Core Features  
+- **Order Synchronization**: Fetch and sync orders from Trendyol marketplace using their REST API
+- **Order Management**: Display Trendyol orders in the unified dashboard alongside existing marketplace orders
+- **Address Mapping**: Convert Trendyol shipping addresses to standardized format for future shipping integrations
+- **Feature Flag Control**: Enable/disable Trendyol functionality without affecting existing features
+- **Incremental Sync**: Fetch only new/updated orders since last sync to optimize performance
+
+# User Experience  
+- **Merchants**: Trendyol sellers who want to manage their orders through a unified platform
+- **Key User Flows**:
+  - Configure Trendyol API credentials in settings
+  - View Trendyol orders in the main orders dashboard
+  - Filter orders by marketplace (including Trendyol)
+  - See Trendyol order details and status
+- **UI/UX Considerations**:
+  - Trendyol orders appear seamlessly alongside existing marketplace orders
+  - Distinctive Trendyol branding/icons for easy identification
+  - No new pages or complex UI changes required
+
+# Technical Architecture  
+- **System Components**:
+  - Trendyol REST API client with authentication
+  - Order/OrderItem mappers for data transformation
+  - Background job processor for periodic sync
+  - Feature flag system for controlled rollout
+  
+- **Data Models**:
+  - Reuse existing Order, OrderItem, ShippingAddress models
+  - Store Trendyol-specific IDs in existing marketplaceOrderId field
+  - Map Trendyol status to existing OrderStatus enum
+  
+- **APIs and Integrations**:
+  - Trendyol Seller API for order fetching
+  - Existing sync pipeline for order processing
+  - Redis cache for lastSyncAt tracking
+  
+- **Infrastructure Requirements**:
+  - No new external dependencies
+  - Reuse existing Bull queue for background jobs
+  - Feature flag environment variables
+
+# Development Roadmap  
+
+## Phase 1: Foundation & Safety (Tasks 0-2)
+- Create feature branch and reversible feature flag
+- Audit existing marketplace flows and document architecture
+- Build Trendyol SDK and authentication layer
+
+## Phase 2: Data Integration (Tasks 3-4)
+- Create data mappers for Trendyol → existing models
+- Implement order sync functionality with incremental updates
+- Unit test all mapping and sync logic
+
+## Phase 3: Background Processing (Task 5)
+- Integrate with existing job queue system
+- Schedule periodic sync jobs
+- Add proper error handling and monitoring
+
+## Phase 4: UI Integration (Task 6)
+- Add Trendyol to marketplace filters and badges
+- Ensure orders display correctly in existing UI
+- No new pages or complex UI changes
+
+## Phase 5: Testing & Validation (Tasks 7-8)
+- Validate address mapping for future shipping integrations
+- End-to-end smoke testing in staging environment
+- Feature flag toggle testing
+
+## Phase 6: Rollout & Support (Tasks 9-10)
+- Safe production deployment with gradual user rollout
+- Documentation and support materials
+- Monitoring and error tracking
+
+# Logical Dependency Chain
+1. **Feature Flag Setup** (Task 0) - Must be first to ensure reversibility
+2. **Architecture Audit** (Task 1) - Required before building new components
+3. **SDK & Auth** (Task 2) - Foundation for all API interactions
+4. **Data Mapping** (Task 3) - Required before sync implementation
+5. **Sync Logic** (Task 4) - Core functionality implementation
+6. **Background Jobs** (Task 5) - Automation layer
+7. **UI Integration** (Task 6) - User-facing features
+8. **Address Validation** (Task 7) - Future shipping compatibility
+9. **E2E Testing** (Task 8) - Quality assurance
+10. **Rollout** (Task 9) - Safe deployment
+11. **Documentation** (Task 10) - Support enablement
+
+# Risks and Mitigations  
+- **Technical Challenges**:
+  - Risk: Trendyol API changes or rate limits
+  - Mitigation: Robust error handling and API versioning
+  
+- **Data Integrity**:
+  - Risk: Mapping errors causing data corruption
+  - Mitigation: Comprehensive unit tests and validation
+  
+- **Feature Flag Complexity**:
+  - Risk: Flag logic becoming complex and error-prone
+  - Mitigation: Simple boolean flags with clear boundaries
+  
+- **Shipping Integration Limitation**:
+  - Risk: Users expecting immediate shipping label generation
+  - Mitigation: Clear documentation that shipping integration comes later with Turkish cargo companies
+
+# Appendix  
+- **Research Findings**: Trendyol uses domestic shipping only, requiring future integration with Turkish cargo companies (Trendyol Express, Aras Kargo, etc.)
+- **Technical Specifications**: 
+  - Trendyol API uses OAuth-style signed requests
+  - Orders have unique trendyolOrderNumber field
+  - Status mapping required for order lifecycle management
+  - No immediate shipping label generation (domestic-only marketplace)
+- **Environment Variables**:
+  - MARKETPLACE_TRENDYOL (boolean, default false)
+  - TRENDYOL_SUPPLIER_ID
+  - TRENDYOL_API_KEY  
+  - TRENDYOL_API_SECRET
+  - ALLOW_TRENDYOL_USERS (user ID list for gradual rollout)
+</context>
+<PRD>
+# Product Requirements Document: Trendyol Marketplace Integration
+
+## Executive Summary
+Integrate Trendyol marketplace into the existing multi-marketplace shipping and order management platform using a minimal-impact, feature-flagged approach. This integration will enable merchants to sync orders from Trendyol and manage them through the unified dashboard, with future support for Turkish domestic shipping providers.
+
+## Functional Requirements
+
+### F1: Order Synchronization
+- Fetch orders from Trendyol Seller API using supplier credentials
+- Map Trendyol order data to existing Order/OrderItem models
+- Store Trendyol order numbers in marketplaceOrderId field
+- Implement incremental sync based on updatedAt timestamps
+- Support both manual and scheduled sync operations
+
+### F2: Data Mapping & Transformation
+- Convert Trendyol order status to existing OrderStatus enum
+- Map Trendyol shipping addresses to ShippingAddress model
+- Transform product data to OrderItem format
+- Handle Trendyol-specific fields (supplier ID, domestic shipping flags)
+- Preserve original Trendyol data in raw JSON fields
+
+### F3: UI Integration
+- Display Trendyol orders in existing orders dashboard
+- Add Trendyol to marketplace filter dropdown
+- Show Trendyol badge/icon for easy identification
+- Ensure order details page works with Trendyol orders
+- No new pages or major UI changes required
+
+### F4: Background Processing
+- Extend existing Bull queue with Trendyol sync jobs
+- Schedule periodic sync operations (configurable interval)
+- Implement proper error handling and retry logic
+- Add job monitoring and status tracking
+- Cache lastSyncAt timestamp in Redis
+
+### F5: Feature Flag Control
+- MARKETPLACE_TRENDYOL environment variable (default false)
+- Wrap all Trendyol functionality behind feature flag
+- Support gradual user rollout via ALLOW_TRENDYOL_USERS
+- Ensure zero impact when flag is disabled
+- Provide easy rollback mechanism
+
+## Technical Requirements
+
+### T1: Authentication & API Client
+- Implement Trendyol REST API client using existing HTTP library
+- Support OAuth-style signed request authentication
+- Handle API rate limiting and error responses
+- Sandbox/production environment switching
+- Comprehensive error logging and monitoring
+
+### T2: Data Architecture
+- Reuse existing database schema (no new tables)
+- Utilize existing Order, OrderItem, ShippingAddress models
+- Store Trendyol-specific metadata in existing JSON fields
+- Maintain referential integrity and constraints
+- Support future shipping integration data requirements
+
+### T3: Sync Architecture
+- Leverage existing sync pipeline and patterns
+- Implement incremental sync with cursor-based pagination
+- Support both full and delta sync operations
+- Handle duplicate detection and order updates
+- Preserve sync history and audit trail
+
+### T4: Shipping Integration Preparation
+- Map Trendyol addresses to standard shipping format
+- Validate address data completeness
+- Prepare for future Turkish cargo company integrations
+- Document shipping limitations (domestic only)
+- Maintain compatibility with existing shipping providers
+
+## Non-Functional Requirements
+
+### N1: Performance
+- Sync operations must not impact existing marketplace performance
+- Support concurrent sync operations across marketplaces
+- Implement efficient data pagination and batching
+- Optimize database queries and indexing
+- Cache frequently accessed data
+
+### N2: Reliability
+- 99.9% uptime for sync operations
+- Graceful handling of API failures and timeouts
+- Automatic retry with exponential backoff
+- Comprehensive error logging and alerting
+- Data consistency validation
+
+### N3: Security
+- Secure storage of API credentials
+- Encrypted communication with Trendyol API
+- Input validation and sanitization
+- Rate limiting and abuse prevention
+- Audit logging for all operations
+
+### N4: Maintainability
+- Follow existing code patterns and conventions
+- Comprehensive unit and integration tests
+- Clear documentation and code comments
+- Modular architecture for easy extension
+- Monitoring and observability tools
+
+## Constraints & Assumptions
+
+### C1: Technical Constraints
+- Must use existing technology stack (Node.js, Next.js, Prisma)
+- No new external dependencies or services
+- Reuse existing database schema and models
+- Maintain backward compatibility with existing features
+- Support existing deployment and CI/CD processes
+
+### C2: Business Constraints
+- Minimal disruption to existing merchant workflows
+- No breaking changes to existing API endpoints
+- Support gradual rollout and easy rollback
+- Maintain existing SLA commitments
+- Cost-neutral implementation (no new infrastructure)
+
+### C3: Integration Constraints
+- Trendyol API limitations and rate limits
+- Domestic shipping only (no international)
+- Future dependency on Turkish cargo company APIs
+- OAuth-style authentication requirements
+- Sandbox environment limitations
+
+## Success Criteria
+
+### S1: Technical Success
+- ✅ Zero regression in existing marketplace functionality
+- ✅ Successful order sync from Trendyol sandbox environment
+- ✅ Unit test coverage > 90% for new code
+- ✅ E2E test suite passing with Trendyol integration
+- ✅ Performance benchmarks maintained
+
+### S2: Business Success  
+- ✅ Merchants can view Trendyol orders in dashboard
+- ✅ Order data accurately mapped and displayed
+- ✅ Feature flag allows safe rollout and rollback
+- ✅ Support documentation completed
+- ✅ Customer success team trained on new features
+
+### S3: Operational Success
+- ✅ Monitoring and alerting in place
+- ✅ Error rates < 1% for sync operations
+- ✅ Deployment process validated
+- ✅ Rollback procedure documented and tested
+- ✅ 24-hour error-free operation in production
+
+## Future Considerations
+
+### Phase 2: Shipping Integration
+- Integration with Turkish cargo companies (Trendyol Express, Aras Kargo)
+- Domestic shipping label generation
+- Tracking number synchronization
+- Shipping cost calculation and optimization
+
+### Phase 3: Advanced Features
+- Bulk order operations for Trendyol
+- Inventory synchronization
+- Product listing management
+- Analytics and reporting enhancements
+
+### Phase 4: Optimization
+- Real-time webhook integration
+- Advanced filtering and search
+- Performance optimization
+- Mobile app support
+</PRD> 

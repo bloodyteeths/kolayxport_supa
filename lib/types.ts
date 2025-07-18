@@ -1,5 +1,5 @@
-export type OrderSource = 'veeqo' | 'shippo';
-export type OrderChannel = 'etsy' | 'shopify' | 'amazon' | 'ebay' | 'other';
+export type OrderSource = 'veeqo' | 'shippo' | 'trendyol';
+export type OrderChannel = 'etsy' | 'shopify' | 'amazon' | 'ebay' | 'trendyol' | 'other';
 
 export interface NormalizedAddress {
   name: string;

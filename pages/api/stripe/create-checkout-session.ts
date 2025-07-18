@@ -140,32 +140,7 @@ export default async function handler(req, res) {
     // Create a new Stripe customer if one doesn't exist or if there's a mode mismatch
     if (!stripeCustomerId) {
       console.log('Creating new Stripe customer for user:', dbUser.email);
-      const customer = await stripe.customers.create({
-        email: dbUser.email ?? undefined,
-        name: dbUser.name ?? undefined,
-        metadata: {
-          userId: dbUser.id,
-        },
-      });
-      stripeCustomerId = customer.id;
-
       try {
-        await prisma.user.update({
-          where: { id: dbUser.id },
-          data: { stripeCustomerId } as any,
-        });
-      } catch (updateError: any) {
-        console.error('Stripe customer ID update error:', updateError);
-        // Continue with checkout even if update fails - customer is created in Stripe
-      }
-    } else {
-      // Verify the customer exists in current Stripe mode (test/live)
-      try {
-        await stripe.customers.retrieve(stripeCustomerId);
-        console.log('Existing Stripe customer found:', stripeCustomerId);
-      } catch (customerError: any) {
-        console.log('Stripe customer not found in current mode, creating new one:', customerError.message);
-        // Customer exists in different mode (live vs test), create a new one
         const customer = await stripe.customers.create({
           email: dbUser.email ?? undefined,
           name: dbUser.name ?? undefined,
@@ -174,40 +149,85 @@ export default async function handler(req, res) {
           },
         });
         stripeCustomerId = customer.id;
+        console.log('Stripe customer created successfully:', stripeCustomerId);
 
         try {
           await prisma.user.update({
             where: { id: dbUser.id },
             data: { stripeCustomerId } as any,
           });
+          console.log('Database updated with new Stripe customer ID');
         } catch (updateError: any) {
           console.error('Stripe customer ID update error:', updateError);
           // Continue with checkout even if update fails - customer is created in Stripe
+        }
+      } catch (stripeError: any) {
+        console.error('Failed to create Stripe customer:', stripeError);
+        throw stripeError;
+      }
+    } else {
+      // Verify the customer exists in current Stripe mode (test/live)
+      console.log('Checking existing Stripe customer:', stripeCustomerId);
+      try {
+        await stripe.customers.retrieve(stripeCustomerId);
+        console.log('Existing Stripe customer found:', stripeCustomerId);
+      } catch (customerError: any) {
+        console.log('Stripe customer not found in current mode, creating new one:', customerError.message);
+        // Customer exists in different mode (live vs test), create a new one
+        try {
+          const customer = await stripe.customers.create({
+            email: dbUser.email ?? undefined,
+            name: dbUser.name ?? undefined,
+            metadata: {
+              userId: dbUser.id,
+            },
+          });
+          stripeCustomerId = customer.id;
+          console.log('New Stripe customer created for mode mismatch:', stripeCustomerId);
+
+          try {
+            await prisma.user.update({
+              where: { id: dbUser.id },
+              data: { stripeCustomerId } as any,
+            });
+            console.log('Database updated with new Stripe customer ID after mode mismatch');
+          } catch (updateError: any) {
+            console.error('Stripe customer ID update error:', updateError);
+            // Continue with checkout even if update fails - customer is created in Stripe
+          }
+        } catch (stripeError: any) {
+          console.error('Failed to create new Stripe customer:', stripeError);
+          throw stripeError;
         }
       }
     }
 
     console.log('Creating checkout session for customer:', stripeCustomerId);
-    const checkoutSession = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      billing_address_collection: 'required',
-      customer: stripeCustomerId,
-      line_items: [{ price: priceId, quantity: 1 }],
-      mode: 'subscription',
-      subscription_data: {
-        trial_period_days: 30,
-        metadata: {
-          userId: dbUser.id,
-          plan: plan,
-          interval: interval,
-        }
-      },
-      success_url: `${req.headers.origin || 'http://localhost:3000'}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.origin || 'http://localhost:3000'}/fiyatlandirma`,
-    });
+    try {
+      const checkoutSession = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        billing_address_collection: 'required',
+        customer: stripeCustomerId,
+        line_items: [{ price: priceId, quantity: 1 }],
+        mode: 'subscription',
+        subscription_data: {
+          trial_period_days: 30,
+          metadata: {
+            userId: dbUser.id,
+            plan: plan,
+            interval: interval,
+          }
+        },
+        success_url: `${req.headers.origin || 'http://localhost:3000'}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.headers.origin || 'http://localhost:3000'}/fiyatlandirma`,
+      });
 
-    console.log('Checkout session created:', checkoutSession.id);
-    res.status(200).json({ sessionId: checkoutSession.id });
+      console.log('Checkout session created successfully:', checkoutSession.id);
+      res.status(200).json({ sessionId: checkoutSession.id });
+    } catch (checkoutError: any) {
+      console.error('Failed to create checkout session:', checkoutError);
+      throw checkoutError;
+    }
   } catch (error: any) {
     console.error('Stripe Checkout Error:', error);
     

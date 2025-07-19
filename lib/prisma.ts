@@ -3,9 +3,26 @@ import { PrismaClient } from '@prisma/client';
 const prismaClientSingleton = () => {
   // Ensure we have proper PgBouncer parameters to avoid prepared statement conflicts
   const databaseUrl = process.env.DATABASE_URL;
-  const finalUrl = databaseUrl?.includes('statement_cache_size=0') 
-    ? databaseUrl 
-    : `${databaseUrl}${databaseUrl?.includes('?') ? '&' : '?'}statement_cache_size=0`;
+  
+  // Check if the URL already has the required parameters
+  let finalUrl = databaseUrl;
+  if (databaseUrl) {
+    const urlParams = new URLSearchParams(databaseUrl.split('?')[1] || '');
+    
+    // Add required PgBouncer parameters if not present
+    if (!urlParams.has('pgbouncer')) {
+      urlParams.set('pgbouncer', 'true');
+    }
+    if (!urlParams.has('statement_cache_size')) {
+      urlParams.set('statement_cache_size', '0');
+    }
+    if (!urlParams.has('pool_timeout')) {
+      urlParams.set('pool_timeout', '20');
+    }
+    
+    const baseUrl = databaseUrl.split('?')[0];
+    finalUrl = `${baseUrl}?${urlParams.toString()}`;
+  }
 
   return new PrismaClient({
     log: ['error', 'warn'],

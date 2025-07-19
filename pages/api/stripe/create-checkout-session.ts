@@ -161,20 +161,24 @@ export default async function handler(req, res) {
         stripeCustomerId = customer.id;
         console.log('Stripe customer created successfully:', stripeCustomerId);
 
-        // Temporarily skip database update to test if this is causing the hang
-        console.log('Skipping database update for now to test checkout flow');
-        // try {
-        //   console.log('Updating database with Stripe customer ID...', { userId: dbUser.id, customerId: stripeCustomerId });
-        //   await prisma.user.update({
-        //     where: { id: dbUser.id },
-        //     data: { stripeCustomerId } as any,
-        //   });
-        //   console.log('Database updated with new Stripe customer ID');
-        // } catch (updateError: any) {
-        //   console.error('Stripe customer ID update error:', updateError);
-        //   console.error('Error code:', updateError.code);
-        //   // Continue with checkout even if update fails - customer is created in Stripe
-        // }
+        try {
+          console.log('Updating database with Stripe customer ID...', { userId: dbUser.id, customerId: stripeCustomerId });
+          
+          // Use a simpler approach for PgBouncer compatibility
+          const updatedUser = await prisma.$queryRaw`
+            UPDATE "User" 
+            SET "stripeCustomerId" = ${stripeCustomerId}::text,
+                "updatedAt" = NOW()
+            WHERE "id" = ${dbUser.id}::text
+            RETURNING "id"
+          `;
+          
+          console.log('Database updated with new Stripe customer ID:', updatedUser);
+        } catch (updateError: any) {
+          console.error('Stripe customer ID update error:', updateError);
+          console.error('Error details:', { code: updateError.code, message: updateError.message });
+          // Continue with checkout even if update fails - customer is created in Stripe
+        }
       } catch (stripeError: any) {
         console.error('Failed to create Stripe customer:', stripeError);
         throw stripeError;
@@ -199,18 +203,24 @@ export default async function handler(req, res) {
           stripeCustomerId = customer.id;
           console.log('New Stripe customer created for mode mismatch:', stripeCustomerId);
 
-          // Temporarily skip database update to test if this is causing the hang
-          console.log('Skipping database update for mode mismatch to test checkout flow');
-          // try {
-          //   await prisma.user.update({
-          //     where: { id: dbUser.id },
-          //     data: { stripeCustomerId } as any,
-          //   });
-          //   console.log('Database updated with new Stripe customer ID after mode mismatch');
-          // } catch (updateError: any) {
-          //   console.error('Stripe customer ID update error:', updateError);
-          //   // Continue with checkout even if update fails - customer is created in Stripe
-          // }
+          try {
+            console.log('Updating database with new Stripe customer ID after mode mismatch...');
+            
+            // Use a simpler approach for PgBouncer compatibility
+            const updatedUser = await prisma.$queryRaw`
+              UPDATE "User" 
+              SET "stripeCustomerId" = ${stripeCustomerId}::text,
+                  "updatedAt" = NOW()
+              WHERE "id" = ${dbUser.id}::text
+              RETURNING "id"
+            `;
+            
+            console.log('Database updated with new Stripe customer ID after mode mismatch:', updatedUser);
+          } catch (updateError: any) {
+            console.error('Stripe customer ID update error:', updateError);
+            console.error('Error details:', { code: updateError.code, message: updateError.message });
+            // Continue with checkout even if update fails - customer is created in Stripe
+          }
         } catch (stripeError: any) {
           console.error('Failed to create new Stripe customer:', stripeError);
           throw stripeError;

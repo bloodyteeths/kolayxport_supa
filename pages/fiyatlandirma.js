@@ -191,7 +191,18 @@ export default function FiyatlandirmaPage() {
         body: JSON.stringify({ plan, interval }),
       });
 
-      const { sessionId, error } = await res.json();
+      console.log('API response status:', res.status);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('API error response:', errorText);
+        throw new Error(`API error: ${res.status} - ${errorText}`);
+      }
+
+      const data = await res.json();
+      console.log('API response data:', data);
+      
+      const { sessionId, error } = data;
       if (error) {
         throw new Error(error);
       }
@@ -199,8 +210,14 @@ export default function FiyatlandirmaPage() {
         throw new Error('Could not create checkout session');
       }
 
+      console.log('Redirecting to Stripe checkout with session:', sessionId);
       const stripe = await stripePromise;
-      await stripe.redirectToCheckout({ sessionId });
+      const { error: redirectError } = await stripe.redirectToCheckout({ sessionId });
+      
+      if (redirectError) {
+        console.error('Stripe redirect error:', redirectError);
+        throw redirectError;
+      }
     } catch (error) {
       console.error('Error during checkout:', error);
       alert(`Bir hata oluştu: ${error.message}`);

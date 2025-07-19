@@ -45,10 +45,20 @@ export default async function handler(req, res) {
     const priceId = STRIPE_PRICES[plan as 'starter' | 'growth'][interval];
     if (!priceId) {
       console.error('Missing price ID for plan:', plan, 'interval:', interval);
-      return res.status(400).json({ error: 'Price configuration missing for selected plan' });
+      console.error('STRIPE_PRICES config:', JSON.stringify(STRIPE_PRICES, null, 2));
+      return res.status(400).json({ error: 'Price configuration missing for selected plan. Please check environment variables.' });
     }
 
     console.log('Using price ID:', priceId);
+    
+    // Verify the price exists in Stripe
+    try {
+      const price = await stripe.prices.retrieve(priceId);
+      console.log('Price verified in Stripe:', { id: price.id, active: price.active });
+    } catch (priceError: any) {
+      console.error('Invalid price ID:', priceError.message);
+      return res.status(400).json({ error: 'Invalid price configuration. The price ID does not exist in your Stripe account.' });
+    }
 
     // Smart user lookup: first by ID, then by email if needed
     let dbUser;

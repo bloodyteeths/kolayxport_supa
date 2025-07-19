@@ -40,7 +40,7 @@ const navItems = [
   { href: '/app', icon: LayoutDashboard, label: 'Genel Bakış' },
   { href: '/app/labels', icon: FileText, label: 'Label' },
   { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: 'Entegrasyonlar' },
-  { href: '/app/settings', icon: Settings, label: 'Ayarlar' },
+  { href: '/ayarlar', icon: Settings, label: 'Ayarlar' },
   { href: '/app/senkron', icon: ShoppingCart, label: 'Senkron' },
 ];
 
@@ -177,7 +177,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 </button>
               </div>
               <button
-                onClick={() => router.push('/app/settings')}
+                onClick={() => router.push('/ayarlar')}
                 className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
               >
                 <Settings size={20} />

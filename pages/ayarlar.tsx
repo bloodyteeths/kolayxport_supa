@@ -6,7 +6,7 @@ import {
   Container, TextField, Button, Typography, Paper, CircularProgress, Select, MenuItem, FormControl, InputLabel, FormHelperText, Box, Snackbar, Alert, AlertColor, SelectChangeEvent, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton
 } from '@mui/material';
 import { fedexOptionsData, FedExOption } from '../lib/fedex/fedex.config'; // For dutiesPaymentTypes
-import Layout from '../components/Layout'; // Assuming you have a Layout component
+import AppLayout from '../components/AppLayout'; // Use AppLayout for consistent sidebar
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ReplayIcon from '@mui/icons-material/Replay';
@@ -271,12 +271,12 @@ const AyarlarPage = () => {
   if (isLoading && !initialDataLoaded) {
     console.log('Showing loading screen - isLoading:', isLoading, 'initialDataLoaded:', initialDataLoaded);
     return (
-      <Layout>
+      <AppLayout title="Ayarlar - Yükleniyor">
         <Container sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
           <CircularProgress />
           <Typography sx={{ mt: 2 }}>Yükleniyor...</Typography>
         </Container>
-      </Layout>
+      </AppLayout>
     );
   }
 
@@ -308,7 +308,7 @@ const AyarlarPage = () => {
 
   try {
     return (
-      <Layout>
+      <AppLayout title="Ayarlar">
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
           {fetchError && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -619,12 +619,12 @@ const AyarlarPage = () => {
             </Alert>
           </Snackbar>
         </Container>
-      </Layout>
+      </AppLayout>
     );
   } catch (error) {
     console.error('Error rendering ayarlar page:', error);
     return (
-      <Layout>
+      <AppLayout title="Ayarlar - Hata">
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
           <Typography variant="h4" component="h1" gutterBottom>
             Hata
@@ -633,7 +633,7 @@ const AyarlarPage = () => {
             Sayfa yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.
           </Typography>
         </Container>
-      </Layout>
+      </AppLayout>
     );
   }
 };

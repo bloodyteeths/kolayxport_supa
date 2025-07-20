@@ -111,12 +111,13 @@ export default async function handler(
     if (payload.shippingAddress && typeof payload.shippingAddress === 'object') {
         updateData.shippingAddress = payload.shippingAddress;
     }
-    const extraFields = { ...payload };
+    const extraFields: any = { ...payload };
     delete extraFields.status;
     delete extraFields.customerName;
     delete extraFields.currency;
     delete extraFields.totalPrice;
     delete extraFields.shippingAddress;
+    delete extraFields.line_items; // Don't store line_items in rawData as it should come from OrderItem table
     const baseRawData = (order && typeof order.rawData === 'object' && order.rawData !== null) ? order.rawData : {};
     if (Object.keys(extraFields).length > 0) {
         updateData.rawData = { ...baseRawData, ...extraFields };

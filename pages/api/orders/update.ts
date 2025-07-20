@@ -78,6 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         postal:    recipientPostal,
         country:   recipientCountry,
         phone:     recipientPhone,
+        email:     req.body.shippingAddress?.email,
     };
     
     // Only include shippingAddress in update if there are any address fields provided.
@@ -98,11 +99,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (countryOfOrigin !== undefined) itemUpdateData.countryOfMfg = countryOfOrigin;
       
       if (Object.keys(itemUpdateData).length > 0) {
-        await prisma.orderItem.update({
-          where: { id: itemId },
-          data: itemUpdateData,
-        })
-        logger.info(`[API /orders/update] Updated OrderItem ${itemId}`, itemUpdateData);
+        // First check if the OrderItem exists
+        const existingItem = await prisma.orderItem.findUnique({
+          where: { id: String(itemId) }
+        });
+        
+        if (existingItem) {
+          await prisma.orderItem.update({
+            where: { id: String(itemId) },
+            data: itemUpdateData,
+          })
+          logger.info(`[API /orders/update] Updated OrderItem ${itemId}`, itemUpdateData);
+        } else {
+          logger.warn(`[API /orders/update] OrderItem ${itemId} not found, skipping update`);
+        }
       }
     }
 

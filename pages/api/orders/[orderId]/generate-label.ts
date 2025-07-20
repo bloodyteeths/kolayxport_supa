@@ -5,6 +5,7 @@ import { createFedexShipment } from '../../../../lib/fedex/fedex.service';
 import { OrderRow, ShipperProfileData, FedexShipmentResult, OrderRowItem } from '../../../../lib/fedex/fedex.types';
 import { fedexOptionsData } from '../../../../lib/fedex/fedex.config';
 import { logger } from '../../../../lib/logger';
+import { withUsageLimiter } from '../../../../lib/middleware/withUsageLimiter';
 
 interface ResponseData extends Partial<FedexShipmentResult> {
   error?: string;
@@ -28,7 +29,7 @@ interface ShippingAddressParsed {
   isResidential?: boolean;
 }
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ResponseData>
 ) {
@@ -302,7 +303,7 @@ export default async function handler(
       recipientPostal: parsedShippingAddress.postal,
       recipientCountry: parsedShippingAddress.country,
       recipientPhone: parsedShippingAddress.phone || '0000000000',
-      recipientEmail: parsedShippingAddress.email || undefined,
+      recipientEmail: parsedShippingAddress.email || (orderRecord.items?.[0]?.recipientEmail) || undefined,
       isResidential: parsedShippingAddress.isResidential === true,
       
       // Shipment Details (These will be mapped to requestedShipment by createFedexShipment)
@@ -393,7 +394,7 @@ export default async function handler(
       lineItemsFromRequest.map(async (item) => {
         return prisma.labelJob.create({
           data: {
-            orderItemId: item.id,
+            orderItemId: String(item.id),
             carrier: 'FEDEX',
             status: 'created',
             pdfUrl: fedexResult.labelUrl,
@@ -402,6 +403,11 @@ export default async function handler(
         });
       })
     );
+
+    // Increment usage counter after successful label generation
+    if (res.incrementUsage) {
+      await res.incrementUsage();
+    }
 
     // Keep only essential success logging
     logger.info(`[API generate-label] Label generated successfully for order ${orderId}. Tracking: ${fedexResult.trackingNumber}`);
@@ -422,7 +428,7 @@ export default async function handler(
         lineItemsFromRequest.map(async (item) => {
           return prisma.labelJob.create({
             data: {
-              orderItemId: item.id,
+              orderItemId: String(item.id),
               carrier: 'FEDEX',
               status: 'failed',
               errorMessage: error.message || 'Unknown error during label generation',
@@ -439,4 +445,6 @@ export default async function handler(
       details: error.details || error,
     });
   }
-} 
+}
+
+export default withUsageLimiter(handler, 'label'); 

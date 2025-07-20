@@ -1,13 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 import { getSupabaseServerClient } from '../../../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
+import prisma from '../../../lib/prisma';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // DEBUG: Log every request to this endpoint
+  console.log(`[API DEBUG] === NEW REQUEST TO /api/orders ===`);
+  console.log(`[API DEBUG] Method: ${req.method}`);
+  console.log(`[API DEBUG] Query params:`, req.query);
+  console.log(`[API DEBUG] Context:`, req.query.context);
+  console.log(`[API DEBUG] Date filters:`, {
+    startDate: req.query.startDate,
+    endDate: req.query.endDate
+  });
+  
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
@@ -153,7 +162,7 @@ export default async function handler(
     }
 
     if (startDate) {
-      whereClause += ` AND o."createdAt" >= $${paramIndex}`;
+      whereClause += ` AND COALESCE(o."uiOrderDate", o."createdAt") >= $${paramIndex}::timestamp`;
       params.push(startDate as string);
       paramIndex++;
     }
@@ -161,7 +170,7 @@ export default async function handler(
     if (endDate) {
       const endOfDay = new Date(endDate as string);
       endOfDay.setHours(23, 59, 59, 999);
-      whereClause += ` AND o."createdAt" <= $${paramIndex}`;
+      whereClause += ` AND COALESCE(o."uiOrderDate", o."createdAt") <= $${paramIndex}::timestamp`;
       params.push(endOfDay.toISOString());
       paramIndex++;
     }
@@ -240,13 +249,24 @@ export default async function handler(
     // console.log('SQL Query:', ordersQuery);
     // console.log('SQL Params:', params);
 
-    const result = await pool.query(ordersQuery, params);
+    const result = await prisma.$queryRawUnsafe(ordersQuery, ...params);
+    
+    // DEBUG: Always log for now
+    console.log(`[API DEBUG] Raw DB query returned ${(result as any[]).length} orders`);
+    console.log(`[API DEBUG] Sample raw order:`, (result as any[])[0] ? {
+      id: (result as any[])[0].id,
+      orderNumber: (result as any[])[0].orderNumber,
+      marketplace: (result as any[])[0].marketplace,
+      createdAt: (result as any[])[0].createdAt,
+      uiOrderDate: (result as any[])[0].uiOrderDate
+    } : 'No orders');
+    
     // To re-enable order debug logs, set ORDERS_DEBUG=1 in your environment and uncomment the lines below.
     // if (process.env.ORDERS_DEBUG === '1') {
     //   console.log('[API Orders] Raw Result Rows:', result.rows.length);
     //   console.log('[API Orders] Sample Order:', result.rows[0]);
     // }
-    let processedOrders = await Promise.all(result.rows.map(async (rawOrder: any) => {
+    let processedOrders = await Promise.all((result as any[]).map(async (rawOrder: any) => {
       // if (process.env.ORDERS_DEBUG === '1') {
       //   console.log('[API Orders] Processing order:', rawOrder.id);
       //   console.log('[API Orders] Order items:', rawOrder.items);
@@ -310,12 +330,21 @@ export default async function handler(
       // Fetch all label jobs for items in this order
       let labelJobsByItemId: Record<string, any[]> = {};
       if (itemsFromDb.length > 0) {
-        const itemIds = itemsFromDb.map(item => `'${item.id}'`).join(',');
+        const itemIds = itemsFromDb.map(item => item.id).filter(Boolean);
         if (itemIds.length > 0) {
-          const labelJobsQuery = `SELECT * FROM "LabelJob" WHERE "orderItemId" IN (${itemIds}) ORDER BY "createdAt" DESC`;
           try {
-            const { rows: labelJobsRows } = await pool.query(labelJobsQuery);
-            labelJobsRows.forEach(job => {
+            const labelJobs = await prisma.labelJob.findMany({
+              where: {
+                orderItemId: {
+                  in: itemIds
+                }
+              },
+              orderBy: {
+                createdAt: 'desc'
+              }
+            });
+            
+            labelJobs.forEach(job => {
               if (!labelJobsByItemId[job.orderItemId]) labelJobsByItemId[job.orderItemId] = [];
               labelJobsByItemId[job.orderItemId].push({
                 id: job.id,
@@ -425,17 +454,35 @@ export default async function handler(
         recipientStreet1?: string;
         recipientCity?: string;
         // ...other fields
-      };
+      } | string;
       recipientStreet1?: string;
       recipientCity?: string;
       [key: string]: any;
     };
 
-    const hasAddress = (o: UIOrder) =>
-      !!(
-        (o.shippingAddress?.recipientStreet1 || o.recipientStreet1) &&
-        (o.shippingAddress?.recipientCity || o.recipientCity)
-      );
+    const hasAddress = (o: UIOrder) => {
+      // Check object-style shipping address (Veeqo/Shippo)
+      const objectAddress = o.shippingAddress && typeof o.shippingAddress === 'object' 
+        ? o.shippingAddress 
+        : null;
+      
+      // Check to_address field (Trendyol/mapped orders)
+      const toAddress = o.to_address || (o.rawData && typeof o.rawData === 'object' ? o.rawData.to_address : null);
+      
+      // Check top-level recipient fields (processed orders)
+      const topLevel = {
+        street1: o.recipientStreet1,
+        city: o.recipientCity
+      };
+      
+      // Check if any address format has required fields
+      const hasObjectAddr = objectAddress?.recipientStreet1 && objectAddress?.recipientCity;
+      const hasToAddr = toAddress?.street1 && toAddress?.city;
+      const hasTopLevelAddr = topLevel.street1 && topLevel.city;
+      const hasStringAddr = typeof o.shippingAddress === 'string' && o.shippingAddress.length > 10; // Basic check for string addresses
+      
+      return !!(hasObjectAddr || hasToAddr || hasTopLevelAddr || hasStringAddr);
+    };
 
     const makeKey = (o: UIOrder) =>
       `${o.marketplace}-${o.marketplaceOrderId ?? o.orderNumber}`;
@@ -471,10 +518,28 @@ export default async function handler(
       FROM "Order" o
       ${whereClause}
     `;
-    const { rows: countRows2 } = await pool.query(countQuery, params.slice(0, paramIndex - 1));
-    const total = parseInt(countRows2[0]?.total || '0', 10);
+    const countResult = await prisma.$queryRawUnsafe(countQuery, ...params.slice(0, paramIndex - 1)) as any[];
+    const total = parseInt(countResult[0]?.total || '0', 10);
 
-    const cleanedOrders = await dedupeAndFilter(processedOrders.filter(Boolean));
+    // TEMPORARILY DISABLED: Deduplication and filtering for debugging
+    // const cleanedOrders = await dedupeAndFilter(processedOrders.filter(Boolean));
+    const cleanedOrders = processedOrders.filter(Boolean); // Just remove null/undefined orders
+    
+    console.log(`[API DEBUG] Before deduplication: ${processedOrders.length} orders`);
+    console.log(`[API DEBUG] After filtering nulls: ${cleanedOrders.length} orders`);
+    console.log(`[API DEBUG] Sample orders:`, cleanedOrders.slice(0, 3).map(o => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      marketplace: o.marketplace,
+      source: o.source,
+      marketplaceOrderDate: o.marketplaceOrderDate
+    })));
+    
+    console.log(`[API DEBUG] === RESPONSE BEING SENT ===`);
+    console.log(`[API DEBUG] Sending ${cleanedOrders.length} orders to frontend`);
+    console.log(`[API DEBUG] Total: ${total}, Page: ${page}, PageSize: ${pageSize}`);
+    console.log(`[API DEBUG] First 3 order numbers:`, cleanedOrders.slice(0, 3).map(o => o.orderNumber));
+    
     return res.status(200).json({
       orders: cleanedOrders,
       total, // Use the correct total count from the count query

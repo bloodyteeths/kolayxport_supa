@@ -26,17 +26,14 @@ model User {
   lastSyncedAt        DateTime?
   onboardingStep      Int?                @default(0)
   shippingSettings    Json?
-
-  // Stripe Billing Fields
-  stripeCustomerId    String?             @unique
-  subscriptionPlan    String?             // e.g., 'starter', 'growth', 'enterprise'
-  billingInterval     String?             // 'month' or 'year'
-  subscriptionStatus  String?             // e.g., 'trialing', 'active', 'canceled', 'past_due'
-  orderSyncCount      Int                 @default(0)
+  billingInterval     String?
   labelCount          Int                 @default(0)
+  orderSyncCount      Int                 @default(0)
+  stripeCustomerId    String?             @unique
+  subscriptionPlan    String?
+  subscriptionStatus  String?
   trialExpiresAt      DateTime?
   usageResetAt        DateTime?
-
   accounts            Account[]
   marketplaceConfigs  MarketplaceConfig[]
   orders              Order[]
@@ -100,7 +97,6 @@ model Order {
   marketplaceKey              String
   customerName                String?
   status                      String?
-  externalStatus              String?
   currency                    String?
   totalPrice                  Float?
   createdAt                   DateTime       @default(now())
@@ -130,9 +126,8 @@ model Order {
   termsOfSale                 String?        @default("DDU")
   trackingNumber              String?
   weightKg                    Float?         @default(0.5)
+  externalStatus              String?
   uiOrderDate                 DateTime?
-  // source                      String?  // TODO: Uncomment after migration
-  // channel                     String?  // TODO: Uncomment after migration
   items                       OrderItem[]    @relation("OrderToOrderItem")
   user                        User           @relation(fields: [userId], references: [id])
   shipments                   Shipment[]     @relation("OrderToShipment")
@@ -163,6 +158,7 @@ model OrderItem {
   countryOfMfg   String?
   harmonizedCode String?
   weightKg       Float?     @default(0.5)
+  recipientEmail String?    @map("recipient_email")
   labelJobs      LabelJob[]
   order          Order      @relation("OrderToOrderItem", fields: [orderId], references: [id], onDelete: Cascade)
   product        Product?   @relation(fields: [productId], references: [id])

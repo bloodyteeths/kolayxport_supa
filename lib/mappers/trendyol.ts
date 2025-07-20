@@ -29,12 +29,17 @@ export async function toOrderWithImages(order: any, productImages: Record<string
       '';
     
     // If no image and we have a barcode, try to get from product images
-    if (!imageUrl && item.barcode && productImages[item.barcode]) {
-      imageUrl = productImages[item.barcode];
-
-    }
+    // Also check merchantSku which might be the barcode
+    const barcodesToCheck = [item.barcode, item.merchantSku, item.sku].filter(Boolean);
     
-
+    if (!imageUrl) {
+      for (const barcode of barcodesToCheck) {
+        if (barcode && productImages[barcode]) {
+          imageUrl = productImages[barcode];
+          break;
+        }
+      }
+    }
     
     return {
       id: item.id || item.orderLineId || String(Math.random()),
@@ -85,6 +90,7 @@ export async function toOrderWithImages(order: any, productImages: Record<string
       postal: shipmentAddr?.postalCode || '',
       country: shipmentAddr?.countryCode || 'TR',
       isResidential: true,
+      email: order.customerEmail || '',
     },
     // Additional required fields
     marketplaceOrderDate: order.orderDate
@@ -96,6 +102,7 @@ export async function toOrderWithImages(order: any, productImages: Record<string
     rawData: order,
     commodityDesc: line_items.length > 0 ? line_items[0].title : '',
     externalStatus: order.status || '',
+    recipientEmail: order.customerEmail || '',
   };
 }
 
@@ -140,6 +147,7 @@ export function toOrder(order: any): UIOrder {
       postal: shipmentAddr?.postalCode || '',
       country: shipmentAddr?.countryCode || 'TR',
       isResidential: true,
+      email: order.customerEmail || '',
     },
     // Additional required fields
     marketplaceOrderDate: order.orderDate
@@ -151,6 +159,7 @@ export function toOrder(order: any): UIOrder {
     rawData: order,
     commodityDesc: line_items.length > 0 ? line_items[0].title : '',
     externalStatus: order.status || '',
+    recipientEmail: order.customerEmail || '',
   };
 }
 
@@ -175,21 +184,44 @@ export async function mapTrendyolOrdersWithImages(
 
   // Collect all barcodes from orders that don't have images
   const barcodesNeedingImages: string[] = [];
+  const addedBarcodes = new Set<string>(); // To avoid duplicates
+  
   orders.forEach(order => {
     if (order.lines || order.lineItems) {
       (order.lines || order.lineItems).forEach((item: any) => {
         const hasImage = item.productImage || 
           (item.images && item.images[0] && item.images[0].url);
-        if (!hasImage && item.barcode && item.barcode.trim()) {
-          barcodesNeedingImages.push(item.barcode.trim());
+        
+        if (!hasImage) {
+          // Check all possible barcode fields
+          const barcodesToCheck = [item.barcode, item.merchantSku, item.sku].filter(Boolean);
+          barcodesToCheck.forEach(barcode => {
+            const trimmedBarcode = barcode.trim();
+            if (trimmedBarcode && !addedBarcodes.has(trimmedBarcode)) {
+              barcodesNeedingImages.push(trimmedBarcode);
+              addedBarcodes.add(trimmedBarcode);
+            }
+          });
         }
       });
     }
   });
 
-  // Product image fetching is currently disabled - would need implementation
-  // of getProductImages function in trendyolClient
+  // Fetch product images from Trendyol Product API
   let productImages: Record<string, string> = {};
+  if (barcodesNeedingImages.length > 0) {
+    console.log('[Trendyol Mapper] Need to fetch images for', barcodesNeedingImages.length, 'barcodes:', barcodesNeedingImages);
+    try {
+      // Dynamic import to avoid circular dependency
+      const { getProductImages } = await import('../integrations/trendyolClient');
+      productImages = await getProductImages(barcodesNeedingImages, credentials);
+      console.log('[Trendyol Mapper] Fetched images for', Object.keys(productImages).length, 'products');
+    } catch (error) {
+      console.warn('Failed to fetch product images from Trendyol:', error);
+    }
+  } else {
+    console.log('[Trendyol Mapper] All items already have images or no items found');
+  }
 
   // Map orders with the fetched images
   return Promise.all(orders.map(order => toOrderWithImages(order, productImages)));

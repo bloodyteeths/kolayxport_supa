@@ -116,7 +116,12 @@ export default function SenkronPage() {
     setSyncing(true);
     setSyncMessage(null);
     try {
-      await axios.post('/api/orders/sync');
+      const { fetchWithLimit } = await import('../../lib/fetchWithLimit');
+      const res = await fetchWithLimit('/api/orders/sync', { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Senkronizasyon hatası');
+      }
       setSyncMessage('Siparişler başarıyla senkronize edildi');
     } catch (err) {
       setSyncMessage('Senkronizasyon sırasında hata oluştu: ' + (err.response?.data?.error || err.message));

@@ -3,8 +3,12 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { syncAllOrders } from '@/lib/orderSync';
 import { getSupabaseServerClient } from '@/lib/supabase';
+import { isTrendyolEnabled } from '@/lib/config';
+import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
+// Import Trendyol sync function from auto-sync script
+const { syncTrendyolRecentOrders } = require('../../../scripts/auto-sync-all-users.js');
 
-export default async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -32,8 +36,15 @@ export default async function handler(
     // Use provided credentials or fall back to user settings
     const finalVeeqoApiKey = veeqoApiKey || userSettings?.veeqoApiKey;
     const finalShippoToken = shippoToken || userSettings?.shippoToken;
+    const finalTrendyolApiKey = userSettings?.trendyolApiKey;
+    const finalTrendyolApiSecret = userSettings?.trendyolApiSecret;
+    const finalTrendyolSupplierId = userSettings?.trendyolSupplierId;
 
-    if (!finalVeeqoApiKey && !finalShippoToken) {
+    const hasVeeqo = !!finalVeeqoApiKey;
+    const hasShippo = !!finalShippoToken;
+    const hasTrendyol = !!(finalTrendyolApiKey && finalTrendyolApiSecret && finalTrendyolSupplierId) && isTrendyolEnabled(userId);
+
+    if (!hasVeeqo && !hasShippo && !hasTrendyol) {
       logger.error('No integration credentials found', undefined, { userId, operation: 'order-sync' });
       return res.status(400).json({ error: 'No integration credentials found. Please check your settings.' });
     }
@@ -59,13 +70,88 @@ export default async function handler(
     
     while (retries > 0) {
       try {
-        const result = await syncAllOrders(userId, {
-          veeqoApiKey: finalVeeqoApiKey,
-          shippoToken: finalShippoToken,
-          startDate: startDate === null ? undefined : startDate,
-          syncType: syncType || 'full',
-        });
-        return res.status(200).json(result);
+        // Create array of sync promises to run in parallel
+        const syncPromises: Promise<any>[] = [];
+        let combinedResult = {
+          newOrders: 0,
+          updatedOrders: 0,
+          skippedOrders: 0,
+          failedOrders: 0,
+          errors: [] as Array<{ orderId: string; error: string }>
+        };
+
+        // Add Veeqo + Shippo sync if credentials exist
+        if (hasVeeqo || hasShippo) {
+          syncPromises.push(
+            syncAllOrders(userId, {
+              veeqoApiKey: finalVeeqoApiKey,
+              shippoToken: finalShippoToken,
+              startDate: startDate === null ? undefined : startDate,
+              syncType: syncType || 'full',
+            })
+          );
+        }
+
+        // Add Trendyol sync if enabled and credentials exist
+        if (hasTrendyol) {
+          syncPromises.push(
+            (async () => {
+              try {
+                const user = await prisma.user.findUnique({ where: { id: userId } });
+                if (!user) throw new Error('User not found for Trendyol sync');
+                
+                const trendyolSettings = {
+                  trendyolApiKey: finalTrendyolApiKey,
+                  trendyolApiSecret: finalTrendyolApiSecret,
+                  trendyolSupplierId: finalTrendyolSupplierId,
+                };
+
+                logger.info(`[Fast Sync] Starting Trendyol sync for user ${userId}`);
+                await syncTrendyolRecentOrders(user, trendyolSettings);
+                
+                // Return a result structure compatible with syncAllOrders
+                return {
+                  newOrders: 0, // Trendyol sync doesn't return these metrics in same format
+                  updatedOrders: 0,
+                  skippedOrders: 0,
+                  failedOrders: 0,
+                  errors: []
+                };
+              } catch (error: any) {
+                logger.error(`[Fast Sync] Trendyol sync failed for user ${userId}:`, error);
+                // Return failed result instead of throwing to not break entire sync
+                return {
+                  newOrders: 0,
+                  updatedOrders: 0,
+                  skippedOrders: 0,
+                  failedOrders: 1,
+                  errors: [{ orderId: 'trendyol_sync', error: error.message }]
+                };
+              }
+            })()
+          );
+        }
+
+        // Execute all syncs in parallel
+        const results = await Promise.all(syncPromises);
+        
+        // Combine results from all sync operations
+        for (const result of results) {
+          combinedResult.newOrders += result.newOrders || 0;
+          combinedResult.updatedOrders += result.updatedOrders || 0;
+          combinedResult.skippedOrders += result.skippedOrders || 0;
+          combinedResult.failedOrders += result.failedOrders || 0;
+          combinedResult.errors.push(...(result.errors || []));
+        }
+
+        // Increment usage counter after successful sync
+        if (res.incrementUsage) {
+          await res.incrementUsage();
+        }
+
+        logger.info(`[Fast Sync] Combined sync completed for user ${userId}:`, combinedResult);
+        return res.status(200).json(combinedResult);
+        
       } catch (error: any) {
         lastError = error;
         retries--;
@@ -84,4 +170,6 @@ export default async function handler(
       details: error.message
     });
   }
-} 
+}
+
+export default withUsageLimiter(handler, 'orderSync'); 

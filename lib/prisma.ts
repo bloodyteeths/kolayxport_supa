@@ -17,7 +17,10 @@ const prismaClientSingleton = () => {
       urlParams.set('statement_cache_size', '0');
     }
     if (!urlParams.has('pool_timeout')) {
-      urlParams.set('pool_timeout', '20');
+      urlParams.set('pool_timeout', '30');
+    }
+    if (!urlParams.has('connection_limit')) {
+      urlParams.set('connection_limit', '20');
     }
     
     const baseUrl = databaseUrl.split('?')[0];

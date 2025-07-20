@@ -234,6 +234,7 @@ export interface LabelRow {
   recipientPostal: string;
   recipientCountry: string;
   recipientPhone?: string;
+  recipientEmail?: string;
 
   // For label generation form & actions (can be duplicated from above if needed, or extended)
   fedexServiceType?: string;
@@ -254,6 +255,8 @@ export interface LabelRow {
 const statusColors: Record<string, {bg: string, text: string}> = {
   UNSHIPPED: { bg: '#FFD700', text: '#000' }, // Gold
   PENDING: { bg: '#FFD700', text: '#000' },
+  AWAITING_FULFILLMENT: { bg: '#FFD700', text: '#000' }, // Gold - same as PENDING
+  PAID: { bg: '#FFD700', text: '#000' }, // Gold - same as PENDING
   PARTIALLY_SHIPPED: { bg: '#ADD8E6', text: '#000' }, // Light Blue
   SHIPPED: { bg: '#90EE90', text: '#000' }, // Light Green
   DELIVERED: { bg: '#32CD32', text: '#fff' }, // Lime Green
@@ -286,14 +289,15 @@ const integrationOptions = [
 const orderStatusOptions = [
   { value: '', label: 'Tümü (Sipariş)' },
   { value: 'UNSHIPPED', label: 'Hazırlanıyor' },
-  { value: 'PENDING', label: 'Beklemede' },
+  { value: 'PENDING', label: 'Onaylandı' },
+  { value: 'AWAITING_FULFILLMENT', label: 'Onaylandı' },
+  { value: 'PAID', label: 'Onaylandı' },
   { value: 'PARTIALLY_SHIPPED', label: 'Kısmen Kargolandı' },
   { value: 'SHIPPED', label: 'Kargolandı' },
   { value: 'DELIVERED', label: 'Teslim Edildi' },
   { value: 'CANCELLED', label: 'İptal Edildi' },
   { value: 'REFUNDED', label: 'İade Edildi' },
   { value: 'ON_HOLD', label: 'Askıya Alındı' },
-  { value: 'AWAITING_PAYMENT', label: 'Ödeme Bekliyor' },
   { value: 'COMPLETED', label: 'Tamamlandı' },
   { value: 'FAILED', label: 'Başarısız Oldu' },
   { value: 'Synced', label: 'Senkronize' },
@@ -411,6 +415,11 @@ function extractAddress(order: LocalUIOrder) { // Ensure input type matches Loca
       addr?.recipientPhone, addr?.recipient_phone, addr?.phone,
       deliverTo.phone, billing.phone, raw?.phone,
       fallback(['recipientPhone','recipient_phone','phone'])
+    ),
+    recipientEmail: getValue(
+      addr?.recipientEmail, addr?.recipient_email, addr?.email,
+      deliverTo.email, billing.email, raw?.email,
+      fallback(['recipientEmail','recipient_email','email'])
     ),
   };
 }
@@ -610,6 +619,7 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         recipientPostal: addr.recipientPostal || '—',
         recipientCountry: addr.recipientCountry || '—',
         recipientPhone: addr.recipientPhone || '',
+        recipientEmail: addr.recipientEmail || '',
 
         fedexServiceType: order.fedexServiceType,
         fedexPackagingType: order.fedexPackagingType,
@@ -667,6 +677,7 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         recipientPostal: addr.recipientPostal || '—',
         recipientCountry: addr.recipientCountry || '—',
         recipientPhone: addr.recipientPhone || '',
+        recipientEmail: addr.recipientEmail || '',
 
         fedexServiceType: order.fedexServiceType,
         fedexPackagingType: order.fedexPackagingType,
@@ -708,6 +719,7 @@ export function getDefaultValues(row: LabelRow) {
     recipientPostal: row.recipientPostal === '—' ? '' : row.recipientPostal,
     recipientCountry: row.recipientCountry === '—' ? '' : row.recipientCountry,
     recipientPhone: row.recipientPhone,
+    recipientEmail: row.recipientEmail === '—' ? '' : row.recipientEmail,
     // Fields from originalOrder for label generation payload
     commodityDesc: row.title === 'N/A' ? (row.originalOrder?.commodityDesc || row.title) : row.title,
     termsOfSale: row.originalOrder?.termsOfSale || 'DDP',
@@ -823,10 +835,14 @@ function dedupeLabelRows(rows: LabelRow[]): LabelRow[] {
 }
 
 function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 100 });
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 20 });
   // --- UPS Drawer State ---
   const [upsDrawerOpen, setUpsDrawerOpen] = useState(false);
   const [selectedOrderForUPS, setSelectedOrderForUPS] = useState<UIOrder | null>(null);
+  
+  // --- Image Modal State ---
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [marketplaceFilter, setMarketplaceFilter] = useState('');
@@ -895,6 +911,13 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   };
 
   const filteredAndPaginatedItems = useMemo(() => {
+    // TEMPORARILY DISABLED: Frontend filtering for debugging
+    console.log('[DEBUG] Frontend filtering DISABLED - showing all labelRows');
+    console.log('[DEBUG] labelRows count:', labelRows.length);
+    console.log('[DEBUG] labelFilter setting:', labelFilter);
+    return labelRows; // Always return all rows for debugging
+    
+    /* ORIGINAL FILTERING CODE - DISABLED
     if (labelFilter === 'all') {
       return labelRows;
     }
@@ -917,6 +940,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       }
       return true;
     });
+    */
   }, [labelRows, labelFilter]);
 
   useEffect(() => {
@@ -992,6 +1016,9 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       recipientPostal: row.recipientPostal === '—' ? '' : row.recipientPostal,
       recipientCountry: row.recipientCountry === '—' ? '' : row.recipientCountry,
       labelStockType: row.labelStockType || 'PAPER_4X6',
+      fedexServiceType: row.fedexServiceType || 'INTERNATIONAL_PRIORITY',
+      fedexPackagingType: row.fedexPackagingType || 'FEDEX_PAK',
+      hsCode: '', // Always start with empty HS code
       // Ensure line_items for the payload is correctly formed by getDefaultValues
     };
     
@@ -1154,18 +1181,69 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     {
       field: 'itemImageUrl',
       headerName: 'Ürün Görseli',
-      width: 70,
+      width: 100,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
-        <img
-          src={params.value as string || '/placeholder.png'} 
-          alt="Ürün Görseli"
-          style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8 }}
-          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
-        />
+        <Box
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            height: '100%',
+            cursor: 'pointer'
+          }}
+          onClick={() => {
+            const imageUrl = params.value as string || '/placeholder.png';
+            setSelectedImageUrl(imageUrl);
+            setImageModalOpen(true);
+          }}
+        >
+          <img
+            src={params.value as string || '/placeholder.png'} 
+            alt="Ürün Görseli"
+            style={{ 
+              width: 60, 
+              height: 60, 
+              objectFit: 'cover', 
+              borderRadius: 8,
+              transition: 'transform 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              (e.target as HTMLImageElement).style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              (e.target as HTMLImageElement).style.transform = 'scale(1)';
+            }}
+            onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
+          />
+        </Box>
       )
     },
     { field: 'marketplace', headerName: 'Mağaza', width: 110 },
+    {
+      field: 'status',
+      headerName: 'Durum',
+      width: 120,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => {
+        const status = params.value?.toUpperCase() || 'UNKNOWN';
+        const config = statusColors[status] || { bg: '#ccc', text: '#000' };
+        const statusOption = orderStatusOptions.find(opt => opt.value === status);
+        const label = statusOption?.label || status.replace(/_/g, ' ');
+        
+        return (
+          <Chip 
+            label={label} 
+            size="small"
+            style={{
+              backgroundColor: config.bg,
+              color: config.text,
+              fontWeight: 500,
+              fontSize: '0.75rem'
+            }}
+          />
+        );
+      }
+    },
     {
       field: 'orderDate', 
       headerName: 'Sipariş Tarihi', 
@@ -1272,7 +1350,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     const toastId = toast.loading('Siparişler senkronize ediliyor...');
     try {
       // Fast sync: only first page from Shippo and Veeqo
-      const res = await fetch('/api/orders/sync', {
+      const { fetchWithLimit } = await import('../../lib/fetchWithLimit');
+      const res = await fetchWithLimit('/api/orders/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ syncType: 'fast' })
@@ -1334,10 +1413,17 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         recipientPostal,
         recipientCountry,
         recipientPhone,
-        ...rest
+        recipientEmail,
+        // Extract only the fields that should be updated on Order table
+        weight,
+        hsCode,
+        countryOfOrigin,
+        itemId,
+        // Ignore all other fields to prevent data corruption
       } = currentFormValues;
       const dbUpdatePayload = {
         id: orderId,
+        itemId, // For OrderItem updates
         shippingAddress: {
           firstName: recipientFirstName,
           lastName: recipientLastName,
@@ -1348,8 +1434,12 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           postal: recipientPostal,
           country: recipientCountry,
           phone: recipientPhone,
+          email: recipientEmail,
         },
-        ...rest,
+        // Only include specific safe fields for OrderItem updates
+        weight: weight,
+        hsCode: hsCode,
+        countryOfOrigin: countryOfOrigin,
         commodityDesc: getDefaultValues(currentFormValues).commodityDesc // preserve logic for commodityDesc
       };
 
@@ -1382,6 +1472,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           postal: currentFormValues.recipientPostal,
           country: currentFormValues.recipientCountry,
           phone: currentFormValues.recipientPhone,
+          email: currentFormValues.recipientEmail,
         },
         line_items: defaultsForFedexPayload.line_items,
         weightKg: defaultsForFedexPayload.weightKg,
@@ -1452,13 +1543,15 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         recipientPostal: defaultsForFedexPayload.recipientPostal,
         recipientCountry: defaultsForFedexPayload.recipientCountry,
         recipientPhone: defaultsForFedexPayload.recipientPhone,
+        recipientEmail: defaultsForFedexPayload.recipientEmail,
 
         // And orderId / orderItemId
         orderId: currentFormValues.orderId, // Ensure orderId is at top level
         orderItemId: currentFormValues.itemId
       };
 
-      const labelResponse = await fetch(`/api/orders/${currentFormValues.orderId}/generate-label`, {
+      const { fetchWithLimit } = await import('../../lib/fetchWithLimit');
+      const labelResponse = await fetchWithLimit(`/api/orders/${currentFormValues.orderId}/generate-label`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(bodyForGenerateLabel) 
@@ -1571,6 +1664,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           onPaginationModelChange={setPaginationModel}
           getRowId={(row) => row.itemId || row.orderId}
           disableRowSelectionOnClick
+          rowHeight={80}
           initialState={{
             sorting: {
               sortModel: [{ field: 'orderDate', sort: 'desc' }],
@@ -1612,6 +1706,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                   <TextField name="recipientPostal" label="Posta Kodu" value={drawerOrder.recipientPostal || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Postal code'))} />
                   <TextField name="recipientCountry" label="Ülke" value={drawerOrder.recipientCountry || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Country'))} />
                   <TextField name="recipientPhone" label="Telefon" value={drawerOrder.recipientPhone || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
+                  <TextField name="recipientEmail" label="E-posta (Opsiyonel)" value={drawerOrder.recipientEmail || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" type="email" />
                   <TextField name="commodityDesc" label="Ürün Açıklaması" value={drawerOrder.originalOrder?.commodityDesc || ''} onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" />
                   <Grid container spacing={2}>
                     <Grid item xs={4}><TextField name="weight" label="Ağırlık (kg)" value={drawerOrder.weight || ''} type="number" onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Weight'))} /></Grid>
@@ -1695,6 +1790,51 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           }}
         />
       )}
+      
+      {/* Image Modal */}
+      <Dialog
+        open={imageModalOpen}
+        onClose={() => setImageModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Ürün Görseli
+          <IconButton
+            aria-label="close"
+            onClick={() => setImageModalOpen(false)}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              minHeight: '400px',
+            }}
+          >
+            <img
+              src={selectedImageUrl}
+              alt="Ürün Görseli"
+              style={{
+                maxWidth: '100%',
+                maxHeight: '600px',
+                objectFit: 'contain',
+              }}
+              onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
+            />
+          </Box>
+        </DialogContent>
+      </Dialog>
 </Box>
   );
 }

@@ -71,9 +71,31 @@ interface OrdersApiResponse {
 
 // Fetcher for SWR
 const fetcher = (url: string) => {
+  if (typeof window !== 'undefined') {
+    console.log('[useOrders] FETCHER: Starting fetch for URL:', url);
+  }
   return fetch(url).then(res => {
-    if (!res.ok) throw new Error('Network response was not ok');
-    return res.json();
+    if (typeof window !== 'undefined') {
+      console.log('[useOrders] FETCHER: Fetch response status:', res.status);
+      console.log('[useOrders] FETCHER: Fetch response ok:', res.ok);
+    }
+    if (!res.ok) {
+      if (typeof window !== 'undefined') {
+        console.error('[useOrders] FETCHER: Network response was not ok', res.status, res.statusText);
+      }
+      throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
+    }
+    return res.json().then(json => {
+      if (typeof window !== 'undefined') {
+        console.log('[useOrders] FETCHER: Parsed JSON response:', json);
+      }
+      return json;
+    });
+  }).catch(error => {
+    if (typeof window !== 'undefined') {
+      console.error('[useOrders] FETCHER: Fetch error:', error);
+    }
+    throw error;
   });
 };
 
@@ -98,12 +120,31 @@ export function useOrders(page: number = 1, pageSize: number = 20, filters: Reco
   
   const { data, error, isLoading, mutate } = useSWR<OrdersApiResponse>(
     `/api/orders?${params.toString()}`,
-    fetcher
+    fetcher,
+    {
+      refreshInterval: context === 'labelsPage' ? 30000 : 0, // Refresh every 30 seconds for labels page
+      dedupingInterval: context === 'labelsPage' ? 2000 : 5000, // Dedupe requests for 2 seconds on labels page
+      revalidateOnFocus: context === 'labelsPage', // Revalidate when window regains focus on labels page
+      onError: (error) => {
+        if (typeof window !== 'undefined') {
+          console.error('[useOrders] SWR Error:', error);
+        }
+      },
+      onSuccess: (data) => {
+        if (typeof window !== 'undefined') {
+          console.log('[useOrders] SWR Success:', data);
+        }
+      }
+    }
   );
 
   // Debug: Log the raw response from API
   if (typeof window !== 'undefined') {
-    console.log('[useOrders] API response:', data);
+    console.log('[useOrders] FULL API response received:', data);
+    console.log('[useOrders] data.orders:', data?.orders);
+    console.log('[useOrders] data.data:', data?.data);
+    console.log('[useOrders] typeof data:', typeof data);
+    console.log('[useOrders] JSON.stringify(data):', JSON.stringify(data));
   }
 
   // Process orders based on context

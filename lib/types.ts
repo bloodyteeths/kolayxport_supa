@@ -12,6 +12,7 @@ export interface NormalizedAddress {
   country: string;
   isResidential?: boolean;
   company?: string;
+  email?: string;
 }
 
 export interface NormalizedLineItem {
@@ -56,6 +57,7 @@ export interface UIOrder {
     postal: string;
     country: string;
     isResidential: boolean;
+    email?: string;
   };
   line_items: Array<{
     id: string;
@@ -90,6 +92,7 @@ export interface UIOrder {
   recipientPostal?: string;
   recipientCountry?: string;
   recipientPhone?: string;
+  recipientEmail?: string;
   weightKg?: number;
   harmonizedCode?: string;
   countryOfMfg?: string;

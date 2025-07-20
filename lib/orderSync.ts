@@ -600,9 +600,16 @@ export async function syncAllOrders(userId: string, options: {
     });
     
     // For full sync of Etsy orders, we don't want to use lastSyncTime because we need to merge all orders
-    // For fast/recent syncs, use incremental fetching
+    // For fast/recent syncs, use incremental fetching with a safety margin
     const useIncrementalSync = options.syncType === 'fast' || options.syncType === 'recent';
-    const lastSyncTime = useIncrementalSync ? lastSyncEntry?.updatedAt : undefined;
+    let lastSyncTime = useIncrementalSync ? lastSyncEntry?.updatedAt : undefined;
+    
+    // For fast sync, add 6-hour safety margin to catch orders that might have been missed
+    if (options.syncType === 'fast' && lastSyncTime) {
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+      lastSyncTime = lastSyncTime < sixHoursAgo ? lastSyncTime : sixHoursAgo;
+      logger.info(`[FastSync] Using safety margin for Veeqo fetch. Original lastSync: ${lastSyncEntry?.updatedAt?.toISOString()}, Using: ${lastSyncTime.toISOString()}`);
+    }
 
     syncId = await startSync(userId, 'full');
     
@@ -647,8 +654,18 @@ export async function syncAllOrders(userId: string, options: {
       if (options.syncType === 'fast') {
         logger.info(`[FastSync] Triggering Shippo fetch (first page only). Options:`, { userId, source, shippoToken: !!shippoToken });
         const etdDefaults = await getEtdDefaults(userId);
+        
+        // Use same 6-hour window as other integrations for consistency
+        const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+        const shippoDateFilter = sixHoursAgo.toISOString();
+        logger.info(`[FastSync] Shippo date filter: ${shippoDateFilter}`);
+        
         fetchPromises.push(
-          fetchShippoOrders(shippoToken, { page: '1', results: '100' }).then(orders => {
+          fetchShippoOrders(shippoToken, { 
+            page: '1', 
+            results: '100',
+            object_created_gte: shippoDateFilter 
+          }).then(orders => {
             logger.info(`[FastSync] Shippo fetch returned ${orders.length} orders.`, { userId });
             return orders.map(order => {
               const addr = order.to_address || order.shipping_address || {};
@@ -710,10 +727,15 @@ export async function syncAllOrders(userId: string, options: {
           })
         );
       } else {
-        logger.info(`[FullSync] Triggering Shippo fetch with token present. Options:`, { userId, source, shippoToken: !!shippoToken });
+        logger.info(`[FullSync] Triggering Shippo fetch with token present. Options:`, { userId, source, shippoToken: !!shippoToken, lastSyncTime });
         const etdDefaults = await getEtdDefaults(userId);
+        
+        // Use date filter for incremental sync, or no filter for full historical sync
+        const shippoOptions = lastSyncTime ? { object_created_gte: lastSyncTime.toISOString() } : {};
+        logger.info(`[FullSync] Shippo options:`, shippoOptions);
+        
         fetchPromises.push(
-          fetchShippoOrders(shippoToken).then(orders => {
+          fetchShippoOrders(shippoToken, shippoOptions).then(orders => {
             logger.info(`[FullSync] Shippo fetch returned ${orders.length} orders.`, { userId });
             return orders.map(order => {
               const addr = order.to_address || order.shipping_address || {};

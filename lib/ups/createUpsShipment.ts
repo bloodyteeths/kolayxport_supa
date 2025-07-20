@@ -28,6 +28,7 @@ export interface UpsRecipientAddress {
   name: string;
   company?: string;
   phone: string;
+  phoneExtension?: string;
   email?: string;
   street1: string;
   street2?: string;
@@ -90,6 +91,7 @@ export interface CreateShipmentInput {
   isEdi?: boolean;
   description?: string;
   internationalForms?: InternationalFormsInput;
+  dutyPaymentType?: 'SHIPPER' | 'RECEIVER'; // Who pays duties and taxes
 }
 
 export interface CreateShipmentResult {
@@ -113,6 +115,12 @@ function normalizePhone(raw?: string): string {
   const digits = raw.replace(/\D/g, '');
   if (digits.length < 6) return '';
   return digits.slice(0, 15); // UPS max length 15
+}
+
+// Normalize postal codes for UPS (remove dashes, max 9 alphanumeric)
+function normalizePostalCode(raw?: string): string {
+  if (!raw) return '';
+  return raw.replace(/-/g, '').slice(0, 9); // Remove dashes and limit to 9 chars
 }
 
 function normalizeStateCode(state: string, countryCode: string): string {
@@ -188,7 +196,8 @@ function buildUpsShipmentPayload(
   serviceType: string,
   isEdi: boolean,
   description: string = 'global cargo shipment',
-  internationalForms?: InternationalFormsInput
+  internationalForms?: InternationalFormsInput,
+  dutyPaymentType: 'SHIPPER' | 'RECEIVER' = 'RECEIVER'
 ) {
   const shipmentPayload: any = {
     ShipmentRequest: {
@@ -199,7 +208,7 @@ function buildUpsShipmentPayload(
         },
       },
       Shipment: {
-        Description: description,
+        Description: description ? description.slice(0, 35) : 'global cargo shipment',
         Shipper: {
           Name: shipper.shipperName,
           AttentionName: shipper.shipperPersonName,
@@ -219,21 +228,34 @@ function buildUpsShipmentPayload(
           Phone: { 
             Number: normalizePhone(recipient.phone) ||
                     normalizePhone(internationalForms?.soldTo.phone) ||
-                    '0000000000'   // final fallback to satisfy UPS
+                    '0000000000',   // final fallback to satisfy UPS
+            ...(recipient.phoneExtension && { Extension: recipient.phoneExtension.slice(0, 4) }) // UPS allows max 4 chars
           },
           Address: {
             AddressLine: [recipient.street1, recipient.street2 || ''].filter(Boolean),
             City: recipient.city,
             StateProvinceCode: normalizeStateCode(recipient.stateCode || '', recipient.countryCode),
-            PostalCode: recipient.postalCode,
+            PostalCode: normalizePostalCode(recipient.postalCode),
             CountryCode: recipient.countryCode,
           },
         },
         PaymentInformation: {
-          ShipmentCharge: {
-            Type: '01', // Bill Shipper
-            BillShipper: { AccountNumber: shipper.upsAccountNumber },
-          },
+          ShipmentCharge: dutyPaymentType === 'SHIPPER' 
+            ? [
+                {
+                  Type: '01', // Transportation charges
+                  BillShipper: { AccountNumber: shipper.upsAccountNumber },
+                },
+                {
+                  Type: '02', // Duties and Taxes - bill to shipper
+                  BillShipper: { AccountNumber: shipper.upsAccountNumber },
+                }
+              ]
+            : {
+                // Default: only transportation charges, let UPS handle duties to receiver at delivery
+                Type: '01', // Transportation charges
+                BillShipper: { AccountNumber: shipper.upsAccountNumber },
+              },
         },
         Service: { Code: serviceType },
         Package: {
@@ -405,7 +427,7 @@ function buildUpsShipmentPayload(
             AddressLine: [internationalForms.soldTo.street1, internationalForms.soldTo.street2 || ''].filter(Boolean),
             City: internationalForms.soldTo.city,
             StateProvinceCode: normalizeStateCode(internationalForms.soldTo.state || '', internationalForms.soldTo.countryCode),
-            PostalCode: internationalForms.soldTo.postalCode,
+            PostalCode: normalizePostalCode(internationalForms.soldTo.postalCode),
             CountryCode: internationalForms.soldTo.countryCode,
           },
         },
@@ -450,7 +472,7 @@ async function callUpsApi(url: string, options: any, label: string) {
 }
 
 export async function createUpsShipment(input: CreateShipmentInput): Promise<CreateShipmentResult> {
-  const { shipper, recipient, package: pkg, serviceType, isEdi = false, description, internationalForms } = input;
+  const { shipper, recipient, package: pkg, serviceType, isEdi = false, description, internationalForms, dutyPaymentType = 'RECEIVER' } = input;
 
   if (isEdi && internationalForms) {
     for (const p of internationalForms.products) {
@@ -471,7 +493,7 @@ export async function createUpsShipment(input: CreateShipmentInput): Promise<Cre
 
   try {
     const token = await getUpsAccessToken(shipper.upsApiKey, shipper.upsApiSecret);
-    const payload = buildUpsShipmentPayload(shipper, recipient, pkg, serviceType, isEdi, description, internationalForms);
+    const payload = buildUpsShipmentPayload(shipper, recipient, pkg, serviceType, isEdi, description, internationalForms, dutyPaymentType);
     console.log('[createUpsShipment] Built payload:', JSON.stringify(payload, null, 2));
     const url = `${UPS_BASE_URL}/api/shipments/v1/ship`;
     const res = await callUpsApi(url, {

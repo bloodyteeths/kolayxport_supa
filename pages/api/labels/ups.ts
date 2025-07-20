@@ -3,24 +3,51 @@ import prisma from '@/lib/prisma';
 import { getUpsCredentialsForUser } from '@/lib/ups/ups.credentials';
 import { createUpsShipment, CreateShipmentInput, getUpsAccessToken } from '@/lib/ups/createUpsShipment';
 import { saveUpsLabelToCache } from '@/lib/ups/cache';
+import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 
-// Utility to parse phone number and extension
+// Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
 function parsePhoneNumberWithExt(raw: string): { phone: string, ext?: string } {
   if (!raw) return { phone: '' };
-  const extMatch = raw.match(/ext\.?\s*(\d+)/i) || raw.match(/x\s*(\d+)/i);
+  
+  // Extract extension - matches "ext. 96793", "ext 96793", "x96793", "x 96793", etc.
+  const extMatch = raw.match(/(?:ext\.?\s*|x\s*)(\d+)/i);
   const ext = extMatch ? extMatch[1] : undefined;
-  let phone = raw.replace(/(ext\.?\s*\d+|x\s*\d+)/i, '').replace(/\D/g, '');
-  if (phone.length > 10) phone = phone.slice(-10);
+  
+  // Remove extension part from the phone number
+  let phoneWithoutExt = raw;
+  if (extMatch) {
+    phoneWithoutExt = raw.substring(0, extMatch.index).trim();
+  }
+  
+  // Extract only digits from the phone number
+  let phone = phoneWithoutExt.replace(/\D/g, '');
+  
+  // Handle different phone number lengths
+  if (phone.length === 11 && phone.startsWith('1')) {
+    // Remove country code for US numbers (1-xxx-xxx-xxxx)
+    phone = phone.substring(1);
+  } else if (phone.length > 10) {
+    // Take the last 10 digits for any other long numbers
+    phone = phone.slice(-10);
+  }
+  
+  // Ensure we have exactly 10 digits for UPS
+  if (phone.length !== 10) {
+    console.warn(`[UPS PHONE] Warning: Phone number "${raw}" normalized to "${phone}" with ${phone.length} digits (expected 10)`);
+  }
+  
   return { phone, ext };
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   // For now, get userId from body (replace with real auth in production)
-  const { userId, orderId, recipient, package: pkg, serviceType, isEdi = true, internationalForms } = req.body || {};
+  const { userId, orderId, recipient, package: pkg, serviceType, isEdi = true, internationalForms, dutyPaymentType = 'RECEIVER', description } = req.body || {};
+  
+  console.log('[UPS LABEL DEBUG] Received description:', description);
 
   if (!userId || !orderId || !recipient || !pkg || !serviceType) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -68,10 +95,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     // Normalize recipient phone and extract extension
-    console.log('[UPS LABEL DEBUG] Normalizing recipient phone');
+    console.log('[UPS LABEL DEBUG] Normalizing recipient phone:', recipient.phone);
     const { phone: normalizedPhone, ext: phoneExt } = parsePhoneNumberWithExt(recipient.phone);
-    const normalizedRecipient = { ...recipient, phone: normalizedPhone };
-    if (phoneExt) normalizedRecipient.ext = phoneExt;
+    
+    // Normalize postal code - remove dashes for UPS (e.g., "20903-2633" → "209032633")
+    const normalizedPostalCode = recipient.postalCode?.replace(/-/g, '') || '';
+    if (recipient.postalCode !== normalizedPostalCode) {
+      console.log('[UPS LABEL DEBUG] Normalized postal code:', recipient.postalCode, '→', normalizedPostalCode);
+    }
+    
+    const normalizedRecipient = { 
+      ...recipient, 
+      phone: normalizedPhone,
+      postalCode: normalizedPostalCode
+    };
+    
+    if (phoneExt) {
+      normalizedRecipient.ext = phoneExt; // Keep for database storage
+      console.log('[UPS LABEL DEBUG] Extracted phone extension:', phoneExt);
+      
+      if (phoneExt.length <= 4) {
+        // Use UPS extension field for 4 digits or less
+        normalizedRecipient.phoneExtension = phoneExt;
+      } else {
+        // Add long extension to address line 2 for 5+ digits
+        const extText = ` EXT ${phoneExt}`;
+        normalizedRecipient.street2 = (normalizedRecipient.street2 || '').trim() + extText;
+        console.log('[UPS LABEL DEBUG] Long extension added to address line 2:', extText);
+      }
+    }
 
     // Overwrite order's shipping address in DB before label generation
     console.log('[UPS LABEL DEBUG] Updating order shipping address in DB for order', orderId);
@@ -99,7 +151,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       package: pkg,
       serviceType,
       isEdi,
+      description,
       internationalForms,
+      dutyPaymentType,
     };
 
     if (isEdi && internationalForms) {
@@ -131,6 +185,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
               console.log('[UPS API] Shipment record saved to DB.');
 
+      // Increment usage counter after successful label generation
+      if (res.incrementUsage) {
+        await res.incrementUsage();
+      }
+
       // No Step 2 needed – EDI label already generated
       return res.status(200).json(shipmentResult);
     } else {
@@ -152,6 +211,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       });
       console.log('[UPS LABEL DEBUG] Shipment record saved to DB');
+      
+      // Increment usage counter after successful label generation
+      if (res.incrementUsage) {
+        await res.incrementUsage();
+      }
+      
       return res.status(200).json({ success: true, trackingNumber: result.trackingNumber, labelUrl: result.labelUrl });
     }
   } catch (error: any) {
@@ -159,3 +224,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
 }
+
+export default withUsageLimiter(handler, 'label');

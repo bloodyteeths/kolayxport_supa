@@ -7,12 +7,171 @@ const prisma = new PrismaClient();
 const { startSync, updateSyncProgress, completeSync } = require('../lib/sync-status');
 const { fetchVeeqoOrders } = require('../lib/integrations/veeqo');
 const { fetchShippoOrders } = require('../lib/integrations/shippo');
-const { fetchCreatedOrders } = require('../lib/integrations/trendyol');
+const { fetchCreatedOrders, fetchTrendyolOrders } = require('../lib/integrations/trendyolClient');
+const { toOrder, mapTrendyolOrdersWithImages } = require('../lib/mappers/trendyol');
 // Stub for Hepsiburada integration
 async function fetchHepsiburadaOrders(settings) {
   // TODO: Implement real fetch logic for Hepsiburada
   return [];
 }
+
+// Trendyol-specific mapper that properly converts to Prisma format
+function mapTrendyolOrderToPrisma(trendyolOrder, userId) {
+  const uiOrder = toOrder(trendyolOrder);
+  
+  return {
+    userId: userId,
+    marketplace: uiOrder.marketplace,
+    marketplaceKey: uiOrder.marketplaceKey,
+    marketplaceCreatedAt: uiOrder.marketplaceOrderDate ? new Date(uiOrder.marketplaceOrderDate) : new Date(),
+    customerName: uiOrder.customerName,
+    status: uiOrder.status,
+    shipByDate: uiOrder.shipByDate ? new Date(uiOrder.shipByDate) : null,
+    currency: uiOrder.currency,
+    totalPrice: uiOrder.totalPrice,
+    notes: null, // Trendyol doesn't have customer notes
+    orderNumber: uiOrder.orderNumber,
+    shippingAddress: uiOrder.shippingAddress,
+    rawData: uiOrder.rawData,
+    
+    // Additional fields from UIOrder
+    uiOrderDate: uiOrder.uiOrderDate ? new Date(uiOrder.uiOrderDate) : null,
+    commodityDesc: uiOrder.commodityDesc,
+    externalStatus: uiOrder.externalStatus,
+    source: uiOrder.source,
+    channel: uiOrder.channel,
+    
+    // Set other required Prisma fields to null/default
+    fedexDutiesPaymentType: null,
+    fedexPackagingType: null,
+    fedexPickupType: null,
+    fedexServiceType: null,
+    countryOfMfg: null,
+    dimensionUnits: null,
+    harmonizedCode: null,
+    labelStockType: null,
+    packageHeight: null,
+    packageLength: null,
+    packageWidth: null,
+    sendCommercialInvoiceViaEtd: null,
+    shippingChargesPaymentType: null,
+    signatureType: null,
+    termsOfSale: null,
+    fedexMasterFormId: null,
+    shipmentStatus: null,
+    shippedAt: null,
+    shippingLabelUrl: null,
+    trackingNumber: null,
+    packingEditedAt: null,
+    packingStatus: null,
+    productionEditedAt: null,
+    productionNotes: null,
+    labelStatus: null,
+  };
+}
+
+function mapTrendyolItemToPrisma(trendyolLineItem, orderData) {
+  return {
+    sku: trendyolLineItem.sku || null,
+    productName: trendyolLineItem.title || null,
+    variantInfo: null, // Trendyol items don't have variant info
+    quantity: trendyolLineItem.quantity || 1,
+    unitPrice: trendyolLineItem.value || null,
+    totalPrice: (trendyolLineItem.value || 0) * (trendyolLineItem.quantity || 1),
+    notes: null,
+    image: trendyolLineItem.image || '',
+    marketplaceKey: trendyolLineItem.id || String(Date.now()),
+    shipBy: null, // Trendyol items don't have individual ship dates
+    orderNumber: orderData.orderNumber,
+    uniqueLineKey: trendyolLineItem.id || String(Date.now()),
+    remoteLineId: trendyolLineItem.id || String(Date.now()),
+    
+    // Additional fields for order items
+    weightKg: trendyolLineItem.weight || 0.5,
+    harmonizedCode: trendyolLineItem.hs_code || null,
+    countryOfMfg: null,
+    recipientEmail: orderData.rawData?.customerEmail || null,
+  };
+}
+
+// Enhanced mapper for UIOrder (with images) to Prisma format
+function mapUIOrderToPrisma(uiOrder, userId) {
+  return {
+    userId: userId,
+    marketplace: uiOrder.marketplace,
+    marketplaceKey: uiOrder.marketplaceKey,
+    marketplaceCreatedAt: uiOrder.marketplaceOrderDate ? new Date(uiOrder.marketplaceOrderDate) : new Date(),
+    customerName: uiOrder.customerName,
+    status: uiOrder.status,
+    shipByDate: uiOrder.shipByDate ? new Date(uiOrder.shipByDate) : null,
+    currency: uiOrder.currency,
+    totalPrice: uiOrder.totalPrice,
+    notes: null, // Trendyol doesn't have customer notes
+    orderNumber: uiOrder.orderNumber,
+    shippingAddress: uiOrder.shippingAddress,
+    rawData: uiOrder.rawData,
+    
+    // Additional fields from UIOrder
+    uiOrderDate: uiOrder.uiOrderDate ? new Date(uiOrder.uiOrderDate) : null,
+    commodityDesc: uiOrder.commodityDesc,
+    externalStatus: uiOrder.externalStatus,
+    source: uiOrder.source,
+    channel: uiOrder.channel,
+    
+    // Set other required Prisma fields to null/default
+    fedexDutiesPaymentType: null,
+    fedexPackagingType: null,
+    fedexPickupType: null,
+    fedexServiceType: null,
+    countryOfMfg: null,
+    dimensionUnits: null,
+    harmonizedCode: null,
+    labelStockType: null,
+    packageHeight: null,
+    packageLength: null,
+    packageWidth: null,
+    sendCommercialInvoiceViaEtd: null,
+    shippingChargesPaymentType: null,
+    signatureType: null,
+    termsOfSale: null,
+    fedexMasterFormId: null,
+    shipmentStatus: null,
+    shippedAt: null,
+    shippingLabelUrl: null,
+    trackingNumber: null,
+    packingEditedAt: null,
+    packingStatus: null,
+    productionEditedAt: null,
+    productionNotes: null,
+    labelStatus: null,
+  };
+}
+
+// Enhanced item mapper for UIOrder line items to Prisma format 
+function mapUIOrderItemToPrisma(lineItem, orderData) {
+  return {
+    sku: lineItem.sku || null,
+    productName: lineItem.title || null,
+    variantInfo: null, // Trendyol items don't have variant info
+    quantity: lineItem.quantity || 1,
+    unitPrice: lineItem.value || null,
+    totalPrice: (lineItem.value || 0) * (lineItem.quantity || 1),
+    notes: null,
+    image: lineItem.image || '',
+    marketplaceKey: lineItem.id || String(Date.now()),
+    shipBy: null, // Trendyol items don't have individual ship dates
+    orderNumber: orderData.orderNumber,
+    uniqueLineKey: lineItem.id || String(Date.now()),
+    remoteLineId: lineItem.id || String(Date.now()),
+    
+    // Additional fields for order items
+    weightKg: lineItem.weight || 0.5,
+    harmonizedCode: lineItem.hs_code || null,
+    countryOfMfg: null,
+    recipientEmail: orderData.rawData?.customerEmail || null,
+  };
+}
+
 const { logger } = require('../lib/logger');
 
 // Helper: filter and map order fields to Prisma schema for VEEQO
@@ -338,29 +497,100 @@ async function syncTrendyolRecentOrders(user, settings) {
   const syncType = 'trendyol';
   let syncId, processed = 0, successful = 0, failed = 0, errors = [];
   try {
-    syncId = await startSync(user.id, syncType);
-    const now = Date.now();
-    const oneHourAgo = now - 60 * 60 * 1000;
-    const orders = await fetchCreatedOrders({
-      supplierId: settings.trendyolSupplierId,
-      apiKey: settings.trendyolApiKey,
-      apiSecret: settings.trendyolApiSecret,
-      startDateMs: oneHourAgo,
-      endDateMs: now,
+    // Check for existing sync operations that might be blocking
+    const existingSyncs = await prisma.syncOperation.findMany({
+      where: { userId: user.id, type: syncType },
+      orderBy: { updatedAt: 'desc' },
+      take: 3
     });
-    for (const order of orders) {
+    
+    if (existingSyncs.length > 0) {
+      logger.info(`[TRENDYOL SYNC] Found ${existingSyncs.length} existing sync operations for user ${user.id}:`, 
+        existingSyncs.map(s => ({
+          id: s.id,
+          status: s.status,
+          updatedAt: s.updatedAt.toISOString(),
+          ageMinutes: Math.round((Date.now() - s.updatedAt.getTime()) / (1000 * 60))
+        }))
+      );
+    }
+    
+    logger.info(`[TRENDYOL SYNC] Attempting to start sync for user ${user.id}, type: ${syncType}`);
+    syncId = await startSync(user.id, syncType);
+    logger.info(`[TRENDYOL SYNC] Started sync successfully, syncId: ${syncId}`);
+    const now = Date.now();
+    const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000; // Extend to 24 hours for debugging
+    // Try fetching all recent orders first, then fall back to Created only
+    let orders = [];
+    
+    try {
+      // First try all orders without status filter
+      orders = await fetchTrendyolOrders({
+        supplierId: settings.trendyolSupplierId,
+        apiKey: settings.trendyolApiKey,
+        apiSecret: settings.trendyolApiSecret,
+        status: undefined, // No status filter to get all orders
+        startDateMs: twentyFourHoursAgo,
+        endDateMs: now,
+      });
+      logger.info(`[TRENDYOL SYNC] Fetched ${orders.length} orders (all statuses) for user ${user.id}`);
+    } catch (err) {
+      logger.warn(`[TRENDYOL SYNC] Failed to fetch all orders, trying Created only:`, err.message);
+      // Fallback to Created orders only
+      orders = await fetchCreatedOrders({
+        supplierId: settings.trendyolSupplierId,
+        apiKey: settings.trendyolApiKey,
+        apiSecret: settings.trendyolApiSecret,
+        startDateMs: twentyFourHoursAgo,
+        endDateMs: now,
+      });
+      logger.info(`[TRENDYOL SYNC] Fetched ${orders.length} orders (Created status only) for user ${user.id}`);
+    }
+    
+    logger.info(`[TRENDYOL SYNC] User ${user.id} - Fetched ${orders.length} orders for recent sync.`);
+    
+    // Map orders with product images
+    let uiOrders = [];
+    try {
+      logger.info(`[TRENDYOL SYNC] Mapping orders with product images for user ${user.id}`);
+      uiOrders = await mapTrendyolOrdersWithImages(orders, {
+        supplierId: settings.trendyolSupplierId,
+        apiKey: settings.trendyolApiKey,
+        apiSecret: settings.trendyolApiSecret,
+      });
+      logger.info(`[TRENDYOL SYNC] Successfully mapped ${uiOrders.length} orders with images for user ${user.id}`);
+    } catch (err) {
+      logger.warn(`[TRENDYOL SYNC] Failed to map orders with images, falling back to basic mapping:`, err.message);
+      // Fallback to basic mapping without images
+      uiOrders = orders.map(order => toOrder(order));
+    }
+    
+    for (const uiOrder of uiOrders) {
       try {
-        const orderData = mapOrderToPrisma(order, syncType);
-        const itemsData = (order.items || order.line_items || []).map(item => mapItemToPrisma(item, order, syncType));
+        const orderData = mapUIOrderToPrisma(uiOrder, user.id);
+        const itemsData = (uiOrder.line_items || []).map(item => mapUIOrderItemToPrisma(item, orderData));
+        
+        logger.info(`[TRENDYOL SYNC PRE-UPSERT] Trendyol Order ID: ${uiOrder.id}, User ID: ${user.id}`, {
+          originalTrendyolId: uiOrder.id,
+          userIdForUpsert: user.id,
+          marketplaceForUpsert: orderData.marketplace,
+          marketplaceKeyForUpsert: orderData.marketplaceKey,
+          orderNumber: orderData.orderNumber,
+          itemsCount: itemsData.length,
+          itemsWithImages: itemsData.filter(item => item.image && item.image.length > 0).length
+        });
+
         await prisma.order.upsert({
           where: { userId_marketplace_marketplaceKey: { userId: user.id, marketplace: orderData.marketplace, marketplaceKey: orderData.marketplaceKey } },
           update: { ...orderData, items: { deleteMany: {}, create: itemsData } },
           create: { ...orderData, items: { create: itemsData } },
         });
+        
+        logger.info(`[TRENDYOL SYNC SUCCESS] Successfully upserted Trendyol order ${uiOrder.id} for user ${user.id}`);
         successful++;
       } catch (err) {
         failed++;
-        errors.push({ orderId: order.id, error: err.message });
+        errors.push({ orderId: uiOrder.id, error: err.message });
         logger.error('Trendyol order sync failed', err, { userId: user.id });
       }
       processed++;
@@ -368,7 +598,11 @@ async function syncTrendyolRecentOrders(user, settings) {
     }
     await completeSync(syncId, failed === 0, { processedOrders: processed, successfulOrders: successful, failedOrders: failed, errors });
   } catch (err) {
-    if (syncId) await completeSync(syncId, false, { processedOrders: processed, successfulOrders: successful, failedOrders: failed + 1, errors: [...errors, { orderId: 'sync', error: err.message }] });
+    if (syncId) {
+      await completeSync(syncId, false, { processedOrders: processed, successfulOrders: successful, failedOrders: failed + 1, errors: [...errors, { orderId: 'sync', error: err.message }] });
+    } else {
+      logger.error(`[TRENDYOL SYNC] Failed to start sync for user ${user.id}:`, err.message);
+    }
     logger.error('Trendyol sync failed', err, { userId: user.id });
     throw err;
   }

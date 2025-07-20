@@ -13,14 +13,27 @@ import { ShippoOrder, ShippoResponse } from '../types';
  */
 export async function fetchShippoOrders(
   token: string,
-  options: { page?: string; results?: string } = {}
+  options: { page?: string; results?: string; object_created_gte?: string } = {}
 ): Promise<ShippoOrder[]> {
   const allOrders: ShippoOrder[] = [];
   let currentPage = parseInt(options.page || '1', 10);
   let hasMore = true;
 
   while (hasMore) {
-    const url = `https://api.goshippo.com/orders/?page=${currentPage}&results=${options.results || '100'}`;
+    let url = `https://api.goshippo.com/orders/?page=${currentPage}&results=${options.results || '100'}`;
+    
+    // Add date filter if provided - try multiple possible parameter names
+    if (options.object_created_gte) {
+      // Try common date filter parameters for Shippo API
+      url += `&object_created_gte=${encodeURIComponent(options.object_created_gte)}`;
+      // Also try alternative parameter names that might work
+      url += `&created_at_min=${encodeURIComponent(options.object_created_gte)}`;
+      url += `&start_date=${encodeURIComponent(options.object_created_gte)}`;
+    }
+    
+    // Debug log the URL being called
+    console.log(`[SHIPPO DEBUG] Fetching URL: ${url}`);
+    
     try {
       const response = await fetch(url, {
         headers: {

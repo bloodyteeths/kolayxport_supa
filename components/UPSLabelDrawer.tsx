@@ -18,6 +18,7 @@ interface UIOrder {
   recipientPostal?: string;
   recipientCountry?: string;
   recipientPhone?: string;
+  recipientEmail?: string;
   orderTotalPrice?: number;
   currency?: string;
   title?: string;
@@ -34,9 +35,10 @@ interface UPSLabelDrawerProps {
 }
 
 const DEFAULTS = {
-  serviceType: 'UPS_SAVER',
+  serviceType: '65', // UPS Saver
   packageType: 'UPS_PAK',
   signatureOption: 'NO_SIGNATURE',
+  dutyPaymentType: 'RECEIVER', // Default: Receiver pays duties
   weight: 0.5,
 };
 
@@ -140,10 +142,10 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
     serviceType: string;
     packageType: string;
     signatureOption: string;
+    dutyPaymentType: string;
     packageLength?: string;
     packageWidth?: string;
     packageHeight?: string;
-    description: string;
     invoiceNumber: string;
     invoiceDate: string;
     exportReason: string;
@@ -193,10 +195,10 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
     serviceType: DEFAULTS.serviceType,
     packageType: DEFAULTS.packageType,
     signatureOption: DEFAULTS.signatureOption,
+    dutyPaymentType: DEFAULTS.dutyPaymentType,
     packageLength: '',
     packageWidth: '',
     packageHeight: '',
-    description: order?.title || 'global cargo shipment',
     invoiceNumber: `INV-${order?.orderNumber || Date.now()}`,
     invoiceDate: today,
     exportReason: 'SALE',
@@ -221,7 +223,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
     soldToCountry: order?.recipientCountry || 'TR',
     soldToPhone: order?.recipientPhone || '',
     soldToState: order?.recipientState || '',
-    soldToEmail: '',
+    soldToEmail: order?.recipientEmail || '',
     termsOfShipment: 'DAP',
     invoiceLineTotal: {
       currencyCode: order?.currency || 'USD',
@@ -250,8 +252,8 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         hsCode: order?.hsCode || '',
         countryOfOrigin: order?.countryOfOrigin || '',
         serviceType: DEFAULTS.serviceType,
+        dutyPaymentType: DEFAULTS.dutyPaymentType,
         weight: order?.weight || DEFAULTS.weight,
-        description: order?.title || 'global cargo shipment',
         soldToPhone: order?.recipientPhone || '',
         products: [{
           description: order?.title || 'Global Cargo Shipment',
@@ -263,7 +265,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
           originCountry: order?.countryOfOrigin || 'TR',
         }],
         soldToState: order?.recipientState || '',
-        soldToEmail: '',
+        soldToEmail: order?.recipientEmail || '',
         invoiceLineTotal: {
           currencyCode: order?.currency || 'USD',
           monetaryValue: initialProductValue.toFixed(2)
@@ -289,7 +291,8 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
     setError(null);
     setSuccess(false);
     try {
-      const res = await fetch('/api/labels/ups', {
+      const { fetchWithLimit } = await import('../lib/fetchWithLimit');
+      const res = await fetchWithLimit('/api/labels/ups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -314,7 +317,8 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
           },
           serviceType: form.serviceType,
           isEdi: true,
-          description: form.description,
+          description: form.products[0].description, // Use product description
+          dutyPaymentType: form.dutyPaymentType,
           internationalForms: {
             invoiceNumber: form.invoiceNumber,
             invoiceLineTotal: {
@@ -325,7 +329,10 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
             currencyCode: form.currencyCode,
             iossNumber: form.iossNumber,
             vatNumber: form.vatNumber,
-            products: form.products,
+            products: form.products.map(product => ({
+              ...product,
+              commodityCode: product.commodityCode || '000000' // Fallback to 000000 if empty
+            })),
             soldTo: {
               name: form.soldToName,
               attention: form.soldToAttention,
@@ -417,9 +424,15 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                 {UPS_SIGNATURE_OPTIONS.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
               </Select>
             </FormControl>
+            <FormControl fullWidth margin="dense" size="small">
+              <InputLabel>Vergi/Gümrük Ödemesi</InputLabel>
+              <Select name="dutyPaymentType" value={form.dutyPaymentType} onChange={handleSelectChange} label="Vergi/Gümrük Ödemesi">
+                <MenuItem value="RECEIVER">Alıcı (Receiver)</MenuItem>
+                <MenuItem value="SHIPPER">Gönderici (Shipper)</MenuItem>
+              </Select>
+            </FormControl>
             
             <TextField label="Weight (kg)" name="weight" type="number" value={form.weight} onChange={handleInputChange} fullWidth margin="dense" size="small" inputProps={{ min: 0, step: 0.01 }} />
-            <TextField label="Description" name="description" value={form.description} onChange={handleInputChange} fullWidth margin="dense" size="small" sx={{ mt: 1 }} />
             <Box mt={2} mb={1}>
               <Chip label="EDI: Electronic Data Interchange (Zorunlu)" color="info" variant="outlined" />
             </Box>

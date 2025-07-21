@@ -3,7 +3,7 @@ import {
   Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, Fade, List, ListItem, ListItemIcon, ListItemText, ToggleButton, ToggleButtonGroup, Grid, SelectChangeEvent
 } from '@mui/material';
 import { DataGrid, GridColDef, GridPaginationModel, GridRenderCellParams, GridValueGetter } from '@mui/x-data-grid';
-import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, Edit as EditIcon, Check as CheckIcon, Warning as WarningIcon, Error as ErrorIcon, Info as InfoIcon, Lock as LockIcon } from '@mui/icons-material';
+import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, Edit as EditIcon, Check as CheckIcon, Warning as WarningIcon, Error as ErrorIcon, Info as InfoIcon, Lock as LockIcon, FlightTakeoff as FlightTakeoffIcon, Flight as FlightIcon } from '@mui/icons-material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
@@ -72,6 +72,17 @@ const ALLOWED_LABEL_STOCK_TYPES = [
   { value: 'PAPER_85X11_TOP_HALF_LABEL',   label: 'Letter – top ½' },
   { value: 'PAPER_85X11_BOTTOM_HALF_LABEL',label: 'Letter – bottom ½' },
   { value: 'PAPER_LETTER',                 label: 'Letter – full page' },
+] as const;
+
+// Veeqo Carrier IDs for tracking submission
+const VEEQO_CARRIERS = [
+  { value: 1, label: 'Royal Mail' },
+  { value: 2, label: 'FedEx' },
+  { value: 3, label: 'Diğer' },
+  { value: 4, label: 'DPD' },
+  { value: 5, label: 'UPS' },
+  { value: 7, label: 'USPS' },
+  { value: 9, label: 'DHL' },
 ] as const;
 
 function formatDate(iso?: string): string {
@@ -253,10 +264,11 @@ export interface LabelRow {
 
 
 const statusColors: Record<string, {bg: string, text: string}> = {
-  UNSHIPPED: { bg: '#FFD700', text: '#000' }, // Gold
-  PENDING: { bg: '#FFD700', text: '#000' },
-  AWAITING_FULFILLMENT: { bg: '#FFD700', text: '#000' }, // Gold - same as PENDING
-  PAID: { bg: '#FFD700', text: '#000' }, // Gold - same as PENDING
+  UNSHIPPED: { bg: '#87CEEB', text: '#000' }, // Baby Blue
+  PENDING: { bg: '#87CEEB', text: '#000' },
+  AWAITING_FULFILLMENT: { bg: '#87CEEB', text: '#000' }, // Baby Blue - same as PENDING
+  PAID: { bg: '#87CEEB', text: '#000' }, // Baby Blue - same as PENDING
+  CREATED: { bg: '#87CEEB', text: '#000' }, // Baby Blue - same as PENDING (Onaylandı)
   PARTIALLY_SHIPPED: { bg: '#ADD8E6', text: '#000' }, // Light Blue
   SHIPPED: { bg: '#90EE90', text: '#000' }, // Light Green
   DELIVERED: { bg: '#32CD32', text: '#fff' }, // Lime Green
@@ -292,6 +304,7 @@ const orderStatusOptions = [
   { value: 'PENDING', label: 'Onaylandı' },
   { value: 'AWAITING_FULFILLMENT', label: 'Onaylandı' },
   { value: 'PAID', label: 'Onaylandı' },
+  { value: 'CREATED', label: 'Onaylandı' },
   { value: 'PARTIALLY_SHIPPED', label: 'Kısmen Kargolandı' },
   { value: 'SHIPPED', label: 'Kargolandı' },
   { value: 'DELIVERED', label: 'Teslim Edildi' },
@@ -429,6 +442,7 @@ function extractAddress(order: LocalUIOrder) { // Ensure input type matches Loca
 interface Shipment {
   id: string;
   status: string;
+  carrier?: string;
   trackingNumber?: string;
   pdfUrl?: string;
   createdAt?: string;
@@ -439,14 +453,6 @@ interface Shipment {
 function getProductTitle(item: any, order: any) {
   const isMissing = (val: any) => !val || val === 'Unknown Product' || val === 'N/A';
 
-  // Debug log to see what data we're getting
-  console.log('[getProductTitle] Item data:', {
-    itemId: item.id,
-    productName: item.productName,
-    title: item.title,
-    sellableFullTitle: item.sellable?.full_title,
-    orderCommodityDesc: order.commodityDesc
-  });
 
   let result;
   // Check productName first (from database)
@@ -462,14 +468,12 @@ function getProductTitle(item: any, order: any) {
     result = 'N/A';
   }
  
-  console.log('[getProductTitle] Final result:', result);
   return result;
 }
 
 /** convert the API payload (LocalUIOrder[]) into grid-ready rows (LabelRow[]) */
 export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
   if (!orders) return [];
-  console.log('[toLabelRows] Processing orders:', { count: orders.length, orders });
 
   return orders.flatMap(order => {
     // Skip invalid orders
@@ -477,14 +481,6 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
       console.warn('[toLabelRows] Skipping invalid order:', order);
       return [];
     }
-    // Debug log for each order being processed
-    console.log(`Processing order ${order.orderNumber} (${order.id}):`, {
-      hasTrackingNumber: !!order.trackingNumber,
-      labelStatus: order.labelStatus,
-      shippingLabelUrl: order.shippingLabelUrl,
-      hasShipments: order.shipments && order.shipments.length > 0,
-      shipmentTracking: order.shipments?.map(s => s.trackingNumber)
-    });
     
     const addr = extractAddress(order);
     // Safe: Parse rawData ONLY for date mapping, do not mutate or affect other columns
@@ -500,26 +496,12 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
       || order.syncTimestamp
       || new Date(0).toISOString();
 
-    // Debug log for order data
-    console.log(`[toLabelRows] Processing order ${order.orderNumber} (${order.id}):`, {
-      hasTrackingNumber: !!order.trackingNumber,
-      labelStatus: order.labelStatus,
-      shippingLabelUrl: order.shippingLabelUrl,
-      shipments: order.shipments?.map(s => ({
-        id: s.id,
-        status: s.status,
-        trackingNumber: s.trackingNumber,
-        pdfUrl: s.pdfUrl,
-        createdAt: s.createdAt
-      }))
-    });
     
     // Get the latest shipment (for UPS labels)
     let latestShipment: Shipment | null = null;
     const orderShipments = order.shipments || [];
     
     if (orderShipments.length > 0) {
-      console.log(`[toLabelRows] Processing ${orderShipments.length} shipments for order ${order.orderNumber}`);
       
       latestShipment = orderShipments.reduce<Shipment | null>((latest, shipment) => {
         if (!shipment) return latest;
@@ -529,26 +511,11 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
            latest.createdAt && 
            new Date(shipment.createdAt) > new Date(latest.createdAt));
           
-        console.log(`[toLabelRows] Shipment:`, {
-          id: shipment.id,
-          status: shipment.status,
-          trackingNumber: shipment.trackingNumber,
-          pdfUrl: shipment.pdfUrl,
-          createdAt: shipment.createdAt,
-          isNewer
-        });
         
         return isNewer ? shipment : latest;
       }, null as any);
       
-      console.log(`[toLabelRows] Selected latest shipment for order ${order.orderNumber}:`, {
-        id: latestShipment?.id,
-        status: latestShipment?.status,
-        trackingNumber: latestShipment?.trackingNumber,
-        pdfUrl: latestShipment?.pdfUrl
-      });
     } else {
-      console.log(`[toLabelRows] No shipments found for order ${order.orderNumber}`);
     }
 
     // Check for order-level tracking and label status (for UPS)
@@ -560,23 +527,8 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
                          hasShipment || 
                          !!order.shippingLabelUrl;
     
-    console.log(`[toLabelRows] Label status for order ${order.orderNumber}:`, {
-      hasTrackingNumber: !!order.trackingNumber,
-      hasShipment,
-      hasOrderLabel,
-      latestShipmentStatus: latestShipment?.status,
-      latestShipmentTracking: latestShipment?.trackingNumber,
-      latestShipmentPdfUrl: latestShipment?.pdfUrl
-    });
     
-    console.log(`[DEBUG] Label status for order ${order.orderNumber}:`, {
-      hasTrackingNumber: !!order.trackingNumber,
-      labelStatus: order.labelStatus,
-      hasShipment,
-      latestShipmentStatus: latestShipment?.status,
-      latestShipmentTracking: latestShipment?.trackingNumber,
-      finalHasOrderLabel: hasOrderLabel
-    });
+    
     
     // Check if line_items are in rawData (Shippo/Etsy case)
     let lineItems = order.line_items;
@@ -587,7 +539,7 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
     
     // If no line items, create a single row for the order (UPS case)
     if (!lineItems || lineItems.length === 0) {
-      return [{
+      const orderLevelRow = {
         orderId: order.id,
         marketplace: order.marketplace ?? '—',
         orderNumber: order.marketplaceOrderNumber || order.orderNumber || '—',
@@ -599,7 +551,7 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         source: order.source || 'shippo',
         channel: order.channel || safeRaw?.shop_app,
         createdAt: order.marketplaceOrderDate,
-        lastCarrier: order.lastShipmentCarrier || safeRaw?.delivery_method?.name || safeRaw?.shipping_method || '—',
+        lastCarrier: latestShipment?.carrier || order.lastShipmentCarrier || safeRaw?.delivery_method?.name || safeRaw?.shipping_method || '—',
 
         itemId: `${order.id}-noitem`,
         sku: '—',
@@ -631,7 +583,10 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         labelCreated: hasOrderLabel,
         shippingLabelUrl: hasOrderLabel ? (latestShipment?.pdfUrl || order.shippingLabelUrl) : undefined,
         labelStockType: order.labelStockType,
-      }];
+      };
+      
+      
+      return [orderLevelRow];
     }
 
     // Map each line item to a row (FedEx case)
@@ -657,7 +612,7 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         source: order.source || 'shippo',
         channel: order.channel || safeRaw?.shop_app,
         createdAt: order.marketplaceOrderDate,
-        lastCarrier: order.lastShipmentCarrier || safeRaw?.delivery_method?.name || safeRaw?.shipping_method || '—',
+        lastCarrier: latestLabelJob?.carrier || latestShipment?.carrier || order.lastShipmentCarrier || safeRaw?.delivery_method?.name || safeRaw?.shipping_method || '—',
 
         itemId: isVeeqoItem ? item.id : (item.object_id || item.id || `${order.id}-item-${lineItems.indexOf(item)}`),
         sku: (isVeeqoItem ? item.sellable?.sku_code : item.sku) ?? '—',
@@ -687,7 +642,7 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         shipByDate: item.shipBy || order.shipByDate,
         originalOrder: order,
         labelCreated: latestLabelJob?.status === 'created' && !!latestLabelJob?.trackingNumber,
-        shippingLabelUrl: latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined,
+        shippingLabelUrl: latestLabelJob?.pdfUrl || (latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined),
         labelStockType: order.labelStockType,
       };
     });
@@ -844,6 +799,17 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
 
+  // --- Tracking Submission State ---
+  const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
+  const [selectedOrderForTracking, setSelectedOrderForTracking] = useState<LabelRow | null>(null);
+  const [trackingFormData, setTrackingFormData] = useState({
+    trackingNumber: '',
+    carrierId: 3, // Default to "Other"
+    notifyCustomer: true,
+    updateRemoteOrder: true
+  });
+  const [submittingTracking, setSubmittingTracking] = useState(false);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [marketplaceFilter, setMarketplaceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -883,7 +849,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       search: debouncedSearch,
       startDate: filterStartDate,
       endDate: filterEndDate,
-      marketplace: marketplaceFilter,
+      marketplace: '', // Always empty to show all marketplaces
       status: statusFilter,
       labelStatus: labelStatusFilter,
     },
@@ -912,9 +878,6 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
   const filteredAndPaginatedItems = useMemo(() => {
     // TEMPORARILY DISABLED: Frontend filtering for debugging
-    console.log('[DEBUG] Frontend filtering DISABLED - showing all labelRows');
-    console.log('[DEBUG] labelRows count:', labelRows.length);
-    console.log('[DEBUG] labelFilter setting:', labelFilter);
     return labelRows; // Always return all rows for debugging
     
     /* ORIGINAL FILTERING CODE - DISABLED
@@ -945,7 +908,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
   useEffect(() => {
     setPaginationModel(prev => ({ ...prev, page: 0 }));
-  }, [debouncedSearch, marketplaceFilter, statusFilter, labelStatusFilter, filterStartDate, filterEndDate]);
+  }, [debouncedSearch, statusFilter, labelStatusFilter, filterStartDate, filterEndDate]);
 
   useEffect(() => {
     const fetchUserSettings = async () => {
@@ -978,20 +941,6 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     fetchUserSettings();
   }, []);
 
-  useEffect(() => {
-    console.log('[LabelsPage] fetchedOrders:', fetchedOrders);
-    console.log('[LabelsPage] isLoading:', isLoading);
-    console.log('[LabelsPage] labelRows:', labelRows);
-    console.log('[LabelsPage] DataGrid rows prop:', filteredAndPaginatedItems);
-    console.log('[LabelsPage] DataGrid row IDs:', filteredAndPaginatedItems.map(r => r.itemId || r.orderId));
-    console.log('[LabelsPage] labelFilter:', labelFilter);
-    console.log('[LabelsPage] filterStartDate:', filterStartDate);
-    console.log('[LabelsPage] filterEndDate:', filterEndDate);
-    console.log('[LabelsPage] marketplaceFilter:', marketplaceFilter);
-    console.log('[LabelsPage] statusFilter:', statusFilter);
-    console.log('[LabelsPage] labelStatusFilter:', labelStatusFilter);
-    console.log('[LabelsPage] debouncedSearch:', debouncedSearch);
-  }, [fetchedOrders, isLoading, labelRows, filteredAndPaginatedItems, labelFilter, filterStartDate, filterEndDate, marketplaceFilter, statusFilter, labelStatusFilter, debouncedSearch]);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerOrder, setDrawerOrder] = useState<LabelRow | null>(null);
@@ -1002,7 +951,6 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   );
 
   const openDrawer = (row: LabelRow) => {
-    console.log('Opening drawer with LabelRow:', row);
     let currentDrawerData = { ...row }; 
     const defaultsFromRow = getDefaultValues(row);
 
@@ -1018,6 +966,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       labelStockType: row.labelStockType || 'PAPER_4X6',
       fedexServiceType: row.fedexServiceType || 'INTERNATIONAL_PRIORITY',
       fedexPackagingType: row.fedexPackagingType || 'FEDEX_PAK',
+      weight: row.weight || 0.5, // Ensure weight defaults to 0.5
       hsCode: '', // Always start with empty HS code
       // Ensure line_items for the payload is correctly formed by getDefaultValues
     };
@@ -1106,10 +1055,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             createdAt: s.createdAt
           }))
         };
-        console.log('[labelStatus] valueGetter - row data:', JSON.stringify(debugInfo, null, 2));
         
         if (!row) {
-          console.log('No row data');
           return '—';
         }
         
@@ -1121,26 +1068,17 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                         hasShipment;
         
         if (hasLabel) {
-          console.log('Label exists with status:', {
-            trackingNumber: row.trackingNumber,
-            labelCreated: row.labelCreated,
-            shippingLabelUrl: row.shippingLabelUrl,
-            labelJobStatus: row.labelJobStatus
-          });
           return 'Alındı';
         }
         
         if (row.labelJobStatus === 'failed') {
-          console.log('Label job failed');
           return 'Hata';
         }
         
         if (row.labelJobStatus === 'pending') {
-          console.log('Label job pending');
           return 'Bekliyor';
         }
         
-        console.log('No label status found');
         return 'Etiketsız';
       },
       renderCell: (params: GridRenderCellParams<LabelRow, string>) => {
@@ -1176,6 +1114,65 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         if (status === 'Hata')     return <Tooltip title="Etiketleme Hatası"><CancelIcon color="error" /></Tooltip>;
         if (status === 'Bekliyor') return <Tooltip title="Etiket İşleniyor/Bekliyor"><HourglassEmptyIcon color="warning" /></Tooltip>;
         return <Tooltip title="Etiket Oluşturulmadı"><CircleIcon color="disabled" /></Tooltip>;
+      },
+    },
+    {
+      field: 'tracking',
+      headerName: 'Kargo',
+      width: 80,
+      sortable: false,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => {
+        const row = params.row;
+        const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
+        
+        // Determine source from marketplace like in the API
+        const source = (() => {
+          const marketplace = (row.marketplace || '').toLowerCase();
+          if (marketplace.includes('etsy')) return 'shippo';
+          if (marketplace.includes('trendyol')) return 'trendyol';
+          return 'veeqo';
+        })();
+
+        // Only show for Veeqo and Shippo orders
+        if (source !== 'veeqo' && source !== 'shippo') {
+          return <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>—</Box>;
+        }
+
+        // Check if tracking number exists
+        const hasTracking = row.trackingNumber || 
+                           originalOrder?.trackingNumber ||
+                           (originalOrder?.shipments && originalOrder.shipments.some(s => s?.trackingNumber));
+
+        const handleTrackingClick = () => {
+          setSelectedOrderForTracking(row);
+          setTrackingFormData({
+            trackingNumber: '',
+            carrierId: 3,
+            notifyCustomer: true,
+            updateRemoteOrder: true
+          });
+          setTrackingDialogOpen(true);
+        };
+
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IconButton 
+              size="small" 
+              onClick={handleTrackingClick}
+              sx={{ 
+                color: hasTracking ? 'success.main' : 'text.secondary',
+                '&:hover': { 
+                  backgroundColor: hasTracking ? 'success.light' : 'action.hover',
+                  opacity: 0.8
+                }
+              }}
+            >
+              <Tooltip title={hasTracking ? 'Takip numarası mevcut' : 'Takip numarası ekle'}>
+                {hasTracking ? <FlightTakeoffIcon /> : <FlightIcon />}
+              </Tooltip>
+            </IconButton>
+          </Box>
+        );
       },
     },
     {
@@ -1334,8 +1331,27 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             <EditIcon fontSize="small"/>
           </IconButton>
           <Button size="small" variant="outlined" sx={{ml:1}} onClick={() => { 
-            console.log('[UPS DEBUG] UPS button clicked', params.row);
-            setSelectedOrderForUPS(params.row); 
+            // Convert LabelRow to UIOrder format for UPS drawer
+            const uiOrder: UIOrder = {
+              orderId: params.row.orderId,
+              orderNumber: params.row.orderNumber,
+              recipientFirstName: params.row.recipientFirstName,
+              recipientLastName: params.row.recipientLastName,
+              recipientStreet1: params.row.recipientStreet1,
+              recipientStreet2: params.row.recipientStreet2,
+              recipientCity: params.row.recipientCity,
+              recipientState: params.row.recipientState,
+              recipientPostal: params.row.recipientPostal,
+              recipientCountry: params.row.recipientCountry,
+              recipientPhone: params.row.recipientPhone,
+              orderTotalPrice: params.row.orderTotalPrice,
+              currency: params.row.currency,
+              title: params.row.title,
+              weight: params.row.weight,
+              hsCode: params.row.hsCode,
+              countryOfOrigin: params.row.countryOfOrigin,
+            };
+            setSelectedOrderForUPS(uiOrder); 
             setUpsDrawerOpen(true); 
           }}>
             UPS
@@ -1370,6 +1386,52 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     }
   };
 
+  const handleTrackingSubmit = async () => {
+    if (!selectedOrderForTracking || !trackingFormData.trackingNumber.trim()) {
+      return;
+    }
+
+    setSubmittingTracking(true);
+    const toastId = toast.loading('Takip numarası gönderiliyor...');
+    
+    try {
+      const { fetchWithLimit } = await import('../../lib/fetchWithLimit');
+      const res = await fetchWithLimit(`/api/orders/${selectedOrderForTracking.orderId}/submit-tracking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trackingNumber: trackingFormData.trackingNumber.trim(),
+          carrierId: trackingFormData.carrierId,
+          notifyCustomer: trackingFormData.notifyCustomer,
+          updateRemoteOrder: trackingFormData.updateRemoteOrder
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Takip numarası gönderilemedi');
+      }
+
+      toast.success('Takip numarası başarıyla kaydedildi!', { id: toastId });
+      setTrackingDialogOpen(false);
+      
+      // Reset form
+      setTrackingFormData({
+        trackingNumber: '',
+        carrierId: 3,
+        notifyCustomer: true,
+        updateRemoteOrder: true
+      });
+      
+      // Refresh data to show updated icons
+      mutate && mutate();
+      
+    } catch (e: any) {
+      toast.error(`Hata: ${e.message}`, { id: toastId });
+    } finally {
+      setSubmittingTracking(false);
+    }
+  };
 
   const handleRefresh = () => {
     const toastId = toast.loading('Siparişler yenileniyor...');
@@ -1611,12 +1673,6 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         </Button>
           <TextField size="small" label="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" /> }} sx={{ minWidth: 200, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}/>
           <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
-            <InputLabel shrink={true}>Marketplace</InputLabel>
-            <Select value={marketplaceFilter} label="Marketplace" onChange={e => setMarketplaceFilter(e.target.value)} displayEmpty>
-            {marketplaceOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-          </Select>
-        </FormControl>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
             <InputLabel shrink={true}>Sipariş Durumu</InputLabel>
             <Select value={statusFilter} label="Sipariş Durumu" onChange={e => setStatusFilter(e.target.value)} displayEmpty>
             {orderStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
@@ -1630,7 +1686,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         </FormControl>
           <TextField label="Başlangıç Tarihi" type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: 150, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }} />
           <TextField label="Bitiş Tarihi" type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: 150, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }} />
-          <Button onClick={() => { setSearchTerm(''); setMarketplaceFilter(''); setStatusFilter(''); setLabelStatusFilter(''); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="outlined" sx={{ ml: 'auto', height: '40px', minWidth: 100, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>Sıfırla</Button>
+          <Button onClick={() => { setSearchTerm(''); setStatusFilter(''); setLabelStatusFilter(''); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="outlined" sx={{ ml: 'auto', height: '40px', minWidth: 100, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>Sıfırla</Button>
         <Tooltip title="Sipariş Listesini Yenile">
             <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" sx={{ height: '40px', width: '40px', mb: { xs: 1, sm: 0 } }}><RefreshIcon /></IconButton></span>
         </Tooltip>
@@ -1707,9 +1763,9 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                   <TextField name="recipientCountry" label="Ülke" value={drawerOrder.recipientCountry || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Country'))} />
                   <TextField name="recipientPhone" label="Telefon" value={drawerOrder.recipientPhone || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
                   <TextField name="recipientEmail" label="E-posta (Opsiyonel)" value={drawerOrder.recipientEmail || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" type="email" />
-                  <TextField name="commodityDesc" label="Ürün Açıklaması" value={drawerOrder.originalOrder?.commodityDesc || ''} onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" />
+                  <TextField name="commodityDesc" label="Ürün Açıklaması" value={drawerOrder.title === 'N/A' ? (drawerOrder.originalOrder?.commodityDesc || drawerOrder.title) : drawerOrder.title} onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" />
                   <Grid container spacing={2}>
-                    <Grid item xs={4}><TextField name="weight" label="Ağırlık (kg)" value={drawerOrder.weight || ''} type="number" onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Weight'))} /></Grid>
+                    <Grid item xs={4}><TextField name="weight" label="Ağırlık (kg)" value={drawerOrder.weight || 0.5} inputProps={{ step: "0.1", style: { MozAppearance: 'textfield' } }} sx={{ '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 } }} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Weight'))} /></Grid>
                     <Grid item xs={4}><TextField name="packageLength" label="Uzunluk (cm)" value={drawerOrder.originalOrder?.packageLength || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
                     <Grid item xs={4}><TextField name="packageWidth" label="Genişlik (cm)" value={drawerOrder.originalOrder?.packageWidth || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
                     <Grid item xs={4}><TextField name="packageHeight" label="Yükseklik (cm)" value={drawerOrder.originalOrder?.packageHeight || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
@@ -1832,6 +1888,85 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
               }}
               onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
             />
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tracking Submission Dialog */}
+      <Dialog
+        open={trackingDialogOpen}
+        onClose={() => setTrackingDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Takip Numarası Ekle
+          <IconButton
+            aria-label="close"
+            onClick={() => setTrackingDialogOpen(false)}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {selectedOrderForTracking && (
+              <Box sx={{ mb: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Sipariş: {selectedOrderForTracking.orderNumber}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Market: {selectedOrderForTracking.marketplace}
+                </Typography>
+              </Box>
+            )}
+            
+            <TextField
+              fullWidth
+              label="Takip Numarası"
+              value={trackingFormData.trackingNumber}
+              onChange={(e) => setTrackingFormData(prev => ({...prev, trackingNumber: e.target.value}))}
+              placeholder="1Z999AA10123456784"
+              required
+            />
+
+            <FormControl fullWidth>
+              <InputLabel>Kargo Firması</InputLabel>
+              <Select
+                value={trackingFormData.carrierId}
+                label="Kargo Firması"
+                onChange={(e) => setTrackingFormData(prev => ({...prev, carrierId: Number(e.target.value)}))}
+              >
+                {VEEQO_CARRIERS.map((carrier) => (
+                  <MenuItem key={carrier.value} value={carrier.value}>
+                    {carrier.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 2 }}>
+              <Button 
+                onClick={() => setTrackingDialogOpen(false)}
+                disabled={submittingTracking}
+              >
+                İptal
+              </Button>
+              <Button 
+                variant="contained" 
+                onClick={handleTrackingSubmit}
+                disabled={submittingTracking || !trackingFormData.trackingNumber.trim()}
+                startIcon={submittingTracking ? <CircularProgress size={16} /> : null}
+              >
+                {submittingTracking ? 'Gönderiliyor...' : 'Kaydet'}
+              </Button>
+            </Box>
           </Box>
         </DialogContent>
       </Dialog>

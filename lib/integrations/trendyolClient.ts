@@ -16,8 +16,8 @@ interface FetchTrendyolOrdersParams {
   apiKey: string;
   apiSecret: string;
   status?: string;
-  startDateMs: number;
-  endDateMs: number;
+  startDateMs: number | null;
+  endDateMs: number | null;
   pageSize?: number;
 }
 
@@ -28,18 +28,25 @@ async function fetchTrendyolOrders({ supplierId, apiKey, apiSecret, status, star
   const auth = 'Basic ' + Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
   let url = `${BASE_URL}/${supplierId}/orders?`;
   if (status) url += `status=${encodeURIComponent(status)}&`;
-  // Convert milliseconds to seconds for Trendyol API
-  const startDateSeconds = Math.floor(startDateMs / 1000);
-  const endDateSeconds = Math.floor(endDateMs / 1000);
-  url += `startDate=${startDateSeconds}&endDate=${endDateSeconds}`;
-  url += `&orderByField=${status === 'Created' ? 'createdDate' : 'PackageLastModifiedDate'}`;
+  
+  // Only add date filters if they are provided (Trendyol API date filtering is buggy)
+  if (startDateMs !== null && endDateMs !== null) {
+    // Convert milliseconds to seconds for Trendyol API
+    const startDateSeconds = Math.floor(startDateMs / 1000);
+    const endDateSeconds = Math.floor(endDateMs / 1000);
+    url += `startDate=${startDateSeconds}&endDate=${endDateSeconds}&`;
+    console.log(`[TRENDYOL DEBUG] Date range (ms): ${startDateMs} to ${endDateMs}`);
+    console.log(`[TRENDYOL DEBUG] Date range (seconds): ${startDateSeconds} to ${endDateSeconds}`);
+    console.log(`[TRENDYOL DEBUG] Date range (ISO): ${new Date(startDateMs).toISOString()} to ${new Date(endDateMs).toISOString()}`);
+  } else {
+    console.log(`[TRENDYOL DEBUG] No date filtering (API date filtering disabled due to bugs)`);
+  }
+  
+  url += `orderByField=${status === 'Created' ? 'createdDate' : 'PackageLastModifiedDate'}`;
   url += `&orderByDirection=DESC&size=${pageSize}`;
 
   // Debug log the URL being called
   console.log(`[TRENDYOL DEBUG] Fetching URL: ${url}`);
-  console.log(`[TRENDYOL DEBUG] Date range (ms): ${startDateMs} to ${endDateMs}`);
-  console.log(`[TRENDYOL DEBUG] Date range (seconds): ${startDateSeconds} to ${endDateSeconds}`);
-  console.log(`[TRENDYOL DEBUG] Date range (ISO): ${new Date(startDateMs).toISOString()} to ${new Date(endDateMs).toISOString()}`);
 
   const res = await fetch(url, { headers: { Authorization: auth }, method: 'GET' });
   if (!res.ok) {

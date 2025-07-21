@@ -116,10 +116,14 @@ export async function createFedexShipment(
   if (!orderData.recipientPostal) validationErrors.push("Recipient Postal Code missing or empty");
   if (!orderData.recipientCountry) validationErrors.push("Recipient Country Code missing or empty");
 
-  const recipientPhoneCleaned = String(orderData.recipientPhone || '').replace(/\D/g, '');
-  if (!recipientPhoneCleaned) {
-      validationErrors.push("Recipient Phone missing or invalid (was empty after cleaning)");
+  // Phone is already normalized in generate-label.ts, so we just use it directly
+  const recipientPhoneCleaned = String(orderData.recipientPhone || '');
+  if (!recipientPhoneCleaned || recipientPhoneCleaned === '0000000000') {
+      validationErrors.push("Recipient Phone missing or invalid");
   }
+  
+  // Extension is also parsed in generate-label.ts
+  const recipientPhoneExt = orderData.recipientPhoneExt;
 
   if (typeof orderData.weightKg !== 'number' || orderData.weightKg <= 0) validationErrors.push("Top-level weightKg (for package) must be a positive number");
   if (!orderData.serviceType || !fedexOptionsData.serviceTypes.some(o => o.value === orderData.serviceType)) validationErrors.push("serviceType is required and must be valid");
@@ -247,6 +251,7 @@ export async function createFedexShipment(
           personName: recipientFullName,
           companyName: orderData.recipientCompany || undefined,
           phoneNumber: recipientPhoneCleaned,
+          ...(recipientPhoneExt && { phoneExtension: recipientPhoneExt }),
           ...(orderData.recipientEmail && { emailAddress: orderData.recipientEmail })
         },
         address: {

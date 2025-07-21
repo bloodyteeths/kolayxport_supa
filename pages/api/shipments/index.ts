@@ -20,8 +20,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Missing FedEx credentials' });
     }
 
-    // 2️⃣  Order + Shipper profile
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    // 2️⃣  Order + Shipper profile (with proper tenant isolation)
+    const order = await prisma.order.findFirst({ 
+      where: { 
+        id: orderId, 
+        userId: userId  // Ensure order belongs to the requesting user
+      } 
+    });
     const profile = await prisma.shipperProfile.findUnique({ where: { userId } });
     if (!order || !profile) return res.status(404).json({ error: 'Order or Shipper profile not found' });
 

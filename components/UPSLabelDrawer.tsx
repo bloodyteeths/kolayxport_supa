@@ -178,20 +178,19 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
     };
   };
   const today = new Date().toISOString().slice(0, 10);
-  const initialProductValue = order?.orderTotalPrice || 0;
   const [form, setForm] = useState<UPSFormState>({
-    recipientFirstName: order?.recipientFirstName || '',
-    recipientLastName: order?.recipientLastName || '',
-    recipientStreet1: order?.recipientStreet1 || '',
-    recipientStreet2: order?.recipientStreet2 || '',
-    recipientCity: order?.recipientCity || '',
-    recipientState: order?.recipientState || '',
-    recipientPostal: order?.recipientPostal || '',
-    recipientCountry: order?.recipientCountry || '',
-    recipientPhone: order?.recipientPhone || '',
-    hsCode: order?.hsCode || '',
-    countryOfOrigin: order?.countryOfOrigin || '',
-    weight: order?.weight || DEFAULTS.weight,
+    recipientFirstName: '',
+    recipientLastName: '',
+    recipientStreet1: '',
+    recipientStreet2: '',
+    recipientCity: '',
+    recipientState: '',
+    recipientPostal: '',
+    recipientCountry: '',
+    recipientPhone: '',
+    hsCode: '',
+    countryOfOrigin: '',
+    weight: DEFAULTS.weight,
     serviceType: DEFAULTS.serviceType,
     packageType: DEFAULTS.packageType,
     signatureOption: DEFAULTS.signatureOption,
@@ -199,35 +198,35 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
     packageLength: '',
     packageWidth: '',
     packageHeight: '',
-    invoiceNumber: `INV-${order?.orderNumber || Date.now()}`,
+    invoiceNumber: '',
     invoiceDate: today,
     exportReason: 'SALE',
-    currencyCode: order?.currency || 'USD',
+    currencyCode: 'USD',
     iossNumber: '',
     vatNumber: '',
     products: [{
-      description: order?.title || 'Global Cargo Shipment',
+      description: 'Global Cargo Shipment',
       quantity: 1,
-      value: initialProductValue,
-      commodityCode: order?.hsCode || '',
+      value: 0,
+      commodityCode: '',
       unitOfMeasurement: 'PCS',
-      weight: (order?.weight || DEFAULTS.weight).toString(),
-      originCountry: order?.countryOfOrigin || 'TR',
+      weight: DEFAULTS.weight.toString(),
+      originCountry: 'TR',
     }],
-    soldToName: order?.recipientFirstName + ' ' + order?.recipientLastName || '',
-    soldToAttention: order?.recipientFirstName + ' ' + order?.recipientLastName || '',
-    soldToStreet1: order?.recipientStreet1 || '',
-    soldToStreet2: order?.recipientStreet2 || '',
-    soldToCity: order?.recipientCity || '',
-    soldToPostal: order?.recipientPostal || '',
-    soldToCountry: order?.recipientCountry || 'TR',
-    soldToPhone: order?.recipientPhone || '',
-    soldToState: order?.recipientState || '',
-    soldToEmail: order?.recipientEmail || '',
+    soldToName: '',
+    soldToAttention: '',
+    soldToStreet1: '',
+    soldToStreet2: '',
+    soldToCity: '',
+    soldToPostal: '',
+    soldToCountry: 'TR',
+    soldToPhone: '',
+    soldToState: '',
+    soldToEmail: '',
     termsOfShipment: 'DAP',
     invoiceLineTotal: {
-      currencyCode: order?.currency || 'USD',
-      monetaryValue: initialProductValue.toFixed(2)
+      currencyCode: 'USD',
+      monetaryValue: '0.00'
     }
   });
   const [saving, setSaving] = useState(false);
@@ -238,6 +237,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
 
   React.useEffect(() => {
     if (order) {
+      const orderValue = order?.orderTotalPrice || 0;
       setForm(f => ({
         ...f,
         recipientFirstName: order?.recipientFirstName || '',
@@ -254,21 +254,29 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         serviceType: DEFAULTS.serviceType,
         dutyPaymentType: DEFAULTS.dutyPaymentType,
         weight: order?.weight || DEFAULTS.weight,
+        invoiceNumber: `INV-${order?.orderNumber || Date.now()}`,
+        soldToName: `${order?.recipientFirstName || ''} ${order?.recipientLastName || ''}`.trim(),
+        soldToAttention: `${order?.recipientFirstName || ''} ${order?.recipientLastName || ''}`.trim(),
+        soldToStreet1: order?.recipientStreet1 || '',
+        soldToStreet2: order?.recipientStreet2 || '',
+        soldToCity: order?.recipientCity || '',
+        soldToPostal: order?.recipientPostal || '',
+        soldToCountry: order?.recipientCountry || 'TR',
         soldToPhone: order?.recipientPhone || '',
+        soldToState: order?.recipientState || '',
+        soldToEmail: order?.recipientEmail || '',
         products: [{
           description: order?.title || 'Global Cargo Shipment',
           quantity: 1,
-          value: initialProductValue,
+          value: orderValue,
           commodityCode: order?.hsCode || '',
           unitOfMeasurement: 'PCS',
           weight: (order?.weight || DEFAULTS.weight).toString(),
           originCountry: order?.countryOfOrigin || 'TR',
         }],
-        soldToState: order?.recipientState || '',
-        soldToEmail: order?.recipientEmail || '',
         invoiceLineTotal: {
           currencyCode: order?.currency || 'USD',
-          monetaryValue: initialProductValue.toFixed(2)
+          monetaryValue: orderValue.toFixed(2)
         }
       }));
     }

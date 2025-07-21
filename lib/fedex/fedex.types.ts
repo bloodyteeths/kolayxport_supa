@@ -28,6 +28,7 @@ export interface OrderRow {
   recipientPostal: string;
   recipientCountry: string;
   recipientPhone: string;
+  recipientPhoneExt?: string;
   recipientEmail?: string;
   isResidential?: boolean;
   weightKg: number;

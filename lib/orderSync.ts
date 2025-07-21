@@ -501,14 +501,14 @@ async function validateAndMapOrder(order: VeeqoOrder, veeqoClient: any): Promise
 
   const address = {
     name: `${recipientFirstName} ${recipientLastName}`.trim(),
-    phone: '',
+    phone: (addr?.phone ?? order.phone ?? '').trim(),
     street1: recipientStreet1,
-    street2: '',
+    street2: (addr?.address2 ?? order.address2 ?? '').trim(),
     city: recipientCity,
-    state: '',
-    postal: '',
+    state: (addr?.state ?? order.state ?? '').trim(),
+    postal: (addr?.zip ?? addr?.postal_code ?? order.zip ?? order.postal_code ?? '').trim(),
     country: recipientCountry,
-    isResidential: false
+    isResidential: addr?.residential ?? false
   };
 
   return {
@@ -595,7 +595,11 @@ export async function syncAllOrders(userId: string, options: {
     const { veeqoApiKey, shippoToken, startDate, endDate, source, channel } = options;
     
     const lastSyncEntry = await prisma.syncOperation.findFirst({
-      where: { userId, status: 'completed' },
+      where: { 
+        userId, 
+        status: 'completed',
+        type: 'full' // Only use 'full' sync operations to avoid Trendyol interference
+      },
       orderBy: { updatedAt: 'desc' },
     });
     
@@ -990,7 +994,7 @@ export async function syncAllOrders(userId: string, options: {
             externalStatus: order.externalStatus,
             currency: order.currency,
             totalPrice: order.totalPrice,
-            shippingAddress: order.shippingAddress ? order.shippingAddress : Prisma.JsonNull,
+            shippingAddress: order.to_address ? JSON.stringify(order.to_address) : (order.shippingAddress ? order.shippingAddress : Prisma.JsonNull),
             rawData: order.rawData ? order.rawData : Prisma.JsonNull,
             uiOrderDate: order.uiOrderDate,
             commodityDesc: order.commodityDesc,
@@ -1035,6 +1039,9 @@ export async function syncAllOrders(userId: string, options: {
           }
           ordersUpdated += ordersToUpdate.length;
         }
+
+        // Create OrderItems for new and updated orders
+        await createOrderItemsForBatch(batch, existingOrdersMap, userId);
 
         processed += batch.length;
         successful += batch.length;
@@ -1119,6 +1126,88 @@ export async function syncAllOrders(userId: string, options: {
         logger.error('Error during sync cleanup', cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)));
       }
     }
+  }
+}
+
+// Helper function to create OrderItems for a batch of orders
+async function createOrderItemsForBatch(
+  orders: UIOrder[], 
+  existingOrdersMap: Map<string, any>, 
+  userId: string
+): Promise<void> {
+  try {
+    const orderItemsToCreate: any[] = [];
+    
+    // Get the order IDs after they've been created/updated
+    const orderMarketplaceKeys = orders.map(o => o.marketplaceKey);
+    const currentOrdersInDb = await prisma.order.findMany({
+      where: { 
+        userId, 
+        marketplaceKey: { in: orderMarketplaceKeys }
+      },
+      select: { id: true, marketplaceKey: true }
+    });
+    const orderIdMap = new Map(currentOrdersInDb.map(o => [o.marketplaceKey, o.id]));
+    
+    for (const order of orders) {
+      const orderId = orderIdMap.get(order.marketplaceKey);
+      if (!orderId) {
+        logger.warn(`[OrderItems] Could not find order ID for marketplaceKey: ${order.marketplaceKey}`);
+        continue;
+      }
+      
+      // For existing orders, only recreate OrderItems if they don't exist or line items have changed
+      const existingOrder = existingOrdersMap.get(order.marketplaceKey);
+      if (existingOrder) {
+        const existingItemCount = await prisma.orderItem.count({
+          where: { orderId: existingOrder.id }
+        });
+        
+        // Only recreate if no OrderItems exist (missing from previous sync issue)
+        // For orders with existing OrderItems, we preserve them to avoid deleting labels
+        if (existingItemCount > 0) {
+          continue; // Skip if items already exist to preserve existing labels
+        }
+      }
+      
+      // Create OrderItems from line_items
+      const lineItems = order.line_items || [];
+      for (let i = 0; i < lineItems.length; i++) {
+        const item = lineItems[i];
+        orderItemsToCreate.push({
+          orderId,
+          productName: item.title || 'Unknown Product',
+          quantity: item.quantity || 1,
+          unitPrice: item.value || 0,
+          totalPrice: (item.value || 0) * (item.quantity || 1),
+          weightKg: item.weight || 0.5,
+          harmonizedCode: item.hs_code || '',
+          countryOfMfg: item.country_of_origin || '',
+          sku: item.sku || '',
+          image: item.image || '',
+          variantInfo: item.variantInfo || '',
+          marketplaceKey: String(item.id || `${order.marketplaceKey}-${i}`),
+          orderNumber: order.orderNumber || '',
+          uniqueLineKey: String(item.id || `${order.marketplaceKey}-${i}`),
+          productId: null, // line_items don't have productId
+          remoteLineId: String(item.id || ''),
+          shipBy: item.shipBy || order.shipByDate || null,
+        });
+      }
+    }
+    
+    // Bulk create OrderItems
+    if (orderItemsToCreate.length > 0) {
+      logger.info(`[OrderItems] Creating ${orderItemsToCreate.length} OrderItems for ${orders.length} orders`);
+      await prisma.orderItem.createMany({
+        data: orderItemsToCreate,
+        skipDuplicates: true,
+      });
+    }
+    
+  } catch (error) {
+    logger.error(`[OrderItems] Error creating OrderItems:`, error);
+    // Don't throw - this shouldn't fail the entire sync
   }
 }
 

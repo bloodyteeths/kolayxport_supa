@@ -168,8 +168,8 @@ export default async function handler(
     }
 
     if (endDate) {
-      const endOfDay = new Date(endDate as string);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Create end of day in UTC to properly filter orders
+      const endOfDay = new Date(endDate as string + 'T23:59:59.999Z');
       whereClause += ` AND COALESCE(o."uiOrderDate", o."createdAt") <= $${paramIndex}::timestamp`;
       params.push(endOfDay.toISOString());
       paramIndex++;
@@ -195,6 +195,7 @@ export default async function handler(
         o."createdAt" as "marketplaceOrderDate",
         o."trackingNumber" as "trackingNumber",
         o."labelStatus" as "labelStatus",
+        o."shippingLabelUrl" as "shippingLabelUrl",
         COALESCE(
           json_agg(DISTINCT
             jsonb_build_object(
@@ -227,6 +228,7 @@ export default async function handler(
             jsonb_build_object(
               'id', s.id,
               'status', s.status,
+              'carrier', s.carrier,
               'trackingNumber', s."trackingNumber",
               'pdfUrl', s."pdfUrl",
               'createdAt', s."createdAt"
@@ -274,14 +276,44 @@ export default async function handler(
       
       // --- Address Extraction ---
       let primaryAddressSource: any = {};
-      if (rawOrder.shippingAddress) {
+      
+      // For Trendyol orders, try to get structured address from rawData
+      if ((rawOrder.source === 'trendyol' || rawOrder.marketplace === 'Trendyol') && rawOrder.rawData) {
+        if (rawOrder.rawData.to_address) {
+          // New format with to_address
+          primaryAddressSource = rawOrder.rawData.to_address;
+        } else if (rawOrder.rawData.shipmentAddress) {
+          // Existing format with shipmentAddress from Trendyol API
+          const shipmentAddr = rawOrder.rawData.shipmentAddress;
+          primaryAddressSource = {
+            name: shipmentAddr.fullName || `${shipmentAddr.firstName || ''} ${shipmentAddr.lastName || ''}`.trim(),
+            street1: shipmentAddr.address1 || '',
+            street2: shipmentAddr.address2 || '',
+            city: shipmentAddr.city || '',
+            state: shipmentAddr.stateName || '',
+            postal: shipmentAddr.postalCode || '',
+            country: shipmentAddr.countryCode || 'TR',
+            phone: shipmentAddr.phone || ''
+          };
+        }
+      } else if (rawOrder.shippingAddress) {
         try {
-          primaryAddressSource = typeof rawOrder.shippingAddress === 'string'
-            ? JSON.parse(rawOrder.shippingAddress)
-            : rawOrder.shippingAddress;
+          if (typeof rawOrder.shippingAddress === 'string') {
+            // Check if it's a JSON string (starts with { or [) or just a plain address string
+            const trimmed = rawOrder.shippingAddress.trim();
+            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+              primaryAddressSource = JSON.parse(rawOrder.shippingAddress);
+            } else {
+              // It's a plain address string, create a simple object
+              primaryAddressSource = { fullAddress: rawOrder.shippingAddress };
+            }
+          } else {
+            primaryAddressSource = rawOrder.shippingAddress;
+          }
         } catch (e) {
           console.error(`Error parsing shippingAddress JSON for order ${rawOrder.id}`, e);
-          primaryAddressSource = {};
+          // Fallback: treat as plain address string
+          primaryAddressSource = { fullAddress: rawOrder.shippingAddress };
         }
       }
       let notesAddress: any = {};
@@ -379,13 +411,24 @@ export default async function handler(
       }));
       // --- Order Date ---
       let marketplaceOrderDate = rawOrder.uiOrderDate || rawOrder.createdAt;
+      let shipByDate = null; // Add shipByDate reconstruction
       if (!marketplaceOrderDate && rawOrder.rawData) {
         try {
           const rawData = typeof rawOrder.rawData === 'string' ? JSON.parse(rawOrder.rawData) : rawOrder.rawData;
           marketplaceOrderDate = rawData.created_at || rawData.order_date || rawData.ordered_at || rawData.placed_at;
+          // Reconstruct shipByDate from Veeqo's due_date (same logic as sync)
+          shipByDate = rawData.due_date || null;
         } catch (e) {
           // Keep essential error logging
           console.error('Error parsing rawData for order date:', e);
+        }
+      } else if (rawOrder.rawData) {
+        // Still need to extract shipByDate even if we have marketplaceOrderDate
+        try {
+          const rawData = typeof rawOrder.rawData === 'string' ? JSON.parse(rawOrder.rawData) : rawOrder.rawData;
+          shipByDate = rawData.due_date || null;
+        } catch (e) {
+          console.error('Error parsing rawData for shipByDate:', e);
         }
       }
       return {
@@ -403,12 +446,18 @@ export default async function handler(
         line_items: line_items_for_ui,
         marketplaceOrderDate,
         orderTotalPrice: rawOrder.totalPrice,
-        source: rawOrder.source || '',
+        source: rawOrder.source || (() => {
+          const marketplace = (rawOrder.marketplace || '').toLowerCase();
+          if (marketplace.includes('etsy')) return 'shippo';
+          if (marketplace.includes('trendyol')) return 'trendyol';
+          return 'veeqo';
+        })(),
         channel: '',
         marketplaceOrderId: rawOrder.marketplaceOrderId || rawOrder.orderNumber || rawOrder.id || '',
         orderNumber: rawOrder.orderNumber || rawOrder.marketplaceOrderId || rawOrder.id || '',
         trackingNumber: rawOrder.trackingNumber || null,
         labelStatus: rawOrder.labelStatus || null,
+        shipByDate: shipByDate, // Add reconstructed shipByDate
       };
     }));
 
@@ -487,7 +536,7 @@ export default async function handler(
     const makeKey = (o: UIOrder) =>
       `${o.marketplace}-${o.marketplaceOrderId ?? o.orderNumber}`;
 
-    async function dedupeAndFilter(raw: UIOrder[]): Promise<UIOrder[]> {
+    const dedupeAndFilter = async (raw: UIOrder[]): Promise<UIOrder[]> => {
       const map = new Map<string, UIOrder>();
       for (const order of raw) {
         // 3-B. De-duplicate by marketplace+orderNumber
@@ -510,7 +559,7 @@ export default async function handler(
         }
       }
       return Array.from(map.values());
-    }
+    };
 
     // Restore total count query
     const countQuery = `

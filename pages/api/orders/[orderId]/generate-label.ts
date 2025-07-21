@@ -7,6 +7,47 @@ import { fedexOptionsData } from '../../../../lib/fedex/fedex.config';
 import { logger } from '../../../../lib/logger';
 import { withUsageLimiter } from '../../../../lib/middleware/withUsageLimiter';
 
+// Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
+// Same logic as UPS but adapted for FedEx (max 6 chars extension vs UPS 4 chars)
+function parsePhoneNumberWithExt(raw: string): { phone: string, ext?: string } {
+  if (!raw) return { phone: '' };
+  
+  // Extract extension - matches "ext. 96793", "ext 96793", "x96793", "x 96793", etc.
+  const extMatch = raw.match(/(?:ext\.?\s*|x\s*)(\d+)/i);
+  let ext = extMatch ? extMatch[1] : undefined;
+  
+  // Remove extension part from the phone number
+  let phoneWithoutExt = raw;
+  if (extMatch) {
+    phoneWithoutExt = raw.substring(0, extMatch.index).trim();
+  }
+  
+  // Extract only digits from the phone number
+  let phone = phoneWithoutExt.replace(/\D/g, '');
+  
+  // Handle different phone number lengths
+  if (phone.length === 11 && phone.startsWith('1')) {
+    // Remove country code for US numbers (1-xxx-xxx-xxxx)
+    phone = phone.substring(1);
+  } else if (phone.length > 15) {
+    // Take the last 15 digits for any other long numbers (FedEx max)
+    phone = phone.slice(-15);
+  }
+  
+  // FedEx accepts 10-15 digits for phone numbers
+  if (phone.length < 10 || phone.length > 15) {
+    console.warn(`[FEDEX PHONE] Warning: Phone number "${raw}" normalized to "${phone}" with ${phone.length} digits (expected 10-15)`);
+  }
+  
+  // FedEx supports up to 6 character extensions (vs UPS 4 chars)
+  if (ext && ext.length > 6) {
+    console.warn(`[FEDEX PHONE] Warning: Extension "${ext}" is ${ext.length} characters (FedEx max 6), truncating`);
+    ext = ext.substring(0, 6);
+  }
+  
+  return { phone, ext };
+}
+
 interface ResponseData extends Partial<FedexShipmentResult> {
   error?: string;
   details?: any;
@@ -229,8 +270,9 @@ async function handler(
     const sanitizeDescription = (desc: string | undefined | null): string => {
       if (!desc) return 'Product';
       let sanitized = String(desc).replace(/&#39;/g, "'");
-      if (sanitized.length > 40) {
-        sanitized = sanitized.substring(0, 37) + '...';
+      // FedEx allows up to 450 characters for commodity descriptions
+      if (sanitized.length > 450) {
+        sanitized = sanitized.substring(0, 447) + '...';
       }
       return sanitized;
     };
@@ -302,7 +344,21 @@ async function handler(
       recipientState: parsedShippingAddress.state || undefined,
       recipientPostal: parsedShippingAddress.postal,
       recipientCountry: parsedShippingAddress.country,
-      recipientPhone: parsedShippingAddress.phone || '0000000000',
+      ...(() => {
+        // Parse phone number and extension using same logic as UPS
+        const { phone: normalizedPhone, ext: phoneExt } = parsePhoneNumberWithExt(parsedShippingAddress.phone || '');
+        const finalPhone = normalizedPhone || '0000000000';
+        
+        // Log phone normalization for debugging
+        if (parsedShippingAddress.phone && parsedShippingAddress.phone !== finalPhone) {
+          logger.info(`[FEDEX PHONE] Normalized "${parsedShippingAddress.phone}" → "${finalPhone}"${phoneExt ? ` ext: ${phoneExt}` : ''}`);
+        }
+        
+        return {
+          recipientPhone: finalPhone,
+          recipientPhoneExt: phoneExt, // Store extension separately for FedEx API
+        };
+      })(),
       recipientEmail: parsedShippingAddress.email || (orderRecord.items?.[0]?.recipientEmail) || undefined,
       isResidential: parsedShippingAddress.isResidential === true,
       
@@ -390,19 +446,81 @@ async function handler(
     const fedexResult: FedexShipmentResult = await createFedexShipment(orderDataForFedex, shipperData);
 
     // --- Create LabelJob record for each line item (tracking info, label URL, etc) ---
-    const labelJobs = await Promise.all(
-      lineItemsFromRequest.map(async (item) => {
-        return prisma.labelJob.create({
-          data: {
-            orderItemId: String(item.id),
-            carrier: 'FEDEX',
-            status: 'created',
-            pdfUrl: fedexResult.labelUrl,
-            trackingNumber: fedexResult.trackingNumber,
-          },
-        });
-      })
-    );
+    // Debug: Log the item IDs we're trying to use
+    logger.info(`[API generate-label] Line items from request:`, lineItemsFromRequest.map(item => ({id: item.id, title: item.title})));
+    
+    // Get actual OrderItems for this order to see what IDs exist
+    let actualOrderItems = await prisma.orderItem.findMany({
+      where: { orderId: orderId },
+      select: { id: true, productName: true }
+    });
+    logger.info(`[API generate-label] Actual OrderItems in DB:`, actualOrderItems);
+
+    // RACE CONDITION FIX: If no OrderItems exist, recreate them from request data
+    if (actualOrderItems.length === 0 && lineItemsFromRequest.length > 0) {
+      logger.warn(`[API generate-label] No OrderItems found for order ${orderId}, recreating from request data`);
+      
+      const createdItems = await Promise.all(
+        lineItemsFromRequest.map(async (item) => {
+          return prisma.orderItem.create({
+            data: {
+              orderId: orderId,
+              productName: item.title || 'Unknown Product',
+              quantity: item.quantity || 1,
+              unitPrice: item.unitPrice || 0,
+              totalPrice: (item.unitPrice || 0) * (item.quantity || 1),
+              weightKg: item.weight || 0.5,
+              harmonizedCode: item.hs_code || '',
+              countryOfMfg: item.country_of_origin || 'TR',
+              sku: item.sku || '',
+              marketplaceKey: String(item.id),
+              orderNumber: orderRecord.orderNumber || orderId,
+              uniqueLineKey: String(item.id)
+            }
+          });
+        })
+      );
+      
+      actualOrderItems = createdItems.map(item => ({ id: item.id, productName: item.productName }));
+      logger.info(`[API generate-label] Recreated ${createdItems.length} OrderItems for order ${orderId}`);
+    }
+
+    // Create labelJobs for each OrderItem
+    const labelJobs = actualOrderItems.length > 0 
+      ? await Promise.all(
+          actualOrderItems.map(async (orderItem) => {
+            return prisma.labelJob.create({
+              data: {
+                orderItemId: orderItem.id,
+                carrier: 'FEDEX',
+                status: 'created',
+                pdfUrl: fedexResult.labelUrl,
+                trackingNumber: fedexResult.trackingNumber,
+              },
+            });
+          })
+        )
+      : [];
+    
+    logger.info(`[API generate-label] Created ${labelJobs.length} labelJob records for ${actualOrderItems.length} OrderItems`);
+
+    // --- Also update the order with tracking information (similar to UPS) ---
+    const orderUpdate = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        trackingNumber: fedexResult.trackingNumber,
+        labelStatus: 'created',
+        shippingLabelUrl: fedexResult.labelUrl,
+        shippedAt: new Date(),
+      },
+    });
+    
+    logger.info(`[API generate-label] Order updated successfully:`, {
+      orderId: orderUpdate.id,
+      trackingNumber: orderUpdate.trackingNumber,
+      labelStatus: orderUpdate.labelStatus,
+      shippingLabelUrl: orderUpdate.shippingLabelUrl ? 'SET' : 'NOT_SET'
+    });
 
     // Increment usage counter after successful label generation
     if (res.incrementUsage) {
@@ -422,20 +540,55 @@ async function handler(
   } catch (error: any) {
     logger.error(`[API generate-label] Error generating label for order ${orderId}:`, error);
 
-    // Create failed LabelJob records for each line item
+    // Create failed LabelJob records for each actual OrderItem
     try {
-      await Promise.all(
-        lineItemsFromRequest.map(async (item) => {
-          return prisma.labelJob.create({
-            data: {
-              orderItemId: String(item.id),
-              carrier: 'FEDEX',
-              status: 'failed',
-              errorMessage: error.message || 'Unknown error during label generation',
-            },
-          });
-        })
-      );
+      let actualOrderItems = await prisma.orderItem.findMany({
+        where: { orderId: orderId },
+        select: { id: true }
+      });
+      
+      // RACE CONDITION FIX: If no OrderItems exist, recreate them from request data
+      if (actualOrderItems.length === 0 && lineItemsFromRequest.length > 0) {
+        logger.warn(`[API generate-label] No OrderItems found for failed label, recreating from request data`);
+        
+        const createdItems = await Promise.all(
+          lineItemsFromRequest.map(async (item) => {
+            return prisma.orderItem.create({
+              data: {
+                orderId: orderId,
+                productName: item.title || 'Unknown Product',
+                quantity: item.quantity || 1,
+                unitPrice: item.unitPrice || 0,
+                totalPrice: (item.unitPrice || 0) * (item.quantity || 1),
+                weightKg: item.weight || 0.5,
+                harmonizedCode: item.hs_code || '',
+                countryOfMfg: item.country_of_origin || 'TR',
+                sku: item.sku || '',
+                marketplaceKey: String(item.id),
+                orderNumber: orderId,
+                uniqueLineKey: String(item.id)
+              }
+            });
+          })
+        );
+        
+        actualOrderItems = createdItems.map(item => ({ id: item.id }));
+      }
+      
+      if (actualOrderItems.length > 0) {
+        await Promise.all(
+          actualOrderItems.map(async (orderItem) => {
+            return prisma.labelJob.create({
+              data: {
+                orderItemId: orderItem.id,
+                carrier: 'FEDEX',
+                status: 'failed',
+                errorMessage: error.message || 'Unknown error during label generation',
+              },
+            });
+          })
+        );
+      }
     } catch (dbError) {
       logger.error(`[API generate-label] Failed to create error LabelJob records:`, dbError);
     }

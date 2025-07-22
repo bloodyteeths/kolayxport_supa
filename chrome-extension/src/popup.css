@@ -197,6 +197,21 @@ main {
   flex-shrink: 0;
 }
 
+.btn-small {
+  padding: 6px 10px;
+  font-size: 12px;
+  margin-top: 8px;
+  background-color: #f5f5f5;
+  color: #666;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.btn-small:hover:not(:disabled) {
+  background-color: #e0e0e0;
+  border-color: #bdbdbd;
+}
+
 /* Help Section */
 .help-section {
   background-color: #fff;

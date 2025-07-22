@@ -23,6 +23,7 @@
   "host_permissions": [
     "https://app.kolayxport.com/*",
     "https://kolayxport.com/*",
+    "https://*.kolayxport.com/*",
     "https://www.etsy.com/*"
   ],
   "content_scripts": [

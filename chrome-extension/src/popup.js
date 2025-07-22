@@ -12,7 +12,8 @@ const elements = {
   lastSync: document.getElementById('lastSync'),
   syncNowBtn: document.getElementById('syncNowBtn'),
   openEtsyBtn: document.getElementById('openEtsyBtn'),
-  fullImportBtn: document.getElementById('fullImportBtn')
+  fullImportBtn: document.getElementById('fullImportBtn'),
+  refreshAuthBtn: document.getElementById('refreshAuthBtn')
 };
 
 // State
@@ -31,13 +32,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Check authentication status
 async function checkAuthStatus() {
   try {
+    console.log('Checking auth status from popup...');
     const response = await chrome.runtime.sendMessage({ action: 'getAuthStatus' });
+    console.log('Auth status response:', response);
+    
     isAuthenticated = response.authenticated;
     
-    updateAuthUI(isAuthenticated);
+    updateAuthUI(isAuthenticated, response);
   } catch (error) {
     console.error('Failed to check auth status:', error);
-    updateAuthUI(false);
+    updateAuthUI(false, { error: error.message });
   }
 }
 
@@ -84,7 +88,7 @@ async function loadSyncStats() {
 }
 
 // Update authentication UI
-function updateAuthUI(authenticated) {
+function updateAuthUI(authenticated, response = {}) {
   if (authenticated) {
     elements.authStatus.textContent = 'Connected';
     elements.authStatus.className = 'status-badge connected';
@@ -92,7 +96,17 @@ function updateAuthUI(authenticated) {
   } else {
     elements.authStatus.textContent = 'Disconnected';
     elements.authStatus.className = 'status-badge disconnected';
-    elements.authMessage.textContent = 'Please log in to Kolayxport to sync orders';
+    
+    if (response.error) {
+      elements.authMessage.textContent = `Error: ${response.error}`;
+    } else {
+      elements.authMessage.textContent = 'Please log in to Kolayxport to sync orders';
+    }
+  }
+  
+  // Add debug info for development
+  if (response.debug) {
+    console.log('Auth debug info:', response.debug);
   }
   
   updateButtonStates();
@@ -121,6 +135,17 @@ function updateButtonStates() {
 
 // Setup event listeners
 function setupEventListeners() {
+  // Refresh Auth button
+  elements.refreshAuthBtn.addEventListener('click', async () => {
+    elements.refreshAuthBtn.textContent = '⟳ Checking...';
+    elements.refreshAuthBtn.disabled = true;
+    
+    await checkAuthStatus();
+    
+    elements.refreshAuthBtn.textContent = '🔄 Refresh';
+    elements.refreshAuthBtn.disabled = false;
+  });
+  
   // Sync Now button
   elements.syncNowBtn.addEventListener('click', async () => {
     if (!currentTab || !isOnEtsyOrders) return;

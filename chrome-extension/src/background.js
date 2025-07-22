@@ -109,33 +109,52 @@ async function handleMessage(request, sender, sendResponse) {
 // Authentication management
 async function checkAuthentication() {
   try {
-    // Check for Kolayxport session cookie
-    const cookies = await chrome.cookies.getAll({
-      domain: KOLAYXPORT_DOMAIN
-    });
+    console.log('Checking authentication...');
     
-    // Look for Supabase auth tokens or NextAuth tokens
-    const authCookie = cookies.find(cookie => 
-      cookie.name.includes('sb-access-token') ||
-      cookie.name.includes('sb-refresh-token') ||
-      cookie.name === 'next-auth.session-token' ||
-      cookie.name === '__Secure-next-auth.session-token' ||
-      cookie.name === 'supabase-auth-token'
-    );
+    // First try to get token from active Kolayxport tabs (more reliable)
+    const token = await getTokenFromKolayxportTab();
+    if (token) {
+      console.log('Found auth token from active tab');
+      authToken = token;
+      updateBadge('authenticated');
+      return;
+    }
+    
+    // Fallback: Check for cookies on different domain variations
+    const domainVariations = [
+      'app.kolayxport.com',
+      'kolayxport.com',
+      '.kolayxport.com'
+    ];
+    
+    let authCookie = null;
+    for (const domain of domainVariations) {
+      const cookies = await chrome.cookies.getAll({ domain });
+      console.log(`Checking cookies for domain: ${domain}`, cookies.map(c => c.name));
+      
+      // Look for various Supabase auth patterns
+      authCookie = cookies.find(cookie => 
+        cookie.name.includes('sb-access-token') ||
+        cookie.name.includes('sb-refresh-token') ||
+        cookie.name === 'supabase-auth-token' ||
+        cookie.name.startsWith('sb-') ||
+        cookie.name === 'next-auth.session-token' ||
+        cookie.name === '__Secure-next-auth.session-token'
+      );
+      
+      if (authCookie) {
+        console.log(`Found auth cookie: ${authCookie.name} on domain: ${domain}`);
+        break;
+      }
+    }
     
     if (authCookie) {
       authToken = authCookie.value;
       updateBadge('authenticated');
     } else {
-      // Try to get token from Kolayxport tab
-      const token = await getTokenFromKolayxportTab();
-      if (token) {
-        authToken = token;
-        updateBadge('authenticated');
-      } else {
-        authToken = null;
-        updateBadge('unauthenticated');
-      }
+      console.log('No authentication found');
+      authToken = null;
+      updateBadge('unauthenticated');
     }
   } catch (error) {
     console.error('Auth check failed:', error);
@@ -147,32 +166,89 @@ async function checkAuthentication() {
 async function getTokenFromKolayxportTab() {
   try {
     const tabs = await chrome.tabs.query({
-      url: `https://${KOLAYXPORT_DOMAIN}/*`
+      url: [`https://${KOLAYXPORT_DOMAIN}/*`, `https://kolayxport.com/*`]
     });
     
-    if (tabs.length === 0) return null;
+    if (tabs.length === 0) {
+      console.log('No Kolayxport tabs found');
+      return null;
+    }
+    
+    console.log(`Found ${tabs.length} Kolayxport tabs`);
     
     // Execute script to get token from localStorage/sessionStorage
     const results = await chrome.scripting.executeScript({
       target: { tabId: tabs[0].id },
       func: () => {
-        // Look for Supabase auth token in localStorage
-        const keys = Object.keys(localStorage);
-        for (const key of keys) {
-          if (key.includes('sb-') && key.includes('access-token')) {
-            return localStorage.getItem(key);
+        try {
+          // Check for Supabase session in localStorage
+          const keys = Object.keys(localStorage);
+          console.log('LocalStorage keys:', keys);
+          
+          // Look for Supabase auth session data
+          for (const key of keys) {
+            if (key.startsWith('sb-') && key.includes('-auth-token')) {
+              const value = localStorage.getItem(key);
+              console.log(`Found Supabase token key: ${key}`);
+              
+              try {
+                // Parse the session data
+                const sessionData = JSON.parse(value);
+                if (sessionData.access_token) {
+                  return sessionData.access_token;
+                }
+              } catch (parseError) {
+                console.error('Failed to parse session data:', parseError);
+                return value; // Return raw value as fallback
+              }
+            }
           }
+          
+          // Check for browser client session storage pattern
+          const supabaseKey = keys.find(key => 
+            key.includes('supabase.auth.token') || 
+            key.includes('sb-') && key.includes('auth') ||
+            key.includes('supabase-auth')
+          );
+          
+          if (supabaseKey) {
+            const session = localStorage.getItem(supabaseKey);
+            console.log(`Found auth key: ${supabaseKey}`);
+            
+            try {
+              const parsed = JSON.parse(session);
+              return parsed.access_token || parsed.token || session;
+            } catch {
+              return session;
+            }
+          }
+          
+          // Check sessionStorage as well
+          const sessionKeys = Object.keys(sessionStorage);
+          for (const key of sessionKeys) {
+            if (key.includes('sb-') || key.includes('supabase')) {
+              const session = sessionStorage.getItem(key);
+              try {
+                const parsed = JSON.parse(session);
+                return parsed.access_token || parsed.token || session;
+              } catch {
+                return session;
+              }
+            }
+          }
+          
+          console.log('No authentication tokens found in storage');
+          return null;
+        } catch (error) {
+          console.error('Error extracting auth token:', error);
+          return null;
         }
-        
-        // Fallback to other possible token locations
-        return localStorage.getItem('supabase.auth.token') ||
-               localStorage.getItem('authToken') ||
-               sessionStorage.getItem('supabase.auth.token') ||
-               sessionStorage.getItem('sb-access-token');
       }
     });
     
-    return results[0]?.result || null;
+    const token = results[0]?.result;
+    console.log('Token extraction result:', token ? 'Found token' : 'No token');
+    return token || null;
   } catch (error) {
     console.error('Failed to get token from tab:', error);
     return null;

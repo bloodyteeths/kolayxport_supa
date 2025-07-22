@@ -39,6 +39,19 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   
   // Set up periodic auth check
   chrome.alarms.create('authCheck', { periodInMinutes: 1 });
+  
+  // Create context menus
+  chrome.contextMenus.create({
+    id: 'syncNow',
+    title: 'Sync Etsy Orders Now',
+    contexts: ['action']
+  });
+  
+  chrome.contextMenus.create({
+    id: 'fullImport',
+    title: 'Import All Etsy Orders',
+    contexts: ['action']
+  });
 });
 
 // Handle alarms
@@ -265,20 +278,7 @@ function updateBadge(status, text = '') {
   chrome.action.setBadgeText({ text: badgeText });
 }
 
-// Context menu for quick actions
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'syncNow',
-    title: 'Sync Etsy Orders Now',
-    contexts: ['action']
-  });
-  
-  chrome.contextMenus.create({
-    id: 'fullImport',
-    title: 'Import All Etsy Orders',
-    contexts: ['action']
-  });
-});
+// Context menu click handling
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'syncNow') {
@@ -307,7 +307,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // Handle extension icon click
-chrome.action.onClicked.addListener(async (tab) => {
+chrome.action.onClicked.addListener((tab) => {
   // If on Etsy orders page, trigger sync
   if (tab.url && tab.url.includes('etsy.com/your/orders')) {
     chrome.tabs.sendMessage(tab.id, { action: 'scrapeNow' });
@@ -331,11 +331,11 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
   ['requestHeaders', 'extraHeaders']
 );
 
-// Export for testing
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    checkAuthentication,
-    handleMessage,
-    updateBadge
-  };
-}
+// Global error handling
+self.addEventListener('error', (event) => {
+  console.error('Service worker error:', event.error);
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+});

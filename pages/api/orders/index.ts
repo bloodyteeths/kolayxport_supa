@@ -7,15 +7,6 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // DEBUG: Log every request to this endpoint
-  console.log(`[API DEBUG] === NEW REQUEST TO /api/orders ===`);
-  console.log(`[API DEBUG] Method: ${req.method}`);
-  console.log(`[API DEBUG] Query params:`, req.query);
-  console.log(`[API DEBUG] Context:`, req.query.context);
-  console.log(`[API DEBUG] Date filters:`, {
-    startDate: req.query.startDate,
-    endDate: req.query.endDate
-  });
   
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   if (req.method !== 'GET') {
@@ -253,15 +244,6 @@ export default async function handler(
 
     const result = await prisma.$queryRawUnsafe(ordersQuery, ...params);
     
-    // DEBUG: Always log for now
-    console.log(`[API DEBUG] Raw DB query returned ${(result as any[]).length} orders`);
-    console.log(`[API DEBUG] Sample raw order:`, (result as any[])[0] ? {
-      id: (result as any[])[0].id,
-      orderNumber: (result as any[])[0].orderNumber,
-      marketplace: (result as any[])[0].marketplace,
-      createdAt: (result as any[])[0].createdAt,
-      uiOrderDate: (result as any[])[0].uiOrderDate
-    } : 'No orders');
     
     // To re-enable order debug logs, set ORDERS_DEBUG=1 in your environment and uncomment the lines below.
     // if (process.env.ORDERS_DEBUG === '1') {
@@ -574,20 +556,6 @@ export default async function handler(
     // const cleanedOrders = await dedupeAndFilter(processedOrders.filter(Boolean));
     const cleanedOrders = processedOrders.filter(Boolean); // Just remove null/undefined orders
     
-    console.log(`[API DEBUG] Before deduplication: ${processedOrders.length} orders`);
-    console.log(`[API DEBUG] After filtering nulls: ${cleanedOrders.length} orders`);
-    console.log(`[API DEBUG] Sample orders:`, cleanedOrders.slice(0, 3).map(o => ({
-      id: o.id,
-      orderNumber: o.orderNumber,
-      marketplace: o.marketplace,
-      source: o.source,
-      marketplaceOrderDate: o.marketplaceOrderDate
-    })));
-    
-    console.log(`[API DEBUG] === RESPONSE BEING SENT ===`);
-    console.log(`[API DEBUG] Sending ${cleanedOrders.length} orders to frontend`);
-    console.log(`[API DEBUG] Total: ${total}, Page: ${page}, PageSize: ${pageSize}`);
-    console.log(`[API DEBUG] First 3 order numbers:`, cleanedOrders.slice(0, 3).map(o => o.orderNumber));
     
     return res.status(200).json({
       orders: cleanedOrders,

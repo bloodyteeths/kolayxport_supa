@@ -790,7 +790,7 @@ function dedupeLabelRows(rows: LabelRow[]): LabelRow[] {
 }
 
 function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 20 });
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 50 });
   // --- UPS Drawer State ---
   const [upsDrawerOpen, setUpsDrawerOpen] = useState(false);
   const [selectedOrderForUPS, setSelectedOrderForUPS] = useState<UIOrder | null>(null);
@@ -1714,13 +1714,16 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           columns={columns}
           rowCount={total}
           loading={isLoading}
-          pageSizeOptions={[20, 50, 100]}
+          pageSizeOptions={[50, 100, 200]}
           paginationModel={paginationModel}
           paginationMode="server"
           onPaginationModelChange={setPaginationModel}
           getRowId={(row) => row.itemId || row.orderId}
           disableRowSelectionOnClick
-          rowHeight={80}
+          rowHeight={60}
+          disableColumnResize
+          disableColumnReorder
+          disableColumnMenu
           initialState={{
             sorting: {
               sortModel: [{ field: 'orderDate', sort: 'desc' }],

@@ -71,31 +71,11 @@ interface OrdersApiResponse {
 
 // Fetcher for SWR
 const fetcher = (url: string) => {
-  if (typeof window !== 'undefined') {
-    console.log('[useOrders] FETCHER: Starting fetch for URL:', url);
-  }
   return fetch(url).then(res => {
-    if (typeof window !== 'undefined') {
-      console.log('[useOrders] FETCHER: Fetch response status:', res.status);
-      console.log('[useOrders] FETCHER: Fetch response ok:', res.ok);
-    }
     if (!res.ok) {
-      if (typeof window !== 'undefined') {
-        console.error('[useOrders] FETCHER: Network response was not ok', res.status, res.statusText);
-      }
       throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
     }
-    return res.json().then(json => {
-      if (typeof window !== 'undefined') {
-        console.log('[useOrders] FETCHER: Parsed JSON response:', json);
-      }
-      return json;
-    });
-  }).catch(error => {
-    if (typeof window !== 'undefined') {
-      console.error('[useOrders] FETCHER: Fetch error:', error);
-    }
-    throw error;
+    return res.json();
   });
 };
 
@@ -122,39 +102,17 @@ export function useOrders(page: number = 1, pageSize: number = 20, filters: Reco
     `/api/orders?${params.toString()}`,
     fetcher,
     {
-      refreshInterval: context === 'labelsPage' ? 30000 : 0, // Refresh every 30 seconds for labels page
-      dedupingInterval: context === 'labelsPage' ? 2000 : 5000, // Dedupe requests for 2 seconds on labels page
-      revalidateOnFocus: context === 'labelsPage', // Revalidate when window regains focus on labels page
-      onError: (error) => {
-        if (typeof window !== 'undefined') {
-          console.error('[useOrders] SWR Error:', error);
-        }
-      },
-      onSuccess: (data) => {
-        if (typeof window !== 'undefined') {
-          console.log('[useOrders] SWR Success:', data);
-        }
-      }
+      refreshInterval: context === 'labelsPage' ? 60000 : 0, // Refresh every 60 seconds (reduced from 30)
+      dedupingInterval: context === 'labelsPage' ? 10000 : 5000, // Dedupe requests for 10 seconds (increased from 2)
+      revalidateOnFocus: false, // Disable aggressive revalidation for better performance
     }
   );
 
-  // Debug: Log the raw response from API
-  if (typeof window !== 'undefined') {
-    console.log('[useOrders] FULL API response received:', data);
-    console.log('[useOrders] data.orders:', data?.orders);
-    console.log('[useOrders] data.data:', data?.data);
-    console.log('[useOrders] typeof data:', typeof data);
-    console.log('[useOrders] JSON.stringify(data):', JSON.stringify(data));
-  }
 
   // Process orders based on context
   const processedOrders = useMemo(() => {
     if (!data?.orders && !data?.data) return [];
     const orders = data.orders || data.data || [];
-
-    if (typeof window !== 'undefined') {
-      console.log('[useOrders] Orders before processing:', orders);
-    }
 
     if (context === 'labelsPage') {
       const transformed = orders
@@ -183,23 +141,6 @@ export function useOrders(page: number = 1, pageSize: number = 20, filters: Reco
                         hasValidShipment;
         
         const labelStatus = hasLabel ? 'created' : 'not_created';
-        
-        // Debug log for label status determination
-        if (typeof window !== 'undefined' && labelStatus === 'created') {
-          console.log(`[useOrders] Order ${order.orderNumber} label status set to 'created' because of:`, {
-            hasShippingLabelUrl: !!order.shippingLabelUrl,
-            hasTrackingNumber: !!order.trackingNumber,
-            hasShipments,
-            hasValidShipment,
-            existingLabelStatus: order.labelStatus,
-            shipments: order.shipments?.map(s => ({
-              id: s?.id,
-              status: s?.status,
-              trackingNumber: s?.trackingNumber,
-              pdfUrl: s?.pdfUrl
-            }))
-          });
-        }
 
         // Use marketplaceOrderDate or createdAt for order date
         const orderDate = order.marketplaceOrderDate || order.createdAt || '';
@@ -214,15 +155,9 @@ export function useOrders(page: number = 1, pageSize: number = 20, filters: Reco
           createdAt: orderDate,
         };
       });
-      if (typeof window !== 'undefined') {
-        console.log('[useOrders] Processed orders for labelsPage:', transformed);
-      }
       return transformed;
     }
 
-    if (typeof window !== 'undefined') {
-      console.log('[useOrders] Processed orders (no context):', orders);
-    }
     return orders;
   }, [data, context]);
 

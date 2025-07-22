@@ -398,8 +398,8 @@ export default function EntegrasyonlarVeRehberlerPage() {
                       </p>
                       <div className="mt-3 space-y-3">
                         <a 
-                          href="/downloads/kolayxport-etsy-chrome-extension.zip" 
-                          download="kolayxport-etsy-chrome-extension.zip"
+                          href="/downloads/kolayxport-etsy-extension-fixed.zip" 
+                          download="kolayxport-etsy-extension-fixed.zip"
                           className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                         >
                           <Download size={18} className="mr-2" />

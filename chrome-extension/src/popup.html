@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kolayxport Etsy Sync</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="../icons/icon-32.png" alt="Kolayxport" class="logo">
+      <h1>Kolayxport Etsy Sync</h1>
+    </header>
+
+    <main>
+      <!-- Authentication Status -->
+      <div class="status-card">
+        <div class="status-header">
+          <h2>Connection Status</h2>
+          <span id="authStatus" class="status-badge">Checking...</span>
+        </div>
+        <p id="authMessage" class="status-message"></p>
+      </div>
+
+      <!-- Sync Statistics -->
+      <div class="stats-card">
+        <h2>Sync Statistics</h2>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-value" id="totalSynced">0</span>
+            <span class="stat-label">Orders Synced</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value" id="pendingSync">0</span>
+            <span class="stat-label">Pending Sync</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-value" id="lastSync">Never</span>
+            <span class="stat-label">Last Sync</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="actions">
+        <button id="syncNowBtn" class="btn btn-primary" disabled>
+          <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+          </svg>
+          Sync Now
+        </button>
+        
+        <button id="openEtsyBtn" class="btn btn-secondary">
+          <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"/>
+          </svg>
+          Open Etsy Orders
+        </button>
+        
+        <button id="fullImportBtn" class="btn btn-secondary" disabled>
+          <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z"/>
+          </svg>
+          Import All Orders
+        </button>
+      </div>
+
+      <!-- Help Section -->
+      <div class="help-section">
+        <details>
+          <summary>How to use</summary>
+          <ol>
+            <li>Log in to your Kolayxport account</li>
+            <li>Navigate to your Etsy Shop Manager Orders page</li>
+            <li>The extension will automatically sync new orders</li>
+            <li>Use "Import All Orders" for historical data</li>
+          </ol>
+        </details>
+      </div>
+    </main>
+
+    <footer>
+      <a href="https://app.kolayxport.com" target="_blank">Open Kolayxport</a>
+      <span class="separator">"</span>
+      <a href="https://app.kolayxport.com/help/chrome-extension" target="_blank">Help</a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Image from 'next/image';
 import PublicLayout from '../components/PublicLayout';
 import { UserPlus, ShoppingBag, Truck, Send, FileText, PlayCircle, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
@@ -155,7 +156,7 @@ export default function NasilKullanirimPage() {
               <div className="absolute inset-0 flex items-center justify-center">
                   <PlayCircle size={80} className="text-blue-500 opacity-70 group-hover:opacity-100 transition-opacity"/>
               </div>
-              <img src="https://via.placeholder.com/1280x720/E2E8F0/94A3B8?text=Loom+Video+Burada" alt="KolayXport Tanıtım Videosu" className="w-full h-full object-cover"/>
+              <Image src="https://via.placeholder.com/1280x720/E2E8F0/94A3B8?text=Loom+Video+Burada" alt="KolayXport kullanım rehberi tanıtım videosu" width={1280} height={720} className="w-full h-full object-cover" priority/>
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-50 group-hover:opacity-20 transition-opacity"></div>
               <p className="absolute bottom-4 left-4 text-white text-sm font-medium bg-black/50 px-2 py-1 rounded">
                 Loom Video (Yer Tutucu)

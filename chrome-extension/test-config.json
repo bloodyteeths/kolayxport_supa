@@ -1,0 +1,85 @@
+{
+  "testUrls": {
+    "etsyOrdersSold": "https://www.etsy.com/your/orders/sold",
+    "etsyOrdersReceived": "https://www.etsy.com/your/orders/received",
+    "kolayxportApp": "https://app.kolayxport.com",
+    "kolayxportLogin": "https://app.kolayxport.com/auth/signin"
+  },
+  "testOrderData": {
+    "sampleOrder": {
+      "orderId": "1234567890",
+      "orderNumber": "1234567890",
+      "buyerName": "John Doe",
+      "orderDate": "2025-01-22",
+      "orderTotal": "49.99",
+      "items": [
+        {
+          "title": "Test Product",
+          "quantity": "2",
+          "price": "24.99",
+          "sku": "TEST-SKU-001",
+          "variation": "Size: Large, Color: Blue"
+        }
+      ],
+      "shippingAddress": {
+        "name": "John Doe",
+        "line1": "123 Main Street",
+        "line2": "Apt 4B",
+        "city": "New York",
+        "state": "NY",
+        "postalCode": "10001",
+        "country": "US"
+      }
+    }
+  },
+  "testSelectors": {
+    "orderRows": [
+      "[data-order-id]",
+      "[data-receipt-id]",
+      ".order-card",
+      "[class*=\"order-item\"]",
+      "[class*=\"receipt-card\"]"
+    ],
+    "addressBlocks": [
+      "address",
+      "[class*=\"shipping-address\"]",
+      "[class*=\"ship-to\"]",
+      "[data-ship-address]"
+    ],
+    "orderNumbers": [
+      "[data-order-id]",
+      "a[href*=\"/orders/\"]",
+      "a[href*=\"receipt_id=\"]"
+    ]
+  },
+  "testCookies": {
+    "supabase": [
+      "sb-app.kolayxport.com-auth-token",
+      "sb-access-token",
+      "sb-refresh-token"
+    ],
+    "nextauth": [
+      "next-auth.session-token",
+      "__Secure-next-auth.session-token"
+    ]
+  },
+  "expectedApiResponse": {
+    "success": {
+      "success": true,
+      "processed": 1,
+      "created": 1,
+      "updated": 0,
+      "errors": []
+    },
+    "error": {
+      "success": false,
+      "error": "Authentication required",
+      "message": "User not authenticated"
+    }
+  },
+  "performanceMetrics": {
+    "maxSyncTime": 30000,
+    "maxOrdersPerBatch": 20,
+    "expectedSuccessRate": 95
+  }
+}

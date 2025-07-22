@@ -59,6 +59,7 @@ export interface UIOrder {
   channel?: string;
   line_items?: any[];
   shipments?: Shipment[];
+  variantInfo?: string;
 }
 
 interface OrdersApiResponse {
@@ -153,6 +154,8 @@ export function useOrders(page: number = 1, pageSize: number = 20, filters: Reco
           labelStatus,
           marketplaceOrderDate: orderDate,
           createdAt: orderDate,
+          // Preserve variantInfo from line_items if available
+          variantInfo: order.line_items?.[0]?.variantInfo || order.variantInfo,
         };
       });
       return transformed;

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ChevronDown, Star, Truck, BarChart3, Box } from 'lucide-react';
 import { Disclosure, Transition } from '@headlessui/react';
 import { supabase } from '@/lib/supabase';
+import { FAQPageJsonLd } from 'next-seo';
 
 // Placeholder data - replace with your actual data or fetch from an API
 const trustLogos = [
@@ -128,7 +129,7 @@ const HeroSection = () => (
         <Link href="/login" className="btn-primary">
           Ücretsiz Dene
         </Link>
-        <Link href="/hakkimizda" className="btn-secondary">Daha Fazla Bilgi <span aria-hidden="true">→</span></Link>
+        <Link href="/ozellikler" className="btn-secondary">Özellikler <span aria-hidden="true">→</span></Link>
       </div>
 
       <Image
@@ -161,6 +162,12 @@ export default function HomePage() {
         },
       }}
     >
+      <FAQPageJsonLd
+        mainEntity={faqItems.map(item => ({
+          questionName: item.question,
+          acceptedAnswerText: item.answer
+        }))}
+      />
       <HeroSection />
 
       {/* Section 2: TRUST BADGES */}
@@ -178,12 +185,13 @@ export default function HomePage() {
           <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-6 md:gap-x-12 lg:gap-x-16">
             {trustLogos.map((logo) => (
               <motion.div key={logo.name} whileHover={{ scale: 1.05 }}>
-                <img 
+                <Image 
                   src={logo.src} 
-                  alt={logo.name} 
+                  alt={`${logo.name} marketplace entegrasyonu`} 
                   width={logo.width} 
                   height={logo.height} 
                   className="h-8 md:h-10 object-contain filter grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-300 ease-in-out"
+                  loading="lazy"
                 />
               </motion.div>
             ))}
@@ -203,7 +211,7 @@ export default function HomePage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">İşinizi Otomatik Pilotta Yönetin</h2>
             <p className="max-w-2xl mx-auto text-lg text-slate-600">
-              KolayXport, karmaşık e-ticaret süreçlerini basitleştirerek size zaman ve maliyet avantajı sağlar.
+              KolayXport, karmaşık e-ticaret süreçlerini basitleştirerek size zaman ve maliyet avantajı sağlar. <Link href="/entegrasyonlar" className="text-blue-600 hover:underline">Desteklenen entegrasyonları</Link> keşfedin.
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
@@ -296,7 +304,7 @@ export default function HomePage() {
                   variants={sectionVariants}
                 >
                   <div className="flex items-center mb-4">
-                    <img src={testimonial.image} alt={testimonial.name} className="w-14 h-14 rounded-full mr-4 object-cover" />
+                    <Image src={testimonial.image} alt={`${testimonial.name} - ${testimonial.company} müşteri görüşü`} width={56} height={56} className="w-14 h-14 rounded-full mr-4 object-cover" loading="lazy" />
                     <div>
                       <h4 className="font-semibold text-slate-800">{testimonial.name}</h4>
                       <p className="text-sm text-slate-500">{testimonial.company}</p>
@@ -327,7 +335,7 @@ export default function HomePage() {
             Hazır mısınız? Bugün entegrasyona başlayın.
           </h2>
           <p className="max-w-xl mx-auto text-lg text-blue-100 mb-10">
-            KolayXport\'un gücünü keşfedin ve e-ticaret operasyonlarınızı bir üst seviyeye taşıyın.
+            KolayXport\'un gücünü keşfedin ve e-ticaret operasyonlarınızı bir üst seviyeye taşıyın. <Link href="/fiyatlandirma" className="text-blue-100 hover:text-white underline">Fiyatlandırma planlarını</Link> inceleyin.
           </p>
           <div className="mt-8">
             <Link href="/login" className="px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
@@ -399,7 +407,7 @@ export default function HomePage() {
         <div className="container max-w-3xl mx-auto px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">KolayXport\'u Denemeye Hazır Olun</h2>
           <p className="max-w-xl mx-auto text-lg text-slate-600 mb-10">
-            Sadece birkaç adımda e-ticaretinizi yeni bir seviyeye taşıyın. Kaydolun ve potansiyeli keşfedin.
+            Sadece birkaç adımda e-ticaretinizi yeni bir seviyeye taşıyın. Kaydolun ve potansiyeli keşfedin. Daha fazla bilgi için <Link href="/nasil-kullanirim" className="text-blue-600 hover:underline">kullanım rehberimizi</Link> inceleyin.
           </p>
           <div className="mt-8">
             <Link href="/login" className="px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">

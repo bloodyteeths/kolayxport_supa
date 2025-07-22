@@ -9,4 +9,8 @@ module.exports = {
     extend: {},
   },
   plugins: [],
+  corePlugins: {
+    // Disable RTL modifiers since they cause CSS warnings with :dir() pseudo-class
+    rtl: false,
+  },
 };

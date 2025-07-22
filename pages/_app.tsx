@@ -13,6 +13,7 @@ import { ReactElement, ReactNode } from 'react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
+import Head from 'next/head';
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
@@ -37,10 +38,55 @@ function MyApp({ Component, pageProps }: AppProps) {
     <AuthProvider>
       <ThemeProvider theme={theme}>
         <CssBaseline />
+        <Head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        </Head>
         <DefaultSeo {...SEO} />
         <LogoJsonLd
           logo="https://kolayxport.com/logo.png"
           url="https://kolayxport.com"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": ["Organization", "LocalBusiness", "SoftwareApplication"],
+              "name": "KolayXport",
+              "description": "E-ticaret entegrasyon ve otomasyon platformu - Trendyol, Hepsiburada, Amazon entegrasyonu",
+              "url": "https://kolayxport.com",
+              "logo": "https://kolayxport.com/logo.png",
+              "foundingDate": "2024",
+              "address": {
+                "@type": "PostalAddress",
+                "addressCountry": "TR",
+                "addressRegion": "Turkey"
+              },
+              "contactPoint": {
+                "@type": "ContactPoint",
+                "contactType": "customer service",
+                "availableLanguage": ["Turkish", "English"],
+                "telephone": "+90-XXX-XXX-XXXX"
+              },
+              "sameAs": [
+                "https://twitter.com/kolayxport"
+              ],
+              "serviceType": "E-commerce Integration Platform",
+              "areaServed": "TR",
+              "applicationCategory": "BusinessApplication",
+              "operatingSystem": "Web Browser",
+              "offers": {
+                "@type": "Offer",
+                "name": "KolayXport Starter Plan",
+                "price": "449",
+                "priceCurrency": "TRY",
+                "priceSpecification": {
+                  "@type": "RecurringPaymentFrequency",
+                  "frequency": "monthly"
+                }
+              }
+            })
+          }}
         />
         <Component {...pageProps} />
         <Toaster position="top-center" />

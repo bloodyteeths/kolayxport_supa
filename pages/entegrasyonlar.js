@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
+import Image from 'next/image';
 import PublicLayout from '../components/PublicLayout';
+import Breadcrumb from '../components/Breadcrumb';
 import { motion } from 'framer-motion';
 import { Package, Truck, CreditCard, CheckSquare, ShoppingCart, Zap } from 'lucide-react'; // Added more icons
 
@@ -50,6 +52,11 @@ export default function EntegrasyonlarPage() {
 
   return (
     <PublicLayout title="Entegrasyonlar - KolayXport" description="KolayXport ile Trendyol, Hepsiburada, Amazon, Yurtiçi Kargo, Aras Kargo ve daha birçok pazaryeri, kargo ve ödeme sistemine kolayca entegre olun.">
+      
+      <Breadcrumb items={[
+        { name: 'Entegrasyonlar', href: '/entegrasyonlar' }
+      ]} />
+
       {/* Hero Section */}
       <motion.section
         className="relative py-20 md:py-32 text-center px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-slate-50 to-sky-100"
@@ -126,7 +133,7 @@ export default function EntegrasyonlarPage() {
                 <div className="p-6 flex-grow">
                   <div className="flex items-center mb-4">
                     {integration.logo ? (
-                      <img src={integration.logo} alt={`${integration.name} logo`} className="h-10 w-auto mr-4 object-contain"/>
+                      <Image src={integration.logo} alt={`${integration.name} entegrasyon logosu`} width={80} height={40} className="h-10 w-auto mr-4 object-contain" loading="lazy"/>
                     ) : (
                       React.createElement(integration.icon || Package, { className: "h-10 w-10 mr-4 text-blue-500" })
                     )}

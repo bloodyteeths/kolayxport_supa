@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import PublicLayout from '../components/PublicLayout';
+import Breadcrumb from '../components/Breadcrumb';
 import { motion } from 'framer-motion';
 import { NextSeo } from 'next-seo';
 import { Zap, Shuffle, Edit3, Package, Link2, Settings, ShieldCheck, Gift } from 'lucide-react';
@@ -102,6 +103,10 @@ export default function OzelliklerPage() {
           ],
         }}
       />
+
+      <Breadcrumb items={[
+        { name: 'Özellikler', href: '/ozellikler' }
+      ]} />
 
       {/* Hero Section */}
       <motion.section

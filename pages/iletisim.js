@@ -3,7 +3,7 @@ import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { useForm, Controller } from 'react-hook-form';
 import toast, { Toaster } from 'react-hot-toast';
-import { Mail, Phone, MapPin, Send, Building } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Building, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
 const sectionVariants = {
@@ -262,6 +262,89 @@ export default function IletisimPage() {
                 </div>
               </div>
             </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-16 md:py-24 bg-slate-50">
+        <div className="container max-w-4xl mx-auto px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-12 text-center">Sıkça Sorulan Sorular</h2>
+          <div className="space-y-6">
+            {[
+              {
+                q: "KolayXport'u nasıl kullanmaya başlayabilirim?",
+                a: "Kayıt olduktan sonra 30 günlük ücretsiz deneme süreniz başlar. Bu süre içinde tüm özelliklerimizi test edebilir, pazaryeri entegrasyonlarınızı kurabilirsiniz."
+              },
+              {
+                q: "Hangi pazaryerleri destekleniyor?",
+                a: "Trendyol, Hepsiburada, Amazon, n11, Shopify, WooCommerce ve daha birçok popüler pazaryeri ile entegrasyonumuz bulunmaktadır. Tam liste için entegrasyonlar sayfamızı ziyaret edebilirsiniz."
+              },
+              {
+                q: "Teknik destek nasıl alabilirim?",
+                a: "E-posta yoluyla 7/24 destek alabilirsiniz. Acil durumlarda telefon desteği de mevcuttur. Ayrıca kapsamlı dokümantasyonumuz ve video rehberlerimiz de yardımınıza hazırdır."
+              },
+              {
+                q: "Verilerim güvende mi?",
+                a: "Evet, tüm verileriniz SSL şifrelemesi ile korunur ve düzenli güvenlik denetimlerinden geçer. API anahtarlarınız şifreli olarak saklanır ve sadece gerekli işlemler için kullanılır."
+              },
+              {
+                q: "Fiyatlandırma nasıl çalışıyor?",
+                a: "Esnek fiyatlandırma planlarımız bulunmaktadır. Kullandığınız kadar ödersiniz mantığıyla, işletmenizin büyüklüğüne uygun planlar sunuyoruz."
+              }
+            ].map((faq, index) => (
+              <div key={index} className="bg-white p-6 rounded-xl shadow-lg">
+                <h3 className="text-lg font-semibold text-slate-800 mb-3">{faq.q}</h3>
+                <p className="text-slate-600 leading-relaxed">{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Alternative Contact Methods */}
+      <section className="py-16 md:py-24 bg-white">
+        <div className="container max-w-6xl mx-auto px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-12 text-center">Diğer İletişim Yolları</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center p-8 bg-blue-50 rounded-2xl">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Mail className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-4">E-posta Desteği</h3>
+              <p className="text-slate-600 mb-4">
+                Teknik konular ve detaylı sorularınız için e-posta yoluyla iletişime geçebilirsiniz.
+              </p>
+              <Link href="mailto:destek@kolayxport.com" className="text-blue-600 hover:text-blue-700 font-semibold">
+                destek@kolayxport.com
+              </Link>
+            </div>
+
+            <div className="text-center p-8 bg-green-50 rounded-2xl">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <MessageSquare className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-4">Canlı Sohbet</h3>
+              <p className="text-slate-600 mb-4">
+                Hızlı sorularınız için canlı sohbet özelliğimizi kullanabilirsiniz. (Çalışma saatleri içinde)
+              </p>
+              <button className="text-green-600 hover:text-green-700 font-semibold">
+                Sohbeti Başlat
+              </button>
+            </div>
+
+            <div className="text-center p-8 bg-purple-50 rounded-2xl">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Phone className="w-8 h-8 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-4">Telefon Desteği</h3>
+              <p className="text-slate-600 mb-4">
+                Acil durumlar ve önemli konular için telefon desteğimizden yararlanabilirsiniz.
+              </p>
+              <Link href="tel:+902161234567" className="text-purple-600 hover:text-purple-700 font-semibold">
+                +90 (216) 123 45 67
+              </Link>
+            </div>
           </div>
         </div>
       </section>

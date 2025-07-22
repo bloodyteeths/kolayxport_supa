@@ -1,0 +1,25 @@
+
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="128" height="128" rx="19.2" fill="#1976d2"/>
+  
+  <!-- Letter K -->
+  <text x="50%" y="50%" 
+        font-family="Arial, sans-serif" 
+        font-size="64px" 
+        font-weight="bold" 
+        fill="white" 
+        text-anchor="middle" 
+        dominant-baseline="central">K</text>
+  
+  <!-- Sync arrows (small) -->
+  <g transform="translate(83.2, 83.2)">
+    <path d="M 0 -12.8 A 12.8 12.8 0 0 1 12.8 0" 
+          fill="none" 
+          stroke="white" 
+          stroke-width="3.84" 
+          stroke-linecap="round"/>
+    <path d="M 12.8 0 L 10.24 -3.84 L 10.24 3.84 Z" 
+          fill="white"/>
+  </g>
+</svg>

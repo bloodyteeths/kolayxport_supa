@@ -17,10 +17,10 @@ const prismaClientSingleton = () => {
       urlParams.set('statement_cache_size', '0');
     }
     if (!urlParams.has('pool_timeout')) {
-      urlParams.set('pool_timeout', '30');
+      urlParams.set('pool_timeout', '60');
     }
     if (!urlParams.has('connection_limit')) {
-      urlParams.set('connection_limit', '10');
+      urlParams.set('connection_limit', '20');
     }
     
     const baseUrl = databaseUrl.split('?')[0];
@@ -46,34 +46,38 @@ const prisma = globalThis.prisma ?? prismaClientSingleton();
 
 if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma;
 
-// Add cleanup on process termination
-process.on('beforeExit', async () => {
-  try {
-    await prisma.$disconnect();
-  } catch (error) {
-    console.error('Error disconnecting Prisma:', error);
-  }
-});
+// Add cleanup on process termination (only once)
+if (!globalThis.prismaEventsRegistered) {
+  process.on('beforeExit', async () => {
+    try {
+      await prisma.$disconnect();
+    } catch (error) {
+      console.error('Error disconnecting Prisma:', error);
+    }
+  });
 
-process.on('SIGINT', async () => {
-  try {
-    await prisma.$disconnect();
-    process.exit(0);
-  } catch (error) {
-    console.error('Error disconnecting Prisma on SIGINT:', error);
-    process.exit(1);
-  }
-});
+  process.on('SIGINT', async () => {
+    try {
+      await prisma.$disconnect();
+      process.exit(0);
+    } catch (error) {
+      console.error('Error disconnecting Prisma on SIGINT:', error);
+      process.exit(1);
+    }
+  });
 
-process.on('SIGTERM', async () => {
-  try {
-    await prisma.$disconnect();
-    process.exit(0);
-  } catch (error) {
-    console.error('Error disconnecting Prisma on SIGTERM:', error);
-    process.exit(1);
-  }
-});
+  process.on('SIGTERM', async () => {
+    try {
+      await prisma.$disconnect();
+      process.exit(0);
+    } catch (error) {
+      console.error('Error disconnecting Prisma on SIGTERM:', error);
+      process.exit(1);
+    }
+  });
+  
+  globalThis.prismaEventsRegistered = true;
+}
 
 // Connection health check function
 export async function checkDatabaseConnection() {

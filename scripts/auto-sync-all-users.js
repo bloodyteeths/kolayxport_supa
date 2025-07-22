@@ -132,7 +132,7 @@ function mapUIOrderItemToPrisma(lineItem, orderData) {
   return {
     sku: lineItem.sku || null,
     productName: lineItem.title || null,
-    variantInfo: null, // Trendyol items don't have variant info
+    variantInfo: lineItem.variantInfo || null, // Fixed: Use actual variant info from mapper
     quantity: lineItem.quantity || 1,
     unitPrice: lineItem.value || null,
     totalPrice: (lineItem.value || 0) * (lineItem.quantity || 1),
@@ -503,7 +503,7 @@ async function syncTrendyolRecentOrders(user, settings) {
     // Implement smart pagination since Trendyol API date filtering is broken
     // Limit orders to prevent DB connection exhaustion
     let orders = [];
-    const MAX_ORDERS_PER_SYNC = 10; // Very conservative limit for fast sync
+    const MAX_ORDERS_PER_SYNC = 50; // Increased limit to catch more orders
     
     try {
       logger.info(`[TRENDYOL SYNC] Starting limited fetch for user ${user.id}, max ${MAX_ORDERS_PER_SYNC} orders`);
@@ -516,7 +516,7 @@ async function syncTrendyolRecentOrders(user, settings) {
         status: undefined,
         startDateMs: null,
         endDateMs: null,
-        pageSize: 15, // Very small limit for fast sync
+        pageSize: 100, // Larger batch to capture more orders
       });
       
       logger.info(`[TRENDYOL SYNC] Fetched ${allOrders.length} orders (limited) for user ${user.id}`);
@@ -545,7 +545,7 @@ async function syncTrendyolRecentOrders(user, settings) {
           apiSecret: settings.trendyolApiSecret,
           startDateMs: null,
           endDateMs: null,
-          pageSize: 10, // Even smaller limit for fallback
+          pageSize: 50, // Reasonable fallback limit
         });
         
         // Filter and limit Created orders

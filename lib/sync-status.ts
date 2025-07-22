@@ -46,12 +46,6 @@ export async function startSync(userId: string, type: string): Promise<string> {
       const staleThresholdMs = type === 'trendyol' ? 5 * 60 * 1000 : 15 * 60 * 1000; // 5 minutes for Trendyol, 15 for others
       const isStale = Date.now() - existingSync.updatedAt.getTime() > staleThresholdMs;
       
-      logger.info(`[SYNC STATUS] Found existing ${type} sync for user ${userId}:`, {
-        syncId: existingSync.id,
-        status: existingSync.status,
-        ageMinutes: Math.round((Date.now() - existingSync.updatedAt.getTime()) / (60 * 1000)),
-        isStale
-      });
       
       if (!isStale) {
         throw new Error(`Sync operation (type: ${type}) already in progress for this user and is not stale.`);
@@ -142,7 +136,6 @@ export async function retryFailedSync(syncId: string): Promise<string> {
         retryOf: syncId,
       },
     });
-    logger.info(`Retrying failed sync ${syncId} as ${newSync.id}`);
     return newSync.id;
   } finally {
     // await prisma.$disconnect(); // Removed
@@ -185,7 +178,6 @@ export async function cleanupStaleSyncs(userId?: string, type?: string): Promise
           }
         });
         cleanedCount++;
-        logger.info(`[SYNC CLEANUP] Cleaned up stale ${sync.type} sync ${sync.id} for user ${sync.userId}`);
       }
     }
     

@@ -75,6 +75,178 @@ export default function SupportPage() {
           </p>
         </div>
       </motion.section>
+
+      {/* Quick Help Section */}
+      <section className="py-16 md:py-24 bg-white">
+        <div className="container max-w-6xl mx-auto px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-12 text-center">Hızlı Yardım</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                title: "Kurulum Rehberi",
+                desc: "Adım adım kurulum talimatları",
+                link: "/docs/kurulum",
+                icon: "🚀"
+              },
+              {
+                title: "Video Rehberler",
+                desc: "Görsel anlatımlarla öğrenin",
+                link: "/docs/videolar",
+                icon: "🎥"
+              },
+              {
+                title: "API Dokümantasyonu",
+                desc: "Geliştiriciler için detaylı API rehberi",
+                link: "/docs/api",
+                icon: "📖"
+              },
+              {
+                title: "Sık Sorulan Sorular",
+                desc: "En çok merak edilenlerin cevapları",
+                link: "#faq",
+                icon: "❓"
+              }
+            ].map((item, index) => (
+              <Link key={index} href={item.link} className="block p-6 bg-slate-50 rounded-xl hover:bg-blue-50 transition-colors">
+                <div className="text-3xl mb-4">{item.icon}</div>
+                <h3 className="text-lg font-semibold text-slate-800 mb-2">{item.title}</h3>
+                <p className="text-sm text-slate-600">{item.desc}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Knowledge Base */}
+      <section className="py-16 md:py-24 bg-slate-50">
+        <div className="container max-w-6xl mx-auto px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-12 text-center">Bilgi Bankası</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-white p-8 rounded-2xl shadow-lg">
+              <h3 className="text-xl font-bold text-slate-800 mb-6">Başlangıç Rehberleri</h3>
+              <ul className="space-y-3">
+                {[
+                  "KolayXport'a İlk Adım",
+                  "Pazaryeri Entegrasyonu Kurulumu",
+                  "İlk Siparişinizi Çekme",
+                  "Kargo Entegrasyonu",
+                  "Etiket Oluşturma"
+                ].map((item, index) => (
+                  <li key={index} className="flex items-center text-slate-600 hover:text-blue-600 cursor-pointer">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="bg-white p-8 rounded-2xl shadow-lg">
+              <h3 className="text-xl font-bold text-slate-800 mb-6">İleri Düzey Özellikler</h3>
+              <ul className="space-y-3">
+                {[
+                  "Toplu İşlem Araçları",
+                  "Otomasyon Kuralları",
+                  "Rapor ve Analitik",
+                  "API Kullanımı",
+                  "Webhook Konfigürasyonu"
+                ].map((item, index) => (
+                  <li key={index} className="flex items-center text-slate-600 hover:text-blue-600 cursor-pointer">
+                    <span className="w-2 h-2 bg-green-500 rounded-full mr-3"></span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="bg-white p-8 rounded-2xl shadow-lg">
+              <h3 className="text-xl font-bold text-slate-800 mb-6">Sorun Giderme</h3>
+              <ul className="space-y-3">
+                {[
+                  "Bağlantı Sorunları",
+                  "Sipariş Çekme Hataları",
+                  "Etiket Yazdırma Sorunları",
+                  "Entegrasyon Hataları",
+                  "Performans İyileştirme"
+                ].map((item, index) => (
+                  <li key={index} className="flex items-center text-slate-600 hover:text-blue-600 cursor-pointer">
+                    <span className="w-2 h-2 bg-red-500 rounded-full mr-3"></span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-16 md:py-24 bg-white">
+        <div className="container max-w-4xl mx-auto px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-12 text-center">Sıkça Sorulan Sorular</h2>
+          <div className="space-y-6">
+            {[
+              {
+                q: "KolayXport ücretsiz mi?",
+                a: "KolayXport 30 günlük ücretsiz deneme sunuyor. Bu süre sonunda kullanım ihtiyacınıza göre planlarımızdan birini seçebilirsiniz."
+              },
+              {
+                q: "Kaç pazaryerine aynı anda bağlanabilirim?",
+                a: "Plan kısıtlaması olmaksızın desteklenen tüm pazaryerlerine bağlanabilirsiniz. Aktif entegrasyon sayısında kısıtlama bulunmamaktadır."
+              },
+              {
+                q: "Verilerim güvende mi?",
+                a: "Evet, tüm verilerin SSL şifrelemesi ile korunur. API anahtarları şifreli saklanır ve güvenlik denetimleri düzenli yapılır."
+              },
+              {
+                q: "Mobil uygulaması var mı?",
+                a: "Şu anda web tabanlı bir platform sunuyoruz. Mobil uygulama geliştirme süreci devam etmektedir."
+              },
+              {
+                q: "Toplu işlem yapabilir miyim?",
+                a: "Evet, toplu sipariş güncelleme, toplu etiket oluşturma ve toplu durum değişikliği gibi birçok toplu işlem özelliği mevcuttur."
+              },
+              {
+                q: "Destek saatleri nedir?",
+                a: "E-posta desteği 7/24 aktiftir. Telefon desteği Pazartesi-Cuma 09:00-18:00 saatleri arasında hizmet vermektedir."
+              }
+            ].map((faq, index) => (
+              <div key={index} className="bg-slate-50 p-6 rounded-xl">
+                <h3 className="text-lg font-semibold text-slate-800 mb-3">{faq.q}</h3>
+                <p className="text-slate-600 leading-relaxed">{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* System Status */}
+      <section className="py-16 md:py-24 bg-slate-50">
+        <div className="container max-w-4xl mx-auto px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-12">Sistem Durumu</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <div className="w-4 h-4 bg-green-500 rounded-full mx-auto mb-4"></div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">API Servisleri</h3>
+              <p className="text-green-600 font-medium">Çalışıyor</p>
+              <p className="text-sm text-slate-500 mt-2">%99.9 Uptime</p>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <div className="w-4 h-4 bg-green-500 rounded-full mx-auto mb-4"></div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">Entegrasyonlar</h3>
+              <p className="text-green-600 font-medium">Çalışıyor</p>
+              <p className="text-sm text-slate-500 mt-2">Tüm entegrasyonlar aktif</p>
+            </div>
+            
+            <div className="bg-white p-6 rounded-xl shadow-lg">
+              <div className="w-4 h-4 bg-green-500 rounded-full mx-auto mb-4"></div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">Veritabanı</h3>
+              <p className="text-green-600 font-medium">Çalışıyor</p>
+              <p className="text-sm text-slate-500 mt-2">Ortalama yanıt süresi: 45ms</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </PublicLayout>
   );
 } 

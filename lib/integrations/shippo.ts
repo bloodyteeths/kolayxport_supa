@@ -31,8 +31,6 @@ export async function fetchShippoOrders(
       url += `&start_date=${encodeURIComponent(options.object_created_gte)}`;
     }
     
-    // Debug log the URL being called
-    console.log(`[SHIPPO DEBUG] Fetching URL: ${url}`);
     
     try {
       const response = await fetch(url, {

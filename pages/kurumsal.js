@@ -102,25 +102,122 @@ export default function KurumsalPage() {
           </div>
         </section>
 
-        {/* Main Content Stub */}
+        {/* Mission & Vision */}
         <section className="py-16 md:py-24 bg-slate-50">
-          <div className="container max-w-3xl mx-auto px-6 lg:px-8 prose prose-slate lg:prose-xl">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-8 text-center">Misyonumuz & Vizyonumuz</h2>
-            <p>
-              KolayXport olarak misyonumuz, KOBİ'lerin ve e-ticaret girişimcilerinin operasyonel yüklerini azaltarak, onların esas işlerine odaklanmalarını sağlamaktır. Karmaşık süreçleri basitleştiren, kullanıcı dostu ve yenilikçi otomasyon çözümleri sunarak Türkiye'deki ve globaldeki satıcıların rekabet gücünü artırmayı hedefliyoruz.
-            </p>
-            <p>
-              Vizyonumuz, e-ticaret otomasyonunda akla ilk gelen, güvenilir ve öncü bir teknoloji markası olmaktır. Sürekli gelişen teknolojiyi yakından takip ederek ve müşteri geri bildirimlerini merkeze alarak, satıcıların ihtiyaç duyduğu tüm araçları tek bir platformda sunan, global bir oyuncu haline gelmeyi amaçlıyoruz.
-            </p>
+          <div className="container max-w-4xl mx-auto px-6 lg:px-8">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-16 text-center">Misyonumuz & Vizyonumuz</h2>
             
-            <h3 className="mt-12">Değerlerimiz</h3>
-            <ul>
-              <li><strong>Müşteri Odaklılık:</strong> Kullanıcılarımızın başarısı, bizim başarımızdır.</li>
-              <li><strong>İnovasyon:</strong> Sürekli öğrenir, gelişir ve en yeni teknolojileri çözümlerimize entegre ederiz.</li>
-              <li><strong>Şeffaflık:</strong> Açık iletişim ve dürüstlük üzerine kurulu ilişkiler inşa ederiz.</li>
-              <li><strong>Takım Çalışması:</strong> Ortak hedeflere ulaşmak için birlikte çalışırız.</li>
-              <li><strong>Sorumluluk:</strong> Yaptığımız işin ve topluma olan etkimizin sorumluluğunu alırız.</li>
-            </ul>
+            <div className="grid md:grid-cols-2 gap-12 mb-16">
+              <div className="bg-white p-8 rounded-2xl shadow-lg">
+                <div className="flex items-center mb-6">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                    <TrendingUp className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800">Misyonumuz</h3>
+                </div>
+                <p className="text-slate-600 leading-relaxed">
+                  KOBİ'lerin ve e-ticaret girişimcilerinin operasyonel yüklerini azaltarak, onların esas işlerine odaklanmalarını sağlamak. 
+                  Karmaşık süreçleri basitleştiren, kullanıcı dostu ve yenilikçi otomasyon çözümleri sunarak Türkiye'deki ve globaldeki 
+                  satıcıların rekabet gücünü artırmayı hedefliyoruz.
+                </p>
+              </div>
+              
+              <div className="bg-white p-8 rounded-2xl shadow-lg">
+                <div className="flex items-center mb-6">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mr-4">
+                    <Rocket className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800">Vizyonumuz</h3>
+                </div>
+                <p className="text-slate-600 leading-relaxed">
+                  E-ticaret otomasyonunda akla ilk gelen, güvenilir ve öncü bir teknoloji markası olmak. Sürekli gelişen teknolojiyi 
+                  yakından takip ederek ve müşteri geri bildirimlerini merkeze alarak, satıcıların ihtiyaç duyduğu tüm araçları tek bir 
+                  platformda sunan, global bir oyuncu haline gelmek.
+                </p>
+              </div>
+            </div>
+
+            {/* Values */}
+            <div className="bg-white p-8 rounded-2xl shadow-lg">
+              <h3 className="text-2xl font-bold text-slate-800 mb-8 text-center">Değerlerimiz</h3>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[
+                  { title: 'Müşteri Odaklılık', desc: 'Kullanıcılarımızın başarısı, bizim başarımızdır.', icon: Users },
+                  { title: 'İnovasyon', desc: 'Sürekli öğrenir, gelişir ve en yeni teknolojileri entegre ederiz.', icon: Rocket },
+                  { title: 'Şeffaflık', desc: 'Açık iletişim ve dürüstlük üzerine kurulu ilişkiler inşa ederiz.', icon: CheckCircle },
+                  { title: 'Takım Çalışması', desc: 'Ortak hedeflere ulaşmak için birlikte çalışırız.', icon: Users },
+                  { title: 'Sorumluluk', desc: 'Yaptığımız işin ve topluma olan etkimizin sorumluluğunu alırız.', icon: Briefcase },
+                  { title: 'Kalite', desc: 'Her detayda mükemmellik arayışıyla çözümler geliştiririz.', icon: TrendingUp }
+                ].map((value, index) => (
+                  <div key={index} className="text-center p-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      {React.createElement(value.icon, { className: 'w-6 h-6 text-blue-600' })}
+                    </div>
+                    <h4 className="font-semibold text-slate-800 mb-2">{value.title}</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">{value.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Statistics */}
+        <section className="py-16 md:py-24 bg-white">
+          <div className="container max-w-6xl mx-auto px-6 lg:px-8 text-center">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-16">Sayılarla KolayXport</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+              {[
+                { number: '500+', label: 'Aktif Kullanıcı', desc: 'Güvenen e-ticaret satıcısı' },
+                { number: '15+', label: 'Entegrasyon', desc: 'Pazaryeri ve kargo firması' },
+                { number: '1M+', label: 'İşlem', desc: 'Başarıyla tamamlanan sipariş' },
+                { number: '%99.9', label: 'Uptime', desc: 'Sistem çalışma süresi' }
+              ].map((stat, index) => (
+                <div key={index} className="p-6 bg-slate-50 rounded-xl">
+                  <div className="text-3xl md:text-4xl font-bold text-blue-600 mb-2">{stat.number}</div>
+                  <div className="text-lg font-semibold text-slate-800 mb-1">{stat.label}</div>
+                  <div className="text-sm text-slate-600">{stat.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Technology Stack */}
+        <section className="py-16 md:py-24 bg-slate-50">
+          <div className="container max-w-6xl mx-auto px-6 lg:px-8">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-16 text-center">Teknoloji Altyapımız</h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-4">Güvenlik</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  SSL şifrelemesi, OAuth 2.0 yetkilendirmesi ve düzenli güvenlik denetimleri ile verilerinizi koruyoruz.
+                </p>
+              </div>
+              
+              <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <TrendingUp className="w-8 h-8 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-4">Ölçeklenebilirlik</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  Cloud-native mimarimiz ile işletmenizin büyümesine paralel olarak sistem kapasitemizi artırıyoruz.
+                </p>
+              </div>
+              
+              <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Rocket className="w-8 h-8 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-4">Performans</h3>
+                <p className="text-slate-600 leading-relaxed">
+                  Optimize edilmiş API'ler ve akıllı önbellekleme ile saniyeler içinde güncel veri sağlıyoruz.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 

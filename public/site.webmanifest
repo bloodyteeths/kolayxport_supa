@@ -1,0 +1,26 @@
+{
+  "name": "KolayXport - E-ticaret Entegrasyon SaaS",
+  "short_name": "KolayXport",
+  "description": "Tek panelden marketplace yönetimi, otomatik kargo ve finans analitiği",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"],
+  "lang": "tr",
+  "scope": "/",
+  "id": "kolayxport-app"
+}

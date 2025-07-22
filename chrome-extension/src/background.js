@@ -111,16 +111,7 @@ async function checkAuthentication() {
   try {
     console.log('Checking authentication...');
     
-    // First try to get token from active Kolayxport tabs (more reliable)
-    const token = await getTokenFromKolayxportTab();
-    if (token) {
-      console.log('Found auth token from active tab');
-      authToken = token;
-      updateBadge('authenticated');
-      return;
-    }
-    
-    // Fallback: Check for cookies on different domain variations
+    // Check for cookies first (more reliable than tab injection)
     const domainVariations = [
       'app.kolayxport.com',
       'kolayxport.com',
@@ -129,33 +120,82 @@ async function checkAuthentication() {
     
     let authCookie = null;
     for (const domain of domainVariations) {
-      const cookies = await chrome.cookies.getAll({ domain });
-      console.log(`Checking cookies for domain: ${domain}`, cookies.map(c => c.name));
-      
-      // Look for various Supabase auth patterns
-      authCookie = cookies.find(cookie => 
-        cookie.name.includes('sb-access-token') ||
-        cookie.name.includes('sb-refresh-token') ||
-        cookie.name === 'supabase-auth-token' ||
-        cookie.name.startsWith('sb-') ||
-        cookie.name === 'next-auth.session-token' ||
-        cookie.name === '__Secure-next-auth.session-token'
-      );
-      
-      if (authCookie) {
-        console.log(`Found auth cookie: ${authCookie.name} on domain: ${domain}`);
-        break;
+      try {
+        const cookies = await chrome.cookies.getAll({ domain });
+        console.log(`Checking cookies for domain: ${domain}`, cookies.map(c => c.name));
+        
+        // Look for various Supabase auth patterns
+        authCookie = cookies.find(cookie => 
+          cookie.name.includes('sb-access-token') ||
+          cookie.name.includes('sb-refresh-token') ||
+          cookie.name === 'supabase-auth-token' ||
+          cookie.name.startsWith('sb-') ||
+          cookie.name === 'next-auth.session-token' ||
+          cookie.name === '__Secure-next-auth.session-token'
+        );
+        
+        if (authCookie) {
+          console.log(`Found auth cookie: ${authCookie.name} on domain: ${domain}`);
+          break;
+        }
+      } catch (cookieError) {
+        console.warn(`Failed to check cookies for domain ${domain}:`, cookieError);
+        continue;
       }
     }
     
     if (authCookie) {
       authToken = authCookie.value;
       updateBadge('authenticated');
-    } else {
-      console.log('No authentication found');
-      authToken = null;
-      updateBadge('unauthenticated');
+      return;
     }
+    
+    // Fallback: Try to get token from active Kolayxport tabs (if cookies not found)
+    console.log('No auth cookies found, trying tab injection...');
+    try {
+      const token = await getTokenFromKolayxportTab();
+      if (token) {
+        console.log('Found auth token from active tab');
+        authToken = token;
+        updateBadge('authenticated');
+        return;
+      }
+    } catch (tabError) {
+      console.warn('Tab injection failed:', tabError);
+      // Continue to unauthenticated state instead of throwing error
+    }
+    
+    // Final fallback: just check if we have an active Kolayxport session (simple presence check)
+    try {
+      const tabs = await chrome.tabs.query({
+        url: [`https://${KOLAYXPORT_DOMAIN}/*`, `https://kolayxport.com/*`]
+      });
+      
+      if (tabs.length > 0) {
+        // Check if any tab seems to be authenticated (simple URL pattern check)
+        const authenticatedTab = tabs.find(tab => 
+          tab.url && 
+          (tab.url.includes('/app/') || tab.url.includes('/dashboard') || tab.url.includes('/labels') || tab.url.includes('/settings')) &&
+          !tab.url.includes('/login') && 
+          !tab.url.includes('/auth')
+        );
+        
+        if (authenticatedTab) {
+          console.log('Found authenticated session based on URL patterns');
+          authToken = 'session-detected'; // Placeholder token indicating authenticated
+          updateBadge('authenticated');
+          return;
+        }
+      }
+    } catch (finalError) {
+      console.warn('Final fallback check failed:', finalError);
+    }
+    
+    // If we get here, no authentication was found
+    console.log('No authentication found via any method');
+    authToken = null;
+    updateBadge('unauthenticated');
+    
   } catch (error) {
     console.error('Auth check failed:', error);
     authToken = null;
@@ -176,81 +216,113 @@ async function getTokenFromKolayxportTab() {
     
     console.log(`Found ${tabs.length} Kolayxport tabs`);
     
-    // Execute script to get token from localStorage/sessionStorage
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tabs[0].id },
-      func: () => {
-        try {
-          // Check for Supabase session in localStorage
-          const keys = Object.keys(localStorage);
-          console.log('LocalStorage keys:', keys);
-          
-          // Look for Supabase auth session data
-          for (const key of keys) {
-            if (key.startsWith('sb-') && key.includes('-auth-token')) {
-              const value = localStorage.getItem(key);
-              console.log(`Found Supabase token key: ${key}`);
-              
-              try {
-                // Parse the session data
-                const sessionData = JSON.parse(value);
-                if (sessionData.access_token) {
-                  return sessionData.access_token;
-                }
-              } catch (parseError) {
-                console.error('Failed to parse session data:', parseError);
-                return value; // Return raw value as fallback
-              }
-            }
-          }
-          
-          // Check for browser client session storage pattern
-          const supabaseKey = keys.find(key => 
-            key.includes('supabase.auth.token') || 
-            key.includes('sb-') && key.includes('auth') ||
-            key.includes('supabase-auth')
-          );
-          
-          if (supabaseKey) {
-            const session = localStorage.getItem(supabaseKey);
-            console.log(`Found auth key: ${supabaseKey}`);
-            
-            try {
-              const parsed = JSON.parse(session);
-              return parsed.access_token || parsed.token || session;
-            } catch {
-              return session;
-            }
-          }
-          
-          // Check sessionStorage as well
-          const sessionKeys = Object.keys(sessionStorage);
-          for (const key of sessionKeys) {
-            if (key.includes('sb-') || key.includes('supabase')) {
-              const session = sessionStorage.getItem(key);
-              try {
-                const parsed = JSON.parse(session);
-                return parsed.access_token || parsed.token || session;
-              } catch {
-                return session;
-              }
-            }
-          }
-          
-          console.log('No authentication tokens found in storage');
-          return null;
-        } catch (error) {
-          console.error('Error extracting auth token:', error);
-          return null;
-        }
+    // Try each tab until we find one that works
+    for (let i = 0; i < tabs.length; i++) {
+      const tab = tabs[i];
+      
+      // Skip if tab is not ready
+      if (!tab.id || tab.status !== 'complete') {
+        console.log(`Skipping tab ${tab.id} - status: ${tab.status}`);
+        continue;
       }
-    });
+      
+      // Check if tab URL is safe to inject into
+      if (tab.url.includes('chrome://') || tab.url.includes('chrome-extension://')) {
+        console.log(`Skipping system tab: ${tab.url}`);
+        continue;
+      }
+      
+      try {
+        console.log(`Attempting to inject script into tab ${tab.id}: ${tab.url}`);
+        
+        // Execute script to get token from localStorage/sessionStorage
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: () => {
+            try {
+              // Check for Supabase session in localStorage
+              const keys = Object.keys(localStorage);
+              console.log('LocalStorage keys:', keys);
+              
+              // Look for Supabase auth session data
+              for (const key of keys) {
+                if (key.startsWith('sb-') && key.includes('-auth-token')) {
+                  const value = localStorage.getItem(key);
+                  console.log(`Found Supabase token key: ${key}`);
+                  
+                  try {
+                    // Parse the session data
+                    const sessionData = JSON.parse(value);
+                    if (sessionData.access_token) {
+                      return sessionData.access_token;
+                    }
+                  } catch (parseError) {
+                    console.error('Failed to parse session data:', parseError);
+                    return value; // Return raw value as fallback
+                  }
+                }
+              }
+              
+              // Check for browser client session storage pattern
+              const supabaseKey = keys.find(key => 
+                key.includes('supabase.auth.token') || 
+                key.includes('sb-') && key.includes('auth') ||
+                key.includes('supabase-auth')
+              );
+              
+              if (supabaseKey) {
+                const session = localStorage.getItem(supabaseKey);
+                console.log(`Found auth key: ${supabaseKey}`);
+                
+                try {
+                  const parsed = JSON.parse(session);
+                  return parsed.access_token || parsed.token || session;
+                } catch {
+                  return session;
+                }
+              }
+              
+              // Check sessionStorage as well
+              const sessionKeys = Object.keys(sessionStorage);
+              for (const key of sessionKeys) {
+                if (key.includes('sb-') || key.includes('supabase')) {
+                  const session = sessionStorage.getItem(key);
+                  try {
+                    const parsed = JSON.parse(session);
+                    return parsed.access_token || parsed.token || session;
+                  } catch {
+                    return session;
+                  }
+                }
+              }
+              
+              console.log('No authentication tokens found in storage');
+              return null;
+            } catch (error) {
+              console.error('Error extracting auth token:', error);
+              return null;
+            }
+          }
+        });
+        
+        const token = results[0]?.result;
+        if (token) {
+          console.log('Successfully extracted token from tab');
+          return token;
+        }
+        
+        console.log(`No token found in tab ${tab.id}`);
+      } catch (tabError) {
+        console.warn(`Failed to inject script into tab ${tab.id}:`, tabError.message);
+        // Continue to next tab instead of giving up
+        continue;
+      }
+    }
     
-    const token = results[0]?.result;
-    console.log('Token extraction result:', token ? 'Found token' : 'No token');
-    return token || null;
+    console.log('No valid tokens found in any Kolayxport tabs');
+    return null;
   } catch (error) {
-    console.error('Failed to get token from tab:', error);
+    console.error('Failed to get token from tabs:', error);
     return null;
   }
 }

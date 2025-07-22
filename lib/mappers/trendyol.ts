@@ -5,6 +5,11 @@
 import { NormalizedLineItem, UIOrder } from '../types';
 
 export function toOrderItem(line: any): NormalizedLineItem {
+  // Combine productSize and productColor for variant info
+  const variantInfo = [line.productSize, line.productColor]
+    .filter(Boolean)
+    .join(' - ') || '';
+
   return {
     id: line.id || line.orderLineId || String(Math.random()),
     title: line.productName || line.title || line.name || 'Unknown Product',
@@ -16,6 +21,7 @@ export function toOrderItem(line: any): NormalizedLineItem {
       line.productImage ??
       (line.images && line.images[0] && line.images[0].url) ??
       '',
+    variantInfo,
   };
 }
 
@@ -41,6 +47,11 @@ export async function toOrderWithImages(order: any, productImages: Record<string
       }
     }
     
+    // Combine productSize and productColor for variant info
+    const variantInfo = [item.productSize, item.productColor]
+      .filter(Boolean)
+      .join(' - ') || '';
+
     return {
       id: item.id || item.orderLineId || String(Math.random()),
       title: item.productName || item.title || item.name || 'Unknown Product',
@@ -49,6 +60,7 @@ export async function toOrderWithImages(order: any, productImages: Record<string
       weight: item.weight || 0.5,
       sku: item.sku || item.merchantSku || item.barcode || item.productCode || '',
       image: imageUrl,
+      variantInfo,
     };
   });
   
@@ -210,17 +222,13 @@ export async function mapTrendyolOrdersWithImages(
   // Fetch product images from Trendyol Product API
   let productImages: Record<string, string> = {};
   if (barcodesNeedingImages.length > 0) {
-    console.log('[Trendyol Mapper] Need to fetch images for', barcodesNeedingImages.length, 'barcodes:', barcodesNeedingImages);
     try {
       // Dynamic import to avoid circular dependency
       const { getProductImages } = await import('../integrations/trendyolClient');
       productImages = await getProductImages(barcodesNeedingImages, credentials);
-      console.log('[Trendyol Mapper] Fetched images for', Object.keys(productImages).length, 'products');
     } catch (error) {
       console.warn('Failed to fetch product images from Trendyol:', error);
     }
-  } else {
-    console.log('[Trendyol Mapper] All items already have images or no items found');
   }
 
   // Map orders with the fetched images

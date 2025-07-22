@@ -64,7 +64,7 @@ function mapTrendyolItemToPrisma(trendyolLineItem, orderData) {
   return {
     sku: trendyolLineItem.sku || null,
     productName: trendyolLineItem.title || null,
-    variantInfo: null, // Trendyol items don't have variant info
+    variantInfo: trendyolLineItem.variantInfo || null, // Now mapped from productSize + productColor
     quantity: trendyolLineItem.quantity || 1,
     unitPrice: trendyolLineItem.value || null,
     totalPrice: (trendyolLineItem.value || 0) * (trendyolLineItem.quantity || 1),
@@ -597,15 +597,7 @@ async function syncTrendyolRecentOrders(user, settings) {
           const orderData = mapUIOrderToPrisma(uiOrder, user.id);
           const itemsData = (uiOrder.line_items || []).map(item => mapUIOrderItemToPrisma(item, orderData));
           
-          logger.info(`[TRENDYOL SYNC PRE-UPSERT] Trendyol Order ID: ${uiOrder.id}, User ID: ${user.id}`, {
-            originalTrendyolId: uiOrder.id,
-            userIdForUpsert: user.id,
-            marketplaceForUpsert: orderData.marketplace,
-            marketplaceKeyForUpsert: orderData.marketplaceKey,
-            orderNumber: orderData.orderNumber,
-            itemsCount: itemsData.length,
-            itemsWithImages: itemsData.filter(item => item.image && item.image.length > 0).length
-          });
+          // Reduced verbose logging - only log batch summaries
 
           await prisma.order.upsert({
             where: { userId_marketplace_marketplaceKey: { userId: user.id, marketplace: orderData.marketplace, marketplaceKey: orderData.marketplaceKey } },
@@ -613,7 +605,7 @@ async function syncTrendyolRecentOrders(user, settings) {
             create: { ...orderData, items: { create: itemsData } },
           });
           
-          logger.info(`[TRENDYOL SYNC SUCCESS] Successfully upserted Trendyol order ${uiOrder.id} for user ${user.id}`);
+          // Success logged in batch summary
           successful++;
         } catch (err) {
           failed++;
@@ -624,11 +616,16 @@ async function syncTrendyolRecentOrders(user, settings) {
         await updateSyncProgress(syncId, { processedOrders: processed, successfulOrders: successful, failedOrders: failed, errors });
       }
       
+      // Log batch completion
+      logger.info(`[TRENDYOL SYNC] Batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(uiOrders.length/BATCH_SIZE)} completed: ${successful - (failed > 0 ? failed : 0)} success, ${failed > 0 ? batch.length - (successful - failed) : 0} failed`);
+      
       // Small delay between batches to let DB connections settle
       if (i + BATCH_SIZE < uiOrders.length) {
         await new Promise(resolve => setTimeout(resolve, 500)); // 500ms pause
       }
     }
+    
+    logger.info(`[TRENDYOL SYNC] Completed: ${successful}/${processed} orders successful for user ${user.id}`);
     await completeSync(syncId, failed === 0, { processedOrders: processed, successfulOrders: successful, failedOrders: failed, errors });
   } catch (err) {
     if (syncId) {

@@ -178,6 +178,7 @@ export default async function handler(
       - Chosen for performance and flexibility, as Prisma's client does not natively support complex JSON aggregation and multi-table joins in a single call.
       - Returns paginated results and total count for UI display.
     */
+    // OPTIMIZED: Simple query without expensive JSON aggregation
     const ordersQuery = `
       SELECT 
         o.*,
@@ -186,53 +187,9 @@ export default async function handler(
         o."createdAt" as "marketplaceOrderDate",
         o."trackingNumber" as "trackingNumber",
         o."labelStatus" as "labelStatus",
-        o."shippingLabelUrl" as "shippingLabelUrl",
-        COALESCE(
-          json_agg(DISTINCT
-            jsonb_build_object(
-              'id', oi.id,
-              'sku', oi.sku,
-              'productName', oi."productName",
-              'variantInfo', oi."variantInfo",
-              'quantity', oi.quantity,
-              'unitPrice', oi."unitPrice",
-              'totalPrice', oi."totalPrice",
-              'weightKg', oi."weightKg",
-              'harmonizedCode', oi."harmonizedCode",
-              'countryOfMfg', oi."countryOfMfg",
-              'notes', oi.notes,
-              'image', oi.image,
-              'marketplaceKey', oi."marketplaceKey",
-              'shipBy', oi."shipBy",
-              'orderNumber', oi."orderNumber",
-              'uniqueLineKey', oi."uniqueLineKey",
-              'productId', oi."productId",
-              'remoteLineId', oi."remoteLineId",
-              'labelJobStatus', lj.status,
-              'trackingNumber', lj."trackingNumber"
-            )
-          ) FILTER (WHERE oi.id IS NOT NULL),
-          '[]'::json
-        ) as items,
-        COALESCE(
-          json_agg(DISTINCT
-            jsonb_build_object(
-              'id', s.id,
-              'status', s.status,
-              'carrier', s.carrier,
-              'trackingNumber', s."trackingNumber",
-              'pdfUrl', s."pdfUrl",
-              'createdAt', s."createdAt"
-            )
-          ) FILTER (WHERE s.id IS NOT NULL),
-          '[]'::json
-        ) as shipments
+        o."shippingLabelUrl" as "shippingLabelUrl"
       FROM "Order" o
-      LEFT JOIN "OrderItem" oi ON oi."orderId" = o.id
-      LEFT JOIN "LabelJob" lj ON lj."orderItemId" = oi.id
-      LEFT JOIN "Shipment" s ON s."orderId" = o.id
       ${whereClause}
-      GROUP BY o.id
       ORDER BY COALESCE(o."uiOrderDate", o."createdAt") ${sort === 'asc' ? 'ASC' : 'DESC'}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
@@ -244,137 +201,103 @@ export default async function handler(
 
     const result = await prisma.$queryRawUnsafe(ordersQuery, ...params);
     
+    // OPTIMIZED: Fetch items and shipments separately only for returned orders
+    const orderIds = (result as any[]).map(order => order.id);
     
-    // To re-enable order debug logs, set ORDERS_DEBUG=1 in your environment and uncomment the lines below.
-    // if (process.env.ORDERS_DEBUG === '1') {
-    //   console.log('[API Orders] Raw Result Rows:', result.rows.length);
-    //   console.log('[API Orders] Sample Order:', result.rows[0]);
-    // }
-    let processedOrders = await Promise.all((result as any[]).map(async (rawOrder: any) => {
-      // if (process.env.ORDERS_DEBUG === '1') {
-      //   console.log('[API Orders] Processing order:', rawOrder.id);
-      //   console.log('[API Orders] Order items:', rawOrder.items);
-      // }
-      
-      // --- Address Extraction ---
-      let primaryAddressSource: any = {};
-      
-      // For Trendyol orders, try to get structured address from rawData
-      if ((rawOrder.source === 'trendyol' || rawOrder.marketplace === 'Trendyol') && rawOrder.rawData) {
-        if (rawOrder.rawData.to_address) {
-          // New format with to_address
-          primaryAddressSource = rawOrder.rawData.to_address;
-        } else if (rawOrder.rawData.shipmentAddress) {
-          // Existing format with shipmentAddress from Trendyol API
-          const shipmentAddr = rawOrder.rawData.shipmentAddress;
-          primaryAddressSource = {
-            name: shipmentAddr.fullName || `${shipmentAddr.firstName || ''} ${shipmentAddr.lastName || ''}`.trim(),
-            street1: shipmentAddr.address1 || '',
-            street2: shipmentAddr.address2 || '',
-            city: shipmentAddr.city || '',
-            state: shipmentAddr.stateName || '',
-            postal: shipmentAddr.postalCode || '',
-            country: shipmentAddr.countryCode || 'TR',
-            phone: shipmentAddr.phone || ''
+    // Fetch items for all orders in one query
+    const itemsQuery = `
+      SELECT 
+        oi.*,
+        lj.status as "labelJobStatus",
+        lj."trackingNumber" as "labelJobTrackingNumber"
+      FROM "OrderItem" oi
+      LEFT JOIN "LabelJob" lj ON lj."orderItemId" = oi.id
+      WHERE oi."orderId" = ANY($1)
+      ORDER BY oi."orderId", oi.id
+    `;
+    const itemsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(itemsQuery, orderIds) : [];
+    
+    // Fetch shipments for all orders in one query  
+    const shipmentsQuery = `
+      SELECT *
+      FROM "Shipment" s
+      WHERE s."orderId" = ANY($1)
+      ORDER BY s."orderId", s."createdAt" DESC
+    `;
+    const shipmentsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(shipmentsQuery, orderIds) : [];
+    
+    // Group items and shipments by orderId for easy lookup
+    const itemsByOrderId = new Map();
+    const shipmentsByOrderId = new Map();
+    
+    (itemsResult as any[]).forEach(item => {
+      if (!itemsByOrderId.has(item.orderId)) {
+        itemsByOrderId.set(item.orderId, []);
+      }
+      itemsByOrderId.get(item.orderId).push(item);
+    });
+    
+    (shipmentsResult as any[]).forEach(shipment => {
+      if (!shipmentsByOrderId.has(shipment.orderId)) {
+        shipmentsByOrderId.set(shipment.orderId, []);
+      }
+      shipmentsByOrderId.get(shipment.orderId).push(shipment);
+    });
+    // OPTIMIZED: Simplified order processing with reduced complexity
+    const processedOrders = (result as any[]).map((rawOrder: any) => {
+      // --- Simplified Address Extraction ---
+      const extractAddress = () => {
+        // Trendyol orders - check for structured address
+        if ((rawOrder.source === 'trendyol' || rawOrder.marketplace === 'Trendyol') && rawOrder.rawData?.to_address) {
+          return rawOrder.rawData.to_address;
+        }
+        if ((rawOrder.source === 'trendyol' || rawOrder.marketplace === 'Trendyol') && rawOrder.rawData?.shipmentAddress) {
+          const addr = rawOrder.rawData.shipmentAddress;
+          return {
+            name: addr.fullName || `${addr.firstName || ''} ${addr.lastName || ''}`.trim(),
+            street1: addr.address1 || '',
+            street2: addr.address2 || '',
+            city: addr.city || '',
+            state: addr.stateName || '',
+            postal: addr.postalCode || '',
+            country: addr.countryCode || 'TR',
+            phone: addr.phone || ''
           };
         }
-      } else if (rawOrder.shippingAddress) {
-        try {
-          if (typeof rawOrder.shippingAddress === 'string') {
-            // Check if it's a JSON string (starts with { or [) or just a plain address string
-            const trimmed = rawOrder.shippingAddress.trim();
-            if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-              primaryAddressSource = JSON.parse(rawOrder.shippingAddress);
-            } else {
-              // It's a plain address string, create a simple object
-              primaryAddressSource = { fullAddress: rawOrder.shippingAddress };
+        // Standard shipping address handling
+        if (typeof rawOrder.shippingAddress === 'string') {
+          const trimmed = rawOrder.shippingAddress.trim();
+          if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try {
+              return JSON.parse(rawOrder.shippingAddress);
+            } catch (e) {
+              return { fullAddress: rawOrder.shippingAddress };
             }
-          } else {
-            primaryAddressSource = rawOrder.shippingAddress;
           }
-        } catch (e) {
-          console.error(`Error parsing shippingAddress JSON for order ${rawOrder.id}`, e);
-          // Fallback: treat as plain address string
-          primaryAddressSource = { fullAddress: rawOrder.shippingAddress };
+          return { fullAddress: rawOrder.shippingAddress };
         }
-      }
-      let notesAddress: any = {};
-      if (rawOrder.source === 'veeqo' && rawOrder.channel === 'etsy' && rawOrder.notes && typeof rawOrder.notes === 'string') {
-        // Try to parse Shippo notes for to_address
-        try {
-          const notesObj = JSON.parse(rawOrder.notes);
-          if (notesObj.to_address) notesAddress = notesObj.to_address;
-        } catch (e) {
-          // fallback: try to extract to_address with regex or other methods if needed
-        }
-      }
-      // Merge: notesAddress overrides primaryAddressSource for Etsy/Veeqo
-      const effectiveAddress = { ...primaryAddressSource, ...notesAddress };
-      // Name logic
-      const fullName = (effectiveAddress.name || effectiveAddress.recipientFirstName || rawOrder.customerName || '').trim();
-      let recipientFirstName = '';
-      let recipientLastName = '';
-      if (fullName) {
-        const split = fullName.split(/\s+/);
-        recipientFirstName = split[0] || '';
-        recipientLastName = split.slice(1).join(' ') || '';
-        if (!recipientLastName && recipientFirstName && effectiveAddress.recipientLastName) {
-          recipientLastName = effectiveAddress.recipientLastName;
-        }
-      } else {
-        recipientFirstName = effectiveAddress.recipientFirstName || '';
-        recipientLastName = effectiveAddress.recipientLastName || '';
-      }
-      // Populate recipient fields
-      const finalRecipientFirstName = recipientFirstName || effectiveAddress.recipientFirstName || '';
-      const finalRecipientLastName = recipientLastName || effectiveAddress.recipientLastName || '';
+        return rawOrder.shippingAddress || {};
+      };
+
+      const effectiveAddress = extractAddress();
+      
+      // Simplified name processing
+      const fullName = effectiveAddress.name || effectiveAddress.recipientFirstName || rawOrder.customerName || '';
+      const nameParts = fullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || effectiveAddress.recipientFirstName || '';
+      const lastName = nameParts.slice(1).join(' ') || effectiveAddress.recipientLastName || '';
+
+      // Extract address fields with simplified logic
       const recipientStreet1 = effectiveAddress.street1 || effectiveAddress.recipientStreet1 || '';
       const recipientStreet2 = effectiveAddress.street2 || effectiveAddress.recipientStreet2 || '';
-      const recipientCity    = effectiveAddress.city    || effectiveAddress.recipientCity    || '';
-      const recipientState   = effectiveAddress.state   || effectiveAddress.recipientState   || effectiveAddress.province || '';
-      const recipientPostal  = effectiveAddress.postal  || effectiveAddress.recipientPostal  || effectiveAddress.zip || effectiveAddress.postcode || '';
+      const recipientCity = effectiveAddress.city || effectiveAddress.recipientCity || '';
+      const recipientState = effectiveAddress.state || effectiveAddress.recipientState || effectiveAddress.province || '';
+      const recipientPostal = effectiveAddress.postal || effectiveAddress.recipientPostal || effectiveAddress.zip || effectiveAddress.postcode || '';
       const recipientCountry = effectiveAddress.country || effectiveAddress.recipientCountry || '';
-      const recipientPhone   = effectiveAddress.phone   || effectiveAddress.recipientPhone   || '';
+      const recipientPhone = effectiveAddress.phone || effectiveAddress.recipientPhone || '';
 
-      // --- Line Items Mapping ---
-      let itemsFromDb: any[] = [];
-      try {
-        itemsFromDb = Array.isArray(rawOrder.items) ? rawOrder.items : JSON.parse(rawOrder.items);
-      } catch (e) { itemsFromDb = []; }
-      // Fetch all label jobs for items in this order
-      let labelJobsByItemId: Record<string, any[]> = {};
-      if (itemsFromDb.length > 0) {
-        const itemIds = itemsFromDb.map(item => item.id).filter(Boolean);
-        if (itemIds.length > 0) {
-          try {
-            const labelJobs = await prisma.labelJob.findMany({
-              where: {
-                orderItemId: {
-                  in: itemIds
-                }
-              },
-              orderBy: {
-                createdAt: 'desc'
-              }
-            });
-            
-            labelJobs.forEach(job => {
-              if (!labelJobsByItemId[job.orderItemId]) labelJobsByItemId[job.orderItemId] = [];
-              labelJobsByItemId[job.orderItemId].push({
-                id: job.id,
-                status: job.status,
-                createdAt: job.createdAt,
-                trackingNumber: job.trackingNumber,
-                pdfUrl: job.pdfUrl,
-                errorMessage: job.errorMessage,
-                carrier: job.carrier
-              });
-            });
-          } catch (e) {
-            console.error('Error fetching label jobs for items:', e);
-          }
-        }
-      }
+      // --- Simplified Line Items Mapping ---
+      const itemsFromDb = itemsByOrderId.get(rawOrder.id) || [];
       const line_items_for_ui = itemsFromDb.map(item => ({
         id: item.id,
         title: item.productName || item.title || 'Unknown Product',
@@ -388,36 +311,39 @@ export default async function handler(
         variantInfo: item.variantInfo || '',
         labelJobStatus: item.labelJobStatus || '',
         trackingNumber: item.trackingNumber || '',
-        shipBy: item.shipBy || '',
-        labelJobs: labelJobsByItemId[item.id] || [],
+        shipBy: item.shipBy ? new Date(item.shipBy).toISOString() : null,
+        labelJobs: item.labelJobStatus ? [{
+          status: item.labelJobStatus,
+          trackingNumber: item.labelJobTrackingNumber,
+        }] : [],
       }));
-      // --- Order Date ---
+
+      // --- Simplified Date Processing ---
       let marketplaceOrderDate = rawOrder.uiOrderDate || rawOrder.createdAt;
-      let shipByDate = null; // Add shipByDate reconstruction
-      if (!marketplaceOrderDate && rawOrder.rawData) {
+      let shipByDate = null;
+      if (rawOrder.rawData) {
         try {
           const rawData = typeof rawOrder.rawData === 'string' ? JSON.parse(rawOrder.rawData) : rawOrder.rawData;
-          marketplaceOrderDate = rawData.created_at || rawData.order_date || rawData.ordered_at || rawData.placed_at;
-          // Reconstruct shipByDate from Veeqo's due_date (same logic as sync)
+          if (!marketplaceOrderDate) {
+            marketplaceOrderDate = rawData.created_at || rawData.order_date || rawData.ordered_at || rawData.placed_at;
+          }
           shipByDate = rawData.due_date || null;
         } catch (e) {
-          // Keep essential error logging
-          console.error('Error parsing rawData for order date:', e);
-        }
-      } else if (rawOrder.rawData) {
-        // Still need to extract shipByDate even if we have marketplaceOrderDate
-        try {
-          const rawData = typeof rawOrder.rawData === 'string' ? JSON.parse(rawOrder.rawData) : rawOrder.rawData;
-          shipByDate = rawData.due_date || null;
-        } catch (e) {
-          console.error('Error parsing rawData for shipByDate:', e);
+          console.error('Error parsing rawData for dates:', e);
         }
       }
+
+      // --- Simplified Source Detection ---
+      const marketplace = (rawOrder.marketplace || '').toLowerCase();
+      const source = rawOrder.source || 
+        (marketplace.includes('etsy') ? 'shippo' : 
+         marketplace.includes('trendyol') ? 'trendyol' : 'veeqo');
+
       return {
         ...rawOrder,
-        customerName: fullName || `${finalRecipientFirstName} ${finalRecipientLastName}`.trim(),
-        recipientFirstName: finalRecipientFirstName,
-        recipientLastName: finalRecipientLastName,
+        customerName: fullName || `${firstName} ${lastName}`.trim(),
+        recipientFirstName: firstName,
+        recipientLastName: lastName,
         recipientStreet1,
         recipientStreet2,
         recipientCity,
@@ -428,20 +354,16 @@ export default async function handler(
         line_items: line_items_for_ui,
         marketplaceOrderDate,
         orderTotalPrice: rawOrder.totalPrice,
-        source: rawOrder.source || (() => {
-          const marketplace = (rawOrder.marketplace || '').toLowerCase();
-          if (marketplace.includes('etsy')) return 'shippo';
-          if (marketplace.includes('trendyol')) return 'trendyol';
-          return 'veeqo';
-        })(),
+        source,
         channel: '',
         marketplaceOrderId: rawOrder.marketplaceOrderId || rawOrder.orderNumber || rawOrder.id || '',
         orderNumber: rawOrder.orderNumber || rawOrder.marketplaceOrderId || rawOrder.id || '',
         trackingNumber: rawOrder.trackingNumber || null,
         labelStatus: rawOrder.labelStatus || null,
-        shipByDate: shipByDate, // Add reconstructed shipByDate
+        shipByDate,
+        shipments: shipmentsByOrderId.get(rawOrder.id) || [],
       };
-    }));
+    });
 
     // Filter orders for Labels page
     const context = req.query.context as string;
@@ -552,9 +474,8 @@ export default async function handler(
     const countResult = await prisma.$queryRawUnsafe(countQuery, ...params.slice(0, paramIndex - 1)) as any[];
     const total = parseInt(countResult[0]?.total || '0', 10);
 
-    // TEMPORARILY DISABLED: Deduplication and filtering for debugging
-    // const cleanedOrders = await dedupeAndFilter(processedOrders.filter(Boolean));
-    const cleanedOrders = processedOrders.filter(Boolean); // Just remove null/undefined orders
+    // OPTIMIZED: Simple filtering without async deduplication
+    const cleanedOrders = processedOrders.filter(Boolean);
     
     
     return res.status(200).json({

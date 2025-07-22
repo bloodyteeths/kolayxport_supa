@@ -35,27 +35,17 @@ async function fetchTrendyolOrders({ supplierId, apiKey, apiSecret, status, star
     const startDateSeconds = Math.floor(startDateMs / 1000);
     const endDateSeconds = Math.floor(endDateMs / 1000);
     url += `startDate=${startDateSeconds}&endDate=${endDateSeconds}&`;
-    console.log(`[TRENDYOL DEBUG] Date range (ms): ${startDateMs} to ${endDateMs}`);
-    console.log(`[TRENDYOL DEBUG] Date range (seconds): ${startDateSeconds} to ${endDateSeconds}`);
-    console.log(`[TRENDYOL DEBUG] Date range (ISO): ${new Date(startDateMs).toISOString()} to ${new Date(endDateMs).toISOString()}`);
-  } else {
-    console.log(`[TRENDYOL DEBUG] No date filtering (API date filtering disabled due to bugs)`);
   }
   
   url += `orderByField=${status === 'Created' ? 'createdDate' : 'PackageLastModifiedDate'}`;
   url += `&orderByDirection=DESC&size=${pageSize}`;
 
-  // Debug log the URL being called
-  console.log(`[TRENDYOL DEBUG] Fetching URL: ${url}`);
-
   const res = await fetch(url, { headers: { Authorization: auth }, method: 'GET' });
   if (!res.ok) {
     const text = await res.text();
-    console.log(`[TRENDYOL DEBUG] API Error ${res.status}: ${text}`);
     throw new Error(`Trendyol API ${res.status}: ${text}`);
   }
   const json = await res.json();
-  console.log(`[TRENDYOL DEBUG] API Response:`, JSON.stringify(json, null, 2));
   return Array.isArray(json.content) ? json.content : [];
 }
 
@@ -118,12 +108,10 @@ export async function getProductImages(
 
   const auth = 'Basic ' + Buffer.from(`${credentials.apiKey}:${credentials.apiSecret}`).toString('base64');
 
-  // Fetch images for remaining barcodes (batch processing)
-  for (const barcode of barcodesToFetch) {
+  // Batch fetch images for remaining barcodes in parallel
+  const fetchPromises = barcodesToFetch.map(async (barcode) => {
     try {
       const url = `https://apigw.trendyol.com/integration/product/sellers/${credentials.supplierId}/products?barcode=${encodeURIComponent(barcode)}`;
-      
-      console.log(`[Trendyol Product API] Fetching image for barcode: ${barcode}`);
       
       const response = await fetch(url, {
         headers: { 
@@ -137,31 +125,45 @@ export async function getProductImages(
 
       if (!response.ok) {
         console.warn(`Failed to fetch product image for barcode ${barcode}: ${response.status}`);
-        continue;
+        return { barcode, imageUrl: null };
       }
 
       const data: TrendyolProductResponse = await response.json();
       
       if (data.content && data.content.length > 0 && data.content[0].images && data.content[0].images.length > 0) {
         const imageUrl = data.content[0].images[0].url;
-        imageMap[barcode] = imageUrl;
-        console.log(`[Trendyol Product API] Found image for barcode ${barcode}: ${imageUrl}`);
-        
-        // Cache the result
-        imageCache.set(barcode, {
-          url: imageUrl,
-          timestamp: now
-        });
+        return { barcode, imageUrl };
       } else {
-        console.log(`[Trendyol Product API] No image found for barcode ${barcode} in response`);
+        return { barcode, imageUrl: null };
       }
-
-      // Rate limiting - small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 100));
       
     } catch (error) {
       console.warn(`Error fetching product image for barcode ${barcode}:`, error);
+      return { barcode, imageUrl: null };
     }
+  });
+
+  // Wait for all parallel requests to complete
+  const results = await Promise.all(fetchPromises);
+  
+  // Process results and update cache
+  let foundImages = 0;
+  for (const { barcode, imageUrl } of results) {
+    if (imageUrl) {
+      imageMap[barcode] = imageUrl;
+      foundImages++;
+      
+      // Cache the result
+      imageCache.set(barcode, {
+        url: imageUrl,
+        timestamp: now
+      });
+    }
+  }
+  
+  // Only log if there were API calls made
+  if (barcodesToFetch.length > 0) {
+    console.log(`[Trendyol] Fetched ${foundImages}/${barcodesToFetch.length} images via API`);
   }
 
   return imageMap;

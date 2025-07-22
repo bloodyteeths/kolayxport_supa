@@ -963,6 +963,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       recipientCity: row.recipientCity === '—' ? '' : row.recipientCity,
       recipientPostal: row.recipientPostal === '—' ? '' : row.recipientPostal,
       recipientCountry: row.recipientCountry === '—' ? '' : row.recipientCountry,
+      recipientPhone: row.recipientPhone || '',
+      recipientEmail: row.recipientEmail || '',
       labelStockType: row.labelStockType || 'PAPER_4X6',
       fedexServiceType: row.fedexServiceType || 'INTERNATIONAL_PRIORITY',
       fedexPackagingType: row.fedexPackagingType || 'FEDEX_PAK',
@@ -1030,7 +1032,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     {
       field: 'labelStatus',
       headerName: 'Etiket',
-      width: 110,
+      width: 90,
       sortable: false,
       valueGetter: (_value, row) => {
         const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
@@ -1178,7 +1180,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     {
       field: 'itemImageUrl',
       headerName: 'Ürün Görseli',
-      width: 100,
+      width: 140,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
         <Box
@@ -1199,8 +1201,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             src={params.value as string || '/placeholder.png'} 
             alt="Ürün Görseli"
             style={{ 
-              width: 60, 
-              height: 60, 
+              width: 65, 
+              height: 65, 
               objectFit: 'cover', 
               borderRadius: 8,
               transition: 'transform 0.2s',
@@ -1259,15 +1261,76 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     { 
       field: 'orderTotalPrice', 
       headerName: 'Toplam', 
-      width: 80, 
+      width: 120, 
       type: 'number',
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
-        <Typography variant="body2">
-          {params.value != null && params.value > 0 ? `${(params.value as number).toFixed(2)} ${params.row.currency || ''}`.trim() : '—'}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          <Typography variant="body2">
+            {params.value != null && params.value > 0 ? `${(params.value as number).toFixed(2)} ${params.row.currency || ''}`.trim() : '—'}
+          </Typography>
+        </Box>
       )
     },
-    { field: 'title', headerName: 'Ürün Adı', width: 180 },
+    { 
+      field: 'title', 
+      headerName: 'Ürün Adı', 
+      width: 180,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => (
+        <Tooltip title={params.value || ''} placement="bottom-start">
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              height: '100%',
+              cursor: 'pointer',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+            onClick={() => {
+              if (params.value) {
+                navigator.clipboard.writeText(params.value as string);
+                toast.success('Ürün adı kopyalandı!');
+              }
+            }}
+          >
+            <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {params.value || '—'}
+            </Typography>
+          </Box>
+        </Tooltip>
+      )
+    },
+    { 
+      field: 'variantInfo', 
+      headerName: 'Varyasyon', 
+      width: 140,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => (
+        <Tooltip title={params.value || ''} placement="bottom-start">
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              height: '100%',
+              cursor: 'pointer',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}
+            onClick={() => {
+              if (params.value) {
+                navigator.clipboard.writeText(params.value as string);
+                toast.success('Varyasyon bilgisi kopyalandı!');
+              }
+            }}
+          >
+            <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {params.value || '—'}
+            </Typography>
+          </Box>
+        </Tooltip>
+      )
+    },
     { field: 'quantity', headerName: 'Adet', width: 60, type: 'number' },
     { 
       field: 'shipByDate', 
@@ -1720,9 +1783,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           onPaginationModelChange={setPaginationModel}
           getRowId={(row) => row.itemId || row.orderId}
           disableRowSelectionOnClick
-          rowHeight={60}
+          rowHeight={90}
           disableColumnResize
-          disableColumnReorder
           disableColumnMenu
           initialState={{
             sorting: {

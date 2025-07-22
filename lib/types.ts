@@ -28,6 +28,7 @@ export interface NormalizedLineItem {
   variantInfo?: string;
   variant_title?: string;
   product_variant?: { title?: string };
+  notes?: string;
   shipBy?: string;
 }
 

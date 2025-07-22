@@ -295,8 +295,108 @@ function createVeeqoClient(apiKey: string) {
   };
 }
 
-async function resolveVeeqoImageUrl(item: VeeqoLineItem, veeqoClient: any): Promise<string> {
-  // Try all possible image sources in order of preference
+// Batch fetch images for multiple items to avoid N+1 API calls
+async function batchFetchVeeqoImages(
+  items: VeeqoLineItem[], 
+  veeqoClient: any
+): Promise<Map<string, string>> {
+  const imageMap = new Map<string, string>();
+  
+  // Collect unique product_ids and sellable_ids that need fetching
+  const productIdsToFetch = new Set<string>();
+  const sellableIdsToFetch = new Set<string>();
+  
+  // First pass: collect items that need API calls
+  for (const item of items) {
+    const existingImage = extractExistingImageUrl(item);
+    if (existingImage) {
+      // Use item ID as key for the map
+      imageMap.set(String(item.id), existingImage);
+      continue;
+    }
+    
+    // Collect IDs that need fetching
+    if (item?.product_id) {
+      productIdsToFetch.add(String(item.product_id));
+    }
+    if (item?.sellable?.id) {
+      sellableIdsToFetch.add(String(item.sellable.id));
+    }
+  }
+  
+  // Batch fetch products
+  const productImages = new Map<string, string>();
+  if (productIdsToFetch.size > 0) {
+    const productPromises = Array.from(productIdsToFetch).map(async (productId) => {
+      try {
+        const product = await veeqoClient.get(`/products/${productId}`);
+        const imageUrl = product?.images?.[0]?.url || 
+                        product?.image_url || 
+                        product?.main_thumbnail_url || 
+                        product?.original_url ||
+                        product?.large_thumbnail_url ||
+                        product?.medium_thumbnail_url ||
+                        product?.small_thumbnail_url || 
+                        '';
+        if (imageUrl) {
+          productImages.set(productId, imageUrl);
+        }
+      } catch (error) {
+        // Silently continue on API errors
+      }
+    });
+    
+    await Promise.all(productPromises);
+  }
+  
+  // Batch fetch sellables
+  const sellableImages = new Map<string, string>();
+  if (sellableIdsToFetch.size > 0) {
+    const sellablePromises = Array.from(sellableIdsToFetch).map(async (sellableId) => {
+      try {
+        const sellable = await veeqoClient.get(`/sellables/${sellableId}`);
+        const imageUrl = sellable?.images?.[0]?.url || 
+                        sellable?.image_url || 
+                        sellable?.main_thumbnail_url || 
+                        sellable?.original_url ||
+                        sellable?.large_thumbnail_url ||
+                        sellable?.medium_thumbnail_url ||
+                        sellable?.small_thumbnail_url || 
+                        '';
+        if (imageUrl) {
+          sellableImages.set(sellableId, imageUrl);
+        }
+      } catch (error) {
+        // Silently continue on API errors
+      }
+    });
+    
+    await Promise.all(sellablePromises);
+  }
+  
+  // Second pass: assign fetched images to items
+  for (const item of items) {
+    const itemId = String(item.id);
+    if (imageMap.has(itemId)) {
+      continue; // Already has image
+    }
+    
+    // Try to get image from fetched data
+    let imageUrl = '';
+    if (item?.product_id && productImages.has(String(item.product_id))) {
+      imageUrl = productImages.get(String(item.product_id))!;
+    } else if (item?.sellable?.id && sellableImages.has(String(item.sellable.id))) {
+      imageUrl = sellableImages.get(String(item.sellable.id))!;
+    }
+    
+    imageMap.set(itemId, imageUrl);
+  }
+  
+  return imageMap;
+}
+
+// Extract existing image URL from item without API calls
+function extractExistingImageUrl(item: VeeqoLineItem): string {
   const imageSources = [
     item.image_url,
     typeof item.product_image === 'string' ? item.product_image : undefined,
@@ -320,9 +420,18 @@ async function resolveVeeqoImageUrl(item: VeeqoLineItem, veeqoClient: any): Prom
     typeof item.product_image === 'object' ? item.product_image.small_thumbnail_url : undefined
   ];
 
-  // Find first non-empty image URL
-  let imageUrl = imageSources.find(url => url && typeof url === 'string') || '';
+  return imageSources.find(url => url && typeof url === 'string') || '';
+}
 
+// Legacy function for backwards compatibility - now just calls extractExistingImageUrl
+async function resolveVeeqoImageUrl(item: VeeqoLineItem, veeqoClient: any): Promise<string> {
+  // Try existing image sources first
+  let imageUrl = extractExistingImageUrl(item);
+  if (imageUrl) {
+    return imageUrl;
+  }
+
+  // Fallback to individual API calls (for backwards compatibility)
   // If no image found and we have a product_id, try to fetch the product
   if (!imageUrl && item?.product_id) {
     try {
@@ -400,6 +509,7 @@ function normalizeShippoLineItems(order: any): NormalizedLineItem[] {
     sku: item.sku,
     image: item.product_image,
     variantInfo: item.product_variant,
+    notes: item.description || order.notes || '', // Shippo stores notes at order level
     sellable: {
       full_title: item.full_title || undefined
     }
@@ -461,9 +571,15 @@ async function validateAndMapOrder(order: VeeqoOrder, veeqoClient: any): Promise
     return [];
   };
 
-  // Map line items with image URLs
-  const lineItems = await Promise.all(getVeeqoLineItems(order).map(async (item: any) => {
-    const imageUrl = await resolveVeeqoImageUrl(item, veeqoClient);
+  // Get line items first
+  const rawLineItems = getVeeqoLineItems(order);
+  
+  // Batch fetch images for all line items at once
+  const imageMap = await batchFetchVeeqoImages(rawLineItems, veeqoClient);
+  
+  // Map line items with the batch-fetched images
+  const lineItems = rawLineItems.map((item: any) => {
+    const imageUrl = imageMap.get(String(item.id)) || '';
     
     // Robustly extract product title from various possible fields
     const productTitle = item.title || 
@@ -480,9 +596,18 @@ async function validateAndMapOrder(order: VeeqoOrder, veeqoClient: any): Promise
     
     // Robustly extract variant info
     const variantInfo = item.variation_title || 
+                       item.variant_title ||
+                       item.sellable?.title || 
                        item.sellable?.sellable_title || 
                        item.variant_options_string || 
                        '';
+    
+    // Extract notes - Veeqo stores Etsy buyer messages at order level in customer_note_attributes
+    const notes = item.notes || 
+                  item.description || 
+                  order.customer_note_attributes?.text || // Veeqo customer notes
+                  order.employee_note_attributes?.text || // Veeqo internal notes
+                  '';
     
     return {
       id: String(item.id),
@@ -495,9 +620,10 @@ async function validateAndMapOrder(order: VeeqoOrder, veeqoClient: any): Promise
       sku: sku,
       image: imageUrl,
       variantInfo: variantInfo,
+      notes: notes,
       shipBy: order.due_date // Add the due_date from the order
     };
-  }));
+  });
 
   const address = {
     name: `${recipientFirstName} ${recipientLastName}`.trim(),
@@ -1186,6 +1312,7 @@ async function createOrderItemsForBatch(
           sku: item.sku || '',
           image: item.image || '',
           variantInfo: item.variantInfo || '',
+          notes: (item as any).notes || (item as any).description || (order as any).notes || '', // Extract notes from item or order level
           marketplaceKey: String(item.id || `${order.marketplaceKey}-${i}`),
           orderNumber: order.orderNumber || '',
           uniqueLineKey: String(item.id || `${order.marketplaceKey}-${i}`),

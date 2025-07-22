@@ -427,16 +427,28 @@ function updateBadge(status, text = '') {
 }
 
 // Context menu click handling
-
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  console.log('📋 Context menu clicked:', info.menuItemId);
+  
   if (info.menuItemId === 'syncNow') {
     // Send message to content script
     const tabs = await chrome.tabs.query({
-      url: 'https://www.etsy.com/your/orders/*'
+      url: [
+        'https://www.etsy.com/your/orders/*',
+        'https://www.etsy.com/your/shops/*/orders*',
+        'https://www.etsy.com/shop-manager/*orders*'
+      ]
     });
     
+    console.log(`Found ${tabs.length} Etsy order tabs`);
+    
     if (tabs.length > 0) {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'scrapeNow' });
+      try {
+        await chrome.tabs.sendMessage(tabs[0].id, { action: 'scrapeNow' });
+        console.log('✅ Sync message sent successfully');
+      } catch (error) {
+        console.error('❌ Failed to send sync message:', error);
+      }
     } else {
       // Open Etsy orders page
       chrome.tabs.create({
@@ -445,11 +457,20 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
   } else if (info.menuItemId === 'fullImport') {
     const tabs = await chrome.tabs.query({
-      url: 'https://www.etsy.com/your/orders/*'
+      url: [
+        'https://www.etsy.com/your/orders/*',
+        'https://www.etsy.com/your/shops/*/orders*',
+        'https://www.etsy.com/shop-manager/*orders*'
+      ]
     });
     
     if (tabs.length > 0) {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'fullImport' });
+      try {
+        await chrome.tabs.sendMessage(tabs[0].id, { action: 'fullImport' });
+        console.log('✅ Full import message sent successfully');
+      } catch (error) {
+        console.error('❌ Failed to send import message:', error);
+      }
     }
   }
 });

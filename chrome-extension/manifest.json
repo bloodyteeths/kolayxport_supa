@@ -30,7 +30,24 @@
     {
       "matches": [
         "https://www.etsy.com/your/orders/*",
-        "https://www.etsy.com/your/shops/*/tools/listings/orders*"
+        "https://www.etsy.com/your/shops/*/tools/listings/orders*",
+        "https://www.etsy.com/your/shops/*/orders*",
+        "https://www.etsy.com/your/account/your-shop/orders*",
+        "https://www.etsy.com/shop-manager/*orders*"
+      ],
+      "js": ["src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.etsy.com/your/orders/*",
+        "https://www.etsy.com/your/shops/*/tools/listings/orders*",
+        "https://www.etsy.com/your/shops/*/orders*",
+        "https://www.etsy.com/your/account/your-shop/orders*",
+        "https://www.etsy.com/shop-manager/*orders*"
       ],
       "js": ["src/content.js"],
       "run_at": "document_idle",

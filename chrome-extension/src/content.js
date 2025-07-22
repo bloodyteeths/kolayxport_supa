@@ -103,23 +103,33 @@ class EtsyOrderScraper {
 
   setupMessageListener() {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      console.log('📨 Received message from background:', request);
+      
       switch (request.action) {
         case 'scrapeNow':
+          console.log('🎯 Manual sync triggered from popup');
           this.scrapeOrders();
           sendResponse({ status: 'started' });
           break;
         case 'fullImport':
+          console.log('📥 Full import triggered');
           this.performFullImport();
           sendResponse({ status: 'importing' });
           break;
         case 'getStatus':
-          sendResponse({
+          const status = {
             syncedCount: this.syncedOrderIds.size,
             pendingCount: this.pendingSync.length,
             authenticated: !!this.authToken
-          });
+          };
+          console.log('📊 Status requested:', status);
+          sendResponse(status);
           break;
+        default:
+          console.log('❓ Unknown action:', request.action);
       }
+      
+      return true; // Keep message channel open for async response
     });
   }
 
@@ -136,25 +146,57 @@ class EtsyOrderScraper {
   extractOrderData() {
     const orders = [];
     
+    console.log('🔍 Starting order extraction from Etsy page...');
+    console.log('Current URL:', window.location.href);
+    
     // Strategy 1: Look for order rows with data attributes
     const orderRows = document.querySelectorAll('[data-order-id], [data-receipt-id]');
+    console.log(`Found ${orderRows.length} rows with data attributes`);
     
     orderRows.forEach(row => {
       const orderData = this.extractOrderFromRow(row);
       if (orderData && orderData.orderId) {
         orders.push(orderData);
+        console.log('✅ Extracted order from row:', orderData.orderId);
       }
     });
     
     // Strategy 2: Look for order cards (newer UI)
     const orderCards = document.querySelectorAll('.order-card, [class*="order-item"], [class*="receipt-card"]');
+    console.log(`Found ${orderCards.length} order cards`);
     
     orderCards.forEach(card => {
       const orderData = this.extractOrderFromCard(card);
       if (orderData && orderData.orderId) {
         orders.push(orderData);
+        console.log('✅ Extracted order from card:', orderData.orderId);
       }
     });
+    
+    // Strategy 3: Modern Etsy UI - Look for common patterns
+    const modernOrderElements = document.querySelectorAll('div[class*="order"], div[class*="receipt"], table tr[class*="order"], li[class*="order"]');
+    console.log(`Found ${modernOrderElements.length} potential modern order elements`);
+    
+    modernOrderElements.forEach(element => {
+      const orderData = this.extractOrderFromModernUI(element);
+      if (orderData && orderData.orderId && !orders.find(o => o.orderId === orderData.orderId)) {
+        orders.push(orderData);
+        console.log('✅ Extracted order from modern UI:', orderData.orderId);
+      }
+    });
+    
+    // Strategy 4: Fallback - scan all elements for order patterns
+    if (orders.length === 0) {
+      console.log('🔍 No orders found, trying fallback pattern matching...');
+      this.scanForOrderPatterns().forEach(order => {
+        if (order && order.orderId && !orders.find(o => o.orderId === order.orderId)) {
+          orders.push(order);
+          console.log('✅ Extracted order from pattern scan:', order.orderId);
+        }
+      });
+    }
+    
+    console.log(`📊 Total orders extracted: ${orders.length}`);
     
     return orders;
   }
@@ -387,6 +429,78 @@ class EtsyOrderScraper {
     
     return items;
   }
+  
+  extractOrderFromModernUI(element) {
+    try {
+      const orderId = this.findOrderIdInElement(element);
+      if (!orderId) return null;
+      
+      // Modern Etsy UI often uses more semantic selectors
+      const buyerName = this.extractTextFromSelectors(element, [
+        '[data-test-id="buyer-name"]',
+        '[class*="buyer"], [class*="customer"]',
+        'strong', 'b'
+      ]);
+      
+      const orderTotal = this.extractTextFromSelectors(element, [
+        '[data-test-id="order-total"]',
+        '[class*="total"], [class*="amount"]',
+        '[class*="price"]'
+      ]);
+      
+      const orderDate = this.extractOrderDate(element);
+      
+      return {
+        orderId,
+        orderNumber: this.extractOrderNumber(element),
+        buyerName,
+        orderDate,
+        orderTotal,
+        items: this.extractOrderItems(element),
+        shippingAddress: this.extractAddressFromDOM(element)
+      };
+    } catch (error) {
+      console.error('Error extracting order from modern UI:', error);
+      return null;
+    }
+  }
+  
+  scanForOrderPatterns() {
+    const orders = [];
+    const bodyText = document.body.innerText || document.body.textContent || '';
+    
+    // Look for order number patterns in the page text
+    const orderMatches = bodyText.match(/(?:Order|Receipt)[\s#]*(\d{8,})/gi);
+    
+    if (orderMatches) {
+      orderMatches.forEach(match => {
+        const orderId = match.match(/(\d{8,})/)[1];
+        if (orderId) {
+          orders.push({
+            orderId,
+            orderNumber: orderId,
+            buyerName: 'Unknown',
+            orderDate: new Date().toISOString(),
+            orderTotal: '0',
+            items: [],
+            shippingAddress: {}
+          });
+        }
+      });
+    }
+    
+    return orders;
+  }
+  
+  extractTextFromSelectors(element, selectors) {
+    for (const selector of selectors) {
+      const el = element.querySelector(selector);
+      if (el && el.textContent && el.textContent.trim()) {
+        return el.textContent.trim();
+      }
+    }
+    return '';
+  }
 
   scheduleSyncBatch() {
     if (this.syncTimeout) {
@@ -399,11 +513,22 @@ class EtsyOrderScraper {
   }
 
   async syncBatch() {
-    if (this.pendingSync.length === 0 || !this.authToken) {
+    console.log('🚀 Starting sync batch...');
+    console.log(`Pending sync orders: ${this.pendingSync.length}`);
+    console.log(`Auth token available: ${!!this.authToken}`);
+    
+    if (this.pendingSync.length === 0) {
+      console.log('❌ No orders to sync');
+      return;
+    }
+    
+    if (!this.authToken) {
+      console.log('❌ No auth token available');
       return;
     }
     
     const batch = this.pendingSync.splice(0, 20); // Process fewer orders at a time for reliability
+    console.log(`📦 Processing batch of ${batch.length} orders:`, batch.map(o => o.orderId));
     
     try {
       const headers = {
@@ -422,6 +547,10 @@ class EtsyOrderScraper {
         }
       }
       
+      console.log(`🌐 Sending request to: ${KOLAYXPORT_API}`);
+      console.log('📋 Request headers:', headers);
+      console.log('📦 Request payload:', { orders: batch, source: 'chrome-extension' });
+      
       const response = await fetch(KOLAYXPORT_API, {
         method: 'POST',
         headers,
@@ -433,8 +562,11 @@ class EtsyOrderScraper {
         })
       });
       
+      console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+      
       if (response.ok) {
         const result = await response.json();
+        console.log('✅ Sync successful:', result);
         
         // Mark orders as synced
         batch.forEach(order => {
@@ -451,14 +583,18 @@ class EtsyOrderScraper {
           totalSynced: this.syncedOrderIds.size
         });
         
+        console.log(`🎉 Successfully synced ${batch.length} orders`);
+        
         // Process remaining orders
         if (this.pendingSync.length > 0) {
+          console.log(`🔄 Processing remaining ${this.pendingSync.length} orders...`);
           this.scheduleSyncBatch();
         }
       } else {
         // Handle errors
         const error = await response.text();
-        console.error('Sync failed:', error);
+        console.error('❌ Sync failed with status:', response.status);
+        console.error('❌ Error details:', error);
         
         // Put orders back in pending queue
         this.pendingSync.unshift(...batch);

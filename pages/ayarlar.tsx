@@ -11,6 +11,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ReplayIcon from '@mui/icons-material/Replay';
 import SubscriptionDashboard from '../components/SubscriptionDashboard';
+import ImporterFormCollapsible from '../components/ImporterFormCollapsible';
 import { useRouter } from 'next/router';
 
 // Mirrored from API route
@@ -219,22 +220,14 @@ const AyarlarPage = () => {
       },
     }));
 
+    // Clear JSON error when component handles its own validation
     if (section === 'shipperProfile' && name === 'importerOfRecord') {
-      try {
-        if (value.trim() !== '') JSON.parse(value);
-        setImporterJsonError(null);
-      } catch (err) {
-        setImporterJsonError('Geçersiz JSON formatı.');
-      }
+      setImporterJsonError(null);
     }
   };
   
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (importerJsonError) {
-      setSnackbar({ open: true, message: 'Lütfen Importer of Record JSON hatasını düzeltin.', severity: 'error' });
-      return;
-    }
     setIsSubmitting(true);
     try {
       await axios.patch('/api/user/settings', formData, { withCredentials: true });
@@ -484,17 +477,10 @@ const AyarlarPage = () => {
                 </Grid>
 
                 <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Importer of Record (JSON)"
-                    name="importerOfRecord"
-                    multiline
-                    rows={4}
+                  <ImporterFormCollapsible
                     value={formData.shipperProfile?.importerOfRecord || ''}
-                    onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)}
-                    error={!!importerJsonError}
-                    helperText={importerJsonError || 'Serbest formatlı JSON objesi girin veya boş bırakın.'}
-                    placeholder='{ "contact": { "personName": "...", ... } }'
+                    onChange={(jsonString) => handleInputChange('shipperProfile', 'importerOfRecord', jsonString)}
+                    error={importerJsonError}
                   />
                 </Grid>
               </Grid>
@@ -607,7 +593,7 @@ const AyarlarPage = () => {
             </Box>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-              <Button type="submit" variant="contained" color="primary" disabled={isSubmitting || isLoading || !!importerJsonError} size="large">
+              <Button type="submit" variant="contained" color="primary" disabled={isSubmitting || isLoading} size="large">
                 {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Ayarları Kaydet'}
               </Button>
             </Box>

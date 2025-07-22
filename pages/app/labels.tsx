@@ -260,6 +260,9 @@ export interface LabelRow {
 
   // Add labelStockType for UI editing
   labelStockType?: string;
+  
+  // Add variantInfo for Trendyol orders
+  variantInfo?: string;
 }
 
 
@@ -583,6 +586,7 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         labelCreated: hasOrderLabel,
         shippingLabelUrl: hasOrderLabel ? (latestShipment?.pdfUrl || order.shippingLabelUrl) : undefined,
         labelStockType: order.labelStockType,
+        variantInfo: lineItems?.[0]?.variantInfo || '—',
       };
       
       
@@ -644,6 +648,7 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         labelCreated: latestLabelJob?.status === 'created' && !!latestLabelJob?.trackingNumber,
         shippingLabelUrl: latestLabelJob?.pdfUrl || (latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined),
         labelStockType: order.labelStockType,
+        variantInfo: item.variantInfo || '—',
       };
     });
   });

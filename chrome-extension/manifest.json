@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Kolayxport Etsy Order Sync",
-  "version": "3.4.0",
+  "version": "4.2.0",
   "description": "Automatically sync Etsy Shop Manager orders with Kolayxport for streamlined shipping label generation",
   "author": "Kolayxport",
   "icons": {
@@ -20,9 +20,8 @@
     "contextMenus"
   ],
   "host_permissions": [
-    "https://kolayxport.com/app/*",
     "https://kolayxport.com/*",
-    "https://*.kolayxport.com/*",
+    "https://www.kolayxport.com/*",
     "https://www.etsy.com/*"
   ],
   "content_scripts": [
@@ -37,10 +36,19 @@
       "js": ["src/content.js"],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "https://kolayxport.com/*",
+        "https://www.kolayxport.com/*"
+      ],
+      "js": ["src/kolayxport.js"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background-simple.js"
   },
   "action": {
     "default_popup": "src/popup.html",

@@ -58,7 +58,7 @@ const log = {
   }
 };
 
-log.info('🚀 Kolayxport Etsy Address Enrichment v3.4 Loading', { url: window.location.href });
+log.info('🚀 Kolayxport Etsy Address Enrichment v4.1 Loading', { url: window.location.href });
 
 // Extract store information from current page
 function getEtsyStoreInfo() {
@@ -205,7 +205,7 @@ const pushBatch = async batch => {
       credentials: 'include',
       body: JSON.stringify({ 
         orders: batch,
-        source: 'chrome-extension-v3.3-multistore',
+        source: 'chrome-extension-v4.1-multistore',
         timestamp: new Date().toISOString()
       })
     });
@@ -505,7 +505,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           syncedCount: (result[STORAGE_KEY] || []).length,
           url: window.location.href,
           scriptLoaded: true,
-          version: '3.4',
+          version: '4.1',
           logs: (result.kx_logs || []).slice(-10) // Last 10 logs
         };
         log.info('Status requested', status);
@@ -564,7 +564,7 @@ observer.observe(document.body, {
   subtree: true 
 });
 
-log.info('Content script v3.4 initialization complete');
+log.info('Content script v4.1 initialization complete');
 
 // Add visual indicator (removed after 3 seconds)
 const indicator = document.createElement('div');
@@ -581,6 +581,6 @@ indicator.style.cssText = `
   font-family: Arial, sans-serif !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 `;
-indicator.textContent = '✅ Kolayxport v3.4 - Address Extraction Fixed!';
+indicator.textContent = '✅ Kolayxport v4.1 - Auth Fixed!';
 document.body.appendChild(indicator);
 setTimeout(() => indicator.remove(), 5000);

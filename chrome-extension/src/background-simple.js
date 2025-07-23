@@ -1,0 +1,367 @@
+/**
+ * Kolayxport Etsy Order Sync - Simple Background Service Worker
+ * Simplified version to avoid service worker registration issues
+ */
+
+// Configuration
+const KOLAYXPORT_DOMAIN = 'kolayxport.com';
+const KOLAYXPORT_APP_URL = 'https://kolayxport.com/app';
+const BADGE_COLORS = {
+  success: '#4CAF50',
+  error: '#F44336',
+  warning: '#FF9800',
+  default: '#2196F3'
+};
+
+// State management
+let authToken = null;
+let syncStats = {
+  totalSynced: 0,
+  lastSyncTime: null,
+  errors: 0
+};
+
+// Initialize extension
+chrome.runtime.onInstalled.addListener(async (details) => {
+  // Initialize badge
+  chrome.action.setBadgeBackgroundColor({ color: BADGE_COLORS.default });
+  chrome.action.setBadgeText({ text: '' });
+  
+  // Check authentication
+  await checkAuthentication();
+  
+  // Create context menus
+  chrome.contextMenus.create({
+    id: 'syncNow',
+    title: 'Sync Etsy Orders Now',
+    contexts: ['action']
+  });
+});
+
+// Message handling
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  handleMessage(request, sender, sendResponse);
+  return true; // Keep channel open for async response
+});
+
+async function handleMessage(request, sender, sendResponse) {
+  switch (request.action) {
+    case 'getCookies':
+      const cookies = await getCookies(request.domain);
+      sendResponse(cookies);
+      break;
+      
+    case 'syncComplete':
+      handleSyncComplete(request);
+      sendResponse({ success: true });
+      break;
+      
+    case 'getAuthStatus':
+      await checkAuthentication(); // Refresh auth status
+      sendResponse({ 
+        authenticated: !!authToken,
+        token: authToken 
+      });
+      break;
+      
+    default:
+      sendResponse({ error: 'Unknown action' });
+  }
+}
+
+// Enhanced authentication check for multiple domains
+async function checkAuthentication() {
+  try {
+    console.log('Checking authentication across domains...');
+    
+    // Try cookies from multiple domain variations
+    const domainVariations = ['kolayxport.com', '.kolayxport.com'];
+    let authCookie = null;
+    
+    for (const domain of domainVariations) {
+      try {
+        const cookies = await chrome.cookies.getAll({ domain });
+        console.log(`Cookies for ${domain}:`, cookies.map(c => c.name));
+        
+        // Look for Supabase auth cookies
+        authCookie = cookies.find(cookie => 
+          cookie.name.startsWith('sb-') ||
+          cookie.name.includes('auth-token') ||
+          cookie.name.includes('session')
+        );
+        
+        if (authCookie) {
+          console.log(`Found auth cookie: ${authCookie.name} on domain: ${domain}`);
+          authToken = authCookie.value;
+          updateBadge('authenticated');
+          return;
+        }
+      } catch (cookieError) {
+        console.warn(`Failed to get cookies for ${domain}:`, cookieError);
+      }
+    }
+    
+    // Try localStorage from Kolayxport tabs - FIXED for path-based app 
+    try {
+      const tabQueries = [
+        `https://kolayxport.com/*`,
+        `https://kolayxport.com/app*`,
+        `https://www.kolayxport.com/*`
+      ];
+      
+      let allTabs = [];
+      for (const query of tabQueries) {
+        try {
+          const tabs = await chrome.tabs.query({ url: query });
+          console.log(`Query ${query} found ${tabs.length} tabs`);
+          allTabs = allTabs.concat(tabs);
+        } catch (e) {
+          console.log(`Query failed for ${query}:`, e.message);
+        }
+      }
+      
+      console.log(`Found ${allTabs.length} Kolayxport tabs`);
+      
+      if (allTabs.length > 0) {
+        // Try the first available tab
+        const tab = allTabs[0];
+        console.log(`Checking auth in tab: ${tab.url}`);
+        
+        try {
+          console.log(`Attempting script injection into tab ${tab.id}: ${tab.url}`);
+          
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+              console.log('=== KOLAYXPORT.COM/APP AUTH DEBUG ===');
+              console.log('Current URL:', window.location.href);
+              console.log('Domain:', window.location.hostname);
+              console.log('Path:', window.location.pathname);
+              console.log('Is /app path:', window.location.pathname.startsWith('/app'));
+              
+              // Check localStorage
+              const keys = Object.keys(localStorage);
+              console.log('LocalStorage keys count:', keys.length);
+              console.log('LocalStorage keys:', keys);
+              
+              // Check sessionStorage too
+              const sessionKeys = Object.keys(sessionStorage);
+              console.log('SessionStorage keys count:', sessionKeys.length);
+              console.log('SessionStorage keys:', sessionKeys);
+              
+              // Check for Supabase client in window
+              console.log('Window.supabase exists:', !!window.supabase);
+              console.log('Window.__NEXT_DATA__ exists:', !!window.__NEXT_DATA__);
+              
+              // Look for any auth-related keys
+              const allKeys = [...keys, ...sessionKeys];
+              const authKeys = allKeys.filter(key => 
+                key.includes('sb-') || 
+                key.includes('supabase') || 
+                key.includes('auth') ||
+                key.includes('session') ||
+                key.includes('token')
+              );
+              
+              console.log('Auth-related keys found:', authKeys);
+              
+              // Try localStorage first
+              for (const key of keys) {
+                if (key.startsWith('sb-') && key.includes('auth-token')) {
+                  const value = localStorage.getItem(key);
+                  console.log(`Found Supabase key: ${key}`);
+                  
+                  try {
+                    const parsed = JSON.parse(value);
+                    console.log('Parsed structure:', Object.keys(parsed));
+                    if (parsed.access_token) {
+                      console.log('SUCCESS: Found access_token!');
+                      return {
+                        token: parsed.access_token,
+                        source: 'localStorage',
+                        key: key
+                      };
+                    }
+                  } catch (e) {
+                    console.log('Parse failed for key:', key);
+                  }
+                }
+              }
+              
+              // Try sessionStorage
+              for (const key of sessionKeys) {
+                if (key.includes('sb-') || key.includes('supabase')) {
+                  const value = sessionStorage.getItem(key);
+                  console.log(`Found session key: ${key}`);
+                  
+                  try {
+                    const parsed = JSON.parse(value);
+                    if (parsed.access_token) {
+                      console.log('SUCCESS: Found access_token in sessionStorage!');
+                      return {
+                        token: parsed.access_token,
+                        source: 'sessionStorage', 
+                        key: key
+                      };
+                    }
+                  } catch (e) {
+                    console.log('Session parse failed for key:', key);
+                  }
+                }
+              }
+              
+              // Try window.supabase if available
+              if (window.supabase && window.supabase.auth) {
+                try {
+                  // Check if there's a current session
+                  console.log('Trying window.supabase.auth...');
+                  // Note: We can't use await here, but we can try to access current session
+                  const authState = window.supabase.auth;
+                  console.log('Auth state available:', !!authState);
+                } catch (e) {
+                  console.log('Window supabase check failed:', e);
+                }
+              }
+              
+              console.log('=== NO AUTH TOKEN FOUND ===');
+              return null;
+            }
+          });
+          
+          console.log('Script injection completed, results:', results);
+          const result = results[0]?.result;
+          if (result && result.token) {
+            console.log(`Found token from ${result.source}: ${result.key}`);
+            authToken = result.token;
+            updateBadge('authenticated');
+            return;
+          } else {
+            console.log('Script injection returned null, trying message approach...');
+          }
+          
+        } catch (injectionError) {
+          console.error('Script injection failed:', injectionError);
+          console.log('This could be due to CSP restrictions on the Kolayxport site');
+        }
+        
+        // Always try the message approach as fallback when script injection fails or returns null
+        try {
+          console.log('Trying message-based approach to kolayxport.js content script...');
+          const response = await new Promise((resolve, reject) => {
+            chrome.tabs.sendMessage(tab.id, { action: 'getAuthToken' }, (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(response);
+              }
+            });
+          });
+          
+          if (response && response.success && response.token) {
+            console.log('SUCCESS: Got token via message approach:', response);
+            authToken = response.token;
+            updateBadge('authenticated');
+            return;
+          } else {
+            console.log('Message approach returned no token:', response);
+          }
+        } catch (messageError) {
+          console.error('Message approach failed:', messageError);
+        }
+      }
+    } catch (tabError) {
+      console.warn('Tab injection failed:', tabError);
+    }
+    
+    // If we get here, no authentication was found
+    console.log('No authentication found via any method');
+    authToken = null;
+    updateBadge('unauthenticated');
+    
+  } catch (error) {
+    console.error('Auth check failed:', error);
+    authToken = null;
+    updateBadge('error');
+  }
+}
+
+async function getCookies(domain) {
+  try {
+    const cookies = await chrome.cookies.getAll({ domain });
+    const cookieObj = {};
+    
+    cookies.forEach(cookie => {
+      cookieObj[cookie.name] = cookie.value;
+    });
+    
+    if (authToken) {
+      cookieObj.kxAuthToken = authToken;
+    }
+    
+    return cookieObj;
+  } catch (error) {
+    console.error('Failed to get cookies:', error);
+    return {};
+  }
+}
+
+// Sync handling
+function handleSyncComplete(data) {
+  syncStats.totalSynced += data.count;
+  syncStats.lastSyncTime = new Date();
+  syncStats.errors = 0;
+  
+  updateBadge('success', syncStats.totalSynced.toString());
+  chrome.storage.local.set({ syncStats });
+}
+
+// Badge management
+function updateBadge(status, text = '') {
+  let color = BADGE_COLORS.default;
+  let badgeText = text;
+  
+  switch (status) {
+    case 'authenticated':
+      color = BADGE_COLORS.success;
+      badgeText = badgeText || '';
+      break;
+    case 'unauthenticated':
+      color = BADGE_COLORS.warning;
+      badgeText = badgeText || '?';
+      break;
+    case 'success':
+      color = BADGE_COLORS.success;
+      break;
+    case 'error':
+      color = BADGE_COLORS.error;
+      break;
+  }
+  
+  chrome.action.setBadgeBackgroundColor({ color });
+  chrome.action.setBadgeText({ text: badgeText });
+}
+
+// Context menu handling
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'syncNow') {
+    const tabs = await chrome.tabs.query({
+      url: [
+        'https://www.etsy.com/your/orders/*',
+        'https://www.etsy.com/your/shops/*/orders*'
+      ]
+    });
+    
+    if (tabs.length > 0) {
+      try {
+        await chrome.tabs.sendMessage(tabs[0].id, { action: 'scrapeNow' });
+      } catch (error) {
+        console.error('Failed to send sync message:', error);
+      }
+    }
+  }
+});
+
+// Global error handling
+self.addEventListener('error', (event) => {
+  console.error('Service worker error:', event.error);
+});

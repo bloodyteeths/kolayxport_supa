@@ -1,33 +1,33 @@
 import { PrismaClient } from '@prisma/client';
 
 const prismaClientSingleton = () => {
-  // Ensure we have proper PgBouncer parameters to avoid prepared statement conflicts
-  const databaseUrl = process.env.DATABASE_URL;
+  // For serverless/Vercel, use DIRECT_URL to bypass pgbouncer issues
+  const databaseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL_NOPREP || process.env.DATABASE_URL;
   
-  console.log('[Prisma] Initializing with DATABASE_URL:', databaseUrl ? 'present' : 'missing');
+  console.log('[Prisma] Initializing with DIRECT_URL:', databaseUrl ? 'present' : 'missing');
   
-  // Check if the URL already has the required parameters
   let finalUrl = databaseUrl;
-  if (databaseUrl) {
+  
+  // Only add serverless-friendly parameters if not using direct connection
+  if (databaseUrl && !process.env.DIRECT_URL) {
     const urlParams = new URLSearchParams(databaseUrl.split('?')[1] || '');
     
-    // Add required PgBouncer parameters if not present
+    // Serverless-optimized parameters
     if (!urlParams.has('pgbouncer')) {
       urlParams.set('pgbouncer', 'true');
     }
     if (!urlParams.has('statement_cache_size')) {
       urlParams.set('statement_cache_size', '0');
     }
-    if (!urlParams.has('pool_timeout')) {
-      urlParams.set('pool_timeout', '60');
-    }
     if (!urlParams.has('connection_limit')) {
-      urlParams.set('connection_limit', '20');
+      urlParams.set('connection_limit', '1');  // Single connection for serverless
     }
     
     const baseUrl = databaseUrl.split('?')[0];
     finalUrl = `${baseUrl}?${urlParams.toString()}`;
     console.log('[Prisma] Using connection params:', urlParams.toString());
+  } else if (process.env.DIRECT_URL) {
+    console.log('[Prisma] Using direct database connection (bypassing pgbouncer)');
   }
 
   const client = new PrismaClient({

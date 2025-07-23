@@ -44,7 +44,9 @@ declare global {
 
 const prisma = globalThis.prisma ?? prismaClientSingleton();
 
-if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma;
+// CRITICAL: Store the singleton in globalThis for ALL environments
+// This prevents connection pool exhaustion in production
+globalThis.prisma = prisma;
 
 // Add cleanup on process termination (only once)
 if (!globalThis.prismaEventsRegistered) {

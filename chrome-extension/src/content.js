@@ -58,7 +58,7 @@ const log = {
   }
 };
 
-log.info('🚀 Kolayxport Etsy Address Enrichment v3.2 Loading', { url: window.location.href });
+log.info('🚀 Kolayxport Etsy Address Enrichment v3.4 Loading', { url: window.location.href });
 
 // Extract store information from current page
 function getEtsyStoreInfo() {
@@ -212,9 +212,39 @@ const pushBatch = async batch => {
   }
 };
 
+// Helper function to expand address sections if collapsed
+function expandAddressSections() {
+  // Look for collapsed address buttons and click them
+  const collapsedButtons = document.querySelectorAll('[data-content-toggle][aria-expanded="false"]');
+  let expandedCount = 0;
+  
+  collapsedButtons.forEach(button => {
+    // Check if this is an address-related toggle
+    const buttonText = button.textContent?.toLowerCase() || '';
+    if (buttonText.includes('ship to') || buttonText.includes('address')) {
+      try {
+        button.click();
+        expandedCount++;
+        log.info('Expanded address section');
+      } catch (e) {
+        log.warn('Failed to expand address section', e.message);
+      }
+    }
+  });
+  
+  return expandedCount;
+}
+
 // Core extractor using REAL Etsy DOM structure
 async function extract() {
-  log.info('Starting order extraction with v3.1 selectors and fixed data format');
+  log.info('Starting order extraction with v3.2 selectors and address expansion');
+  
+  // First, try to expand any collapsed address sections
+  const expandedCount = expandAddressSections();
+  if (expandedCount > 0) {
+    log.info(`Expanded ${expandedCount} address sections, waiting for DOM update`);
+    await new Promise(r => setTimeout(r, 1000)); // Wait for expansion animation
+  }
   
   const synced = (await chrome.storage.local.get({ [STORAGE_KEY]: [] }))[STORAGE_KEY];
   
@@ -267,12 +297,14 @@ async function extract() {
       const orderDate = dateText.replace('Ordered ', '').trim();
       log.info(`Order ${orderId}: Found date: ${orderDate}`);
       
-      // Extract shipping address - THIS IS THE CRITICAL PART
+      // Extract shipping address - Updated for correct HTML structure
       let shippingAddress = {};
-      const addressContainer = row.querySelector('.address');
+      
+      // Look for expanded address view first (most detailed)
+      const addressContainer = row.querySelector('.address.break-word');
       
       if (addressContainer) {
-        // Parse structured address
+        // Parse structured address from expanded view
         const nameSpan = addressContainer.querySelector('.name');
         const firstLineSpan = addressContainer.querySelector('.first-line');
         const citySpan = addressContainer.querySelector('.city');
@@ -290,30 +322,59 @@ async function extract() {
           country: countrySpan?.textContent?.trim() || ''
         };
         
-        log.info(`Order ${orderId}: Found structured address`, shippingAddress);
+        log.info(`Order ${orderId}: Found expanded address structure`, shippingAddress);
       } else {
-        // Fallback: Look for collapsed address view
-        const collapsedAddress = row.querySelector('.break-word .text-body-smaller');
-        if (collapsedAddress) {
-          const addressText = collapsedAddress.textContent.trim();
-          // Parse "Adam Greco Rye Brook, NY" format
-          const parts = addressText.split(/,\s*/);
-          if (parts.length >= 2) {
-            const namePart = parts[0].trim();
-            const locationPart = parts[1].trim();
-            const stateParts = locationPart.split(/\s+/);
+        // Try looking for collapsible address button area
+        const shipToButton = row.querySelector('[data-content-toggle]');
+        if (shipToButton) {
+          // Look for address in the collapsible content area
+          const addressContent = row.querySelector('.address');
+          if (addressContent) {
+            const nameSpan = addressContent.querySelector('.name');
+            const firstLineSpan = addressContent.querySelector('.first-line');
+            const citySpan = addressContent.querySelector('.city');
+            const stateSpan = addressContent.querySelector('.state');
+            const zipSpan = addressContent.querySelector('.zip');
+            const countrySpan = addressContent.querySelector('.country-name');
             
             shippingAddress = {
-              name: namePart,
-              line1: '',
+              name: nameSpan?.textContent?.trim() || '',
+              line1: firstLineSpan?.textContent?.trim() || '',
               line2: '',
-              city: stateParts.slice(0, -1).join(' '),
-              state: stateParts[stateParts.length - 1],
-              postalCode: '',
-              country: ''
+              city: citySpan?.textContent?.trim() || '',
+              state: stateSpan?.textContent?.trim() || '',
+              postalCode: zipSpan?.textContent?.trim() || '',
+              country: countrySpan?.textContent?.trim() || ''
             };
             
-            log.info(`Order ${orderId}: Parsed collapsed address`, shippingAddress);
+            log.info(`Order ${orderId}: Found collapsible address`, shippingAddress);
+          }
+        }
+        
+        // Final fallback: Look for any collapsed address summary
+        if (!shippingAddress.name) {
+          const collapsedAddress = row.querySelector('.break-word .text-body-smaller');
+          if (collapsedAddress) {
+            const addressText = collapsedAddress.textContent.trim();
+            // Parse "Adam Greco Rye Brook, NY" format
+            const parts = addressText.split(/,\s*/);
+            if (parts.length >= 2) {
+              const namePart = parts[0].trim();
+              const locationPart = parts[1].trim();
+              const stateParts = locationPart.split(/\s+/);
+              
+              shippingAddress = {
+                name: namePart,
+                line1: '',
+                line2: '',
+                city: stateParts.slice(0, -1).join(' '),
+                state: stateParts[stateParts.length - 1],
+                postalCode: '',
+                country: ''
+              };
+              
+              log.info(`Order ${orderId}: Parsed collapsed address fallback`, shippingAddress);
+            }
           }
         }
       }
@@ -398,7 +459,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           syncedCount: (result[STORAGE_KEY] || []).length,
           url: window.location.href,
           scriptLoaded: true,
-          version: '3.1',
+          version: '3.4',
           logs: (result.kx_logs || []).slice(-10) // Last 10 logs
         };
         log.info('Status requested', status);
@@ -457,7 +518,7 @@ observer.observe(document.body, {
   subtree: true 
 });
 
-log.info('Content script v3.1 initialization complete');
+log.info('Content script v3.4 initialization complete');
 
 // Add visual indicator (removed after 3 seconds)
 const indicator = document.createElement('div');
@@ -474,6 +535,6 @@ indicator.style.cssText = `
   font-family: Arial, sans-serif !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 `;
-indicator.textContent = '✅ Kolayxport v3.1 - Fixed Data Format!';
+indicator.textContent = '✅ Kolayxport v3.4 - Address Extraction Fixed!';
 document.body.appendChild(indicator);
 setTimeout(() => indicator.remove(), 5000);

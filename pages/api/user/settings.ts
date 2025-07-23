@@ -7,10 +7,21 @@ export default async function handler(
   res: NextApiResponse
 ) {
   try {
+    console.log('[/api/user/settings] Request started', { 
+      method: req.method,
+      hasCookies: !!req.headers.cookie,
+      cookieLength: req.headers.cookie?.length 
+    });
+    
     const supabase = getSupabaseServerClient(req, res);
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !authUser) {
+      console.error('[/api/user/settings] Auth failed', { 
+        error: authError?.message,
+        code: authError?.code,
+        hasCookies: !!req.headers.cookie 
+      });
       return res.status(401).json({ error: 'Not authenticated' });
     }
     const userId = authUser.id;
@@ -82,6 +93,11 @@ export default async function handler(
         },
       });
     } catch (error: any) {
+      console.error('[/api/user/settings] Database error:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
       res.status(500).json({ error: 'Failed to fetch settings.', details: error.message });
     }
   } else if (req.method === 'PATCH') {

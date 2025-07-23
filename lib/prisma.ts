@@ -4,6 +4,8 @@ const prismaClientSingleton = () => {
   // Ensure we have proper PgBouncer parameters to avoid prepared statement conflicts
   const databaseUrl = process.env.DATABASE_URL;
   
+  console.log('[Prisma] Initializing with DATABASE_URL:', databaseUrl ? 'present' : 'missing');
+  
   // Check if the URL already has the required parameters
   let finalUrl = databaseUrl;
   if (databaseUrl) {
@@ -25,6 +27,7 @@ const prismaClientSingleton = () => {
     
     const baseUrl = databaseUrl.split('?')[0];
     finalUrl = `${baseUrl}?${urlParams.toString()}`;
+    console.log('[Prisma] Using connection params:', urlParams.toString());
   }
 
   return new PrismaClient({

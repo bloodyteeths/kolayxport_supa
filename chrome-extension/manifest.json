@@ -17,8 +17,7 @@
     "cookies",
     "alarms",
     "notifications",
-    "contextMenus",
-    "webRequest"
+    "contextMenus"
   ],
   "host_permissions": [
     "https://kolayxport.com/app/*",

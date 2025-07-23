@@ -98,7 +98,7 @@ async function handler(
     // Process each address to store in Etsy addresses table
     for (const addressData of orders) {
       try {
-        const { orderNumber, etsyStoreId, etsyStoreName, shippingAddress, notes } = addressData;
+        const { orderNumber, etsyStoreId, etsyStoreName, shippingAddress, notes, shipByDate, orderDate } = addressData;
 
         if (!orderNumber) {
           results.errors.push({ orderNumber: 'missing', error: 'Order number required' });
@@ -123,6 +123,8 @@ async function handler(
             shippingAddress,
             notes: notes || null,
             etsyStoreName: etsyStoreName || null,
+            shipByDate: shipByDate || null,
+            orderDate: orderDate || null,
             updatedAt: new Date()
           },
           create: {
@@ -131,7 +133,9 @@ async function handler(
             etsyStoreId: etsyStoreId || '',
             etsyStoreName: etsyStoreName || null,
             shippingAddress,
-            notes: notes || null
+            notes: notes || null,
+            shipByDate: shipByDate || null,
+            orderDate: orderDate || null
           }
         });
 

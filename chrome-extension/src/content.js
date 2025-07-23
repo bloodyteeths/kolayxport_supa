@@ -70,29 +70,52 @@ function getEtsyStoreInfo() {
   const shopIdMatch = url.match(/\/shops\/(\d+)\//);
   const shopId = shopIdMatch ? shopIdMatch[1] : null;
   
-  // Try to get store name from page elements
+  // Try to get store name from sidebar Sales channels section
   let storeName = null;
-  const storeNameSelectors = [
-    '[data-test-id="shop-name"]',
-    '.shop-name',
-    'h1 a[href*="/shop/"]',
-    '[aria-label*="shop"]'
-  ];
   
-  for (const selector of storeNameSelectors) {
-    const element = document.querySelector(selector);
-    if (element && element.textContent?.trim()) {
-      storeName = element.textContent.trim();
-      break;
+  // Look for the Etsy store name in the sidebar
+  const etsyChannelLink = document.querySelector('a[href*="/shop/"] [data-test-id="unsanitize"]');
+  if (etsyChannelLink) {
+    storeName = etsyChannelLink.textContent?.trim();
+    log.info('Found store name from sidebar Etsy channel', { storeName });
+  }
+  
+  // Fallback: try other selectors
+  if (!storeName) {
+    const storeNameSelectors = [
+      '[data-test-id="shop-name"]',
+      '.shop-name',
+      'h1 a[href*="/shop/"]',
+      '[aria-label*="shop"]'
+    ];
+    
+    for (const selector of storeNameSelectors) {
+      const element = document.querySelector(selector);
+      if (element && element.textContent?.trim()) {
+        storeName = element.textContent.trim();
+        break;
+      }
     }
   }
   
-  // Fallback: extract from URL breadcrumb or title
+  // Final fallback: extract from URL or title
   if (!storeName) {
-    const title = document.title;
-    const titleMatch = title.match(/^([^|]+)/);
-    if (titleMatch) {
-      storeName = titleMatch[1].trim();
+    // Try to extract from shop URL if present in href
+    const shopLink = document.querySelector('a[href*="/shop/"]');
+    if (shopLink) {
+      const hrefMatch = shopLink.href.match(/\/shop\/([^/?]+)/);
+      if (hrefMatch) {
+        storeName = hrefMatch[1];
+      }
+    }
+    
+    // Last resort: use page title
+    if (!storeName) {
+      const title = document.title;
+      const titleMatch = title.match(/^([^|]+)/);
+      if (titleMatch) {
+        storeName = titleMatch[1].trim();
+      }
     }
   }
   
@@ -297,6 +320,27 @@ async function extract() {
       const orderDate = dateText.replace('Ordered ', '').trim();
       log.info(`Order ${orderId}: Found date: ${orderDate}`);
       
+      // Extract ship by date from the shipping section
+      let shipByDate = '';
+      const shipByElements = row.querySelectorAll('.text-body.strong, .wt-tooltip__trigger');
+      for (const element of shipByElements) {
+        const text = element.textContent?.trim();
+        if (text && text.toLowerCase().includes('ship by')) {
+          shipByDate = text;
+          log.info(`Order ${orderId}: Found ship by: ${shipByDate}`);
+          break;
+        }
+      }
+      
+      // Alternative selector for ship by date
+      if (!shipByDate) {
+        const shipByAlt = row.querySelector('[data-clg-id="WtTooltip"] .wt-tooltip__trigger div div');
+        if (shipByAlt && shipByAlt.textContent?.toLowerCase().includes('ship by')) {
+          shipByDate = shipByAlt.textContent.trim();
+          log.info(`Order ${orderId}: Found ship by (alt): ${shipByDate}`);
+        }
+      }
+      
       // Extract shipping address - Updated for correct HTML structure
       let shippingAddress = {};
       
@@ -393,7 +437,7 @@ async function extract() {
       // Get store information for multi-store support
       const storeInfo = getEtsyStoreInfo();
       
-      // Simplified data structure - only order number, address, notes, and store info
+      // Simplified data structure - only order number, address, notes, store info, and ship by date
       const orderData = {
         orderNumber,
         etsyStoreId: storeInfo.shopId,
@@ -407,7 +451,9 @@ async function extract() {
           postalCode: shippingAddress.postalCode || '',
           country: shippingAddress.country || 'US'
         },
-        notes: notes || ''
+        notes: notes || '',
+        shipByDate: shipByDate || '',
+        orderDate: orderDate || ''
       };
       
       // Only add if we have essential data

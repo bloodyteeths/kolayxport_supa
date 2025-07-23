@@ -235,7 +235,7 @@ async function getTokenFromKolayxportTab() {
       try {
         console.log(`Attempting to inject script into tab ${tab.id}: ${tab.url}`);
         
-        // Execute script to get token from localStorage/sessionStorage
+        // Execute script to get token from localStorage/sessionStorage and window globals
         const results = await chrome.scripting.executeScript({
           target: { tabId: tab.id },
           func: () => {
@@ -244,9 +244,9 @@ async function getTokenFromKolayxportTab() {
               const keys = Object.keys(localStorage);
               console.log('LocalStorage keys:', keys);
               
-              // Look for Supabase auth session data
+              // First try all sb- keys that might contain auth tokens
               for (const key of keys) {
-                if (key.startsWith('sb-') && key.includes('-auth-token')) {
+                if (key.startsWith('sb-') && key.includes('auth-token')) {
                   const value = localStorage.getItem(key);
                   console.log(`Found Supabase token key: ${key}`);
                   
@@ -254,31 +254,53 @@ async function getTokenFromKolayxportTab() {
                     // Parse the session data
                     const sessionData = JSON.parse(value);
                     if (sessionData.access_token) {
+                      console.log('Found access_token in session data');
                       return sessionData.access_token;
                     }
                   } catch (parseError) {
                     console.error('Failed to parse session data:', parseError);
-                    return value; // Return raw value as fallback
+                    // Continue to next key
                   }
                 }
               }
               
-              // Check for browser client session storage pattern
+              // Try to get token from window globals (if Supabase client is available)
+              if (typeof window !== 'undefined' && window.supabase) {
+                try {
+                  const session = window.supabase.auth.getSession();
+                  if (session && session.data && session.data.session) {
+                    console.log('Found session from window.supabase');
+                    return session.data.session.access_token;
+                  }
+                } catch (e) {
+                  console.log('Could not get session from window.supabase:', e.message);
+                }
+              }
+              
+              // Look for any supabase-related keys (broader search)
               const supabaseKey = keys.find(key => 
-                key.includes('supabase.auth.token') || 
-                key.includes('sb-') && key.includes('auth') ||
-                key.includes('supabase-auth')
+                key.includes('supabase') || 
+                key.includes('sb-')
               );
               
               if (supabaseKey) {
                 const session = localStorage.getItem(supabaseKey);
-                console.log(`Found auth key: ${supabaseKey}`);
+                console.log(`Found auth-related key: ${supabaseKey}, length: ${session?.length}`);
                 
                 try {
                   const parsed = JSON.parse(session);
-                  return parsed.access_token || parsed.token || session;
+                  // Look for various token fields
+                  const token = parsed.access_token || parsed.token || parsed.accessToken;
+                  if (token) {
+                    console.log('Found token in parsed data');
+                    return token;
+                  }
                 } catch {
-                  return session;
+                  // If not JSON, check if it's a direct token string
+                  if (session && session.length > 20) {
+                    console.log('Returning raw session value');
+                    return session;
+                  }
                 }
               }
               
@@ -287,11 +309,13 @@ async function getTokenFromKolayxportTab() {
               for (const key of sessionKeys) {
                 if (key.includes('sb-') || key.includes('supabase')) {
                   const session = sessionStorage.getItem(key);
+                  console.log(`Found sessionStorage key: ${key}`);
                   try {
                     const parsed = JSON.parse(session);
-                    return parsed.access_token || parsed.token || session;
+                    const token = parsed.access_token || parsed.token || parsed.accessToken;
+                    if (token) return token;
                   } catch {
-                    return session;
+                    if (session && session.length > 20) return session;
                   }
                 }
               }
@@ -483,22 +507,8 @@ chrome.action.onClicked.addListener((tab) => {
   }
 });
 
-// Web request handling for enhanced authentication
-chrome.webRequest.onBeforeSendHeaders.addListener(
-  (details) => {
-    // Add auth header if we have a token
-    if (authToken && details.url.includes(KOLAYXPORT_DOMAIN)) {
-      const headers = details.requestHeaders || [];
-      headers.push({
-        name: 'X-Extension-Auth',
-        value: authToken
-      });
-      return { requestHeaders: headers };
-    }
-  },
-  { urls: [`https://${KOLAYXPORT_DOMAIN}/*`] },
-  ['requestHeaders', 'extraHeaders']
-);
+// Web request handling removed to fix service worker registration issues
+// Authentication will be handled via cookies and Authorization headers in content script
 
 // Global error handling
 self.addEventListener('error', (event) => {

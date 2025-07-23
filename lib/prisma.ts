@@ -8,26 +8,30 @@ const prismaClientSingleton = () => {
   
   let finalUrl = databaseUrl;
   
-  // Only add serverless-friendly parameters if not using direct connection
-  if (databaseUrl && !process.env.DIRECT_URL) {
-    const urlParams = new URLSearchParams(databaseUrl.split('?')[1] || '');
-    
-    // Serverless-optimized parameters
-    if (!urlParams.has('pgbouncer')) {
-      urlParams.set('pgbouncer', 'true');
-    }
-    if (!urlParams.has('statement_cache_size')) {
-      urlParams.set('statement_cache_size', '0');
-    }
-    if (!urlParams.has('connection_limit')) {
-      urlParams.set('connection_limit', '1');  // Single connection for serverless
-    }
-    
-    const baseUrl = databaseUrl.split('?')[0];
-    finalUrl = `${baseUrl}?${urlParams.toString()}`;
-    console.log('[Prisma] Using connection params:', urlParams.toString());
-  } else if (process.env.DIRECT_URL) {
+  // If we're using DIRECT_URL, use it as-is without any parameters
+  if (process.env.DIRECT_URL && databaseUrl === process.env.DIRECT_URL) {
     console.log('[Prisma] Using direct database connection (bypassing pgbouncer)');
+    finalUrl = databaseUrl;
+  } else {
+    // Only add serverless-friendly parameters for pooled connections
+    if (databaseUrl) {
+      const urlParams = new URLSearchParams(databaseUrl.split('?')[1] || '');
+      
+      // Serverless-optimized parameters
+      if (!urlParams.has('pgbouncer')) {
+        urlParams.set('pgbouncer', 'true');
+      }
+      if (!urlParams.has('statement_cache_size')) {
+        urlParams.set('statement_cache_size', '0');
+      }
+      if (!urlParams.has('connection_limit')) {
+        urlParams.set('connection_limit', '1');  // Single connection for serverless
+      }
+      
+      const baseUrl = databaseUrl.split('?')[0];
+      finalUrl = `${baseUrl}?${urlParams.toString()}`;
+      console.log('[Prisma] Using connection params:', urlParams.toString());
+    }
   }
 
   const client = new PrismaClient({

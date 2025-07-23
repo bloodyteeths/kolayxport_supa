@@ -64,6 +64,50 @@ async function handleMessage(request, sender, sendResponse) {
       });
       break;
       
+    case 'syncOrders':
+      // Handle the API call from background script to avoid CORS
+      try {
+        console.log('Background: Syncing orders to Kolayxport API');
+        const { orders, source, timestamp } = request;
+        
+        if (!authToken) {
+          sendResponse({ success: false, error: 'Not authenticated' });
+          return;
+        }
+        
+        const response = await fetch('https://kolayxport.com/api/integrations/etsy/addresses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'X-Extension-Auth': authToken,
+            'X-Extension-Version': chrome.runtime.getManifest().version
+          },
+          credentials: 'include',
+          body: JSON.stringify({ orders, source, timestamp })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Background: Sync successful', result);
+          sendResponse({ success: true, result });
+        } else {
+          const errorText = await response.text();
+          console.error('Background: Sync failed', response.status, errorText);
+          sendResponse({ 
+            success: false, 
+            error: `Server error ${response.status}: ${errorText}` 
+          });
+        }
+      } catch (error) {
+        console.error('Background: Sync error', error);
+        sendResponse({ 
+          success: false, 
+          error: error.message 
+        });
+      }
+      break;
+      
     default:
       sendResponse({ error: 'Unknown action' });
   }

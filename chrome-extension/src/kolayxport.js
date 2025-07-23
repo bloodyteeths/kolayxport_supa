@@ -24,6 +24,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       console.log('SessionStorage keys count:', sessionKeys.length);
       console.log('SessionStorage keys:', sessionKeys);
       
+      // Log ALL sessionStorage keys to see what's there
+      sessionKeys.forEach(key => {
+        const value = sessionStorage.getItem(key);
+        if (value) {
+          console.log(`sessionStorage[${key}]: ${value.substring(0, 100)}...`);
+        }
+      });
+      
       // Log all Supabase-related keys with their values (first 50 chars)
       const allKeys = [...keys, ...sessionKeys];
       const supabaseKeys = allKeys.filter(key => 
@@ -100,6 +108,52 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       }
       
+      // Check document.cookie directly (might be httpOnly but worth trying)
+      console.log('=== CHECKING COOKIES ===');
+      console.log('document.cookie:', document.cookie);
+      
+      // Parse cookies manually
+      const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+        const [key, ...val] = cookie.trim().split('=');
+        if (key) {
+          acc[key] = decodeURIComponent(val.join('='));
+        }
+        return acc;
+      }, {});
+      console.log('Parsed cookies:', Object.keys(cookies));
+      
+      // Look for auth-related cookies
+      const authCookies = Object.keys(cookies).filter(key => 
+        key.includes('sb-') || key.includes('supabase') || key.includes('auth') || key.includes('session')
+      );
+      console.log('Auth-related cookies:', authCookies);
+      
+      // Try to access cookies that might contain tokens
+      for (const cookieName of authCookies) {
+        const cookieValue = cookies[cookieName];
+        console.log(`Cookie ${cookieName}: ${cookieValue?.substring(0, 100)}...`);
+        
+        // Try to parse as JSON
+        if (cookieValue && cookieValue.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(cookieValue);
+            console.log(`Cookie ${cookieName} structure:`, Object.keys(parsed));
+            if (parsed.access_token) {
+              console.log('SUCCESS: Found access_token in cookie!');
+              sendResponse({
+                success: true,
+                token: parsed.access_token,
+                source: 'cookie',
+                key: cookieName
+              });
+              return;
+            }
+          } catch (e) {
+            console.log(`Cookie ${cookieName} is not JSON`);
+          }
+        }
+      }
+      
       // Check for window.supabase and other globals
       console.log('=== CHECKING WINDOW GLOBALS ===');
       console.log('window.supabase exists:', !!window.supabase);
@@ -110,6 +164,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       // Try to access Next.js props if available
       if (window.__NEXT_DATA__ && window.__NEXT_DATA__.props) {
         console.log('Next.js data available:', Object.keys(window.__NEXT_DATA__.props));
+        
+        // Check if there's session data in Next.js props
+        if (window.__NEXT_DATA__.props.pageProps) {
+          console.log('PageProps available:', Object.keys(window.__NEXT_DATA__.props.pageProps));
+          const pageProps = window.__NEXT_DATA__.props.pageProps;
+          
+          // Look for session or auth data in props
+          const authProps = Object.keys(pageProps).filter(key => 
+            key.toLowerCase().includes('session') || 
+            key.toLowerCase().includes('auth') ||
+            key.toLowerCase().includes('user')
+          );
+          console.log('Auth-related pageProps:', authProps);
+          
+          for (const prop of authProps) {
+            console.log(`PageProp ${prop}:`, pageProps[prop]);
+          }
+        }
       }
       
       // Check for React DevTools or context
@@ -124,6 +196,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         key.toLowerCase().includes('session')
       );
       console.log('Auth-related window globals:', authGlobals);
+      
+      // Try to access React Fiber for context (advanced technique)
+      try {
+        const reactRoot = document.querySelector('#__next');
+        if (reactRoot && reactRoot._reactInternalFiber) {
+          console.log('React Fiber available, trying to access context...');
+          // This is complex and might not work, but let's try
+        }
+      } catch (e) {
+        console.log('Could not access React Fiber');
+      }
       
       if (window.supabase) {
         console.log('Window.supabase exists, trying to get session...');
@@ -167,6 +250,12 @@ function detectAuthInfo() {
     chrome.storage.local.set({ 'kolayxport_auth_available': true });
   }
 }
+
+// Signal that this content script is ready
+console.log('Kolayxport content script ready for messages');
+chrome.runtime.sendMessage({ action: 'contentScriptReady', url: window.location.href }).catch(() => {
+  // Ignore errors - background script might not be ready
+});
 
 // Run detection on load
 detectAuthInfo();

@@ -240,9 +240,27 @@ async function getTokenFromKolayxportTab() {
           target: { tabId: tab.id },
           func: () => {
             try {
-              // Check for Supabase session in localStorage
+              // Simplified debugging to avoid service worker issues
               const keys = Object.keys(localStorage);
+              console.log('=== AUTH DEBUG START ===');
               console.log('LocalStorage keys:', keys);
+              
+              // Find auth-related keys
+              const authKeys = keys.filter(key => 
+                key.includes('sb-') || 
+                key.includes('supabase') || 
+                key.includes('auth')
+              );
+              
+              console.log('Auth-related keys:', authKeys);
+              
+              // Log sample of each auth key (first 50 chars)
+              authKeys.forEach(key => {
+                const value = localStorage.getItem(key);
+                if (value) {
+                  console.log(`${key}: ${value.substring(0, 50)}...`);
+                }
+              });
               
               // First try all sb- keys that might contain auth tokens
               for (const key of keys) {
@@ -253,6 +271,7 @@ async function getTokenFromKolayxportTab() {
                   try {
                     // Parse the session data
                     const sessionData = JSON.parse(value);
+                    console.log('Session data structure:', Object.keys(sessionData));
                     if (sessionData.access_token) {
                       console.log('Found access_token in session data');
                       return sessionData.access_token;
@@ -264,20 +283,59 @@ async function getTokenFromKolayxportTab() {
                 }
               }
               
-              // Try to get token from window globals (if Supabase client is available)
-              if (typeof window !== 'undefined' && window.supabase) {
-                try {
-                  const session = window.supabase.auth.getSession();
-                  if (session && session.data && session.data.session) {
-                    console.log('Found session from window.supabase');
-                    return session.data.session.access_token;
+              // Try specific Supabase patterns based on your project
+              const possibleAuthKeys = [
+                'sb-zkcuvvzmtknzztjjwshx-auth-token',
+                'supabase.auth.token',
+                'sb-auth-token'
+              ];
+              
+              for (const key of possibleAuthKeys) {
+                const value = localStorage.getItem(key);
+                if (value) {
+                  console.log(`Found potential auth key: ${key}`);
+                  try {
+                    const parsed = JSON.parse(value);
+                    if (parsed.access_token) {
+                      console.log('Found access_token in potential auth key');
+                      return parsed.access_token;
+                    }
+                  } catch {
+                    console.log('Could not parse potential auth key');
                   }
-                } catch (e) {
-                  console.log('Could not get session from window.supabase:', e.message);
                 }
               }
               
-              // Look for any supabase-related keys (broader search)
+              // Try to get token from window globals
+              if (typeof window !== 'undefined') {
+                // Check for Supabase client
+                if (window.supabase) {
+                  try {
+                    // Note: getSession() might be async, but we can't use await in this context
+                    const session = window.supabase.auth.getSession();
+                    console.log('Window supabase session:', session);
+                    // If it's a promise, we can't wait for it here
+                    if (session && typeof session.then === 'function') {
+                      console.log('Session is a promise, cannot await in this context');
+                    } else if (session && session.data && session.data.session) {
+                      console.log('Found session from window.supabase');
+                      return session.data.session.access_token;
+                    }
+                  } catch (e) {
+                    console.log('Could not get session from window.supabase:', e.message);
+                  }
+                }
+                
+                // Check for other auth globals
+                const authGlobals = ['__NEXT_DATA__', '_supabaseClient', 'supabaseClient'];
+                for (const global of authGlobals) {
+                  if (window[global]) {
+                    console.log(`Found global: ${global}`, typeof window[global]);
+                  }
+                }
+              }
+              
+              // Fallback: look for any auth-related data
               const supabaseKey = keys.find(key => 
                 key.includes('supabase') || 
                 key.includes('sb-')
@@ -289,6 +347,7 @@ async function getTokenFromKolayxportTab() {
                 
                 try {
                   const parsed = JSON.parse(session);
+                  console.log('Parsed structure:', Object.keys(parsed));
                   // Look for various token fields
                   const token = parsed.access_token || parsed.token || parsed.accessToken;
                   if (token) {
@@ -304,22 +363,7 @@ async function getTokenFromKolayxportTab() {
                 }
               }
               
-              // Check sessionStorage as well
-              const sessionKeys = Object.keys(sessionStorage);
-              for (const key of sessionKeys) {
-                if (key.includes('sb-') || key.includes('supabase')) {
-                  const session = sessionStorage.getItem(key);
-                  console.log(`Found sessionStorage key: ${key}`);
-                  try {
-                    const parsed = JSON.parse(session);
-                    const token = parsed.access_token || parsed.token || parsed.accessToken;
-                    if (token) return token;
-                  } catch {
-                    if (session && session.length > 20) return session;
-                  }
-                }
-              }
-              
+              console.log('=== AUTH DEBUG END ===');
               console.log('No authentication tokens found in storage');
               return null;
             } catch (error) {

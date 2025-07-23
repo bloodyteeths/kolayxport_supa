@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Kolayxport Etsy Order Sync",
-  "version": "5.0.0",
+  "version": "5.2.0",
   "description": "Automatically sync Etsy Shop Manager orders with Kolayxport for streamlined shipping label generation",
   "author": "Kolayxport",
   "icons": {

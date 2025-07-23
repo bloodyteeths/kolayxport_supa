@@ -58,7 +58,7 @@ const log = {
   }
 };
 
-log.info('🚀 Kolayxport Etsy Address Enrichment v4.1 Loading', { url: window.location.href });
+log.info('🚀 Kolayxport Etsy Address Enrichment v5.2 Loading', { url: window.location.href });
 
 // Extract store information from current page
 function getEtsyStoreInfo() {
@@ -197,43 +197,23 @@ const pushBatch = async batch => {
   log.info(`Attempting to sync ${batch.length} orders`);
   
   try {
-    const token = await getAuthToken();
-    if (!token) {
-      log.error('No auth token available');
-      return;
-    }
-    
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-Extension-Version': chrome.runtime.getManifest().version
-    };
-    
-    // Add appropriate auth header based on token type
-    if (token.includes('sb-')) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    // Don't manually set Cookie header - let credentials: 'include' handle it
-    
-    log.info('Sending request to server', { 
+    log.info('Preparing to sync orders', { 
       url: API, 
       orderCount: batch.length,
-      firstOrderId: batch[0]?.orderNumber,
-      authMethod: token.includes('sb-') ? 'Bearer' : 'Cookies'
+      firstOrderId: batch[0]?.orderNumber
     });
     
-    const response = await fetch(API, {
-      method: "POST",
-      headers,
-      credentials: 'include',
-      body: JSON.stringify({ 
-        orders: batch,
-        source: 'chrome-extension-v4.1-multistore',
-        timestamp: new Date().toISOString()
-      })
+    // Use background script to make the API call (avoids CORS issues)
+    log.info('Sending sync request via background script');
+    const response = await chrome.runtime.sendMessage({
+      action: 'syncOrders',
+      orders: batch,
+      source: 'chrome-extension-v5.2-multistore',
+      timestamp: new Date().toISOString()
     });
     
-    if (response.ok) {
-      const result = await response.json();
+    if (response.success) {
+      const result = response.result;
       log.success(`Successfully synced ${batch.length} orders`, result);
       
       // Update synced orders storage
@@ -249,8 +229,7 @@ const pushBatch = async batch => {
       });
       
     } else {
-      const errorText = await response.text();
-      log.error(`Server responded with ${response.status}`, { status: response.status, error: errorText });
+      log.error(`Sync failed via background script`, { error: response.error });
     }
   } catch (err) {
     log.error("Sync failed", { message: err.message, stack: err.stack });
@@ -337,9 +316,31 @@ async function extract() {
       const orderTotal = priceSpan?.textContent?.replace(/[^0-9.]/g, '') || '';
       log.info(`Order ${orderId}: Found total: $${orderTotal}`);
       
-      // Extract order date
-      const dateText = row.querySelector('.text-body-smaller:last-child')?.textContent || '';
-      const orderDate = dateText.replace('Ordered ', '').trim();
+      // Extract order date - look for text with "Ordered" prefix
+      let orderDate = '';
+      const dateElements = row.querySelectorAll('.text-body-smaller');
+      for (const element of dateElements) {
+        const text = element.textContent?.trim() || '';
+        if (text.startsWith('Ordered ')) {
+          orderDate = text.replace('Ordered ', '').trim();
+          break;
+        }
+      }
+      
+      // Fallback: look for date pattern (e.g., "Dec 25, 2024")
+      if (!orderDate) {
+        const textNodes = row.querySelectorAll('*');
+        for (const node of textNodes) {
+          const text = node.textContent?.trim() || '';
+          // Match date patterns like "Dec 25, 2024" or "December 25, 2024"
+          const dateMatch = text.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}$/);
+          if (dateMatch) {
+            orderDate = dateMatch[0];
+            break;
+          }
+        }
+      }
+      
       log.info(`Order ${orderId}: Found date: ${orderDate}`);
       
       // Extract ship by date from the shipping section
@@ -527,7 +528,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           syncedCount: (result[STORAGE_KEY] || []).length,
           url: window.location.href,
           scriptLoaded: true,
-          version: '4.1',
+          version: '5.2',
           logs: (result.kx_logs || []).slice(-10) // Last 10 logs
         };
         log.info('Status requested', status);
@@ -586,7 +587,7 @@ observer.observe(document.body, {
   subtree: true 
 });
 
-log.info('Content script v4.1 initialization complete');
+log.info('Content script v5.2 initialization complete');
 
 // Add visual indicator (removed after 3 seconds)
 const indicator = document.createElement('div');
@@ -603,6 +604,6 @@ indicator.style.cssText = `
   font-family: Arial, sans-serif !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 `;
-indicator.textContent = '✅ Kolayxport v4.1 - Auth Fixed!';
+indicator.textContent = '✅ Kolayxport v5.2 - CORS Fixed!';
 document.body.appendChild(indicator);
 setTimeout(() => indicator.remove(), 5000);

@@ -1,5 +1,6 @@
-/* Kolayxport Etsy Address Enrichment – v3.2
- * Simplified to extract only order number, shipping address, and customization notes
+/* Kolayxport Etsy Address Enrichment – v3.3
+ * Multi-store support: Distinguishes between multiple Etsy stores per user
+ * Extracts order number, shipping address, customization notes, and store info
  * Works with Veeqo data to enrich orders with missing address information
  * Complements existing Veeqo integration for complete order data
  */
@@ -58,6 +59,47 @@ const log = {
 };
 
 log.info('🚀 Kolayxport Etsy Address Enrichment v3.2 Loading', { url: window.location.href });
+
+// Extract store information from current page
+function getEtsyStoreInfo() {
+  const url = window.location.href;
+  
+  // Extract shop ID from URL patterns like:
+  // https://www.etsy.com/your/shops/12345/orders
+  // https://www.etsy.com/your/shops/12345/tools/listings/orders
+  const shopIdMatch = url.match(/\/shops\/(\d+)\//);
+  const shopId = shopIdMatch ? shopIdMatch[1] : null;
+  
+  // Try to get store name from page elements
+  let storeName = null;
+  const storeNameSelectors = [
+    '[data-test-id="shop-name"]',
+    '.shop-name',
+    'h1 a[href*="/shop/"]',
+    '[aria-label*="shop"]'
+  ];
+  
+  for (const selector of storeNameSelectors) {
+    const element = document.querySelector(selector);
+    if (element && element.textContent?.trim()) {
+      storeName = element.textContent.trim();
+      break;
+    }
+  }
+  
+  // Fallback: extract from URL breadcrumb or title
+  if (!storeName) {
+    const title = document.title;
+    const titleMatch = title.match(/^([^|]+)/);
+    if (titleMatch) {
+      storeName = titleMatch[1].trim();
+    }
+  }
+  
+  log.info('Detected Etsy store info', { shopId, storeName });
+  
+  return { shopId, storeName };
+}
 
 // Get authentication token - try multiple sources
 async function getAuthToken() {
@@ -140,7 +182,7 @@ const pushBatch = async batch => {
       credentials: 'include',
       body: JSON.stringify({ 
         orders: batch,
-        source: 'chrome-extension-v3.2-addresses',
+        source: 'chrome-extension-v3.3-multistore',
         timestamp: new Date().toISOString()
       })
     });
@@ -287,9 +329,14 @@ async function extract() {
         }
       });
       
-      // Simplified data structure - only order number, address, and notes
+      // Get store information for multi-store support
+      const storeInfo = getEtsyStoreInfo();
+      
+      // Simplified data structure - only order number, address, notes, and store info
       const orderData = {
         orderNumber,
+        etsyStoreId: storeInfo.shopId,
+        etsyStoreName: storeInfo.storeName,
         shippingAddress: {
           name: shippingAddress.name || buyerName || '',
           line1: shippingAddress.line1 || '',

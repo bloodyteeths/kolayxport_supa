@@ -43,6 +43,7 @@ model User {
   syncLogs            SyncLog[]
   syncOperations      SyncOperation[]
   integrationSettings Credential?
+  etsyAddresses       EtsyAddress[]
 }
 
 model Account {
@@ -357,4 +358,23 @@ model OrderShipping {
   insertedAt  DateTime @default(now())
   updatedAt   DateTime @updatedAt
   order       Order    @relation("OrderToOrderShipping", fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model EtsyAddress {
+  id              String   @id @default(cuid())
+  userId          String
+  orderNumber     String
+  etsyStoreId     String?  // Etsy shop ID for multi-store support
+  etsyStoreName   String?  // Human-readable store name
+  shippingAddress Json
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, etsyStoreId, orderNumber])
+  @@index([userId, orderNumber])
+  @@index([userId, etsyStoreId, orderNumber])
+  @@index([orderNumber])
+  @@index([createdAt])
 }

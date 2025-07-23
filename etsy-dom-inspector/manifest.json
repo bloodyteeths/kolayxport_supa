@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Etsy DOM Inspector",
+  "version": "1.0.0",
+  "description": "Inspects Etsy orders page DOM structure to discover correct selectors",
+  "icons": {
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.etsy.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.etsy.com/your/orders/*",
+        "https://www.etsy.com/your/shops/*/orders*",
+        "https://www.etsy.com/shop-manager/*orders*"
+      ],
+      "js": ["content-inspector.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Etsy DOM Inspector"
+  }
+}

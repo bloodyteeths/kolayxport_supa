@@ -240,10 +240,75 @@ function normalizeVeeqoAddress(raw: any): NormalizedAddress {
   };
 }
 
-function extractAddress(order: any): NormalizedAddress | undefined {
+// Function to fetch Etsy address from EtsyAddress table
+async function getEtsyAddress(userId: string, orderNumber: string, marketplace?: string): Promise<any | null> {
+  // Only try to fetch Etsy address for Etsy orders
+  if (marketplace !== 'etsy' && marketplace !== 'Etsy') {
+    return null;
+  }
+  
+  try {
+    // Try to find address data from Etsy extension
+    const etsyAddress = await prisma.etsyAddress.findFirst({
+      where: {
+        userId,
+        orderNumber
+      },
+      select: {
+        shippingAddress: true,
+        notes: true,
+        etsyStoreId: true,
+        etsyStoreName: true
+      }
+    });
+    
+    return etsyAddress;
+  } catch (error) {
+    logger.error('Failed to fetch Etsy address', { userId, orderNumber, error });
+    return null;
+  }
+}
+
+// Normalize Etsy address from extension data
+function normalizeEtsyAddress(etsyAddressData: any): NormalizedAddress | undefined {
+  if (!etsyAddressData?.shippingAddress) {
+    return undefined;
+  }
+
+  const addr = etsyAddressData.shippingAddress;
+  
+  return {
+    name: addr.name || '',
+    phone: addr.phone || '',
+    street1: addr.line1 || '',
+    street2: addr.line2 || '',
+    city: addr.city || '',
+    state: addr.state || '',
+    postal: addr.postalCode || addr.postal || '',
+    country: addr.country || 'US',
+    isResidential: true // Etsy orders are typically residential
+  };
+}
+
+export async function extractAddressEnriched(order: any, userId?: string): Promise<NormalizedAddress | undefined> {
   let toAddress: NormalizedAddress | undefined = undefined;
 
-  // Try to get address based on source
+  // PRIORITY 1: For Etsy orders, try to get Etsy extension address first (highest priority)
+  if (userId && (order.marketplace === 'etsy' || order.marketplace === 'Etsy')) {
+    const etsyAddressData = await getEtsyAddress(userId, order.orderNumber, order.marketplace);
+    if (etsyAddressData) {
+      toAddress = normalizeEtsyAddress(etsyAddressData);
+      if (toAddress) {
+        logger.info(`Using Etsy extension address for order ${order.orderNumber}`, { 
+          hasAddress: true,
+          storeName: etsyAddressData.etsyStoreName 
+        });
+        return toAddress;
+      }
+    }
+  }
+
+  // PRIORITY 2: Try to get address based on source (existing logic)
   if (order.source === 'shippo') {
     toAddress = normalizeShippoAddress(order.rawData?.to_address);
   } else if (order.source === 'veeqo') {
@@ -256,18 +321,21 @@ function extractAddress(order: any): NormalizedAddress | undefined {
         }
       } catch (e) {
         // Removed verbose order.notes parse log as requested
-// console.warn('Failed to parse order.notes:', order.notes);
       }
     }
     
     // If no address from notes, try rawData
     if (!toAddress && order.rawData) {
       toAddress = normalizeVeeqoAddress(order.rawData.deliver_to || order.rawData.shipping_address);
-      }
     }
+  }
 
   // Log if address is still undefined
   if (!toAddress) {
+    logger.warn(`No address found for order ${order.orderNumber}`, { 
+      source: order.source, 
+      marketplace: order.marketplace 
+    });
   }
 
   return toAddress;

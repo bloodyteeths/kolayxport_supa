@@ -14,6 +14,8 @@ const testPayload = {
   orders: [
     {
       orderNumber: "4173818429",
+      etsyStoreId: "98765432",
+      etsyStoreName: "Adam's Art Store",
       shippingAddress: {
         name: "Adam Greco",
         line1: "",
@@ -27,6 +29,8 @@ const testPayload = {
     },
     {
       orderNumber: "4173818430", 
+      etsyStoreId: "12345678",
+      etsyStoreName: "Sarah's Handmade Shop",
       shippingAddress: {
         name: "Sarah Johnson",
         line1: "123 Main St",

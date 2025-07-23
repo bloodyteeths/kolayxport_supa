@@ -47,61 +47,64 @@ async function handler(
       errors: [] as any[]
     };
 
-    // Process each order to update address information
+    // Process each address to store in Etsy addresses table
     for (const addressData of orders) {
       try {
-        const { orderNumber, shippingAddress, notes } = addressData;
+        const { orderNumber, etsyStoreId, etsyStoreName, shippingAddress, notes } = addressData;
 
         if (!orderNumber) {
           results.errors.push({ orderNumber: 'missing', error: 'Order number required' });
           continue;
         }
 
-        // Find existing order by order number
-        const existingOrder = await prisma.order.findFirst({
-          where: { 
-            userId,
-            orderNumber: orderNumber,
-            marketplace: 'veeqo' // Look for Veeqo orders to enrich with Etsy address
-          }
-        });
-
-        if (!existingOrder) {
-          logger.warn(`Order ${orderNumber} not found for address update`, { userId, orderNumber });
-          results.notFound++;
+        if (!shippingAddress || Object.keys(shippingAddress).length === 0) {
+          results.errors.push({ orderNumber, error: 'Shipping address required' });
           continue;
         }
 
-        // Update the order with shipping address and notes
-        const updateData: any = {};
+        // Upsert Etsy address data
+        await prisma.etsyAddress.upsert({
+          where: {
+            userId_etsyStoreId_orderNumber: {
+              userId,
+              etsyStoreId: etsyStoreId || null,
+              orderNumber
+            }
+          },
+          update: {
+            shippingAddress,
+            notes: notes || null,
+            etsyStoreName: etsyStoreName || null,
+            updatedAt: new Date()
+          },
+          create: {
+            userId,
+            orderNumber,
+            etsyStoreId: etsyStoreId || null,
+            etsyStoreName: etsyStoreName || null,
+            shippingAddress,
+            notes: notes || null
+          }
+        });
+
+        logger.info(`Stored Etsy address for order ${orderNumber}`, { 
+          userId,
+          orderNumber,
+          etsyStoreId,
+          etsyStoreName,
+          hasAddress: !!shippingAddress,
+          hasNotes: !!notes 
+        });
         
-        if (shippingAddress && Object.keys(shippingAddress).length > 0) {
-          updateData.shippingAddress = JSON.stringify(shippingAddress);
-        }
-        
-        if (notes) {
-          updateData.notes = notes;
-        }
-
-        if (Object.keys(updateData).length > 0) {
-          await prisma.order.update({
-            where: { id: existingOrder.id },
-            data: updateData
-          });
-
-          logger.info(`Updated address for order ${orderNumber}`, { 
-            orderId: existingOrder.id, 
-            hasAddress: !!shippingAddress,
-            hasNotes: !!notes 
-          });
-          
-          results.updated++;
-        }
-
+        results.updated++;
         results.processed++;
 
       } catch (error) {
-        logger.error(`Failed to update address for order`, { orderNumber: addressData.orderNumber, error });
+        logger.error(`Failed to store Etsy address`, { 
+          orderNumber: addressData.orderNumber, 
+          etsyStoreId: addressData.etsyStoreId,
+          error 
+        });
         results.errors.push({
           orderNumber: addressData.orderNumber,
           error: error instanceof Error ? error.message : 'Unknown error'

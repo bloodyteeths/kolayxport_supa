@@ -55,15 +55,35 @@ export function getSupabaseServerClient(req, res) {
       cookies: {
         get(name) {
           // Parse cookies from headers since req.cookies is not available in API routes
-          const cookieHeader = req.headers.cookie || '';
-          const cookies = {};
-          cookieHeader.split(';').forEach(cookie => {
-            const [key, ...val] = cookie.trim().split('=');
-            if (key) {
-              cookies[key] = decodeURIComponent(val.join('='));
-            }
-          });
-          return cookies[name];
+          try {
+            const cookieHeader = req.headers.cookie || '';
+            if (!cookieHeader) return undefined;
+            
+            const cookies = {};
+            cookieHeader.split(';').forEach(cookie => {
+              const trimmedCookie = cookie.trim();
+              if (!trimmedCookie) return;
+              
+              const eqIndex = trimmedCookie.indexOf('=');
+              if (eqIndex === -1) return;
+              
+              const key = trimmedCookie.slice(0, eqIndex);
+              const value = trimmedCookie.slice(eqIndex + 1);
+              
+              if (key && value !== undefined) {
+                try {
+                  cookies[key] = decodeURIComponent(value);
+                } catch (e) {
+                  // If decoding fails, use the raw value
+                  cookies[key] = value;
+                }
+              }
+            });
+            return cookies[name];
+          } catch (error) {
+            console.error('Error parsing cookies:', error);
+            return undefined;
+          }
         },
         set(name, value, options) {
           if (res) res.setHeader('Set-Cookie', serializeCookie(name, value, options));

@@ -29,11 +29,29 @@ export default async function handler(
     if (cursor) {
       where.createdAt = { lt: new Date(cursor) };
     }
-    const syncs = await prisma.syncOperation.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
+    // Retry logic for database connection issues
+    let syncs;
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        syncs = await prisma.syncOperation.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        });
+        break;
+      } catch (error: any) {
+        retries--;
+        if (retries === 0 || !error.message?.includes('Closed')) {
+          throw error;
+        }
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // Force reconnection
+        await prisma.$disconnect();
+        await prisma.$connect();
+      }
+    }
 
     // Format response
     const resultSyncs = syncs.map(sync => {

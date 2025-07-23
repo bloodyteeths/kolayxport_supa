@@ -166,14 +166,14 @@ const pushBatch = async batch => {
     // Add appropriate auth header based on token type
     if (token.includes('sb-')) {
       headers['Authorization'] = `Bearer ${token}`;
-    } else {
-      headers['Cookie'] = `next-auth.session-token=${token}`;
     }
+    // Don't manually set Cookie header - let credentials: 'include' handle it
     
     log.info('Sending request to server', { 
       url: API, 
       orderCount: batch.length,
-      firstOrderId: batch[0]?.orderId 
+      firstOrderId: batch[0]?.orderNumber,
+      authMethod: token.includes('sb-') ? 'Bearer' : 'Cookies'
     });
     
     const response = await fetch(API, {

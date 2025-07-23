@@ -8,16 +8,64 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // Set CORS headers for Chrome extension
+  const origin = req.headers.origin;
+  if (origin && (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', 'https://kolayxport.com');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie, X-Extension-Version, X-Extension-Auth');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  
+  // Handle preflight request - don't check auth for OPTIONS
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   // Get user via Supabase client
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  let supabase = getSupabaseServerClient(req, res);
+  let { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  // If regular auth fails, try extension auth header
+  if ((authError || !user) && req.headers['x-extension-auth']) {
+    try {
+      const extensionToken = req.headers['x-extension-auth'] as string;
+      // Create a new Supabase client with the extension token
+      const { createClient } = require('@supabase/supabase-js');
+      const tempSupabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: {
+              Authorization: `Bearer ${extensionToken}`
+            }
+          }
+        }
+      );
+      const { data: { user: extensionUser }, error: extensionError } = await tempSupabase.auth.getUser();
+      if (extensionUser && !extensionError) {
+        user = extensionUser;
+        authError = null;
+      }
+    } catch (extensionAuthError) {
+      logger.warn('Extension auth also failed', { error: extensionAuthError });
+    }
+  }
 
   if (authError || !user) {
-    logger.warn('Unauthorized Etsy address sync attempt', { authError });
+    logger.warn('Unauthorized Etsy address sync attempt', { 
+      authError: authError?.message,
+      hasExtensionAuth: !!req.headers['x-extension-auth'],
+      origin: req.headers.origin,
+      userAgent: req.headers['user-agent']
+    });
     return res.status(401).json({ error: 'Unauthorized', details: authError?.message });
   }
   const userId = user.id;

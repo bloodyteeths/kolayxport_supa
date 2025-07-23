@@ -58,7 +58,7 @@ const log = {
   }
 };
 
-log.info('🚀 Kolayxport Etsy Address Enrichment v5.2 Loading', { url: window.location.href });
+log.info('🚀 Kolayxport Etsy Address Enrichment v5.3 Loading', { url: window.location.href });
 
 // Extract store information from current page
 function getEtsyStoreInfo() {
@@ -208,7 +208,7 @@ const pushBatch = async batch => {
     const response = await chrome.runtime.sendMessage({
       action: 'syncOrders',
       orders: batch,
-      source: 'chrome-extension-v5.2-multistore',
+      source: 'chrome-extension-v5.3-multistore',
       timestamp: new Date().toISOString()
     });
     
@@ -506,9 +506,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   switch (request.action) {
     case 'scrapeNow':
       log.info('Manual sync triggered from popup');
+      
+      // Force extraction even if recently done
+      lastExtractionTime = 0;
+      isExtracting = false;
+      
       extract().then(() => {
         sendResponse({ 
           status: 'completed', 
+          url: window.location.href, 
+          title: document.title 
+        });
+      }).catch(error => {
+        log.error('Manual sync failed', error);
+        sendResponse({ 
+          status: 'error', 
+          error: error.message,
           url: window.location.href, 
           title: document.title 
         });
@@ -524,11 +537,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
     case 'getStatus':
       chrome.storage.local.get([STORAGE_KEY, 'kx_logs']).then(result => {
+        const syncedOrderIds = result[STORAGE_KEY] || [];
+        const totalOrdersOnPage = document.querySelectorAll('.panel-body-row').length;
+        const pendingCount = Math.max(0, totalOrdersOnPage - syncedOrderIds.length);
+        
         const status = {
-          syncedCount: (result[STORAGE_KEY] || []).length,
+          syncedCount: syncedOrderIds.length,
+          pendingCount: pendingCount,
+          totalOrdersOnPage: totalOrdersOnPage,
           url: window.location.href,
           scriptLoaded: true,
-          version: '5.2',
+          version: '5.3',
+          isExtracting: isExtracting,
+          lastExtractionTime: lastExtractionTime,
           logs: (result.kx_logs || []).slice(-10) // Last 10 logs
         };
         log.info('Status requested', status);
@@ -572,14 +593,66 @@ async function performFullImport() {
 // Initialize
 log.info('Setting up observers and initial extraction');
 
-// One-shot extraction
-extract();
+// Track last extraction to prevent duplicates
+let lastExtractionTime = 0;
+let isExtracting = false;
 
-// Observe for dynamic content updates
-const observer = new MutationObserver(() => {
-  // Debounce extraction to avoid too many calls
+// Enhanced debounced extraction
+function debouncedExtract() {
+  if (isExtracting) {
+    log.info('Extraction already in progress, skipping');
+    return;
+  }
+  
+  const now = Date.now();
+  const timeSinceLastExtraction = now - lastExtractionTime;
+  
+  // Don't extract more than once every 10 seconds
+  if (timeSinceLastExtraction < 10000) {
+    log.info(`Skipping extraction, only ${timeSinceLastExtraction}ms since last extraction`);
+    return;
+  }
+  
+  // Clear any pending timeout
   clearTimeout(window.extractTimeout);
-  window.extractTimeout = setTimeout(extract, 1000);
+  
+  // Set timeout for actual extraction
+  window.extractTimeout = setTimeout(async () => {
+    if (isExtracting) return;
+    
+    isExtracting = true;
+    lastExtractionTime = Date.now();
+    
+    try {
+      await extract();
+    } finally {
+      isExtracting = false;
+    }
+  }, 2000); // 2 second delay to allow for DOM settling
+}
+
+// Initial extraction with delay
+setTimeout(debouncedExtract, 3000);
+
+// Observe for dynamic content updates with more restrictive filtering
+const observer = new MutationObserver((mutations) => {
+  // Only trigger on meaningful changes
+  const hasRelevantChanges = mutations.some(mutation => {
+    // Only care about added nodes that might be order rows
+    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+      return Array.from(mutation.addedNodes).some(node => {
+        return node.nodeType === 1 && // Element node
+               (node.classList?.contains('panel-body-row') || 
+                node.querySelector?.('.panel-body-row'));
+      });
+    }
+    return false;
+  });
+  
+  if (hasRelevantChanges) {
+    log.info('Relevant DOM changes detected, scheduling extraction');
+    debouncedExtract();
+  }
 });
 
 observer.observe(document.body, { 
@@ -587,7 +660,7 @@ observer.observe(document.body, {
   subtree: true 
 });
 
-log.info('Content script v5.2 initialization complete');
+log.info('Content script v5.3 initialization complete');
 
 // Add visual indicator (removed after 3 seconds)
 const indicator = document.createElement('div');
@@ -604,6 +677,6 @@ indicator.style.cssText = `
   font-family: Arial, sans-serif !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 `;
-indicator.textContent = '✅ Kolayxport v5.2 - CORS Fixed!';
+indicator.textContent = '✅ Kolayxport v5.3 - Senkron Düzeltmeleri!';
 document.body.appendChild(indicator);
 setTimeout(() => indicator.remove(), 5000);

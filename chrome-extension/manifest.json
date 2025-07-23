@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Kolayxport Etsy Order Sync",
-  "version": "5.2.0",
-  "description": "Automatically sync Etsy Shop Manager orders with Kolayxport for streamlined shipping label generation",
+  "name": "Kolayxport Etsy Sipariş Senkronizasyonu",
+  "version": "5.3.0",
+  "description": "Etsy Shop Manager siparişlerini Kolayxport ile otomatik senkronlayarak kargo etiketi oluşturmayı kolaylaştırır",
   "author": "Kolayxport",
   "icons": {
     "16": "icons/icon-16.png",
@@ -52,7 +52,7 @@
   },
   "action": {
     "default_popup": "src/popup.html",
-    "default_title": "Kolayxport Etsy Sync Status",
+    "default_title": "Kolayxport Etsy Senkron Durumu",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"

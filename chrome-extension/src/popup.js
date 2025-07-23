@@ -69,18 +69,34 @@ async function loadSyncStats() {
     
     // Update UI
     elements.totalSynced.textContent = stats.totalSynced || syncedOrders.length;
-    elements.lastSync.textContent = stats.lastSyncTime 
-      ? formatRelativeTime(new Date(stats.lastSyncTime))
-      : 'Never';
+    
+    // Fix date formatting
+    if (stats.lastSyncTime) {
+      const lastSyncDate = new Date(stats.lastSyncTime);
+      if (!isNaN(lastSyncDate.getTime())) {
+        elements.lastSync.textContent = formatRelativeTime(lastSyncDate);
+      } else {
+        elements.lastSync.textContent = 'Invalid date';
+      }
+    } else {
+      elements.lastSync.textContent = 'Hiçbir zaman';
+    }
     
     // Get pending count from content script if on Etsy page
     if (isOnEtsyOrders && currentTab) {
       try {
         const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getStatus' });
-        elements.pendingSync.textContent = response.pendingCount || 0;
+        if (response && typeof response.pendingCount === 'number') {
+          elements.pendingSync.textContent = response.pendingCount;
+        } else {
+          elements.pendingSync.textContent = '0';
+        }
       } catch (error) {
+        console.log('Could not get pending count from content script:', error.message);
         elements.pendingSync.textContent = '0';
       }
+    } else {
+      elements.pendingSync.textContent = '0';
     }
   } catch (error) {
     console.error('Failed to load sync stats:', error);
@@ -90,17 +106,17 @@ async function loadSyncStats() {
 // Update authentication UI
 function updateAuthUI(authenticated, response = {}) {
   if (authenticated) {
-    elements.authStatus.textContent = 'Connected';
+    elements.authStatus.textContent = 'Bağlandı';
     elements.authStatus.className = 'status-badge connected';
-    elements.authMessage.textContent = 'Your Kolayxport account is connected';
+    elements.authMessage.textContent = 'Kolayxport hesabınız bağlandı';
   } else {
-    elements.authStatus.textContent = 'Disconnected';
+    elements.authStatus.textContent = 'Bağlantı Kesildi';
     elements.authStatus.className = 'status-badge disconnected';
     
     if (response.error) {
-      elements.authMessage.textContent = `Error: ${response.error}`;
+      elements.authMessage.textContent = `Hata: ${response.error}`;
     } else {
-      elements.authMessage.textContent = 'Please log in to Kolayxport to sync orders';
+      elements.authMessage.textContent = 'Siparişleri senkronlamak için Kolayxport\'a giriş yapın';
     }
   }
   
@@ -122,14 +138,14 @@ function updateButtonStates() {
   
   // Update button tooltips
   if (!isAuthenticated) {
-    elements.syncNowBtn.title = 'Please log in to Kolayxport first';
-    elements.fullImportBtn.title = 'Please log in to Kolayxport first';
+    elements.syncNowBtn.title = 'Önce Kolayxport\'a giriş yapın';
+    elements.fullImportBtn.title = 'Önce Kolayxport\'a giriş yapın';
   } else if (!isOnEtsyOrders) {
-    elements.syncNowBtn.title = 'Please navigate to your Etsy orders page';
-    elements.fullImportBtn.title = 'Please navigate to your Etsy orders page';
+    elements.syncNowBtn.title = 'Etsy siparişler sayfanıza gidin';
+    elements.fullImportBtn.title = 'Etsy siparişler sayfanıza gidin';
   } else {
-    elements.syncNowBtn.title = 'Sync visible orders on current page';
-    elements.fullImportBtn.title = 'Import all historical orders (may take time)';
+    elements.syncNowBtn.title = 'Mevcut sayfadaki görünür siparişleri senkronla';
+    elements.fullImportBtn.title = 'Tüm geçmiş siparişleri içe aktar (zaman alabilir)';
   }
 }
 
@@ -137,18 +153,18 @@ function updateButtonStates() {
 function setupEventListeners() {
   // Refresh Auth button
   elements.refreshAuthBtn.addEventListener('click', async () => {
-    elements.refreshAuthBtn.textContent = '⟳ Checking...';
+    elements.refreshAuthBtn.textContent = '⟳ Kontrol ediliyor...';
     elements.refreshAuthBtn.disabled = true;
     
     await checkAuthStatus();
     
-    elements.refreshAuthBtn.textContent = '🔄 Refresh';
+    elements.refreshAuthBtn.textContent = '🔄 Yenile';
     elements.refreshAuthBtn.disabled = false;
   });
   
   // Add logs viewer button
   const logsBtn = document.createElement('button');
-  logsBtn.textContent = '📋 View Logs';
+  logsBtn.textContent = '📋 Logları Görüntüle';
   logsBtn.className = 'btn-secondary';
   logsBtn.addEventListener('click', showLogs);
   document.querySelector('.actions').appendChild(logsBtn);
@@ -159,7 +175,7 @@ function setupEventListeners() {
     
     try {
       elements.syncNowBtn.disabled = true;
-      elements.syncNowBtn.innerHTML = '<span class="loading"></span> Syncing...';
+      elements.syncNowBtn.innerHTML = '<span class="loading"></span> Senkronlanıyor...';
       
       console.log('🎯 Triggering sync from popup...');
       console.log('Current tab URL:', currentTab.url);
@@ -191,7 +207,7 @@ function setupEventListeners() {
       console.log('🚀 Sync triggered:', syncResponse);
       
       // Don't close popup - let background process handle it
-      showMessage('Sync started! Orders will sync in background.', 'success');
+      showMessage('Senkron başlatıldı! Siparişler arka planda senkronlanacak.', 'success');
       
       // Reload stats after a moment
       setTimeout(async () => {
@@ -200,7 +216,7 @@ function setupEventListeners() {
           <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
             <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
           </svg>
-          Sync Now
+          Şimdi Senkronla
         `;
         elements.syncNowBtn.disabled = false;
       }, 2000);
@@ -208,11 +224,11 @@ function setupEventListeners() {
     } catch (error) {
       console.error('❌ Failed to trigger sync:', error);
       
-      let errorMessage = 'Failed to start sync.';
+      let errorMessage = 'Senkron başlatılamadı.';
       if (error.message.includes('Could not establish connection')) {
-        errorMessage = 'Content script failed to load. Please refresh the Etsy page and try again.';
+        errorMessage = 'İçerik scripti yüklenemedi. Etsy sayfasını yenileyin ve tekrar deneyin.';
       } else if (error.message.includes('Frame with ID')) {
-        errorMessage = 'Page not ready. Please wait a moment and try again.';
+        errorMessage = 'Sayfa hazır değil. Biraz bekleyin ve tekrar deneyin.';
       }
       
       showMessage(errorMessage, 'error');
@@ -221,7 +237,7 @@ function setupEventListeners() {
         <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
           <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
         </svg>
-        Sync Now
+        Şimdi Senkronla
       `;
       elements.syncNowBtn.disabled = false;
     }
@@ -238,22 +254,22 @@ function setupEventListeners() {
     if (!currentTab || !isOnEtsyOrders) return;
     
     const confirmed = confirm(
-      'This will scroll through all your orders to import historical data. ' +
-      'This may take several minutes depending on your order volume. Continue?'
+      'Bu işlem geçmiş verileri içe aktarmak için tüm siparişlerinizi tarayacak. ' +
+      'Sipariş hacminize bağlı olarak birkaç dakika sürebilir. Devam etmek istiyor musunuz?'
     );
     
     if (!confirmed) return;
     
     try {
       elements.fullImportBtn.disabled = true;
-      elements.fullImportBtn.innerHTML = '<span class="loading"></span> Importing...';
+      elements.fullImportBtn.innerHTML = '<span class="loading"></span> İçe aktarılıyor...';
       
       await chrome.tabs.sendMessage(currentTab.id, { action: 'fullImport' });
       
-      showMessage('Full import started. Please keep this tab open.', 'success');
+      showMessage('Tam içe aktarma başlatıldı. Bu sekmeyi açık tutun.', 'success');
     } catch (error) {
       console.error('Failed to start import:', error);
-      showMessage('Failed to start import. Please refresh the page and try again.', 'error');
+      showMessage('İçe aktarma başlatılamadı. Sayfayı yenileyin ve tekrar deneyin.', 'error');
       elements.fullImportBtn.disabled = false;
     }
   });
@@ -313,7 +329,7 @@ function showLogs() {
         const response = await chrome.tabs.sendMessage(tab.id, { action: 'getLogs' });
         displayLogsModal(response.logs || []);
       } catch (error) {
-        showMessage('Could not retrieve logs from Etsy page', 'error');
+        showMessage('Etsy sayfasından loglar alınamadı', 'error');
       }
     } else {
       // Get logs from storage
@@ -354,7 +370,7 @@ function displayLogsModal(logs) {
   const header = document.createElement('div');
   header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;';
   header.innerHTML = `
-    <h3 style="margin: 0;">Extension Logs (${logs.length})</h3>
+    <h3 style="margin: 0;">Eklenti Logları (${logs.length})</h3>
     <button id="closeLogs" style="background: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">&times;</button>
   `;
   
@@ -362,7 +378,7 @@ function displayLogsModal(logs) {
   logContainer.style.cssText = 'max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;';
   
   if (logs.length === 0) {
-    logContainer.innerHTML = '<em>No logs available</em>';
+    logContainer.innerHTML = '<em>Hiç log bulunmuyor</em>';
   } else {
     logs.slice(-50).forEach(log => {
       const logEntry = document.createElement('div');

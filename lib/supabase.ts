@@ -47,24 +47,6 @@ export function getSupabaseServerClient(req, res) {
   if (!URL || !ANON) {
     throw new Error('Missing Supabase URL or Anon Key for server client. Check your .env file.');
   }
-  
-  // Parse cookies from the request
-  const parseCookies = (cookieHeader) => {
-    const cookies = {};
-    if (cookieHeader) {
-      cookieHeader.split(';').forEach(cookie => {
-        const [name, value] = cookie.trim().split('=');
-        if (name && value) {
-          cookies[name] = decodeURIComponent(value);
-        }
-      });
-    }
-    return cookies;
-  };
-  
-  const cookieHeader = req.headers.cookie || '';
-  const parsedCookies = parseCookies(cookieHeader);
-  
   // URL and ANON are confirmed to exist by the module-level check
   return createServerClient(
     URL,
@@ -72,15 +54,16 @@ export function getSupabaseServerClient(req, res) {
     {
       cookies: {
         get(name) {
-          // First try parsed cookies from header
-          if (parsedCookies[name]) {
-            return parsedCookies[name];
-          }
-          // Then try req.cookies if available (from middleware)
-          if (req && req.cookies) {
-            return req.cookies[name];
-          }
-          return undefined;
+          // Parse cookies from headers since req.cookies is not available in API routes
+          const cookieHeader = req.headers.cookie || '';
+          const cookies = {};
+          cookieHeader.split(';').forEach(cookie => {
+            const [key, ...val] = cookie.trim().split('=');
+            if (key) {
+              cookies[key] = decodeURIComponent(val.join('='));
+            }
+          });
+          return cookies[name];
         },
         set(name, value, options) {
           if (res) res.setHeader('Set-Cookie', serializeCookie(name, value, options));
@@ -93,8 +76,20 @@ export function getSupabaseServerClient(req, res) {
   );
 }
 
-// Helper to serialize cookies using the 'cookie' package format
-const serializeCookie = (name, value, options = {}) => {
-  const cookie = require('cookie');
-  return cookie.serialize(name, value, options);
+// Helper to serialize cookies (since res.cookie is not directly available in API routes like in Express)
+// This is a simplified version. For robust cookie serialization, a library like 'cookie' is often used.
+// However, createServerClient from @supabase/ssr might handle some of this internally or expect a specific format.
+// Let's assume for now this basic serialization is what's needed or that createServerClient handles the options correctly.
+// We might need to install and use the 'cookie' package if this is not sufficient.
+// For now, this will be a placeholder to satisfy the structure.
+// The options object is passed through.
+const serializeCookie = (name, value, options) => {
+  const parts = [`${name}=${encodeURIComponent(value)}`];
+  if (options.maxAge) parts.push(`Max-Age=${options.maxAge}`);
+  if (options.path) parts.push(`Path=${options.path}`);
+  if (options.domain) parts.push(`Domain=${options.domain}`);
+  if (options.secure) parts.push('Secure');
+  if (options.httpOnly) parts.push('HttpOnly');
+  if (options.sameSite) parts.push(`SameSite=${options.sameSite}`);
+  return parts.join('; ');
 }; 

@@ -7,24 +7,13 @@ export default async function handler(
   res: NextApiResponse
 ) {
   try {
-    console.log('[API user/settings] Starting request, method:', req.method);
-    console.log('[API user/settings] Cookies present:', !!req.headers.cookie);
-    
     const supabase = getSupabaseServerClient(req, res);
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-    console.log('[API user/settings] Auth result:', { 
-      hasUser: !!authUser, 
-      hasError: !!authError,
-      errorMessage: authError?.message 
-    });
-
     if (authError || !authUser) {
-      console.error('[API user/settings] Authentication failed:', authError);
       return res.status(401).json({ error: 'Not authenticated' });
     }
     const userId = authUser.id;
-    console.log('[API user/settings] Authenticated user:', userId);
 
   if (req.method === 'GET') {
     try {

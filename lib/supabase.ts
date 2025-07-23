@@ -47,6 +47,24 @@ export function getSupabaseServerClient(req, res) {
   if (!URL || !ANON) {
     throw new Error('Missing Supabase URL or Anon Key for server client. Check your .env file.');
   }
+  
+  // Parse cookies from the request
+  const parseCookies = (cookieHeader) => {
+    const cookies = {};
+    if (cookieHeader) {
+      cookieHeader.split(';').forEach(cookie => {
+        const [name, value] = cookie.trim().split('=');
+        if (name && value) {
+          cookies[name] = decodeURIComponent(value);
+        }
+      });
+    }
+    return cookies;
+  };
+  
+  const cookieHeader = req.headers.cookie || '';
+  const parsedCookies = parseCookies(cookieHeader);
+  
   // URL and ANON are confirmed to exist by the module-level check
   return createServerClient(
     URL,
@@ -54,9 +72,15 @@ export function getSupabaseServerClient(req, res) {
     {
       cookies: {
         get(name) {
-          // Defensive: handle undefined req or req.cookies
-          if (!req || !req.cookies) return undefined;
-          return req.cookies[name];
+          // First try parsed cookies from header
+          if (parsedCookies[name]) {
+            return parsedCookies[name];
+          }
+          // Then try req.cookies if available (from middleware)
+          if (req && req.cookies) {
+            return req.cookies[name];
+          }
+          return undefined;
         },
         set(name, value, options) {
           if (res) res.setHeader('Set-Cookie', serializeCookie(name, value, options));

@@ -1,10 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '@/lib/prisma';
-import { logger } from '@/lib/logger';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import prisma from '../../../../lib/prisma';
+import { logger } from '../../../../lib/logger';
+import { getSupabaseServerClient } from '../../../../lib/supabase';
 import { Prisma } from '@prisma/client';
-import { UIOrder, OrderChannel, OrderSource } from '@/lib/types';
-import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
+import { UIOrder, OrderChannel, OrderSource } from '../../../../lib/types';
+import { withUsageLimiter } from '../../../../lib/middleware/withUsageLimiter';
 
 async function handler(
   req: NextApiRequest,

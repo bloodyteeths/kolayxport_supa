@@ -333,12 +333,16 @@ function useDebouncedValue<T>(value: T, delay: number): T {
 async function fetchEtsyAddressEnrichment(orderNumber: string): Promise<any | null> {
   try {
     const response = await fetch(`/api/etsy-addresses?orderNumbers=${encodeURIComponent(orderNumber)}`);
+    
     if (response.ok) {
       const data = await response.json();
-      return data.lookup?.[orderNumber] || null;
+      const enrichment = data.lookup?.[orderNumber] || null;
+      return enrichment;
+    } else {
+      console.warn(`Failed to fetch Etsy address enrichment for order ${orderNumber}:`, response.status, response.statusText);
     }
   } catch (error) {
-    console.warn('Failed to fetch Etsy address enrichment:', error);
+    console.warn(`Failed to fetch Etsy address enrichment for order ${orderNumber}:`, error);
   }
   return null;
 }
@@ -455,13 +459,14 @@ async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async
 
   // --- ETSY ENRICHMENT: Check if address fields are missing and try to enrich from EtsyAddress table ---
   const isMissingCriticalAddress = !extractedAddress.recipientStreet1 || !extractedAddress.recipientCity;
-  const isEtsyOrder = order.marketplace?.toLowerCase() === 'etsy';
+  const isEtsyOrder = order.marketplace?.toLowerCase().includes('etsy');
   
   if (isMissingCriticalAddress && isEtsyOrder && order.orderNumber) {
     try {
       const etsyEnrichment = await fetchEtsyAddressEnrichment(order.orderNumber);
       if (etsyEnrichment?.shippingAddress) {
         const etsyAddr = etsyEnrichment.shippingAddress;
+        console.log(`✅ Etsy address enrichment applied for order ${order.orderNumber}`);
         
         // Only fill missing fields - existing data has priority
         const enrichedAddress = {
@@ -485,7 +490,7 @@ async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async
         return enrichedAddress;
       }
     } catch (error) {
-      console.warn('Etsy address enrichment failed:', error);
+      console.warn(`Etsy address enrichment failed for order ${order.orderNumber}:`, error);
       // Continue with original address if enrichment fails
     }
   }

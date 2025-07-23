@@ -264,7 +264,7 @@ async function getEtsyAddress(userId: string, orderNumber: string, marketplace?:
     
     return etsyAddress;
   } catch (error) {
-    logger.error('Failed to fetch Etsy address', { userId, orderNumber, error });
+    logger.error(`Failed to fetch Etsy address for user ${userId}, order ${orderNumber}: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }

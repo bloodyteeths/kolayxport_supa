@@ -100,11 +100,7 @@ async function handler(
         results.processed++;
 
       } catch (error) {
-        logger.error(`Failed to store Etsy address`, { 
-          orderNumber: addressData.orderNumber, 
-          etsyStoreId: addressData.etsyStoreId,
-          error 
-        });
+        logger.error(`Failed to store Etsy address for order ${addressData.orderNumber}, store ${addressData.etsyStoreId}: ${error instanceof Error ? error.message : String(error)}`);
         results.errors.push({
           orderNumber: addressData.orderNumber,
           error: error instanceof Error ? error.message : 'Unknown error'

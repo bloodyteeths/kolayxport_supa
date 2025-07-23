@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from 'lib/prisma';
 import { getSupabaseServerClient } from 'lib/supabase';
+import { withPrismaRetry } from 'lib/prismaWithRetry';
 
 export default async function handler(
   req: NextApiRequest,
@@ -28,11 +29,13 @@ export default async function handler(
   if (cursor) {
     where.createdAt = { lt: new Date(cursor) };
   }
-  const syncs = await prisma.syncOperation.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: limit,
-  });
+  const syncs = await withPrismaRetry(() =>
+    prisma.syncOperation.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    })
+  );
 
   // Format response
   const resultSyncs = syncs.map(sync => {

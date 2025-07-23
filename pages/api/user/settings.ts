@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getSupabaseServerClient } from '../../../lib/supabase';
 import prisma from '../../../lib/prisma';
+import { withPrismaRetry } from '../../../lib/prismaWithRetry';
 
 export default async function handler(
   req: NextApiRequest,
@@ -28,7 +29,8 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      const userWithSettings = await prisma.user.findUnique({
+      const userWithSettings = await withPrismaRetry(() => 
+        prisma.user.findUnique({
         where: { id: userId },
         select: {
           id: true,
@@ -75,7 +77,8 @@ export default async function handler(
             }
           },
         },
-      });
+        })
+      );
       if (!userWithSettings) {
         return res.status(404).json({ error: 'User not found.' });
       }

@@ -17,14 +17,9 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      // Retry logic for database connection issues
-      let userWithSettings;
-      let retries = 3;
-      while (retries > 0) {
-        try {
-          userWithSettings = await prisma.user.findUnique({
-            where: { id: userId },
-            select: {
+      const userWithSettings = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
           id: true,
           subscriptionPlan: true,
           subscriptionStatus: true,
@@ -69,20 +64,7 @@ export default async function handler(
             }
           },
         },
-          });
-          break;
-        } catch (error: any) {
-          retries--;
-          if (retries === 0 || !error.message?.includes('Closed')) {
-            throw error;
-          }
-          // Wait a bit before retrying
-          await new Promise(resolve => setTimeout(resolve, 100));
-          // Force reconnection
-          await prisma.$disconnect();
-          await prisma.$connect();
-        }
-      }
+      });
       if (!userWithSettings) {
         return res.status(404).json({ error: 'User not found.' });
       }
@@ -259,4 +241,4 @@ export default async function handler(
       code: 'INTERNAL_ERROR'
     });
   }
-} 
+}

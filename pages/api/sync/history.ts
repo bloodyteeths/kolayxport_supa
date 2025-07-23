@@ -6,85 +6,59 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<any>
 ) {
-  try {
-    if (req.method !== 'GET') {
-      res.setHeader('Allow', ['GET']);
-      return res.status(405).json({ error: 'Method Not Allowed' });
-    }
-
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-    const userId = user.id;
-
-    // Pagination params
-    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
-    const cursor = req.query.cursor as string | undefined; // ISO string
-
-    // Query SyncOperation
-    const where: any = { userId };
-    if (cursor) {
-      where.createdAt = { lt: new Date(cursor) };
-    }
-    // Retry logic for database connection issues
-    let syncs;
-    let retries = 3;
-    while (retries > 0) {
-      try {
-        syncs = await prisma.syncOperation.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          take: limit,
-        });
-        break;
-      } catch (error: any) {
-        retries--;
-        if (retries === 0 || !error.message?.includes('Closed')) {
-          throw error;
-        }
-        // Wait a bit before retrying
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // Force reconnection
-        await prisma.$disconnect();
-        await prisma.$connect();
-      }
-    }
-
-    // Format response
-    const resultSyncs = syncs.map(sync => {
-      let metrics: any = sync.metrics || {};
-      if (typeof metrics === 'string') {
-        try {
-          metrics = JSON.parse(metrics);
-        } catch {
-          metrics = {};
-        }
-      }
-      return {
-        id: sync.id,
-        type: sync.type,
-        status: sync.status,
-        startedAt: metrics.startTime || sync.createdAt,
-        endedAt: metrics.endTime || sync.updatedAt,
-        processedOrders: metrics.processedOrders ?? 0,
-        successfulOrders: metrics.successfulOrders ?? 0,
-        failedOrders: metrics.failedOrders ?? 0,
-        errors: metrics.errors ?? [],
-      };
-    });
-
-    res.status(200).json({
-      syncs: resultSyncs,
-      nextCursor: resultSyncs.length === limit ? resultSyncs[resultSyncs.length - 1].startedAt : null,
-    });
-  } catch (error: any) {
-    console.error('Sync history error:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch sync history', 
-      details: error.message 
-    });
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
-} 
+
+  const supabase = getSupabaseServerClient(req, res);
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !user) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  const userId = user.id;
+
+  // Pagination params
+  const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+  const cursor = req.query.cursor as string | undefined; // ISO string
+
+  // Query SyncOperation
+  const where: any = { userId };
+  if (cursor) {
+    where.createdAt = { lt: new Date(cursor) };
+  }
+  const syncs = await prisma.syncOperation.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+
+  // Format response
+  const resultSyncs = syncs.map(sync => {
+    let metrics: any = sync.metrics || {};
+    if (typeof metrics === 'string') {
+      try {
+        metrics = JSON.parse(metrics);
+      } catch {
+        metrics = {};
+      }
+    }
+    return {
+      id: sync.id,
+      type: sync.type,
+      status: sync.status,
+      startedAt: metrics.startTime || sync.createdAt,
+      endedAt: metrics.endTime || sync.updatedAt,
+      processedOrders: metrics.processedOrders ?? 0,
+      successfulOrders: metrics.successfulOrders ?? 0,
+      failedOrders: metrics.failedOrders ?? 0,
+      errors: metrics.errors ?? [],
+    };
+  });
+
+  res.status(200).json({
+    syncs: resultSyncs,
+    nextCursor: resultSyncs.length === limit ? resultSyncs[resultSyncs.length - 1].startedAt : null,
+  });
+}

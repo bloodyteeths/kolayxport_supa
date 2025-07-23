@@ -25,12 +25,12 @@ export default async function handler(
       cookies: {},
       auth: {
         authenticated: false,
-        error: null,
-        userId: null,
+        error: null as string | null,
+        userId: null as string | null,
       },
       database: {
         connected: false,
-        error: null,
+        error: null as string | null,
       },
     },
   };
@@ -49,7 +49,7 @@ export default async function handler(
       };
     }
   } catch (error: any) {
-    diagnostics.checks.cookies = { error: error.message };
+    diagnostics.checks.cookies = { error: error.message } as any;
   }
 
   // Check Supabase auth

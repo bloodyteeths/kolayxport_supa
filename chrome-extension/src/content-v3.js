@@ -1,18 +1,17 @@
-/* Kolayxport Etsy Address Enrichment – v3.2
- * Simplified to extract only order number, shipping address, and customization notes
- * Works with Veeqo data to enrich orders with missing address information
- * Complements existing Veeqo integration for complete order data
+/* Kolayxport Etsy Orders scraper – v3.0
+ * Fixed selectors based on actual Etsy DOM structure
+ * Extracts buyer address + line items and POSTs to Kolayxport SaaS.
  */
 
 // Determine API endpoint based on current domain
 const getKolayxportAPI = () => {
   const hostname = window.location.hostname;
   if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
-    return 'http://localhost:3000/api/integrations/etsy/addresses';
+    return 'http://localhost:3000/api/integrations/etsy/orders';
   } else if (hostname.includes('staging') || hostname.includes('dev')) {
-    return 'https://staging.kolayxport.com/api/integrations/etsy/addresses';
+    return 'https://staging.kolayxport.com/api/integrations/etsy/orders';
   }
-  return 'https://app.kolayxport.com/api/integrations/etsy/addresses';
+  return 'https://app.kolayxport.com/api/integrations/etsy/orders';
 };
 
 const API = getKolayxportAPI();
@@ -57,7 +56,7 @@ const log = {
   }
 };
 
-log.info('🚀 Kolayxport Etsy Address Enrichment v3.2 Loading', { url: window.location.href });
+log.info('🚀 Kolayxport Etsy Content Script v3.0 Loading', { url: window.location.href });
 
 // Get authentication token - try multiple sources
 async function getAuthToken() {
@@ -140,7 +139,7 @@ const pushBatch = async batch => {
       credentials: 'include',
       body: JSON.stringify({ 
         orders: batch,
-        source: 'chrome-extension-v3.2-addresses',
+        source: 'chrome-extension-v3',
         timestamp: new Date().toISOString()
       })
     });
@@ -172,7 +171,7 @@ const pushBatch = async batch => {
 
 // Core extractor using REAL Etsy DOM structure
 async function extract() {
-  log.info('Starting order extraction with v3.1 selectors and fixed data format');
+  log.info('Starting order extraction with v3.0 selectors');
   
   const synced = (await chrome.storage.local.get({ [STORAGE_KEY]: [] }))[STORAGE_KEY];
   
@@ -276,38 +275,50 @@ async function extract() {
         }
       }
       
-      // Extract customization notes from item details
-      let notes = '';
-      const customizationElements = row.querySelectorAll('.text-body-smaller, .personalization, .note, [data-test-id*="custom"]');
-      customizationElements.forEach(el => {
-        const text = el.textContent?.trim();
-        if (text && !text.includes('Ordered') && !text.includes('$') && text.length > 10) {
-          if (notes) notes += ' | ';
-          notes += text;
-        }
-      });
+      // Extract items (basic extraction)
+      const items = [];
+      const productLink = row.querySelector('a[href*="/transaction/"]');
+      if (productLink) {
+        const title = productLink.getAttribute('title') || '';
+        const image = row.querySelector('img[alt]');
+        const alt = image?.getAttribute('alt') || title;
+        
+        // Extract quantity and variations
+        const quantity = 1; // Default, could be extracted from item details
+        
+        items.push({
+          id: productLink.href.match(/transaction\/(\d+)/)?.[1] || '',
+          title: alt || title,
+          quantity,
+          sku: '',
+          price: orderTotal
+        });
+        
+        log.info(`Order ${orderId}: Found item: "${alt}"`);
+      }
       
-      // Simplified data structure - only order number, address, and notes
       const orderData = {
+        orderId,
         orderNumber,
-        shippingAddress: {
-          name: shippingAddress.name || buyerName || '',
-          line1: shippingAddress.line1 || '',
-          line2: shippingAddress.line2 || '',
-          city: shippingAddress.city || '',
-          state: shippingAddress.state || '',
-          postalCode: shippingAddress.postalCode || '',
-          country: shippingAddress.country || 'US'
-        },
-        notes: notes || ''
+        buyer: buyerName,
+        addr1: shippingAddress.line1 || '',
+        addr2: shippingAddress.line2 || '',
+        city: shippingAddress.city || '',
+        state: shippingAddress.state || '',
+        zip: shippingAddress.postalCode || '',
+        country: shippingAddress.country || '',
+        phone: '', // Not visible in summary view
+        orderDate,
+        orderTotal,
+        items
       };
       
       // Only add if we have essential data
-      if (orderData.orderNumber && orderData.shippingAddress.name) {
+      if (orderData.orderId && orderData.buyer) {
         batch.push(orderData);
-        log.success(`Order ${orderNumber}: Successfully extracted address and notes`, orderData);
+        log.success(`Order ${orderId}: Successfully extracted`, orderData);
       } else {
-        log.warn(`Order ${orderNumber}: Missing essential data, skipping`, orderData);
+        log.warn(`Order ${orderId}: Missing essential data, skipping`, orderData);
       }
       
     } catch (error) {
@@ -351,7 +362,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           syncedCount: (result[STORAGE_KEY] || []).length,
           url: window.location.href,
           scriptLoaded: true,
-          version: '3.1',
+          version: '3.0',
           logs: (result.kx_logs || []).slice(-10) // Last 10 logs
         };
         log.info('Status requested', status);
@@ -410,7 +421,7 @@ observer.observe(document.body, {
   subtree: true 
 });
 
-log.info('Content script v3.1 initialization complete');
+log.info('Content script v3.0 initialization complete');
 
 // Add visual indicator (removed after 3 seconds)
 const indicator = document.createElement('div');
@@ -427,6 +438,6 @@ indicator.style.cssText = `
   font-family: Arial, sans-serif !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 `;
-indicator.textContent = '✅ Kolayxport v3.1 - Fixed Data Format!';
+indicator.textContent = '✅ Kolayxport v3.0 - Fixed Selectors!';
 document.body.appendChild(indicator);
 setTimeout(() => indicator.remove(), 5000);

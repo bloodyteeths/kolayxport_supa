@@ -31,7 +31,7 @@ async function handler(
       return res.status(400).json({ error: 'Invalid request: orders array required' });
     }
 
-    if (source !== 'chrome-extension') {
+    if (!source || !source.includes('chrome-extension')) {
       return res.status(400).json({ error: 'Invalid source' });
     }
 
@@ -64,11 +64,11 @@ async function handler(
         status: 'pending', // Default status for new orders
         externalStatus: 'New', // Chrome extension scraped orders are new
         currency: 'USD', // Default to USD, can be enhanced later
-        totalPrice: parseFloat(extOrder.orderTotal || '0'),
+        totalPrice: typeof extOrder.orderTotal === 'number' ? extOrder.orderTotal : parseFloat(extOrder.orderTotal || '0'),
         uiOrderDate: orderDate,
         marketplaceOrderDate: orderDate,
         to_address: {
-          name: extOrder.shippingAddress?.name || '',
+          name: extOrder.shippingAddress?.name || extOrder.buyerName || '',
           phone: '', // Etsy doesn't show phone in UI
           street1: extOrder.shippingAddress?.line1 || '',
           street2: extOrder.shippingAddress?.line2 || '',

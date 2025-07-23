@@ -398,15 +398,15 @@ export default function EntegrasyonlarVeRehberlerPage() {
                       </p>
                       <div className="mt-3 space-y-3">
                         <a 
-                          href="/downloads/kolayxport-etsy-extension-debug.zip" 
-                          download="kolayxport-etsy-extension-debug.zip"
+                          href="/downloads/kolayxport-etsy-extension-v3.2-addresses.zip" 
+                          download="kolayxport-etsy-extension-v3.2-addresses.zip"
                           className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                         >
                           <Download size={18} className="mr-2" />
-                          Doğrudan İndir (.zip) - Debug Version
+                          Doğrudan İndir (.zip) - Güncel Sürüm
                         </a>
                         <p className="text-sm text-gray-600">
-                          <strong>Dosya Boyutu:</strong> 21KB | <strong>Versiyon:</strong> 1.0.0 | <strong>İçerik:</strong> Kurulum rehberi dahil
+                          <strong>Dosya Boyutu:</strong> 25KB | <strong>Versiyon:</strong> 3.2.0 | <strong>İçerik:</strong> Güncel sürüm, kurulum rehberi dahil
                         </p>
                       </div>
                       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -429,11 +429,11 @@ export default function EntegrasyonlarVeRehberlerPage() {
                     <Step number="2" title="Eklentiyi Chrome'a Yükleyin">
                       <p>İndirdiğiniz ZIP dosyasını açın ve Chrome'a yükleyin:</p>
                       <ol className="list-decimal list-inside space-y-2 text-sm mt-3">
-                        <li>İndirdiğiniz <code className="bg-gray-100 px-2 py-1 rounded">kolayxport-etsy-extension-debug.zip</code> dosyasını bilgisayarınızda uygun bir yere çıkarın</li>
+                        <li>İndirdiğiniz <code className="bg-gray-100 px-2 py-1 rounded">kolayxport-etsy-extension-v3.2-addresses.zip</code> dosyasını bilgisayarınızda uygun bir yere çıkarın</li>
                         <li>Chrome tarayıcısında <code className="bg-gray-100 px-2 py-1 rounded">chrome://extensions/</code> adresine gidin</li>
                         <li>Sağ üst köşede "Geliştirici modu" (Developer mode) anahtarını açın</li>
                         <li>"Paketlenmemiş öğe yükle" (Load unpacked) butonuna tıklayın</li>
-                        <li>Çıkardığınız <code className="bg-gray-100 px-2 py-1 rounded">kolayxport-etsy-extension-debug</code> klasörünü seçin</li>
+                        <li>Çıkardığınız <code className="bg-gray-100 px-2 py-1 rounded">chrome-extension</code> klasörünü seçin</li>
                         <li>Eklenti Chrome'a yüklendi! Sağ üst köşede Kolayxport simgesini göreceksiniz.</li>
                       </ol>
                       <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">

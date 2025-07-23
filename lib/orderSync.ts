@@ -173,9 +173,11 @@ function determineChannel(order: any): OrderChannel {
     if (shippoShopApp.includes('ebay')) return 'ebay';
   }
 
-  // Fallback to marketplace field (from DB model)
+  // Fallback to marketplace field (from DB model) with robust Etsy detection
+  const { isEtsyOrderSync } = require('./utils/etsyDetection');
+  if (isEtsyOrderSync(order.marketplace)) return 'etsy';
+  
   const marketplace = order.marketplace?.toLowerCase() || '';
-  if (marketplace.includes('etsy')) return 'etsy';
   if (marketplace.includes('shopify')) return 'shopify';
   if (marketplace.includes('amazon')) return 'amazon';
   if (marketplace.includes('ebay')) return 'ebay';
@@ -242,8 +244,11 @@ function normalizeVeeqoAddress(raw: any): NormalizedAddress {
 
 // Function to fetch Etsy address from EtsyAddress table
 async function getEtsyAddress(userId: string, orderNumber: string, marketplace?: string): Promise<any | null> {
-  // Only try to fetch Etsy address for Etsy orders
-  if (marketplace !== 'etsy' && marketplace !== 'Etsy') {
+  // Import Etsy detection utility
+  const { isEtsyOrderSync } = await import('./utils/etsyDetection');
+  
+  // Use robust Etsy detection instead of simple string comparison
+  if (!isEtsyOrderSync(marketplace)) {
     return null;
   }
   
@@ -294,14 +299,16 @@ export async function extractAddressEnriched(order: any, userId?: string): Promi
   let toAddress: NormalizedAddress | undefined = undefined;
 
   // PRIORITY 1: For Etsy orders, try to get Etsy extension address first (highest priority)
-  if (userId && (order.marketplace === 'etsy' || order.marketplace === 'Etsy')) {
+  const { isEtsyOrderSync } = await import('./utils/etsyDetection');
+  if (userId && isEtsyOrderSync(order.marketplace)) {
     const etsyAddressData = await getEtsyAddress(userId, order.orderNumber, order.marketplace);
     if (etsyAddressData) {
       toAddress = normalizeEtsyAddress(etsyAddressData);
       if (toAddress) {
         logger.info(`Using Etsy extension address for order ${order.orderNumber}`, { 
           hasAddress: true,
-          storeName: etsyAddressData.etsyStoreName 
+          storeName: etsyAddressData.etsyStoreName,
+          marketplace: order.marketplace
         });
         return toAddress;
       }

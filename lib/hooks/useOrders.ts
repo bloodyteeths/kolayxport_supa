@@ -1,5 +1,6 @@
 import useSWR from 'swr';
 import { useMemo } from 'react';
+import { isEtsyOrderSync } from '../utils/etsyDetection';
 
 // Define the shape of the order data we expect from the API
 export interface Shipment {
@@ -125,9 +126,8 @@ export function useOrders(page: number = 1, pageSize: number = 20, filters: Reco
           ? lineItems[0].title || lineItems[0].productName || '---'
           : '---';
 
-        // Determine source and channel based on marketplace
-        const marketplaceLower = order.marketplace?.toLowerCase() || '';
-        const isEtsy = marketplaceLower.includes('etsy');
+        // Determine source and channel based on marketplace using robust Etsy detection
+        const isEtsy = isEtsyOrderSync(order.marketplace);
         const source = order.source || (isEtsy ? 'shippo' : 'veeqo');
         const channel = order.channel || (isEtsy ? 'etsy' : 'other');
 

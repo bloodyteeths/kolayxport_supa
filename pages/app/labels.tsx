@@ -491,6 +491,42 @@ async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async
         // Helper function to check if a value is missing or placeholder
         const isMissingValue = (value: any) => !value || value === '—' || value?.trim() === '';
         
+        // Helper function to parse relative ship by dates from Chrome extension
+        const parseShipByDate = (shipByText: string): string | null => {
+          if (!shipByText || shipByText.trim() === '' || shipByText === 'null') return null;
+          
+          const text = shipByText.toLowerCase().trim();
+          const now = new Date();
+          
+          if (text.includes('today')) {
+            return now.toISOString();
+          } else if (text.includes('tomorrow')) {
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return tomorrow.toISOString();
+          } else if (text.includes('in 2 days')) {
+            const inTwoDays = new Date(now);
+            inTwoDays.setDate(inTwoDays.getDate() + 2);
+            return inTwoDays.toISOString();
+          } else if (text.includes('in 3 days')) {
+            const inThreeDays = new Date(now);
+            inThreeDays.setDate(inThreeDays.getDate() + 3);
+            return inThreeDays.toISOString();
+          }
+          
+          // Try to parse as a regular date if it's already in a date format
+          try {
+            const parsed = new Date(shipByText);
+            if (!isNaN(parsed.getTime())) {
+              return parsed.toISOString();
+            }
+          } catch (e) {
+            // Ignore parsing errors
+          }
+          
+          return null;
+        };
+        
         // Fill missing fields with Etsy data - override placeholder values
         
         const enrichedAddress = {
@@ -507,7 +543,22 @@ async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async
           _etsyEnriched: true,
           _etsyStoreName: etsyEnrichment.etsyStoreName,
           _etsyNotes: etsyEnrichment.notes,
-          _etsyShipByDate: etsyEnrichment.shipByDate,
+          _etsyShipByDate: parseShipByDate(etsyEnrichment.shipByDate) || etsyEnrichment.shipByDate || (() => {
+            // Fallback: if no ship by date, use order date + 3 days
+            if (etsyEnrichment.orderDate) {
+              try {
+                const orderDate = new Date(etsyEnrichment.orderDate);
+                if (!isNaN(orderDate.getTime())) {
+                  const shipBy = new Date(orderDate);
+                  shipBy.setDate(shipBy.getDate() + 3);
+                  return shipBy.toISOString();
+                }
+              } catch (e) {
+                // Ignore parsing errors
+              }
+            }
+            return null;
+          })(),
           _etsyOrderDate: etsyEnrichment.orderDate
         };
         

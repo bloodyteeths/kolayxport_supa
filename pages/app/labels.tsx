@@ -13,6 +13,7 @@ import Layout from '@/components/Layout';
 import AppLayout from '@/components/AppLayout';
 import CircleIcon from '@mui/icons-material/Circle';
 import UPSLabelDrawer from '@/components/UPSLabelDrawer';
+import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
 
 // Minimal UIOrder type for UPS drawer
 interface UIOrder {
@@ -27,6 +28,7 @@ interface UIOrder {
   recipientPostal?: string;
   recipientCountry?: string;
   recipientPhone?: string;
+  recipientEmail?: string;
   orderTotalPrice?: number;
   currency?: string;
   title?: string;
@@ -458,27 +460,49 @@ async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async
   };
 
   // --- ETSY ENRICHMENT: Check if address fields are missing and try to enrich from EtsyAddress table ---
-  const isMissingCriticalAddress = !extractedAddress.recipientStreet1 || !extractedAddress.recipientCity;
-  const isEtsyOrder = order.marketplace?.toLowerCase().includes('etsy');
+  const isMissingCriticalAddress = 
+    !extractedAddress.recipientStreet1 || 
+    !extractedAddress.recipientCity ||
+    extractedAddress.recipientStreet1 === '—' ||
+    extractedAddress.recipientCity === '—' ||
+    extractedAddress.recipientStreet1?.trim() === '' ||
+    extractedAddress.recipientCity?.trim() === '';
   
-  if (isMissingCriticalAddress && isEtsyOrder && order.orderNumber) {
+  // For multitenant SaaS: Always try Etsy enrichment if address is missing, regardless of marketplace name
+  // The API will return null if no EtsyAddress record exists for this order
+  const shouldTryEtsyEnrichment = isMissingCriticalAddress && order.orderNumber;
+  
+  // Debug logging
+  console.log(`🔍 Debug order ${order.orderNumber}:`, {
+    marketplace: order.marketplace,
+    shouldTryEtsyEnrichment,
+    isMissingCriticalAddress,
+    street1: extractedAddress.recipientStreet1,
+    city: extractedAddress.recipientCity,
+    extractedAddress
+  });
+  
+  if (shouldTryEtsyEnrichment && order.orderNumber) {
     try {
       const etsyEnrichment = await fetchEtsyAddressEnrichment(order.orderNumber);
+      
       if (etsyEnrichment?.shippingAddress) {
         const etsyAddr = etsyEnrichment.shippingAddress;
-        console.log(`✅ Etsy address enrichment applied for order ${order.orderNumber}`);
+        // Helper function to check if a value is missing or placeholder
+        const isMissingValue = (value: any) => !value || value === '—' || value?.trim() === '';
         
-        // Only fill missing fields - existing data has priority
+        // Fill missing fields with Etsy data - override placeholder values
+        
         const enrichedAddress = {
           ...extractedAddress,
-          recipientFirstName: extractedAddress.recipientFirstName || etsyAddr.name?.split(' ')[0] || '',
-          recipientLastName: extractedAddress.recipientLastName || etsyAddr.name?.split(' ').slice(1).join(' ') || '',
-          recipientStreet1: extractedAddress.recipientStreet1 || etsyAddr.line1 || '',
-          recipientStreet2: extractedAddress.recipientStreet2 || etsyAddr.line2 || '',
-          recipientCity: extractedAddress.recipientCity || etsyAddr.city || '',
-          recipientState: extractedAddress.recipientState || etsyAddr.state || '',
-          recipientPostal: extractedAddress.recipientPostal || etsyAddr.postalCode || '',
-          recipientCountry: extractedAddress.recipientCountry || etsyAddr.country || 'US',
+          recipientFirstName: isMissingValue(extractedAddress.recipientFirstName) ? (etsyAddr.name?.split(' ')[0] || '') : extractedAddress.recipientFirstName,
+          recipientLastName: isMissingValue(extractedAddress.recipientLastName) ? (etsyAddr.name?.split(' ').slice(1).join(' ') || '') : extractedAddress.recipientLastName,
+          recipientStreet1: isMissingValue(extractedAddress.recipientStreet1) ? (etsyAddr.line1 || '') : extractedAddress.recipientStreet1,
+          recipientStreet2: isMissingValue(extractedAddress.recipientStreet2) ? (etsyAddr.line2 || '') : extractedAddress.recipientStreet2,
+          recipientCity: isMissingValue(extractedAddress.recipientCity) ? (etsyAddr.city || '') : extractedAddress.recipientCity,
+          recipientState: isMissingValue(extractedAddress.recipientState) ? (etsyAddr.state || '') : extractedAddress.recipientState,
+          recipientPostal: isMissingValue(extractedAddress.recipientPostal) ? (etsyAddr.postalCode || '') : extractedAddress.recipientPostal,
+          recipientCountry: isMissingValue(extractedAddress.recipientCountry) ? (etsyAddr.country || 'US') : extractedAddress.recipientCountry,
           // Add Etsy-specific data for debugging/display
           _etsyEnriched: true,
           _etsyStoreName: etsyEnrichment.etsyStoreName,
@@ -1206,7 +1230,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         // Determine source from marketplace like in the API
         const source = (() => {
           const marketplace = (row.marketplace || '').toLowerCase();
-          if (marketplace.includes('etsy')) return 'shippo';
+          if (isEtsyOrderSync(marketplace)) return 'shippo';
           if (marketplace.includes('trendyol')) return 'trendyol';
           return 'veeqo';
         })();
@@ -1483,6 +1507,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
               recipientPostal: params.row.recipientPostal,
               recipientCountry: params.row.recipientCountry,
               recipientPhone: params.row.recipientPhone,
+              recipientEmail: params.row.recipientEmail,
               orderTotalPrice: params.row.orderTotalPrice,
               currency: params.row.currency,
               title: params.row.title,

@@ -50,14 +50,36 @@ export default async function handler(
 
     // Create a lookup map by order number for easy access
     const addressLookup = etsyAddresses.reduce((acc, addr) => {
-      acc[addr.orderNumber] = addr;
+      // Parse shippingAddress if it's a JSON string
+      let parsedAddr = { ...addr };
+      if (typeof addr.shippingAddress === 'string') {
+        try {
+          parsedAddr.shippingAddress = JSON.parse(addr.shippingAddress);
+        } catch (e) {
+          console.warn(`Failed to parse shippingAddress for order ${addr.orderNumber}:`, e);
+        }
+      }
+      acc[addr.orderNumber] = parsedAddr;
       return acc;
     }, {} as Record<string, any>);
+
+    // Also parse shippingAddress in the addresses array
+    const parsedAddresses = etsyAddresses.map(addr => {
+      let parsedAddr = { ...addr };
+      if (typeof addr.shippingAddress === 'string') {
+        try {
+          parsedAddr.shippingAddress = JSON.parse(addr.shippingAddress);
+        } catch (e) {
+          console.warn(`Failed to parse shippingAddress for order ${addr.orderNumber}:`, e);
+        }
+      }
+      return parsedAddr;
+    });
 
     return res.status(200).json({
       success: true,
       count: etsyAddresses.length,
-      addresses: etsyAddresses,
+      addresses: parsedAddresses,
       lookup: addressLookup
     });
 

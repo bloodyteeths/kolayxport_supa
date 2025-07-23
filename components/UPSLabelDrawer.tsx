@@ -65,6 +65,27 @@ const UPS_COUNTRY_CODES = [
   // ...add more as needed
 ];
 
+// Helper function to convert country names to country codes
+const getCountryCode = (countryName: string): string => {
+  const countryMappings: Record<string, string> = {
+    'United States': 'US',
+    'USA': 'US',
+    'US': 'US',
+    'Turkey': 'TR',
+    'Türkiye': 'TR',
+    'TR': 'TR',
+    'United Kingdom': 'GB',
+    'UK': 'GB',
+    'GB': 'GB',
+    'Germany': 'DE',
+    'DE': 'DE',
+    'France': 'FR',
+    'FR': 'FR',
+  };
+  
+  return countryMappings[countryName] || 'US'; // Default to US if not found
+};
+
 const US_STATES = [
   { code: 'AL', name: 'Alabama' },
   { code: 'AK', name: 'Alaska' },
@@ -247,7 +268,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         recipientCity: order?.recipientCity || '',
         recipientState: order?.recipientState || '',
         recipientPostal: order?.recipientPostal || '',
-        recipientCountry: order?.recipientCountry || '',
+        recipientCountry: getCountryCode(order?.recipientCountry || ''),
         recipientPhone: order?.recipientPhone || '',
         hsCode: order?.hsCode || '',
         countryOfOrigin: order?.countryOfOrigin || '',
@@ -261,7 +282,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         soldToStreet2: order?.recipientStreet2 || '',
         soldToCity: order?.recipientCity || '',
         soldToPostal: order?.recipientPostal || '',
-        soldToCountry: order?.recipientCountry || 'TR',
+        soldToCountry: getCountryCode(order?.recipientCountry || ''),
         soldToPhone: order?.recipientPhone || '',
         soldToState: order?.recipientState || '',
         soldToEmail: order?.recipientEmail || '',
@@ -728,17 +749,17 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                   margin="dense"
                 />
               </FormControl>
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Alıcı E-posta</InputLabel>
-                <TextField
-                  name="soldToEmail"
-                  value={form.soldToEmail}
-                  onChange={handleInputChange}
-                  inputProps={{ maxLength: 50 }}
-                  fullWidth
-                  margin="dense"
-                />
-              </FormControl>
+              <TextField
+                label="Alıcı E-posta"
+                name="soldToEmail"
+                type="email"
+                value={form.soldToEmail}
+                onChange={handleInputChange}
+                inputProps={{ maxLength: 50 }}
+                fullWidth
+                margin="dense"
+                size="small"
+              />
             </Box>
             <FormControl fullWidth margin="dense" size="small">
               <InputLabel>Teslim Şartı</InputLabel>

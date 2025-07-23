@@ -8,7 +8,25 @@ export default async function handler(
 ) {
   try {
     const supabase = getSupabaseServerClient(req, res);
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    let { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      // Try Authorization header fallback
+      const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
+      let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
+      const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (token) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+          console.error('[API user/settings] Missing Supabase environment variables for direct client init.');
+        } else {
+          const { createClient } = require('@supabase/supabase-js');
+          const supabaseDirect = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+          const { data, error } = await supabaseDirect.auth.getUser(token);
+          authUser = data.user;
+          authError = error;
+        }
+      }
+    }
 
     if (authError || !authUser) {
       return res.status(401).json({ error: 'Not authenticated' });

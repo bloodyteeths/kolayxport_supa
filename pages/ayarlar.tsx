@@ -13,6 +13,7 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import SubscriptionDashboard from '../components/SubscriptionDashboard';
 import ImporterFormCollapsible from '../components/ImporterFormCollapsible';
 import { useRouter } from 'next/router';
+import { supabase } from '../lib/supabase';
 
 // Mirrored from API route
 interface UserSettingsResponse {
@@ -187,8 +188,10 @@ const AyarlarPage = () => {
       setIsLoading(true);
       setFetchError(null);
       try {
-        const response = await axios.get<UserSettingsResponse>('/api/user/settings', { 
-          withCredentials: true,
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        const response = await axios.get<UserSettingsResponse>('/api/user/settings', {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
           timeout: 10000
         });
         setFormData({

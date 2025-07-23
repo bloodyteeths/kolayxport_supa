@@ -4,7 +4,7 @@
  */
 
 // Configuration
-const KOLAYXPORT_DOMAIN = 'app.kolayxport.com';
+const KOLAYXPORT_DOMAIN = 'kolayxport.com';
 const AUTH_CHECK_INTERVAL = 60000; // Check auth every minute
 const BADGE_COLORS = {
   success: '#4CAF50',
@@ -26,7 +26,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
     // Open welcome page on first install
     chrome.tabs.create({
-      url: 'https://app.kolayxport.com/help/chrome-extension'
+      url: 'https://kolayxport.com/help/chrome-extension'
     });
   }
   
@@ -113,7 +113,7 @@ async function checkAuthentication() {
     
     // Check for cookies first (more reliable than tab injection)
     const domainVariations = [
-      'app.kolayxport.com',
+      'kolayxport.com',
       'kolayxport.com',
       '.kolayxport.com'
     ];

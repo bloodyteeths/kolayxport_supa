@@ -6,14 +6,14 @@
 export const CONFIG = {
   // API endpoints for different environments
   API_ENDPOINTS: {
-    production: 'https://app.kolayxport.com/api/integrations/etsy/orders',
+    production: 'https://kolayxport.com/api/integrations/etsy/orders',
     staging: 'https://staging.kolayxport.com/api/integrations/etsy/orders',
     development: 'http://localhost:3000/api/integrations/etsy/orders'
   },
   
   // Kolayxport domains for auth
   DOMAINS: {
-    production: 'app.kolayxport.com',
+    production: 'kolayxport.com',
     staging: 'staging.kolayxport.com', 
     development: 'localhost'
   },

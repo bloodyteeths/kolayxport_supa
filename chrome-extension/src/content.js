@@ -13,7 +13,7 @@ const getKolayxportAPI = () => {
   } else if (hostname.includes('staging') || hostname.includes('dev')) {
     return 'https://staging.kolayxport.com/api/integrations/etsy/addresses';
   }
-  return 'https://app.kolayxport.com/api/integrations/etsy/addresses';
+  return 'https://kolayxport.com/api/integrations/etsy/addresses';
 };
 
 const API = getKolayxportAPI();
@@ -121,7 +121,7 @@ async function getAuthToken() {
     try {
       const cookies = await chrome.runtime.sendMessage({ 
         action: 'getCookies',
-        domain: 'app.kolayxport.com'
+        domain: 'kolayxport.com'
       });
       
       // Look for auth cookies

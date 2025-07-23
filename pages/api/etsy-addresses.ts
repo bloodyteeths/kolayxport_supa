@@ -40,6 +40,8 @@ export default async function handler(
         etsyStoreName: true,
         shippingAddress: true,
         notes: true,
+        shipByDate: true,
+        orderDate: true,
         createdAt: true,
         updatedAt: true
       },

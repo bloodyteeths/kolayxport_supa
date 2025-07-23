@@ -477,7 +477,9 @@ async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async
           // Add Etsy-specific data for debugging/display
           _etsyEnriched: true,
           _etsyStoreName: etsyEnrichment.etsyStoreName,
-          _etsyNotes: etsyEnrichment.notes
+          _etsyNotes: etsyEnrichment.notes,
+          _etsyShipByDate: etsyEnrichment.shipByDate,
+          _etsyOrderDate: etsyEnrichment.orderDate
         };
         
         return enrichedAddress;
@@ -633,7 +635,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         countryOfOrigin: order.countryOfMfg,
         labelJobStatus: hasOrderLabel ? 'created' : undefined,
         trackingNumber: latestShipment?.trackingNumber || order.trackingNumber || undefined,
-        shipByDate: order.shipByDate,
+        shipByDate: order.shipByDate || (extractedAddr._etsyShipByDate ? extractedAddr._etsyShipByDate : undefined),
         originalOrder: order,
         labelCreated: hasOrderLabel,
         shippingLabelUrl: hasOrderLabel ? (latestShipment?.pdfUrl || order.shippingLabelUrl) : undefined,
@@ -695,7 +697,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         countryOfOrigin: (isVeeqoItem ? item.sellable?.product?.origin_country : item.country_of_origin) || order.countryOfMfg,
         labelJobStatus: latestLabelJob?.status,
         trackingNumber: latestLabelJob?.trackingNumber,
-        shipByDate: item.shipBy || order.shipByDate,
+        shipByDate: item.shipBy || order.shipByDate || (extractedAddr._etsyShipByDate ? extractedAddr._etsyShipByDate : undefined),
         originalOrder: order,
         labelCreated: latestLabelJob?.status === 'created' && !!latestLabelJob?.trackingNumber,
         shippingLabelUrl: latestLabelJob?.pdfUrl || (latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined),

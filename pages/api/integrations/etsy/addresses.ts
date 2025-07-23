@@ -67,7 +67,7 @@ async function handler(
           where: {
             userId_etsyStoreId_orderNumber: {
               userId,
-              etsyStoreId: etsyStoreId || null,
+              etsyStoreId: etsyStoreId || '',
               orderNumber
             }
           },
@@ -80,7 +80,7 @@ async function handler(
           create: {
             userId,
             orderNumber,
-            etsyStoreId: etsyStoreId || null,
+            etsyStoreId: etsyStoreId || '',
             etsyStoreName: etsyStoreName || null,
             shippingAddress,
             notes: notes || null

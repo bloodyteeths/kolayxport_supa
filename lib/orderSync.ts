@@ -925,14 +925,20 @@ export async function syncAllOrders(userId: string, options: {
           })
         );
       } else {
-        logger.info(`[FullSync] Triggering Shippo fetch with token present. Options:`, { userId, source, shippoToken: !!shippoToken, lastSyncTime });
-        const etdDefaults = await getEtdDefaults(userId);
+        // TEMPORARY: Disable Shippo sync for testing
+        const DISABLE_SHIPPO_SYNC = true; // Set to false to re-enable
         
-        // Use date filter for incremental sync, or no filter for full historical sync
-        const shippoOptions = lastSyncTime ? { object_created_gte: lastSyncTime.toISOString() } : {};
-        logger.info(`[FullSync] Shippo options:`, shippoOptions);
-        
-        fetchPromises.push(
+        if (DISABLE_SHIPPO_SYNC) {
+          logger.warn(`[FullSync] SHIPPO SYNC IS TEMPORARILY DISABLED FOR TESTING`, { userId });
+        } else {
+          logger.info(`[FullSync] Triggering Shippo fetch with token present. Options:`, { userId, source, shippoToken: !!shippoToken, lastSyncTime });
+          const etdDefaults = await getEtdDefaults(userId);
+          
+          // Use date filter for incremental sync, or no filter for full historical sync
+          const shippoOptions = lastSyncTime ? { object_created_gte: lastSyncTime.toISOString() } : {};
+          logger.info(`[FullSync] Shippo options:`, shippoOptions);
+          
+          fetchPromises.push(
           fetchShippoOrders(shippoToken, shippoOptions).then(orders => {
             logger.info(`[FullSync] Shippo fetch returned ${orders.length} orders.`, { userId });
             return orders.map(order => {
@@ -994,6 +1000,7 @@ export async function syncAllOrders(userId: string, options: {
             });
           })
         );
+        }
       }
     }
 

@@ -435,6 +435,10 @@ async function syncVeeqoRecentOrders(user, settings) {
 }
 
 async function syncShippoRecentOrders(user, settings) {
+  // TEMPORARY: Disable Shippo sync for testing
+  logger.warn('[SHIPPO SYNC] TEMPORARILY DISABLED FOR TESTING', { userId: user.id });
+  return;
+  
   const syncType = 'shippo';
   let syncId, processed = 0, successful = 0, failed = 0, errors = [];
   try {

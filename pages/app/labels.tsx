@@ -329,8 +329,22 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   return debounced;
 }
 
+// --- Etsy address enrichment helper ---
+async function fetchEtsyAddressEnrichment(orderNumber: string): Promise<any | null> {
+  try {
+    const response = await fetch(`/api/etsy-addresses?orderNumbers=${encodeURIComponent(orderNumber)}`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.lookup?.[orderNumber] || null;
+    }
+  } catch (error) {
+    console.warn('Failed to fetch Etsy address enrichment:', error);
+  }
+  return null;
+}
+
 // --- Address mapping utility (already defined in the file) ---
-function extractAddress(order: LocalUIOrder) { // Ensure input type matches LocalUIOrder
+async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async and ensure input type matches LocalUIOrder
   let addr = order.shippingAddress;
   if (typeof addr === 'string') {
     try { addr = JSON.parse(addr); } catch { addr = {}; }
@@ -394,7 +408,7 @@ function extractAddress(order: LocalUIOrder) { // Ensure input type matches Loca
   recipientLastName = recipientLastName || order.recipientLastName || '';
 
 
-  return {
+  const extractedAddress = {
     recipientFirstName,
     recipientLastName,
     recipientStreet1: getValue(
@@ -438,6 +452,43 @@ function extractAddress(order: LocalUIOrder) { // Ensure input type matches Loca
       fallback(['recipientEmail','recipient_email','email'])
     ),
   };
+
+  // --- ETSY ENRICHMENT: Check if address fields are missing and try to enrich from EtsyAddress table ---
+  const isMissingCriticalAddress = !extractedAddress.recipientStreet1 || !extractedAddress.recipientCity;
+  const isEtsyOrder = order.marketplace?.toLowerCase() === 'etsy';
+  
+  if (isMissingCriticalAddress && isEtsyOrder && order.orderNumber) {
+    try {
+      const etsyEnrichment = await fetchEtsyAddressEnrichment(order.orderNumber);
+      if (etsyEnrichment?.shippingAddress) {
+        const etsyAddr = etsyEnrichment.shippingAddress;
+        
+        // Only fill missing fields - existing data has priority
+        const enrichedAddress = {
+          ...extractedAddress,
+          recipientFirstName: extractedAddress.recipientFirstName || etsyAddr.name?.split(' ')[0] || '',
+          recipientLastName: extractedAddress.recipientLastName || etsyAddr.name?.split(' ').slice(1).join(' ') || '',
+          recipientStreet1: extractedAddress.recipientStreet1 || etsyAddr.line1 || '',
+          recipientStreet2: extractedAddress.recipientStreet2 || etsyAddr.line2 || '',
+          recipientCity: extractedAddress.recipientCity || etsyAddr.city || '',
+          recipientState: extractedAddress.recipientState || etsyAddr.state || '',
+          recipientPostal: extractedAddress.recipientPostal || etsyAddr.postalCode || '',
+          recipientCountry: extractedAddress.recipientCountry || etsyAddr.country || 'US',
+          // Add Etsy-specific data for debugging/display
+          _etsyEnriched: true,
+          _etsyStoreName: etsyEnrichment.etsyStoreName,
+          _etsyNotes: etsyEnrichment.notes
+        };
+        
+        return enrichedAddress;
+      }
+    } catch (error) {
+      console.warn('Etsy address enrichment failed:', error);
+      // Continue with original address if enrichment fails
+    }
+  }
+  
+  return extractedAddress;
 }
 
 
@@ -475,17 +526,18 @@ function getProductTitle(item: any, order: any) {
 }
 
 /** convert the API payload (LocalUIOrder[]) into grid-ready rows (LabelRow[]) */
-export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
+export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
   if (!orders) return [];
 
-  return orders.flatMap(order => {
+  const labelRows: LabelRow[] = [];
+  for (const order of orders) {
     // Skip invalid orders
     if (!order || typeof order !== 'object') {
       console.warn('[toLabelRows] Skipping invalid order:', order);
-      return [];
+      continue;
     }
     
-    const addr = extractAddress(order);
+    const addr = await extractAddress(order);
     // Safe: Parse rawData ONLY for date mapping, do not mutate or affect other columns
     let safeRaw = order.rawData;
     if (typeof safeRaw === 'string') {
@@ -589,12 +641,12 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         variantInfo: lineItems?.[0]?.variantInfo || '—',
       };
       
-      
-      return [orderLevelRow];
+      labelRows.push(orderLevelRow);
+      continue;
     }
 
     // Map each line item to a row (FedEx case)
-    return lineItems.map(item => {
+    const itemRows = lineItems.map(item => {
       // Get the latest label job for this item
       const latestLabelJob = item.labelJobs && item.labelJobs.length > 0
         ? item.labelJobs.reduce<typeof item.labelJobs[0] | undefined>((latest, job) => 
@@ -651,7 +703,11 @@ export function toLabelRows(orders: LocalUIOrder[]): LabelRow[] {
         variantInfo: item.variantInfo || '—',
       };
     });
-  });
+    
+    labelRows.push(...itemRows);
+  }
+  
+  return labelRows;
 }
 
 
@@ -870,10 +926,18 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     return [{ value: '', label: 'Tümü (Market)' }, ...options];
   }, [fetchedOrders]);
 
-  const labelRows: LabelRow[] = useMemo(() => {
-    if (!fetchedOrders || !Array.isArray(fetchedOrders)) return [];
-    const rows = toLabelRows(fetchedOrders as LocalUIOrder[]);
-    return dedupeLabelRows(rows);
+  const [labelRows, setLabelRows] = useState<LabelRow[]>([]);
+  
+  useEffect(() => {
+    async function processOrders() {
+      if (!fetchedOrders || !Array.isArray(fetchedOrders)) {
+        setLabelRows([]);
+        return;
+      }
+      const rows = await toLabelRows(fetchedOrders as LocalUIOrder[]);
+      setLabelRows(dedupeLabelRows(rows));
+    }
+    processOrders();
   }, [fetchedOrders]);
 
   // Restore label filter tab interactivity

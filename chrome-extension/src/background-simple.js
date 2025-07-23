@@ -69,12 +69,51 @@ async function handleMessage(request, sender, sendResponse) {
   }
 }
 
-// Enhanced authentication check for multiple domains
+// Enhanced authentication check using dedicated API endpoint
 async function checkAuthentication() {
   try {
-    console.log('Checking authentication across domains...');
+    console.log('Checking authentication using Kolayxport API...');
     
-    // Try cookies from multiple domain variations
+    // Try the new auth endpoint first (most reliable)
+    try {
+      const response = await fetch('https://kolayxport.com/api/auth/extension', {
+        method: 'GET',
+        credentials: 'include', // Include httpOnly cookies
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Kolayxport Chrome Extension'
+        }
+      });
+      
+      if (response.ok) {
+        const authData = await response.json();
+        console.log('Auth endpoint response:', { authenticated: authData.authenticated, hasToken: !!authData.token });
+        
+        if (authData.authenticated && authData.token) {
+          console.log('SUCCESS: Authenticated via API endpoint');
+          authToken = authData.token;
+          updateBadge('authenticated');
+          
+          // Store user info for later use
+          chrome.storage.local.set({
+            'kx_user': authData.user,
+            'kx_auth_expires': authData.expires_at,
+            'kx_last_auth_check': Date.now()
+          });
+          
+          return;
+        } else {
+          console.log('Auth endpoint says not authenticated:', authData.message);
+        }
+      } else {
+        console.log(`Auth endpoint returned ${response.status}:`, await response.text());
+      }
+    } catch (apiError) {
+      console.warn('Auth API endpoint failed:', apiError.message);
+    }
+    
+    // Fallback: Try cookies from multiple domain variations
+    console.log('Falling back to cookie-based authentication...');
     const domainVariations = ['kolayxport.com', '.kolayxport.com'];
     let authCookie = null;
     
@@ -247,9 +286,20 @@ async function checkAuthentication() {
         // Always try the message approach as fallback when script injection fails or returns null
         try {
           console.log('Trying message-based approach to kolayxport.js content script...');
+          console.log('Waiting 2 seconds for content script to load...');
+          
+          // Wait a bit for content script to load
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
           const response = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error('Message timeout - content script may not be loaded'));
+            }, 5000);
+            
             chrome.tabs.sendMessage(tab.id, { action: 'getAuthToken' }, (response) => {
+              clearTimeout(timeout);
               if (chrome.runtime.lastError) {
+                console.log('Chrome runtime error:', chrome.runtime.lastError.message);
                 reject(new Error(chrome.runtime.lastError.message));
               } else {
                 resolve(response);
@@ -266,7 +316,8 @@ async function checkAuthentication() {
             console.log('Message approach returned no token:', response);
           }
         } catch (messageError) {
-          console.error('Message approach failed:', messageError);
+          console.error('Message approach failed:', messageError.message);
+          console.log('This usually means the kolayxport.js content script is not loaded on the page');
         }
       }
     } catch (tabError) {

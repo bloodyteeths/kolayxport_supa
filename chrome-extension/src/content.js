@@ -124,23 +124,45 @@ function getEtsyStoreInfo() {
   return { shopId, storeName };
 }
 
-// Get authentication token - try multiple sources
+// Get authentication token - use API endpoint approach
 async function getAuthToken() {
-  // Try localStorage first (common for SPAs)
+  try {
+    // Try getting from background script first (it handles the API call)
+    const response = await chrome.runtime.sendMessage({ action: 'getAuthStatus' });
+    if (response && response.token) {
+      log.info('Got auth token from background script');
+      return response.token;
+    }
+  } catch (e) {
+    log.warn('Could not get auth token from background', e.message);
+  }
+
+  // Fallback: Try direct API call (though this might fail due to CORS)
+  try {
+    log.info('Trying direct auth API call...');
+    const response = await fetch(API.replace('/addresses', '/auth/extension'), {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      const authData = await response.json();
+      if (authData.authenticated && authData.token) {
+        log.success('Got auth token from direct API call');
+        return authData.token;
+      }
+    }
+  } catch (e) {
+    log.warn('Direct auth API call failed', e.message);
+  }
+
+  // Final fallback: Try localStorage/cookies (legacy approach)
   let token = localStorage.getItem("kxJwt") || localStorage.getItem("authToken");
   
   if (!token) {
-    // Try getting from background script
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'getAuthStatus' });
-      token = response.token;
-    } catch (e) {
-      log.warn('Could not get auth token from background', e.message);
-    }
-  }
-  
-  if (!token) {
-    // Try cookies via background script
     try {
       const cookies = await chrome.runtime.sendMessage({ 
         action: 'getCookies',

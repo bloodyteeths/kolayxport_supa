@@ -69,20 +69,8 @@ export function getSupabaseServerClient(req, res) {
   );
 }
 
-// Helper to serialize cookies (since res.cookie is not directly available in API routes like in Express)
-// This is a simplified version. For robust cookie serialization, a library like 'cookie' is often used.
-// However, createServerClient from @supabase/ssr might handle some of this internally or expect a specific format.
-// Let's assume for now this basic serialization is what's needed or that createServerClient handles the options correctly.
-// We might need to install and use the 'cookie' package if this is not sufficient.
-// For now, this will be a placeholder to satisfy the structure.
-// The options object is passed through.
-const serializeCookie = (name, value, options) => {
-  const parts = [`${name}=${encodeURIComponent(value)}`];
-  if (options.maxAge) parts.push(`Max-Age=${options.maxAge}`);
-  if (options.path) parts.push(`Path=${options.path}`);
-  if (options.domain) parts.push(`Domain=${options.domain}`);
-  if (options.secure) parts.push('Secure');
-  if (options.httpOnly) parts.push('HttpOnly');
-  if (options.sameSite) parts.push(`SameSite=${options.sameSite}`);
-  return parts.join('; ');
+// Helper to serialize cookies using the 'cookie' package format
+const serializeCookie = (name, value, options = {}) => {
+  const cookie = require('cookie');
+  return cookie.serialize(name, value, options);
 }; 

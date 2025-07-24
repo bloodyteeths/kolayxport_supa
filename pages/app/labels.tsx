@@ -256,6 +256,7 @@ export interface LabelRow {
   labelJobStatus?: string; // From item
   trackingNumber?: string; // From item
   shipByDate?: string; // Effective ship by date
+  customerNote?: string; // Customer personalization/notes (especially from Etsy)
 
   // Reference to the original full LocalUIOrder if complex data needed for actions not covered by LabelRow
   originalOrder?: LocalUIOrder; 
@@ -559,7 +560,16 @@ async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async
             }
             return null;
           })(),
-          _etsyOrderDate: etsyEnrichment.orderDate
+          _etsyOrderDate: etsyEnrichment.orderDate,
+          // Extract customer note from Etsy notes
+          _etsyCustomerNote: (() => {
+            const customerNote = parseEtsyPersonalization(etsyEnrichment.notes);
+            console.log(`🔍 Etsy customer note extraction for order ${order.orderNumber}:`, {
+              originalNotes: etsyEnrichment.notes,
+              extractedNote: customerNote
+            });
+            return customerNote;
+          })()
         };
         
         return enrichedAddress;
@@ -716,6 +726,17 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelJobStatus: hasOrderLabel ? 'created' : undefined,
         trackingNumber: latestShipment?.trackingNumber || order.trackingNumber || undefined,
         shipByDate: order.shipByDate || (addr as any)?._etsyShipByDate,
+        customerNote: (() => {
+          const note = (addr as any)?._etsyCustomerNote || '';
+          if (order.orderNumber === '3749610005') {
+            console.log(`🔍 Customer note for order ${order.orderNumber} (no line items):`, {
+              etsyCustomerNote: (addr as any)?._etsyCustomerNote,
+              finalNote: note,
+              addrObj: addr
+            });
+          }
+          return note;
+        })(),
         originalOrder: order,
         labelCreated: hasOrderLabel,
         shippingLabelUrl: hasOrderLabel ? (latestShipment?.pdfUrl || order.shippingLabelUrl) : undefined,
@@ -778,6 +799,17 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelJobStatus: latestLabelJob?.status,
         trackingNumber: latestLabelJob?.trackingNumber,
         shipByDate: item.shipBy || order.shipByDate || (addr as any)?._etsyShipByDate,
+        customerNote: (() => {
+          const note = (addr as any)?._etsyCustomerNote || '';
+          if (order.orderNumber === '3749610005') {
+            console.log(`🔍 Customer note for order ${order.orderNumber} (with line items):`, {
+              etsyCustomerNote: (addr as any)?._etsyCustomerNote,
+              finalNote: note,
+              addrObj: addr
+            });
+          }
+          return note;
+        })(),
         originalOrder: order,
         labelCreated: latestLabelJob?.status === 'created' && !!latestLabelJob?.trackingNumber,
         shippingLabelUrl: latestLabelJob?.pdfUrl || (latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined),
@@ -903,6 +935,48 @@ function parseShippoNotes(notes: string): { to_address?: any; success: boolean }
   } catch (error) {
     console.error('Failed to parse Shippo notes:', error);
     return { success: false };
+  }
+}
+
+// Parse Etsy personalization from Chrome extension notes
+function parseEtsyPersonalization(notes: string): string {
+  console.log(`🔍 parseEtsyPersonalization called with:`, notes);
+  
+  if (!notes || typeof notes !== 'string') {
+    console.log(`🔍 parseEtsyPersonalization: notes is empty or not string`);
+    return '';
+  }
+  
+  try {
+    // Look for "Personalization" followed by the actual personalization text
+    // Examples:
+    // "...PersonalizationLENA | Track package..."
+    // "...PersonalizationNot requested on this item. | ..."
+    // "...Personalizationit is a custom order | Track package..."
+    
+    const personalizationMatch = notes.match(/Personalization([^|]*)/);
+    console.log(`🔍 parseEtsyPersonalization: regex match result:`, personalizationMatch);
+    
+    if (personalizationMatch && personalizationMatch[1]) {
+      const personalization = personalizationMatch[1].trim();
+      console.log(`🔍 parseEtsyPersonalization: extracted personalization:`, personalization);
+      
+      // Handle common cases
+      if (personalization.toLowerCase().includes('not requested') || 
+          personalization.toLowerCase().includes('no personalization')) {
+        console.log(`🔍 parseEtsyPersonalization: filtered out "not requested" case`);
+        return '';
+      }
+      
+      console.log(`🔍 parseEtsyPersonalization: returning:`, personalization);
+      return personalization;
+    }
+    
+    console.log(`🔍 parseEtsyPersonalization: no match found, returning empty`);
+    return '';
+  } catch (error) {
+    console.warn('Failed to parse Etsy personalization:', error);
+    return '';
   }
 }
 
@@ -1488,6 +1562,63 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       headerName: 'Son Kargo Tarihi',
       width: 130,
       valueFormatter: (value: string | undefined) => value ? formatDate(value) : '—',
+    },
+    { 
+      field: 'customerNote', 
+      headerName: 'Müşteri Notu',
+      width: 140,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => {
+        const note = params.row.customerNote;
+        if (!note || note.trim() === '') {
+          return (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              height: '100%' 
+            }}>
+              <span style={{ color: '#999' }}>—</span>
+            </div>
+          );
+        }
+
+        const handleCopyClick = async () => {
+          try {
+            await navigator.clipboard.writeText(note);
+            toast.success('Müşteri notu kopyalandı');
+          } catch (err) {
+            console.error('Failed to copy note:', err);
+            toast.error('Kopyalama başarısız');
+          }
+        };
+
+        return (
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            height: '100%',
+            fontSize: '13px', 
+            lineHeight: '1.2',
+            maxHeight: '40px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            cursor: 'pointer',
+            padding: '2px 4px',
+            borderRadius: '4px',
+            transition: 'background-color 0.2s'
+          }}
+          onClick={handleCopyClick}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f5f5f5';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+          title={`Kopyalamak için tıklayın: ${note}`}
+          >
+            {note}
+          </div>
+        );
+      }
     },
     { 
       field: 'lastCarrier', 

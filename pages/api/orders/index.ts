@@ -49,6 +49,7 @@ export default async function handler(
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.limit as string) || 15;
   const search = req.query.search as string;
+  const searchType = req.query.searchType as string || 'all';
   const source = req.query.source as string;
   const channel = req.query.channel as string;
   const sort = req.query.sort as string || 'desc';
@@ -60,6 +61,7 @@ export default async function handler(
     status,
     marketplace,
     labelStatus,
+    labelFilter,
     serviceType,
     packagingType,
     pickupType,
@@ -92,29 +94,145 @@ export default async function handler(
   // console.log('[ORDERS API] Fetching orders for userId:', user.id, 'Query:', req.query);
 
   try {
-    let whereClause = 'WHERE o."userId" = $1';
+    let whereClause = 'WHERE o."userId" = $1 AND o."status" NOT IN (\'PENDING\', \'AWAITING_PAYMENT\')';
     const params: any[] = [user.id];
     let paramIndex = 2;
 
     if (search) {
-      whereClause += ` AND (
-        o."orderNumber" ILIKE $${paramIndex} OR
-        o."customerName" ILIKE $${paramIndex} OR
-        o."marketplace" ILIKE $${paramIndex}
-      )`;
-      params.push(`%${search}%`);
-      paramIndex++;
+      const searchPattern = `%${search}%`;
+      
+      switch (searchType) {
+        case 'customer':
+          whereClause += ` AND (
+            o."customerName" ILIKE $${paramIndex} OR
+            o."shippingAddress"::text ILIKE $${paramIndex}
+          )`;
+          params.push(searchPattern);
+          paramIndex++;
+          break;
+          
+        case 'order':
+          whereClause += ` AND o."orderNumber" ILIKE $${paramIndex}`;
+          params.push(searchPattern);
+          paramIndex++;
+          break;
+          
+        case 'tracking':
+          whereClause += ` AND (
+            o."trackingNumber" ILIKE $${paramIndex} OR
+            o."rawData"::text ILIKE $${paramIndex}
+          )`;
+          params.push(searchPattern);
+          paramIndex++;
+          break;
+          
+        case 'marketplace':
+          whereClause += ` AND o."marketplace" ILIKE $${paramIndex}`;
+          params.push(searchPattern);
+          paramIndex++;
+          break;
+          
+        case 'product':
+          whereClause += ` AND EXISTS (
+            SELECT 1 FROM "OrderItem" oi 
+            WHERE oi."orderId" = o.id 
+            AND oi."productName" ILIKE $${paramIndex}
+          )`;
+          params.push(searchPattern);
+          paramIndex++;
+          break;
+          
+        case 'sku':
+          whereClause += ` AND EXISTS (
+            SELECT 1 FROM "OrderItem" oi 
+            WHERE oi."orderId" = o.id 
+            AND oi."sku" ILIKE $${paramIndex}
+          )`;
+          params.push(searchPattern);
+          paramIndex++;
+          break;
+          
+        case 'city':
+          whereClause += ` AND o."shippingAddress"::text ILIKE $${paramIndex}`;
+          params.push(`%"city"%${search}%`);
+          paramIndex++;
+          break;
+          
+        case 'phone':
+          whereClause += ` AND o."shippingAddress"::text ILIKE $${paramIndex}`;
+          params.push(`%"phone"%${search}%`);
+          paramIndex++;
+          break;
+          
+        case 'note':
+          whereClause += ` AND (
+            o."rawData"::text ILIKE $${paramIndex} OR
+            EXISTS (
+              SELECT 1 FROM "OrderItem" oi 
+              WHERE oi."orderId" = o.id 
+              AND oi."notes" ILIKE $${paramIndex}
+            )
+          )`;
+          params.push(searchPattern);
+          paramIndex++;
+          break;
+          
+        case 'all':
+        default:
+          // Search across all main fields
+          whereClause += ` AND (
+            o."orderNumber" ILIKE $${paramIndex} OR
+            o."customerName" ILIKE $${paramIndex} OR
+            o."marketplace" ILIKE $${paramIndex} OR
+            o."trackingNumber" ILIKE $${paramIndex} OR
+            o."rawData"::text ILIKE $${paramIndex} OR
+            o."shippingAddress"::text ILIKE $${paramIndex} OR
+            EXISTS (
+              SELECT 1 FROM "OrderItem" oi 
+              WHERE oi."orderId" = o.id 
+              AND (oi."productName" ILIKE $${paramIndex} OR oi."sku" ILIKE $${paramIndex})
+            )
+          )`;
+          params.push(searchPattern);
+          paramIndex++;
+          break;
+      }
     }
 
     if (status) {
-      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."status" = $${paramIndex}`;
-      params.push(status);
-      paramIndex++;
+      // Handle unified status filters
+      const statusMappings: Record<string, string[]> = {
+        'onaylandi': ['PAID', 'Created'],
+        'kargolandi': ['shipped', 'Shipped'],
+        'iptal': ['cancelled', 'Cancelled'],
+        'Delivered': ['Delivered']
+      };
+
+      if (statusMappings[status as keyof typeof statusMappings]) {
+        // For unified filters, use IN clause with multiple statuses
+        const statusKey = status as keyof typeof statusMappings;
+        const placeholders = statusMappings[statusKey].map((_, index) => `$${paramIndex + index}`).join(', ');
+        whereClause += ` AND o."status" IN (${placeholders})`;
+        statusMappings[statusKey].forEach(statusValue => {
+          params.push(statusValue);
+          paramIndex++;
+        });
+      } else {
+        // For single status filters, use direct comparison
+        whereClause += ` AND o."status" = $${paramIndex}`;
+        params.push(status);
+        paramIndex++;
+      }
     }
     if (marketplace) {
-      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."marketplace" = $${paramIndex}`;
-      params.push(marketplace);
-      paramIndex++;
+      // Handle multiple marketplace filtering
+      const marketplaceValues = Array.isArray(marketplace) ? marketplace : [marketplace];
+      const placeholders = marketplaceValues.map((_, index) => `$${paramIndex + index}`).join(', ');
+      whereClause += ` AND o."marketplace" IN (${placeholders})`;
+      marketplaceValues.forEach(value => {
+        params.push(value);
+        paramIndex++;
+      });
     }
     if (labelStatus) {
       whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."labelStatus" = $${paramIndex}`;
@@ -150,6 +268,36 @@ export default async function handler(
       whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."labelStockType" = $${paramIndex}`;
       params.push(labelStockType);
       paramIndex++;
+    }
+
+    if (labelFilter && labelFilter !== 'all') {
+      if (labelFilter === 'labeled') {
+        // Has label: trackingNumber OR shippingLabelUrl OR labelStatus='created' OR has shipment
+        whereClause += ` AND (
+          o."trackingNumber" IS NOT NULL OR 
+          o."shippingLabelUrl" IS NOT NULL OR 
+          o."labelStatus" = 'created' OR
+          EXISTS (
+            SELECT 1 FROM "Shipment" s 
+            WHERE s."orderId" = o.id 
+            AND s.status = 'created' 
+            AND (s."trackingNumber" IS NOT NULL OR s."pdfUrl" IS NOT NULL)
+          )
+        )`;
+      } else if (labelFilter === 'unlabeled') {
+        // No label: opposite of above
+        whereClause += ` AND (
+          (o."trackingNumber" IS NULL OR o."trackingNumber" = '') AND
+          (o."shippingLabelUrl" IS NULL OR o."shippingLabelUrl" = '') AND
+          (o."labelStatus" IS NULL OR o."labelStatus" != 'created') AND
+          NOT EXISTS (
+            SELECT 1 FROM "Shipment" s 
+            WHERE s."orderId" = o.id 
+            AND s.status = 'created' 
+            AND (s."trackingNumber" IS NOT NULL OR s."pdfUrl" IS NOT NULL)
+          )
+        )`;
+      }
     }
 
     if (startDate) {

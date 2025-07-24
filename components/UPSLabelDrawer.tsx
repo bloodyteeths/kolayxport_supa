@@ -6,6 +6,18 @@ import { UPS_SERVICE_TYPES, UPS_PACKAGE_TYPES, UPS_SIGNATURE_OPTIONS } from '@/c
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'react-hot-toast';
 
+// Utility function to normalize decimal values to max 2 decimal places
+const normalizeDecimal = (value: number | string): number => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return 0;
+  return Math.round(num * 100) / 100; // Round to 2 decimal places
+};
+
+// Format decimal for display (ensures 2 decimal places)
+const formatDecimal = (value: number | string): string => {
+  return normalizeDecimal(value).toFixed(2);
+};
+
 interface UIOrder {
   orderId: string;
   orderNumber: string;
@@ -228,10 +240,10 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
     products: [{
       description: 'Global Cargo Shipment',
       quantity: 1,
-      value: 0,
+      value: 0.01,
       commodityCode: '',
       unitOfMeasurement: 'PCS',
-      weight: DEFAULTS.weight.toString(),
+      weight: formatDecimal(DEFAULTS.weight),
       originCountry: 'TR',
     }],
     soldToName: '',
@@ -258,6 +270,12 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
 
   React.useEffect(() => {
     if (order) {
+      // Reset UI state when order changes
+      setSuccess(false);
+      setError(null);
+      setLabelUrl(null);
+      setSaving(false);
+      
       const orderValue = order?.orderTotalPrice || 0;
       setForm(f => ({
         ...f,
@@ -274,7 +292,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         countryOfOrigin: order?.countryOfOrigin || '',
         serviceType: DEFAULTS.serviceType,
         dutyPaymentType: DEFAULTS.dutyPaymentType,
-        weight: order?.weight || DEFAULTS.weight,
+        weight: normalizeDecimal(order?.weight || DEFAULTS.weight),
         invoiceNumber: `INV-${order?.orderNumber || Date.now()}`,
         soldToName: `${order?.recipientFirstName || ''} ${order?.recipientLastName || ''}`.trim(),
         soldToAttention: `${order?.recipientFirstName || ''} ${order?.recipientLastName || ''}`.trim(),
@@ -289,23 +307,40 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         products: [{
           description: order?.title || 'Global Cargo Shipment',
           quantity: 1,
-          value: orderValue,
+          value: normalizeDecimal(orderValue),
           commodityCode: order?.hsCode || '',
           unitOfMeasurement: 'PCS',
-          weight: (order?.weight || DEFAULTS.weight).toString(),
+          weight: formatDecimal(order?.weight || DEFAULTS.weight),
           originCountry: order?.countryOfOrigin || 'TR',
         }],
         invoiceLineTotal: {
           currencyCode: order?.currency || 'USD',
-          monetaryValue: orderValue.toFixed(2)
+          monetaryValue: formatDecimal(orderValue)
         }
       }));
     }
   }, [order]);
 
+  // Reset UI state when drawer opens
+  React.useEffect(() => {
+    if (open) {
+      setSuccess(false);
+      setError(null);
+      setLabelUrl(null);
+      setSaving(false);
+    }
+  }, [open]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: value }));
+    
+    // Normalize decimal values for specific fields
+    if (name === 'weight') {
+      const normalizedValue = normalizeDecimal(value);
+      setForm(f => ({ ...f, [name]: normalizedValue }));
+    } else {
+      setForm(f => ({ ...f, [name]: value }));
+    }
   };
 
   const handleSelectChange = (e: SelectChangeEvent<string>) => {
@@ -352,7 +387,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
             invoiceNumber: form.invoiceNumber,
             invoiceLineTotal: {
               currencyCode: form.currencyCode,
-              monetaryValue: (form.products[0].quantity * form.products[0].value).toFixed(2)
+              monetaryValue: formatDecimal(form.products[0].quantity * form.products[0].value)
             },
             exportReason: form.exportReason,
             currencyCode: form.currencyCode,
@@ -569,7 +604,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     products: [{ ...f.products[0], quantity }],
                     invoiceLineTotal: {
                       currencyCode: f.currencyCode,
-                      monetaryValue: (quantity * unitPrice).toFixed(2)
+                      monetaryValue: formatDecimal(quantity * unitPrice)
                     }
                   }));
                 }}
@@ -584,13 +619,13 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                 type="number"
                 value={form.products[0].value}
                 onChange={e => {
-                  const unitPrice = Math.max(0.01, Number(e.target.value));
+                  const unitPrice = Math.max(0.01, normalizeDecimal(e.target.value));
                   setForm(f => ({
                     ...f, 
                     products: [{ ...f.products[0], value: unitPrice }],
                     invoiceLineTotal: {
                       currencyCode: f.currencyCode,
-                      monetaryValue: (f.products[0].quantity * unitPrice).toFixed(2)
+                      monetaryValue: formatDecimal(f.products[0].quantity * unitPrice)
                     }
                   }));
                 }}
@@ -602,7 +637,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
               <TextField
                 label="Toplam Tutar"
                 type="number"
-                value={(form.products[0].quantity * form.products[0].value).toFixed(2)}
+                value={formatDecimal(form.products[0].quantity * form.products[0].value)}
                 disabled
                 fullWidth
                 margin="dense"
@@ -630,7 +665,10 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                   name="weight"
                   type="number"
                   value={form.products[0].weight}
-                  onChange={e => setForm(f => ({ ...f, products: [{ ...f.products[0], weight: e.target.value }] }))}
+                  onChange={e => {
+                    const normalizedWeight = formatDecimal(e.target.value);
+                    setForm(f => ({ ...f, products: [{ ...f.products[0], weight: normalizedWeight }] }));
+                  }}
                   inputProps={{ min: 0, step: 0.01 }}
                   required
                   fullWidth

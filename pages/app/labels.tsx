@@ -4,12 +4,13 @@ import {
   Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, Fade, List, ListItem, ListItemIcon, ListItemText, ToggleButton, ToggleButtonGroup, Grid, SelectChangeEvent
 } from '@mui/material';
 import { DataGrid, GridColDef, GridPaginationModel, GridRenderCellParams, GridValueGetter } from '@mui/x-data-grid';
-import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, Edit as EditIcon, Check as CheckIcon, Warning as WarningIcon, Error as ErrorIcon, Info as InfoIcon, Lock as LockIcon, FlightTakeoff as FlightTakeoffIcon, Flight as FlightIcon } from '@mui/icons-material';
+import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, Edit as EditIcon, Check as CheckIcon, Warning as WarningIcon, Error as ErrorIcon, Info as InfoIcon, Lock as LockIcon, FlightTakeoff as FlightTakeoffIcon, Flight as FlightIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import { toast, Toaster, Toast } from 'react-hot-toast';
 import { useOrders } from '@/lib/hooks/useOrders';
+import { useMarketplaceOptions } from '@/lib/hooks/useMarketplaceOptions';
 import Layout from '@/components/Layout';
 import AppLayout from '@/components/AppLayout';
 import CircleIcon from '@mui/icons-material/Circle';
@@ -272,7 +273,6 @@ export interface LabelRow {
 
 const statusColors: Record<string, {bg: string, text: string}> = {
   UNSHIPPED: { bg: '#87CEEB', text: '#000' }, // Baby Blue
-  PENDING: { bg: '#87CEEB', text: '#000' },
   AWAITING_FULFILLMENT: { bg: '#87CEEB', text: '#000' }, // Baby Blue - same as PENDING
   PAID: { bg: '#87CEEB', text: '#000' }, // Baby Blue - same as PENDING
   CREATED: { bg: '#87CEEB', text: '#000' }, // Baby Blue - same as PENDING (Onaylandı)
@@ -282,7 +282,6 @@ const statusColors: Record<string, {bg: string, text: string}> = {
   CANCELLED: { bg: '#F08080', text: '#fff' }, // Light Coral
   REFUNDED: { bg: '#DDA0DD', text: '#000' }, // Plum
   ON_HOLD: { bg: '#FFA500', text: '#000' }, // Orange
-  AWAITING_PAYMENT: { bg: '#FFFFE0', text: '#000' }, // Light Yellow
   COMPLETED: { bg: '#388e3c', text: '#fff' }, // Dark Green (for general success)
   LABEL_GENERATED: { bg: '#8A2BE2', text: '#fff' }, // BlueViolet
   FAILED: {bg: '#DC143C', text: '#fff'}, // Crimson for general failure
@@ -308,7 +307,6 @@ const integrationOptions = [
 const orderStatusOptions = [
   { value: '', label: 'Tümü (Sipariş)' },
   { value: 'UNSHIPPED', label: 'Hazırlanıyor' },
-  { value: 'PENDING', label: 'Onaylandı' },
   { value: 'AWAITING_FULFILLMENT', label: 'Onaylandı' },
   { value: 'PAID', label: 'Onaylandı' },
   { value: 'CREATED', label: 'Onaylandı' },
@@ -321,6 +319,29 @@ const orderStatusOptions = [
   { value: 'COMPLETED', label: 'Tamamlandı' },
   { value: 'FAILED', label: 'Başarısız Oldu' },
   { value: 'Synced', label: 'Senkronize' },
+];
+
+// Filter options - unified for better UX
+const orderStatusFilterOptions = [
+  { value: '', label: 'Tümü (Sipariş)' },
+  { value: 'onaylandi', label: 'Onaylandı', statuses: ['PAID', 'Created'] },
+  { value: 'kargolandi', label: 'Kargolandı', statuses: ['shipped', 'Shipped'] },
+  { value: 'iptal', label: 'İptal Edildi', statuses: ['cancelled', 'Cancelled'] },
+  { value: 'Delivered', label: 'Teslim Edildi', statuses: ['Delivered'] },
+];
+
+// Search type options
+const searchTypeOptions = [
+  { value: 'all', label: 'Tümünde Ara' },
+  { value: 'customer', label: 'Müşteri' },
+  { value: 'order', label: 'Sipariş No' },
+  { value: 'tracking', label: 'Takip No' },
+  { value: 'product', label: 'Ürün Adı' },
+  { value: 'sku', label: 'Stok Kodu' },
+  { value: 'marketplace', label: 'Mağaza' },
+  { value: 'city', label: 'Şehir' },
+  { value: 'phone', label: 'Telefon' },
+  { value: 'note', label: 'Müşteri Notu' },
 ];
 
 // --- Debounce utility ---
@@ -766,6 +787,8 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
       continue;
     }
     
+    // PENDING and AWAITING_PAYMENT orders are now filtered out server-side
+    
     // Pass the pre-fetched enrichment to extractAddress
     const etsyEnrichment = order.orderNumber ? etsyEnrichments.get(order.orderNumber) : null;
     if (order.orderNumber && isEtsyOrderSync(order.marketplace)) {
@@ -1173,7 +1196,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   const [submittingTracking, setSubmittingTracking] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [marketplaceFilter, setMarketplaceFilter] = useState('');
+  const [searchType, setSearchType] = useState('all');
+  const [marketplaceFilter, setMarketplaceFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [labelStatusFilter, setLabelStatusFilter] = useState('');
   const [generatingLabelId, setGeneratingLabelId] = useState<string | null>(null);
@@ -1183,6 +1207,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   const [hasFedexCredentials, setHasFedexCredentials] = useState(false);
   const [checkingFedexCredentials, setCheckingFedexCredentials] = useState(true);
   const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
+  const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [filterStartDate, setFilterStartDate] = useState(() => {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -1198,6 +1224,9 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
+  // Fetch marketplace options
+  const { marketplaceOptions: dbMarketplaceOptions, isLoading: isLoadingMarketplaces } = useMarketplaceOptions();
+
   const { 
     orders: fetchedOrders, 
     total, 
@@ -1209,11 +1238,13 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     paginationModel.pageSize,
     {
       search: debouncedSearch,
+      searchType: searchType,
       startDate: filterStartDate,
       endDate: filterEndDate,
-      marketplace: '', // Always empty to show all marketplaces
+      marketplace: marketplaceFilter.length > 0 ? marketplaceFilter : undefined,
       status: statusFilter,
       labelStatus: labelStatusFilter,
+      labelFilter: labelFilter,
     },
     'labelsPage'
   );
@@ -1247,46 +1278,83 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   };
 
   const filteredAndPaginatedItems = useMemo(() => {
-    // TEMPORARILY DISABLED: Frontend filtering for debugging
-    return labelRows; // Always return all rows for debugging
-    
-    /* ORIGINAL FILTERING CODE - DISABLED
-    if (labelFilter === 'all') {
-      return labelRows;
+    let filtered = labelRows;
+
+    // Status filtering is now handled server-side in the API
+
+    // Apply label status filter
+    if (labelStatusFilter) {
+      filtered = filtered.filter(row => {
+        const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
+        const shipments = originalOrder?.shipments || [];
+        const hasShipment = shipments.some(s => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
+        const hasLabel = row.trackingNumber || 
+                        row.labelCreated || 
+                        row.shippingLabelUrl || 
+                        row.labelJobStatus === 'created' ||
+                        hasShipment;
+        
+        if (labelStatusFilter === 'created') {
+          return hasLabel;
+        } else if (labelStatusFilter === 'not_created') {
+          return !hasLabel;
+        } else if (labelStatusFilter === 'failed') {
+          return row.labelJobStatus === 'failed';
+        }
+        return true;
+      });
     }
-    return labelRows.filter(row => {
-      const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
-      const shipments = originalOrder?.shipments || [];
-      const hasShipment = shipments.some(s => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
 
-      const hasLabel = row.trackingNumber || 
-                      row.labelCreated || 
-                      row.shippingLabelUrl || 
-                      row.labelJobStatus === 'created' ||
-                      hasShipment;
+    // Marketplace filtering is now handled server-side in the API
 
-      if (labelFilter === 'labeled') {
-        return hasLabel;
-      }
-      if (labelFilter === 'unlabeled') {
-        return !hasLabel;
-      }
-      return true;
-    });
-    */
-  }, [labelRows, labelFilter, marketplaceFilter]);
+    // Search filtering is now handled server-side in the API
 
+    // Apply date filters
+    if (filterStartDate || filterEndDate) {
+      filtered = filtered.filter(row => {
+        const orderDate = row?.originalOrder?.marketplaceOrderDate || row?.orderDate;
+        if (!orderDate) return false;
+        
+        const date = new Date(orderDate);
+        const startDate = filterStartDate ? new Date(filterStartDate) : null;
+        const endDate = filterEndDate ? new Date(filterEndDate + 'T23:59:59') : null;
+        
+        if (startDate && date < startDate) return false;
+        if (endDate && date > endDate) return false;
+        
+        return true;
+      });
+    }
+
+    // Label filtering is now handled server-side in the API
+
+
+    
+    return filtered;
+  }, [labelRows, marketplaceFilter, labelStatusFilter, filterStartDate, filterEndDate]);
+
+  // Reset pagination when filters change, but use a more stable approach
   useEffect(() => {
-    setPaginationModel(prev => ({ ...prev, page: 0 }));
-  }, [debouncedSearch, statusFilter, labelStatusFilter, filterStartDate, filterEndDate]);
+    // Use setTimeout to avoid race conditions with the filtering useMemo
+    const timer = setTimeout(() => {
+      setPaginationModel(prev => ({ ...prev, page: 0 }));
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [debouncedSearch, searchType, statusFilter, labelStatusFilter, labelFilter, filterStartDate, filterEndDate, marketplaceFilter]);
 
   useEffect(() => {
     const fetchUserSettings = async () => {
       setCheckingFedexCredentials(true);
       try {
-        const response = await fetch('/api/user/settings'); 
+        const response = await fetch('/api/user/settings', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        }); 
         if (!response.ok) {
-          console.error('Kullanıcı ayarları alınamadı', response.status);
+          console.error('Kullanıcı ayarları alınamadı', response.status, response.statusText);
           setHasFedexCredentials(false);
           return;
         }
@@ -1850,6 +1918,66 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         </>
       )
     },
+    {
+      field: 'delete',
+      headerName: 'Sil',
+      width: 80,
+      sortable: false,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => {
+        const orderId = params.row?.orderId;
+        const orderNumber = params.row?.orderNumber;
+        
+        if (!orderId) return null;
+
+        const isConfirming = deleteConfirmation === orderId;
+        const isDeleting = deletingOrderId === orderId;
+
+        if (isDeleting) {
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <CircularProgress size={16} />
+            </Box>
+          );
+        }
+
+        if (isConfirming) {
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Tooltip title="Sil">
+                <IconButton
+                  size="small"
+                  onClick={() => handleDeleteOrder(orderId)}
+                  sx={{ color: 'success.main', padding: '2px' }}
+                >
+                  <CheckIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="İptal">
+                <IconButton
+                  size="small"
+                  onClick={() => setDeleteConfirmation(null)}
+                  sx={{ color: 'error.main', padding: '2px' }}
+                >
+                  <CancelIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          );
+        }
+
+        return (
+          <Tooltip title={`Sipariş ${orderNumber} sil`}>
+            <IconButton
+              size="small"
+              onClick={() => setDeleteConfirmation(orderId)}
+              sx={{ color: 'error.main', padding: '4px' }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        );
+      }
+    },
   ];
 
   const handleSync = async () => {
@@ -2144,6 +2272,33 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     }
   };
 
+  const handleDeleteOrder = async (orderId: string) => {
+    setDeletingOrderId(orderId);
+    try {
+      const response = await fetch(`/api/orders/${orderId}/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete order');
+      }
+
+      toast.success('Sipariş başarıyla silindi!');
+      setDeleteConfirmation(null);
+      await mutate(); // Refresh the orders list
+    } catch (error: any) {
+      console.error('Error deleting order:', error);
+      toast.error(error.message || 'Sipariş silinirken bir hata oluştu.');
+    } finally {
+      setDeletingOrderId(null);
+    }
+  };
+
   const handleViewRawData = (data: Record<string, any>) => {
     setCurrentRawData(data);
     setRawOrderDataModalOpen(true);
@@ -2162,11 +2317,17 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} sx={{ textTransform: 'none', height: '40px', minWidth: 180, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>
           {syncingOrders ? 'Senkronize Ediliyor...' : 'Siparişleri Senkron Et'}
         </Button>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, height: '40px', mb: { xs: 1, sm: 0 } }}>
+            <InputLabel shrink={true}>Arama Türü</InputLabel>
+            <Select value={searchType} label="Arama Türü" onChange={e => setSearchType(e.target.value)} displayEmpty>
+              {searchTypeOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+            </Select>
+          </FormControl>
           <TextField size="small" label="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" /> }} sx={{ minWidth: 200, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}/>
           <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
             <InputLabel shrink={true}>Sipariş Durumu</InputLabel>
             <Select value={statusFilter} label="Sipariş Durumu" onChange={e => setStatusFilter(e.target.value)} displayEmpty>
-            {orderStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+            {orderStatusFilterOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
           <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
@@ -2175,9 +2336,46 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             {labelStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
+            <InputLabel shrink={true}>Mağaza</InputLabel>
+            <Select 
+              multiple
+              value={marketplaceFilter} 
+              label="Mağaza" 
+              onChange={(e) => setMarketplaceFilter(typeof e.target.value === 'string' ? [e.target.value] : e.target.value)}
+              displayEmpty
+              renderValue={(selected) => {
+                if (selected.length === 0) {
+                  return <em>Tümü</em>;
+                }
+                if (selected.length === 1) {
+                  return selected[0];
+                }
+                return `${selected.length} mağaza seçildi`;
+              }}
+              disabled={isLoadingMarketplaces}
+              MenuProps={{
+                PaperProps: {
+                  style: {
+                    maxHeight: 7 * 48 + 8, // 7 items × 48px height + 8px padding
+                    width: 250,
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">
+                <em>Tümü</em>
+              </MenuItem>
+              {dbMarketplaceOptions.map(opt => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label} ({opt.count})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <TextField label="Başlangıç Tarihi" type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: 150, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }} />
           <TextField label="Bitiş Tarihi" type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: 150, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }} />
-          <Button onClick={() => { setSearchTerm(''); setStatusFilter(''); setLabelStatusFilter(''); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="outlined" sx={{ ml: 'auto', height: '40px', minWidth: 100, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>Sıfırla</Button>
+          <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="outlined" sx={{ ml: 'auto', height: '40px', minWidth: 100, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>Sıfırla</Button>
         <Tooltip title="Sipariş Listesini Yenile">
             <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" sx={{ height: '40px', width: '40px', mb: { xs: 1, sm: 0 } }}><RefreshIcon /></IconButton></span>
         </Tooltip>

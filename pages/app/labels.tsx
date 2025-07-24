@@ -336,9 +336,14 @@ function useDebouncedValue<T>(value: T, delay: number): T {
 // --- Etsy address enrichment helper ---
 async function fetchEtsyAddressEnrichment(orderNumber: string): Promise<any | null> {
   try {
-    const response = await fetch(`/api/etsy-addresses?orderNumbers=${encodeURIComponent(orderNumber)}`);
+    const response = await fetch(`/api/etsy-addresses?orderNumbers=${encodeURIComponent(orderNumber)}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    });
     
-    if (response.ok) {
+    if (response.ok || response.status === 304) {
       const data = await response.json();
       const enrichment = data.lookup?.[orderNumber] || null;
       return enrichment;
@@ -461,6 +466,52 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
     ),
   };
 
+  // --- FALLBACK: If critical address fields are still missing, check rawData fallbacks ---
+  if ((!extractedAddress.recipientStreet1 || extractedAddress.recipientStreet1 === '—' || !extractedAddress.recipientCity || extractedAddress.recipientCity === '—') && raw) {
+    // Check for to_address field (used by Trendyol and potentially other marketplaces)
+    if (raw.to_address && typeof raw.to_address === 'object') {
+      const toAddr = raw.to_address;
+      extractedAddress.recipientStreet1 = extractedAddress.recipientStreet1 || toAddr.street1 || '';
+      extractedAddress.recipientStreet2 = extractedAddress.recipientStreet2 || toAddr.street2 || '';
+      extractedAddress.recipientCity = extractedAddress.recipientCity || toAddr.city || '';
+      extractedAddress.recipientState = extractedAddress.recipientState || toAddr.state || '';
+      extractedAddress.recipientPostal = extractedAddress.recipientPostal || toAddr.postal || toAddr.zip || '';
+      extractedAddress.recipientCountry = extractedAddress.recipientCountry || toAddr.country || '';
+      extractedAddress.recipientPhone = extractedAddress.recipientPhone || toAddr.phone || '';
+      
+      // Update name if missing
+      if ((!extractedAddress.recipientFirstName || !extractedAddress.recipientLastName) && toAddr.name) {
+        const nameParts = toAddr.name.split(' ');
+        extractedAddress.recipientFirstName = extractedAddress.recipientFirstName || nameParts[0] || '';
+        extractedAddress.recipientLastName = extractedAddress.recipientLastName || nameParts.slice(1).join(' ') || '';
+      }
+    }
+    
+    // Check for shipmentAddress field (alternative format used by some marketplaces)
+    if (raw.shipmentAddress && typeof raw.shipmentAddress === 'object') {
+      const shipAddr = raw.shipmentAddress;
+      extractedAddress.recipientStreet1 = extractedAddress.recipientStreet1 || shipAddr.address1 || shipAddr.address || '';
+      extractedAddress.recipientStreet2 = extractedAddress.recipientStreet2 || shipAddr.address2 || '';
+      extractedAddress.recipientCity = extractedAddress.recipientCity || shipAddr.city || '';
+      extractedAddress.recipientState = extractedAddress.recipientState || shipAddr.stateName || shipAddr.state || '';
+      extractedAddress.recipientPostal = extractedAddress.recipientPostal || shipAddr.postalCode || shipAddr.zipCode || '';
+      extractedAddress.recipientCountry = extractedAddress.recipientCountry || shipAddr.countryCode || '';
+      extractedAddress.recipientPhone = extractedAddress.recipientPhone || shipAddr.phone || '';
+      
+      // Update name if missing
+      if (!extractedAddress.recipientFirstName || !extractedAddress.recipientLastName) {
+        if (shipAddr.firstName || shipAddr.lastName) {
+          extractedAddress.recipientFirstName = extractedAddress.recipientFirstName || shipAddr.firstName || '';
+          extractedAddress.recipientLastName = extractedAddress.recipientLastName || shipAddr.lastName || '';
+        } else if (shipAddr.fullName) {
+          const nameParts = shipAddr.fullName.split(' ');
+          extractedAddress.recipientFirstName = extractedAddress.recipientFirstName || nameParts[0] || '';
+          extractedAddress.recipientLastName = extractedAddress.recipientLastName || nameParts.slice(1).join(' ') || '';
+        }
+      }
+    }
+  }
+
   // --- ETSY ENRICHMENT: Check if address fields are missing and try to enrich from EtsyAddress table ---
   const isMissingCriticalAddress = 
     !extractedAddress.recipientStreet1 || 
@@ -486,7 +537,16 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
   
   if (shouldTryEtsyEnrichment && order.orderNumber) {
     try {
-      const etsyEnrichment = preFetchedEnrichment || await fetchEtsyAddressEnrichment(order.orderNumber);
+      // Use pre-fetched enrichment first, fallback to individual API call if needed
+      let etsyEnrichment = preFetchedEnrichment;
+      
+      // If no pre-fetched enrichment found, make individual API call as fallback
+      if (!etsyEnrichment) {
+        console.log(`No batch enrichment found for ${order.orderNumber}, trying individual call`);
+        etsyEnrichment = await fetchEtsyAddressEnrichment(order.orderNumber);
+      } else {
+        console.log(`Using batch enrichment for ${order.orderNumber}`);
+      }
       
       if (etsyEnrichment?.shippingAddress) {
         const etsyAddr = etsyEnrichment.shippingAddress;
@@ -629,8 +689,24 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
   for (const order of orders) {
     if (!order || typeof order !== 'object') continue;
     
-    // Check if this order might need Etsy enrichment
-    const shouldTryEtsyEnrichment = order.orderNumber && (
+    // Use the same logic as in extractAddress to determine enrichment need
+    const addr = order.shippingAddress;
+    let parsedAddr = addr;
+    if (typeof addr === 'string') {
+      try { parsedAddr = JSON.parse(addr); } catch { parsedAddr = {}; }
+    }
+    if (!parsedAddr) parsedAddr = {};
+
+    const extractedAddress = {
+      recipientFirstName: parsedAddr.recipientFirstName || parsedAddr.firstName || '',
+      recipientLastName: parsedAddr.recipientLastName || parsedAddr.lastName || '', 
+      recipientStreet1: parsedAddr.recipientStreet1 || parsedAddr.street1 || parsedAddr.address1 || '',
+      recipientCity: parsedAddr.recipientCity || parsedAddr.city || '',
+    };
+
+    const isMissingCriticalAddress = !extractedAddress.recipientStreet1 || !extractedAddress.recipientCity;
+    
+    const shouldTryEtsyEnrichment = order.orderNumber && isMissingCriticalAddress && (
       isEtsyOrderSync(order.marketplace) || 
       order.marketplace === 'Trendyol' ||
       order.marketplace === 'Amazon Channel' ||
@@ -643,22 +719,39 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
     }
   }
   
-  // Batch fetch Etsy enrichments
+  // Batch fetch Etsy enrichments in a single API call
   const etsyEnrichments = new Map<string, any>();
   if (etsyOrderNumbers.length > 0) {
     try {
-      // Fetch up to 10 at a time to avoid overwhelming the API
-      const batchSize = 10;
-      for (let i = 0; i < etsyOrderNumbers.length; i += batchSize) {
-        const batch = etsyOrderNumbers.slice(i, i + batchSize);
-        const promises = batch.map(orderNumber => 
-          fetchEtsyAddressEnrichment(orderNumber).then(enrichment => {
-            if (enrichment) {
-              etsyEnrichments.set(orderNumber, enrichment);
-            }
-          })
-        );
-        await Promise.all(promises);
+      console.log(`Fetching Etsy enrichments for ${etsyOrderNumbers.length} orders in single batch call`);
+      const response = await fetch(`/api/etsy-addresses?orderNumbers=${etsyOrderNumbers.join(',')}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (response.ok || response.status === 304) {
+        const data = await response.json();
+        console.log('Etsy batch API response:', data);
+        console.log('Lookup object keys:', data.lookup ? Object.keys(data.lookup) : 'no lookup');
+        console.log('Addresses array length:', data.addresses ? data.addresses.length : 'no addresses');
+        if (data.debug) {
+          console.log('DEBUG - Queried order numbers:', data.debug.queriedOrderNumbers);
+          console.log('DEBUG - Found order numbers:', data.debug.foundOrderNumbers);
+          console.log('DEBUG - User ID:', data.debug.userId);
+        }
+        if (data.success && data.lookup) {
+          // Use the lookup map to populate our enrichments
+          for (const [orderNumber, enrichment] of Object.entries(data.lookup)) {
+            etsyEnrichments.set(orderNumber, enrichment);
+          }
+          console.log(`Successfully fetched ${Object.keys(data.lookup).length} Etsy enrichments`);
+        } else {
+          console.warn('Etsy batch API returned unexpected format:', data);
+        }
+      } else {
+        console.warn('Failed to fetch Etsy enrichments:', response.status, response.statusText);
       }
     } catch (error) {
       console.warn('Failed to batch fetch Etsy enrichments:', error);
@@ -675,6 +768,9 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
     
     // Pass the pre-fetched enrichment to extractAddress
     const etsyEnrichment = order.orderNumber ? etsyEnrichments.get(order.orderNumber) : null;
+    if (order.orderNumber && isEtsyOrderSync(order.marketplace)) {
+      console.log(`Processing order ${order.orderNumber}, has enrichment:`, !!etsyEnrichment);
+    }
     const addr = await extractAddress(order, etsyEnrichment);
     // Safe: Parse rawData ONLY for date mapping, do not mutate or affect other columns
     let safeRaw = order.rawData;

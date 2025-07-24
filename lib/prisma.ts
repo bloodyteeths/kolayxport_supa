@@ -44,12 +44,10 @@ const prismaClientSingleton = () => {
     },
   });
 
-  // CRITICAL: Eagerly connect in production to avoid connection issues
-  if (process.env.NODE_ENV === 'production') {
-    client.$connect().catch(err => {
-      console.error('[Prisma] Failed to connect:', err);
-    });
-  }
+  // CRITICAL: Eagerly connect to avoid connection issues
+  client.$connect().catch(err => {
+    console.error('[Prisma] Failed to connect:', err);
+  });
 
   return client;
 };

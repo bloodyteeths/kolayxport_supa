@@ -6,6 +6,9 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // Set cache control headers
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -29,6 +32,7 @@ export default async function handler(
         ? orderNumbers 
         : orderNumbers.split(',');
       where.orderNumber = { in: orderNumberList };
+      console.log('[etsy-addresses] Querying for order numbers:', orderNumberList);
     }
 
     const etsyAddresses = await prisma.etsyAddress.findMany({
@@ -47,6 +51,8 @@ export default async function handler(
       },
       orderBy: { updatedAt: 'desc' }
     });
+
+    console.log('[etsy-addresses] Found', etsyAddresses.length, 'addresses for query:', where);
 
     // Create a lookup map by order number for easy access
     const addressLookup = etsyAddresses.reduce((acc, addr) => {
@@ -80,7 +86,12 @@ export default async function handler(
       success: true,
       count: etsyAddresses.length,
       addresses: parsedAddresses,
-      lookup: addressLookup
+      lookup: addressLookup,
+      debug: {
+        queriedOrderNumbers: orderNumbers ? (Array.isArray(orderNumbers) ? orderNumbers : orderNumbers.split(',')) : 'all',
+        foundOrderNumbers: etsyAddresses.map(addr => addr.orderNumber),
+        userId: user.id
+      }
     });
 
   } catch (error: any) {

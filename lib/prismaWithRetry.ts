@@ -11,6 +11,10 @@ export async function withPrismaRetry<T>(
     try {
       // Ensure connection before operation
       await prisma.$connect();
+      
+      // Quick health check to ensure the connection is working
+      await prisma.$queryRaw`SELECT 1`;
+      
       return await operation();
     } catch (error: any) {
       lastError = error;
@@ -25,6 +29,8 @@ export async function withPrismaRetry<T>(
       if (
         error.message?.includes('connection') ||
         error.message?.includes('FATAL') ||
+        error.message?.includes('Engine is not yet connected') ||
+        error.message?.includes('not yet connected') ||
         error.code === 'P1001' ||
         error.code === 'P1002'
       ) {

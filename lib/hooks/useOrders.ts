@@ -81,7 +81,7 @@ const fetcher = (url: string) => {
   });
 };
 
-export function useOrders(page: number = 1, pageSize: number = 20, filters: Record<string, any> = {}, context?: string) {
+export function useOrders(page: number = 1, pageSize: number = 15, filters: Record<string, any> = {}, context?: string) {
   const params = new URLSearchParams();
   if (typeof page !== 'undefined' && typeof pageSize !== 'undefined') {
     params.append('page', String(page));
@@ -104,9 +104,12 @@ export function useOrders(page: number = 1, pageSize: number = 20, filters: Reco
     `/api/orders?${params.toString()}`,
     fetcher,
     {
-      refreshInterval: context === 'labelsPage' ? 60000 : 0, // Refresh every 60 seconds (reduced from 30)
-      dedupingInterval: context === 'labelsPage' ? 10000 : 5000, // Dedupe requests for 10 seconds (increased from 2)
+      refreshInterval: context === 'labelsPage' ? 120000 : 0, // Refresh every 2 minutes (reduced frequency)
+      dedupingInterval: context === 'labelsPage' ? 1000 : 5000, // Reduced to 1 second for faster pagination
       revalidateOnFocus: false, // Disable aggressive revalidation for better performance
+      revalidateOnReconnect: false, // Don't refetch on reconnect
+      shouldRetryOnError: false, // Don't retry on error to prevent hanging
+      keepPreviousData: true, // Keep previous data while loading new page
     }
   );
 

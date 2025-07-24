@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Button, Checkbox, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert } from '@mui/material';
 import { DataGrid, GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 import { toast } from 'react-hot-toast';
@@ -25,10 +25,12 @@ interface HealthCheckResult {
 }
 
 export default function LabelsPage() {
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 20 });
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 15 });
   const { orders, total, isLoading, isError, mutate } = useOrders(
-    undefined, // fetch all orders (no pagination)
-    undefined
+    paginationModel.page + 1, // DataGrid uses 0-based, API uses 1-based
+    paginationModel.pageSize,
+    {},
+    'labelsPage'
   );
   const [loadingIds, setLoadingIds] = useState<string[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -109,9 +111,7 @@ export default function LabelsPage() {
     }
   };
 
-  if (isError) return <Box p={2}>Hata: Siparişler yüklenemedi.</Box>;
-
-  const columns: GridColDef<UIOrder>[] = [
+  const columns: GridColDef<UIOrder>[] = useMemo(() => [
     { field: 'id', headerName: 'Sipariş ID', width: 150 },
     {
       field: 'thumbnail',
@@ -242,7 +242,9 @@ export default function LabelsPage() {
         );
       },
     },
-  ];
+  ], [loadingIds, resyncingIds, handleGenerate, showRawData, handleResync]);
+
+  if (isError) return <Box p={2}>Hata: Siparişler yüklenemedi.</Box>;
 
   return (
     <Box p={2}>
@@ -271,11 +273,14 @@ export default function LabelsPage() {
           columns={columns}
           rowCount={total}
           loading={isLoading || syncing || healthChecking}
-          pageSizeOptions={[10, 20, 50]}
+          pageSizeOptions={[15, 25, 50]}
           paginationModel={paginationModel}
           paginationMode="server"
           onPaginationModelChange={setPaginationModel}
           getRowId={row => row.id}
+          disableRowSelectionOnClick
+          disableColumnMenu
+          rowHeight={52}
         />
       </Box>
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>

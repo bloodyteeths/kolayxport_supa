@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import {
   Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, Fade, List, ListItem, ListItemIcon, ListItemText, ToggleButton, ToggleButtonGroup, Grid, SelectChangeEvent
 } from '@mui/material';
@@ -351,7 +352,7 @@ async function fetchEtsyAddressEnrichment(orderNumber: string): Promise<any | nu
 }
 
 // --- Address mapping utility (already defined in the file) ---
-async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async and ensure input type matches LocalUIOrder
+async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): Promise<any> { // Made async and ensure input type matches LocalUIOrder
   let addr = order.shippingAddress;
   if (typeof addr === 'string') {
     try { addr = JSON.parse(addr); } catch { addr = {}; }
@@ -485,7 +486,7 @@ async function extractAddress(order: LocalUIOrder): Promise<any> { // Made async
   
   if (shouldTryEtsyEnrichment && order.orderNumber) {
     try {
-      const etsyEnrichment = await fetchEtsyAddressEnrichment(order.orderNumber);
+      const etsyEnrichment = preFetchedEnrichment || await fetchEtsyAddressEnrichment(order.orderNumber);
       
       if (etsyEnrichment?.shippingAddress) {
         const etsyAddr = etsyEnrichment.shippingAddress;
@@ -621,6 +622,49 @@ function getProductTitle(item: any, order: any) {
 export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
   if (!orders) return [];
 
+  // Pre-fetch all Etsy addresses in parallel for orders that need enrichment
+  const etsyOrderNumbers: string[] = [];
+  const orderMap = new Map<string, LocalUIOrder>();
+  
+  for (const order of orders) {
+    if (!order || typeof order !== 'object') continue;
+    
+    // Check if this order might need Etsy enrichment
+    const shouldTryEtsyEnrichment = order.orderNumber && (
+      isEtsyOrderSync(order.marketplace) || 
+      order.marketplace === 'Trendyol' ||
+      order.marketplace === 'Amazon Channel' ||
+      (order.marketplace === 'outletemporiumus' && order.orderNumber)
+    );
+    
+    if (shouldTryEtsyEnrichment && order.orderNumber) {
+      etsyOrderNumbers.push(order.orderNumber);
+      orderMap.set(order.orderNumber, order);
+    }
+  }
+  
+  // Batch fetch Etsy enrichments
+  const etsyEnrichments = new Map<string, any>();
+  if (etsyOrderNumbers.length > 0) {
+    try {
+      // Fetch up to 10 at a time to avoid overwhelming the API
+      const batchSize = 10;
+      for (let i = 0; i < etsyOrderNumbers.length; i += batchSize) {
+        const batch = etsyOrderNumbers.slice(i, i + batchSize);
+        const promises = batch.map(orderNumber => 
+          fetchEtsyAddressEnrichment(orderNumber).then(enrichment => {
+            if (enrichment) {
+              etsyEnrichments.set(orderNumber, enrichment);
+            }
+          })
+        );
+        await Promise.all(promises);
+      }
+    } catch (error) {
+      console.warn('Failed to batch fetch Etsy enrichments:', error);
+    }
+  }
+
   const labelRows: LabelRow[] = [];
   for (const order of orders) {
     // Skip invalid orders
@@ -629,7 +673,9 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
       continue;
     }
     
-    const addr = await extractAddress(order);
+    // Pass the pre-fetched enrichment to extractAddress
+    const etsyEnrichment = order.orderNumber ? etsyEnrichments.get(order.orderNumber) : null;
+    const addr = await extractAddress(order, etsyEnrichment);
     // Safe: Parse rawData ONLY for date mapping, do not mutate or affect other columns
     let safeRaw = order.rawData;
     if (typeof safeRaw === 'string') {
@@ -1007,7 +1053,10 @@ function dedupeLabelRows(rows: LabelRow[]): LabelRow[] {
 }
 
 function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 50 });
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ 
+    page: 0, 
+    pageSize: 15 
+  });
   // --- UPS Drawer State ---
   const [upsDrawerOpen, setUpsDrawerOpen] = useState(false);
   const [selectedOrderForUPS, setSelectedOrderForUPS] = useState<UIOrder | null>(null);
@@ -1129,7 +1178,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       return true;
     });
     */
-  }, [labelRows, labelFilter]);
+  }, [labelRows, labelFilter, marketplaceFilter]);
 
   useEffect(() => {
     setPaginationModel(prev => ({ ...prev, page: 0 }));
@@ -2055,35 +2104,53 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       </Box>
 
       <Box sx={{ flexGrow: 1, width: '100%', overflow: 'auto', minHeight: 0 }}>
-        <DataGrid
-          rows={filteredAndPaginatedItems}
-          columns={columns}
-          rowCount={total}
-          loading={isLoading}
-          pageSizeOptions={[50, 100, 200]}
-          paginationModel={paginationModel}
-          paginationMode="server"
-          onPaginationModelChange={setPaginationModel}
-          getRowId={(row) => row.itemId || row.orderId}
-          disableRowSelectionOnClick
-          rowHeight={90}
-          disableColumnResize
-          disableColumnMenu
-          initialState={{
-            sorting: {
-              sortModel: [{ field: 'orderDate', sort: 'desc' }],
-            },
+        <div 
+          onSubmit={(e) => e.preventDefault()} 
+          onClick={(e) => {
+            // Only stop propagation for specific pagination elements
+            const target = e.target as HTMLElement;
+            if (target.closest('.MuiTablePagination-root') || target.closest('[aria-label*="page"]')) {
+              e.stopPropagation();
+            }
           }}
-          density="compact"
-          sx={{ 
-            height: '100%',
-            border: 0,
-            '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' },
-            '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cell:focus': {
-              outline: 'none !important',
-            },
-          }}
-        />
+        >
+          <DataGrid
+            rows={filteredAndPaginatedItems}
+            columns={columns}
+            rowCount={total}
+            loading={isLoading}
+            pageSizeOptions={[15, 25, 50]}
+            paginationModel={paginationModel}
+            paginationMode="server"
+            onPaginationModelChange={(newModel, details) => {
+              console.log('Pagination change:', newModel, 'Details:', details);
+              // Use requestAnimationFrame to ensure state update happens after current event
+              requestAnimationFrame(() => {
+                setPaginationModel(newModel);
+              });
+            }}
+            getRowId={(row) => row.itemId || row.orderId}
+            disableRowSelectionOnClick
+            rowHeight={90}
+            disableColumnResize
+            disableColumnMenu
+            keepNonExistentRowsSelected={false}
+            initialState={{
+              sorting: {
+                sortModel: [{ field: 'orderDate', sort: 'desc' }],
+              },
+            }}
+            density="compact"
+            sx={{ 
+              height: '100%',
+              border: 0,
+              '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' },
+              '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cell:focus': {
+                outline: 'none !important',
+              },
+            }}
+          />
+        </div>
       </Box>
 
       {drawerOrder && (

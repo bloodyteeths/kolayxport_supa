@@ -47,7 +47,7 @@ export default async function handler(
   }
 
   const page = parseInt(req.query.page as string) || 1;
-  const pageSize = parseInt(req.query.limit as string) || 20;
+  const pageSize = parseInt(req.query.limit as string) || 15;
   const search = req.query.search as string;
   const source = req.query.source as string;
   const channel = req.query.channel as string;

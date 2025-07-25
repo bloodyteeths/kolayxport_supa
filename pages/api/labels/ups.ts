@@ -192,7 +192,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       await prisma.shipment.create({
         data: {
           order: { connect: { id: orderId } },
-          carrier: 'ups',
+          carrier: 'UPS',
           status: 'created',
           pdfUrl: shipmentResult.labelUrl,
           trackingNumber: shipmentResult.trackingNumber,
@@ -219,7 +219,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       await prisma.shipment.create({
         data: {
           order: { connect: { id: orderId } },
-          carrier: 'ups',
+          carrier: 'UPS',
           status: 'created',
           pdfUrl: result.labelUrl,
           trackingNumber: result.trackingNumber,

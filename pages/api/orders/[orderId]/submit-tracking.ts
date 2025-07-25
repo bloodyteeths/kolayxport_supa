@@ -101,6 +101,20 @@ export default async function handler(
       );
     }
 
+    // Create TrackingSubmission record
+    await prisma.trackingSubmission.create({
+      data: {
+        orderId: orderId as string,
+        trackingNumber: trackingNumber,
+        carrierId: carrierId,
+        carrierName: getCarrierName(carrierId),
+        notifyCustomer: notifyCustomer,
+        updateRemoteOrder: updateRemoteOrder,
+        submittedBy: user.id,
+        status: 'submitted'
+      }
+    });
+
     // Update our local database with tracking info
     await prisma.order.update({
       where: { id: orderId as string },
@@ -132,6 +146,19 @@ export default async function handler(
       details: error.message 
     });
   }
+}
+
+function getCarrierName(carrierId: number): string {
+  const carrierMap: { [key: number]: string } = {
+    3: 'DHL',
+    4: 'FedEx',
+    5: 'UPS',
+    6: 'USPS',
+    1: 'TNT',
+    2: 'DPD',
+    // Add more carrier mappings as needed
+  };
+  return carrierMap[carrierId] || `Carrier ${carrierId}`;
 }
 
 async function submitVeeqoTracking(

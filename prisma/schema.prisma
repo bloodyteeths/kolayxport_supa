@@ -44,6 +44,7 @@ model User {
   syncOperations      SyncOperation[]
   integrationSettings Credential?
   etsyAddresses       EtsyAddress[]
+  trackingSubmissions TrackingSubmission[] @relation("UserTrackingSubmissions")
 }
 
 model Account {
@@ -133,6 +134,7 @@ model Order {
   user                        User           @relation(fields: [userId], references: [id])
   shipments                   Shipment[]     @relation("OrderToShipment")
   shipping                    OrderShipping? @relation("OrderToOrderShipping")
+  trackingSubmissions         TrackingSubmission[] @relation("OrderTrackingSubmissions")
 
   @@unique([userId, marketplace, marketplaceKey])
   @@index([userId])
@@ -379,4 +381,26 @@ model EtsyAddress {
   @@index([userId, etsyStoreId, orderNumber])
   @@index([orderNumber])
   @@index([createdAt])
+}
+
+model TrackingSubmission {
+  id              String   @id @default(cuid())
+  orderId         String
+  trackingNumber  String
+  carrierId       Int
+  carrierName     String
+  notifyCustomer  Boolean  @default(true)
+  updateRemoteOrder Boolean @default(true)
+  submittedAt     DateTime @default(now())
+  submittedBy     String
+  status          String   @default("submitted")
+  errorMessage    String?
+  veeqoResponse   Json?
+  
+  order           Order    @relation("OrderTrackingSubmissions", fields: [orderId], references: [id], onDelete: Cascade)
+  user            User     @relation("UserTrackingSubmissions", fields: [submittedBy], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([submittedBy])
+  @@index([submittedAt])
 }

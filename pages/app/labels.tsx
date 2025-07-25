@@ -37,6 +37,7 @@ interface UIOrder {
   weight?: number;
   hsCode?: string;
   countryOfOrigin?: string;
+  shipments?: any[];
 }
 
 // --- Constants for FedEx Dropdowns ---
@@ -77,6 +78,63 @@ const ALLOWED_LABEL_STOCK_TYPES = [
   { value: 'PAPER_85X11_BOTTOM_HALF_LABEL',label: 'Letter – bottom ½' },
   { value: 'PAPER_LETTER',                 label: 'Letter – full page' },
 ] as const;
+
+// FedEx Currency Codes
+const FEDEX_CURRENCY_CODES = [
+  { value: 'USD', label: 'ABD Doları (USD)' },
+  { value: 'EUR', label: 'Euro (EUR)' },
+  { value: 'GBP', label: 'İngiliz Sterlini (GBP)' },
+  { value: 'TRY', label: 'Türk Lirası (TRY)' },
+  { value: 'CAD', label: 'Kanada Doları (CAD)' },
+  { value: 'AUD', label: 'Avustralya Doları (AUD)' },
+  { value: 'JPY', label: 'Japon Yeni (JPY)' },
+  { value: 'CHF', label: 'İsviçre Frangı (CHF)' },
+  { value: 'CNY', label: 'Çin Yuanı (CNY)' },
+  { value: 'SEK', label: 'İsveç Kronu (SEK)' },
+  { value: 'NOK', label: 'Norveç Kronu (NOK)' },
+  { value: 'DKK', label: 'Danimarka Kronu (DKK)' },
+  { value: 'NZD', label: 'Yeni Zelanda Doları (NZD)' },
+  { value: 'SGD', label: 'Singapur Doları (SGD)' },
+  { value: 'HKD', label: 'Hong Kong Doları (HKD)' },
+  { value: 'KRW', label: 'Güney Kore Wonu (KRW)' },
+  { value: 'MXN', label: 'Meksika Pesosu (MXN)' },
+  { value: 'BRL', label: 'Brezilya Reali (BRL)' },
+  { value: 'INR', label: 'Hindistan Rupisi (INR)' },
+  { value: 'ZAR', label: 'Güney Afrika Randı (ZAR)' },
+  { value: 'AED', label: 'BAE Dirhemi (AED)' },
+  { value: 'SAR', label: 'Suudi Arabistan Riyali (SAR)' },
+  { value: 'PLN', label: 'Polonya Zlotisi (PLN)' },
+  { value: 'CZK', label: 'Çek Korunası (CZK)' },
+  { value: 'HUF', label: 'Macar Forinti (HUF)' },
+  { value: 'RON', label: 'Romen Leyi (RON)' },
+  { value: 'BGN', label: 'Bulgar Levası (BGN)' },
+  { value: 'HRK', label: 'Hırvat Kunası (HRK)' },
+  { value: 'RUB', label: 'Rus Rublesi (RUB)' },
+  { value: 'THB', label: 'Tayland Bahtı (THB)' },
+  { value: 'MYR', label: 'Malezya Ringgiti (MYR)' },
+  { value: 'IDR', label: 'Endonezya Rupisi (IDR)' },
+  { value: 'PHP', label: 'Filipin Pesosu (PHP)' },
+  { value: 'ILS', label: 'İsrail Şekeli (ILS)' },
+  { value: 'TWD', label: 'Tayvan Doları (TWD)' },
+  { value: 'VND', label: 'Vietnam Dongu (VND)' },
+  { value: 'CLP', label: 'Şili Pesosu (CLP)' },
+  { value: 'ARS', label: 'Arjantin Pesosu (ARS)' },
+  { value: 'COP', label: 'Kolombiya Pesosu (COP)' },
+  { value: 'PEN', label: 'Peru Solu (PEN)' },
+  { value: 'UAH', label: 'Ukrayna Grivnası (UAH)' },
+  { value: 'KZT', label: 'Kazakistan Tengesi (KZT)' },
+  { value: 'EGP', label: 'Mısır Lirası (EGP)' },
+  { value: 'MAD', label: 'Fas Dirhemi (MAD)' },
+  { value: 'QAR', label: 'Katar Riyali (QAR)' },
+  { value: 'KWD', label: 'Kuveyt Dinarı (KWD)' },
+  { value: 'OMR', label: 'Umman Riyali (OMR)' },
+  { value: 'BHD', label: 'Bahreyn Dinarı (BHD)' },
+  { value: 'JOD', label: 'Ürdün Dinarı (JOD)' },
+  { value: 'LBP', label: 'Lübnan Lirası (LBP)' },
+  { value: 'PKR', label: 'Pakistan Rupisi (PKR)' },
+  { value: 'BDT', label: 'Bangladeş Takası (BDT)' },
+  { value: 'LKR', label: 'Sri Lanka Rupisi (LKR)' },
+].sort((a, b) => a.label.localeCompare(b.label, 'tr'));
 
 // Veeqo Carrier IDs for tracking submission
 const VEEQO_CARRIERS = [
@@ -138,6 +196,7 @@ interface LocalUIOrder {
   rawData?: any; // For extractAddress and Shippo notes
   source?: string; // e.g., 'veeqo', 'shippo'
   channel?: string; // e.g., 'etsy'
+  trackingSubmissions?: any[]; // Array of tracking submissions
   currency?: string; // For drawer display
   weightKg?: number; // For label generation
   harmonizedCode?: string; // For label generation
@@ -1610,8 +1669,12 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         }
 
         // Check if tracking number exists (only manual entries, not from label generation)
-        const hasTracking = row.trackingNumber || 
-                           originalOrder?.trackingNumber;
+        // Check if this order has any manual tracking submissions
+        const hasManualTracking = originalOrder?.trackingSubmissions && 
+                                 originalOrder.trackingSubmissions.length > 0;
+        
+        // Show tracking as active only if there's a manual tracking submission
+        const hasTracking = hasManualTracking;
 
         const handleTrackingClick = () => {
           setSelectedOrderForTracking(row);
@@ -1871,7 +1934,12 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         // Try to get the latest label job's carrier
         const labelJobs = params.row.originalOrder?.line_items?.find(i => i.id === params.row.itemId)?.labelJobs || [];
         const latestLabelJob = labelJobs.length > 0 ? labelJobs[0] : null;
-        const carrier = latestLabelJob?.carrier || params.row.lastCarrier;
+        
+        // Also check shipments for carrier info (UPS creates shipments but not labelJobs)
+        const shipments = params.row.originalOrder?.shipments || [];
+        const latestShipment = shipments.length > 0 ? shipments[0] : null;
+        
+        const carrier = latestLabelJob?.carrier || (latestShipment as any)?.carrier || params.row.lastCarrier;
         if (carrier === 'FEDEX') {
           if (latestLabelJob?.pdfUrl) {
             return (
@@ -1898,11 +1966,11 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                 style={{ display: 'inline-block' }}
                 title="Etiketi aç"
               >
-                <img src="/images/United_Parcel_Service_logo_2014.svg.png" alt="UPS" style={{ height: 16, marginLeft: 2, cursor: 'pointer' }} />
+                <img src="/images/United_Parcel_Service_logo.png" alt="UPS" style={{ height: 16, marginLeft: 2, cursor: 'pointer' }} />
               </a>
             );
           }
-          return <img src="/images/United_Parcel_Service_logo_2014.svg.png" alt="UPS" style={{ height: 16, marginLeft: 2 }} title="UPS" />;
+          return <img src="/images/United_Parcel_Service_logo.png" alt="UPS" style={{ height: 16, marginLeft: 2 }} title="UPS" />;
         }
         return carrier || '—';
       }
@@ -2538,6 +2606,37 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                     <Grid item xs={4}><TextField name="packageWidth" label="Genişlik (cm)" value={drawerOrder.originalOrder?.packageWidth || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
                     <Grid item xs={4}><TextField name="packageHeight" label="Yükseklik (cm)" value={drawerOrder.originalOrder?.packageHeight || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
                     <Grid item xs={8}><TextField name="hsCode" label="HS Kodu" value={drawerOrder.hsCode || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" /></Grid>
+                  </Grid>
+                  <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                    <Grid item xs={6}>
+                      <TextField 
+                        name="orderTotalPrice" 
+                        label="Değer" 
+                        value={drawerOrder.orderTotalPrice || 0} 
+                        type="number"
+                        inputProps={{ step: "0.01", min: "0", style: { MozAppearance: 'textfield' } }} 
+                        sx={{ '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 } }} 
+                        onChange={handleDrawerChange} 
+                        fullWidth 
+                        margin="dense" 
+                        size="small" 
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <FormControl fullWidth margin="dense" size="small">
+                        <InputLabel>Para Birimi</InputLabel>
+                        <Select
+                          name="currency"
+                          value={drawerOrder.currency || 'USD'}
+                          onChange={handleDrawerChange}
+                          label="Para Birimi"
+                        >
+                          {FEDEX_CURRENCY_CODES.map(curr => (
+                            <MenuItem key={curr.value} value={curr.value}>{curr.label}</MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
                   </Grid>
                 </AccordionDetails>
               </Accordion>

@@ -357,7 +357,9 @@ export default async function handler(
       SELECT 
         oi.*,
         lj.status as "labelJobStatus",
-        lj."trackingNumber" as "labelJobTrackingNumber"
+        lj."trackingNumber" as "labelJobTrackingNumber",
+        lj.carrier as "labelJobCarrier",
+        lj."pdfUrl" as "labelJobPdfUrl"
       FROM "OrderItem" oi
       LEFT JOIN "LabelJob" lj ON lj."orderItemId" = oi.id
       WHERE oi."orderId" = ANY($1)
@@ -374,9 +376,19 @@ export default async function handler(
     `;
     const shipmentsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(shipmentsQuery, orderIds) : [];
     
-    // Group items and shipments by orderId for easy lookup
+    // Fetch tracking submissions for all orders in one query
+    const trackingSubmissionsQuery = `
+      SELECT *
+      FROM "TrackingSubmission" ts
+      WHERE ts."orderId" = ANY($1)
+      ORDER BY ts."orderId", ts."submittedAt" DESC
+    `;
+    const trackingSubmissionsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(trackingSubmissionsQuery, orderIds) : [];
+    
+    // Group items, shipments, and tracking submissions by orderId for easy lookup
     const itemsByOrderId = new Map();
     const shipmentsByOrderId = new Map();
+    const trackingSubmissionsByOrderId = new Map();
     
     (itemsResult as any[]).forEach(item => {
       if (!itemsByOrderId.has(item.orderId)) {
@@ -390,6 +402,13 @@ export default async function handler(
         shipmentsByOrderId.set(shipment.orderId, []);
       }
       shipmentsByOrderId.get(shipment.orderId).push(shipment);
+    });
+    
+    (trackingSubmissionsResult as any[]).forEach(submission => {
+      if (!trackingSubmissionsByOrderId.has(submission.orderId)) {
+        trackingSubmissionsByOrderId.set(submission.orderId, []);
+      }
+      trackingSubmissionsByOrderId.get(submission.orderId).push(submission);
     });
     // OPTIMIZED: Simplified order processing with reduced complexity
     const processedOrders = (result as any[]).map((rawOrder: any) => {
@@ -463,6 +482,8 @@ export default async function handler(
         labelJobs: item.labelJobStatus ? [{
           status: item.labelJobStatus,
           trackingNumber: item.labelJobTrackingNumber,
+          carrier: item.labelJobCarrier,
+          pdfUrl: item.labelJobPdfUrl,
         }] : [],
       }));
 
@@ -504,6 +525,7 @@ export default async function handler(
         orderTotalPrice: rawOrder.totalPrice,
         source,
         channel: '',
+        trackingSubmissions: trackingSubmissionsByOrderId.get(rawOrder.id) || [],
         marketplaceOrderId: rawOrder.marketplaceOrderId || rawOrder.orderNumber || rawOrder.id || '',
         orderNumber: rawOrder.orderNumber || rawOrder.marketplaceOrderId || rawOrder.id || '',
         trackingNumber: rawOrder.trackingNumber || null,

@@ -95,6 +95,26 @@ async function handler(
     return res.status(400).json({ error: 'Order ID is required.' });
   }
 
+  // Check for existing shipments to prevent multiple labels
+  try {
+    const existingShipments = await prisma.shipment.findMany({
+      where: {
+        orderId: orderId,
+        status: 'created'
+      }
+    });
+
+    if (existingShipments.length > 0) {
+      logger.warn(`[API generate-label] Order ${orderId} already has existing shipments: ${existingShipments.length}`);
+      return res.status(400).json({ 
+        error: 'Bu sipariş için zaten bir etiket mevcut. Yeni etiket oluşturmak için mevcut etiketi silin.' 
+      });
+    }
+  } catch (error) {
+    logger.error('[API generate-label] Error checking existing shipments:', error);
+    return res.status(500).json({ error: 'Failed to validate existing labels.' });
+  }
+
   // --- Extract data from request body ---
   const {
     line_items: lineItemsFromRequest, // Renamed for clarity

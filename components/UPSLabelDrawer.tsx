@@ -6,6 +6,14 @@ import { UPS_SERVICE_TYPES, UPS_PACKAGE_TYPES, UPS_SIGNATURE_OPTIONS } from '@/c
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'react-hot-toast';
 
+// Check if an order has existing successful shipments (labels)
+function hasExistingLabel(order: any): boolean {
+  if (!order) return false;
+  
+  const shipments = order.shipments || [];
+  return shipments.some((s: any) => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
+}
+
 // Utility function to normalize decimal values to max 2 decimal places
 const normalizeDecimal = (value: number | string): number => {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -37,6 +45,7 @@ interface UIOrder {
   weight?: number;
   hsCode?: string;
   countryOfOrigin?: string;
+  shipments?: any[];
 }
 
 interface UPSLabelDrawerProps {
@@ -823,7 +832,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
             </FormControl>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }}>UPS etiketi başarıyla kaydedildi.</Alert>}
-            <Button type="submit" variant="contained" color="primary" fullWidth disabled={saving}>{saving ? 'Kaydediliyor...' : 'Kaydet'}</Button>
+            <Button type="submit" variant="contained" color="primary" fullWidth disabled={saving || (!!order && hasExistingLabel(order))}>{saving ? 'Kaydediliyor...' : (order && hasExistingLabel(order) ? 'Mevcut Etiketi Silin' : 'Kaydet')}</Button>
           </form>
           {labelUrl && (
             <Box mt={2} textAlign="center">

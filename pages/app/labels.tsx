@@ -699,6 +699,14 @@ function getProductTitle(item: any, order: any) {
   return result;
 }
 
+/** Check if an order has existing successful shipments (labels) */
+function hasExistingLabel(order: LocalUIOrder): boolean {
+  if (!order) return false;
+  
+  const shipments = order.shipments || [];
+  return shipments.some(s => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
+}
+
 /** convert the API payload (LocalUIOrder[]) into grid-ready rows (LabelRow[]) */
 export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
   if (!orders) return [];
@@ -1209,6 +1217,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
   const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [shipmentDeleteConfirmation, setShipmentDeleteConfirmation] = useState<string | null>(null);
+  const [deletingShipmentId, setDeletingShipmentId] = useState<string | null>(null);
   const [filterStartDate, setFilterStartDate] = useState(() => {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -1470,7 +1480,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     {
       field: 'labelStatus',
       headerName: 'Etiket',
-      width: 90,
+      width: 30,
       sortable: false,
       valueGetter: (_value, row) => {
         const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
@@ -1534,21 +1544,42 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             trackingNumber = latestShipment?.trackingNumber || 'Tracking number not available';
           }
           
+          // Find the shipment to get its ID for deletion
+          const originalOrder = params.row?.originalOrder as LocalUIOrder | undefined;
+          const shipments = originalOrder?.shipments || [];
+          const latestShipment = shipments.find(s => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
+          
           return (
-            <Tooltip title="Etiket Alındı">
-              <span
-                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  if (trackingNumber && trackingNumber !== 'Tracking number not available') {
-                    await navigator.clipboard.writeText(trackingNumber);
-                    toast.success('takip numarası kopyalandı.', { duration: 1500 });
-                  }
-                }}
-              >
-                <CheckCircleIcon color="success" />
-              </span>
-            </Tooltip>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Tooltip title="Etiket Alındı - Takip numarasını kopyala">
+                <span
+                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    if (trackingNumber && trackingNumber !== 'Tracking number not available') {
+                      await navigator.clipboard.writeText(trackingNumber);
+                      toast.success('takip numarası kopyalandı.', { duration: 1500 });
+                    }
+                  }}
+                >
+                  <CheckCircleIcon color="success" />
+                </span>
+              </Tooltip>
+              {latestShipment?.id && (
+                <Tooltip title="Etiketi sil">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShipmentDeleteConfirmation(latestShipment.id);
+                    }}
+                    sx={{ p: 0.25, '&:hover': { backgroundColor: 'error.light', opacity: 0.8 } }}
+                  >
+                    <DeleteIcon sx={{ fontSize: 14, color: 'error.main' }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
           );
         }
         if (status === 'Hata')     return <Tooltip title="Etiketleme Hatası"><CancelIcon color="error" /></Tooltip>;
@@ -1559,7 +1590,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     {
       field: 'tracking',
       headerName: 'Kargo',
-      width: 80,
+      width: 30,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         const row = params.row;
@@ -1578,10 +1609,9 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           return <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>—</Box>;
         }
 
-        // Check if tracking number exists
+        // Check if tracking number exists (only manual entries, not from label generation)
         const hasTracking = row.trackingNumber || 
-                           originalOrder?.trackingNumber ||
-                           (originalOrder?.shipments && originalOrder.shipments.some(s => s?.trackingNumber));
+                           originalOrder?.trackingNumber;
 
         const handleTrackingClick = () => {
           setSelectedOrderForTracking(row);
@@ -1890,6 +1920,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           </IconButton>
           <Button size="small" variant="outlined" sx={{ml:1}} onClick={() => { 
             // Convert LabelRow to UIOrder format for UPS drawer
+            const originalOrder = params.row.originalOrder as LocalUIOrder | undefined;
             const uiOrder: UIOrder = {
               orderId: params.row.orderId,
               orderNumber: params.row.orderNumber,
@@ -1909,6 +1940,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
               weight: params.row.weight,
               hsCode: params.row.hsCode,
               countryOfOrigin: params.row.countryOfOrigin,
+              shipments: originalOrder?.shipments || [],
             };
             setSelectedOrderForUPS(uiOrder); 
             setUpsDrawerOpen(true); 
@@ -2299,6 +2331,33 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     }
   };
 
+  const handleDeleteShipment = async (shipmentId: string) => {
+    setDeletingShipmentId(shipmentId);
+    try {
+      const response = await fetch(`/api/shipments/${shipmentId}/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete shipment');
+      }
+
+      toast.success('Etiket başarıyla silindi! Artık yeni etiket oluşturabilirsiniz.');
+      setShipmentDeleteConfirmation(null);
+      await mutate(); // Refresh the orders list
+    } catch (error: any) {
+      console.error('Error deleting shipment:', error);
+      toast.error(error.message || 'Etiket silinirken bir hata oluştu.');
+    } finally {
+      setDeletingShipmentId(null);
+    }
+  };
+
   const handleViewRawData = (data: Record<string, any>) => {
     setCurrentRawData(data);
     setRawOrderDataModalOpen(true);
@@ -2531,9 +2590,9 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             <Box sx={{ p: {xs: 1, sm: 2}, borderTop: '1px solid', borderColor: 'divider', mt: 'auto' }}>
               <Button fullWidth variant="contained" color="primary" 
                 onClick={() => drawerOrder && handleGenerateLabel(drawerOrder)} 
-                disabled={drawerErrors.length > 0 || generatingLabelId === drawerOrder?.itemId || checkingFedexCredentials || !hasFedexCredentials}
+                disabled={drawerErrors.length > 0 || generatingLabelId === drawerOrder?.itemId || checkingFedexCredentials || !hasFedexCredentials || (drawerOrder?.originalOrder && hasExistingLabel(drawerOrder.originalOrder))}
               >
-                {generatingLabelId === drawerOrder?.itemId ? <CircularProgress size={24} color="inherit" /> : (checkingFedexCredentials ? 'Ayarlar Kontrol Ediliyor...': (!hasFedexCredentials ? 'FedEx Ayarları Eksik' : 'ETİKET OLUŞTUR'))}
+                {generatingLabelId === drawerOrder?.itemId ? <CircularProgress size={24} color="inherit" /> : (checkingFedexCredentials ? 'Ayarlar Kontrol Ediliyor...': (!hasFedexCredentials ? 'FedEx Ayarları Eksik' : (drawerOrder?.originalOrder && hasExistingLabel(drawerOrder.originalOrder) ? 'Mevcut Etiketi Silin' : 'ETİKET OLUŞTUR')))}
               </Button>
               <Button fullWidth variant="text" onClick={closeDrawer} sx={{mt:1}}>İptal</Button>
             </Box>
@@ -2678,6 +2737,43 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             </Box>
           </Box>
         </DialogContent>
+      </Dialog>
+
+      {/* Shipment Delete Confirmation Dialog */}
+      <Dialog
+        open={!!shipmentDeleteConfirmation}
+        onClose={() => setShipmentDeleteConfirmation(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Etiketi Sil
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Bu etiket silinecek ve yeni etiket oluşturabilir hale geleceksiniz. Bu işlem geri alınamaz.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Emin misiniz?
+          </Typography>
+        </DialogContent>
+        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', p: 2 }}>
+          <Button 
+            onClick={() => setShipmentDeleteConfirmation(null)}
+            disabled={!!deletingShipmentId}
+          >
+            İptal
+          </Button>
+          <Button 
+            variant="contained" 
+            color="error"
+            onClick={() => shipmentDeleteConfirmation && handleDeleteShipment(shipmentDeleteConfirmation)}
+            disabled={!!deletingShipmentId}
+            startIcon={deletingShipmentId ? <CircularProgress size={16} /> : null}
+          >
+            {deletingShipmentId ? 'Siliniyor...' : 'Sil'}
+          </Button>
+        </Box>
       </Dialog>
 </Box>
   );

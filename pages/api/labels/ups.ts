@@ -74,6 +74,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ success: false, error: 'Missing shipper profile for user. Please complete your shipper address and contact information.' });
     }
 
+    // Check for existing shipments to prevent multiple labels
+    console.log('[UPS LABEL DEBUG] Checking for existing shipments for order', orderId);
+    const existingShipments = await prisma.shipment.findMany({
+      where: {
+        orderId: orderId,
+        status: 'created'
+      }
+    });
+
+    if (existingShipments.length > 0) {
+      console.error('[UPS LABEL DEBUG] Order already has existing shipments:', existingShipments.length);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Bu sipariş için zaten bir etiket mevcut. Yeni etiket oluşturmak için mevcut etiketi silin.' 
+      });
+    }
+
     // Build shipper input for UPS
     console.log('[UPS LABEL DEBUG] Building shipper input');
     const shipper = {

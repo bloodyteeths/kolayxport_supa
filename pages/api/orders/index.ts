@@ -94,7 +94,7 @@ export default async function handler(
   // console.log('[ORDERS API] Fetching orders for userId:', user.id, 'Query:', req.query);
 
   try {
-    let whereClause = 'WHERE o."userId" = $1 AND o."status" NOT IN (\'PENDING\', \'AWAITING_PAYMENT\')';
+    let whereClause = 'WHERE o."userId" = $1 AND o."status" NOT IN (\'PENDING\', \'AWAITING_PAYMENT\', \'pending\', \'awaiting_payment\', \'pending_payment\')';
     const params: any[] = [user.id];
     let paramIndex = 2;
 
@@ -332,11 +332,14 @@ export default async function handler(
         o.*,
         o."shippingAddress" as "shippingAddress",
         o."rawData" as "rawData",
-        o."createdAt" as "marketplaceOrderDate",
+        COALESCE(o."uiOrderDate", o."createdAt") as "marketplaceOrderDate",
         o."trackingNumber" as "trackingNumber",
         o."labelStatus" as "labelStatus",
-        o."shippingLabelUrl" as "shippingLabelUrl"
+        o."shippingLabelUrl" as "shippingLabelUrl",
+        sod."internalNote" as "senkronInternalNote",
+        sod."customStatus" as "senkronCustomStatus"
       FROM "Order" o
+      LEFT JOIN "SenkronOrderData" sod ON sod."orderId" = o.id
       ${whereClause}
       ORDER BY COALESCE(o."uiOrderDate", o."createdAt") ${sort === 'asc' ? 'ASC' : 'DESC'}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -487,19 +490,33 @@ export default async function handler(
         }] : [],
       }));
 
-      // --- Simplified Date Processing ---
-      let marketplaceOrderDate = rawOrder.uiOrderDate || rawOrder.createdAt;
+      // --- Enhanced Date Processing ---
+      let marketplaceOrderDate = rawOrder.uiOrderDate;
       let shipByDate = null;
+      
+      // Always try to extract the actual order date from rawData first
       if (rawOrder.rawData) {
         try {
           const rawData = typeof rawOrder.rawData === 'string' ? JSON.parse(rawOrder.rawData) : rawOrder.rawData;
-          if (!marketplaceOrderDate) {
-            marketplaceOrderDate = rawData.created_at || rawData.order_date || rawData.ordered_at || rawData.placed_at;
+          
+          // Extract actual marketplace order date from various possible fields
+          const possibleOrderDate = rawData.created_at || rawData.order_date || rawData.ordered_at || 
+                                   rawData.placed_at || rawData.order_placed_at || rawData.date_created ||
+                                   rawData.order_datetime || rawData.created_date;
+          
+          if (possibleOrderDate && !marketplaceOrderDate) {
+            marketplaceOrderDate = possibleOrderDate;
           }
-          shipByDate = rawData.due_date || null;
+          
+          shipByDate = rawData.due_date || rawData.ship_by_date || null;
         } catch (e) {
           console.error('Error parsing rawData for dates:', e);
         }
+      }
+      
+      // Fall back to createdAt only if no other date is found
+      if (!marketplaceOrderDate) {
+        marketplaceOrderDate = rawOrder.createdAt;
       }
 
       // --- Simplified Source Detection ---
@@ -532,6 +549,10 @@ export default async function handler(
         labelStatus: rawOrder.labelStatus || null,
         shipByDate,
         shipments: shipmentsByOrderId.get(rawOrder.id) || [],
+        senkronData: {
+          internalNote: rawOrder.senkronInternalNote || null,
+          customStatus: rawOrder.senkronCustomStatus || null,
+        },
       };
     });
 

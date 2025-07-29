@@ -51,7 +51,7 @@ export default async function handler(
       where: {
         userId: user.id,
         status: {
-          notIn: ['PENDING', 'AWAITING_PAYMENT']
+          notIn: ['PENDING', 'AWAITING_PAYMENT', 'pending', 'awaiting_payment', 'pending_payment']
         }
       },
       _count: {

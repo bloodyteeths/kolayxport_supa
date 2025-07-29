@@ -30,7 +30,6 @@ import {
 import { useAuth } from '@/lib/auth-context'; // Changed from next-auth/react
 import { supabase } from '@/lib/supabase'; // Added for direct Supabase calls if needed for signout
 import useSidebar from '../hooks/useSidebar'; // Import the hook
-import SidebarToggle from './SidebarToggle'; // Import the toggle component
 
 /**
  * AppLayout: For authenticated application routes (e.g., /app/*)
@@ -49,20 +48,7 @@ const navItems = [
 const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   const { user, session, supabaseSignOut, isLoading } = useAuth(); // Fixed: use supabaseSignOut
   const router = useRouter();
-  const { isOpen, toggleSidebar, openSidebar, closeSidebar } = useSidebar(); // Use the hook
-
-  // Close sidebar on mobile when route changes
-  useEffect(() => {
-    const handleRouteChange = () => {
-      if (window.innerWidth < 1024) {
-        closeSidebar();
-      }
-    };
-    router.events.on('routeChangeComplete', handleRouteChange);
-    return () => {
-      router.events.off('routeChangeComplete', handleRouteChange);
-    };
-  }, [router.events, closeSidebar]);
+  const { isOpen, openSidebar, closeSidebar } = useSidebar(); // Use the hook
 
   // Check for active link
   const isActive = (href) => router.pathname === href;
@@ -79,78 +65,104 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
         <title>{title}</title>
       </Head>
       <div className="min-h-screen bg-slate-100 flex text-slate-800">
-        {/* Sidebar Overlay for mobile - Conditionally rendered based on sidebar state */}
-        <AnimatePresence>
-          {isOpen && (
+
+        {/* Sidebar - Always visible, minimal by default, expands on hover */}
+        <motion.aside
+          initial={{ width: '4rem' }}
+          animate={{ width: isOpen ? '16rem' : '4rem' }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          onMouseEnter={() => openSidebar()}
+          onMouseLeave={() => closeSidebar()}
+          className="fixed top-0 left-0 h-full bg-slate-800 text-slate-100 flex flex-col z-40 shadow-lg overflow-hidden"
+        >
+          <div className="flex items-center justify-between h-16 px-4 border-b border-slate-700">
             <motion.div
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeSidebar} // Use closeSidebar from the hook
-              className="fixed inset-0 bg-black/30 z-30 md:hidden"
-            />
-          )}
-        </AnimatePresence>
-
-        {/* Sidebar */}
-        <AnimatePresence>
-          {isOpen && (
-            <motion.aside
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="fixed top-0 left-0 h-full w-64 bg-slate-800 text-slate-100 flex flex-col z-40 shadow-lg"
+              animate={{ opacity: isOpen ? 1 : 0 }}
+              transition={{ duration: 0.2 }}
+              className="font-semibold text-lg whitespace-nowrap"
             >
-              <div className="flex items-center justify-between h-14 px-4 border-b border-slate-800">
-
-                <button 
-                    onClick={closeSidebar} 
-                    className="text-slate-400 hover:text-slate-200 lg:hidden"
-                    aria-label="Kenar çubuğunu kapat"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-              <nav className="py-4">
-                <ul>
-                  {navItems.map((item) => {
-                    const IconComponent = item.icon;
-                    return (
-                      <li key={item.label} className="px-3 py-1">
-                        <Link 
-  href={item.href} 
-  className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150
-    ${
-      isActive(item.href)
-        ? 'bg-slate-700 text-white shadow-inner'
-        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-    }`}
->
-  <IconComponent size={18} className="mr-3 flex-shrink-0" />
-  {item.label}
-</Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </nav>
-            </motion.aside>
-          )}
-        </AnimatePresence>
+              KolayXport
+            </motion.div>
+          </div>
+          <nav className="py-4 flex-1">
+            <ul>
+              {navItems.map((item) => {
+                const IconComponent = item.icon;
+                return (
+                  <li key={item.label} className="relative">
+                    <Link 
+                      href={item.href} 
+                      className={`flex items-center px-4 py-3 text-sm font-medium transition-all duration-150 group relative
+                        ${
+                          isActive(item.href)
+                            ? 'bg-slate-700 text-white shadow-inner'
+                            : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                        }`}
+                    >
+                      <IconComponent size={20} className="flex-shrink-0" />
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ 
+                          opacity: isOpen ? 1 : 0,
+                          width: isOpen ? 'auto' : 0,
+                          marginLeft: isOpen ? '0.75rem' : 0
+                        }}
+                        transition={{ duration: 0.2 }}
+                        className="whitespace-nowrap overflow-hidden"
+                      >
+                        {item.label}
+                      </motion.span>
+                      
+                      {/* Tooltip for collapsed state */}
+                      {!isOpen && (
+                        <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                          {item.label}
+                        </div>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+          
+          {/* User section at bottom */}
+          <div className="border-t border-slate-700 p-4">
+            <button
+              onClick={handleSignOut}
+              className="flex items-center w-full text-slate-300 hover:text-white transition-colors group relative"
+            >
+              <LogOutIcon size={20} className="flex-shrink-0" />
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ 
+                  opacity: isOpen ? 1 : 0,
+                  width: isOpen ? 'auto' : 0,
+                  marginLeft: isOpen ? '0.75rem' : 0
+                }}
+                transition={{ duration: 0.2 }}
+                className="text-sm whitespace-nowrap overflow-hidden"
+              >
+                Çıkış Yap
+              </motion.span>
+              
+              {/* Tooltip for collapsed state */}
+              {!isOpen && (
+                <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                  Çıkış Yap
+                </div>
+              )}
+            </button>
+          </div>
+        </motion.aside>
 
         {/* Main content area */}
-        <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${isOpen ? 'md:ml-64' : 'md:ml-0'}`}>
+        <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ml-16`}>
           {/* Topbar */}
           <header className="sticky top-0 z-20 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16 border-b border-gray-200">
             <div className="flex items-center">
-              <div className="md:hidden mr-2">
-                <SidebarToggle />
-              </div>
-              <div className="hidden md:block">
-                <SidebarToggle />
-              </div>
-              <h1 className="text-lg font-semibold text-slate-800 ml-2 hidden sm:block">{title}</h1>
+              <h1 className="text-lg font-semibold text-slate-800">{title}</h1>
             </div>
             {/* Center: Search */}
             <div className="flex-1 max-w-md mx-auto">

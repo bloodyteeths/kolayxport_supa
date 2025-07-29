@@ -63,20 +63,13 @@ export default async function handler(
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Determine source from marketplace like in orders/index.ts
+    // Determine source from marketplace for logging purposes only
     const source = (() => {
       const marketplace = (order.marketplace || '').toLowerCase();
       if (marketplace.includes('etsy')) return 'shippo';
       if (marketplace.includes('trendyol')) return 'trendyol';
       return 'veeqo';
     })();
-
-    // Only allow for Veeqo and Shippo orders
-    if (source !== 'veeqo' && source !== 'shippo') {
-      return res.status(400).json({ 
-        error: 'Tracking number submission is only available for Veeqo and Shippo orders' 
-      });
-    }
 
     // Get user's API credentials
     const userSettings = await prisma.credential.findUnique({ 
@@ -89,17 +82,16 @@ export default async function handler(
       });
     }
 
-    // For Veeqo orders, we need to submit tracking through Veeqo API
-    if (source === 'veeqo') {
-      await submitVeeqoTracking(
-        userSettings.veeqoApiKey,
-        order.marketplaceKey,
-        trackingNumber,
-        carrierId,
-        notifyCustomer,
-        updateRemoteOrder
-      );
-    }
+    // Always submit tracking through Veeqo API regardless of original marketplace
+    // This ensures consistent tracking management through our primary integration
+    await submitVeeqoTracking(
+      userSettings.veeqoApiKey,
+      order.marketplaceKey,
+      trackingNumber,
+      carrierId,
+      notifyCustomer,
+      updateRemoteOrder
+    );
 
     // Create TrackingSubmission record
     await prisma.trackingSubmission.create({

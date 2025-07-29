@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Drawer, Box, Typography, IconButton, TextField, Select, MenuItem, FormControl, InputLabel, Button, Alert, Chip } from '@mui/material';
+import { Drawer, Box, Typography, IconButton, TextField, Select, MenuItem, FormControl, InputLabel, Button, Alert, Chip, Autocomplete, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import CloseIcon from '@mui/icons-material/Close';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { UPS_SERVICE_TYPES, UPS_PACKAGE_TYPES, UPS_SIGNATURE_OPTIONS } from '@/constants/ups';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'react-hot-toast';
@@ -127,34 +128,297 @@ const UPS_CURRENCY_CODES = [
   { value: 'LKR', label: 'Sri Lanka Rupisi (LKR)' },
 ].sort((a, b) => a.label.localeCompare(b.label, 'tr'));
 
-const UPS_COUNTRY_CODES = [
-  { value: 'TR', label: 'Türkiye' },
-  { value: 'US', label: 'ABD' },
-  { value: 'GB', label: 'İngiltere' },
-  { value: 'DE', label: 'Almanya' },
-  { value: 'FR', label: 'Fransa' },
-  // ...add more as needed
-];
+// Comprehensive list of countries with ISO codes
+const COUNTRIES = [
+  { code: 'AF', name: 'Afghanistan' },
+  { code: 'AL', name: 'Albania' },
+  { code: 'DZ', name: 'Algeria' },
+  { code: 'AD', name: 'Andorra' },
+  { code: 'AO', name: 'Angola' },
+  { code: 'AG', name: 'Antigua and Barbuda' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'AM', name: 'Armenia' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'AZ', name: 'Azerbaijan' },
+  { code: 'BS', name: 'Bahamas' },
+  { code: 'BH', name: 'Bahrain' },
+  { code: 'BD', name: 'Bangladesh' },
+  { code: 'BB', name: 'Barbados' },
+  { code: 'BY', name: 'Belarus' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'BZ', name: 'Belize' },
+  { code: 'BJ', name: 'Benin' },
+  { code: 'BT', name: 'Bhutan' },
+  { code: 'BO', name: 'Bolivia' },
+  { code: 'BA', name: 'Bosnia and Herzegovina' },
+  { code: 'BW', name: 'Botswana' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'BN', name: 'Brunei' },
+  { code: 'BG', name: 'Bulgaria' },
+  { code: 'BF', name: 'Burkina Faso' },
+  { code: 'BI', name: 'Burundi' },
+  { code: 'CV', name: 'Cabo Verde' },
+  { code: 'KH', name: 'Cambodia' },
+  { code: 'CM', name: 'Cameroon' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'CF', name: 'Central African Republic' },
+  { code: 'TD', name: 'Chad' },
+  { code: 'CL', name: 'Chile' },
+  { code: 'CN', name: 'China' },
+  { code: 'CO', name: 'Colombia' },
+  { code: 'KM', name: 'Comoros' },
+  { code: 'CG', name: 'Congo' },
+  { code: 'CR', name: 'Costa Rica' },
+  { code: 'CI', name: "Côte d'Ivoire" },
+  { code: 'HR', name: 'Croatia' },
+  { code: 'CU', name: 'Cuba' },
+  { code: 'CY', name: 'Cyprus' },
+  { code: 'CZ', name: 'Czech Republic' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'DJ', name: 'Djibouti' },
+  { code: 'DM', name: 'Dominica' },
+  { code: 'DO', name: 'Dominican Republic' },
+  { code: 'EC', name: 'Ecuador' },
+  { code: 'EG', name: 'Egypt' },
+  { code: 'SV', name: 'El Salvador' },
+  { code: 'GQ', name: 'Equatorial Guinea' },
+  { code: 'ER', name: 'Eritrea' },
+  { code: 'EE', name: 'Estonia' },
+  { code: 'SZ', name: 'Eswatini' },
+  { code: 'ET', name: 'Ethiopia' },
+  { code: 'FJ', name: 'Fiji' },
+  { code: 'FI', name: 'Finland' },
+  { code: 'FR', name: 'France' },
+  { code: 'GA', name: 'Gabon' },
+  { code: 'GM', name: 'Gambia' },
+  { code: 'GE', name: 'Georgia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'GH', name: 'Ghana' },
+  { code: 'GR', name: 'Greece' },
+  { code: 'GD', name: 'Grenada' },
+  { code: 'GT', name: 'Guatemala' },
+  { code: 'GN', name: 'Guinea' },
+  { code: 'GW', name: 'Guinea-Bissau' },
+  { code: 'GY', name: 'Guyana' },
+  { code: 'HT', name: 'Haiti' },
+  { code: 'HN', name: 'Honduras' },
+  { code: 'HU', name: 'Hungary' },
+  { code: 'IS', name: 'Iceland' },
+  { code: 'IN', name: 'India' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'IR', name: 'Iran' },
+  { code: 'IQ', name: 'Iraq' },
+  { code: 'IE', name: 'Ireland' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'JM', name: 'Jamaica' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'JO', name: 'Jordan' },
+  { code: 'KZ', name: 'Kazakhstan' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'KI', name: 'Kiribati' },
+  { code: 'KP', name: 'North Korea' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'KW', name: 'Kuwait' },
+  { code: 'KG', name: 'Kyrgyzstan' },
+  { code: 'LA', name: 'Laos' },
+  { code: 'LV', name: 'Latvia' },
+  { code: 'LB', name: 'Lebanon' },
+  { code: 'LS', name: 'Lesotho' },
+  { code: 'LR', name: 'Liberia' },
+  { code: 'LY', name: 'Libya' },
+  { code: 'LI', name: 'Liechtenstein' },
+  { code: 'LT', name: 'Lithuania' },
+  { code: 'LU', name: 'Luxembourg' },
+  { code: 'MG', name: 'Madagascar' },
+  { code: 'MW', name: 'Malawi' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'MV', name: 'Maldives' },
+  { code: 'ML', name: 'Mali' },
+  { code: 'MT', name: 'Malta' },
+  { code: 'MH', name: 'Marshall Islands' },
+  { code: 'MR', name: 'Mauritania' },
+  { code: 'MU', name: 'Mauritius' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'FM', name: 'Micronesia' },
+  { code: 'MD', name: 'Moldova' },
+  { code: 'MC', name: 'Monaco' },
+  { code: 'MN', name: 'Mongolia' },
+  { code: 'ME', name: 'Montenegro' },
+  { code: 'MA', name: 'Morocco' },
+  { code: 'MZ', name: 'Mozambique' },
+  { code: 'MM', name: 'Myanmar' },
+  { code: 'NA', name: 'Namibia' },
+  { code: 'NR', name: 'Nauru' },
+  { code: 'NP', name: 'Nepal' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'NI', name: 'Nicaragua' },
+  { code: 'NE', name: 'Niger' },
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'MK', name: 'North Macedonia' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'OM', name: 'Oman' },
+  { code: 'PK', name: 'Pakistan' },
+  { code: 'PW', name: 'Palau' },
+  { code: 'PS', name: 'Palestine' },
+  { code: 'PA', name: 'Panama' },
+  { code: 'PG', name: 'Papua New Guinea' },
+  { code: 'PY', name: 'Paraguay' },
+  { code: 'PE', name: 'Peru' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'PT', name: 'Portugal' },
+  { code: 'QA', name: 'Qatar' },
+  { code: 'RO', name: 'Romania' },
+  { code: 'RU', name: 'Russia' },
+  { code: 'RW', name: 'Rwanda' },
+  { code: 'KN', name: 'Saint Kitts and Nevis' },
+  { code: 'LC', name: 'Saint Lucia' },
+  { code: 'VC', name: 'Saint Vincent and the Grenadines' },
+  { code: 'WS', name: 'Samoa' },
+  { code: 'SM', name: 'San Marino' },
+  { code: 'ST', name: 'Sao Tome and Principe' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'SN', name: 'Senegal' },
+  { code: 'RS', name: 'Serbia' },
+  { code: 'SC', name: 'Seychelles' },
+  { code: 'SL', name: 'Sierra Leone' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'SK', name: 'Slovakia' },
+  { code: 'SI', name: 'Slovenia' },
+  { code: 'SB', name: 'Solomon Islands' },
+  { code: 'SO', name: 'Somalia' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'SS', name: 'South Sudan' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'LK', name: 'Sri Lanka' },
+  { code: 'SD', name: 'Sudan' },
+  { code: 'SR', name: 'Suriname' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'SY', name: 'Syria' },
+  { code: 'TW', name: 'Taiwan' },
+  { code: 'TJ', name: 'Tajikistan' },
+  { code: 'TZ', name: 'Tanzania' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'TL', name: 'Timor-Leste' },
+  { code: 'TG', name: 'Togo' },
+  { code: 'TO', name: 'Tonga' },
+  { code: 'TT', name: 'Trinidad and Tobago' },
+  { code: 'TN', name: 'Tunisia' },
+  { code: 'TR', name: 'Turkey' },
+  { code: 'TM', name: 'Turkmenistan' },
+  { code: 'TV', name: 'Tuvalu' },
+  { code: 'UG', name: 'Uganda' },
+  { code: 'UA', name: 'Ukraine' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'US', name: 'United States' },
+  { code: 'UY', name: 'Uruguay' },
+  { code: 'UZ', name: 'Uzbekistan' },
+  { code: 'VU', name: 'Vanuatu' },
+  { code: 'VA', name: 'Vatican City' },
+  { code: 'VE', name: 'Venezuela' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'YE', name: 'Yemen' },
+  { code: 'ZM', name: 'Zambia' },
+  { code: 'ZW', name: 'Zimbabwe' },
+  // Common territories and special codes
+  { code: 'HK', name: 'Hong Kong' },
+  { code: 'MO', name: 'Macau' },
+  { code: 'PR', name: 'Puerto Rico' },
+  { code: 'VI', name: 'U.S. Virgin Islands' },
+  { code: 'GU', name: 'Guam' },
+  { code: 'AS', name: 'American Samoa' },
+  { code: 'MP', name: 'Northern Mariana Islands' },
+].sort((a, b) => a.name.localeCompare(b.name));
+
+// Countries that require state/province codes for UPS shipping
+const COUNTRIES_REQUIRING_STATE = ['US', 'CA', 'AU', 'CN', 'BR', 'MX', 'MY', 'IE'];
+
+// Helper function to check if a country requires state
+const countryRequiresState = (countryCode: string): boolean => {
+  return COUNTRIES_REQUIRING_STATE.includes(countryCode);
+};
 
 // Helper function to convert country names to country codes
 const getCountryCode = (countryName: string): string => {
+  if (!countryName) return '';
+  
+  // First check if it's already a 2-letter code
+  if (countryName.length === 2) {
+    const upperCode = countryName.toUpperCase();
+    if (COUNTRIES.find(c => c.code === upperCode)) {
+      return upperCode;
+    }
+  }
+  
+  // Common country name variations and mappings
   const countryMappings: Record<string, string> = {
     'United States': 'US',
+    'United States of America': 'US',
     'USA': 'US',
+    'U.S.A.': 'US',
     'US': 'US',
+    'America': 'US',
     'Turkey': 'TR',
     'Türkiye': 'TR',
     'TR': 'TR',
     'United Kingdom': 'GB',
     'UK': 'GB',
+    'U.K.': 'GB',
+    'Great Britain': 'GB',
+    'England': 'GB',
     'GB': 'GB',
     'Germany': 'DE',
+    'Deutschland': 'DE',
     'DE': 'DE',
     'France': 'FR',
     'FR': 'FR',
+    'Netherlands': 'NL',
+    'Holland': 'NL',
+    'The Netherlands': 'NL',
+    'South Korea': 'KR',
+    'Republic of Korea': 'KR',
+    'North Korea': 'KP',
+    'Czech Republic': 'CZ',
+    'Czechia': 'CZ',
+    'Russia': 'RU',
+    'Russian Federation': 'RU',
+    'China': 'CN',
+    'People\'s Republic of China': 'CN',
+    'PRC': 'CN',
+    'UAE': 'AE',
+    'U.A.E.': 'AE',
   };
   
-  return countryMappings[countryName] || 'US'; // Default to US if not found
+  // Check common mappings
+  const normalizedName = countryName.trim();
+  if (countryMappings[normalizedName]) {
+    return countryMappings[normalizedName];
+  }
+  
+  // Try to find by exact name match
+  const exactMatch = COUNTRIES.find(
+    c => c.name.toLowerCase() === normalizedName.toLowerCase()
+  );
+  if (exactMatch) {
+    return exactMatch.code;
+  }
+  
+  // Try partial match
+  const partialMatch = COUNTRIES.find(
+    c => c.name.toLowerCase().includes(normalizedName.toLowerCase()) ||
+         normalizedName.toLowerCase().includes(c.name.toLowerCase())
+  );
+  if (partialMatch) {
+    return partialMatch.code;
+  }
+  
+  // Default to empty string if not found
+  return '';
 };
 
 const US_STATES = [
@@ -529,357 +793,530 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         <Box sx={{ overflowY: 'auto', p: { xs: 1, sm: 2 }, flexGrow: 1 }}>
           <form onSubmit={handleSubmit}>
             
-            <FormControl fullWidth margin="dense" size="small">
-              <InputLabel>Service Type</InputLabel>
-              <Select name="serviceType" value={form.serviceType} onChange={handleSelectChange} label="Service Type">
-                {UPS_SERVICE_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="dense" size="small">
-              <InputLabel>Package Type</InputLabel>
-              <Select name="packageType" value={form.packageType} onChange={handleSelectChange} label="Package Type">
-                {UPS_PACKAGE_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="dense" size="small">
-              <InputLabel>Signature Option</InputLabel>
-              <Select name="signatureOption" value={form.signatureOption} onChange={handleSelectChange} label="Signature Option">
-                {UPS_SIGNATURE_OPTIONS.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="dense" size="small">
-              <InputLabel>Vergi/Gümrük Ödemesi</InputLabel>
-              <Select name="dutyPaymentType" value={form.dutyPaymentType} onChange={handleSelectChange} label="Vergi/Gümrük Ödemesi">
-                <MenuItem value="RECEIVER">Alıcı (Receiver)</MenuItem>
-                <MenuItem value="SHIPPER">Gönderici (Shipper)</MenuItem>
-              </Select>
-            </FormControl>
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>Recipient Information</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box>
+                  <TextField
+                    label="First Name"
+                    name="recipientFirstName"
+                    value={form.recipientFirstName}
+                    onChange={handleInputChange}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Last Name"
+                    name="recipientLastName"
+                    value={form.recipientLastName}
+                    onChange={handleInputChange}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Street Address 1"
+                    name="recipientStreet1"
+                    value={form.recipientStreet1}
+                    onChange={handleInputChange}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Street Address 2"
+                    name="recipientStreet2"
+                    value={form.recipientStreet2}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="City"
+                    name="recipientCity"
+                    value={form.recipientCity}
+                    onChange={handleInputChange}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="State/Province"
+                    name="recipientState"
+                    value={form.recipientState}
+                    onChange={handleInputChange}
+                    required={countryRequiresState(form.recipientCountry)}
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                    helperText={
+                      countryRequiresState(form.recipientCountry) 
+                        ? 'State/Province is required for this country' 
+                        : 'State/Province is optional for this country'
+                    }
+                  />
+                  <TextField
+                    label="Postal Code"
+                    name="recipientPostal"
+                    value={form.recipientPostal}
+                    onChange={handleInputChange}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <Autocomplete
+                    options={COUNTRIES}
+                    getOptionLabel={(option) => option.name}
+                    value={COUNTRIES.find(c => c.code === form.recipientCountry) || null}
+                    onChange={(event, newValue) => {
+                      setForm(f => ({ ...f, recipientCountry: newValue?.code || '' }));
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Country"
+                        required
+                        margin="dense"
+                        size="small"
+                      />
+                    )}
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 1 }}
+                  />
+                  <TextField
+                    label="Phone"
+                    name="recipientPhone"
+                    value={form.recipientPhone}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                </Box>
+              </AccordionDetails>
+            </Accordion>
             
-            <TextField label="Weight (kg)" name="weight" type="number" value={form.weight} onChange={handleInputChange} fullWidth margin="dense" size="small" inputProps={{ min: 0, step: 0.01 }} />
-            <Box mt={2} mb={1}>
-              <Chip label="EDI: Electronic Data Interchange (Zorunlu)" color="info" variant="outlined" />
-            </Box>
-            <TextField
-              label="Fatura Numarası"
-              name="invoiceNumber"
-              value={form.invoiceNumber}
-              onChange={handleInputChange}
-              inputProps={{ maxLength: 30 }}
-              required
-              fullWidth
-              margin="dense"
-            />
-            <TextField
-              label="Fatura Tarihi"
-              name="invoiceDate"
-              type="date"
-              value={form.invoiceDate}
-              onChange={handleInputChange}
-              required
-              fullWidth
-              margin="dense"
-              InputLabelProps={{ shrink: true }}
-            />
-            <FormControl fullWidth margin="dense" size="small">
-              <InputLabel>İhracat Nedeni</InputLabel>
-              <Select
-                name="exportReason"
-                value={form.exportReason}
-                onChange={handleSelectChange}
-                label="İhracat Nedeni"
-                required
-              >
-                {UPS_EXPORT_REASONS.map(opt => (
-                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="dense" size="small">
-              <InputLabel>Para Birimi</InputLabel>
-              <Select
-                name="currencyCode"
-                value={form.currencyCode}
-                onChange={handleSelectChange}
-                label="Para Birimi"
-                required
-              >
-                {UPS_CURRENCY_CODES.map(opt => (
-                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              label="IOSS Numarası"
-              name="iossNumber"
-              value={form.iossNumber}
-              onChange={handleInputChange}
-              inputProps={{ maxLength: 35, pattern: '^[A-Z0-9]{1,35}$' }}
-              fullWidth
-              margin="dense"
-            />
-            <TextField
-              label="KDV Numarası"
-              name="vatNumber"
-              value={form.vatNumber}
-              onChange={handleInputChange}
-              inputProps={{ maxLength: 20, pattern: '^[A-Z0-9]{1,20}$' }}
-              fullWidth
-              margin="dense"
-            />
-            <Box mt={2} mb={1} p={1} sx={{ border: '1px solid #eee', borderRadius: 1 }}>
-              <Typography variant="subtitle2" gutterBottom>Ürün Bilgisi</Typography>
-              <TextField
-                label="Açıklama"
-                name="description"
-                value={form.products[0].description}
-                onChange={e => setForm(f => ({ ...f, products: [{ ...f.products[0], description: e.target.value }] }))}
-                inputProps={{ maxLength: 35 }}
-                required
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="GTIP Kodu"
-                name="commodityCode"
-                value={form.products[0].commodityCode}
-                onChange={e => setForm(f => ({
-                  ...f,
-                  products: [{ ...f.products[0], commodityCode: e.target.value }]
-                }))}
-                inputProps={{ maxLength: 20, pattern: '^[0-9]*$' }}
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="Miktar"
-                name="quantity"
-                type="number"
-                value={form.products[0].quantity}
-                onChange={e => {
-                  const quantity = Math.max(1, Number(e.target.value));
-                  const unitPrice = form.products[0].value;
-                  setForm(f => ({
-                    ...f, 
-                    products: [{ ...f.products[0], quantity }],
-                    invoiceLineTotal: {
-                      currencyCode: f.currencyCode,
-                      monetaryValue: formatDecimal(quantity * unitPrice)
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>UPS Seçenekleri</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box>
+                  <FormControl fullWidth margin="dense" size="small">
+                    <InputLabel>Service Type</InputLabel>
+                    <Select name="serviceType" value={form.serviceType} onChange={handleSelectChange} label="Service Type">
+                      {UPS_SERVICE_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth margin="dense" size="small">
+                    <InputLabel>Package Type</InputLabel>
+                    <Select name="packageType" value={form.packageType} onChange={handleSelectChange} label="Package Type">
+                      {UPS_PACKAGE_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth margin="dense" size="small">
+                    <InputLabel>Signature Option</InputLabel>
+                    <Select name="signatureOption" value={form.signatureOption} onChange={handleSelectChange} label="Signature Option">
+                      {UPS_SIGNATURE_OPTIONS.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth margin="dense" size="small">
+                    <InputLabel>Vergi/Gümrük Ödemesi</InputLabel>
+                    <Select name="dutyPaymentType" value={form.dutyPaymentType} onChange={handleSelectChange} label="Vergi/Gümrük Ödemesi">
+                      <MenuItem value="RECEIVER">Alıcı (Receiver)</MenuItem>
+                      <MenuItem value="SHIPPER">Gönderici (Shipper)</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField label="Weight (kg)" name="weight" type="number" value={form.weight} onChange={handleInputChange} fullWidth margin="dense" size="small" inputProps={{ min: 0, step: 0.01 }} />
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+            
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>Satış Bilgileri</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box>
+                  <TextField
+                    label="Fatura Numarası"
+                    name="invoiceNumber"
+                    value={form.invoiceNumber}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 30 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Fatura Tarihi"
+                    name="invoiceDate"
+                    type="date"
+                    value={form.invoiceDate}
+                    onChange={handleInputChange}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <FormControl fullWidth margin="dense" size="small">
+                    <InputLabel>İhracat Nedeni</InputLabel>
+                    <Select
+                      name="exportReason"
+                      value={form.exportReason}
+                      onChange={handleSelectChange}
+                      label="İhracat Nedeni"
+                      required
+                    >
+                      {UPS_EXPORT_REASONS.map(opt => (
+                        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth margin="dense" size="small">
+                    <InputLabel>Para Birimi</InputLabel>
+                    <Select
+                      name="currencyCode"
+                      value={form.currencyCode}
+                      onChange={handleSelectChange}
+                      label="Para Birimi"
+                      required
+                    >
+                      {UPS_CURRENCY_CODES.map(opt => (
+                        <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label="IOSS Numarası"
+                    name="iossNumber"
+                    value={form.iossNumber}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 35, pattern: '^[A-Z0-9]{1,35}$' }}
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="KDV Numarası"
+                    name="vatNumber"
+                    value={form.vatNumber}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 20, pattern: '^[A-Z0-9]{1,20}$' }}
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+            
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>Ürün Bilgisi</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box>
+                  <TextField
+                    label="Açıklama"
+                    name="description"
+                    value={form.products[0].description}
+                    onChange={e => setForm(f => ({ ...f, products: [{ ...f.products[0], description: e.target.value }] }))}
+                    inputProps={{ maxLength: 35 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="GTIP Kodu"
+                    name="commodityCode"
+                    value={form.products[0].commodityCode}
+                    onChange={e => setForm(f => ({
+                      ...f,
+                      products: [{ ...f.products[0], commodityCode: e.target.value }]
+                    }))}
+                    inputProps={{ maxLength: 20, pattern: '^[0-9]*$' }}
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Miktar"
+                    name="quantity"
+                    type="number"
+                    value={form.products[0].quantity}
+                    onChange={e => {
+                      const quantity = Math.max(1, Number(e.target.value));
+                      const unitPrice = form.products[0].value;
+                      setForm(f => ({
+                        ...f, 
+                        products: [{ ...f.products[0], quantity }],
+                        invoiceLineTotal: {
+                          currencyCode: f.currencyCode,
+                          monetaryValue: formatDecimal(quantity * unitPrice)
+                        }
+                      }));
+                    }}
+                    inputProps={{ min: 1 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Birim Fiyat"
+                    name="value"
+                    type="number"
+                    value={form.products[0].value}
+                    onChange={e => {
+                      const unitPrice = Math.max(0.01, normalizeDecimal(e.target.value));
+                      setForm(f => ({
+                        ...f, 
+                        products: [{ ...f.products[0], value: unitPrice }],
+                        invoiceLineTotal: {
+                          currencyCode: f.currencyCode,
+                          monetaryValue: formatDecimal(f.products[0].quantity * unitPrice)
+                        }
+                      }));
+                    }}
+                    inputProps={{ min: 0.01, step: 0.01 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Toplam Tutar"
+                    type="number"
+                    value={formatDecimal(form.products[0].quantity * form.products[0].value)}
+                    disabled
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <FormControl fullWidth margin="dense" size="small">
+                    <InputLabel>Ürün Birimi</InputLabel>
+                    <Select
+                      name="unitOfMeasurement"
+                      value={form.products[0].unitOfMeasurement}
+                      onChange={e => setForm(f => ({ ...f, products: [{ ...f.products[0], unitOfMeasurement: e.target.value }] }))}
+                      label="Ürün Birimi"
+                      required
+                    >
+                      <MenuItem value="PCS">Adet</MenuItem>
+                      <MenuItem value="KG">Kilogram</MenuItem>
+                      <MenuItem value="LTR">Litre</MenuItem>
+                      <MenuItem value="MTR">Metre</MenuItem>
+                      <MenuItem value="CMT">Santimetre</MenuItem>
+                      <MenuItem value="MMT">Milimetre</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    label="Ürün Ağırlığı"
+                    name="weight"
+                    type="number"
+                    value={form.products[0].weight}
+                    onChange={e => {
+                      const normalizedWeight = formatDecimal(e.target.value);
+                      setForm(f => ({ ...f, products: [{ ...f.products[0], weight: normalizedWeight }] }));
+                    }}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <Autocomplete
+                    options={COUNTRIES}
+                    getOptionLabel={(option) => option.name}
+                    value={COUNTRIES.find(c => c.code === form.products[0].originCountry) || null}
+                    onChange={(event, newValue) => {
+                      setForm(f => ({ ...f, products: [{ ...f.products[0], originCountry: newValue?.code || 'TR' }] }));
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Country of Origin"
+                        required
+                        margin="dense"
+                        size="small"
+                      />
+                    )}
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 1 }}
+                  />
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+            
+            <Accordion>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography>Alıcı (Sold To)</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box>
+                  <TextField
+                    label="Ad"
+                    name="soldToName"
+                    value={form.soldToName}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 35 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Dikkat Edilecek Kişi"
+                    name="soldToAttention"
+                    value={form.soldToAttention}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 35 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Adres Satırı 1"
+                    name="soldToStreet1"
+                    value={form.soldToStreet1}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 35 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Adres Satırı 2"
+                    name="soldToStreet2"
+                    value={form.soldToStreet2}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 35 }}
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Şehir"
+                    name="soldToCity"
+                    value={form.soldToCity}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 35 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Posta Kodu"
+                    name="soldToPostal"
+                    value={form.soldToPostal}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 10 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <TextField
+                    label="Telefon Numarası"
+                    name="soldToPhone"
+                    value={form.soldToPhone}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 20 }}
+                    required
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <Autocomplete
+                    options={COUNTRIES}
+                    getOptionLabel={(option) => option.name}
+                    value={COUNTRIES.find(c => c.code === form.soldToCountry) || null}
+                    onChange={(event, newValue) => {
+                      setForm(f => ({ ...f, soldToCountry: newValue?.code || 'TR' }));
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Country (Sold To)"
+                        required
+                        margin="dense"
+                        size="small"
+                      />
+                    )}
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 1 }}
+                  />
+                  <TextField
+                    label="State/Province (Sold To)"
+                    name="soldToState"
+                    value={form.soldToState}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 5 }}
+                    required={countryRequiresState(form.soldToCountry)}
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                    helperText={
+                      countryRequiresState(form.soldToCountry) 
+                        ? 'State/Province is required for this country' 
+                        : 'State/Province is optional for this country'
                     }
-                  }));
-                }}
-                inputProps={{ min: 1 }}
-                required
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="Birim Fiyat"
-                name="value"
-                type="number"
-                value={form.products[0].value}
-                onChange={e => {
-                  const unitPrice = Math.max(0.01, normalizeDecimal(e.target.value));
-                  setForm(f => ({
-                    ...f, 
-                    products: [{ ...f.products[0], value: unitPrice }],
-                    invoiceLineTotal: {
-                      currencyCode: f.currencyCode,
-                      monetaryValue: formatDecimal(f.products[0].quantity * unitPrice)
-                    }
-                  }));
-                }}
-                inputProps={{ min: 0.01, step: 0.01 }}
-                required
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="Toplam Tutar"
-                type="number"
-                value={formatDecimal(form.products[0].quantity * form.products[0].value)}
-                disabled
-                fullWidth
-                margin="dense"
-              />
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Ürün Birimi</InputLabel>
-                <Select
-                  name="unitOfMeasurement"
-                  value={form.products[0].unitOfMeasurement}
-                  onChange={e => setForm(f => ({ ...f, products: [{ ...f.products[0], unitOfMeasurement: e.target.value }] }))}
-                  label="Ürün Birimi"
-                  required
-                >
-                  <MenuItem value="PCS">Adet</MenuItem>
-                  <MenuItem value="KG">Kilogram</MenuItem>
-                  <MenuItem value="LTR">Litre</MenuItem>
-                  <MenuItem value="MTR">Metre</MenuItem>
-                  <MenuItem value="CMT">Santimetre</MenuItem>
-                  <MenuItem value="MMT">Milimetre</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Ürün Ağırlığı</InputLabel>
-                <TextField
-                  name="weight"
-                  type="number"
-                  value={form.products[0].weight}
-                  onChange={e => {
-                    const normalizedWeight = formatDecimal(e.target.value);
-                    setForm(f => ({ ...f, products: [{ ...f.products[0], weight: normalizedWeight }] }));
-                  }}
-                  inputProps={{ min: 0, step: 0.01 }}
-                  required
-                  fullWidth
-                  margin="dense"
-                />
-              </FormControl>
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Menşei Ülke</InputLabel>
-                <Select
-                  name="originCountry"
-                  value={form.products[0].originCountry}
-                  onChange={e => setForm(f => ({ ...f, products: [{ ...f.products[0], originCountry: e.target.value }] }))}
-                  label="Menşei Ülke"
-                  required
-                >
-                  {UPS_COUNTRY_CODES.map(opt => (
-                    <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
-            <Box mt={2} mb={1} p={1} sx={{ border: '1px solid #eee', borderRadius: 1 }}>
-              <Typography variant="subtitle2" gutterBottom>Alıcı (Sold To)</Typography>
-              <TextField
-                label="Ad"
-                name="soldToName"
-                value={form.soldToName}
-                onChange={handleInputChange}
-                inputProps={{ maxLength: 35 }}
-                required
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="Dikkat Edilecek Kişi"
-                name="soldToAttention"
-                value={form.soldToAttention}
-                onChange={handleInputChange}
-                inputProps={{ maxLength: 35 }}
-                required
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="Adres Satırı 1"
-                name="soldToStreet1"
-                value={form.soldToStreet1}
-                onChange={handleInputChange}
-                inputProps={{ maxLength: 35 }}
-                required
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="Adres Satırı 2"
-                name="soldToStreet2"
-                value={form.soldToStreet2}
-                onChange={handleInputChange}
-                inputProps={{ maxLength: 35 }}
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="Şehir"
-                name="soldToCity"
-                value={form.soldToCity}
-                onChange={handleInputChange}
-                inputProps={{ maxLength: 35 }}
-                required
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="Posta Kodu"
-                name="soldToPostal"
-                value={form.soldToPostal}
-                onChange={handleInputChange}
-                inputProps={{ maxLength: 10 }}
-                required
-                fullWidth
-                margin="dense"
-              />
-              <TextField
-                label="Telefon Numarası"
-                name="soldToPhone"
-                value={form.soldToPhone}
-                onChange={handleInputChange}
-                inputProps={{ maxLength: 20 }}
-                required
-                fullWidth
-                margin="dense"
-              />
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Ülke</InputLabel>
-                <Select
-                  name="soldToCountry"
-                  value={form.soldToCountry}
-                  onChange={handleSelectChange}
-                  label="Ülke"
-                  required
-                >
-                  {UPS_COUNTRY_CODES.map(opt => (
-                    <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth margin="dense" size="small">
-                <InputLabel>Alıcı Eyalet/Kod</InputLabel>
-                <TextField
-                  name="soldToState"
-                  value={form.soldToState}
-                  onChange={handleInputChange}
-                  inputProps={{ maxLength: 2 }}
-                  required
-                  fullWidth
-                  margin="dense"
-                />
-              </FormControl>
-              <TextField
-                label="Alıcı E-posta"
-                name="soldToEmail"
-                type="email"
-                value={form.soldToEmail}
-                onChange={handleInputChange}
-                inputProps={{ maxLength: 50 }}
-                fullWidth
-                margin="dense"
-                size="small"
-              />
-            </Box>
-            <FormControl fullWidth margin="dense" size="small">
-              <InputLabel>Teslim Şartı</InputLabel>
-              <Select
-                name="termsOfShipment"
-                value={form.termsOfShipment}
-                onChange={handleSelectChange}
-                label="Teslim Şartı"
-                required
-              >
-                <MenuItem value="DAP">DAP (Delivered At Place)</MenuItem>
-                <MenuItem value="DDP">DDP (Delivered Duty Paid)</MenuItem>
-                <MenuItem value="DDU">DDU (Delivered Duty Unpaid)</MenuItem>
-                <MenuItem value="EXW">EXW (Ex Works)</MenuItem>
-                <MenuItem value="FCA">FCA (Free Carrier)</MenuItem>
-                <MenuItem value="CPT">CPT (Carriage Paid To)</MenuItem>
-                <MenuItem value="CIP">CIP (Carriage and Insurance Paid To)</MenuItem>
-                <MenuItem value="DAT">DAT (Delivered At Terminal)</MenuItem>
-                <MenuItem value="DPU">DPU (Delivered at Place Unloaded)</MenuItem>
-                <MenuItem value="CFR">CFR (Cost and Freight)</MenuItem>
-                <MenuItem value="CIF">CIF (Cost, Insurance and Freight)</MenuItem>
-              </Select>
-            </FormControl>
+                  />
+                  <TextField
+                    label="Alıcı E-posta"
+                    name="soldToEmail"
+                    type="email"
+                    value={form.soldToEmail}
+                    onChange={handleInputChange}
+                    inputProps={{ maxLength: 50 }}
+                    fullWidth
+                    margin="dense"
+                    size="small"
+                  />
+                  <FormControl fullWidth margin="dense" size="small">
+                    <InputLabel>Teslim Şartı</InputLabel>
+                    <Select
+                      name="termsOfShipment"
+                      value={form.termsOfShipment}
+                      onChange={handleSelectChange}
+                      label="Teslim Şartı"
+                      required
+                    >
+                      <MenuItem value="DAP">DAP (Delivered At Place)</MenuItem>
+                      <MenuItem value="DDP">DDP (Delivered Duty Paid)</MenuItem>
+                      <MenuItem value="DDU">DDU (Delivered Duty Unpaid)</MenuItem>
+                      <MenuItem value="EXW">EXW (Ex Works)</MenuItem>
+                      <MenuItem value="FCA">FCA (Free Carrier)</MenuItem>
+                      <MenuItem value="CPT">CPT (Carriage Paid To)</MenuItem>
+                      <MenuItem value="CIP">CIP (Carriage and Insurance Paid To)</MenuItem>
+                      <MenuItem value="DAT">DAT (Delivered At Terminal)</MenuItem>
+                      <MenuItem value="DPU">DPU (Delivered at Place Unloaded)</MenuItem>
+                      <MenuItem value="CFR">CFR (Cost and Freight)</MenuItem>
+                      <MenuItem value="CIF">CIF (Cost, Insurance and Freight)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
             {success && <Alert severity="success" sx={{ mb: 2 }}>UPS etiketi başarıyla kaydedildi.</Alert>}
             <Button type="submit" variant="contained" color="primary" fullWidth disabled={saving || (!!order && hasExistingLabel(order))}>{saving ? 'Kaydediliyor...' : (order && hasExistingLabel(order) ? 'Mevcut Etiketi Silin' : 'Kaydet')}</Button>

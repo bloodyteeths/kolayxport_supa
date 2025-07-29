@@ -115,6 +115,11 @@ export async function createFedexShipment(
   if (!orderData.recipientCity) validationErrors.push("Recipient City missing or empty");
   if (!orderData.recipientPostal) validationErrors.push("Recipient Postal Code missing or empty");
   if (!orderData.recipientCountry) validationErrors.push("Recipient Country Code missing or empty");
+  
+  // Normalize country codes to uppercase
+  if (orderData.recipientCountry) {
+    orderData.recipientCountry = orderData.recipientCountry.toUpperCase();
+  }
 
   // Phone is already normalized in generate-label.ts, so we just use it directly
   const recipientPhoneCleaned = String(orderData.recipientPhone || '');
@@ -132,7 +137,9 @@ export async function createFedexShipment(
   if (!orderData.shippingChargesPaymentType || !fedexOptionsData.shippingChargesPaymentTypes.some(o => o.value === orderData.shippingChargesPaymentType)) validationErrors.push("shippingChargesPaymentType is required and must be valid");
   if (!orderData.labelStockType || !fedexOptionsData.labelStockTypes.some(o => o.value === orderData.labelStockType)) validationErrors.push("labelStockType is required and must be valid");
 
-  const isShipmentInternational = shipper.shipperCountryCode.toUpperCase() !== orderData.recipientCountry?.toUpperCase();
+  // Normalize shipper country code too
+  const shipperCountryNormalized = shipper.shipperCountryCode.toUpperCase();
+  const isShipmentInternational = shipperCountryNormalized !== orderData.recipientCountry;
 
   if (isShipmentInternational) {
     if (!orderData.customsClearanceDetail || typeof orderData.customsClearanceDetail !== 'object') {
@@ -148,18 +155,49 @@ export async function createFedexShipment(
         if (!ccd.commodities || !Array.isArray(ccd.commodities) || ccd.commodities.length === 0) {
             validationErrors.push("customsClearanceDetail.commodities array is required and must not be empty.");
         } else {
+            // Calculate total customs value from commodities
+            let calculatedTotalCustomsValue = 0;
+            
             ccd.commodities.forEach((item: any, index: number) => {
                 if (!item.description || String(item.description).trim() === '') validationErrors.push(`Commodity ${index+1}: description is required`);
                 if (typeof item.quantity !== 'number' || item.quantity <= 0) validationErrors.push(`Commodity ${index+1}: quantity must be a positive number`);
                 if (!item.quantityUnits || item.quantityUnits !== 'EA') validationErrors.push(`Commodity ${index+1}: quantityUnits must be 'EA'`);
                 if (!item.unitPrice || typeof item.unitPrice.amount !== 'number' || item.unitPrice.amount < 0) validationErrors.push(`Commodity ${index+1}: unitPrice.amount must be a number >= 0`);
                 if (!item.unitPrice.currency) validationErrors.push(`Commodity ${index+1}: unitPrice.currency is required`);
+                
+                // Auto-set customsValue based on unitPrice * quantity (like UPS)
+                if (item.unitPrice && typeof item.unitPrice.amount === 'number' && typeof item.quantity === 'number') {
+                    const itemCustomsValue = item.unitPrice.amount * item.quantity;
+                    item.customsValue = {
+                        amount: parseFloat(itemCustomsValue.toFixed(2)),
+                        currency: item.unitPrice.currency
+                    };
+                    calculatedTotalCustomsValue += itemCustomsValue;
+                }
+                
                 if (!item.customsValue || typeof item.customsValue.amount !== 'number' || item.customsValue.amount < 0) validationErrors.push(`Commodity ${index+1}: customsValue.amount must be a number >= 0`);
                 if (!item.customsValue.currency) validationErrors.push(`Commodity ${index+1}: customsValue.currency is required`);
                 if (!item.weight || typeof item.weight.value !== 'number' || item.weight.value <= 0) validationErrors.push(`Commodity ${index+1}: weight.value must be a positive number`);
                 if (!item.weight.units || item.weight.units !== 'KG') validationErrors.push(`Commodity ${index+1}: weight.units must be 'KG'`);
                 if (!item.countryOfManufacture || String(item.countryOfManufacture).trim() === '') validationErrors.push(`Commodity ${index+1}: countryOfManufacture is required`);
+                
+                // Normalize country of manufacture to uppercase
+                if (item.countryOfManufacture) {
+                    item.countryOfManufacture = item.countryOfManufacture.toUpperCase();
+                }
             });
+            
+            // Auto-adjust total customs value to match sum of commodities (like UPS)
+            if (calculatedTotalCustomsValue > 0) {
+                const declaredTotal = ccd.totalCustomsValue?.amount || 0;
+                const totalDifference = Math.abs(calculatedTotalCustomsValue - declaredTotal);
+                
+                // If difference is significant (more than 1 cent), use calculated value
+                if (totalDifference > 0.01) {
+                    logger.warn(`[FedEx Service] Total customs value mismatch for order ${orderData.orderId}. Declared: ${declaredTotal}, Calculated: ${calculatedTotalCustomsValue}. Using calculated value.`);
+                    ccd.totalCustomsValue.amount = parseFloat(calculatedTotalCustomsValue.toFixed(2));
+                }
+            }
         }
     }
   } else { // Domestic (customsClearanceDetail might not be strictly needed by FedEx but good to have basic structure if sent)
@@ -237,7 +275,7 @@ export async function createFedexShipment(
           city: shipper.shipperCity,
           stateOrProvinceCode: shipper.shipperStateCode,
           postalCode: shipper.shipperPostalCode,
-          countryCode: shipper.shipperCountryCode,
+          countryCode: shipperCountryNormalized,
         },
         ...(shipper.shipperTinNumber && shipper.shipperTinType && {
           tins: [{

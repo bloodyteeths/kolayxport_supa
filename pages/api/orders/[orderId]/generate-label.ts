@@ -316,15 +316,17 @@ async function handler(
 
       const itemWeightKg = item.weight || weightKgOverride || orderRecord.weightKg || etdDefaults.weightKg;
       const itemUnitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : 0;
+      const itemQuantity = item.quantity || 1;
+      const itemCustomsValue = itemUnitPrice * itemQuantity;
 
       return {
         description: sanitizeDescription(item.title || commodityDescOverride || orderRecord.commodityDesc || 'Product'),
-        quantity: item.quantity || 1,
+        quantity: itemQuantity,
         quantityUnits: 'EA', // Added quantityUnits
         unitPrice: { amount: itemUnitPrice, currency: effectiveCurrency }, // Nested unitPrice
-        customsValue: { amount: itemUnitPrice * (item.quantity || 1), currency: effectiveCurrency }, // Nested customsValue per item
+        customsValue: { amount: parseFloat(itemCustomsValue.toFixed(2)), currency: effectiveCurrency }, // Auto-calculate customsValue per item
         weight: { units: 'KG', value: itemWeightKg }, // Nested weight
-        countryOfManufacture: item.country_of_origin || countryOfMfgOverride || orderRecord.countryOfMfg || etdDefaults.countryOfMfg,
+        countryOfManufacture: (item.country_of_origin || countryOfMfgOverride || orderRecord.countryOfMfg || etdDefaults.countryOfMfg || '').toUpperCase(), // Normalize to uppercase
         ...(effectiveItemHs && { harmonizedCode: effectiveItemHs }), // Uses correct type now
         // sku: item.sku || undefined // SKU is not typically part of FedEx commodities array
       };
@@ -340,7 +342,7 @@ async function handler(
             unitPrice: { amount: 0, currency: effectiveCurrency },
             customsValue: { amount: 0, currency: effectiveCurrency },
             weight: { units: 'KG', value: effectiveWeightKg },
-            countryOfManufacture: countryOfMfgOverride || orderRecord.countryOfMfg || etdDefaults.countryOfMfg,
+            countryOfManufacture: (countryOfMfgOverride || orderRecord.countryOfMfg || etdDefaults.countryOfMfg || '').toUpperCase(),
             ...( (validGlobalHsOverride || sanitizeAndValidateHsCode(orderRecord.harmonizedCode) || sanitizeAndValidateHsCode(etdDefaults.harmonizedCode)) && 
                { harmonizedCode: validGlobalHsOverride || sanitizeAndValidateHsCode(orderRecord.harmonizedCode) || sanitizeAndValidateHsCode(etdDefaults.harmonizedCode) }
             )
@@ -363,7 +365,7 @@ async function handler(
       recipientCity: parsedShippingAddress.city,
       recipientState: parsedShippingAddress.state || undefined,
       recipientPostal: parsedShippingAddress.postal,
-      recipientCountry: parsedShippingAddress.country,
+      recipientCountry: parsedShippingAddress.country ? parsedShippingAddress.country.toUpperCase() : '', // Normalize country code to uppercase
       ...(() => {
         // Parse phone number and extension using same logic as UPS
         const { phone: normalizedPhone, ext: phoneExt } = parsePhoneNumberWithExt(parsedShippingAddress.phone || '');

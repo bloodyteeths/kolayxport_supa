@@ -13,7 +13,8 @@ export default function withAuth(Component: React.ComponentType<any>) {
       // If not loading and user is not authenticated, redirect to login
       if (!authLoading && !user) {
         // Redirect to main app page which handles OAuth login
-        router.push('/app');
+        // Use replace instead of push to avoid back button issues
+        router.replace('/app');
       }
     }, [authLoading, user, router]);
 

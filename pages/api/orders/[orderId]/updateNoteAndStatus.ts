@@ -29,28 +29,34 @@ export default async function handler(
   }
 
   try {
-    // Update both the Order (for status) and the first OrderItem (for notes)
-    const order = await prisma.order.update({
+    // Verify order exists and belongs to user
+    const order = await prisma.order.findUnique({
       where: { id: orderId as string, userId: user.id },
-      data: {
-        status: durum,
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Upsert SenkronOrderData record
+    await prisma.senkronOrderData.upsert({
+      where: { orderId: orderId as string },
+      update: {
+        internalNote: not || null,
+        customStatus: durum || null,
+        updatedAt: new Date(),
+      },
+      create: {
+        orderId: orderId as string,
+        userId: user.id,
+        internalNote: not || null,
+        customStatus: durum || null,
       },
     });
 
-    // Update the first OrderItem's notes field
-    const orderItem = await prisma.orderItem.findFirst({
-      where: { orderId: orderId as string },
-      orderBy: { id: 'asc' },
-    });
-    if (orderItem) {
-      await prisma.orderItem.update({
-        where: { id: orderItem.id },
-        data: { notes: not },
-      });
-    }
-
     return res.status(200).json({ success: true });
   } catch (error: any) {
+    console.error('Error updating note and status:', error);
     return res.status(500).json({ error: error.message, stack: error?.stack });
   }
 }

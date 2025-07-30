@@ -45,6 +45,7 @@ model User {
   integrationSettings Credential?
   etsyAddresses       EtsyAddress[]
   trackingSubmissions TrackingSubmission[] @relation("UserTrackingSubmissions")
+  senkronOrderData    SenkronOrderData[] @relation("UserSenkronData")
 }
 
 model Account {
@@ -135,6 +136,7 @@ model Order {
   shipments                   Shipment[]     @relation("OrderToShipment")
   shipping                    OrderShipping? @relation("OrderToOrderShipping")
   trackingSubmissions         TrackingSubmission[] @relation("OrderTrackingSubmissions")
+  senkronData                 SenkronOrderData? @relation("OrderSenkronData")
 
   @@unique([userId, marketplace, marketplaceKey])
   @@index([userId])
@@ -286,6 +288,21 @@ model LabelJob {
   orderItem      OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
 
   @@index([orderItemId])
+}
+
+model SenkronOrderData {
+  id             String   @id @default(cuid())
+  orderId        String   @unique
+  userId         String
+  internalNote   String?  // User's internal notes for the order
+  customStatus   String?  // User's custom status (İptal, Üretimde, etc.)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  order          Order    @relation("OrderSenkronData", fields: [orderId], references: [id], onDelete: Cascade)
+  user           User     @relation("UserSenkronData", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([userId])
 }
 
 model Shipment {

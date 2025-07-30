@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import AppLayout from '../../components/AppLayout';
 import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
@@ -18,32 +18,92 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import axios from 'axios';
+import { useOrders } from '../../lib/hooks/useOrders';
 import InputAdornment from '@mui/material/InputAdornment';
 import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
 import PrintIcon from '@mui/icons-material/Print';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import IconButton from '@mui/material/IconButton';
+import Chip from '@mui/material/Chip';
 import Pagination from '@mui/material/Pagination';
 import Stack from '@mui/material/Stack';
 
-const DURUM_OPTIONS = ['Çıkmadı', 'Çıktı'];
+const DURUM_OPTIONS = ['Çıkmadı', 'Çıktı', 'İptal', 'Üretimde', 'Sipariş Verildi', 'Hazırlanıyor', 'Kargoya Verildi', 'Teslim Edildi'];
+
+// Status mapping from English to Turkish (matching labels page)
+const orderStatusOptions = [
+  { value: 'UNSHIPPED', label: 'Hazırlanıyor' },
+  { value: 'AWAITING_FULFILLMENT', label: 'Onaylandı' },
+  { value: 'PAID', label: 'Onaylandı' },
+  { value: 'CREATED', label: 'Onaylandı' },
+  { value: 'PARTIALLY_SHIPPED', label: 'Kısmen Kargolandı' },
+  { value: 'SHIPPED', label: 'Kargolandı' },
+  { value: 'DELIVERED', label: 'Teslim Edildi' },
+  { value: 'CANCELLED', label: 'İptal Edildi' },
+  { value: 'REFUNDED', label: 'İade Edildi' },
+  { value: 'ON_HOLD', label: 'Askıya Alındı' },
+  { value: 'COMPLETED', label: 'Tamamlandı' },
+  { value: 'FAILED', label: 'Başarısız Oldu' },
+];
+
+// Status colors for Kargo Durumu column (matching labels page)
+const statusColors = {
+  'UNSHIPPED': { bg: '#87CEEB', text: '#000' }, // Baby Blue
+  'AWAITING_FULFILLMENT': { bg: '#87CEEB', text: '#000' }, // Baby Blue
+  'PAID': { bg: '#87CEEB', text: '#000' }, // Baby Blue
+  'CREATED': { bg: '#87CEEB', text: '#000' }, // Baby Blue (Onaylandı)
+  'PARTIALLY_SHIPPED': { bg: '#ADD8E6', text: '#000' }, // Light Blue
+  'SHIPPED': { bg: '#90EE90', text: '#000' }, // Light Green
+  'DELIVERED': { bg: '#32CD32', text: '#fff' }, // Lime Green
+  'CANCELLED': { bg: '#F08080', text: '#fff' }, // Light Coral
+  'REFUNDED': { bg: '#DDA0DD', text: '#000' }, // Plum
+  'ON_HOLD': { bg: '#FFA500', text: '#000' }, // Orange
+  'COMPLETED': { bg: '#388e3c', text: '#fff' }, // Dark Green
+  'LABEL_GENERATED': { bg: '#8A2BE2', text: '#fff' }, // BlueViolet
+  'FAILED': { bg: '#DC143C', text: '#fff' }, // Crimson
+};
+
+// Helper function to extract customer note (same logic as labels page)
+const extractCustomerNote = (order) => {
+  try {
+    let rawData = order.rawData;
+    if (typeof rawData === 'string') {
+      try { rawData = JSON.parse(rawData); } catch { rawData = {}; }
+    }
+    if (!rawData) rawData = {};
+    
+    // Check for Etsy personalization notes
+    const notes = rawData.notes || '';
+    if (notes && notes.includes('Personalization:')) {
+      const personalizationMatch = notes.match(/Personalization:\s*(.+?)(?:\n|$)/);
+      if (personalizationMatch) {
+        return personalizationMatch[1].trim();
+      }
+    }
+    
+    return '';
+  } catch (error) {
+    console.error('Error extracting customer note:', error);
+    return '';
+  }
+};
 
 export default function SenkronPage() {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [editState, setEditState] = useState({}); // { [orderId]: { not, durum } }
+  const [editingNotes, setEditingNotes] = useState({}); // { [orderId]: true/false }
+  const [noteValues, setNoteValues] = useState({}); // { [orderId]: 'note text' }
+  const [savingNotes, setSavingNotes] = useState({}); // { [orderId]: true/false }
   const [search, setSearch] = useState('');
   const [filterDurum, setFilterDurum] = useState('');
   const [filterMarketplace, setFilterMarketplace] = useState('');
   const [filterVariant, setFilterVariant] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
-  const [syncing, setSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  const [total, setTotal] = useState(0);
   const [marketplaceOptions, setMarketplaceOptions] = useState([]);
-
+  
   // Set default filter to last 7 days in Turkish time
   const getTodayTR = () => {
     const now = new Date();
@@ -56,82 +116,127 @@ export default function SenkronPage() {
     now.setDate(now.getDate() - 7);
     return now.toISOString().slice(0, 10);
   };
-  const [filterStartDate, setFilterStartDate] = useState(get7DaysAgoTR());
-  const [filterEndDate, setFilterEndDate] = useState(getTodayTR());
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  
+  // Use the same hook as labels page
+  const { orders, total, isLoading: loading, isError, mutate } = useOrders(
+    page,
+    pageSize,
+    {
+      search,
+      ...(filterStartDate && { startDate: filterStartDate }),
+      ...(filterEndDate && { endDate: filterEndDate }),
+      status: filterDurum,
+      marketplace: filterMarketplace,
+      sort: sortOrder
+    },
+    'senkronPage'
+  );
 
-  // Fetch orders with all filters
+  // Auto-populate marketplace options
   useEffect(() => {
-    setLoading(true);
-    axios.get('/api/orders', {
-      params: {
-        page,
-        limit: pageSize
-      },
-    })
-      .then(res => {
-        console.log('[Senkron] Raw API Response:', res.data);
-        // Handle both data formats for backward compatibility
-        const ordersData = res.data.data || res.data.orders || [];
-        console.log('[Senkron] Orders from API:', ordersData);
-        setOrders(ordersData);
-        setTotal(res.data.total || 0);
-        // Auto-populate marketplace options
-        const uniqueMarketplaces = Array.from(new Set(ordersData.map(o => o.marketplace).filter(Boolean)));
-        setMarketplaceOptions(uniqueMarketplaces);
-      })
-      .catch(err => {
-        console.error('[Senkron] API Error:', err);
-        setError(err.response?.data?.error || err.message);
-      })
-      .finally(() => setLoading(false));
-  }, [page, pageSize]);
+    if (orders && orders.length > 0) {
+      const uniqueMarketplaces = Array.from(new Set(orders.map(o => o.marketplace).filter(Boolean)));
+      setMarketplaceOptions(uniqueMarketplaces);
+    }
+  }, [orders]);
 
-  const handleEditChange = (orderId, field, value) => {
-    setEditState(prev => ({
-      ...prev,
-      [orderId]: {
-        ...prev[orderId],
-        [field]: value,
-      },
-    }));
+
+  const handleEditNote = (orderId) => {
+    const order = orders.find(o => o.id === orderId);
+    const existingNote = order?.senkronData?.internalNote || '';
+    
+    // Always initialize/update note value when starting to edit
+    setNoteValues(prev => ({ ...prev, [orderId]: existingNote }));
+    setEditingNotes(prev => ({ ...prev, [orderId]: true }));
   };
 
-  const handleSave = async (orderId) => {
-    const { not, durum } = editState[orderId] || {};
-    setLoading(true);
-    setError(null);
+  const handleSaveNote = async (orderId) => {
+    setSavingNotes(prev => ({ ...prev, [orderId]: true }));
     try {
-      await axios.post(`/api/orders/${orderId}/updateNoteAndStatus`, { not, durum });
-      // Refetch orders
-      const res = await axios.get('/api/orders', { params: { page, limit: pageSize } });
-      setOrders(res.data.data || []);
+      const noteValue = noteValues[orderId] || '';
+      const order = orders.find(o => o.id === orderId);
+      const currentStatus = order?.senkronData?.customStatus || null;
+      
+      await axios.post(`/api/orders/${orderId}/updateNoteAndStatus`, { 
+        not: noteValue, 
+        durum: currentStatus 
+      });
+      
+      // Trigger re-fetch
+      await mutate();
+      
+      setEditingNotes(prev => ({ ...prev, [orderId]: false }));
     } catch (err) {
+      console.error('Error saving note:', err);
       setError(err.response?.data?.error || err.message);
     } finally {
-      setLoading(false);
+      setSavingNotes(prev => ({ ...prev, [orderId]: false }));
     }
   };
 
-  const handleSyncOrders = async () => {
-    setSyncing(true);
-    setSyncMessage(null);
+  const handleSaveStatus = async (orderId, newStatus) => {
     try {
-      const { fetchWithLimit } = await import('../../lib/fetchWithLimit');
-      const res = await fetchWithLimit('/api/orders/sync', { method: 'POST' });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Senkronizasyon hatası');
-      }
-      setSyncMessage('Siparişler başarıyla senkronize edildi');
+      const order = orders.find(o => o.id === orderId);
+      const currentNote = order?.senkronData?.internalNote || null;
+      
+      await axios.post(`/api/orders/${orderId}/updateNoteAndStatus`, { 
+        not: currentNote, 
+        durum: newStatus 
+      });
+      
+      // Trigger re-fetch
+      await mutate();
     } catch (err) {
-      setSyncMessage('Senkronizasyon sırasında hata oluştu: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setSyncing(false);
+      console.error('Error saving status:', err);
+      setError(err.response?.data?.error || err.message);
     }
   };
 
-  // No additional filtering needed; all filtering is done server-side
-  const filteredOrders = orders; // for compatibility with existing rendering
+
+  // Flatten orders to individual line item rows (like labels page)
+  const flattenOrdersToRows = useMemo(() => {
+    if (!orders || !Array.isArray(orders)) return [];
+    
+    const rows = [];
+    for (const order of orders) {
+      const lineItems = order.line_items && order.line_items.length > 0 
+        ? order.line_items 
+        : (order.items || []);
+      
+      if (lineItems.length === 0) {
+        // If no line items, create a single row for the order
+        rows.push({
+          ...order,
+          lineItem: null,
+          rowKey: order.id,
+          orderDate: order.marketplaceOrderDate || order.createdAt
+        });
+      } else {
+        // Create a row for each line item
+        lineItems.forEach((item, index) => {
+          rows.push({
+            ...order,
+            lineItem: item,
+            rowKey: `${order.id}-${item.id || index}`,
+            orderDate: order.marketplaceOrderDate || order.createdAt
+          });
+        });
+      }
+    }
+    
+    // Sort by order date (newest first)
+    rows.sort((a, b) => {
+      const dateA = new Date(a.orderDate || 0);
+      const dateB = new Date(b.orderDate || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    return rows;
+  }, [orders]);
+  
+  const filteredOrders = flattenOrdersToRows; // Now using flattened and sorted rows
 
   // Count orders with null/empty orderNumber for debug
   const nullOrderNumberCount = orders.filter(o => !o.orderNumber || o.orderNumber === 'null').length;
@@ -220,16 +325,6 @@ export default function SenkronPage() {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <Button
-                variant="contained"
-                color="primary"
-                startIcon={<SyncIcon />}
-                onClick={handleSyncOrders}
-                disabled={syncing}
-                sx={{ minWidth: 220, fontWeight: 600 }}
-              >
-                {syncing ? 'Senkronize Ediliyor...' : 'Siparişleri Senkronize Et'}
-              </Button>
-              <Button
                 variant="outlined"
                 color="secondary"
                 onClick={() => window.print()}
@@ -237,7 +332,6 @@ export default function SenkronPage() {
               >
                 <PrintIcon />
               </Button>
-              {syncMessage && <Alert severity={syncMessage.startsWith('Siparişler') ? 'success' : 'error'} sx={{ ml: 2 }}>{syncMessage}</Alert>}
             </div>
           </div>
           {/* Filters */}
@@ -327,10 +421,8 @@ export default function SenkronPage() {
                 setFilterDurum('');
                 setFilterMarketplace('');
                 setFilterVariant('');
-                const d = new Date();
-                d.setDate(d.getDate() - 7);
-                setFilterStartDate(d.toISOString().slice(0, 10));
-                setFilterEndDate(new Date().toISOString().slice(0, 10));
+                setFilterStartDate('');
+                setFilterEndDate('');
                 setSortOrder('desc');
                 setPage(1);
               }}
@@ -366,12 +458,14 @@ export default function SenkronPage() {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Görsel</TableCell>
+                    <TableCell sx={{ minWidth: 120, width: 120 }}>Görsel</TableCell>
                     <TableCell>Müşteri Adı</TableCell>
                     <TableCell>Sipariş Tarihi</TableCell>
                     <TableCell>Varyant</TableCell>
-                    <TableCell>Not</TableCell>
+                    <TableCell>Müşteri Notu</TableCell>
+                    <TableCell sx={{ minWidth: 180 }}>Not</TableCell>
                     <TableCell>Durum</TableCell>
+                    <TableCell>Kargo Durumu</TableCell>
                     <TableCell>Son Kargo Tarihi</TableCell>
                     <TableCell>Mağaza</TableCell>
                     <TableCell>Sipariş No</TableCell>
@@ -380,44 +474,108 @@ export default function SenkronPage() {
                 <TableBody>
                   {filteredOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={11} align="center">
                         <Typography>Sonuç bulunamadı.</Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredOrders.map(order => {
-                      console.log('[Senkron] Processing order:', order);
-                      // Use line_items for mapping, fallback to items for backward compatibility
-                      const lineItems = order.line_items && order.line_items.length > 0 
-                        ? order.line_items 
-                        : (order.items || []);
-                      console.log('[Senkron] Line items for order:', lineItems);
+                    filteredOrders.map(row => {
+                      const order = row;
+                      const item = row.lineItem;
                       
-                      // If no line items, create a single row for the order
-                      if (lineItems.length === 0) {
+                      console.log('[Senkron] Processing row:', row.rowKey);
+                      
+                      // If no line item, this is an order-only row
+                      if (!item) {
                         console.log('[Senkron] No line items found for order:', order.id);
                         const orderDate = order.marketplaceOrderDate || order.createdAt;
                         const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
                         const shipByDateTR = order.shipByDate ? new Date(order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
                         
+                        const customerNote = extractCustomerNote(order);
+                        
                         return (
-                          <TableRow key={order.id} sx={{ height: 120 }}>
-                            <TableCell sx={{ p: 2, width: 200, verticalAlign: 'middle' }}>—</TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>{order.customerName || '—'}</TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>{orderDateTR}</TableCell>
-                            <TableCell sx={{ p: 2, minWidth: 340, fontSize: 16 }}>—</TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>
-                              <TextField
-                                defaultValue=""
-                                variant="outlined"
-                                size="small"
-                                onChange={e => handleEditChange(order.id, 'not', e.target.value)}
-                              />
+                          <TableRow key={row.rowKey} sx={{ height: 80 }}>
+                            <TableCell sx={{ p: 1, minWidth: 120, width: 120, verticalAlign: 'middle' }}>—</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>{order.customerName || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>{orderDateTR}</TableCell>
+                            <TableCell sx={{ p: 1, minWidth: 120, fontSize: 14 }}>—</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
+                              {customerNote ? (
+                                <div style={{ 
+                                  maxHeight: 60,
+                                  overflowY: 'auto',
+                                  padding: '4px 8px',
+                                  backgroundColor: '#f5f5f5',
+                                  borderRadius: 4,
+                                  fontSize: 14,
+                                  border: '1px solid #ddd'
+                                }}>
+                                  {customerNote}
+                                </div>
+                              ) : (
+                                <span style={{ color: '#999' }}>—</span>
+                              )}
                             </TableCell>
-                            <TableCell sx={{ p: 2, minWidth: 180, fontSize: 20, fontWeight: 600, textAlign: 'center' }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, minWidth: 180 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                                {editingNotes[order.id] ? (
+                                  <>
+                                    <TextField
+                                      value={noteValues[order.id] || ''}
+                                      variant="outlined"
+                                      size="small"
+                                      multiline
+                                      rows={2}
+                                      onChange={e => setNoteValues(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                      sx={{ 
+                                        flexGrow: 1,
+                                        backgroundColor: 'white',
+                                        '& .MuiOutlinedInput-root': {
+                                          fontSize: 14,
+                                          backgroundColor: 'white',
+                                        },
+                                        '& .MuiOutlinedInput-input': {
+                                          padding: '8px',
+                                          color: '#000',
+                                        }
+                                      }}
+                                      placeholder="Not ekleyin..."
+                                      inputProps={{
+                                        style: {
+                                          minHeight: '40px',
+                                          resize: 'vertical'
+                                        }
+                                      }}
+                                    />
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => handleSaveNote(order.id)}
+                                      disabled={savingNotes[order.id]}
+                                    >
+                                      {savingNotes[order.id] ? <CircularProgress size={16} /> : <SaveIcon />}
+                                    </IconButton>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div style={{ flexGrow: 1, minHeight: 40, display: 'flex', alignItems: 'center' }}>
+                                      {order.senkronData?.internalNote || <span style={{ color: '#999' }}>—</span>}
+                                    </div>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleEditNote(order.id)}
+                                    >
+                                      <EditIcon />
+                                    </IconButton>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell sx={{ p: 1, minWidth: 140, fontSize: 16, fontWeight: 600, textAlign: 'center' }}>
                               <Select
-                                value={editState[order.id]?.durum ?? order.status ?? 'Çıkmadı'}
-                                onChange={e => handleEditChange(order.id, 'durum', e.target.value)}
+                                value={order.senkronData?.customStatus ?? 'Çıkmadı'}
+                                onChange={e => handleSaveStatus(order.id, e.target.value)}
                                 size="small"
                               >
                                 {DURUM_OPTIONS.map(opt => (
@@ -425,9 +583,30 @@ export default function SenkronPage() {
                                 ))}
                               </Select>
                             </TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>{shipByDateTR}</TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>{order.marketplace || '—'}</TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>
+                              {(() => {
+                                const status = (order.status || order.externalStatus || 'UNKNOWN').toUpperCase();
+                                const config = statusColors[status] || { bg: '#ccc', text: '#000' };
+                                const statusOption = orderStatusOptions.find(opt => opt.value === status);
+                                const label = statusOption?.label || status.replace(/_/g, ' ');
+                                
+                                return (
+                                  <Chip 
+                                    label={label} 
+                                    size="small"
+                                    style={{
+                                      backgroundColor: config.bg,
+                                      color: config.text,
+                                      fontWeight: 600,
+                                      fontSize: 12
+                                    }}
+                                  />
+                                );
+                              })()}
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>{shipByDateTR}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>{order.marketplace || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>
                               {order.orderNumber
                                 ? order.orderNumber
                                 : <span style={{ color: 'red', fontWeight: 'bold' }}>
@@ -439,34 +618,98 @@ export default function SenkronPage() {
                         );
                       }
 
-                      // Map each line item to a row
-                      return lineItems.map((item, index) => {
-                        const orderDate = order.marketplaceOrderDate || order.createdAt;
-                        const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
-                        const shipByDateTR = order.shipByDate ? new Date(order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
-                        
-                        return (
-                          <TableRow key={`${order.id}-${item.id || index}`} sx={{ height: 120 }}>
-                            <TableCell sx={{ p: 2, width: 200, verticalAlign: 'middle' }}>
+                      // This is a line item row
+                      const orderDate = order.marketplaceOrderDate || order.createdAt;
+                      const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                      const shipByDateTR = order.shipByDate ? new Date(order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                      const customerNote = extractCustomerNote(order);
+                      
+                      return (
+                        <TableRow key={row.rowKey} sx={{ height: 120 }}>
+                            <TableCell sx={{ p: 1, minWidth: 120, width: 120, verticalAlign: 'middle' }}>
                               {item.image
-                                ? <img src={item.image} width={180} height={180} style={{ objectFit:'cover', borderRadius: 12, display: 'block', margin: '0 auto' }} />
+                                ? <img src={item.image} width={100} height={100} style={{ objectFit:'cover', borderRadius: 12, display: 'block', margin: '0 auto' }} />
                                 : '—'}
                             </TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>{order.customerName || '—'}</TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>{orderDateTR}</TableCell>
-                            <TableCell sx={{ p: 2, minWidth: 340, fontSize: 16 }}>{item.variantInfo || '—'}</TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>
-                              <TextField
-                                defaultValue={item.notes || ''}
-                                variant="outlined"
-                                size="small"
-                                onChange={e => handleEditChange(order.id, 'not', e.target.value)}
-                              />
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>{order.customerName || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>{orderDateTR}</TableCell>
+                            <TableCell sx={{ p: 1, minWidth: 120, fontSize: 14 }}>{item.variantInfo || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
+                              {customerNote ? (
+                                <div style={{ 
+                                  maxHeight: 60,
+                                  overflowY: 'auto',
+                                  padding: '4px 8px',
+                                  backgroundColor: '#f5f5f5',
+                                  borderRadius: 4,
+                                  fontSize: 14,
+                                  border: '1px solid #ddd'
+                                }}>
+                                  {customerNote}
+                                </div>
+                              ) : (
+                                <span style={{ color: '#999' }}>—</span>
+                              )}
                             </TableCell>
-                            <TableCell sx={{ p: 2, minWidth: 180, fontSize: 20, fontWeight: 600, textAlign: 'center' }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, minWidth: 180 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                                {editingNotes[order.id] ? (
+                                  <>
+                                    <TextField
+                                      value={noteValues[order.id] || ''}
+                                      variant="outlined"
+                                      size="small"
+                                      multiline
+                                      rows={2}
+                                      onChange={e => setNoteValues(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                      sx={{ 
+                                        flexGrow: 1,
+                                        backgroundColor: 'white',
+                                        '& .MuiOutlinedInput-root': {
+                                          fontSize: 14,
+                                          backgroundColor: 'white',
+                                        },
+                                        '& .MuiOutlinedInput-input': {
+                                          padding: '8px',
+                                          color: '#000',
+                                        }
+                                      }}
+                                      placeholder="Not ekleyin..."
+                                      inputProps={{
+                                        style: {
+                                          minHeight: '40px',
+                                          resize: 'vertical'
+                                        }
+                                      }}
+                                    />
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => handleSaveNote(order.id)}
+                                      disabled={savingNotes[order.id]}
+                                    >
+                                      {savingNotes[order.id] ? <CircularProgress size={16} /> : <SaveIcon />}
+                                    </IconButton>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div style={{ flexGrow: 1, minHeight: 40, display: 'flex', alignItems: 'center' }}>
+                                      {order.senkronData?.internalNote || <span style={{ color: '#999' }}>—</span>}
+                                    </div>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleEditNote(order.id)}
+                                    >
+                                      <EditIcon />
+                                    </IconButton>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell sx={{ p: 1, minWidth: 140, fontSize: 16, fontWeight: 600, textAlign: 'center' }}>
                               <Select
-                                value={editState[order.id]?.durum ?? order.status ?? 'Çıkmadı'}
-                                onChange={e => handleEditChange(order.id, 'durum', e.target.value)}
+                                value={order.senkronData?.customStatus ?? 'Çıkmadı'}
+                                onChange={e => handleSaveStatus(order.id, e.target.value)}
                                 size="small"
                               >
                                 {DURUM_OPTIONS.map(opt => (
@@ -474,9 +717,30 @@ export default function SenkronPage() {
                                 ))}
                               </Select>
                             </TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>{shipByDateTR}</TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>{order.marketplace || '—'}</TableCell>
-                            <TableCell sx={{ p: 2, fontSize: 16 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>
+                              {(() => {
+                                const status = (order.status || order.externalStatus || 'UNKNOWN').toUpperCase();
+                                const config = statusColors[status] || { bg: '#ccc', text: '#000' };
+                                const statusOption = orderStatusOptions.find(opt => opt.value === status);
+                                const label = statusOption?.label || status.replace(/_/g, ' ');
+                                
+                                return (
+                                  <Chip 
+                                    label={label} 
+                                    size="small"
+                                    style={{
+                                      backgroundColor: config.bg,
+                                      color: config.text,
+                                      fontWeight: 600,
+                                      fontSize: 12
+                                    }}
+                                  />
+                                );
+                              })()}
+                            </TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>{shipByDateTR}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>{order.marketplace || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14 }}>
                               {order.orderNumber
                                 ? order.orderNumber
                                 : <span style={{ color: 'red', fontWeight: 'bold' }}>
@@ -486,7 +750,6 @@ export default function SenkronPage() {
                             </TableCell>
                           </TableRow>
                         );
-                      });
                     })
                   )}
                 </TableBody>

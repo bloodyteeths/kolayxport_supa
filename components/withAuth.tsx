@@ -20,7 +20,7 @@ export default function withAuth(Component: React.ComponentType<any>) {
     // Show loading state while checking authentication
     if (authLoading) {
       return (
-        <AppLayout title="Yükleniyor..." simpleHeader>
+        <AppLayout title="Yükleniyor...">
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
             <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
             <p className="text-slate-500 text-lg">Hesap durumu kontrol ediliyor...</p>
@@ -32,7 +32,7 @@ export default function withAuth(Component: React.ComponentType<any>) {
     // If user is not authenticated, show redirecting message
     if (!user) {
       return (
-        <AppLayout title="Yönlendiriliyor..." simpleHeader>
+        <AppLayout title="Yönlendiriliyor...">
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
             <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
             <p className="text-slate-500 text-lg">Giriş sayfasına yönlendiriliyor...</p>

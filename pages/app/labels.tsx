@@ -1084,7 +1084,7 @@ export function getDefaultValues(row: LabelRow) {
     recipientPhone: row.recipientPhone,
     recipientEmail: row.recipientEmail === '—' ? '' : row.recipientEmail,
     // Fields from originalOrder for label generation payload
-    commodityDesc: row.title === 'N/A' ? (row.originalOrder?.commodityDesc || row.title) : row.title,
+    commodityDesc: row.originalOrder?.commodityDesc || row.title || 'Product',
     termsOfSale: row.originalOrder?.termsOfSale || 'DDP',
     sendCommercialInvoiceViaEtd: row.originalOrder?.sendCommercialInvoiceViaEtd ?? true,
     fedexPickupType: row.originalOrder?.fedexPickupType || 'DROP_BOX',
@@ -1099,7 +1099,7 @@ export function getDefaultValues(row: LabelRow) {
     customsValue: effectiveCustomsValue, // Use the determined effective customs value
     line_items: [{ // Construct a single line item for the label based on the current LabelRow
       id: row.itemId,
-      title: row.title === 'N/A' ? (row.originalOrder?.commodityDesc || 'Product') : row.title,
+      title: row.originalOrder?.commodityDesc || row.title || 'Product',
       quantity: effectiveQuantity,
       unitPrice: calculatedUnitPrice, // Use calculated unit price
       weight: row.weight,
@@ -2600,7 +2600,15 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                   <TextField name="recipientCountry" label="Ülke" value={drawerOrder.recipientCountry || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Country'))} />
                   <TextField name="recipientPhone" label="Telefon" value={drawerOrder.recipientPhone || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
                   <TextField name="recipientEmail" label="E-posta (Opsiyonel)" value={drawerOrder.recipientEmail || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" type="email" />
-                  <TextField name="commodityDesc" label="Ürün Açıklaması" value={drawerOrder.title === 'N/A' ? (drawerOrder.originalOrder?.commodityDesc || drawerOrder.title) : drawerOrder.title} onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" />
+                  <TextField 
+                    name="commodityDesc" 
+                    label="Ürün Açıklaması" 
+                    value={drawerOrder.originalOrder?.commodityDesc || drawerOrder.title || ''} 
+                    onChange={handleOriginalOrderChange} 
+                    fullWidth 
+                    margin="dense" 
+                    size="small" 
+                  />
                   <Grid container spacing={2}>
                     <Grid item xs={4}><TextField name="weight" label="Ağırlık (kg)" value={drawerOrder.weight || 0.5} inputProps={{ step: "0.1", style: { MozAppearance: 'textfield' } }} sx={{ '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 } }} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Weight'))} /></Grid>
                     <Grid item xs={4}><TextField name="packageLength" label="Uzunluk (cm)" value={drawerOrder.originalOrder?.packageLength || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>

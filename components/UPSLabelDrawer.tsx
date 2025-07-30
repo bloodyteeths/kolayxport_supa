@@ -1033,7 +1033,16 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     label="Açıklama"
                     name="description"
                     value={form.products[0].description}
-                    onChange={e => setForm(f => ({ ...f, products: [{ ...f.products[0], description: e.target.value }] }))}
+                    onChange={e => {
+                      const newDescription = e.target.value;
+                      setForm(f => ({
+                        ...f,
+                        products: [{
+                          ...f.products[0],
+                          description: newDescription
+                        }]
+                      }));
+                    }}
                     inputProps={{ maxLength: 35 }}
                     required
                     fullWidth

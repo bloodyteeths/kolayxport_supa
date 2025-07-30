@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/');
+      router.push('/app');
     } else if (user) {
       fetchAnalyticsData();
     }

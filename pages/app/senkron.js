@@ -28,6 +28,7 @@ import IconButton from '@mui/material/IconButton';
 import Chip from '@mui/material/Chip';
 import Pagination from '@mui/material/Pagination';
 import Stack from '@mui/material/Stack';
+import withAuth from '../../components/withAuth';
 
 const DURUM_OPTIONS = ['Çıkmadı', 'Çıktı', 'İptal', 'Üretimde', 'Sipariş Verildi', 'Hazırlanıyor', 'Kargoya Verildi', 'Teslim Edildi'];
 
@@ -89,7 +90,7 @@ const extractCustomerNote = (order) => {
   }
 };
 
-export default function SenkronPage() {
+function SenkronPage() {
   const [error, setError] = useState(null);
   const [editState, setEditState] = useState({}); // { [orderId]: { not, durum } }
   const [editingNotes, setEditingNotes] = useState({}); // { [orderId]: true/false }
@@ -778,3 +779,5 @@ export default function SenkronPage() {
     </AppLayout>
   );
 }
+
+export default withAuth(SenkronPage);

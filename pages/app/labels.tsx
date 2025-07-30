@@ -16,6 +16,7 @@ import AppLayout from '@/components/AppLayout';
 import CircleIcon from '@mui/icons-material/Circle';
 import UPSLabelDrawer from '@/components/UPSLabelDrawer';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
+import withAuth from '@/components/withAuth';
 
 // Minimal UIOrder type for UPS drawer
 interface UIOrder {
@@ -2878,10 +2879,12 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   );
 }
 
-export default function LabelsPageWithLayout(props: any): JSX.Element {
+function LabelsPageWithLayout(props: any): JSX.Element {
   return (
     <AppLayout title="Etiket Yönetimi">
       <LabelsPage {...props} />
     </AppLayout>
   );
 }
+
+export default withAuth(LabelsPageWithLayout);

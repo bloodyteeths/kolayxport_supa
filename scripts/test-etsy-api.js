@@ -9,7 +9,7 @@ const fetch = require('node-fetch');
 
 const API_URL = 'http://localhost:3000/api/integrations/etsy/addresses';
 
-// Sample data from extension logs (v3.2 simplified format - only addresses and notes)
+// Sample data from extension logs (v5.3 simplified format - only addresses and notes)
 const testPayload = {
   orders: [
     {
@@ -43,7 +43,7 @@ const testPayload = {
       notes: "Please leave at door | Blue house with white trim"
     }
   ],
-  source: 'chrome-extension-v3.2-addresses',
+  source: 'chrome-extension-v5.3-addresses',
   timestamp: new Date().toISOString()
 };
 
@@ -60,7 +60,7 @@ async function testEtsyAPI() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Extension-Version': '3.1.0'
+        'X-Extension-Version': '5.3.0'
       },
       body: JSON.stringify(testPayload)
     });
@@ -146,7 +146,7 @@ async function runTests() {
   console.log('\nNext steps:');
   console.log('1. If API test passed, the extension should work correctly');
   console.log('2. If API test failed, check the error messages above');
-  console.log('3. Install the updated extension: kolayxport-etsy-extension-v3.1-fixed.zip');
+  console.log('3. Install the updated extension: kolayxport-etsy-extension-v5.3-fixed.zip');
 }
 
 runTests();

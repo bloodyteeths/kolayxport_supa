@@ -1084,7 +1084,7 @@ export function getDefaultValues(row: LabelRow) {
     recipientPhone: row.recipientPhone,
     recipientEmail: row.recipientEmail === '—' ? '' : row.recipientEmail,
     // Fields from originalOrder for label generation payload
-    commodityDesc: row.originalOrder?.commodityDesc || row.title || 'Product',
+    commodityDesc: row.title || 'Product',
     termsOfSale: row.originalOrder?.termsOfSale || 'DDP',
     sendCommercialInvoiceViaEtd: row.originalOrder?.sendCommercialInvoiceViaEtd ?? true,
     fedexPickupType: row.originalOrder?.fedexPickupType || 'DROP_BOX',
@@ -2222,7 +2222,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         weight: weight,
         hsCode: hsCode,
         countryOfOrigin: countryOfOrigin,
-        commodityDesc: getDefaultValues(currentFormValues).commodityDesc // preserve logic for commodityDesc
+        commodityDesc: currentFormValues.title || 'Product' // use the edited title
       };
 
       const dbUpdateResponse = await fetch('/api/orders/update', {
@@ -2601,10 +2601,10 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                   <TextField name="recipientPhone" label="Telefon" value={drawerOrder.recipientPhone || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
                   <TextField name="recipientEmail" label="E-posta (Opsiyonel)" value={drawerOrder.recipientEmail || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" type="email" />
                   <TextField 
-                    name="commodityDesc" 
+                    name="title" 
                     label="Ürün Açıklaması" 
-                    value={drawerOrder.originalOrder?.commodityDesc || drawerOrder.title || ''} 
-                    onChange={handleOriginalOrderChange} 
+                    value={drawerOrder.title || ''} 
+                    onChange={handleDrawerChange} 
                     fullWidth 
                     margin="dense" 
                     size="small" 

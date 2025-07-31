@@ -70,7 +70,7 @@ function mapTrendyolItemToPrisma(trendyolLineItem, orderData) {
     totalPrice: (trendyolLineItem.value || 0) * (trendyolLineItem.quantity || 1),
     image: trendyolLineItem.image || '',
     marketplaceKey: String(trendyolLineItem.id || Date.now()),
-    shipBy: null, // Trendyol items don't have individual ship dates
+    shipBy: lineItem.shipBy ? new Date(lineItem.shipBy) : null, // Use shipBy from line item if available
     orderNumber: orderData.orderNumber,
     uniqueLineKey: String(trendyolLineItem.id || Date.now()),
     remoteLineId: String(trendyolLineItem.id || Date.now()),
@@ -138,7 +138,7 @@ function mapUIOrderItemToPrisma(lineItem, orderData) {
     totalPrice: (lineItem.value || 0) * (lineItem.quantity || 1),
     image: lineItem.image || '',
     marketplaceKey: String(lineItem.id || Date.now()),
-    shipBy: null, // Trendyol items don't have individual ship dates
+    shipBy: lineItem.shipBy ? new Date(lineItem.shipBy) : null, // Use shipBy from line item if available
     orderNumber: orderData.orderNumber,
     uniqueLineKey: String(lineItem.id || Date.now()),
     remoteLineId: String(lineItem.id || Date.now()),
@@ -585,7 +585,24 @@ async function syncTrendyolRecentOrders(user, settings) {
     } catch (err) {
       logger.warn(`[TRENDYOL SYNC] Failed to map orders with images, falling back to basic mapping:`, err.message);
       // Fallback to basic mapping without images
-      uiOrders = orders.map(order => toOrder(order));
+      // Calculate shipByDate for fallback mapping - use Trendyol's correct ship-by logic
+      const shipByDate = order => {
+        const shipByMs = (order.extendedAgreedDeliveryDate && order.extendedAgreedDeliveryDate > 0)
+          ? order.extendedAgreedDeliveryDate
+          : order.agreedDeliveryDate;
+        return shipByMs ? new Date(Number(shipByMs)).toISOString() : undefined;
+      };
+      
+      uiOrders = orders.map(order => {
+        const basicOrder = toOrder(order);
+        // Ensure line items have shipBy field
+        const orderShipBy = shipByDate(order);
+        basicOrder.line_items = basicOrder.line_items.map(item => ({
+          ...item,
+          shipBy: orderShipBy
+        }));
+        return basicOrder;
+      });
     }
     
     // Process orders in small batches to prevent DB connection exhaustion

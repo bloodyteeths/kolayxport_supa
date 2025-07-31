@@ -4,7 +4,7 @@
 
 import { NormalizedLineItem, UIOrder } from '../types';
 
-export function toOrderItem(line: any): NormalizedLineItem {
+export function toOrderItem(line: any, orderShipByDate?: string): NormalizedLineItem {
   // Combine productSize and productColor for variant info
   const variantInfo = [line.productSize, line.productColor]
     .filter(Boolean)
@@ -22,11 +22,20 @@ export function toOrderItem(line: any): NormalizedLineItem {
       (line.images && line.images[0] && line.images[0].url) ??
       '',
     variantInfo,
+    shipBy: orderShipByDate,
   };
 }
 
 export async function toOrderWithImages(order: any, productImages: Record<string, string> = {}): Promise<UIOrder> {
 
+  // Calculate shipByDate once for the order
+  // In Trendyol, agreedDeliveryDate is the ship-by deadline, not delivery date
+  // If seller extended preparation time, use extendedAgreedDeliveryDate instead
+  const shipByMs = (order.extendedAgreedDeliveryDate && order.extendedAgreedDeliveryDate > 0)
+    ? order.extendedAgreedDeliveryDate
+    : order.agreedDeliveryDate;
+  
+  const shipByDate = shipByMs ? new Date(Number(shipByMs)).toISOString() : undefined;
   
   const line_items = (order.lines || order.lineItems || []).map((item: any) => {
     // Try to get image from product API if not already present
@@ -61,6 +70,7 @@ export async function toOrderWithImages(order: any, productImages: Record<string
       sku: item.sku || item.merchantSku || item.barcode || item.productCode || '',
       image: imageUrl,
       variantInfo,
+      shipBy: shipByDate,
     };
   });
   
@@ -108,9 +118,7 @@ export async function toOrderWithImages(order: any, productImages: Record<string
     marketplaceOrderDate: order.orderDate
       ? new Date(Number(order.orderDate)).toISOString()
       : undefined,
-    shipByDate: order.lastShippingDate || order.agreedDeliveryDate
-      ? new Date(Number(order.lastShippingDate || order.agreedDeliveryDate)).toISOString()
-      : undefined,
+    shipByDate,
     rawData: order,
     commodityDesc: line_items.length > 0 ? line_items[0].title : '',
     externalStatus: order.status || '',
@@ -119,7 +127,16 @@ export async function toOrderWithImages(order: any, productImages: Record<string
 }
 
 export function toOrder(order: any): UIOrder {
-  const line_items = (order.lines || order.lineItems || []).map(toOrderItem);
+  // Calculate shipByDate once for the order
+  // In Trendyol, agreedDeliveryDate is the ship-by deadline, not delivery date
+  // If seller extended preparation time, use extendedAgreedDeliveryDate instead
+  const shipByMs = (order.extendedAgreedDeliveryDate && order.extendedAgreedDeliveryDate > 0)
+    ? order.extendedAgreedDeliveryDate
+    : order.agreedDeliveryDate;
+  
+  const shipByDate = shipByMs ? new Date(Number(shipByMs)).toISOString() : undefined;
+
+  const line_items = (order.lines || order.lineItems || []).map((item: any) => toOrderItem(item, shipByDate));
   
   // Properly map Trendyol addresses using correct field names from the API response
   const shipmentAddr = order.shipmentAddress;
@@ -165,9 +182,7 @@ export function toOrder(order: any): UIOrder {
     marketplaceOrderDate: order.orderDate
       ? new Date(Number(order.orderDate)).toISOString()
       : undefined,
-    shipByDate: order.lastShippingDate || order.agreedDeliveryDate
-      ? new Date(Number(order.lastShippingDate || order.agreedDeliveryDate)).toISOString()
-      : undefined,
+    shipByDate,
     rawData: order,
     commodityDesc: line_items.length > 0 ? line_items[0].title : '',
     externalStatus: order.status || '',

@@ -99,7 +99,6 @@ function SenkronPage() {
   const [search, setSearch] = useState('');
   const [filterDurum, setFilterDurum] = useState('');
   const [filterMarketplace, setFilterMarketplace] = useState('');
-  const [filterVariant, setFilterVariant] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -117,8 +116,12 @@ function SenkronPage() {
     now.setDate(now.getDate() - 7);
     return now.toISOString().slice(0, 10);
   };
-  const [filterStartDate, setFilterStartDate] = useState('');
-  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState(() => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return sevenDaysAgo.toISOString().slice(0, 10);
+  });
+  const [filterEndDate, setFilterEndDate] = useState(() => new Date().toISOString().slice(0, 10));
   
   // Use the same hook as labels page
   const { orders, total, isLoading: loading, isError, mutate } = useOrders(
@@ -126,8 +129,8 @@ function SenkronPage() {
     pageSize,
     {
       search,
-      ...(filterStartDate && { startDate: filterStartDate }),
-      ...(filterEndDate && { endDate: filterEndDate }),
+      startDate: filterStartDate,
+      endDate: filterEndDate,
       status: filterDurum,
       marketplace: filterMarketplace,
       sort: sortOrder
@@ -375,18 +378,6 @@ function SenkronPage() {
                 <MenuItem key={opt} value={opt}>{opt}</MenuItem>
               ))}
             </Select>
-            <Select
-              value={filterVariant || ''}
-              onChange={e => { setFilterVariant(e.target.value); setPage(1); }}
-              displayEmpty
-              size="small"
-              sx={{ minWidth: 160 }}
-            >
-              <MenuItem value="">Tüm Varyantlar</MenuItem>
-              {[...new Set(orders.flatMap(o => o.items?.map(i => i.variantInfo).filter(Boolean) || []))].map(opt => (
-                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-              ))}
-            </Select>
             <TextField
               label="Başlangıç Tarihi"
               type="date"
@@ -421,9 +412,10 @@ function SenkronPage() {
                 setSearch('');
                 setFilterDurum('');
                 setFilterMarketplace('');
-                setFilterVariant('');
-                setFilterStartDate('');
-                setFilterEndDate('');
+                const now = new Date();
+                const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10));
+                setFilterEndDate(now.toISOString().slice(0, 10));
                 setSortOrder('desc');
                 setPage(1);
               }}
@@ -622,7 +614,8 @@ function SenkronPage() {
                       // This is a line item row
                       const orderDate = order.marketplaceOrderDate || order.createdAt;
                       const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
-                      const shipByDateTR = order.shipByDate ? new Date(order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                      // Check item.shipBy first (for Trendyol), then fall back to order.shipByDate
+                      const shipByDateTR = (item.shipBy || order.shipByDate) ? new Date(item.shipBy || order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
                       const customerNote = extractCustomerNote(order);
                       
                       return (

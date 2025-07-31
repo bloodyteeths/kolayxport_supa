@@ -9,6 +9,7 @@ import { getIntegrationCreds } from './config';
 import { fetchVeeqoOrders, processOrdersInBatches } from './integrations/veeqo';
 import { fetchShippoOrders } from './integrations/shippo';
 import type { VeeqoOrder } from './types';
+import { batchExecuteStatusUpdateHook } from './hooks/statusUpdateHook';
 
 function splitName(fullName: string) {
   const parts = (fullName || '').trim().split(/\\s+/);
@@ -1250,6 +1251,22 @@ export async function syncAllOrders(userId: string, options: {
 
         // Create OrderItems for new and updated orders
         await createOrderItemsForBatch(batch, existingOrdersMap, userId);
+
+        // Execute status update hook for all orders in this batch
+        // This will check if any orders have "SHIPPED" status and update custom status to "Çıktı"
+        const batchOrderIds = batch.map(order => {
+          const existingOrder = existingOrdersMap.get(order.orderNumber || '');
+          return existingOrder?.id || '';
+        }).filter(Boolean);
+        
+        if (batchOrderIds.length > 0) {
+          try {
+            await batchExecuteStatusUpdateHook(batchOrderIds, userId);
+          } catch (hookError) {
+            logger.warn(`[Status Update Hook] Failed for batch:`, hookError);
+            // Don't fail the entire sync if hook fails
+          }
+        }
 
         processed += batch.length;
         successful += batch.length;

@@ -119,14 +119,20 @@ function normalizePhone(raw?: string): string {
 
 // Normalize postal codes for UPS (remove dashes, max 9 alphanumeric)
 function normalizePostalCode(raw?: string): string {
-  if (!raw) return '';
+  if (!raw || raw === '—' || raw.trim() === '') return '';
   return raw.replace(/-/g, '').slice(0, 9); // Remove dashes and limit to 9 chars
 }
 
 function normalizeStateCode(state: string, countryCode: string): string {
   if (countryCode === 'US') {
     if (state.length === 2) return state.toUpperCase();
-    return US_STATE_NAME_TO_CODE[state] || state;
+    
+    // Try case-insensitive lookup for full state names
+    const normalizedName = Object.keys(US_STATE_NAME_TO_CODE).find(
+      key => key.toLowerCase() === state.toLowerCase()
+    );
+    
+    return normalizedName ? US_STATE_NAME_TO_CODE[normalizedName] : state.toUpperCase();
   }
   return state;
 }
@@ -490,6 +496,22 @@ export async function createUpsShipment(input: CreateShipmentInput): Promise<Cre
       upsApiSecret: '[REDACTED]',
     }
   }, null, 2));
+
+  // Validate required fields for US addresses
+  if (input.recipient.countryCode === 'US') {
+    const normalizedState = normalizeStateCode(input.recipient.stateCode || '', input.recipient.countryCode);
+    const normalizedPostal = normalizePostalCode(input.recipient.postalCode);
+    
+    if (!normalizedState || normalizedState.length !== 2) {
+      throw new Error(`Invalid or missing state code for US address. Received: "${input.recipient.stateCode}", normalized to: "${normalizedState}"`);
+    }
+    
+    if (!normalizedPostal || normalizedPostal.length < 5) {
+      throw new Error(`Invalid or missing postal code for US address. Received: "${input.recipient.postalCode}", normalized to: "${normalizedPostal}"`);
+    }
+    
+    console.log(`[UPS VALIDATION] US address validation passed - State: "${input.recipient.stateCode}" → "${normalizedState}", Postal: "${input.recipient.postalCode}" → "${normalizedPostal}"`);
+  }
 
   try {
     const token = await getUpsAccessToken(shipper.upsApiKey, shipper.upsApiSecret);

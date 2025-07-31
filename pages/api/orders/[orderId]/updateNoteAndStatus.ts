@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../../lib/prisma';
 import { getSupabaseServerClient } from '../../../../lib/supabase';
+import { executeStatusUpdateHook } from '../../../../lib/hooks/statusUpdateHook';
 
 export default async function handler(
   req: NextApiRequest,
@@ -53,6 +54,14 @@ export default async function handler(
         customStatus: durum || null,
       },
     });
+
+    // Execute status update hook to check if cargo status requires auto-update
+    try {
+      await executeStatusUpdateHook(orderId as string, user.id);
+    } catch (hookError) {
+      console.warn(`Status update hook failed for order ${orderId}:`, hookError);
+      // Don't fail the entire request if hook fails
+    }
 
     return res.status(200).json({ success: true });
   } catch (error: any) {

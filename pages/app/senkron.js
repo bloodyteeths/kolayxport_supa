@@ -24,11 +24,18 @@ import SearchIcon from '@mui/icons-material/Search';
 import PrintIcon from '@mui/icons-material/Print';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
+import SyncIcon from '@mui/icons-material/Sync';
 import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import Chip from '@mui/material/Chip';
 import Pagination from '@mui/material/Pagination';
 import Stack from '@mui/material/Stack';
 import withAuth from '../../components/withAuth';
+import Checkbox from '@mui/material/Checkbox';
+import ListItemText from '@mui/material/ListItemText';
+import OutlinedInput from '@mui/material/OutlinedInput';
+import InputLabel from '@mui/material/InputLabel';
+import FormControl from '@mui/material/FormControl';
 
 const DURUM_OPTIONS = ['Çıkmadı', 'Çıktı', 'İptal', 'Üretimde', 'Sipariş Verildi', 'Hazırlanıyor', 'Kargoya Verildi', 'Teslim Edildi'];
 
@@ -96,13 +103,15 @@ function SenkronPage() {
   const [editingNotes, setEditingNotes] = useState({}); // { [orderId]: true/false }
   const [noteValues, setNoteValues] = useState({}); // { [orderId]: 'note text' }
   const [savingNotes, setSavingNotes] = useState({}); // { [orderId]: true/false }
+  const [optimisticStatus, setOptimisticStatus] = useState({}); // { [orderId]: 'status' }
   const [search, setSearch] = useState('');
-  const [filterDurum, setFilterDurum] = useState('');
+  const [filterDurum, setFilterDurum] = useState([]);
   const [filterMarketplace, setFilterMarketplace] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [marketplaceOptions, setMarketplaceOptions] = useState([]);
+  const [updatingStatuses, setUpdatingStatuses] = useState(false);
   
   // Set default filter to last 7 days in Turkish time
   const getTodayTR = () => {
@@ -131,7 +140,7 @@ function SenkronPage() {
       search,
       startDate: filterStartDate,
       endDate: filterEndDate,
-      status: filterDurum,
+      status: filterDurum.length > 0 ? filterDurum.join(',') : '',
       marketplace: filterMarketplace,
       sort: sortOrder
     },
@@ -145,6 +154,51 @@ function SenkronPage() {
       setMarketplaceOptions(uniqueMarketplaces);
     }
   }, [orders]);
+
+  // Auto-update status for Kargolandı and İptal Edildi orders on page load
+  useEffect(() => {
+    if (orders && orders.length > 0) {
+      // Find all orders that need status updates
+      const ordersToUpdate = orders.map(order => {
+        const orderStatus = (order.status || order.externalStatus || '').toUpperCase();
+        const customStatus = order.senkronData?.customStatus;
+        
+        // Check for SHIPPED → Çıktı
+        if (orderStatus === 'SHIPPED' && customStatus !== 'Çıktı') {
+          return { order, targetStatus: 'Çıktı' };
+        }
+        
+        // Check for CANCELLED → İptal
+        if ((orderStatus === 'CANCELLED' || orderStatus === 'CANCELED') && customStatus !== 'İptal') {
+          return { order, targetStatus: 'İptal' };
+        }
+        
+        return null;
+      }).filter(item => item !== null);
+
+      if (ordersToUpdate.length > 0) {
+        console.log(`Found ${ordersToUpdate.length} orders that need status updates`);
+        
+        // Batch update all orders that need it
+        const updatePromises = ordersToUpdate.map(item => {
+          const { order, targetStatus } = item;
+          return axios.post(`/api/orders/${order.id}/updateNoteAndStatus`, {
+            not: order.senkronData?.internalNote || null,
+            durum: targetStatus
+          }).catch(err => {
+            console.error(`Failed to auto-update order ${order.id} to ${targetStatus}:`, err);
+          });
+        });
+
+        // Run all updates in parallel
+        Promise.all(updatePromises).then(() => {
+          console.log('Auto-update completed for orders');
+          // Refresh the data to show updated statuses
+          mutate();
+        });
+      }
+    }
+  }, [orders, mutate]); // Only run when orders change
 
 
   const handleEditNote = (orderId) => {
@@ -168,8 +222,11 @@ function SenkronPage() {
         durum: currentStatus 
       });
       
-      // Trigger re-fetch
-      await mutate();
+      // Trigger re-fetch with cache busting
+      await mutate(undefined, { 
+        revalidate: true,
+        populateCache: false // Force fresh fetch
+      });
       
       setEditingNotes(prev => ({ ...prev, [orderId]: false }));
     } catch (err) {
@@ -180,21 +237,63 @@ function SenkronPage() {
     }
   };
 
+  const handleSyncAllStatuses = async () => {
+    setUpdatingStatuses(true);
+    try {
+      const response = await axios.post('/api/orders/status-update-hook', {
+        batchProcess: true
+      });
+      
+      console.log('Status sync result:', response.data);
+      
+      if (response.data.updatedOrders > 0) {
+        // Refresh data to show updates
+        await mutate();
+      }
+      
+      alert(`Durum güncelleme tamamlandı: ${response.data.updatedOrders} sipariş güncellendi.`);
+    } catch (err) {
+      console.error('Error syncing statuses:', err);
+      alert('Durum güncelleme hatası: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setUpdatingStatuses(false);
+    }
+  };
+
   const handleSaveStatus = async (orderId, newStatus) => {
     try {
       const order = orders.find(o => o.id === orderId);
       const currentNote = order?.senkronData?.internalNote || null;
       
+      // Set optimistic status immediately
+      setOptimisticStatus(prev => ({ ...prev, [orderId]: newStatus }));
+      
+      // Make API call
       await axios.post(`/api/orders/${orderId}/updateNoteAndStatus`, { 
         not: currentNote, 
         durum: newStatus 
       });
       
-      // Trigger re-fetch
+      // Clear optimistic status after successful update
+      setOptimisticStatus(prev => {
+        const updated = { ...prev };
+        delete updated[orderId];
+        return updated;
+      });
+      
+      // Refresh data
       await mutate();
+      
     } catch (err) {
       console.error('Error saving status:', err);
       setError(err.response?.data?.error || err.message);
+      
+      // Clear optimistic status on error
+      setOptimisticStatus(prev => {
+        const updated = { ...prev };
+        delete updated[orderId];
+        return updated;
+      });
     }
   };
 
@@ -328,14 +427,50 @@ function SenkronPage() {
         <div className="w-screen px-0">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
-              <Button
-                variant="outlined"
+              <IconButton
                 color="secondary"
                 onClick={() => window.print()}
-                sx={{ minWidth: 56, fontWeight: 600 }}
+                sx={{ 
+                  border: '1px solid',
+                  borderColor: 'secondary.main',
+                  borderRadius: 1,
+                  p: 1
+                }}
               >
                 <PrintIcon />
-              </Button>
+              </IconButton>
+              <Tooltip 
+                title="Durum Güncelle: Kargolandı → Çıktı, İptal Edildi → İptal"
+                placement="bottom"
+              >
+                <IconButton
+                  color="primary"
+                  onClick={handleSyncAllStatuses}
+                  disabled={updatingStatuses}
+                  sx={{ 
+                    ml: 1,
+                    border: '1px solid',
+                    borderColor: updatingStatuses ? 'grey.400' : 'primary.main',
+                    borderRadius: 1,
+                    p: 1,
+                    bgcolor: updatingStatuses ? 'grey.100' : 'primary.main',
+                    color: updatingStatuses ? 'grey.600' : 'white',
+                    '&:hover': {
+                      bgcolor: updatingStatuses ? 'grey.100' : 'primary.dark',
+                    },
+                    '&:disabled': {
+                      bgcolor: 'grey.100',
+                      borderColor: 'grey.300',
+                    }
+                  }}
+                >
+                  {updatingStatuses ? (
+                    <CircularProgress size={18} sx={{ color: 'grey.600' }} />
+                  ) : (
+                    <SyncIcon sx={{ fontSize: 18 }} />
+                  )}
+                </IconButton>
+              </Tooltip>
             </div>
           </div>
           {/* Filters */}
@@ -354,18 +489,32 @@ function SenkronPage() {
               }}
               sx={{ minWidth: 220 }}
             />
-            <Select
-              value={filterDurum}
-              onChange={e => { setFilterDurum(e.target.value); setPage(1); }}
-              displayEmpty
-              size="small"
-              sx={{ minWidth: 160 }}
-            >
-              <MenuItem value="">Tüm Durumlar</MenuItem>
-              {DURUM_OPTIONS.map(opt => (
-                <MenuItem key={opt} value={opt}>{opt}</MenuItem>
-              ))}
-            </Select>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel id="durum-multiple-checkbox-label">Tüm Durumlar</InputLabel>
+              <Select
+                labelId="durum-multiple-checkbox-label"
+                multiple
+                value={filterDurum}
+                onChange={e => { setFilterDurum(e.target.value); setPage(1); }}
+                input={<OutlinedInput label="Tüm Durumlar" />}
+                renderValue={(selected) => selected.length === 0 ? 'Tüm Durumlar' : selected.join(', ')}
+                MenuProps={{
+                  PaperProps: {
+                    style: {
+                      maxHeight: 48 * 4.5 + 8,
+                      width: 250,
+                    },
+                  },
+                }}
+              >
+                {DURUM_OPTIONS.map(opt => (
+                  <MenuItem key={opt} value={opt}>
+                    <Checkbox checked={filterDurum.indexOf(opt) > -1} />
+                    <ListItemText primary={opt} />
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <Select
               value={filterMarketplace}
               onChange={e => { setFilterMarketplace(e.target.value); setPage(1); }}
@@ -410,7 +559,7 @@ function SenkronPage() {
               color="secondary"
               onClick={() => {
                 setSearch('');
-                setFilterDurum('');
+                setFilterDurum([]);
                 setFilterMarketplace('');
                 const now = new Date();
                 const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -567,7 +716,7 @@ function SenkronPage() {
                             </TableCell>
                             <TableCell sx={{ p: 1, minWidth: 140, fontSize: 16, fontWeight: 600, textAlign: 'center' }}>
                               <Select
-                                value={order.senkronData?.customStatus ?? 'Çıkmadı'}
+                                value={optimisticStatus[order.id] ?? order.senkronData?.customStatus ?? 'Çıkmadı'}
                                 onChange={e => handleSaveStatus(order.id, e.target.value)}
                                 size="small"
                               >
@@ -702,7 +851,7 @@ function SenkronPage() {
                             </TableCell>
                             <TableCell sx={{ p: 1, minWidth: 140, fontSize: 16, fontWeight: 600, textAlign: 'center' }}>
                               <Select
-                                value={order.senkronData?.customStatus ?? 'Çıkmadı'}
+                                value={optimisticStatus[order.id] ?? order.senkronData?.customStatus ?? 'Çıkmadı'}
                                 onChange={e => handleSaveStatus(order.id, e.target.value)}
                                 size="small"
                               >

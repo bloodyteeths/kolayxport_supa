@@ -8,7 +8,18 @@ export default async function handler(
   res: NextApiResponse
 ) {
   
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  // Optimized caching for senkron page with cache busting for updates
+  if (req.query.context === 'senkronPage') {
+    // Check if this is likely a post-update refetch (has _ts parameter or recent activity)
+    const hasTimestamp = req.query._ts || req.query.bust;
+    if (hasTimestamp) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0'); // No cache for updates
+    } else {
+      res.setHeader('Cache-Control', 'private, max-age=15'); // Reduced to 15 seconds
+    }
+  } else {
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+  }
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res
@@ -200,28 +211,46 @@ export default async function handler(
     }
 
     if (status) {
-      // Handle unified status filters
-      const statusMappings: Record<string, string[]> = {
-        'onaylandi': ['PAID', 'Created'],
-        'kargolandi': ['shipped', 'Shipped'],
-        'iptal': ['cancelled', 'Cancelled'],
-        'Delivered': ['Delivered']
-      };
+      // Handle multiple status filtering (comma-separated)
+      const statusValues = (status as string).split(',').filter(s => s.trim());
+      
+      if (statusValues.length > 0) {
+        // For senkron page, we need to filter by customStatus in SenkronOrderData
+        if (req.query.context === 'senkronPage') {
+          const placeholders = statusValues.map((_, index) => `$${paramIndex + index}`).join(', ');
+          whereClause += ` AND sod."customStatus" IN (${placeholders})`;
+          statusValues.forEach(statusValue => {
+            params.push(statusValue.trim());
+            paramIndex++;
+          });
+        } else {
+          // Handle unified status filters for other pages
+          const statusMappings: Record<string, string[]> = {
+            'onaylandi': ['PAID', 'Created'],
+            'kargolandi': ['shipped', 'Shipped'],
+            'iptal': ['cancelled', 'Cancelled'],
+            'Delivered': ['Delivered']
+          };
 
-      if (statusMappings[status as keyof typeof statusMappings]) {
-        // For unified filters, use IN clause with multiple statuses
-        const statusKey = status as keyof typeof statusMappings;
-        const placeholders = statusMappings[statusKey].map((_, index) => `$${paramIndex + index}`).join(', ');
-        whereClause += ` AND o."status" IN (${placeholders})`;
-        statusMappings[statusKey].forEach(statusValue => {
-          params.push(statusValue);
-          paramIndex++;
-        });
-      } else {
-        // For single status filters, use direct comparison
-        whereClause += ` AND o."status" = $${paramIndex}`;
-        params.push(status);
-        paramIndex++;
+          // Collect all mapped statuses
+          const allMappedStatuses: string[] = [];
+          statusValues.forEach(statusValue => {
+            if (statusMappings[statusValue as keyof typeof statusMappings]) {
+              allMappedStatuses.push(...statusMappings[statusValue as keyof typeof statusMappings]);
+            } else {
+              allMappedStatuses.push(statusValue);
+            }
+          });
+
+          if (allMappedStatuses.length > 0) {
+            const placeholders = allMappedStatuses.map((_, index) => `$${paramIndex + index}`).join(', ');
+            whereClause += ` AND o."status" IN (${placeholders})`;
+            allMappedStatuses.forEach(mappedStatus => {
+              params.push(mappedStatus);
+              paramIndex++;
+            });
+          }
+        }
       }
     }
     if (marketplace) {
@@ -354,39 +383,56 @@ export default async function handler(
     
     // OPTIMIZED: Fetch items and shipments separately only for returned orders
     const orderIds = (result as any[]).map(order => order.id);
+    const context = req.query.context as string;
     
-    // Fetch items for all orders in one query
-    const itemsQuery = `
-      SELECT 
-        oi.*,
-        lj.status as "labelJobStatus",
-        lj."trackingNumber" as "labelJobTrackingNumber",
-        lj.carrier as "labelJobCarrier",
-        lj."pdfUrl" as "labelJobPdfUrl"
-      FROM "OrderItem" oi
-      LEFT JOIN "LabelJob" lj ON lj."orderItemId" = oi.id
-      WHERE oi."orderId" = ANY($1)
-      ORDER BY oi."orderId", oi.id
-    `;
-    const itemsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(itemsQuery, orderIds) : [];
+    // For senkron page, we only need basic items data (skip complex joins for performance)
+    let itemsResult, shipmentsResult, trackingSubmissionsResult;
     
-    // Fetch shipments for all orders in one query  
-    const shipmentsQuery = `
-      SELECT *
-      FROM "Shipment" s
-      WHERE s."orderId" = ANY($1)
-      ORDER BY s."orderId", s."createdAt" DESC
-    `;
-    const shipmentsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(shipmentsQuery, orderIds) : [];
-    
-    // Fetch tracking submissions for all orders in one query
-    const trackingSubmissionsQuery = `
-      SELECT *
-      FROM "TrackingSubmission" ts
-      WHERE ts."orderId" = ANY($1)
-      ORDER BY ts."orderId", ts."submittedAt" DESC
-    `;
-    const trackingSubmissionsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(trackingSubmissionsQuery, orderIds) : [];
+    if (context === 'senkronPage') {
+      // Simplified queries for senkron page - skip heavy joins
+      const itemsQuery = `
+        SELECT oi.*, null as "labelJobStatus", null as "labelJobTrackingNumber", null as "labelJobCarrier", null as "labelJobPdfUrl"
+        FROM "OrderItem" oi
+        WHERE oi."orderId" = ANY($1)
+        ORDER BY oi."orderId", oi.id
+      `;
+      itemsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(itemsQuery, orderIds) : [];
+      
+      // Skip shipments and tracking for senkron page (not displayed)
+      shipmentsResult = [];
+      trackingSubmissionsResult = [];
+    } else {
+      // Full queries for labels page and other contexts
+      const itemsQuery = `
+        SELECT 
+          oi.*,
+          lj.status as "labelJobStatus",
+          lj."trackingNumber" as "labelJobTrackingNumber",
+          lj.carrier as "labelJobCarrier",
+          lj."pdfUrl" as "labelJobPdfUrl"
+        FROM "OrderItem" oi
+        LEFT JOIN "LabelJob" lj ON lj."orderItemId" = oi.id
+        WHERE oi."orderId" = ANY($1)
+        ORDER BY oi."orderId", oi.id
+      `;
+      itemsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(itemsQuery, orderIds) : [];
+      
+      const shipmentsQuery = `
+        SELECT *
+        FROM "Shipment" s
+        WHERE s."orderId" = ANY($1)
+        ORDER BY s."orderId", s."createdAt" DESC
+      `;
+      shipmentsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(shipmentsQuery, orderIds) : [];
+      
+      const trackingSubmissionsQuery = `
+        SELECT *
+        FROM "TrackingSubmission" ts
+        WHERE ts."orderId" = ANY($1)
+        ORDER BY ts."orderId", ts."submittedAt" DESC
+      `;
+      trackingSubmissionsResult = orderIds.length > 0 ? await prisma.$queryRawUnsafe(trackingSubmissionsQuery, orderIds) : [];
+    }
     
     // Group items, shipments, and tracking submissions by orderId for easy lookup
     const itemsByOrderId = new Map();
@@ -557,7 +603,7 @@ export default async function handler(
     });
 
     // Filter orders for Labels page
-    const context = req.query.context as string;
+    // context already declared above
     // REMOVE the filter that excludes orders with missing address fields
     // Always return all processedOrders
     // if (context === 'labelsPage') {
@@ -660,6 +706,7 @@ export default async function handler(
     const countQuery = `
       SELECT COUNT(*) as total
       FROM "Order" o
+      LEFT JOIN "SenkronOrderData" sod ON sod."orderId" = o.id
       ${whereClause}
     `;
     const countResult = await prisma.$queryRawUnsafe(countQuery, ...params.slice(0, paramIndex - 1)) as any[];

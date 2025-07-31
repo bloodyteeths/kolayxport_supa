@@ -15,6 +15,7 @@ import Layout from '@/components/Layout';
 import AppLayout from '@/components/AppLayout';
 import CircleIcon from '@mui/icons-material/Circle';
 import UPSLabelDrawer from '@/components/UPSLabelDrawer';
+import ManualOrderButton from '@/components/ManualOrderButton';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
 import withAuth from '@/components/withAuth';
 
@@ -526,9 +527,9 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
       fallback(['recipientState','recipient_state','state','province'])
     ),
     recipientPostal: getValue(
-      addr?.recipientPostal, addr?.recipient_postal, addr?.zip, addr?.postalCode, addr?.postcode,
+      addr?.recipientPostal, addr?.recipient_postal, addr?.postal, addr?.zip, addr?.postalCode, addr?.postcode,
       deliverTo.zip, deliverTo.postalCode, deliverTo.postcode, billing.zip, billing.postalCode, billing.postcode, raw?.zip, raw?.postalCode, raw?.postcode,
-      fallback(['recipientPostal','recipient_postal','zip','postalCode','postcode'])
+      fallback(['recipientPostal','recipient_postal','postal','zip','postalCode','postcode'])
     ),
     recipientCountry: getValue(
       addr?.recipientCountry, addr?.recipient_country, addr?.country,
@@ -2445,6 +2446,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} sx={{ textTransform: 'none', height: '40px', minWidth: 180, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>
           {syncingOrders ? 'Senkronize Ediliyor...' : 'Siparişleri Senkron Et'}
         </Button>
+        <ManualOrderButton onOrderCreated={() => { mutate(); toast.success('Sipariş listesi yenilendi'); }} />
           <FormControl size="small" variant="outlined" sx={{ minWidth: 120, height: '40px', mb: { xs: 1, sm: 0 } }}>
             <InputLabel shrink={true}>Arama Türü</InputLabel>
             <Select value={searchType} label="Arama Türü" onChange={e => setSearchType(e.target.value)} displayEmpty>

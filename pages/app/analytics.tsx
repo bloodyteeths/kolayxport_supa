@@ -290,7 +290,7 @@ export default function AnalyticsPage() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <StatCard
             title="Toplam Sipariş"
             value={data?.totalOrders || 0}
@@ -322,9 +322,9 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Revenue Chart */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Günlük Performans</h3>
             <Chart
               options={revenueChartOptions}
@@ -335,7 +335,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Marketplace Breakdown */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Pazaryeri Dağılımı</h3>
             <Chart
               options={marketplaceChartOptions}
@@ -347,9 +347,9 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Data Tables */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Top Products */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">En Çok Satan Ürünler</h3>
             <div className="space-y-3">
               {data?.topProducts.map((product, index) => (
@@ -367,7 +367,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Order Status */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Sipariş Durumları</h3>
             <div className="space-y-3">
               {data?.orderStatusBreakdown.map((status, index) => (
@@ -387,7 +387,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Marketplace Performance Table */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Pazaryeri Performansı</h3>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">

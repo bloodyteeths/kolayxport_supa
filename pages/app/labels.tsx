@@ -2579,13 +2579,13 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
       {drawerOrder && (
         <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer}>
-          <Box sx={{ width: { xs: '100vw', sm: 500 }, display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ width: { xs: '95vw', sm: 500, md: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <Box sx={{ p: { xs: 1.5, sm: 2 }, borderBottom: '1px solid', borderColor: 'divider' }}>
               <Typography variant="h6">Etiket Oluştur</Typography>
               <Typography variant="body2" color="text.secondary">Sipariş No: {drawerOrder.orderNumber}</Typography>
             </Box>
 
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2 }}>
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', p: { xs: 1.5, sm: 2 } }}>
               {/* Shipping Details Accordion */}
               <Accordion defaultExpanded>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>

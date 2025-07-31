@@ -10,13 +10,13 @@ import { supabase } from '@/lib/supabase';
 // The existing <Dashboard /> component can be integrated here or replaced.
 const DashboardLandingContent = () => {
   return (
-    <div className="space-y-8">
-      <div className="bg-white p-6 md:p-8 rounded-lg shadow-md">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-md">
         <div className="flex items-center mb-4">
           <Zap size={32} className="mr-3 text-blue-600" />
-          <h1 className="text-3xl font-bold text-slate-800">KolayXport'a Hoş Geldiniz!</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">KolayXport'a Hoş Geldiniz!</h1>
         </div>
-        <p className="text-lg text-slate-700 mb-3">
+        <p className="text-base sm:text-lg text-slate-700 mb-3">
           Harika bir haberimiz var! KolayXport artık yayında ve e-ticaret operasyonlarınızı kolaylaştırmak için burada.
         </p>
         <p className="text-slate-600">
@@ -24,10 +24,10 @@ const DashboardLandingContent = () => {
         </p>
       </div>
 
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 md:p-8 rounded-lg shadow-lg">
+      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-4 sm:p-6 md:p-8 rounded-lg shadow-lg">
         <div className="flex items-center mb-3">
           <Gift size={28} className="mr-3" />
-          <h2 className="text-2xl font-semibold">Her Şey ÜCRETSİZ! (Şimdilik!)</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold">Her Şey ÜCRETSİZ! (Şimdilik!)</h2>
         </div>
         <p className="mb-4">
           Lansmanımıza özel olarak, KolayXport'un tüm temel özelliklerini ve entegrasyonlarını hiçbir ücret ödemeden kullanabilirsiniz. Bu fırsatı kaçırmayın, hemen tüm özelliklerimizi keşfedin!
@@ -37,7 +37,7 @@ const DashboardLandingContent = () => {
 </Link>
       </div>
       
-      <div className="bg-white p-6 md:p-8 rounded-lg shadow-md">
+      <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-md">
         <div className="flex items-center mb-3">
           <Share2 size={28} className="mr-3 text-green-600" />
           <h2 className="text-2xl font-semibold text-slate-800">KolayXport'u Arkadaşlarınla Paylaş!</h2>
@@ -48,7 +48,7 @@ const DashboardLandingContent = () => {
         {/* Add social share buttons here if desired */}
       </div>
 
-      <div className="bg-white p-6 md:p-8 rounded-lg shadow-md">
+      <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold text-slate-800 mb-4">Son Güncellemeler</h2>
         <ul className="list-disc list-inside text-slate-600 space-y-2">
           <li>KolayXport platformu başarıyla yayına alındı!</li>

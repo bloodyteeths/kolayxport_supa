@@ -44,4 +44,30 @@ html {
 /* Add delay for second slide up */
 .animate-slideUp:nth-child(2) {
   animation-delay: 0.2s;
+}
+
+/* Mobile-first responsive utilities */
+@media (max-width: 640px) {
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+  
+  .table-responsive th,
+  .table-responsive td {
+    padding: 0.5rem 0.25rem;
+  }
+  
+  .mobile-hidden {
+    display: none;
+  }
+}
+
+/* Touch-friendly button sizes */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  .btn,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 } 

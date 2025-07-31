@@ -424,7 +424,7 @@ function SenkronPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        <div className="w-screen px-0">
+        <div className="w-full max-w-full px-0">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <IconButton
@@ -474,7 +474,7 @@ function SenkronPage() {
             </div>
           </div>
           {/* Filters */}
-          <div className="flex flex-wrap gap-4 justify-between items-center mb-6 bg-white p-4 rounded shadow">
+          <div className="flex flex-wrap gap-2 sm:gap-4 justify-between items-center mb-6 bg-white p-2 sm:p-4 rounded shadow">
             <TextField
               label="Sipariş No / Müşteri Ara"
               value={search}
@@ -487,9 +487,9 @@ function SenkronPage() {
                   </InputAdornment>
                 ),
               }}
-              sx={{ minWidth: 220 }}
+              sx={{ minWidth: { xs: 180, sm: 220 } }}
             />
-            <FormControl size="small" sx={{ minWidth: 200 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: 160, sm: 200 } }}>
               <InputLabel id="durum-multiple-checkbox-label">Tüm Durumlar</InputLabel>
               <Select
                 labelId="durum-multiple-checkbox-label"
@@ -520,7 +520,7 @@ function SenkronPage() {
               onChange={e => { setFilterMarketplace(e.target.value); setPage(1); }}
               displayEmpty
               size="small"
-              sx={{ minWidth: 160 }}
+              sx={{ minWidth: { xs: 120, sm: 160 } }}
             >
               <MenuItem value="">Tüm Mağazalar</MenuItem>
               {marketplaceOptions.map(opt => (
@@ -534,7 +534,7 @@ function SenkronPage() {
               onChange={e => { setFilterStartDate(e.target.value); setPage(1); }}
               size="small"
               InputLabelProps={{ shrink: true }}
-              sx={{ minWidth: 180 }}
+              sx={{ minWidth: { xs: 140, sm: 180 } }}
             />
             <TextField
               label="Bitiş Tarihi"
@@ -543,13 +543,13 @@ function SenkronPage() {
               onChange={e => { setFilterEndDate(e.target.value); setPage(1); }}
               size="small"
               InputLabelProps={{ shrink: true }}
-              sx={{ minWidth: 180 }}
+              sx={{ minWidth: { xs: 140, sm: 180 } }}
             />
             <Select
               value={sortOrder}
               onChange={e => { setSortOrder(e.target.value); setPage(1); }}
               size="small"
-              sx={{ minWidth: 160 }}
+              sx={{ minWidth: { xs: 120, sm: 160 } }}
             >
               <MenuItem value="desc">Yeniden Eskiye</MenuItem>
               <MenuItem value="asc">Eskiden Yeniye</MenuItem>
@@ -568,7 +568,7 @@ function SenkronPage() {
                 setSortOrder('desc');
                 setPage(1);
               }}
-              sx={{ minWidth: 120, fontWeight: 600 }}
+              sx={{ minWidth: { xs: 100, sm: 120 }, fontWeight: 600 }}
             >
               Filtreleri Sıfırla
             </Button>
@@ -596,7 +596,7 @@ function SenkronPage() {
             </Typography>
           </div>
           <div className="w-full overflow-x-auto">
-            <TableContainer component={Paper} sx={{ mt: 2, width: '100vw', px: 3 }}>
+            <TableContainer component={Paper} sx={{ mt: 2, maxWidth: '100%', px: { xs: 1, sm: 2, md: 3 } }}>
               <Table>
                 <TableHead>
                   <TableRow>
@@ -639,7 +639,15 @@ function SenkronPage() {
                         return (
                           <TableRow key={row.rowKey} sx={{ height: 80 }}>
                             <TableCell sx={{ p: 1, minWidth: 120, width: 120, verticalAlign: 'middle' }}>—</TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>{order.customerName || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
+                      <div style={{ 
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {order.customerName || '—'}
+                      </div>
+                    </TableCell>
                             <TableCell sx={{ p: 1, fontSize: 14 }}>{orderDateTR}</TableCell>
                             <TableCell sx={{ p: 1, minWidth: 120, fontSize: 14 }}>—</TableCell>
                             <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
@@ -659,7 +667,7 @@ function SenkronPage() {
                                 <span style={{ color: '#999' }}>—</span>
                               )}
                             </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14, minWidth: 180 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, minWidth: 160, maxWidth: 200 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
                                 {editingNotes[order.id] ? (
                                   <>
@@ -771,10 +779,29 @@ function SenkronPage() {
                         <TableRow key={row.rowKey} sx={{ height: 120 }}>
                             <TableCell sx={{ p: 1, minWidth: 120, width: 120, verticalAlign: 'middle' }}>
                               {item.image
-                                ? <img src={item.image} width={100} height={100} style={{ objectFit:'cover', borderRadius: 12, display: 'block', margin: '0 auto' }} />
+                                ? <img 
+                                    src={item.image} 
+                                    style={{ 
+                                      width: '80px',
+                                      height: '80px',
+                                      objectFit: 'cover', 
+                                      borderRadius: 12, 
+                                      display: 'block', 
+                                      margin: '0 auto'
+                                    }} 
+                                    alt="Product"
+                                  />
                                 : '—'}
                             </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>{order.customerName || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
+                      <div style={{ 
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {order.customerName || '—'}
+                      </div>
+                    </TableCell>
                             <TableCell sx={{ p: 1, fontSize: 14 }}>{orderDateTR}</TableCell>
                             <TableCell sx={{ p: 1, minWidth: 120, fontSize: 14 }}>{item.variantInfo || '—'}</TableCell>
                             <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
@@ -794,7 +821,7 @@ function SenkronPage() {
                                 <span style={{ color: '#999' }}>—</span>
                               )}
                             </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14, minWidth: 180 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, minWidth: 160, maxWidth: 200 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
                                 {editingNotes[order.id] ? (
                                   <>

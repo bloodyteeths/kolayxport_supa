@@ -159,14 +159,27 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
 
         {/* Main content area */}
         <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ml-16`}>
+          {/* Mobile overlay when sidebar is open */}
+          {isOpen && (
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+              onClick={() => closeSidebar()}
+            />
+          )}
           {/* Topbar */}
           <header className="sticky top-0 z-20 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16 border-b border-gray-200">
             <div className="flex items-center">
-              <h1 className="text-lg font-semibold text-slate-800">{title}</h1>
+              <button
+                className="p-2 rounded-md text-slate-600 hover:bg-slate-100 mr-3 md:hidden"
+                onClick={() => isOpen ? closeSidebar() : openSidebar()}
+              >
+                <Menu size={20} />
+              </button>
+              <h1 className="text-lg font-semibold text-slate-800 truncate">{title}</h1>
             </div>
-            {/* Center: Search */}
-            <div className="flex-1 max-w-md mx-auto">
-              <div className="relative">
+            {/* Center: Search - Hidden on mobile */}
+            <div className="hidden sm:flex flex-1 max-w-md mx-auto">
+              <div className="relative w-full">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Search className="h-5 w-5 text-slate-400" />
                 </div>
@@ -180,7 +193,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
               </div>
             </div>
             {/* Right: Actions */}
-            <div className="flex items-center space-x-3 sm:space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4">
               <div className="relative">
                 <button 
                   onClick={() => alert('Yeni bildiriminiz yok.')} 
@@ -194,21 +207,21 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 onClick={() => router.push('/ayarlar')}
                 className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
               >
-                <Settings size={20} />
+                <Settings size={18} />
                 <span className="sr-only">Ayarlar</span>
               </button>
               <button
                 onClick={handleSignOut}
                 className="p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
               >
-                <LogOutIcon size={20} />
+                <LogOutIcon size={18} />
                 <span className="sr-only">Çıkış Yap</span>
               </button>
             </div>
           </header>
 
           {/* Page content */}
-          <main className="flex-grow p-6 lg:p-8 bg-slate-50">
+          <main className="flex-grow p-4 sm:p-6 lg:p-8 bg-slate-50">
             {/* Optional: Page header can go here if not in topbar */}
             {/* <h1 className="text-2xl font-semibold text-slate-800 mb-6">{title.replace('KolayXport Dashboard - ','')}</h1> */}
             {children}

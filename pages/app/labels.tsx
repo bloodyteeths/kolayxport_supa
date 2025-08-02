@@ -1353,28 +1353,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
     // Status filtering is now handled server-side in the API
 
-    // Apply label status filter
-    if (labelStatusFilter) {
-      filtered = filtered.filter(row => {
-        const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
-        const shipments = originalOrder?.shipments || [];
-        const hasShipment = shipments.some(s => s?.status === 'created' && (s?.trackingNumber || s?.pdfUrl));
-        const hasLabel = row.trackingNumber || 
-                        row.labelCreated || 
-                        row.shippingLabelUrl || 
-                        row.labelJobStatus === 'created' ||
-                        hasShipment;
-        
-        if (labelStatusFilter === 'created') {
-          return hasLabel;
-        } else if (labelStatusFilter === 'not_created') {
-          return !hasLabel;
-        } else if (labelStatusFilter === 'failed') {
-          return row.labelJobStatus === 'failed';
-        }
-        return true;
-      });
-    }
+    // Label status filtering is now handled server-side in the API
 
     // Marketplace filtering is now handled server-side in the API
 

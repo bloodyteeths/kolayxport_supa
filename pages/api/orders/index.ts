@@ -226,10 +226,10 @@ export default async function handler(
         } else {
           // Handle unified status filters for other pages
           const statusMappings: Record<string, string[]> = {
-            'onaylandi': ['PAID', 'Created'],
-            'kargolandi': ['shipped', 'Shipped'],
-            'iptal': ['cancelled', 'Cancelled'],
-            'Delivered': ['Delivered']
+            'onaylandi': ['PAID', 'CREATED', 'Created', 'awaiting_fulfillment', 'AWAITING_FULFILLMENT', 'UNSHIPPED', 'awaiting_payment'],
+            'kargolandi': ['SHIPPED', 'shipped', 'Shipped', 'PARTIALLY_SHIPPED'],
+            'iptal': ['CANCELLED', 'cancelled', 'Cancelled', 'REFUNDED', 'refunded', 'returned'],
+            'Delivered': ['DELIVERED', 'delivered', 'Delivered', 'COMPLETED']
           };
 
           // Collect all mapped statuses
@@ -264,9 +264,36 @@ export default async function handler(
       });
     }
     if (labelStatus) {
-      whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."labelStatus" = $${paramIndex}`;
-      params.push(labelStatus);
-      paramIndex++;
+      // Handle label status filter with complex logic
+      if (labelStatus === 'created') {
+        // Has label: trackingNumber OR shippingLabelUrl OR labelStatus='created' OR has shipment
+        whereClause += ` AND (
+          o."trackingNumber" IS NOT NULL OR 
+          o."shippingLabelUrl" IS NOT NULL OR 
+          o."labelStatus" = 'created' OR
+          EXISTS (
+            SELECT 1 FROM "Shipment" s 
+            WHERE s."orderId" = o.id 
+            AND s.status = 'created' 
+            AND (s."trackingNumber" IS NOT NULL OR s."pdfUrl" IS NOT NULL)
+          )
+        )`;
+      } else if (labelStatus === 'not_created') {
+        // No label: no trackingNumber AND no shippingLabelUrl AND labelStatus != 'created' AND no shipment
+        whereClause += ` AND (
+          (o."trackingNumber" IS NULL OR o."trackingNumber" = '') AND
+          (o."shippingLabelUrl" IS NULL OR o."shippingLabelUrl" = '') AND
+          (o."labelStatus" IS NULL OR o."labelStatus" != 'created') AND
+          NOT EXISTS (
+            SELECT 1 FROM "Shipment" s 
+            WHERE s."orderId" = o.id 
+            AND s.status = 'created' 
+            AND (s."trackingNumber" IS NOT NULL OR s."pdfUrl" IS NOT NULL)
+          )
+        )`;
+      } else if (labelStatus === 'failed') {
+        whereClause += ` AND o."labelStatus" = 'failed'`;
+      }
     }
     if (serviceType) {
       whereClause += (whereClause ? ' AND' : ' WHERE') + ` o."fedexServiceType" = $${paramIndex}`;

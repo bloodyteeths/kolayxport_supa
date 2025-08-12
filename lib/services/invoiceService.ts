@@ -328,17 +328,18 @@ export class InvoiceService {
         where: { userId }
       });
 
-      if (!credential || !credential.parasutClientId || !credential.parasutClientSecret || 
-          !credential.parasutUsername || !credential.parasutPassword || !credential.parasutCompanyId) {
+      const c: any = credential as any;
+      if (!c || !c.parasutClientId || !c.parasutClientSecret || 
+          !c.parasutUsername || !c.parasutPassword || !c.parasutCompanyId) {
         return null;
       }
 
       return {
-        clientId: credential.parasutClientId,
-        clientSecret: credential.parasutClientSecret,
-        username: credential.parasutUsername,
-        password: credential.parasutPassword,
-        companyId: credential.parasutCompanyId
+        clientId: c.parasutClientId,
+        clientSecret: c.parasutClientSecret,
+        username: c.parasutUsername,
+        password: c.parasutPassword,
+        companyId: c.parasutCompanyId
       };
 
     } catch (error) {

@@ -1295,7 +1295,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   
   // --- ETGB Selection State ---
   const [etgbSelectedRows, setEtgbSelectedRows] = useState<string[]>([]);
-  const [etgbSelectionModel, setEtgbSelectionModel] = useState<GridRowSelectionModel>([] as GridRowSelectionModel);
+  const [etgbSelectionModel, setEtgbSelectionModel] = useState<GridRowId[]>([]);
   const [etgbEnabled, setEtgbEnabled] = useState(false);
   const [processingEtgb, setProcessingEtgb] = useState(false);
 
@@ -2619,10 +2619,11 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             disableColumnMenu
             keepNonExistentRowsSelected={etgbEnabled}
             checkboxSelection={etgbEnabled}
-            rowSelectionModel={etgbEnabled ? etgbSelectionModel : undefined}
+            rowSelectionModel={etgbEnabled ? (etgbSelectionModel as GridRowSelectionModel) : undefined}
             onRowSelectionModelChange={etgbEnabled ? ((newSelection) => {
-              setEtgbSelectionModel(newSelection);
-              const selectionArray = (newSelection as unknown as GridRowId[]);
+              const nextSelection = newSelection as unknown as GridRowId[];
+              setEtgbSelectionModel(nextSelection);
+              const selectionArray = nextSelection;
               const orderIds = selectionArray
                 .map(id => {
                   const row = filteredAndPaginatedItems.find(r => (r.itemId || r.orderId) === id);

@@ -184,6 +184,19 @@ export class EtgbExcelService {
         const fallback = toNum(item?.totalPrice ?? order.totalPrice ?? 0);
         declaredValue = Number.isFinite(fallback) ? Number(fallback) : 0;
       }
+      // Final fallback: try rawData.line_items from imported marketplaces (Shippo/Veeqo)
+      if (declaredValue === 0) {
+        const raw: any = (order as any).rawData;
+        const lineItems = Array.isArray(raw?.line_items) ? raw.line_items : [];
+        if (lineItems.length > 0) {
+          const rawSum = lineItems.reduce((acc: number, li: any) => {
+            // Shippo: li.total_price is string; Veeqo: li.price * li.quantity
+            const liTotal = toNum(li.total_price) || (toNum(li.price) * (toNum(li.quantity) || 1));
+            return acc + (Number.isFinite(liTotal) ? liTotal : 0);
+          }, 0);
+          if (rawSum > 0) declaredValue = Number(rawSum.toFixed(2));
+        }
+      }
     } catch {}
 
     const row: EtgbOrderData = {

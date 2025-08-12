@@ -323,17 +323,9 @@ export class InvoiceService {
    */
   private async getParasutCredentials(userId: string): Promise<ParasutCredentials | null> {
     try {
+      // Fetch full record to avoid type issues with select on older Prisma client typings during build
       const credential = await prisma.credential.findFirst({
-        where: {
-          userId
-        },
-        select: {
-          parasutClientId: true,
-          parasutClientSecret: true,
-          parasutUsername: true,
-          parasutPassword: true,
-          parasutCompanyId: true
-        }
+        where: { userId }
       });
 
       if (!credential || !credential.parasutClientId || !credential.parasutClientSecret || 

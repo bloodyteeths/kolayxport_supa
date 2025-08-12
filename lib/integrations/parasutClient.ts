@@ -211,9 +211,9 @@ export class ParasutClient {
   }
 
   /**
-   * Create invoice in Paraşüt
+   * Create Sales Invoice (item_type must be 'invoice')
    */
-  async createInvoice(invoiceData: ParasutInvoiceData): Promise<{
+  async createSalesInvoice(invoiceData: ParasutInvoiceData): Promise<{
     pdfUrl?: string;
     ublUrl?: string;
     invoiceId: number;
@@ -231,13 +231,12 @@ export class ParasutClient {
       // First, create or get contact
       const contact = await this.createOrGetContact(invoiceData.contact);
 
-      // Prepare invoice payload using inline details_attributes per Paraşüt API
+      // Prepare invoice payload per Paraşüt API (sales invoice)
       const invoicePayload = {
         data: {
           type: 'sales_invoices',
           attributes: {
-            // Mark as e-invoice for export. Paraşüt uses item_type with 'e_invoice' for e-fatura.
-            item_type: 'e_invoice',
+            item_type: 'invoice',
             description: `Invoice for ${invoiceData.contact.name}`,
             issue_date: invoiceData.issue_date || new Date().toISOString().split('T')[0],
             due_date: invoiceData.due_date,
@@ -246,21 +245,23 @@ export class ParasutClient {
             currency: 'TRL',
             withholding_rate: invoiceData.withholding_rate || 0,
             fatura_no: invoiceData.fatura_no,
-            details_attributes: invoiceData.items.map((item) => ({
-              quantity: item.quantity,
-              unit_price: item.unit_price,
-              vat_rate: item.vat_rate,
-              description: item.description,
-              unit: item.unit || 'Adet',
-              ...(item.product_id ? { product_id: item.product_id } : {})
-            })),
           },
           relationships: {
-            contact: {
-              data: {
-                type: 'contacts',
-                id: contact.id.toString()
-              }
+            contact: { data: { type: 'contacts', id: contact.id.toString() } },
+            details: {
+              data: invoiceData.items.map((item) => ({
+                type: 'sales_invoice_details',
+                attributes: {
+                  quantity: item.quantity,
+                  unit_price: item.unit_price,
+                  vat_rate: item.vat_rate,
+                  description: item.description,
+                  ...(item.unit ? { unit: item.unit } : {})
+                },
+                ...(item.product_id
+                  ? { relationships: { product: { data: { type: 'products', id: String(item.product_id) } } } }
+                  : {})
+              }))
             }
           }
         }
@@ -279,13 +280,15 @@ export class ParasutClient {
       );
 
       if (!response.ok) {
-        const error = await response.text();
+        const errorText = await response.text();
+        let errorJson: any = undefined;
+        try { errorJson = JSON.parse(errorText); } catch {}
         logger.error('Invoice creation failed', undefined, {
           status: response.status,
-          errorMessage: error,
+          errorMessage: errorJson?.errors || errorText,
           companyId: this.credentials.companyId
         });
-        throw new Error(`Invoice creation failed: ${response.status} - ${error}`);
+        throw new Error(`Invoice creation failed: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json() as any;
@@ -297,8 +300,8 @@ export class ParasutClient {
         companyId: this.credentials.companyId
       });
 
-      // Ensure e-invoice is generated; then fetch PDF/UBL URLs
-      const pdfUrl = await this.getInvoicePdfUrl(invoice.id);
+      // For pure sales invoice we may not have e-document yet
+      const pdfUrl = await this.getInvoicePdfUrl(invoice.id); // May be undefined until e-document created
       const ublUrl = await this.getInvoiceUblUrl(invoice.id);
 
       return {
@@ -315,6 +318,118 @@ export class ParasutClient {
         });
       throw error;
     }
+  }
+
+  /** Lookup e-invoice inboxes by VKN/TCKN */
+  async listEInvoiceInboxesByTaxNumber(taxNumber: string): Promise<any[]> {
+    await this.ensureValidToken();
+    const url = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/e_invoice_inboxes?tax_number=${encodeURIComponent(taxNumber)}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${this.credentials.accessToken}` } });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`listEInvoiceInboxes failed: ${res.status} - ${text}`);
+    }
+    const json = await res.json() as any;
+    return Array.isArray(json?.data) ? json.data : [];
+  }
+
+  /** Create e-invoice for a sales invoice; returns job id */
+  async createEInvoice(params: { salesInvoiceId: number; to: string; scenario: 'basic' | 'commercial'; note?: string }): Promise<string> {
+    await this.ensureValidToken();
+    const url = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/e_invoices`;
+    const payload = {
+      data: {
+        type: 'e_invoices',
+        attributes: { to: params.to, scenario: params.scenario, ...(params.note ? { note: params.note } : {}) },
+        relationships: { invoice: { data: { type: 'sales_invoices', id: String(params.salesInvoiceId) } } }
+      }
+    };
+    const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${this.credentials.accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`createEInvoice failed: ${res.status} - ${text}`);
+    }
+    const json = await res.json() as any;
+    return json?.data?.attributes?.trackable_job_id || json?.data?.id || '';
+  }
+
+  /** Create e-archive for a sales invoice; returns job id */
+  async createEArchive(params: { salesInvoiceId: number; note?: string; internetSale?: { url?: string; payment_type?: string; payment_platform?: string; payment_date?: string } }): Promise<string> {
+    await this.ensureValidToken();
+    const url = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/e_archives`;
+    const payload = {
+      data: {
+        type: 'e_archives',
+        attributes: {
+          ...(params.note ? { note: params.note } : {}),
+          ...(params.internetSale ? { internet_sale: params.internetSale } : {})
+        },
+        relationships: { sales_invoice: { data: { type: 'sales_invoices', id: String(params.salesInvoiceId) } } }
+      }
+    };
+    const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${this.credentials.accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`createEArchive failed: ${res.status} - ${text}`);
+    }
+    const json = await res.json() as any;
+    return json?.data?.attributes?.trackable_job_id || json?.data?.id || '';
+  }
+
+  /** Track a job until finished/failed */
+  async trackJob(jobId: string, timeoutMs: number = 60000): Promise<'finished' | 'failed'> {
+    const url = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/trackable_jobs/${jobId}`;
+    const start = Date.now();
+    let attempt = 0;
+    while (Date.now() - start < timeoutMs) {
+      attempt++;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${this.credentials.accessToken}` } });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`trackJob failed: ${res.status} - ${text}`);
+      }
+      const json = await res.json() as any;
+      const status = json?.data?.attributes?.status;
+      if (status && status !== 'running') {
+        if (status === 'failed') {
+          const errMsg = json?.data?.attributes?.error || 'unknown job error';
+          throw new Error(`Paraşüt job failed: ${errMsg}`);
+        }
+        return 'finished';
+      }
+      await new Promise(r => setTimeout(r, Math.min(1000 + attempt * 250, 3000)));
+    }
+    throw new Error('Paraşüt job timeout');
+  }
+
+  /** Show a sales invoice, including active e-document relation */
+  async showSalesInvoice(id: number): Promise<any> {
+    await this.ensureValidToken();
+    const url = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices/${id}?include=active_e_document`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${this.credentials.accessToken}` } });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`showSalesInvoice failed: ${res.status} - ${text}`);
+    }
+    return await res.json();
+  }
+
+  async showEInvoicePDF(eInvoiceId: number): Promise<string | undefined> {
+    await this.ensureValidToken();
+    const url = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/e_invoices/${eInvoiceId}/pdf`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${this.credentials.accessToken}` } });
+    if (!res.ok) return undefined;
+    const json = await res.json() as any;
+    return json?.data?.attributes?.url;
+  }
+
+  async showEArchivePDF(eArchiveId: number): Promise<string | undefined> {
+    await this.ensureValidToken();
+    const url = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/e_archives/${eArchiveId}/pdf`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${this.credentials.accessToken}` } });
+    if (!res.ok) return undefined;
+    const json = await res.json() as any;
+    return json?.data?.attributes?.url;
   }
 
   /**

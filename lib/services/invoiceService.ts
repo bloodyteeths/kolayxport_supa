@@ -56,14 +56,53 @@ export class InvoiceService {
       for (const order of orders) {
         try {
           const invoiceData = await this.orderToParasutInvoiceConverted(order);
-          const result = await parasutClient.createInvoice(invoiceData);
-          logger.info('Invoice create result', { orderId: order.id, invoiceId: result.invoiceId, hasPdf: !!result.pdfUrl, hasUbl: !!result.ublUrl });
+          const result = await parasutClient.createSalesInvoice(invoiceData);
+          logger.info('Sales invoice created', { orderId: order.id, invoiceId: result.invoiceId, hasPdf: !!result.pdfUrl });
           
+          // Decide e-invoice vs e-archive
+          const taxNumber = (order as any)?.buyer?.tax_number || (order as any)?.tax_number || undefined;
+          let jobId: string | undefined;
+          if (taxNumber) {
+            try {
+              const inboxes = await parasutClient.listEInvoiceInboxesByTaxNumber(taxNumber);
+              if (Array.isArray(inboxes) && inboxes.length > 0) {
+                const to = inboxes[0]?.attributes?.e_invoice_address || inboxes[0]?.attributes?.identifier;
+                if (to) jobId = await parasutClient.createEInvoice({ salesInvoiceId: result.invoiceId, to, scenario: 'basic' });
+              }
+            } catch (e) {
+              logger.warn('E-invoice inbox lookup failed; falling back to e-archive', { orderId: order.id, error: e instanceof Error ? e.message : String(e) });
+            }
+          }
+          if (!jobId) {
+            jobId = await parasutClient.createEArchive({ salesInvoiceId: result.invoiceId });
+          }
+
+          // Poll job until finished
+          try {
+            await parasutClient.trackJob(jobId);
+          } catch (e) {
+            logger.error('Paraşüt job failed', e instanceof Error ? e : new Error(String(e)), { orderId: order.id, jobId });
+            // Continue, but we may not get a PDF URL
+          }
+
+          // Read active e-document and get PDF URL
+          let pdfUrl = result.pdfUrl;
+          try {
+            const shown = await parasutClient.showSalesInvoice(result.invoiceId);
+            const active = shown?.included?.find((inc: any) => inc?.type === 'e_invoices' || inc?.type === 'e_archives');
+            if (active) {
+              if (active.type === 'e_invoices') pdfUrl = await parasutClient.showEInvoicePDF(Number(active.id));
+              if (active.type === 'e_archives') pdfUrl = await parasutClient.showEArchivePDF(Number(active.id));
+            }
+          } catch (e) {
+            logger.warn('Failed to resolve active e-document PDF', { orderId: order.id, error: e instanceof Error ? e.message : String(e) });
+          }
+
           // Download PDF if available
           let localPdfPath: string | undefined;
           const tracking = order.trackingNumber || '';
-          if (result.pdfUrl) {
-            localPdfPath = await this.downloadInvoicePdf(result.pdfUrl, tracking ? tracking : result.invoiceNo);
+          if (pdfUrl) {
+            localPdfPath = await this.downloadInvoicePdf(pdfUrl, tracking ? tracking : result.invoiceNo);
             if (localPdfPath) {
               attachments.push({
                 filename: `invoice-${tracking ? tracking : result.invoiceNo}.pdf`,
@@ -73,18 +112,7 @@ export class InvoiceService {
               logger.info('Attached invoice PDF', { orderId: order.id, path: localPdfPath });
             }
           }
-          // Also include UBL XML if available (common for e-invoice workflows)
-          if (result.ublUrl) {
-            const ublPath = await this.downloadInvoicePdf(result.ublUrl, tracking ? `${tracking}.ubl` : `${result.invoiceNo}.ubl`);
-            if (ublPath) {
-              attachments.push({
-                filename: `invoice-${tracking ? tracking : result.invoiceNo}.xml`,
-                path: ublPath,
-                contentType: 'application/xml'
-              });
-              logger.info('Attached invoice UBL', { orderId: order.id, path: ublPath });
-            }
-          }
+          // Note: UBL retrieval path differs for e-docs; omitted in sandbox unless required
 
           invoices.push({
             ...result,

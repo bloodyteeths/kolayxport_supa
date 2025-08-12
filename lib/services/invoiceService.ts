@@ -246,6 +246,8 @@ export class InvoiceService {
    */
   private orderToParasutInvoice(order: Order & { items: OrderItem[] }): ParasutInvoiceData {
     const shippingAddr = order.shippingAddress as any;
+    const raw: any = (order as any).rawData || {};
+    const rawLineItems: any[] = Array.isArray(raw?.line_items) ? raw.line_items : [];
     
     // Extract contact information
     const contact = {
@@ -282,13 +284,23 @@ export class InvoiceService {
             } else if (orderTotal && orderTotal > 0 && totalQty > 0) {
               // Pro-rate order total across items by quantity
               unit = (orderTotal / totalQty);
+            } else if (rawLineItems.length > 0) {
+              // Try match raw marketplace item for pricing
+              const match = rawLineItems.find((li: any) => {
+                return (li?.sku && item.sku && String(li.sku) === String(item.sku)) ||
+                       (li?.id && item.marketplaceKey && String(li.id) === String(item.marketplaceKey)) ||
+                       (li?.object_id && item.uniqueLineKey && String(li.object_id) === String(item.uniqueLineKey));
+              }) || rawLineItems[0];
+              const liTotal = toNum(match?.total_price) || (toNum(match?.price) * (toNum(match?.quantity) || 1));
+              if (liTotal && qty > 0) unit = liTotal / qty;
             }
           }
+          const desc = (item.productName || item.sku || rawLineItems.find((li: any) => li?.sku === item.sku)?.title || 'Product').toString().trim() || 'Product';
           return {
             quantity: qty,
             unit_price: Math.round((unit + Number.EPSILON) * 100) / 100,
             vat_rate: 0,
-            description: item.productName || item.sku || 'Product',
+            description: desc,
             unit: 'Adet'
           };
         })
@@ -296,7 +308,7 @@ export class InvoiceService {
           quantity: 1,
           unit_price: Math.round((orderTotal + Number.EPSILON) * 100) / 100,
           vat_rate: 0,
-          description: order.commodityDesc || 'Product',
+          description: (order.commodityDesc || rawLineItems?.[0]?.title || 'Product'),
           unit: 'Adet'
         }];
 

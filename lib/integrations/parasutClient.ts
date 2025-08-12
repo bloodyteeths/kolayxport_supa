@@ -225,6 +225,7 @@ export class ParasutClient {
       logger.info('Creating Paraşüt invoice', {
         contactName: invoiceData.contact.name,
         itemCount: invoiceData.items.length,
+        sampleItem: invoiceData.items[0]?.description,
         companyId: this.credentials.companyId
       });
 

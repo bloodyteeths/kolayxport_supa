@@ -15,7 +15,12 @@ export default async function handler(
     });
     
     const supabase = getSupabaseServerClient(req, res);
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    const bearer = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.substring('Bearer '.length)
+      : undefined;
+    const { data: { user: authUser }, error: authError } = bearer
+      ? await supabase.auth.getUser(bearer)
+      : await supabase.auth.getUser();
 
     if (authError || !authUser) {
       console.error('[/api/user/settings] Auth failed', { 

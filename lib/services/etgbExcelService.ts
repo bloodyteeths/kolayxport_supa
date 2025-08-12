@@ -156,18 +156,24 @@ export class EtgbExcelService {
       }
     } catch {}
 
-    // Determine declared value: prefer shipment.customsValue, then item.totalPrice, then order.totalPrice
-    let declaredValue: number = Number(item?.totalPrice || order.totalPrice || 0);
+    // Determine declared value:
+    // - Prefer sum of item.unitPrice * item.quantity (when items exist)
+    // - Fallback to item.totalPrice (when single-row export)
+    // - Finally fallback to order.totalPrice
+    let declaredValue: number = 0;
     try {
-      const anyOrder = order as any;
-      if (Array.isArray(anyOrder.shipments) && anyOrder.shipments.length > 0) {
-        const createdShipments = anyOrder.shipments.filter((s: any) => s?.status === 'created');
-        if (createdShipments.length > 0) {
-          // pick the latest by createdAt
-          createdShipments.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          const s = createdShipments[0];
-          if (s?.customsValue) declaredValue = Number(s.customsValue);
-        }
+      if (order && (order as any).items && Array.isArray((order as any).items) && (order as any).items.length > 0) {
+        const items: any[] = (order as any).items;
+        const sum = items.reduce((acc, it) => {
+          const qty = Number(it?.quantity ?? 1);
+          const unit = Number(it?.unitPrice ?? 0);
+          return acc + qty * unit;
+        }, 0);
+        declaredValue = Number.isFinite(sum) && sum > 0 ? Number(sum.toFixed(2)) : 0;
+      }
+      if (declaredValue === 0) {
+        const fallback = Number(item?.totalPrice ?? order.totalPrice ?? 0);
+        declaredValue = Number.isFinite(fallback) ? Number(fallback) : 0;
       }
     } catch {}
 

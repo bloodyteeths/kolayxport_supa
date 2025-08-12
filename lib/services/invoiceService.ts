@@ -60,8 +60,8 @@ export class InvoiceService {
           
           // Download PDF if available
           let localPdfPath: string | undefined;
+          const tracking = order.trackingNumber || '';
           if (result.pdfUrl) {
-            const tracking = order.trackingNumber || '';
             localPdfPath = await this.downloadInvoicePdf(result.pdfUrl, tracking ? tracking : result.invoiceNo);
             if (localPdfPath) {
               attachments.push({
@@ -73,7 +73,6 @@ export class InvoiceService {
           }
           // Also include UBL XML if available (common for e-invoice workflows)
           if (result.ublUrl) {
-            const tracking = order.trackingNumber || '';
             const ublPath = await this.downloadInvoicePdf(result.ublUrl, tracking ? `${tracking}.ubl` : `${result.invoiceNo}.ubl`);
             if (ublPath) {
               attachments.push({

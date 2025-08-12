@@ -234,18 +234,34 @@ export class InvoiceService {
                shippingAddr?.country || 'Diğer'
     };
 
-    // Convert order items to invoice items
-    const items = order.items && order.items.length > 0 
-      ? order.items.map(item => ({
-          quantity: item.quantity || 1,
-          unit_price: Number(item.unitPrice || 0),
-          vat_rate: 0, // Export e-fatura often 0%; adjust as needed
-          description: item.productName || item.sku || 'Product',
-          unit: 'Adet'
-        }))
+    // Convert order items to invoice items with robust value calculation
+    const hasItems = Array.isArray(order.items) && order.items.length > 0;
+    const totalQty = hasItems ? order.items.reduce((acc, it) => acc + (it.quantity || 1), 0) : 1;
+    const orderTotal = Number(order.totalPrice || 0);
+    const items = hasItems
+      ? order.items.map((item) => {
+          const qty = item.quantity || 1;
+          let unit = Number(item.unitPrice || 0);
+          if (!unit || unit <= 0) {
+            const itemTotal = Number(item.totalPrice || 0);
+            if (itemTotal && itemTotal > 0) {
+              unit = itemTotal / qty;
+            } else if (orderTotal && orderTotal > 0 && totalQty > 0) {
+              // Pro-rate order total across items by quantity
+              unit = (orderTotal / totalQty);
+            }
+          }
+          return {
+            quantity: qty,
+            unit_price: Math.round((unit + Number.EPSILON) * 100) / 100,
+            vat_rate: 0,
+            description: item.productName || item.sku || 'Product',
+            unit: 'Adet'
+          };
+        })
       : [{
           quantity: 1,
-          unit_price: Number(order.totalPrice || 0),
+          unit_price: Math.round((orderTotal + Number.EPSILON) * 100) / 100,
           vat_rate: 0,
           description: order.commodityDesc || 'Product',
           unit: 'Adet'

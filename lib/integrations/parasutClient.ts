@@ -236,7 +236,8 @@ export class ParasutClient {
         data: {
           type: 'sales_invoices',
           attributes: {
-            item_type: 'invoice',
+            // Mark as e-invoice for export. Paraşüt uses item_type with 'e_invoice' for e-fatura.
+            item_type: 'e_invoice',
             description: `Invoice for ${invoiceData.contact.name}`,
             issue_date: invoiceData.issue_date || new Date().toISOString().split('T')[0],
             due_date: invoiceData.due_date,
@@ -296,7 +297,7 @@ export class ParasutClient {
         companyId: this.credentials.companyId
       });
 
-      // Get PDF and UBL URLs if available
+      // Ensure e-invoice is generated; then fetch PDF/UBL URLs
       const pdfUrl = await this.getInvoicePdfUrl(invoice.id);
       const ublUrl = await this.getInvoiceUblUrl(invoice.id);
 

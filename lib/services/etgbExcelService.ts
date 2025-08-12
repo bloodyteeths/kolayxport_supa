@@ -156,6 +156,15 @@ export class EtgbExcelService {
       }
     } catch {}
 
+    // Helper to coerce Prisma Decimal or number-like into number
+    const toNum = (v: any): number => {
+      try {
+        if (v && typeof v === 'object' && typeof v.toNumber === 'function') return v.toNumber();
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      } catch { return 0; }
+    };
+
     // Determine declared value:
     // - Prefer sum of item.unitPrice * item.quantity (when items exist)
     // - Fallback to item.totalPrice (when single-row export)
@@ -165,14 +174,14 @@ export class EtgbExcelService {
       if (order && (order as any).items && Array.isArray((order as any).items) && (order as any).items.length > 0) {
         const items: any[] = (order as any).items;
         const sum = items.reduce((acc, it) => {
-          const qty = Number(it?.quantity ?? 1);
-          const unit = Number(it?.unitPrice ?? 0);
+          const qty = toNum(it?.quantity ?? 1) || 1;
+          const unit = toNum(it?.unitPrice ?? 0);
           return acc + qty * unit;
         }, 0);
         declaredValue = Number.isFinite(sum) && sum > 0 ? Number(sum.toFixed(2)) : 0;
       }
       if (declaredValue === 0) {
-        const fallback = Number(item?.totalPrice ?? order.totalPrice ?? 0);
+        const fallback = toNum(item?.totalPrice ?? order.totalPrice ?? 0);
         declaredValue = Number.isFinite(fallback) ? Number(fallback) : 0;
       }
     } catch {}

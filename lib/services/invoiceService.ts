@@ -241,9 +241,14 @@ export class InvoiceService {
     const items = hasItems
       ? order.items.map((item) => {
           const qty = item.quantity || 1;
-          let unit = Number(item.unitPrice || 0);
+          // Handle Prisma Decimal gracefully
+          const toNum = (v: any): number => {
+            try { if (v && typeof v === 'object' && typeof (v as any).toNumber === 'function') return (v as any).toNumber(); } catch {}
+            const n = Number(v); return Number.isFinite(n) ? n : 0;
+          };
+          let unit = toNum(item.unitPrice || 0);
           if (!unit || unit <= 0) {
-            const itemTotal = Number(item.totalPrice || 0);
+            const itemTotal = toNum(item.totalPrice || 0);
             if (itemTotal && itemTotal > 0) {
               unit = itemTotal / qty;
             } else if (orderTotal && orderTotal > 0 && totalQty > 0) {

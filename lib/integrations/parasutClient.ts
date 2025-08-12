@@ -328,7 +328,7 @@ export class ParasutClient {
       data: {
         type: 'contacts',
         attributes: {
-          // Paraşüt requires account_type; default to 'customer' for sales invoices
+          // Sandbox requires a valid account_type; use 'customer' or 'person' as supported values
           account_type: 'customer',
           name: contactData.name,
           email: contactData.email,

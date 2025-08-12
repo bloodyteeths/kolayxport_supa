@@ -121,6 +121,45 @@ export class InvoiceService {
     }
   }
 
+  // Convert invoice amounts to TRY using daily FX rate on order date
+  private async orderToParasutInvoiceConverted(order: Order & { items: OrderItem[] }): Promise<ParasutInvoiceData> {
+    const base = this.orderToParasutInvoice(order);
+    const sourceCurrency = (order.currency || 'TRY').toUpperCase();
+    const orderDate = (order.createdAt || new Date()).toISOString().split('T')[0];
+
+    if (sourceCurrency === 'TRY') {
+      return { ...base, currency: 'TRY', issue_date: orderDate };
+    }
+
+    const rate = await this.fetchFxRate(orderDate, sourceCurrency, 'TRY');
+    const itemsTRY = (base.items || []).map((i) => ({
+      ...i,
+      unit_price: Math.round((Number(i.unit_price) * rate + Number.EPSILON) * 100) / 100,
+    }));
+
+    return {
+      ...base,
+      currency: 'TRY',
+      exchange_rate: undefined,
+      items: itemsTRY,
+      issue_date: orderDate,
+    };
+  }
+
+  private async fetchFxRate(dateISO: string, from: string, to: string): Promise<number> {
+    try {
+      const res = await fetch(
+        `https://api.exchangerate.host/${dateISO}?base=${encodeURIComponent(from)}&symbols=${encodeURIComponent(to)}`
+      );
+      if (!res.ok) throw new Error(`fx ${res.status}`);
+      const json = (await res.json()) as any;
+      const rate = Number(json?.rates?.[to]);
+      if (!isFinite(rate) || rate <= 0) throw new Error('bad rate');
+      return rate;
+    } catch {
+      return 1; // conservative fallback
+    }
+  }
   /**
    * Get user's Paraşüt credentials
    */

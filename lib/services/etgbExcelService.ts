@@ -163,6 +163,8 @@ export class EtgbExcelService {
       if (Array.isArray(anyOrder.shipments) && anyOrder.shipments.length > 0) {
         const createdShipments = anyOrder.shipments.filter((s: any) => s?.status === 'created');
         if (createdShipments.length > 0) {
+          // pick the latest by createdAt
+          createdShipments.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           const s = createdShipments[0];
           if (s?.customsValue) declaredValue = Number(s.customsValue);
         }

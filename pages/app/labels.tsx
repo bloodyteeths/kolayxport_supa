@@ -18,6 +18,7 @@ import UPSLabelDrawer from '@/components/UPSLabelDrawer';
 import ManualOrderButton from '@/components/ManualOrderButton';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
 import withAuth from '@/components/withAuth';
+import { supabase } from '@/lib/supabase';
 
 // Minimal UIOrder type for UPS drawer
 interface UIOrder {

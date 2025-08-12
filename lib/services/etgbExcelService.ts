@@ -165,36 +165,46 @@ export class EtgbExcelService {
       } catch { return 0; }
     };
 
-    // Determine declared value:
-    // - Prefer sum of item.unitPrice * item.quantity (when items exist)
-    // - Fallback to item.totalPrice (when single-row export)
-    // - Finally fallback to order.totalPrice
+    // Determine declared value per row
+    // If item provided: prefer item-level qty*unitPrice -> item.totalPrice -> match raw line item
+    // Else (no item): prefer order.totalPrice -> sum of DB items -> rawData.total_price
     let declaredValue: number = 0;
     try {
-      if (order && (order as any).items && Array.isArray((order as any).items) && (order as any).items.length > 0) {
-        const items: any[] = (order as any).items;
-        const sum = items.reduce((acc, it) => {
-          const qty = toNum(it?.quantity ?? 1) || 1;
-          const unit = toNum(it?.unitPrice ?? 0);
-          return acc + qty * unit;
-        }, 0);
-        declaredValue = Number.isFinite(sum) && sum > 0 ? Number(sum.toFixed(2)) : 0;
-      }
-      if (declaredValue === 0) {
-        const fallback = toNum(item?.totalPrice ?? order.totalPrice ?? 0);
-        declaredValue = Number.isFinite(fallback) ? Number(fallback) : 0;
-      }
-      // Final fallback: try rawData.line_items from imported marketplaces (Shippo/Veeqo)
-      if (declaredValue === 0) {
-        const raw: any = (order as any).rawData;
-        const lineItems = Array.isArray(raw?.line_items) ? raw.line_items : [];
-        if (lineItems.length > 0) {
-          const rawSum = lineItems.reduce((acc: number, li: any) => {
-            // Shippo: li.total_price is string; Veeqo: li.price * li.quantity
-            const liTotal = toNum(li.total_price) || (toNum(li.price) * (toNum(li.quantity) || 1));
-            return acc + (Number.isFinite(liTotal) ? liTotal : 0);
-          }, 0);
-          if (rawSum > 0) declaredValue = Number(rawSum.toFixed(2));
+      if (item) {
+        const qty = toNum((item as any)?.quantity ?? 1) || 1;
+        const unit = toNum((item as any)?.unitPrice ?? 0);
+        const calc = qty * unit;
+        if (calc > 0) declaredValue = Number(calc.toFixed(2));
+        if (declaredValue === 0) {
+          const fallbackItemTotal = toNum((item as any)?.totalPrice ?? 0);
+          if (fallbackItemTotal > 0) declaredValue = Number(fallbackItemTotal.toFixed(2));
+        }
+        if (declaredValue === 0) {
+          const raw: any = (order as any).rawData;
+          const lineItems = Array.isArray(raw?.line_items) ? raw.line_items : [];
+          if (lineItems.length > 0) {
+            // Try to match by SKU or id if possible
+            const matched = lineItems.find((li: any) => {
+              const sku = (item as any)?.sku || (item as any)?.productName;
+              return (li?.sku && sku && String(li.sku) === String(sku)) || (li?.id && (item as any)?.marketplaceKey && String(li.id) === String((item as any).marketplaceKey)) || (li?.object_id && (item as any)?.uniqueLineKey && String(li.object_id) === String((item as any).uniqueLineKey));
+            }) || lineItems[0];
+            const liTotal = toNum(matched?.total_price) || (toNum(matched?.price) * (toNum(matched?.quantity) || 1));
+            if (liTotal > 0) declaredValue = Number(liTotal.toFixed(2));
+          }
+        }
+      } else {
+        // No item: use order totals first
+        const orderTotal = toNum((order as any).totalPrice ?? 0);
+        if (orderTotal > 0) declaredValue = Number(orderTotal.toFixed(2));
+        if (declaredValue === 0 && (order as any).items && Array.isArray((order as any).items)) {
+          const items: any[] = (order as any).items;
+          const sum = items.reduce((acc, it) => acc + (toNum(it?.totalPrice ?? 0) || (toNum(it?.unitPrice ?? 0) * (toNum(it?.quantity ?? 1) || 1))), 0);
+          if (sum > 0) declaredValue = Number(sum.toFixed(2));
+        }
+        if (declaredValue === 0) {
+          const raw: any = (order as any).rawData;
+          const totalRaw = toNum(raw?.total_price ?? 0);
+          if (totalRaw > 0) declaredValue = Number(totalRaw.toFixed(2));
         }
       }
     } catch {}

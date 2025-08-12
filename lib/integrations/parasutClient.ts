@@ -367,22 +367,21 @@ export class ParasutClient {
    * Get invoice PDF URL
    */
   private async getInvoicePdfUrl(invoiceId: number): Promise<string | undefined> {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices/${invoiceId}/pdf`,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.credentials.accessToken}`
-          }
+    const endpoint = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices/${invoiceId}/pdf`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await fetch(endpoint, {
+          headers: { 'Authorization': `Bearer ${this.credentials.accessToken}` }
+        });
+        if (response.ok) {
+          const result = await response.json() as any;
+          const url = result.data?.attributes?.url;
+          if (url) return url;
         }
-      );
-
-      if (response.ok) {
-        const result = await response.json() as any;
-        return result.data?.attributes?.url;
+      } catch (error) {
+        logger.warn('Failed to get PDF URL', { invoiceId, error, attempt });
       }
-    } catch (error) {
-      logger.warn('Failed to get PDF URL', { invoiceId, error });
+      await new Promise(r => setTimeout(r, 800));
     }
     return undefined;
   }
@@ -391,22 +390,21 @@ export class ParasutClient {
    * Get invoice UBL URL
    */
   private async getInvoiceUblUrl(invoiceId: number): Promise<string | undefined> {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices/${invoiceId}/ubl`,
-        {
-          headers: {
-            'Authorization': `Bearer ${this.credentials.accessToken}`
-          }
+    const endpoint = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices/${invoiceId}/ubl`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const response = await fetch(endpoint, {
+          headers: { 'Authorization': `Bearer ${this.credentials.accessToken}` }
+        });
+        if (response.ok) {
+          const result = await response.json() as any;
+          const url = result.data?.attributes?.url;
+          if (url) return url;
         }
-      );
-
-      if (response.ok) {
-        const result = await response.json() as any;
-        return result.data?.attributes?.url;
+      } catch (error) {
+        logger.warn('Failed to get UBL URL', { invoiceId, error, attempt });
       }
-    } catch (error) {
-      logger.warn('Failed to get UBL URL', { invoiceId, error });
+      await new Promise(r => setTimeout(r, 800));
     }
     return undefined;
   }

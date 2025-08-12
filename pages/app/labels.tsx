@@ -2169,9 +2169,18 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     const toastId = toast.loading(`${etgbSelectedRows.length} sipariş için ETGB işlemi başlatılıyor...`);
     
     try {
-      // Get user settings for ETGB recipient email
-      const settingsResponse = await fetch('/api/user/settings');
-      const settings = await settingsResponse.json();
+      // Get user settings for ETGB recipient email (send auth header and safe JSON parse)
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      const settingsResponse = await fetch('/api/user/settings', {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+      let settings: any = {};
+      try {
+        settings = await settingsResponse.json();
+      } catch (_) {
+        settings = {};
+      }
       const recipientEmail = settings.shippingSettings?.etgbRecipientEmail;
       
       if (!recipientEmail) {
@@ -2182,14 +2191,23 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       // Process ETGB
       const response = await fetch('/api/etgb/process', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({
           orderIds: etgbSelectedRows,
           recipientEmail: recipientEmail
         })
       });
       
-      const result = await response.json();
+      let result: any = {};
+      try {
+        result = await response.json();
+      } catch (_) {
+        // If backend crashed and returned non-JSON, create a fallback error
+        throw new Error('Sunucu beklenmeyen bir cevap döndü');
+      }
       
       if (response.ok && result.success) {
         toast.success(`ETGB dosyası ${recipientEmail} adresine gönderildi!`, { id: toastId });

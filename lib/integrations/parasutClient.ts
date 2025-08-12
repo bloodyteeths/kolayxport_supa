@@ -337,6 +337,8 @@ export class ParasutClient {
       data: {
         type: 'contacts',
         attributes: {
+          // Paraşüt requires account_type; default to 'customer' for sales invoices
+          account_type: 'customer',
           name: contactData.name,
           email: contactData.email,
           phone: contactData.phone,

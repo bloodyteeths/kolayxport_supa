@@ -5,8 +5,8 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/sync",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/sync-orders",
+      "schedule": "*/15 * * * *"
     }
   ],
   "build": {

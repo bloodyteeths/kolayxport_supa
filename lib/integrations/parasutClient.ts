@@ -368,7 +368,7 @@ export class ParasutClient {
    */
   private async getInvoicePdfUrl(invoiceId: number): Promise<string | undefined> {
     const endpoint = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices/${invoiceId}/pdf`;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 1; attempt <= 8; attempt++) {
       try {
         const response = await fetch(endpoint, {
           headers: { 'Authorization': `Bearer ${this.credentials.accessToken}` }
@@ -377,12 +377,17 @@ export class ParasutClient {
           const result = await response.json() as any;
           const url = result.data?.attributes?.url;
           if (url) return url;
+          logger.debug('PDF URL not ready yet', { invoiceId, attempt });
+        } else {
+          const text = await response.text();
+          logger.debug('PDF URL response not ok', { invoiceId, status: response.status, body: text, attempt });
         }
       } catch (error) {
-        logger.warn('Failed to get PDF URL', { invoiceId, error, attempt });
+        logger.warn('Failed to get PDF URL', { invoiceId, error: error instanceof Error ? error.message : String(error), attempt });
       }
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, attempt * 600));
     }
+    logger.warn('PDF URL unavailable after retries', { invoiceId });
     return undefined;
   }
 
@@ -391,7 +396,7 @@ export class ParasutClient {
    */
   private async getInvoiceUblUrl(invoiceId: number): Promise<string | undefined> {
     const endpoint = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices/${invoiceId}/ubl`;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 1; attempt <= 8; attempt++) {
       try {
         const response = await fetch(endpoint, {
           headers: { 'Authorization': `Bearer ${this.credentials.accessToken}` }
@@ -400,12 +405,17 @@ export class ParasutClient {
           const result = await response.json() as any;
           const url = result.data?.attributes?.url;
           if (url) return url;
+          logger.debug('UBL URL not ready yet', { invoiceId, attempt });
+        } else {
+          const text = await response.text();
+          logger.debug('UBL URL response not ok', { invoiceId, status: response.status, body: text, attempt });
         }
       } catch (error) {
-        logger.warn('Failed to get UBL URL', { invoiceId, error, attempt });
+        logger.warn('Failed to get UBL URL', { invoiceId, error: error instanceof Error ? error.message : String(error), attempt });
       }
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, attempt * 600));
     }
+    logger.warn('UBL URL unavailable after retries', { invoiceId });
     return undefined;
   }
 }

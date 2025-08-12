@@ -177,7 +177,7 @@ export class EtgbExcelService {
       }
     } catch {}
 
-    return {
+    const row: EtgbOrderData = {
       trackingNumber: tracking,
       packageCount: 1,
       grossWeight: (item ? (order.weightKg || 0.5) : 0.5),
@@ -198,6 +198,8 @@ export class EtgbExcelService {
       commercialInvoiceNo: `INV${order.orderNumber}`,
       commercialInvoiceDate: order.createdAt.toISOString().split('T')[0]
     };
+    logger.debug?.('ETGB row computed', { orderId: (order as any).id, tracking: row.trackingNumber, value: row.value });
+    return row;
   }
 
   /**

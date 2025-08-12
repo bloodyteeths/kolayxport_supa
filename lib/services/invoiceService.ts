@@ -57,6 +57,7 @@ export class InvoiceService {
         try {
           const invoiceData = await this.orderToParasutInvoiceConverted(order);
           const result = await parasutClient.createInvoice(invoiceData);
+          logger.info('Invoice create result', { orderId: order.id, invoiceId: result.invoiceId, hasPdf: !!result.pdfUrl, hasUbl: !!result.ublUrl });
           
           // Download PDF if available
           let localPdfPath: string | undefined;
@@ -69,6 +70,7 @@ export class InvoiceService {
                 path: localPdfPath,
                 contentType: 'application/pdf'
               });
+              logger.info('Attached invoice PDF', { orderId: order.id, path: localPdfPath });
             }
           }
           // Also include UBL XML if available (common for e-invoice workflows)
@@ -80,6 +82,7 @@ export class InvoiceService {
                 path: ublPath,
                 contentType: 'application/xml'
               });
+              logger.info('Attached invoice UBL', { orderId: order.id, path: ublPath });
             }
           }
 

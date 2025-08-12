@@ -2195,7 +2195,6 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         toast.success(`ETGB dosyası ${recipientEmail} adresine gönderildi!`, { id: toastId });
         // Clear selection after successful processing
         setEtgbSelectedRows([]);
-        setEtgbSelectionModel([]);
       } else {
         throw new Error(result.error || result.message || 'ETGB işlemi başarısız oldu');
       }

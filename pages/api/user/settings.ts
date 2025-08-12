@@ -63,6 +63,8 @@ export default async function handler(
                parasutUsername: true,
                parasutPassword: true,
                parasutCompanyId: true,
+               parasutBaseUrl: true,
+               parasutRedirectUri: true,
             }
           },
           shipperProfile: {
@@ -166,6 +168,8 @@ export default async function handler(
               parasutUsername: integrationSettings.parasutUsername,
               parasutPassword: integrationSettings.parasutPassword,
               parasutCompanyId: integrationSettings.parasutCompanyId,
+              parasutBaseUrl: integrationSettings.parasutBaseUrl,
+              parasutRedirectUri: integrationSettings.parasutRedirectUri,
             },
             update: {
               veeqoApiKey: integrationSettings.veeqoApiKey,
@@ -184,6 +188,8 @@ export default async function handler(
               parasutUsername: integrationSettings.parasutUsername,
               parasutPassword: integrationSettings.parasutPassword,
               parasutCompanyId: integrationSettings.parasutCompanyId,
+              parasutBaseUrl: integrationSettings.parasutBaseUrl,
+              parasutRedirectUri: integrationSettings.parasutRedirectUri,
             },
           });
           console.log('Integration settings saved successfully');

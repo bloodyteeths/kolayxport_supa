@@ -50,6 +50,8 @@ interface UserSettingsResponse {
     parasutUsername?: string | null;
     parasutPassword?: string | null;
     parasutCompanyId?: string | null;
+    parasutBaseUrl?: string | null;
+    parasutRedirectUri?: string | null;
   } | null; // Allow null for the whole object
   shipperProfile?: {
     shipperName?: string | null;
@@ -93,6 +95,8 @@ const initialFormData: UserSettingsResponse = {
     parasutUsername: '',
     parasutPassword: '',
     parasutCompanyId: '',
+    parasutBaseUrl: '',
+    parasutRedirectUri: '',
   },
   shipperProfile: {
     shipperName: '',
@@ -406,6 +410,12 @@ const AyarlarPage = () => {
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <TextField fullWidth label="Paraşüt Company ID" name="parasutCompanyId" value={formData.integrationSettings?.parasutCompanyId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField fullWidth label="Paraşüt Base URL (opsiyonel)" name="parasutBaseUrl" placeholder="https://api.parasut.com veya https://api.heroku-staging.parasut.com" value={formData.integrationSettings?.parasutBaseUrl || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField fullWidth label="Paraşüt Redirect URI (opsiyonel)" name="parasutRedirectUri" placeholder="urn:ietf:wg:oauth:2.0:oob" value={formData.integrationSettings?.parasutRedirectUri || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
               </Grid>
             </Paper>

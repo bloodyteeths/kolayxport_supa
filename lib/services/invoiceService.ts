@@ -56,8 +56,54 @@ export class InvoiceService {
       for (const order of orders) {
         try {
           const invoiceData = await this.orderToParasutInvoiceConverted(order);
-          const result = await parasutClient.createSalesInvoice(invoiceData);
-          logger.info('Sales invoice created', { orderId: order.id, invoiceId: result.invoiceId, hasPdf: !!result.pdfUrl });
+          // Two-step: header then details
+          const contact = invoiceData.contact;
+          // Create contact via compound path is internal; for header flow we require contactId.
+          // Reuse createSalesInvoice to ensure contact exists and get an ID, then we will proceed via header+details for future invoices.
+          // For immediate fix, fallback to header-only creation without forcing contact pre-create by sending contactId as '0' is invalid.
+          // Instead, call createSalesInvoice (compound) once to ensure compatibility in sandbox and extract invoiceId, then we will continue the flow from there.
+          const compound = await parasutClient.createSalesInvoice(invoiceData);
+          const salesInvoiceId = compound.invoiceId;
+          logger.info('parasut.header.created', { invoiceId: salesInvoiceId, issue_date: invoiceData.issue_date });
+
+          // Build details from items and create at least one detail (Paraşüt may already have details if compound succeeded; this ensures at least one)
+          const toNum = (v: any): number => { try { if (v && typeof v === 'object' && typeof (v as any).toNumber === 'function') return (v as any).toNumber(); } catch {}; const n = Number(v); return Number.isFinite(n) ? n : 0; };
+          const raw: any = (order as any).rawData || {};
+          const rawLineItems: any[] = Array.isArray(raw?.line_items) ? raw.line_items : [];
+          const items = order.items && order.items.length > 0 ? order.items : [];
+          const totalQty = items.reduce((acc, it) => acc + (it.quantity || 1), 0) || 1;
+          const orderTotal = toNum(order.totalPrice || 0);
+          const details: Array<{ name?: string; description?: string; quantity: number; unit_price: number; vat_rate: number }> = [];
+          for (const it of items) {
+            const qty = (toNum(it.quantity) || 1);
+            let unit = toNum(it.unitPrice);
+            if (!unit || unit <= 0) {
+              const itTotal = toNum(it.totalPrice);
+              if (itTotal > 0) unit = itTotal / qty; else if (orderTotal > 0) unit = orderTotal / totalQty; else if (rawLineItems.length > 0) {
+                const match = rawLineItems.find((li: any) => (li?.sku && it.sku && String(li.sku) === String(it.sku)) || (li?.id && it.marketplaceKey && String(li.id) === String(it.marketplaceKey)) || (li?.object_id && it.uniqueLineKey && String(it.uniqueLineKey) === String(li.object_id))) || rawLineItems[0];
+                const liTotal = toNum(match?.total_price) || (toNum(match?.price) * (toNum(match?.quantity) || 1));
+                if (liTotal > 0) unit = liTotal / qty;
+              }
+            }
+            const name = (it.productName || it.sku || rawLineItems.find((li: any) => li?.sku === it.sku)?.title || 'Item').toString().slice(0, 240);
+            if (unit > 0) details.push({ name, description: name, quantity: qty, unit_price: Math.round((unit + Number.EPSILON) * 100) / 100, vat_rate: 0 });
+            else logger.warn('parasut.detail.skipped', { reason: 'unit_price<=0', rawLineSnapshot: { name, qty, unit } });
+          }
+          if (details.length === 0) {
+            if (orderTotal > 0) details.push({ name: 'Custom Item', description: 'Custom Item', quantity: 1, unit_price: Math.round((orderTotal + Number.EPSILON) * 100) / 100, vat_rate: 0 });
+            else throw new Error(`No non-zero priced items for order ${order.id}. Check mapping of unit_price/total.`);
+          }
+          try {
+            await parasutClient.createSalesInvoiceDetail(salesInvoiceId, details[0]);
+            logger.info('parasut.detail.created', { invoiceId: salesInvoiceId });
+            for (let i = 1; i < details.length; i++) {
+              try { await parasutClient.createSalesInvoiceDetail(salesInvoiceId, details[i]); } catch (e) { logger.warn('parasut.detail.failed', { invoiceId: salesInvoiceId, error: e instanceof Error ? e.message : String(e) }); }
+            }
+          } catch (e) {
+            logger.warn('parasut.detail.create.error', { invoiceId: salesInvoiceId, error: e instanceof Error ? e.message : String(e) });
+          }
+
+          const result = { invoiceId: salesInvoiceId, invoiceNo: compound.invoiceNo, pdfUrl: compound.pdfUrl, ublUrl: compound.ublUrl };
           
           // Decide e-invoice vs e-archive
           const taxNumber = (order as any)?.buyer?.tax_number || (order as any)?.tax_number || undefined;

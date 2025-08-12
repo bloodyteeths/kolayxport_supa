@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import {
   Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, Fade, List, ListItem, ListItemIcon, ListItemText, ToggleButton, ToggleButtonGroup, Grid, SelectChangeEvent
 } from '@mui/material';
-import { DataGrid, GridColDef, GridPaginationModel, GridRenderCellParams, GridValueGetter } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridPaginationModel, GridRenderCellParams, GridValueGetter, GridRowSelectionModel, GridRowId } from '@mui/x-data-grid';
 import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, Edit as EditIcon, Check as CheckIcon, Warning as WarningIcon, Error as ErrorIcon, Info as InfoIcon, Lock as LockIcon, FlightTakeoff as FlightTakeoffIcon, Flight as FlightIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -1292,6 +1292,12 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     fedexPackagingType: '',
     labelStockType: 'PAPER_4X6',
   });
+  
+  // --- ETGB Selection State ---
+  const [etgbSelectedRows, setEtgbSelectedRows] = useState<string[]>([]);
+  const [etgbSelectionModel, setEtgbSelectionModel] = useState<GridRowSelectionModel>([]);
+  const [etgbEnabled, setEtgbEnabled] = useState(false);
+  const [processingEtgb, setProcessingEtgb] = useState(false);
 
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
@@ -1418,6 +1424,11 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           setHasFedexCredentials(false);
           // toast.error('Lütfen entegrasyon ayarlarınızı tamamlayın.'); // Consider if this toast is too aggressive on load
         }
+        
+        // Check ETGB settings
+        if (data.shippingSettings) {
+          setEtgbEnabled(!!data.shippingSettings.etgbEnabled);
+        }
       } catch (error) {
         console.error('Error fetching user settings for labels page:', error);
         setHasFedexCredentials(false);
@@ -1428,6 +1439,14 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     };
     fetchUserSettings();
   }, []);
+  
+  // Clear selection when ETGB is disabled
+  useEffect(() => {
+    if (!etgbEnabled) {
+      setEtgbSelectedRows([]);
+      setEtgbSelectionModel([] as unknown as GridRowSelectionModel);
+    }
+  }, [etgbEnabled]);
 
 
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -2142,6 +2161,54 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     });
   };
   
+  const handleProcessEtgb = async () => {
+    if (etgbSelectedRows.length === 0) {
+      toast.error('Lütfen işlem için en az bir sipariş seçin.');
+      return;
+    }
+    
+    setProcessingEtgb(true);
+    const toastId = toast.loading(`${etgbSelectedRows.length} sipariş için ETGB işlemi başlatılıyor...`);
+    
+    try {
+      // Get user settings for ETGB recipient email
+      const settingsResponse = await fetch('/api/user/settings');
+      const settings = await settingsResponse.json();
+      const recipientEmail = settings.shippingSettings?.etgbRecipientEmail;
+      
+      if (!recipientEmail) {
+        toast.error('ETGB alıcı e-posta adresi ayarlanmamış. Lütfen ayarlar sayfasından düzenleyin.', { id: toastId });
+        return;
+      }
+      
+      // Process ETGB
+      const response = await fetch('/api/etgb/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderIds: etgbSelectedRows,
+          recipientEmail: recipientEmail
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.success) {
+        toast.success(`ETGB dosyası ${recipientEmail} adresine gönderildi!`, { id: toastId });
+        // Clear selection after successful processing
+        setEtgbSelectedRows([]);
+        setEtgbSelectionModel([] as unknown as GridRowSelectionModel);
+      } else {
+        throw new Error(result.error || result.message || 'ETGB işlemi başarısız oldu');
+      }
+      
+    } catch (error: any) {
+      toast.error(`ETGB Hatası: ${error.message}`, { id: toastId });
+    } finally {
+      setProcessingEtgb(false);
+    }
+  };
+  
   const handleGenerateLabel = async (rowForLabel: LabelRow) => {
     if (!hasFedexCredentials) {
       toast.error('Etiket oluşturmak için FedEx ayarlarınızı tamamlamanız gerekmektedir.');
@@ -2426,6 +2493,19 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           {syncingOrders ? 'Senkronize Ediliyor...' : 'Siparişleri Senkron Et'}
         </Button>
         <ManualOrderButton onOrderCreated={() => { mutate(); toast.success('Sipariş listesi yenilendi'); }} />
+        
+        {/* ETGB Button - Only show if enabled in settings */}
+        {etgbEnabled && (
+          <Button 
+            variant="contained" 
+            color="secondary" 
+            onClick={handleProcessEtgb} 
+            disabled={processingEtgb || etgbSelectedRows.length === 0}
+            sx={{ textTransform: 'none', height: '40px', minWidth: 140 }}
+          >
+            {processingEtgb ? 'İşleniyor...' : `ETGB İşle (${etgbSelectedRows.length})`}
+          </Button>
+        )}
           <FormControl size="small" variant="outlined" sx={{ minWidth: 120, height: '40px', mb: { xs: 1, sm: 0 } }}>
             <InputLabel shrink={true}>Arama Türü</InputLabel>
             <Select value={searchType} label="Arama Türü" onChange={e => setSearchType(e.target.value)} displayEmpty>
@@ -2538,6 +2618,20 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             disableColumnResize
             disableColumnMenu
             keepNonExistentRowsSelected={false}
+            checkboxSelection={etgbEnabled}
+            rowSelectionModel={etgbEnabled ? etgbSelectionModel : []}
+            onRowSelectionModelChange={etgbEnabled ? (newSelection) => {
+              setEtgbSelectionModel(newSelection);
+              const selectionArray = (newSelection as unknown as GridRowId[]);
+              const orderIds = selectionArray
+                .map(id => {
+                  const row = filteredAndPaginatedItems.find(r => (r.itemId || r.orderId) === id);
+                  return row?.orderId;
+                })
+                .filter(Boolean) as string[];
+              const uniqueOrderIds = Array.from(new Set(orderIds));
+              setEtgbSelectedRows(uniqueOrderIds);
+            } : undefined}
             initialState={{
               sorting: {
                 sortModel: [{ field: 'orderDate', sort: 'desc' }],

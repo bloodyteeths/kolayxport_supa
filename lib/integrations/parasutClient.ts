@@ -241,8 +241,8 @@ export class ParasutClient {
             issue_date: invoiceData.issue_date || new Date().toISOString().split('T')[0],
             due_date: invoiceData.due_date,
             invoice_series: invoiceData.invoice_series || 'A',
-            // enforce TRY; values must already be converted by caller
-            currency: 'TRY',
+            // Paraşüt expects TRL code in many endpoints; use TRL
+            currency: 'TRL',
             withholding_rate: invoiceData.withholding_rate || 0,
             fatura_no: invoiceData.fatura_no,
             details_attributes: invoiceData.items.map((item) => ({

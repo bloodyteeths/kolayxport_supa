@@ -56,25 +56,14 @@ export class InvoiceService {
       for (const order of orders) {
         try {
           const invoiceData = await this.orderToParasutInvoiceConverted(order);
-          // Two-step: ensure contact, create header, then details
-          const contactCreated = await parasutClient.createOrGetContact(invoiceData.contact);
-          const header = await parasutClient.createSalesInvoiceHeader({
-            issue_date: invoiceData.issue_date || new Date().toISOString().split('T')[0],
-            description: `Invoice for ${contactCreated.name}`,
-            currency: 'TRL',
-            contactId: String(contactCreated.id)
-          });
-          const salesInvoiceId = header.id;
-          logger.info('parasut.header.created', { invoiceId: salesInvoiceId, issue_date: invoiceData.issue_date, contactId: contactCreated.id });
-
-          // Build details from items and create at least one detail (Paraşüt may already have details if compound succeeded; this ensures at least one)
+          // Build details from items
           const toNum = (v: any): number => { try { if (v && typeof v === 'object' && typeof (v as any).toNumber === 'function') return (v as any).toNumber(); } catch {}; const n = Number(v); return Number.isFinite(n) ? n : 0; };
           const raw: any = (order as any).rawData || {};
           const rawLineItems: any[] = Array.isArray(raw?.line_items) ? raw.line_items : [];
           const items = order.items && order.items.length > 0 ? order.items : [];
           const totalQty = items.reduce((acc, it) => acc + (it.quantity || 1), 0) || 1;
           const orderTotal = toNum(order.totalPrice || 0);
-          const details: Array<{ name?: string; description?: string; quantity: number; unit_price: number; vat_rate: number }> = [];
+          const details: Array<{ name: string; description?: string; quantity: number; unit_price: number; vat_rate: number }> = [];
           for (const it of items) {
             const qty = (toNum(it.quantity) || 1);
             let unit = toNum(it.unitPrice);
@@ -94,17 +83,17 @@ export class InvoiceService {
             if (orderTotal > 0) details.push({ name: 'Custom Item', description: 'Custom Item', quantity: 1, unit_price: Math.round((orderTotal + Number.EPSILON) * 100) / 100, vat_rate: 0 });
             else throw new Error(`No non-zero priced items for order ${order.id}. Check mapping of unit_price/total.`);
           }
-          try {
-            await parasutClient.createSalesInvoiceDetail(salesInvoiceId, details[0]);
-            logger.info('parasut.detail.created', { invoiceId: salesInvoiceId });
-            for (let i = 1; i < details.length; i++) {
-              try { await parasutClient.createSalesInvoiceDetail(salesInvoiceId, details[i]); } catch (e) { logger.warn('parasut.detail.failed', { invoiceId: salesInvoiceId, error: e instanceof Error ? e.message : String(e) }); }
-            }
-          } catch (e) {
-            logger.warn('parasut.detail.create.error', { invoiceId: salesInvoiceId, error: e instanceof Error ? e.message : String(e) });
-          }
-
-          const result = { invoiceId: salesInvoiceId, invoiceNo: 'N/A', pdfUrl: undefined as string | undefined, ublUrl: undefined as string | undefined };
+          // Create invoice with details via compound create
+          const contactCreated = await parasutClient.createOrGetContact(invoiceData.contact);
+          const created = await parasutClient.createSalesInvoiceWithDetails({
+            contactId: String(contactCreated.id),
+            issueDate: invoiceData.issue_date || new Date().toISOString().split('T')[0],
+            description: `Invoice for ${contactCreated.name}`,
+            currency: 'TRY',
+            details
+          });
+          const result = { invoiceId: created.id, invoiceNo: created.invoice_no || 'N/A', pdfUrl: undefined as string | undefined, ublUrl: undefined as string | undefined };
+          logger.info('parasut.invoice.created', { invoiceId: result.invoiceId, contactId: contactCreated.id, detailCount: details.length });
           
           // Decide e-invoice vs e-archive
           const taxNumber = (order as any)?.buyer?.tax_number || (order as any)?.tax_number || undefined;

@@ -242,8 +242,8 @@ export class ParasutClient {
             issue_date: invoiceData.issue_date || new Date().toISOString().split('T')[0],
             due_date: invoiceData.due_date,
             invoice_series: invoiceData.invoice_series || 'A',
-            // Paraşüt expects TRL code in many endpoints; use TRL
-            currency: 'TRL',
+            // Use modern TRY currency code
+            currency: 'TRY',
             withholding_rate: invoiceData.withholding_rate || 0,
             fatura_no: invoiceData.fatura_no,
           },
@@ -368,51 +368,61 @@ export class ParasutClient {
     return { id };
   }
 
-  /** Create a sales invoice detail referencing header */
-  async createSalesInvoiceDetail(headerId: number, detail: {
-    name?: string;
+  /** Create Sales Invoice with details using JSON:API compound create */
+  async createSalesInvoiceWithDetails(args: {
+    contactId: string;
+    issueDate: string;
     description?: string;
-    quantity: number;
-    unit_price: number;
-    vat_rate: number;
-    productId?: string;
-    discount_type?: 'percentage' | 'amount';
-    discount_value?: number;
-  }): Promise<{ id: number }> {
+    currency?: 'TRY' | 'USD' | 'EUR' | 'GBP';
+    details: Array<{ name: string; description?: string; quantity: number; unit_price: number; vat_rate: number }>
+  }): Promise<{ id: number; invoice_no?: string }> {
     await this.ensureValidToken();
-    const payload: any = {
+    const currency = args.currency || 'TRY';
+    // Build temp-id linked details
+    const detailRefs = args.details.map((_, idx) => ({ type: 'sales_invoice_details', 'temp-id': `d${idx+1}`, method: 'create' }));
+    const included = args.details.map((d, idx) => ({
+      type: 'sales_invoice_details',
+      'temp-id': `d${idx+1}`,
+      attributes: {
+        name: d.name,
+        ...(d.description ? { description: d.description } : {}),
+        quantity: Number(d.quantity),
+        unit_price: Number(d.unit_price),
+        vat_rate: Number(d.vat_rate)
+      }
+    }));
+    const payload = {
       data: {
-        type: 'sales_invoice_details',
+        type: 'sales_invoices',
         attributes: {
-          quantity: Number(detail.quantity),
-          unit_price: Number(detail.unit_price),
-          vat_rate: Number(detail.vat_rate),
-          ...(detail.name ? { name: String(detail.name).slice(0, 240) } : {}),
-          ...(detail.description ? { description: String(detail.description).slice(0, 240) } : {}),
-          ...(detail.discount_type ? { discount_type: detail.discount_type } : {}),
-          ...(detail.discount_value !== undefined ? { discount_value: Number(detail.discount_value) } : {}),
+          item_type: 'invoice',
+          issue_date: args.issueDate,
+          ...(args.description ? { description: args.description } : {}),
+          currency
         },
         relationships: {
-          sales_invoice: { data: { type: 'sales_invoices', id: String(headerId) } },
-          ...(detail.productId ? { product: { data: { type: 'products', id: String(detail.productId) } } } : {})
+          contact: { data: { type: 'contacts', id: args.contactId } },
+          details: { data: detailRefs }
         }
-      }
+      },
+      included
     };
-    logger.debug?.('parasut.createSalesInvoiceDetail.payload', { headerId, payload });
-    const res = await fetch(`${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoice_details`, {
+    logger.debug?.('parasut.createSalesInvoiceWithDetails.payload', payload);
+    const res = await fetch(`${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${this.credentials.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const text = await res.text();
     if (!res.ok) {
-      logger.error('parasut.createSalesInvoiceDetail.failed', undefined, { status: res.status, body: text });
-      throw new Error(`createSalesInvoiceDetail failed: ${res.status} - ${text}`);
+      logger.error('parasut.createSalesInvoiceWithDetails.failed', undefined, { status: res.status, body: text });
+      throw new Error(`createSalesInvoiceWithDetails failed: ${res.status} - ${text}`);
     }
     const json = JSON.parse(text);
     const id = Number(json?.data?.id);
-    logger.info('parasut.detail.created', { invoiceId: headerId, detailId: id, name: detail.name, unit_price: detail.unit_price, quantity: detail.quantity, vat_rate: detail.vat_rate });
-    return { id };
+    const invoice_no = json?.data?.attributes?.invoice_no;
+    logger.info('parasut.invoice.created', { invoiceId: id, detailCount: args.details.length, contactId: args.contactId });
+    return { id, invoice_no };
   }
 
   /** Lookup e-invoice inboxes by VKN/TCKN */

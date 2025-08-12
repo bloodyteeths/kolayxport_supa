@@ -530,7 +530,7 @@ export class ParasutClient {
   /**
    * Create or get existing contact
    */
-  private async createOrGetContact(contactData: ParasutContact): Promise<ParasutContact & { id: number }> {
+  async createOrGetContact(contactData: ParasutContact): Promise<ParasutContact & { id: number }> {
     // For simplicity, always create new contact
     // In production, you might want to search for existing contacts first
     

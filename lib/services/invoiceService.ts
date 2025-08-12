@@ -56,15 +56,16 @@ export class InvoiceService {
       for (const order of orders) {
         try {
           const invoiceData = await this.orderToParasutInvoiceConverted(order);
-          // Two-step: header then details
-          const contact = invoiceData.contact;
-          // Create contact via compound path is internal; for header flow we require contactId.
-          // Reuse createSalesInvoice to ensure contact exists and get an ID, then we will proceed via header+details for future invoices.
-          // For immediate fix, fallback to header-only creation without forcing contact pre-create by sending contactId as '0' is invalid.
-          // Instead, call createSalesInvoice (compound) once to ensure compatibility in sandbox and extract invoiceId, then we will continue the flow from there.
-          const compound = await parasutClient.createSalesInvoice(invoiceData);
-          const salesInvoiceId = compound.invoiceId;
-          logger.info('parasut.header.created', { invoiceId: salesInvoiceId, issue_date: invoiceData.issue_date });
+          // Two-step: ensure contact, create header, then details
+          const contactCreated = await parasutClient.createOrGetContact(invoiceData.contact);
+          const header = await parasutClient.createSalesInvoiceHeader({
+            issue_date: invoiceData.issue_date || new Date().toISOString().split('T')[0],
+            description: `Invoice for ${contactCreated.name}`,
+            currency: 'TRL',
+            contactId: String(contactCreated.id)
+          });
+          const salesInvoiceId = header.id;
+          logger.info('parasut.header.created', { invoiceId: salesInvoiceId, issue_date: invoiceData.issue_date, contactId: contactCreated.id });
 
           // Build details from items and create at least one detail (Paraşüt may already have details if compound succeeded; this ensures at least one)
           const toNum = (v: any): number => { try { if (v && typeof v === 'object' && typeof (v as any).toNumber === 'function') return (v as any).toNumber(); } catch {}; const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -103,7 +104,7 @@ export class InvoiceService {
             logger.warn('parasut.detail.create.error', { invoiceId: salesInvoiceId, error: e instanceof Error ? e.message : String(e) });
           }
 
-          const result = { invoiceId: salesInvoiceId, invoiceNo: compound.invoiceNo, pdfUrl: compound.pdfUrl, ublUrl: compound.ublUrl };
+          const result = { invoiceId: salesInvoiceId, invoiceNo: 'N/A', pdfUrl: undefined as string | undefined, ublUrl: undefined as string | undefined };
           
           // Decide e-invoice vs e-archive
           const taxNumber = (order as any)?.buyer?.tax_number || (order as any)?.tax_number || undefined;

@@ -1444,7 +1444,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   useEffect(() => {
     if (!etgbEnabled) {
       setEtgbSelectedRows([]);
-      setEtgbSelectionModel([] as unknown as GridRowSelectionModel);
+      setEtgbSelectionModel([]);
     }
   }, [etgbEnabled]);
 

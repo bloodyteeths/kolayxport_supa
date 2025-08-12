@@ -5,6 +5,10 @@ import { syncTrendyolRecentOrdersForUser } from '@/lib/sync/trendyol';
 import { isTrendyolEnabled } from '@/lib/config';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Temporary disable cron via env flag to avoid Hobby plan limits
+  if (process.env.DISABLE_CRON_SYNC === 'true') {
+    return res.status(503).json({ error: 'Cron sync temporarily disabled' });
+  }
   // Allow Vercel Cron (GET with x-vercel-cron header) and secured calls (POST with Bearer token)
   const isVercelCron = req.headers["x-vercel-cron"] !== undefined;
   const authHeader = req.headers.authorization;

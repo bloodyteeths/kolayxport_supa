@@ -105,9 +105,10 @@ export default async function handler(
         });
         
         try {
+          // Cast data objects to any to avoid Prisma type mismatches in certain build environments
           await prisma.credential.upsert({
             where: { userId: authUser.id },
-            create: {
+            create: ({
               userId: authUser.id,
               veeqoApiKey: integrationSettings.veeqoApiKey,
               shippoToken: integrationSettings.shippoToken,
@@ -125,8 +126,8 @@ export default async function handler(
               parasutUsername: integrationSettings.parasutUsername,
               parasutPassword: integrationSettings.parasutPassword,
               parasutCompanyId: integrationSettings.parasutCompanyId,
-            },
-            update: {
+            } as any),
+            update: ({
               veeqoApiKey: integrationSettings.veeqoApiKey,
               shippoToken: integrationSettings.shippoToken,
               trendyolApiKey: integrationSettings.trendyolApiKey,
@@ -143,7 +144,7 @@ export default async function handler(
               parasutUsername: integrationSettings.parasutUsername,
               parasutPassword: integrationSettings.parasutPassword,
               parasutCompanyId: integrationSettings.parasutCompanyId,
-            },
+            } as any),
           });
           console.log('Integration settings saved successfully');
         } catch (error) {

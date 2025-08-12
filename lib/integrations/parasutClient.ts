@@ -231,7 +231,7 @@ export class ParasutClient {
       // First, create or get contact
       const contact = await this.createOrGetContact(invoiceData.contact);
 
-      // Prepare invoice payload
+      // Prepare invoice payload using inline details_attributes per Paraşüt API
       const invoicePayload = {
         data: {
           type: 'sales_invoices',
@@ -241,11 +241,18 @@ export class ParasutClient {
             issue_date: invoiceData.issue_date || new Date().toISOString().split('T')[0],
             due_date: invoiceData.due_date,
             invoice_series: invoiceData.invoice_series || 'A',
-            invoice_id: invoiceData.invoice_id,
-            currency: invoiceData.currency || 'TRL',
-            exchange_rate: invoiceData.exchange_rate || 1,
+            // enforce TRY; values must already be converted by caller
+            currency: 'TRY',
             withholding_rate: invoiceData.withholding_rate || 0,
-            fatura_no: invoiceData.fatura_no
+            fatura_no: invoiceData.fatura_no,
+            details_attributes: invoiceData.items.map((item) => ({
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              vat_rate: item.vat_rate,
+              description: item.description,
+              unit: item.unit || 'Adet',
+              ...(item.product_id ? { product_id: item.product_id } : {})
+            })),
           },
           relationships: {
             contact: {
@@ -253,26 +260,9 @@ export class ParasutClient {
                 type: 'contacts',
                 id: contact.id.toString()
               }
-            },
-            details: {
-              data: invoiceData.items.map((item, index) => ({
-                type: 'sales_invoice_details',
-                id: (index + 1).toString()
-              }))
             }
           }
-        },
-        included: invoiceData.items.map((item, index) => ({
-          type: 'sales_invoice_details',
-          id: (index + 1).toString(),
-          attributes: {
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            vat_rate: item.vat_rate,
-            description: item.description,
-            unit: item.unit || 'Adet'
-          }
-        }))
+        }
       };
 
       const response = await fetch(

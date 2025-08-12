@@ -142,6 +142,8 @@ export class EtgbExcelService {
    */
   private orderToEtgbData(order: Order, item: OrderItem | null): EtgbOrderData {
     const shippingAddr = order.shippingAddress as any;
+    const raw: any = (order as any).rawData || {};
+    const rawLineItems: any[] = Array.isArray(raw?.line_items) ? raw.line_items : [];
     // Determine tracking number: prefer order.trackingNumber else latest created shipment tracking
     let tracking = order.trackingNumber || '';
     try {
@@ -157,55 +159,61 @@ export class EtgbExcelService {
     } catch {}
 
     // Helper to coerce Prisma Decimal or number-like into number
-    const toNum = (v: any): number => {
+    const parseMoney = (v: any): number => {
       try {
         if (v && typeof v === 'object' && typeof v.toNumber === 'function') return v.toNumber();
+        if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+        if (typeof v === 'string') {
+          let s = v.trim();
+          // remove currency symbols and spaces
+          s = s.replace(/[\s₺$€£]/g, '');
+          // handle thousand/decimal separators (TR: "," decimal)
+          if (s.includes(',') && !s.includes('.')) {
+            s = s.replace(/\./g, '').replace(',', '.');
+          } else if (s.includes(',') && s.includes('.')) {
+            // Assume last separator is decimal; remove others
+            const lastComma = s.lastIndexOf(',');
+            const lastDot = s.lastIndexOf('.');
+            if (lastComma > lastDot) {
+              s = s.replace(/\./g, '').replace(',', '.');
+            } else {
+              s = s.replace(/,/g, '');
+            }
+          } else {
+            // just digits and dots
+          }
+          const n = parseFloat(s);
+          return Number.isFinite(n) ? n : 0;
+        }
         const n = Number(v);
         return Number.isFinite(n) ? n : 0;
       } catch { return 0; }
     };
 
-    // Determine declared value per row
-    // If item provided: prefer item-level qty*unitPrice -> item.totalPrice -> match raw line item
-    // Else (no item): prefer order.totalPrice -> sum of DB items -> rawData.total_price
+    // Determine declared value per row (per item preferred)
     let declaredValue: number = 0;
     try {
       if (item) {
-        const qty = toNum((item as any)?.quantity ?? 1) || 1;
-        const unit = toNum((item as any)?.unitPrice ?? 0);
-        const calc = qty * unit;
-        if (calc > 0) declaredValue = Number(calc.toFixed(2));
-        if (declaredValue === 0) {
-          const fallbackItemTotal = toNum((item as any)?.totalPrice ?? 0);
-          if (fallbackItemTotal > 0) declaredValue = Number(fallbackItemTotal.toFixed(2));
+        const qty = parseMoney((item as any)?.quantity ?? 1) || 1;
+        let unit = parseMoney((item as any)?.unitPrice ?? 0);
+        if (!unit || unit <= 0) {
+          const itemTotal = parseMoney((item as any)?.totalPrice ?? 0);
+          if (itemTotal > 0) unit = itemTotal / qty;
         }
-        if (declaredValue === 0) {
-          const raw: any = (order as any).rawData;
-          const lineItems = Array.isArray(raw?.line_items) ? raw.line_items : [];
-          if (lineItems.length > 0) {
-            // Try to match by SKU or id if possible
-            const matched = lineItems.find((li: any) => {
-              const sku = (item as any)?.sku || (item as any)?.productName;
-              return (li?.sku && sku && String(li.sku) === String(sku)) || (li?.id && (item as any)?.marketplaceKey && String(li.id) === String((item as any).marketplaceKey)) || (li?.object_id && (item as any)?.uniqueLineKey && String(li.object_id) === String((item as any).uniqueLineKey));
-            }) || lineItems[0];
-            const liTotal = toNum(matched?.total_price) || (toNum(matched?.price) * (toNum(matched?.quantity) || 1));
-            if (liTotal > 0) declaredValue = Number(liTotal.toFixed(2));
+        if (!unit || unit <= 0) {
+          // Try raw marketplace line matching
+          if (rawLineItems.length > 0) {
+            const match = rawLineItems.find((li: any) => (li?.sku && (item as any)?.sku && String(li.sku) === String((item as any).sku)) || (li?.id && (item as any)?.marketplaceKey && String(li.id) === String((item as any).marketplaceKey)) || (li?.object_id && (item as any)?.uniqueLineKey && String(li.object_id) === String((item as any).uniqueLineKey))) || rawLineItems[0];
+            const liTotal = parseMoney(match?.total_price) || (parseMoney(match?.price) * (parseMoney(match?.quantity) || 1));
+            if (liTotal > 0) unit = liTotal / qty;
           }
         }
+        const calc = qty * (unit || 0);
+        if (calc > 0) declaredValue = Number(calc.toFixed(2));
       } else {
-        // No item: use order totals first
-        const orderTotal = toNum((order as any).totalPrice ?? 0);
+        // Order-level row: use order total
+        const orderTotal = parseMoney((order as any).totalPrice ?? raw?.total_price ?? 0);
         if (orderTotal > 0) declaredValue = Number(orderTotal.toFixed(2));
-        if (declaredValue === 0 && (order as any).items && Array.isArray((order as any).items)) {
-          const items: any[] = (order as any).items;
-          const sum = items.reduce((acc, it) => acc + (toNum(it?.totalPrice ?? 0) || (toNum(it?.unitPrice ?? 0) * (toNum(it?.quantity ?? 1) || 1))), 0);
-          if (sum > 0) declaredValue = Number(sum.toFixed(2));
-        }
-        if (declaredValue === 0) {
-          const raw: any = (order as any).rawData;
-          const totalRaw = toNum(raw?.total_price ?? 0);
-          if (totalRaw > 0) declaredValue = Number(totalRaw.toFixed(2));
-        }
       }
     } catch {}
 

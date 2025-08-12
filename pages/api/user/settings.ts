@@ -42,51 +42,8 @@ export default async function handler(
           orderSyncCount: true,
           labelCount: true,
           shippingSettings: true,
-          integrationSettings: {
-            select: {
-              veeqoApiKey: true,
-              shippoToken: true,
-              trendyolApiKey: true,
-              trendyolApiSecret: true,
-              trendyolSupplierId: true,
-              fedexApiKey: true,
-              fedexApiSecret: true,
-              fedexAccountNumber: true,
-              upsApiKey: true,
-              upsApiSecret: true,
-              upsAccountNumber: true,
-              etsyAccessToken: true,
-              etsyShopId: true,
-               etsyTokenExpiresAt: true,
-               parasutClientId: true,
-               parasutClientSecret: true,
-               parasutUsername: true,
-               parasutPassword: true,
-               parasutCompanyId: true,
-               parasutBaseUrl: true,
-               parasutRedirectUri: true,
-            }
-          },
-          shipperProfile: {
-            select: {
-              shipperName: true,
-              shipperPersonName: true,
-              shipperPhoneNumber: true,
-              shipperStreet1: true,
-              shipperStreet2: true,
-              shipperCity: true,
-              shipperStateCode: true,
-              shipperPostalCode: true,
-              shipperCountryCode: true,
-              shipperTinNumber: true,
-              shipperTinType: true,
-              importerOfRecord: true,
-              fedexFolderId: true,
-              defaultCurrencyCode: true,
-              dutiesPaymentType: true,
-              defaultShippingChargesPaymentType: true,
-            }
-          },
+          integrationSettings: true,
+          shipperProfile: true,
         },
         })
       );
@@ -168,8 +125,6 @@ export default async function handler(
               parasutUsername: integrationSettings.parasutUsername,
               parasutPassword: integrationSettings.parasutPassword,
               parasutCompanyId: integrationSettings.parasutCompanyId,
-              parasutBaseUrl: integrationSettings.parasutBaseUrl,
-              parasutRedirectUri: integrationSettings.parasutRedirectUri,
             },
             update: {
               veeqoApiKey: integrationSettings.veeqoApiKey,
@@ -188,8 +143,6 @@ export default async function handler(
               parasutUsername: integrationSettings.parasutUsername,
               parasutPassword: integrationSettings.parasutPassword,
               parasutCompanyId: integrationSettings.parasutCompanyId,
-              parasutBaseUrl: integrationSettings.parasutBaseUrl,
-              parasutRedirectUri: integrationSettings.parasutRedirectUri,
             },
           });
           console.log('Integration settings saved successfully');

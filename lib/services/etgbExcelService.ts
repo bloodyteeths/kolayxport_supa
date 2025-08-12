@@ -210,6 +210,14 @@ export class EtgbExcelService {
         }
         const calc = qty * (unit || 0);
         if (calc > 0) declaredValue = Number(calc.toFixed(2));
+        // Final fallback: allocate from order total if still zero
+        if (declaredValue === 0) {
+          const orderTotal = parseMoney((order as any).totalPrice ?? raw?.total_price ?? 0);
+          const itemsCount = Array.isArray((order as any).items) && (order as any).items.length > 0 ? (order as any).items.length : 1;
+          if (orderTotal > 0 && itemsCount > 0) {
+            declaredValue = Number((orderTotal / itemsCount).toFixed(2));
+          }
+        }
       } else {
         // Order-level row: use order total
         const orderTotal = parseMoney((order as any).totalPrice ?? raw?.total_price ?? 0);

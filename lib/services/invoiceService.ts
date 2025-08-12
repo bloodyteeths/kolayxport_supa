@@ -63,7 +63,7 @@ export class InvoiceService {
           const items = order.items && order.items.length > 0 ? order.items : [];
           const totalQty = items.reduce((acc, it) => acc + (it.quantity || 1), 0) || 1;
           const orderTotal = toNum(order.totalPrice || 0);
-          const details: Array<{ name: string; description?: string; quantity: number; unit_price: number; vat_rate: number }> = [];
+          const details: Array<{ name: string; description?: string; quantity: number; unit_price: number; vat_rate: number; sku?: string }> = [];
           for (const it of items) {
             const qty = (toNum(it.quantity) || 1);
             let unit = toNum(it.unitPrice);
@@ -76,7 +76,7 @@ export class InvoiceService {
               }
             }
             const name = (it.productName || it.sku || rawLineItems.find((li: any) => li?.sku === it.sku)?.title || 'Item').toString().slice(0, 240);
-            if (unit > 0) details.push({ name, description: name, quantity: qty, unit_price: Math.round((unit + Number.EPSILON) * 100) / 100, vat_rate: 0 });
+            if (unit > 0) details.push({ name, description: name, quantity: qty, unit_price: Math.round((unit + Number.EPSILON) * 100) / 100, vat_rate: 0, sku: it.sku || undefined });
             else logger.warn('parasut.detail.skipped', { reason: 'unit_price<=0', rawLineSnapshot: { name, qty, unit } });
           }
           if (details.length === 0) {
@@ -85,17 +85,47 @@ export class InvoiceService {
           }
           // Create invoice with details via compound create
           const contactCreated = await parasutClient.createOrGetContact(invoiceData.contact);
+
+          // Ensure product existence per line (cache per request)
+          const productIdCache = new Map<string, number>();
+          const ensureProductIdFor = async (detail: { name: string; sku?: string }): Promise<number | undefined> => {
+            const key = detail.sku || detail.name;
+            if (productIdCache.has(key)) return productIdCache.get(key);
+            try {
+              const id = await parasutClient.ensureProductId({ code: detail.sku, name: detail.name, vat_rate: 0, unit: 'Adet' });
+              productIdCache.set(key, id);
+              return id;
+            } catch (e) {
+              logger.warn('ensureProductId.failed', { key, error: e instanceof Error ? e.message : String(e) });
+              return undefined;
+            }
+          };
+
+          const detailsWithProducts = [] as Array<{ name: string; description?: string; quantity: number; unit_price: number; vat_rate: number; productId?: string }>;
+          for (const d of details) {
+            const pid = await ensureProductIdFor(d);
+            detailsWithProducts.push({ ...d, productId: pid ? String(pid) : undefined });
+          }
+
+          logger.debug('parasut.invoice.details.summary', {
+            detailCount: details.length,
+            nonZeroLines: details.filter(d => d.unit_price > 0 && d.quantity > 0).length,
+            names: details.slice(0, 5).map(d => d.name)
+          });
+
           const created = await parasutClient.createSalesInvoiceWithDetails({
             contactId: String(contactCreated.id),
             issueDate: invoiceData.issue_date || new Date().toISOString().split('T')[0],
             description: `Invoice for ${contactCreated.name}`,
-            // Send TRL explicitly for TL or omit to let company default
-            currency: 'TRL',
-            details: details.map(d => ({
-              description: d.description || d.name || 'Item',
+            // For TL omit currency; for FX send USD/EUR/GBP only
+            currency: undefined,
+            details: detailsWithProducts.map(d => ({
+              name: d.name || 'Item',
+              description: d.description || d.name,
               quantity: d.quantity,
               unit_price: d.unit_price,
-              vat_rate: d.vat_rate
+              vat_rate: d.vat_rate,
+              productId: d.productId
             }))
           });
           const result = { invoiceId: created.id, invoiceNo: created.invoice_no || 'N/A', pdfUrl: undefined as string | undefined, ublUrl: undefined as string | undefined };
@@ -109,7 +139,10 @@ export class InvoiceService {
               const inboxes = await parasutClient.listEInvoiceInboxesByTaxNumber(taxNumber);
               if (Array.isArray(inboxes) && inboxes.length > 0) {
                 const to = inboxes[0]?.attributes?.e_invoice_address || inboxes[0]?.attributes?.identifier;
-                if (to) jobId = await parasutClient.createEInvoice({ salesInvoiceId: result.invoiceId, to, scenario: 'basic' });
+                if (to) {
+                  jobId = await parasutClient.createEInvoice({ salesInvoiceId: result.invoiceId, to, scenario: 'basic' });
+                  logger.info('parasut.edoc.started', { orderId: order.id, invoiceId: result.invoiceId, kind: 'e_invoice', jobId });
+                }
               }
             } catch (e) {
               logger.warn('E-invoice inbox lookup failed; falling back to e-archive', { orderId: order.id, error: e instanceof Error ? e.message : String(e) });
@@ -117,11 +150,17 @@ export class InvoiceService {
           }
           if (!jobId) {
             jobId = await parasutClient.createEArchive({ salesInvoiceId: result.invoiceId });
+            logger.info('parasut.edoc.started', { orderId: order.id, invoiceId: result.invoiceId, kind: 'e_archive', jobId });
           }
 
           // Poll job until finished
+          let jobResourceType: string | undefined;
+          let jobResourceId: number | undefined;
           try {
-            await parasutClient.trackJob(jobId);
+            const job = await parasutClient.trackJob(jobId);
+            jobResourceType = job.resourceType;
+            jobResourceId = job.resourceId;
+            logger.info('parasut.edoc.completed', { orderId: order.id, invoiceId: result.invoiceId, jobId, status: job.status, resourceType: job.resourceType, resourceId: job.resourceId });
           } catch (e) {
             logger.error('Paraşüt job failed', e instanceof Error ? e : new Error(String(e)), { orderId: order.id, jobId });
             // Continue, but we may not get a PDF URL
@@ -130,16 +169,52 @@ export class InvoiceService {
           // Read active e-document and get PDF URL
           let pdfUrl = result.pdfUrl;
           try {
+            // First try directly from job resource if available
+            if (!pdfUrl && jobResourceType && jobResourceId) {
+              if (jobResourceType === 'e_archives') {
+                pdfUrl = await parasutClient.showEArchivePDF(jobResourceId);
+              } else if (jobResourceType === 'e_invoices') {
+                pdfUrl = await parasutClient.showEInvoicePDF(jobResourceId);
+              }
+            }
+            if (pdfUrl) {
+              logger.debug('parasut.edoc.pdf.fromJob', { orderId: order.id, invoiceId: result.invoiceId, jobResourceType, jobResourceId });
+            }
+            
             const shown = await parasutClient.showSalesInvoice(result.invoiceId);
-            const active = shown?.included?.find((inc: any) => inc?.type === 'e_invoices' || inc?.type === 'e_archives');
-            if (active) {
-              if (active.type === 'e_invoices') pdfUrl = await parasutClient.showEInvoicePDF(Number(active.id));
-              if (active.type === 'e_archives') pdfUrl = await parasutClient.showEArchivePDF(Number(active.id));
+            let eDocType: string | undefined;
+            let eDocId: string | undefined;
+            const rel = shown?.data?.relationships?.active_e_document?.data;
+            if (rel?.type && rel?.id) {
+              eDocType = String(rel.type);
+              eDocId = String(rel.id);
+            } else {
+              const activeInc = Array.isArray(shown?.included) ? shown.included.find((inc: any) => inc?.type === 'e_invoices' || inc?.type === 'e_archives') : undefined;
+              if (activeInc) {
+                eDocType = String(activeInc.type);
+                eDocId = String(activeInc.id);
+              }
+            }
+            logger.debug('parasut.edoc.active', { orderId: order.id, invoiceId: result.invoiceId, eDocType, eDocId });
+            if (eDocType === 'e_invoices' && eDocId) pdfUrl = await parasutClient.showEInvoicePDF(Number(eDocId));
+            if (eDocType === 'e_archives' && eDocId) pdfUrl = await parasutClient.showEArchivePDF(Number(eDocId));
+            // If relationship not ready or missing, try find by invoice id
+            if (!pdfUrl) {
+              logger.debug('parasut.edoc.lookup.eArchiveByInvoice', { invoiceId: result.invoiceId });
+              const eArchiveId = await parasutClient.findEArchiveForInvoice(result.invoiceId);
+              if (eArchiveId) {
+                logger.debug('parasut.edoc.lookup.eArchiveByInvoice.found', { invoiceId: result.invoiceId, eArchiveId });
+                pdfUrl = await parasutClient.showEArchivePDF(eArchiveId);
+              }
+            }
+            if (!pdfUrl) {
+              // Fallback to sales invoice PDF endpoint in case active link is not yet populated
+              pdfUrl = await parasutClient.showSalesInvoicePDF(result.invoiceId);
             }
           } catch (e) {
             logger.warn('Failed to resolve active e-document PDF', { orderId: order.id, error: e instanceof Error ? e.message : String(e) });
           }
-
+          
           // Download PDF if available
           let localPdfPath: string | undefined;
           const tracking = order.trackingNumber || '';
@@ -343,7 +418,7 @@ export class InvoiceService {
             unit_price: Math.round((unit + Number.EPSILON) * 100) / 100,
             vat_rate: 0,
             description: desc,
-            unit: 'Adet'
+          unit: 'Adet'
           };
         })
       : [{

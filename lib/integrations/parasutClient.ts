@@ -368,70 +368,178 @@ export class ParasutClient {
     return { id };
   }
 
-  /** Create Sales Invoice with details using JSON:API compound create */
+  /** Create Sales Invoice with details using JSON:API compound create (included + temp-id) */
   async createSalesInvoiceWithDetails(args: {
     contactId: string;
     issueDate: string;
     description?: string;
-    currency?: 'TRL' | 'USD' | 'EUR' | 'GBP';
-    details: Array<{ description: string; quantity: number; unit_price: number; vat_rate: number; discount_type?: 'percentage'|'amount'; discount_value?: number; productId?: string }>
+    currency?: 'USD' | 'EUR' | 'GBP'; // omit for TL
+    details: Array<{ name: string; description?: string; quantity: number; unit_price: number; vat_rate: number; discount_type?: 'percentage'|'amount'; discount_value?: number; productId?: string }>
   }): Promise<{ id: number; invoice_no?: string }> {
     await this.ensureValidToken();
     const asNumber = (v: any) => (typeof v === 'number' ? v : Number(v));
-    const normalizedCurrency = args.currency && ['TRL','USD','EUR','GBP'].includes(args.currency) ? args.currency : undefined;
+    const defaultProductId = process.env.PARASUT_DEFAULT_PRODUCT_ID?.trim();
+    const payloadMode = (process.env.PARASUT_INVOICE_PAYLOAD_MODE || 'inline').toLowerCase(); // 'inline' | 'included' | 'attributes'
 
-    const buildPayload = (withCurrency: boolean) => ({
-      data: {
-        type: 'sales_invoices',
-        attributes: {
-          item_type: 'invoice',
-          issue_date: args.issueDate,
-          ...(args.description ? { description: args.description } : {}),
-          ...(withCurrency && normalizedCurrency ? { currency: normalizedCurrency } : {})
+    const buildPayload = (forceProductId?: string) => {
+      const included = args.details.map((d, idx) => {
+        const tempId = `d${idx + 1}`;
+        const item: any = {
+          type: 'sales_invoice_details',
+          'temp-id': tempId,
+          attributes: {
+            // Some tenants require only description; still include name for traceability
+            name: String(d.name).slice(0, 120),
+            ...(d.description ? { description: String(d.description).slice(0, 240) } : {}),
+            quantity: asNumber(d.quantity) || 1,
+            unit_price: asNumber(d.unit_price),
+            vat_rate: asNumber(d.vat_rate),
+            ...(d.discount_type ? { discount_type: d.discount_type } : {}),
+            ...(d.discount_value != null ? { discount_value: asNumber(d.discount_value) } : {})
+          }
+        };
+        const pid = forceProductId || d.productId;
+        if (pid) {
+          item.relationships = { product: { data: { type: 'products', id: String(pid) } } };
+        }
+        return item;
+      });
+      const detailsRel = {
+        data: included.map((inc: any) => ({ type: 'sales_invoice_details', 'temp-id': inc['temp-id'], method: 'create' }))
+      };
+      const payload: any = {
+        data: {
+          type: 'sales_invoices',
+          attributes: {
+            item_type: 'invoice',
+            issue_date: args.issueDate,
+            ...(args.description ? { description: args.description } : {}),
+            ...(args.currency ? { currency: args.currency } : {})
+          },
+          relationships: {
+            contact: { data: { type: 'contacts', id: String(args.contactId) } },
+            details: detailsRel
+          }
         },
-        relationships: {
-          contact: { data: { type: 'contacts', id: String(args.contactId) } },
-          details: {
-            data: args.details.map(d => ({
-              type: 'sales_invoice_details',
-              attributes: {
-                quantity: asNumber(d.quantity) || 1,
-                unit_price: asNumber(d.unit_price),
-                vat_rate: asNumber(d.vat_rate),
-                description: String(d.description).slice(0, 240),
-                ...(d.discount_type ? { discount_type: d.discount_type } : {}),
-                ...(d.discount_value !== undefined ? { discount_value: asNumber(d.discount_value) } : {})
-              },
-              ...(d.productId || process.env.PARASUT_DEFAULT_PRODUCT_ID ? {
-                relationships: {
-                  product: { data: { type: 'products', id: String(d.productId || process.env.PARASUT_DEFAULT_PRODUCT_ID) } }
-                }
-              } : {})
-            }))
+        included
+      };
+      return payload;
+    };
+
+    const buildAttributesPayload = (forceProductId?: string) => {
+      const attrsDetails = args.details.map(d => {
+        // Free-text detail; some tenants accept product_id inline, others ignore in attributes mode
+        const item: any = {
+          quantity: asNumber(d.quantity) || 1,
+          unit_price: asNumber(d.unit_price),
+          vat_rate: asNumber(d.vat_rate),
+          description: String(d.description || d.name).slice(0, 240)
+        };
+        const pid = forceProductId || d.productId;
+        if (pid) item.product_id = String(pid);
+        return item;
+      });
+      const payload: any = {
+        data: {
+          type: 'sales_invoices',
+          attributes: {
+            item_type: 'invoice',
+            issue_date: args.issueDate,
+            ...(args.description ? { description: args.description } : {}),
+            ...(args.currency ? { currency: args.currency } : {}),
+            details_attributes: attrsDetails
+          },
+          relationships: {
+            contact: { data: { type: 'contacts', id: String(args.contactId) } }
           }
         }
-      }
-    });
+      };
+      return payload;
+    };
 
-    const attempt = async (withCurrency: boolean) => {
-      const payload = buildPayload(withCurrency);
+    const buildInlineRelPayload = (forceProductId?: string) => {
+      const relDetails = args.details.map(d => {
+        const item: any = {
+          type: 'sales_invoice_details',
+          attributes: {
+            // Paraşüt tenants often require description only
+            description: String(d.description || d.name).slice(0, 240),
+            quantity: asNumber(d.quantity) || 1,
+            unit_price: asNumber(d.unit_price),
+            vat_rate: asNumber(d.vat_rate)
+          }
+        };
+        const pid = forceProductId || d.productId;
+        if (pid) {
+          item.relationships = {
+            product: { data: { type: 'products', id: String(pid) } }
+          };
+        }
+        return item;
+      });
+      const payload: any = {
+        data: {
+          type: 'sales_invoices',
+          attributes: {
+            item_type: 'invoice',
+            issue_date: args.issueDate,
+            ...(args.description ? { description: args.description } : {}),
+            ...(args.currency ? { currency: args.currency } : {})
+          },
+          relationships: {
+            contact: { data: { type: 'contacts', id: String(args.contactId) } },
+            details: { data: relDetails }
+          }
+        }
+      };
+      return payload;
+    };
+
+    const attempt = async (forceProductId?: string, withCurrency: boolean = true) => {
+      const usingAttributesMode = payloadMode === 'attributes';
+      const usingInlineMode = payloadMode === 'inline';
+      const payload = usingInlineMode
+        ? buildInlineRelPayload(forceProductId)
+        : usingAttributesMode
+          ? buildAttributesPayload(forceProductId)
+          : buildPayload(forceProductId);
+      if (!withCurrency) delete (payload.data.attributes as any).currency;
+      const detailStats = {
+        total: args.details.length,
+        withProduct: args.details.filter(d => (forceProductId || d.productId)).length,
+        mode: usingInlineMode ? 'inline' : (usingAttributesMode ? 'attributes' : 'included'),
+        withCurrency
+      };
       logger.debug?.('parasut.createSalesInvoiceWithDetails.payload', payload);
-      const res = await fetch(`${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices`, {
+      logger.debug?.('parasut.createSalesInvoiceWithDetails.detailStats', detailStats);
+      const res = await fetch(`${this.baseUrl}/v4/${this.credentials.companyId}/sales_invoices`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.credentials.accessToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'application/vnd.api+json',
+          'Accept': 'application/vnd.api+json'
         },
         body: JSON.stringify(payload)
       });
       const text = await res.text();
       if (!res.ok) {
-        logger.error('parasut.createSalesInvoiceWithDetails.failed', undefined, { status: res.status, body: text, withCurrency });
-        const currencyError = text.includes('Döviz tipi') || text.includes('currency');
-        if (withCurrency && currencyError) {
-          // retry without currency
-          return attempt(false);
+        let parsed: any = undefined;
+        try { parsed = JSON.parse(text); } catch {}
+        logger.error('parasut.createSalesInvoiceWithDetails.failed', undefined, { status: res.status, body: text, parsedErrors: parsed?.errors, mode: usingInlineMode ? 'inline' : (usingAttributesMode ? 'attributes' : 'included') });
+        const lacksProduct = /Ürün\/hizmet doldurulmalı/i.test(text);
+        const currencyErr = /Döviz tipi/i.test(text);
+        if (currencyErr && withCurrency) {
+          // Retry once without currency (TL default)
+          return attempt(forceProductId, false);
+        }
+        if (lacksProduct && defaultProductId && !forceProductId) {
+          logger.warn('parasut.retry.withDefaultProduct', { defaultProductId });
+          return attempt(defaultProductId, withCurrency);
+        }
+        // If error persists, hint payload mode switches for diagnostics
+        if (lacksProduct) {
+          if (!usingInlineMode) logger.warn('parasut.hint.switchInlineMode', { suggestion: 'Set PARASUT_INVOICE_PAYLOAD_MODE=inline' });
+          if (!usingAttributesMode) logger.warn('parasut.hint.switchAttributesMode', { suggestion: 'Set PARASUT_INVOICE_PAYLOAD_MODE=attributes' });
         }
         throw new Error(`createSalesInvoiceWithDetails failed: ${res.status} - ${text}`);
       }
@@ -442,7 +550,83 @@ export class ParasutClient {
       return { id, invoice_no };
     };
 
-    return await attempt(true);
+    // Start with currency if provided (USD/EUR/GBP). For TL, args.currency should be undefined.
+    return await attempt(undefined, args.currency != null);
+  }
+
+  /**
+   * Find a product by code (SKU) or name
+   */
+  async findProduct(params: { code?: string; name?: string }): Promise<{ id: number; name: string; code?: string } | null> {
+    await this.ensureValidToken();
+    const base = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/products`;
+    const queries: string[] = [];
+    if (params.code) queries.push(`filter[code]=${encodeURIComponent(params.code)}`);
+    if (params.name && !params.code) queries.push(`filter[name]=${encodeURIComponent(params.name)}`);
+    const url = queries.length ? `${base}?${queries.join('&')}` : `${base}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${this.credentials.accessToken}` } });
+    if (!res.ok) {
+      const text = await res.text();
+      logger.warn('parasut.findProduct.failed', { status: res.status, body: text });
+      return null;
+    }
+    const json = await res.json() as any;
+    const first = Array.isArray(json?.data) ? json.data[0] : undefined;
+    if (!first) return null;
+    return { id: Number(first.id), name: first?.attributes?.name, code: first?.attributes?.code };
+  }
+
+  /**
+   * Create a product (service) to be used on invoice lines
+   */
+  async createProduct(params: { name: string; code?: string; vat_rate?: number; unit?: string }): Promise<{ id: number }> {
+    await this.ensureValidToken();
+    const payload = {
+      data: {
+        type: 'products',
+        attributes: {
+          name: params.name.slice(0, 240),
+          ...(params.code ? { code: params.code.slice(0, 60) } : {}),
+          vat_rate: typeof params.vat_rate === 'number' ? params.vat_rate : 0,
+          unit: params.unit || 'Adet'
+        }
+      }
+    };
+    logger.debug?.('parasut.createProduct.payload', payload);
+    const res = await fetch(`${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/products`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.credentials.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      logger.error('parasut.createProduct.failed', undefined, { status: res.status, body: text });
+      throw new Error(`createProduct failed: ${res.status} - ${text}`);
+    }
+    const json = JSON.parse(text);
+    const id = Number(json?.data?.id);
+    logger.info('parasut.product.created', { id, code: params.code, name: params.name });
+    return { id };
+  }
+
+  /**
+   * Ensure a product exists; try by code, then name; create if missing.
+   */
+  async ensureProductId(params: { code?: string; name: string; vat_rate?: number; unit?: string }): Promise<number> {
+    // Try by code first
+    if (params.code) {
+      const byCode = await this.findProduct({ code: params.code });
+      if (byCode?.id) return byCode.id;
+    }
+    // Then by name
+    const byName = await this.findProduct({ name: params.name });
+    if (byName?.id) return byName.id;
+    // Create
+    const created = await this.createProduct({ name: params.name, code: params.code, vat_rate: params.vat_rate, unit: params.unit });
+    return created.id;
   }
 
   /** Lookup e-invoice inboxes by VKN/TCKN */
@@ -501,8 +685,8 @@ export class ParasutClient {
     return json?.data?.attributes?.trackable_job_id || json?.data?.id || '';
   }
 
-  /** Track a job until finished/failed */
-  async trackJob(jobId: string, timeoutMs: number = 60000): Promise<'finished' | 'failed'> {
+  /** Track a job until finished/failed and return resource info when available */
+  async trackJob(jobId: string, timeoutMs: number = 60000): Promise<{ status: 'finished' | 'failed'; resourceType?: string; resourceId?: number }> {
     const url = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/trackable_jobs/${jobId}`;
     const start = Date.now();
     let attempt = 0;
@@ -515,12 +699,15 @@ export class ParasutClient {
       }
       const json = await res.json() as any;
       const status = json?.data?.attributes?.status;
+      const relData = json?.data?.relationships?.resource?.data;
+      const resourceType = relData?.type;
+      const resourceId = relData?.id ? Number(relData.id) : undefined;
       if (status && status !== 'running') {
         if (status === 'failed') {
           const errMsg = json?.data?.attributes?.error || 'unknown job error';
           throw new Error(`Paraşüt job failed: ${errMsg}`);
         }
-        return 'finished';
+        return { status: 'finished', resourceType, resourceId };
       }
       await new Promise(r => setTimeout(r, Math.min(1000 + attempt * 250, 3000)));
     }
@@ -555,6 +742,69 @@ export class ParasutClient {
     if (!res.ok) return undefined;
     const json = await res.json() as any;
     return json?.data?.attributes?.url;
+  }
+
+  /** Try listing e-archives by sales invoice id using likely filter keys */
+  async findEArchiveForInvoice(salesInvoiceId: number): Promise<number | undefined> {
+    await this.ensureValidToken();
+    const base = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/e_archives`;
+    const tryUrls = [
+      `${base}?filter[invoice_id]=${encodeURIComponent(String(salesInvoiceId))}`,
+      `${base}?filter[sales_invoice_id]=${encodeURIComponent(String(salesInvoiceId))}`
+    ];
+    for (const url of tryUrls) {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${this.credentials.accessToken}` } });
+      if (!res.ok) continue;
+      const json = await res.json() as any;
+      const first = Array.isArray(json?.data) ? json.data[0] : undefined;
+      if (first?.id) return Number(first.id);
+    }
+    return undefined;
+  }
+
+  /** Try listing e-invoices by sales invoice id using likely filter keys */
+  async findEInvoiceForInvoice(salesInvoiceId: number): Promise<number | undefined> {
+    await this.ensureValidToken();
+    const base = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/e_invoices`;
+    const tryUrls = [
+      `${base}?filter[invoice_id]=${encodeURIComponent(String(salesInvoiceId))}`,
+      `${base}?filter[sales_invoice_id]=${encodeURIComponent(String(salesInvoiceId))}`
+    ];
+    for (const url of tryUrls) {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${this.credentials.accessToken}` } });
+      if (!res.ok) continue;
+      const json = await res.json() as any;
+      const first = Array.isArray(json?.data) ? json.data[0] : undefined;
+      if (first?.id) return Number(first.id);
+    }
+    return undefined;
+  }
+
+  /** Public: Get Sales Invoice PDF URL (falls back if active e-doc linkage not yet present) */
+  async showSalesInvoicePDF(invoiceId: number): Promise<string | undefined> {
+    await this.ensureValidToken();
+    const endpoint = `${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices/${invoiceId}/pdf`;
+    for (let attempt = 1; attempt <= 8; attempt++) {
+      try {
+        const response = await fetch(endpoint, {
+          headers: { 'Authorization': `Bearer ${this.credentials.accessToken}` }
+        });
+        if (response.ok) {
+          const result = await response.json() as any;
+          const url = result.data?.attributes?.url;
+          if (url) return url;
+          logger.debug('Sales invoice PDF URL not ready yet', { invoiceId, attempt });
+        } else {
+          const text = await response.text();
+          logger.debug('Sales invoice PDF response not ok', { invoiceId, status: response.status, body: text, attempt });
+        }
+      } catch (error) {
+        logger.warn('Failed to get Sales invoice PDF URL', { invoiceId, error: error instanceof Error ? error.message : String(error), attempt });
+      }
+      await new Promise(r => setTimeout(r, attempt * 600));
+    }
+    logger.warn('Sales invoice PDF URL unavailable after retries', { invoiceId });
+    return undefined;
   }
 
   /**

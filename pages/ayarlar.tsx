@@ -26,6 +26,10 @@ interface UserSettingsResponse {
     orderSyncCount: number;
     labelCount: number;
   };
+  shippingSettings?: {
+    etgbRecipientEmail?: string | null;
+    etgbEnabled?: boolean;
+  } | null;
   integrationSettings?: {
     veeqoApiKey?: string | null;
     shippoToken?: string | null;
@@ -38,6 +42,14 @@ interface UserSettingsResponse {
     upsApiKey?: string | null;
     upsApiSecret?: string | null;
     upsAccountNumber?: string | null;
+    etsyAccessToken?: string | null;
+    etsyShopId?: string | null;
+    etsyTokenExpiresAt?: string | null;
+    parasutClientId?: string | null;
+    parasutClientSecret?: string | null;
+    parasutUsername?: string | null;
+    parasutPassword?: string | null;
+    parasutCompanyId?: string | null;
   } | null; // Allow null for the whole object
   shipperProfile?: {
     shipperName?: string | null;
@@ -60,6 +72,10 @@ interface UserSettingsResponse {
 }
 
 const initialFormData: UserSettingsResponse = {
+  shippingSettings: {
+    etgbRecipientEmail: '',
+    etgbEnabled: false,
+  },
   integrationSettings: {
     veeqoApiKey: '',
     shippoToken: '',
@@ -72,6 +88,11 @@ const initialFormData: UserSettingsResponse = {
     upsApiKey: '',
     upsApiSecret: '',
     upsAccountNumber: '',
+    parasutClientId: '',
+    parasutClientSecret: '',
+    parasutUsername: '',
+    parasutPassword: '',
+    parasutCompanyId: '',
   },
   shipperProfile: {
     shipperName: '',
@@ -195,6 +216,7 @@ const AyarlarPage = () => {
           timeout: 10000
         });
         setFormData({
+          shippingSettings: response.data.shippingSettings || initialFormData.shippingSettings,
           integrationSettings: response.data.integrationSettings || initialFormData.integrationSettings,
           shipperProfile: response.data.shipperProfile || initialFormData.shipperProfile,
         });
@@ -213,7 +235,7 @@ const AyarlarPage = () => {
   const handleInputChange = (
     section: keyof UserSettingsResponse,
     name: string,
-    value: string
+    value: string | boolean
   ) => {
     setFormData(prev => ({
       ...prev,
@@ -364,6 +386,114 @@ const AyarlarPage = () => {
                 </Grid>
                 <Grid item xs={12} md={4}>
                   <TextField fullWidth label="UPS Account Number" name="upsAccountNumber" value={formData.integrationSettings?.upsAccountNumber || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+
+                {/* Paraşüt Integration */}
+                <Grid item xs={12}>
+                  <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Paraşüt Entegrasyonu</Typography>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField fullWidth label="Paraşüt Client ID" name="parasutClientId" value={formData.integrationSettings?.parasutClientId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField fullWidth label="Paraşüt Client Secret" name="parasutClientSecret" type="password" value={formData.integrationSettings?.parasutClientSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField fullWidth label="Paraşüt Username" name="parasutUsername" value={formData.integrationSettings?.parasutUsername || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField fullWidth label="Paraşüt Password" name="parasutPassword" type="password" value={formData.integrationSettings?.parasutPassword || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField fullWidth label="Paraşüt Company ID" name="parasutCompanyId" value={formData.integrationSettings?.parasutCompanyId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+              </Grid>
+            </Paper>
+
+            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1 }}>
+                Marketplace Bağlantıları
+              </Typography>
+              
+              {/* Etsy Connection */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Etsy Shop Bağlantısı
+                </Typography>
+                {formData.integrationSettings?.etsyAccessToken ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Typography color="success.main" sx={{ fontWeight: 'bold' }}>
+                      ✅ Etsy shop bağlı
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Shop ID: {formData.integrationSettings.etsyShopId}
+                    </Typography>
+                    {formData.integrationSettings.etsyTokenExpiresAt && (
+                      <Typography variant="body2" color="text.secondary">
+                        Token geçerlilik: {new Date(formData.integrationSettings.etsyTokenExpiresAt).toLocaleString('tr-TR')}
+                      </Typography>
+                    )}
+                  </Box>
+                ) : (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Etsy shop'ınızı bağlayarak sipariş takip numaralarını otomatik olarak Etsy'ye gönderebilirsiniz.
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      href="/api/auth/etsy/connect"
+                      sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
+                    >
+                      🔗 Etsy Shop Bağla
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            </Paper>
+
+            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1 }}>
+                ETGB (E-Ticaret Gümrük Beyanı) Ayarları
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Türkiye'ye gönderilecek siparişler için ETGB belgesi oluşturma ayarları
+              </Typography>
+              
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    label="ETGB Alıcı E-posta Adresi"
+                    name="etgbRecipientEmail"
+                    type="email"
+                    value={formData.shippingSettings?.etgbRecipientEmail || ''}
+                    onChange={(e) => handleInputChange('shippingSettings', e.target.name, e.target.value)}
+                    helperText="ETGB Excel dosyaları bu adrese gönderilecektir"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth>
+                    <InputLabel id="etgb-enabled-label">ETGB Özelliği</InputLabel>
+                    <Select
+                      labelId="etgb-enabled-label"
+                      name="etgbEnabled"
+                      label="ETGB Özelliği"
+                      value={formData.shippingSettings?.etgbEnabled ? 'true' : 'false'}
+                      onChange={(e: SelectChangeEvent<string>) => 
+                        handleInputChange('shippingSettings', 'etgbEnabled', e.target.value === 'true')
+                      }
+                    >
+                      <MenuItem value="true">Aktif</MenuItem>
+                      <MenuItem value="false">Pasif</MenuItem>
+                    </Select>
+                    <FormHelperText>ETGB özelliği aktif olduğunda sipariş listesinde seçim yapabilirsiniz</FormHelperText>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    Not: ETGB işlemi için siparişleri, sipariş listesinde seçip "ETGB İşle" butonuna tıklamanız gerekmektedir.
+                  </Typography>
                 </Grid>
               </Grid>
             </Paper>

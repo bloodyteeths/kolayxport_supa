@@ -41,6 +41,7 @@ export default async function handler(
           usageResetAt: true,
           orderSyncCount: true,
           labelCount: true,
+          shippingSettings: true,
           integrationSettings: {
             select: {
               veeqoApiKey: true,
@@ -54,6 +55,14 @@ export default async function handler(
               upsApiKey: true,
               upsApiSecret: true,
               upsAccountNumber: true,
+              etsyAccessToken: true,
+              etsyShopId: true,
+               etsyTokenExpiresAt: true,
+               parasutClientId: true,
+               parasutClientSecret: true,
+               parasutUsername: true,
+               parasutPassword: true,
+               parasutCompanyId: true,
             }
           },
           shipperProfile: {
@@ -85,6 +94,7 @@ export default async function handler(
       res.status(200).json({
         integrationSettings: userWithSettings.integrationSettings,
         shipperProfile: userWithSettings.shipperProfile,
+        shippingSettings: userWithSettings.shippingSettings || {},
         subscription: {
           subscriptionPlan: userWithSettings.subscriptionPlan,
           subscriptionStatus: userWithSettings.subscriptionStatus,
@@ -105,7 +115,7 @@ export default async function handler(
     }
   } else if (req.method === 'PATCH') {
     try {
-      const { integrationSettings, shipperProfile } = req.body;
+      const { integrationSettings, shipperProfile, shippingSettings } = req.body;
 
       // First ensure the User record exists
       await prisma.user.upsert({
@@ -113,14 +123,16 @@ export default async function handler(
         update: { 
           updatedAt: new Date(),
           email: authUser.email || undefined,
-          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || undefined
+          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || undefined,
+          shippingSettings: shippingSettings || undefined
         },
         create: {
           id: userId,
           email: authUser.email || undefined,
           name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || undefined,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          shippingSettings: shippingSettings || {}
         }
       });
 
@@ -149,6 +161,11 @@ export default async function handler(
               upsApiKey: integrationSettings.upsApiKey,
               upsApiSecret: integrationSettings.upsApiSecret,
               upsAccountNumber: integrationSettings.upsAccountNumber,
+              parasutClientId: integrationSettings.parasutClientId,
+              parasutClientSecret: integrationSettings.parasutClientSecret,
+              parasutUsername: integrationSettings.parasutUsername,
+              parasutPassword: integrationSettings.parasutPassword,
+              parasutCompanyId: integrationSettings.parasutCompanyId,
             },
             update: {
               veeqoApiKey: integrationSettings.veeqoApiKey,
@@ -162,6 +179,11 @@ export default async function handler(
               upsApiKey: integrationSettings.upsApiKey,
               upsApiSecret: integrationSettings.upsApiSecret,
               upsAccountNumber: integrationSettings.upsAccountNumber,
+              parasutClientId: integrationSettings.parasutClientId,
+              parasutClientSecret: integrationSettings.parasutClientSecret,
+              parasutUsername: integrationSettings.parasutUsername,
+              parasutPassword: integrationSettings.parasutPassword,
+              parasutCompanyId: integrationSettings.parasutCompanyId,
             },
           });
           console.log('Integration settings saved successfully');

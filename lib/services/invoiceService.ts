@@ -89,8 +89,14 @@ export class InvoiceService {
             contactId: String(contactCreated.id),
             issueDate: invoiceData.issue_date || new Date().toISOString().split('T')[0],
             description: `Invoice for ${contactCreated.name}`,
-            currency: 'TRY',
-            details
+            // Send TRL explicitly for TL or omit to let company default
+            currency: 'TRL',
+            details: details.map(d => ({
+              description: d.description || d.name || 'Item',
+              quantity: d.quantity,
+              unit_price: d.unit_price,
+              vat_rate: d.vat_rate
+            }))
           });
           const result = { invoiceId: created.id, invoiceNo: created.invoice_no || 'N/A', pdfUrl: undefined as string | undefined, ublUrl: undefined as string | undefined };
           logger.info('parasut.invoice.created', { invoiceId: result.invoiceId, contactId: contactCreated.id, detailCount: details.length });

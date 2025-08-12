@@ -373,56 +373,76 @@ export class ParasutClient {
     contactId: string;
     issueDate: string;
     description?: string;
-    currency?: 'TRY' | 'USD' | 'EUR' | 'GBP';
-    details: Array<{ name: string; description?: string; quantity: number; unit_price: number; vat_rate: number }>
+    currency?: 'TRL' | 'USD' | 'EUR' | 'GBP';
+    details: Array<{ description: string; quantity: number; unit_price: number; vat_rate: number; discount_type?: 'percentage'|'amount'; discount_value?: number; productId?: string }>
   }): Promise<{ id: number; invoice_no?: string }> {
     await this.ensureValidToken();
-    const currency = args.currency || 'TRY';
-    // Build temp-id linked details
-    const detailRefs = args.details.map((_, idx) => ({ type: 'sales_invoice_details', 'temp-id': `d${idx+1}`, method: 'create' }));
-    const included = args.details.map((d, idx) => ({
-      type: 'sales_invoice_details',
-      'temp-id': `d${idx+1}`,
-      attributes: {
-        name: d.name,
-        ...(d.description ? { description: d.description } : {}),
-        quantity: Number(d.quantity),
-        unit_price: Number(d.unit_price),
-        vat_rate: Number(d.vat_rate)
-      }
-    }));
-    const payload = {
+    const asNumber = (v: any) => (typeof v === 'number' ? v : Number(v));
+    const normalizedCurrency = args.currency && ['TRL','USD','EUR','GBP'].includes(args.currency) ? args.currency : undefined;
+
+    const buildPayload = (withCurrency: boolean) => ({
       data: {
         type: 'sales_invoices',
         attributes: {
           item_type: 'invoice',
           issue_date: args.issueDate,
           ...(args.description ? { description: args.description } : {}),
-          currency
+          ...(withCurrency && normalizedCurrency ? { currency: normalizedCurrency } : {})
         },
         relationships: {
-          contact: { data: { type: 'contacts', id: args.contactId } },
-          details: { data: detailRefs }
+          contact: { data: { type: 'contacts', id: String(args.contactId) } },
+          details: {
+            data: args.details.map(d => ({
+              type: 'sales_invoice_details',
+              attributes: {
+                quantity: asNumber(d.quantity) || 1,
+                unit_price: asNumber(d.unit_price),
+                vat_rate: asNumber(d.vat_rate),
+                description: String(d.description).slice(0, 240),
+                ...(d.discount_type ? { discount_type: d.discount_type } : {}),
+                ...(d.discount_value !== undefined ? { discount_value: asNumber(d.discount_value) } : {})
+              },
+              ...(d.productId || process.env.PARASUT_DEFAULT_PRODUCT_ID ? {
+                relationships: {
+                  product: { data: { type: 'products', id: String(d.productId || process.env.PARASUT_DEFAULT_PRODUCT_ID) } }
+                }
+              } : {})
+            }))
+          }
         }
-      },
-      included
-    };
-    logger.debug?.('parasut.createSalesInvoiceWithDetails.payload', payload);
-    const res = await fetch(`${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${this.credentials.accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      }
     });
-    const text = await res.text();
-    if (!res.ok) {
-      logger.error('parasut.createSalesInvoiceWithDetails.failed', undefined, { status: res.status, body: text });
-      throw new Error(`createSalesInvoiceWithDetails failed: ${res.status} - ${text}`);
-    }
-    const json = JSON.parse(text);
-    const id = Number(json?.data?.id);
-    const invoice_no = json?.data?.attributes?.invoice_no;
-    logger.info('parasut.invoice.created', { invoiceId: id, detailCount: args.details.length, contactId: args.contactId });
-    return { id, invoice_no };
+
+    const attempt = async (withCurrency: boolean) => {
+      const payload = buildPayload(withCurrency);
+      logger.debug?.('parasut.createSalesInvoiceWithDetails.payload', payload);
+      const res = await fetch(`${this.baseUrl}/${this.apiVersion}/${this.credentials.companyId}/sales_invoices`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.credentials.accessToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        logger.error('parasut.createSalesInvoiceWithDetails.failed', undefined, { status: res.status, body: text, withCurrency });
+        const currencyError = text.includes('Döviz tipi') || text.includes('currency');
+        if (withCurrency && currencyError) {
+          // retry without currency
+          return attempt(false);
+        }
+        throw new Error(`createSalesInvoiceWithDetails failed: ${res.status} - ${text}`);
+      }
+      const json = JSON.parse(text);
+      const id = Number(json?.data?.id);
+      const invoice_no = json?.data?.attributes?.invoice_no || json?.data?.attributes?.no;
+      logger.info('parasut.invoice.created', { invoiceId: id, detailCount: args.details.length, contactId: args.contactId, withCurrency });
+      return { id, invoice_no };
+    };
+
+    return await attempt(true);
   }
 
   /** Lookup e-invoice inboxes by VKN/TCKN */

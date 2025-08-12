@@ -1295,7 +1295,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   
   // --- ETGB Selection State ---
   const [etgbSelectedRows, setEtgbSelectedRows] = useState<string[]>([]);
-  const [etgbSelectionModel, setEtgbSelectionModel] = useState<GridRowSelectionModel>([]);
+  const [etgbSelectionModel, setEtgbSelectionModel] = useState<GridRowSelectionModel>([] as GridRowSelectionModel);
   const [etgbEnabled, setEtgbEnabled] = useState(false);
   const [processingEtgb, setProcessingEtgb] = useState(false);
 
@@ -2617,10 +2617,10 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             rowHeight={90}
             disableColumnResize
             disableColumnMenu
-            keepNonExistentRowsSelected={false}
+            keepNonExistentRowsSelected={etgbEnabled}
             checkboxSelection={etgbEnabled}
-            rowSelectionModel={etgbEnabled ? etgbSelectionModel : []}
-            onRowSelectionModelChange={etgbEnabled ? (newSelection) => {
+            rowSelectionModel={etgbEnabled ? etgbSelectionModel : undefined}
+            onRowSelectionModelChange={etgbEnabled ? ((newSelection) => {
               setEtgbSelectionModel(newSelection);
               const selectionArray = (newSelection as unknown as GridRowId[]);
               const orderIds = selectionArray
@@ -2631,7 +2631,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                 .filter(Boolean) as string[];
               const uniqueOrderIds = Array.from(new Set(orderIds));
               setEtgbSelectedRows(uniqueOrderIds);
-            } : undefined}
+            }) : undefined}
             initialState={{
               sorting: {
                 sortModel: [{ field: 'orderDate', sort: 'desc' }],

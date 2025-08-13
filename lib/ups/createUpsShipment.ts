@@ -137,6 +137,19 @@ function normalizeStateCode(state: string, countryCode: string): string {
   return state;
 }
 
+function normalizeUpsTaxIdType(rawType?: string, countryCode?: string): string {
+  const type = (rawType || '').toUpperCase().trim();
+  const allowed = new Set(['VAT', 'EORI', 'IOSS', 'OSS', 'EIN', 'SSN', 'TIN', 'GST', 'PAN']);
+  if (type === 'BUSINESS_NATIONAL' || type === 'PERSONAL_NATIONAL') {
+    return 'VAT';
+  }
+  if (!allowed.has(type)) {
+    // Default sensible mapping: VAT for non‑US, EIN for US
+    return countryCode === 'US' ? 'EIN' : 'VAT';
+  }
+  return type;
+}
+
 function toUPSDate(date: string): string {
   // Accepts 'YYYY-MM-DD' or 'YYYY/MM/DD' or 'YYYYMMDD', returns 'YYYYMMDD'
   if (!date) return '';
@@ -220,6 +233,33 @@ function buildUpsShipmentPayload(
           AttentionName: shipper.shipperPersonName,
           Phone: { Number: shipper.shipperPhoneNumber },
           ShipperNumber: shipper.upsAccountNumber,
+          ...(() => {
+            const raw = (shipper.shipperTinNumber || '').toString();
+            const num = raw.replace(/[^A-Za-z0-9]/g, '').slice(0, 15);
+            if (!num) return {};
+            const type = normalizeUpsTaxIdType(shipper.shipperTinType, shipper.shipperCountryCode);
+            return { TaxIdentificationNumber: { Type: type, Number: num } };
+          })(),
+          Address: {
+            AddressLine: [shipper.shipperStreet1, shipper.shipperStreet2 || ''].filter(Boolean),
+            City: shipper.shipperCity,
+            StateProvinceCode: shipper.shipperStateCode,
+            PostalCode: shipper.shipperPostalCode,
+            CountryCode: shipper.shipperCountryCode,
+          },
+        },
+        // Some UPS accounts require ShipFrom block with tax id present when InternationalForms are used
+        ShipFrom: {
+          Name: shipper.shipperName,
+          AttentionName: shipper.shipperPersonName,
+          Phone: { Number: shipper.shipperPhoneNumber },
+          ...(() => {
+            const raw = (shipper.shipperTinNumber || '').toString();
+            const num = raw.replace(/[^A-Za-z0-9]/g, '').slice(0, 15);
+            if (!num) return {};
+            const type = normalizeUpsTaxIdType(shipper.shipperTinType, shipper.shipperCountryCode);
+            return { TaxIdentificationNumber: { Type: type, Number: num } };
+          })(),
           Address: {
             AddressLine: [shipper.shipperStreet1, shipper.shipperStreet2 || ''].filter(Boolean),
             City: shipper.shipperCity,
@@ -415,6 +455,15 @@ function buildUpsShipmentPayload(
       throw new Error(`Invalid invoice date format: ${internationalForms.invoiceDate}. Expected YYYY-MM-DD, YYYY/MM/DD, or YYYYMMDD`);
     }
 
+    // Prepare VAT for SoldTo tax identification.
+    // Note: UPS throws 128116 for SoldTo IOSS; IOSS is transmitted electronically and should not be set here.
+    const sanitizeTaxId = (value?: string) => (value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
+    const soldToTaxIds: Array<{ Type: string; Number: string }> = [];
+    const vatSanitized = sanitizeTaxId(internationalForms.vatNumber);
+    if (vatSanitized) {
+      soldToTaxIds.push({ Type: 'VAT', Number: vatSanitized });
+    }
+
     const forms = {
       FormType: '01', // 01 = EDI
       InvoiceNumber: internationalForms.invoiceNumber,
@@ -423,6 +472,7 @@ function buildUpsShipmentPayload(
       ReasonForExport: internationalForms.exportReason,
       CurrencyCode: internationalForms.currencyCode,
       TermsOfShipment: internationalForms.termsOfShipment || 'DAP',
+      ...(soldToTaxIds.length > 0 && { TaxInformationIndicator: 'Y' }),
       Contacts: {
         SoldTo: {
           Name: internationalForms.soldTo.name,
@@ -436,6 +486,7 @@ function buildUpsShipmentPayload(
             PostalCode: normalizePostalCode(internationalForms.soldTo.postalCode),
             CountryCode: internationalForms.soldTo.countryCode,
           },
+          ...(soldToTaxIds.length > 0 && { TaxIdentificationNumber: soldToTaxIds }),
         },
       },
       Product: products,
@@ -452,6 +503,26 @@ function buildUpsShipmentPayload(
       }),
     };
     shipmentPayload.ShipmentRequest.Shipment.ShipmentServiceOptions.InternationalForms = forms;
+
+    // Also reflect VAT on the ShipTo contact so it appears under SHIP TO on the UPS invoice
+    if (vatSanitized) {
+      shipmentPayload.ShipmentRequest.Shipment.ShipTo.TaxIdentificationNumber = {
+        Type: 'VAT',
+        Number: vatSanitized,
+      };
+    }
+
+    // If IOSS is present, use VendorCollect on ShipFrom so UPS prints it on the commercial invoice
+    if (internationalForms.iossNumber) {
+      const iossSanitized = (internationalForms.iossNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 15);
+      if (iossSanitized) {
+        shipmentPayload.ShipmentRequest.Shipment.ShipFrom = shipmentPayload.ShipmentRequest.Shipment.ShipFrom || {};
+        shipmentPayload.ShipmentRequest.Shipment.ShipFrom.VendorInfo = {
+          VendorCollectIDNumber: iossSanitized,
+          VendorCollectIDTypeCode: '0356', // 0356 = IOSS per UPS
+        };
+      }
+    }
   }
 
   return shipmentPayload;

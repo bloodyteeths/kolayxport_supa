@@ -243,6 +243,15 @@ model Credential {
   upsAccountNumber      String?
   upsApiKey             String?
   upsApiSecret          String?
+  parasutClientId       String?
+  parasutClientSecret   String?
+  parasutUsername       String?
+  parasutPassword       String?
+  parasutCompanyId      String?
+  etsyAccessToken       String?
+  etsyRefreshToken      String?
+  etsyShopId            String?
+  etsyTokenExpiresAt    DateTime?
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

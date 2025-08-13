@@ -662,7 +662,28 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
       const normalizedValue = normalizeDecimal(value);
       setForm(f => ({ ...f, [name]: normalizedValue }));
     } else {
-      setForm(f => ({ ...f, [name]: value }));
+      // Propagate unified Alıcı fields to recipient as well
+      setForm(f => {
+        const next = { ...f, [name]: value } as any;
+        const propagateMap: Record<string, (val: string) => void> = {
+          soldToName: (v) => {
+            next.recipientFirstName = v.split(' ')[0] || '';
+            next.recipientLastName = v.split(' ').slice(1).join(' ') || v;
+          },
+          soldToAttention: (v) => {},
+          soldToStreet1: (v) => { next.recipientStreet1 = v; },
+          soldToStreet2: (v) => { next.recipientStreet2 = v; },
+          soldToCity: (v) => { next.recipientCity = v; },
+          soldToPostal: (v) => { next.recipientPostal = v; },
+          soldToCountry: (v) => { next.recipientCountry = v; },
+          soldToPhone: (v) => { next.recipientPhone = v; },
+          soldToState: (v) => { next.recipientState = v; },
+          soldToEmail: (_) => {},
+        };
+        const updater = propagateMap[name as string];
+        if (updater) updater(value);
+        return next;
+      });
     }
   };
 
@@ -793,118 +814,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         <Box sx={{ overflowY: 'auto', p: { xs: 1, sm: 2 }, flexGrow: 1 }}>
           <form onSubmit={handleSubmit}>
             
-            <Accordion>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Recipient Information</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box>
-                  <TextField
-                    label="First Name"
-                    name="recipientFirstName"
-                    value={form.recipientFirstName}
-                    onChange={handleInputChange}
-                    required
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                  <TextField
-                    label="Last Name"
-                    name="recipientLastName"
-                    value={form.recipientLastName}
-                    onChange={handleInputChange}
-                    required
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                  <TextField
-                    label="Street Address 1"
-                    name="recipientStreet1"
-                    value={form.recipientStreet1}
-                    onChange={handleInputChange}
-                    required
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                  <TextField
-                    label="Street Address 2"
-                    name="recipientStreet2"
-                    value={form.recipientStreet2}
-                    onChange={handleInputChange}
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                  <TextField
-                    label="City"
-                    name="recipientCity"
-                    value={form.recipientCity}
-                    onChange={handleInputChange}
-                    required
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                  <TextField
-                    label="State/Province"
-                    name="recipientState"
-                    value={form.recipientState}
-                    onChange={handleInputChange}
-                    required={countryRequiresState(form.recipientCountry)}
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                    helperText={
-                      countryRequiresState(form.recipientCountry) 
-                        ? 'State/Province is required for this country' 
-                        : 'State/Province is optional for this country'
-                    }
-                  />
-                  <TextField
-                    label="Postal Code"
-                    name="recipientPostal"
-                    value={form.recipientPostal}
-                    onChange={handleInputChange}
-                    required
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                  <Autocomplete
-                    options={COUNTRIES}
-                    getOptionLabel={(option) => option.name}
-                    value={COUNTRIES.find(c => c.code === form.recipientCountry) || null}
-                    onChange={(event, newValue) => {
-                      setForm(f => ({ ...f, recipientCountry: newValue?.code || '' }));
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Country"
-                        required
-                        margin="dense"
-                        size="small"
-                      />
-                    )}
-                    fullWidth
-                    size="small"
-                    sx={{ mt: 1 }}
-                  />
-                  <TextField
-                    label="Phone"
-                    name="recipientPhone"
-                    value={form.recipientPhone}
-                    onChange={handleInputChange}
-                    fullWidth
-                    margin="dense"
-                    size="small"
-                  />
-                </Box>
-              </AccordionDetails>
-            </Accordion>
+            {/* Recipient Information removed; we will use unified Alıcı fields and propagate to both ShipTo and SoldTo */}
             
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -1174,7 +1084,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
             
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Alıcı (Sold To)</Typography>
+                <Typography>Alıcı</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box>
@@ -1259,12 +1169,16 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     getOptionLabel={(option) => option.name}
                     value={COUNTRIES.find(c => c.code === form.soldToCountry) || null}
                     onChange={(event, newValue) => {
-                      setForm(f => ({ ...f, soldToCountry: newValue?.code || 'TR' }));
+                      setForm(f => ({ 
+                        ...f, 
+                        soldToCountry: newValue?.code || 'TR',
+                        recipientCountry: newValue?.code || ''
+                      }));
                     }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Country (Sold To)"
+                        label="Country"
                         required
                         margin="dense"
                         size="small"
@@ -1275,7 +1189,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     sx={{ mt: 1 }}
                   />
                   <TextField
-                    label="State/Province (Sold To)"
+                    label="State/Province"
                     name="soldToState"
                     value={form.soldToState}
                     onChange={handleInputChange}

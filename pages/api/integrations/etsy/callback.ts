@@ -124,35 +124,58 @@ export default async function handler(
       }
     });
 
-    const isFirstShop = userShopCount === 0;
-
-    // Store/update shop in new EtsyShop model
-    await prisma.etsyShop.upsert({
-      where: {
-        userId_shopId: {
-          userId,
-          shopId: shopData.shop_id.toString()
-        }
-      },
-      update: {
-        shopName: shopData.shop_name,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenExpiresAt: tokenExpiresAt,
-        isActive: true,
-        updatedAt: new Date()
-      },
-      create: {
+    // Also check for legacy credentials
+    const hasLegacyCredentials = await prisma.credential.findFirst({
+      where: { 
         userId,
-        shopId: shopData.shop_id.toString(),
-        shopName: shopData.shop_name,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        tokenExpiresAt: tokenExpiresAt,
-        isDefault: isFirstShop, // First shop becomes default
-        isActive: true
+        etsyAccessToken: { not: null }
       }
     });
+
+    const isFirstShop = userShopCount === 0 && !hasLegacyCredentials;
+
+    // Store/update shop in new EtsyShop model
+    try {
+      await prisma.etsyShop.upsert({
+        where: {
+          userId_shopId: {
+            userId,
+            shopId: shopData.shop_id.toString()
+          }
+        },
+        update: {
+          shopName: shopData.shop_name,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          tokenExpiresAt: tokenExpiresAt,
+          isActive: true,
+          updatedAt: new Date()
+        },
+        create: {
+          userId,
+          shopId: shopData.shop_id.toString(),
+          shopName: shopData.shop_name,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          tokenExpiresAt: tokenExpiresAt,
+          isDefault: isFirstShop, // First shop becomes default
+          isActive: true
+        }
+      });
+
+      logger.info('Successfully stored shop in EtsyShop model', {
+        userId,
+        shopId: shopData.shop_id,
+        shopName: shopData.shop_name,
+        isFirstShop
+      });
+    } catch (etsyShopError) {
+      logger.error('Failed to store in EtsyShop model', etsyShopError, {
+        userId,
+        shopId: shopData.shop_id
+      });
+      // Continue to legacy storage even if new model fails
+    }
 
     // Also maintain backward compatibility with old Credential model for now
     await prisma.credential.upsert({
@@ -185,7 +208,12 @@ export default async function handler(
 
   } catch (error) {
     logger.error('Etsy OAuth callback failed', 
-      error instanceof Error ? error : new Error(String(error)));
+      error instanceof Error ? error : new Error(String(error)), {
+        userId,
+        hasShopData: !!shopData,
+        shopId: shopData?.shop_id,
+        step: 'callback_processing'
+      });
 
     return res.redirect('/ayarlar?error=etsy_callback_failed');
   }

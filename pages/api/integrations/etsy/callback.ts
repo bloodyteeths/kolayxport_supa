@@ -32,12 +32,16 @@ export default async function handler(
   let shopData: any = null;
 
   try {
+    logger.info('Starting Etsy OAuth callback processing', { hasCode: !!code, hasState: !!state });
+
     // Decode state to get userId and codeVerifier
     const stateData = JSON.parse(
       Buffer.from(state as string, 'base64url').toString()
     );
     userId = stateData.userId;
     codeVerifier = stateData.codeVerifier;
+
+    logger.info('Decoded OAuth state', { userId, hasCodeVerifier: !!codeVerifier });
 
     // Exchange authorization code for access token
     const tokenParams = new URLSearchParams({
@@ -73,6 +77,8 @@ export default async function handler(
       token_type: string;
     };
 
+    logger.info('Token exchange successful', { userId, hasAccessToken: !!tokens.access_token });
+
     // Get user's shops info
     const shopsResponse = await fetch('https://openapi.etsy.com/v3/application/users/me/shops', {
       headers: {
@@ -100,6 +106,11 @@ export default async function handler(
       }
     } else {
       const errorBody = await shopsResponse.text();
+      logger.error('Failed to fetch Etsy shops', undefined, {
+        status: shopsResponse.status,
+        body: errorBody,
+        userId
+      });
       throw new Error(`Failed to get Etsy shops: ${shopsResponse.status} - ${errorBody}`);
     }
 
@@ -208,6 +219,11 @@ export default async function handler(
     });
 
     // Redirect back to settings with success message
+    logger.info('Etsy OAuth callback completed successfully', { 
+      userId, 
+      shopId: shopData.shop_id,
+      shopName: shopData.shop_name 
+    });
     res.redirect('/ayarlar?success=etsy_connected');
 
   } catch (error) {
@@ -219,6 +235,8 @@ export default async function handler(
         step: 'callback_processing'
       });
 
-    return res.redirect('/ayarlar?error=etsy_callback_failed');
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const encodedError = encodeURIComponent(errorMsg.substring(0, 100));
+    return res.redirect(`/ayarlar?error=etsy_callback_failed&details=${encodedError}`);
   }
 }

@@ -285,27 +285,16 @@ async function submitEtsyTracking(
     }
   }
 
-  // Fallback to default shop if no specific shop found
-  if (!targetShop) {
-    targetShop = await prisma.etsyShop.findFirst({
-      where: {
-        userId,
-        isDefault: true,
-        isActive: true
-      }
-    });
-    
-    // Final fallback to legacy credentials
-    if (!targetShop && userSettings?.etsyAccessToken) {
-      targetShop = {
-        shopId: userSettings.etsyShopId,
-        shopName: `Shop ${userSettings.etsyShopId}`,
-        accessToken: userSettings.etsyAccessToken,
-        refreshToken: userSettings.etsyRefreshToken,
-        tokenExpiresAt: userSettings.etsyTokenExpiresAt,
-        isLegacy: true
-      };
-    }
+  // If no specific shop found from order data, use legacy credentials as fallback
+  if (!targetShop && userSettings?.etsyAccessToken) {
+    targetShop = {
+      shopId: userSettings.etsyShopId,
+      shopName: `Shop ${userSettings.etsyShopId}`,
+      accessToken: userSettings.etsyAccessToken,
+      refreshToken: userSettings.etsyRefreshToken,
+      tokenExpiresAt: userSettings.etsyTokenExpiresAt,
+      isLegacy: true
+    };
   }
 
   if (!targetShop || !targetShop.accessToken) {

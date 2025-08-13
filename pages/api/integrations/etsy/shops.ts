@@ -34,7 +34,6 @@ export default async function handler(
           updatedAt: true
         },
         orderBy: [
-          { isDefault: 'desc' },
           { createdAt: 'desc' }
         ]
       });
@@ -58,7 +57,7 @@ export default async function handler(
             id: `legacy-${legacyCredential.etsyShopId}`,
             shopId: legacyCredential.etsyShopId,
             shopName: `Shop ${legacyCredential.etsyShopId}`,
-            isDefault: etsyShops.length === 0, // Default if no other shops
+            isDefault: false, // No default shops
             isActive: true,
             tokenExpiresAt: legacyCredential.etsyTokenExpiresAt,
             createdAt: new Date(),
@@ -83,26 +82,6 @@ export default async function handler(
     }
 
     try {
-      if (action === 'setDefault') {
-        // First, remove default from all user's shops
-        await prisma.etsyShop.updateMany({
-          where: { userId: user.id },
-          data: { isDefault: false }
-        });
-
-        // Set the selected shop as default
-        await prisma.etsyShop.update({
-          where: { 
-            userId_shopId: { 
-              userId: user.id, 
-              shopId: shopId 
-            }
-          },
-          data: { isDefault: true }
-        });
-
-        return res.status(200).json({ message: 'Default shop updated successfully' });
-      }
 
       if (action === 'delete') {
         // Check if it's a legacy shop

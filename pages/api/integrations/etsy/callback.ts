@@ -171,7 +171,7 @@ export default async function handler(
           accessToken: tokens.access_token,
           refreshToken: tokens.refresh_token,
           tokenExpiresAt: tokenExpiresAt,
-          isDefault: isFirstShop, // First shop becomes default
+          isDefault: false, // No default shops - always auto-match
           isActive: true
         }
       });
@@ -190,24 +190,27 @@ export default async function handler(
       // Continue to legacy storage even if new model fails
     }
 
-    // Also maintain backward compatibility with old Credential model for now
-    await prisma.credential.upsert({
-      where: { userId },
-      update: {
-        etsyAccessToken: tokens.access_token,
-        etsyRefreshToken: tokens.refresh_token,
-        etsyShopId: shopData.shop_id.toString(),
-        etsyTokenExpiresAt: tokenExpiresAt,
-        updatedAt: new Date()
-      },
-      create: {
-        userId,
-        etsyAccessToken: tokens.access_token,
-        etsyRefreshToken: tokens.refresh_token,
-        etsyShopId: shopData.shop_id.toString(),
-        etsyTokenExpiresAt: tokenExpiresAt
-      }
-    });
+    // Only update Credential table if this is the user's first Etsy shop
+    // This maintains backward compatibility for the first shop only
+    if (isFirstShop) {
+      await prisma.credential.upsert({
+        where: { userId },
+        update: {
+          etsyAccessToken: tokens.access_token,
+          etsyRefreshToken: tokens.refresh_token,
+          etsyShopId: shopData.shop_id.toString(),
+          etsyTokenExpiresAt: tokenExpiresAt,
+          updatedAt: new Date()
+        },
+        create: {
+          userId,
+          etsyAccessToken: tokens.access_token,
+          etsyRefreshToken: tokens.refresh_token,
+          etsyShopId: shopData.shop_id.toString(),
+          etsyTokenExpiresAt: tokenExpiresAt
+        }
+      });
+    }
 
     logger.info('Etsy OAuth completed successfully', {
       userId,

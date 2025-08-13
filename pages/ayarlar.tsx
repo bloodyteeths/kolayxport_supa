@@ -196,34 +196,6 @@ const AyarlarPage = () => {
     }
   };
 
-  const handleSetDefaultEtsyShop = async (shopId: string) => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-      await axios.post('/api/integrations/etsy/shops', {
-        shopId,
-        action: 'setDefault'
-      }, {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      });
-      
-      setSnackbar({ 
-        open: true, 
-        message: 'Varsayılan shop başarıyla değiştirildi!', 
-        severity: 'success' 
-      });
-      
-      // Refresh shops list
-      await fetchEtsyShops();
-    } catch (error: any) {
-      setSnackbar({ 
-        open: true, 
-        message: 'Shop değiştirilemedi. Lütfen tekrar deneyin.', 
-        severity: 'error' 
-      });
-      console.error('Failed to set default shop:', error);
-    }
-  };
 
   const handleDisconnectEtsyShop = async (shopId: string) => {
     if (!window.confirm('Bu Etsy shop bağlantısını kesmek istediğinize emin misiniz?')) return;
@@ -552,22 +524,12 @@ const AyarlarPage = () => {
                 ) : (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {etsyShops.map((shop) => (
-                      <Paper key={shop.id} elevation={1} sx={{ p: 2, border: shop.isDefault ? '2px solid #4caf50' : '1px solid #e0e0e0' }}>
+                      <Paper key={shop.id} elevation={1} sx={{ p: 2, border: '1px solid #e0e0e0' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                              <Typography variant="subtitle1" fontWeight="bold">
-                                {shop.shopName || `Shop ${shop.shopId}`}
-                              </Typography>
-                              {shop.isDefault && (
-                                <Chip 
-                                  label="Varsayılan" 
-                                  color="success" 
-                                  size="small" 
-                                  variant="outlined"
-                                />
-                              )}
-                            </Box>
+                            <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
+                              {shop.shopName || `Shop ${shop.shopId}`}
+                            </Typography>
                             <Typography variant="body2" color="text.secondary">
                               Shop ID: {shop.shopId}
                             </Typography>
@@ -577,16 +539,7 @@ const AyarlarPage = () => {
                               </Typography>
                             )}
                           </Box>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            {!shop.isDefault && (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => handleSetDefaultEtsyShop(shop.shopId)}
-                              >
-                                Varsayılan Yap
-                              </Button>
-                            )}
+                          <Box>
                             <Button
                               size="small"
                               variant="outlined"

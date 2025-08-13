@@ -452,7 +452,7 @@ const AyarlarPage = () => {
                     <Button
                       variant="contained"
                       color="primary"
-                      href="/api/auth/etsy/connect"
+                      href="/api/integrations/etsy/connect"
                       sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
                     >
                       🔗 Etsy Shop Bağla

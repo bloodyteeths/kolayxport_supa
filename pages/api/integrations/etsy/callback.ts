@@ -27,12 +27,17 @@ export default async function handler(
     return res.status(400).json({ error: 'Missing code or state parameter' });
   }
 
+  let userId: string = '';
+  let codeVerifier: string = '';
+  let shopData: any = null;
+
   try {
     // Decode state to get userId and codeVerifier
     const stateData = JSON.parse(
       Buffer.from(state as string, 'base64url').toString()
     );
-    const { userId, codeVerifier } = stateData;
+    userId = stateData.userId;
+    codeVerifier = stateData.codeVerifier;
 
     // Exchange authorization code for access token
     const tokenParams = new URLSearchParams({
@@ -76,7 +81,6 @@ export default async function handler(
       }
     });
 
-    let shopData: any = null;
     if (shopsResponse.ok) {
       const shopsData = await shopsResponse.json() as any;
       const shops = shopsData.results || [];
@@ -209,7 +213,7 @@ export default async function handler(
   } catch (error) {
     logger.error('Etsy OAuth callback failed', 
       error instanceof Error ? error : new Error(String(error)), {
-        userId,
+        userId: userId || 'unknown',
         hasShopData: !!shopData,
         shopId: shopData?.shop_id,
         step: 'callback_processing'

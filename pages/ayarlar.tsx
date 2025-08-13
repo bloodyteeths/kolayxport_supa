@@ -3,7 +3,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import axios from 'axios';
 import { Grid } from '@mui/material';
 import {
-  Container, TextField, Button, Typography, Paper, CircularProgress, Select, MenuItem, FormControl, InputLabel, FormHelperText, Box, Snackbar, Alert, AlertColor, SelectChangeEvent, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton
+  Container, TextField, Button, Typography, Paper, CircularProgress, Select, MenuItem, FormControl, InputLabel, FormHelperText, Box, Snackbar, Alert, AlertColor, SelectChangeEvent, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Chip
 } from '@mui/material';
 import { fedexOptionsData, FedExOption } from '../lib/fedex/fedex.config'; // For dutiesPaymentTypes
 import AppLayout from '../components/AppLayout'; // Use AppLayout for consistent sidebar
@@ -171,45 +171,88 @@ const AyarlarPage = () => {
     }
   };
 
-  // --- Etsy Disconnect Handler ---
-  const handleDisconnectEtsy = async () => {
-    if (!window.confirm('Etsy bağlantısını kesmek istediğinize emin misiniz?')) return;
-    
+
+  // --- Etsy Shops State ---
+  const [etsyShops, setEtsyShops] = useState<any[]>([]);
+  const [etsyShopsLoading, setEtsyShopsLoading] = useState(false);
+  const [etsyShopsError, setEtsyShopsError] = useState<string | null>(null);
+
+  // --- Etsy Shops Functions ---
+  const fetchEtsyShops = async () => {
+    setEtsyShopsLoading(true);
+    setEtsyShopsError(null);
     try {
-      const response = await axios.patch('/api/user/settings', {
-        integrationSettings: {
-          ...formData.integrationSettings,
-          etsyAccessToken: null,
-          etsyRefreshToken: null,
-          etsyShopId: null,
-          etsyTokenExpiresAt: null
-        }
-      }, { withCredentials: true });
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      const response = await axios.get('/api/integrations/etsy/shops', {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+      setEtsyShops(response.data.shops || []);
+    } catch (error: any) {
+      setEtsyShopsError(error.response?.data?.error || 'Failed to fetch Etsy shops');
+      console.error('Failed to fetch Etsy shops:', error);
+    } finally {
+      setEtsyShopsLoading(false);
+    }
+  };
 
-      // Update local state
-      setFormData(prev => ({
-        ...prev,
-        integrationSettings: {
-          ...prev.integrationSettings,
-          etsyAccessToken: null,
-          etsyRefreshToken: null,
-          etsyShopId: null,
-          etsyTokenExpiresAt: null
-        }
-      }));
-
+  const handleSetDefaultEtsyShop = async (shopId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      await axios.post('/api/integrations/etsy/shops', {
+        shopId,
+        action: 'setDefault'
+      }, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+      
       setSnackbar({ 
         open: true, 
-        message: 'Etsy bağlantısı başarıyla kesildi!', 
+        message: 'Varsayılan shop başarıyla değiştirildi!', 
         severity: 'success' 
       });
-    } catch (error) {
-      console.error('Failed to disconnect Etsy:', error);
+      
+      // Refresh shops list
+      await fetchEtsyShops();
+    } catch (error: any) {
       setSnackbar({ 
         open: true, 
-        message: 'Etsy bağlantısı kesilemedi. Lütfen tekrar deneyin.', 
+        message: 'Shop değiştirilemedi. Lütfen tekrar deneyin.', 
         severity: 'error' 
       });
+      console.error('Failed to set default shop:', error);
+    }
+  };
+
+  const handleDisconnectEtsyShop = async (shopId: string) => {
+    if (!window.confirm('Bu Etsy shop bağlantısını kesmek istediğinize emin misiniz?')) return;
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      await axios.post('/api/integrations/etsy/shops', {
+        shopId,
+        action: 'delete'
+      }, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+      
+      setSnackbar({ 
+        open: true, 
+        message: 'Etsy shop bağlantısı başarıyla kesildi!', 
+        severity: 'success' 
+      });
+      
+      // Refresh shops list
+      await fetchEtsyShops();
+    } catch (error: any) {
+      setSnackbar({ 
+        open: true, 
+        message: 'Shop bağlantısı kesilemedi. Lütfen tekrar deneyin.', 
+        severity: 'error' 
+      });
+      console.error('Failed to disconnect shop:', error);
     }
   };
 
@@ -247,6 +290,7 @@ const AyarlarPage = () => {
 
   useEffect(() => {
     fetchSyncHistory();
+    fetchEtsyShops();
     // eslint-disable-next-line
   }, []);
 
@@ -469,47 +513,92 @@ const AyarlarPage = () => {
               
               {/* Etsy Connection */}
               <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  Etsy Shop Bağlantısı
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">
+                    Etsy Shop Bağlantıları
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    href="/api/integrations/etsy/connect"
+                    sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
+                  >
+                    🔗 Yeni Shop Bağla
+                  </Button>
+                </Box>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Birden fazla Etsy shop'ınızı bağlayabilir ve takip numaralarını otomatik olarak gönderebilirsiniz.
                 </Typography>
-                {formData.integrationSettings?.etsyAccessToken ? (
-                  <Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                      <Typography color="success.main" sx={{ fontWeight: 'bold' }}>
-                        ✅ Etsy shop bağlı
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Shop ID: {formData.integrationSettings.etsyShopId}
-                      </Typography>
-                    </Box>
-                    {formData.integrationSettings.etsyTokenExpiresAt && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Token geçerlilik: {new Date(formData.integrationSettings.etsyTokenExpiresAt).toLocaleString('tr-TR')}
-                      </Typography>
-                    )}
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      onClick={() => handleDisconnectEtsy()}
-                      sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
-                    >
-                      🔌 Bağlantıyı Kes
-                    </Button>
-                  </Box>
-                ) : (
-                  <Box>
+
+                {etsyShopsLoading ? (
+                  <Typography>Etsy shop'ları yükleniyor...</Typography>
+                ) : etsyShopsError ? (
+                  <Typography color="error">Hata: {etsyShopsError}</Typography>
+                ) : etsyShops.length === 0 ? (
+                  <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 1 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Etsy shop'ınızı bağlayarak sipariş takip numaralarını otomatik olarak Etsy'ye gönderebilirsiniz.
+                      Henüz bağlı Etsy shop'ınız yok.
                     </Typography>
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       color="primary"
                       href="/api/integrations/etsy/connect"
                       sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
                     >
-                      🔗 Etsy Shop Bağla
+                      🔗 İlk Shop'ınızı Bağlayın
                     </Button>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {etsyShops.map((shop) => (
+                      <Paper key={shop.id} elevation={1} sx={{ p: 2, border: shop.isDefault ? '2px solid #4caf50' : '1px solid #e0e0e0' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                              <Typography variant="subtitle1" fontWeight="bold">
+                                {shop.shopName || `Shop ${shop.shopId}`}
+                              </Typography>
+                              {shop.isDefault && (
+                                <Chip 
+                                  label="Varsayılan" 
+                                  color="success" 
+                                  size="small" 
+                                  variant="outlined"
+                                />
+                              )}
+                            </Box>
+                            <Typography variant="body2" color="text.secondary">
+                              Shop ID: {shop.shopId}
+                            </Typography>
+                            {shop.tokenExpiresAt && (
+                              <Typography variant="caption" color="text.secondary">
+                                Token geçerlilik: {new Date(shop.tokenExpiresAt).toLocaleString('tr-TR')}
+                              </Typography>
+                            )}
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            {!shop.isDefault && (
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleSetDefaultEtsyShop(shop.shopId)}
+                              >
+                                Varsayılan Yap
+                              </Button>
+                            )}
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              onClick={() => handleDisconnectEtsyShop(shop.shopId)}
+                            >
+                              Bağlantıyı Kes
+                            </Button>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    ))}
                   </Box>
                 )}
               </Box>

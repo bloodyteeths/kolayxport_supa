@@ -286,25 +286,131 @@ async function submitEtsyTracking(
   // Initialize Etsy client
   const etsyClient = new EtsyClient(etsyCredentials, onTokenRefresh);
 
-  // Skip validation for now and proceed directly to tracking submission
-  // The tracking submission will fail with proper error message if credentials are invalid
-  logger.info('Etsy client initialized, skipping validation for tracking submission', {
+  // Try validation to trigger any necessary token refresh
+  logger.info('Etsy client initialized, attempting validation to check/refresh token', {
     shopId: userSettings.etsyShopId,
     hasAccessToken: !!etsyCredentials.accessToken,
     tokenExpiresAt: etsyCredentials.tokenExpiresAt
   });
 
+  try {
+    const isValid = await etsyClient.validateCredentials();
+    logger.info('Etsy credentials validation result', {
+      isValid,
+      shopId: userSettings.etsyShopId
+    });
+
+    // If validation failed, force a token refresh if we have a refresh token
+    if (!isValid && userSettings.etsyRefreshToken) {
+      logger.info('Validation failed, forcing token refresh', {
+        shopId: userSettings.etsyShopId
+      });
+      
+      try {
+        // Force refresh by calling a method that triggers it
+        await (etsyClient as any).refreshAccessToken();
+        logger.info('Forced token refresh completed');
+        
+        // Try validation again
+        const isValidAfterRefresh = await etsyClient.validateCredentials();
+        logger.info('Validation after forced refresh', {
+          isValid: isValidAfterRefresh
+        });
+      } catch (refreshError) {
+        logger.error('Forced token refresh failed', refreshError);
+      }
+    }
+  } catch (error) {
+    logger.warn('Etsy credentials validation failed, proceeding anyway', {
+      shopId: userSettings.etsyShopId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    // Continue anyway - the tracking submission might still work
+  }
+
   // Map carrier ID to carrier name
   const carrierName = getCarrierName(carrierId);
+  
+  // Extract Etsy receipt ID from order data
+  let etsyReceiptId: string;
+  try {
+    // Try to get receipt ID from rawData first
+    const rawData = order.rawData as any;
+    if (rawData && rawData.receipt_id) {
+      etsyReceiptId = String(rawData.receipt_id);
+    } else if (rawData && rawData.id) {
+      etsyReceiptId = String(rawData.id);
+    } else {
+      // Fallback: try to parse marketplaceKey if it looks like a number
+      const marketplaceKey = order.marketplaceKey;
+      if (/^\d+$/.test(marketplaceKey)) {
+        etsyReceiptId = marketplaceKey;
+      } else {
+        throw new Error(`Cannot determine Etsy receipt ID from order data. MarketplaceKey: ${marketplaceKey}`);
+      }
+    }
+
+    logger.info('Extracted Etsy receipt ID', {
+      orderId: order.id,
+      etsyReceiptId,
+      marketplaceKey: order.marketplaceKey,
+      hasRawData: !!order.rawData
+    });
+
+  } catch (error) {
+    logger.error('Failed to extract Etsy receipt ID', error, {
+      orderId: order.id,
+      marketplaceKey: order.marketplaceKey,
+      rawData: order.rawData
+    });
+    throw new Error(`Invalid Etsy receipt ID format. Expected numeric ID, got: ${order.marketplaceKey}`);
+  }
   
   // Submit tracking to Etsy
   const trackingData: EtsyTrackingData = {
     shopId: userSettings.etsyShopId,
-    receiptId: order.marketplaceKey, // Etsy receipt ID
+    receiptId: etsyReceiptId,
     trackingNumber,
     carrier: carrierName
   };
 
+  // First, let's try to get the receipt details to debug access issues
+  try {
+    const receiptUrl = `https://openapi.etsy.com/v3/application/shops/${userSettings.etsyShopId}/receipts/${etsyReceiptId}`;
+    const receiptCheckResponse = await fetch(receiptUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${etsyCredentials.accessToken}`,
+        'x-api-key': process.env.ETSY_API_KEY || ''
+      }
+    });
+
+    logger.info('Receipt access check', {
+      receiptId: etsyReceiptId,
+      status: receiptCheckResponse.status,
+      statusText: receiptCheckResponse.statusText
+    });
+
+    if (receiptCheckResponse.ok) {
+      const receiptData = await receiptCheckResponse.json();
+      logger.info('Receipt details available', {
+        receiptId: etsyReceiptId,
+        buyerUserId: receiptData.buyer_user_id,
+        wasShipped: receiptData.was_shipped,
+        receiptType: receiptData.receipt_type
+      });
+    } else {
+      const errorBody = await receiptCheckResponse.text();
+      logger.error('Cannot access receipt', new Error(`Status: ${receiptCheckResponse.status}, Body: ${errorBody}`), {
+        receiptId: etsyReceiptId,
+        status: receiptCheckResponse.status
+      });
+    }
+  } catch (receiptError) {
+    logger.error('Receipt check failed', receiptError);
+  }
+
+  // Now try the tracking submission
   const result = await etsyClient.submitTracking(trackingData);
 
   logger.info('Etsy tracking submitted successfully', {

@@ -46,6 +46,7 @@ model User {
   etsyAddresses       EtsyAddress[]
   trackingSubmissions TrackingSubmission[] @relation("UserTrackingSubmissions")
   senkronOrderData    SenkronOrderData[] @relation("UserSenkronData")
+  etsyShops           EtsyShop[] @relation("UserEtsyShops")
 }
 
 model Account {
@@ -429,4 +430,24 @@ model TrackingSubmission {
   @@index([orderId])
   @@index([submittedBy])
   @@index([submittedAt])
+}
+
+model EtsyShop {
+  id              String    @id @default(cuid())
+  userId          String
+  shopId          String    // Etsy shop ID
+  shopName        String?   // Human readable shop name
+  accessToken     String
+  refreshToken    String?
+  tokenExpiresAt  DateTime?
+  isDefault       Boolean   @default(false)  // Default shop for this user
+  isActive        Boolean   @default(true)   // Can be disabled without deleting
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  user            User      @relation("UserEtsyShops", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shopId])  // One record per user-shop combination
+  @@index([userId])
+  @@index([shopId])
 }

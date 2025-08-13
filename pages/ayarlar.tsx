@@ -171,6 +171,48 @@ const AyarlarPage = () => {
     }
   };
 
+  // --- Etsy Disconnect Handler ---
+  const handleDisconnectEtsy = async () => {
+    if (!window.confirm('Etsy bağlantısını kesmek istediğinize emin misiniz?')) return;
+    
+    try {
+      const response = await axios.patch('/api/user/settings', {
+        integrationSettings: {
+          ...formData.integrationSettings,
+          etsyAccessToken: null,
+          etsyRefreshToken: null,
+          etsyShopId: null,
+          etsyTokenExpiresAt: null
+        }
+      }, { withCredentials: true });
+
+      // Update local state
+      setFormData(prev => ({
+        ...prev,
+        integrationSettings: {
+          ...prev.integrationSettings,
+          etsyAccessToken: null,
+          etsyRefreshToken: null,
+          etsyShopId: null,
+          etsyTokenExpiresAt: null
+        }
+      }));
+
+      setSnackbar({ 
+        open: true, 
+        message: 'Etsy bağlantısı başarıyla kesildi!', 
+        severity: 'success' 
+      });
+    } catch (error) {
+      console.error('Failed to disconnect Etsy:', error);
+      setSnackbar({ 
+        open: true, 
+        message: 'Etsy bağlantısı kesilemedi. Lütfen tekrar deneyin.', 
+        severity: 'error' 
+      });
+    }
+  };
+
   const [syncHistoryLoading, setSyncHistoryLoading] = useState(false);
   const [syncHistoryError, setSyncHistoryError] = useState<string | null>(null);
   const [syncHistoryCursor, setSyncHistoryCursor] = useState<string | null>(null);
@@ -431,18 +473,29 @@ const AyarlarPage = () => {
                   Etsy Shop Bağlantısı
                 </Typography>
                 {formData.integrationSettings?.etsyAccessToken ? (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography color="success.main" sx={{ fontWeight: 'bold' }}>
-                      ✅ Etsy shop bağlı
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Shop ID: {formData.integrationSettings.etsyShopId}
-                    </Typography>
-                    {formData.integrationSettings.etsyTokenExpiresAt && (
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Typography color="success.main" sx={{ fontWeight: 'bold' }}>
+                        ✅ Etsy shop bağlı
+                      </Typography>
                       <Typography variant="body2" color="text.secondary">
+                        Shop ID: {formData.integrationSettings.etsyShopId}
+                      </Typography>
+                    </Box>
+                    {formData.integrationSettings.etsyTokenExpiresAt && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         Token geçerlilik: {new Date(formData.integrationSettings.etsyTokenExpiresAt).toLocaleString('tr-TR')}
                       </Typography>
                     )}
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      size="small"
+                      onClick={() => handleDisconnectEtsy()}
+                      sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
+                    >
+                      🔌 Bağlantıyı Kes
+                    </Button>
                   </Box>
                 ) : (
                   <Box>

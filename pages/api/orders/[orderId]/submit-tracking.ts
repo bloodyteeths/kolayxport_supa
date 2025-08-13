@@ -286,11 +286,13 @@ async function submitEtsyTracking(
   // Initialize Etsy client
   const etsyClient = new EtsyClient(etsyCredentials, onTokenRefresh);
 
-  // Validate credentials
-  const isValid = await etsyClient.validateCredentials();
-  if (!isValid) {
-    throw new Error('Invalid Etsy credentials. Please re-authenticate.');
-  }
+  // Skip validation for now and proceed directly to tracking submission
+  // The tracking submission will fail with proper error message if credentials are invalid
+  logger.info('Etsy client initialized, skipping validation for tracking submission', {
+    shopId: userSettings.etsyShopId,
+    hasAccessToken: !!etsyCredentials.accessToken,
+    tokenExpiresAt: etsyCredentials.tokenExpiresAt
+  });
 
   // Map carrier ID to carrier name
   const carrierName = getCarrierName(carrierId);

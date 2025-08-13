@@ -79,39 +79,37 @@ export default async function handler(
 
     logger.info('Token exchange successful', { userId, hasAccessToken: !!tokens.access_token });
 
-    // Get user's shops info
-    const shopsResponse = await fetch('https://openapi.etsy.com/v3/application/users/me/shops', {
+    // Get shop info to store shop ID (using working API endpoint)
+    const shopResponse = await fetch('https://api.etsy.com/v3/application/users/me', {
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
         'x-api-key': process.env.ETSY_API_KEY!
       }
     });
 
-    if (shopsResponse.ok) {
-      const shopsData = await shopsResponse.json() as any;
-      const shops = shopsData.results || [];
+    let shopId = '';
+    if (shopResponse.ok) {
+      const userData = await shopResponse.json() as any;
+      shopId = userData.user_id?.toString() || '';
       
-      if (shops.length > 0) {
-        // For now, use the first shop (primary shop)
-        shopData = shops[0];
-        
-        logger.info('Etsy shops retrieved', {
-          userId,
-          shopCount: shops.length,
-          primaryShopId: shopData.shop_id,
-          primaryShopName: shopData.shop_name
-        });
-      } else {
-        throw new Error('No Etsy shops found for this user');
-      }
+      // Create shopData object for compatibility with multi-store logic
+      shopData = {
+        shop_id: shopId,
+        shop_name: `Shop ${shopId}` // Default name since /users/me doesn't provide shop name
+      };
+      
+      logger.info('Etsy user info retrieved', {
+        userId,
+        etsyUserId: shopId
+      });
     } else {
-      const errorBody = await shopsResponse.text();
-      logger.error('Failed to fetch Etsy shops', undefined, {
-        status: shopsResponse.status,
+      const errorBody = await shopResponse.text();
+      logger.error('Failed to fetch Etsy user info', undefined, {
+        status: shopResponse.status,
         body: errorBody,
         userId
       });
-      throw new Error(`Failed to get Etsy shops: ${shopsResponse.status} - ${errorBody}`);
+      throw new Error(`Failed to get Etsy user info: ${shopResponse.status} - ${errorBody}`);
     }
 
     // Calculate token expiration

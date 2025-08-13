@@ -499,8 +499,16 @@ const AyarlarPage = () => {
                   </Button>
                 </Box>
 
+                <Box sx={{ mb: 2, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+                  <Typography variant="body2" color="warning.dark" fontWeight="bold">
+                    ⚠️ Etsy Tracking API Geçici Olarak Devre Dışı
+                  </Typography>
+                  <Typography variant="caption" color="warning.dark">
+                    Etsy'den ticari API erişimi onayı beklenirken, takip numaraları manuel olarak Etsy seller dashboard'ından girilmelidir.
+                  </Typography>
+                </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Birden fazla Etsy shop'ınızı bağlayabilir ve takip numaralarını otomatik olarak gönderebilirsiniz.
+                  Birden fazla Etsy shop'ınızı bağlayabilirsiniz. Takip numarası otomasyonu Etsy onayı sonrası aktif olacaktır.
                 </Typography>
 
                 {etsyShopsLoading ? (

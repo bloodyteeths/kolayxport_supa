@@ -79,14 +79,8 @@ export default async function handler(
 
     // Route to appropriate tracking submission based on marketplace
     if (source === 'etsy') {
-      // Submit tracking to Etsy directly
-      await submitEtsyTracking(
-        userSettings,
-        order,
-        trackingNumber,
-        carrierId,
-        user.id
-      );
+      // Etsy tracking API temporarily disabled pending commercial access approval
+      throw new Error('Etsy tracking submission is temporarily unavailable while we await API approval from Etsy. Please submit tracking numbers manually through your Etsy seller dashboard.');
     } else {
       // Submit through Veeqo for other marketplaces
       if (!userSettings?.veeqoApiKey) {
@@ -262,6 +256,61 @@ async function submitEtsyTracking(
   const orderRawData = order.rawData as any;
   const orderShopId = orderRawData?.shop_id?.toString() || orderRawData?.shop?.shop_id?.toString();
   
+  logger.info('Analyzing order for shop matching', {
+    orderId: order.id,
+    marketplace: order.marketplace,
+    marketplaceKey: order.marketplaceKey,
+    orderShopId,
+    rawDataKeys: orderRawData ? Object.keys(orderRawData) : [],
+    hasShopId: !!orderRawData?.shop_id,
+    hasNestedShop: !!orderRawData?.shop?.shop_id,
+    // Check for other possible shop ID fields
+    shopApp: orderRawData?.shop_app,
+    objectOwner: orderRawData?.object_owner,
+    channel: orderRawData?.channel,
+    possibleShopFields: {
+      shop_app: orderRawData?.shop_app,
+      object_owner: orderRawData?.object_owner,
+      channel: orderRawData?.channel,
+      contact_id: orderRawData?.contact_id
+    }
+  });
+
+  // Extract Etsy receipt ID from order data first (needed for shop testing)
+  let etsyReceiptId: string;
+  try {
+    // Try to get receipt ID from rawData first
+    const rawData = order.rawData as any;
+    if (rawData && rawData.receipt_id) {
+      etsyReceiptId = String(rawData.receipt_id);
+    } else if (rawData && rawData.id) {
+      etsyReceiptId = String(rawData.id);
+    } else {
+      // Fallback: try to parse marketplaceKey if it looks like a number
+      const marketplaceKey = order.marketplaceKey;
+      if (/^\d+$/.test(marketplaceKey)) {
+        etsyReceiptId = marketplaceKey;
+      } else {
+        throw new Error(`Cannot determine Etsy receipt ID from order data. MarketplaceKey: ${marketplaceKey}`);
+      }
+    }
+
+    logger.info('Extracted Etsy receipt ID', {
+      orderId: order.id,
+      etsyReceiptId,
+      marketplaceKey: order.marketplaceKey,
+      hasRawData: !!order.rawData
+    });
+
+  } catch (error) {
+    logger.error('Failed to extract Etsy receipt ID', error, {
+      orderId: order.id,
+      marketplaceKey: order.marketplaceKey,
+      rawData: order.rawData
+    });
+    throw new Error(`Invalid Etsy receipt ID format. Expected numeric ID, got: ${order.marketplaceKey}`);
+  }
+  
   if (orderShopId) {
     // Look for shop in new EtsyShop model first
     targetShop = await prisma.etsyShop.findFirst({
@@ -282,6 +331,138 @@ async function submitEtsyTracking(
         tokenExpiresAt: userSettings.etsyTokenExpiresAt,
         isLegacy: true
       };
+    }
+  }
+
+  // For Veeqo-aggregated Etsy orders, check if this receipt belongs to any connected shop
+  if (!targetShop && order.marketplace?.toLowerCase().includes('etsy')) {
+    logger.info('Order has no shop_id in rawData, checking all connected Etsy shops for receipt access');
+    
+    // Get all connected Etsy shops
+    const allEtsyShops = await prisma.etsyShop.findMany({
+      where: { userId, isActive: true }
+    });
+    
+    // Also include legacy shop if exists
+    const allShops = [...allEtsyShops];
+    if (userSettings?.etsyAccessToken && userSettings?.etsyShopId) {
+      const legacyExists = allEtsyShops.some(shop => shop.shopId === userSettings.etsyShopId);
+      if (!legacyExists) {
+        allShops.push({
+          shopId: userSettings.etsyShopId,
+          shopName: `Shop ${userSettings.etsyShopId}`,
+          accessToken: userSettings.etsyAccessToken,
+          refreshToken: userSettings.etsyRefreshToken,
+          tokenExpiresAt: userSettings.etsyTokenExpiresAt,
+          isLegacy: true
+        } as any);
+      }
+    }
+
+    logger.info('Testing receipt access across all connected shops', {
+      receiptId: etsyReceiptId,
+      totalShops: allShops.length,
+      shopIds: allShops.map(s => s.shopId)
+    });
+
+    // Smart matching: Test only a limited number of shops to avoid rate limiting
+    const channelEmail = orderRawData?.channel?.email;
+    const channelName = orderRawData?.channel?.name;
+    
+    // Limit testing to max 3 shops to avoid suspicious activity
+    const shopsToTest = allShops.slice(0, 3);
+    logger.info('Limiting shop testing to avoid rate limits', {
+      totalShops: allShops.length,
+      testing: shopsToTest.length,
+      testingShopIds: shopsToTest.map(s => s.shopId)
+    });
+    
+    for (const shop of shopsToTest) {
+      try {
+        // Get shop details from Etsy API
+        const shopDetailsUrl = `https://openapi.etsy.com/v3/application/shops/${shop.shopId}`;
+        const shopDetailsResponse = await fetch(shopDetailsUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${shop.accessToken}`,
+            'x-api-key': process.env.ETSY_API_KEY || ''
+          }
+        });
+
+        if (shopDetailsResponse.ok) {
+          const shopDetails = await shopDetailsResponse.json() as any;
+          
+          logger.info('Fetched shop details for matching', {
+            shopId: shop.shopId,
+            shopName: shopDetails.shop_name,
+            etsyUrl: shopDetails.url,
+            channelEmail,
+            channelName
+          });
+
+          // Try to match by shop name similarity or other criteria
+          const shopName = shopDetails.shop_name?.toLowerCase() || '';
+          const veeqoChannelName = (channelName || '').toLowerCase();
+          
+          // Try to match by shop name similarity (remove hardcoded values)
+          const nameMatches = veeqoChannelName.includes(shopName.slice(0, 5)) || shopName.includes(veeqoChannelName.slice(0, 5));
+          
+          if (nameMatches) {
+            targetShop = shop;
+            logger.info('Matched shop using smart matching', {
+              shopId: shop.shopId,
+              shopName: shopDetails.shop_name,
+              matchReason: 'name similarity',
+              channelName
+            });
+            break;
+          }
+        } else {
+          logger.info('Cannot fetch shop details, testing receipt access instead', {
+            shopId: shop.shopId,
+            status: shopDetailsResponse.status
+          });
+        }
+        
+        // Always test receipt access for each shop (regardless of shop details success)
+        if (!targetShop) {
+          const testUrl = `https://openapi.etsy.com/v3/application/shops/${shop.shopId}/receipts/${etsyReceiptId}`;
+          const testResponse = await fetch(testUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${shop.accessToken}`,
+              'x-api-key': process.env.ETSY_API_KEY || ''
+            }
+          });
+
+          logger.info('Receipt access test result', {
+            shopId: shop.shopId,
+            receiptId: etsyReceiptId,
+            status: testResponse.status,
+            canAccess: testResponse.ok
+          });
+
+          if (testResponse.ok) {
+            targetShop = shop;
+            logger.info('Found correct shop via receipt access test', {
+              shopId: shop.shopId,
+              shopName: shop.shopName,
+              receiptId: etsyReceiptId
+            });
+            break;
+          }
+        }
+      } catch (testError) {
+        logger.warn('Error in shop matching', {
+          shopId: shop.shopId,
+          error: testError instanceof Error ? testError.message : String(testError)
+        });
+      }
+      
+      // Add small delay between shop tests to be respectful to Etsy API
+      if (!targetShop && shopsToTest.indexOf(shop) < shopsToTest.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay
+      }
     }
   }
 
@@ -399,41 +580,6 @@ async function submitEtsyTracking(
 
   // Map carrier ID to carrier name
   const carrierName = getCarrierName(carrierId);
-  
-  // Extract Etsy receipt ID from order data
-  let etsyReceiptId: string;
-  try {
-    // Try to get receipt ID from rawData first
-    const rawData = order.rawData as any;
-    if (rawData && rawData.receipt_id) {
-      etsyReceiptId = String(rawData.receipt_id);
-    } else if (rawData && rawData.id) {
-      etsyReceiptId = String(rawData.id);
-    } else {
-      // Fallback: try to parse marketplaceKey if it looks like a number
-      const marketplaceKey = order.marketplaceKey;
-      if (/^\d+$/.test(marketplaceKey)) {
-        etsyReceiptId = marketplaceKey;
-      } else {
-        throw new Error(`Cannot determine Etsy receipt ID from order data. MarketplaceKey: ${marketplaceKey}`);
-      }
-    }
-
-    logger.info('Extracted Etsy receipt ID', {
-      orderId: order.id,
-      etsyReceiptId,
-      marketplaceKey: order.marketplaceKey,
-      hasRawData: !!order.rawData
-    });
-
-  } catch (error) {
-    logger.error('Failed to extract Etsy receipt ID', error, {
-      orderId: order.id,
-      marketplaceKey: order.marketplaceKey,
-      rawData: order.rawData
-    });
-    throw new Error(`Invalid Etsy receipt ID format. Expected numeric ID, got: ${order.marketplaceKey}`);
-  }
   
   // Submit tracking to Etsy using the correct shop
   const trackingData: EtsyTrackingData = {

@@ -255,31 +255,111 @@ async function submitEtsyTracking(
   carrierId: number,
   userId: string
 ): Promise<void> {
-  if (!userSettings?.etsyAccessToken || !userSettings?.etsyShopId) {
-    throw new Error('Etsy not connected. Please connect your Etsy shop first.');
+  // Find the correct Etsy shop for this order
+  let targetShop: any = null;
+  
+  // First, try to find shop based on order's rawData
+  const orderRawData = order.rawData as any;
+  const orderShopId = orderRawData?.shop_id?.toString() || orderRawData?.shop?.shop_id?.toString();
+  
+  if (orderShopId) {
+    // Look for shop in new EtsyShop model first
+    targetShop = await prisma.etsyShop.findFirst({
+      where: {
+        userId,
+        shopId: orderShopId,
+        isActive: true
+      }
+    });
+    
+    // If not found and matches legacy shop, use legacy credentials
+    if (!targetShop && userSettings?.etsyShopId === orderShopId && userSettings?.etsyAccessToken) {
+      targetShop = {
+        shopId: userSettings.etsyShopId,
+        shopName: `Shop ${userSettings.etsyShopId}`,
+        accessToken: userSettings.etsyAccessToken,
+        refreshToken: userSettings.etsyRefreshToken,
+        tokenExpiresAt: userSettings.etsyTokenExpiresAt,
+        isLegacy: true
+      };
+    }
   }
 
+  // Fallback to default shop if no specific shop found
+  if (!targetShop) {
+    targetShop = await prisma.etsyShop.findFirst({
+      where: {
+        userId,
+        isDefault: true,
+        isActive: true
+      }
+    });
+    
+    // Final fallback to legacy credentials
+    if (!targetShop && userSettings?.etsyAccessToken) {
+      targetShop = {
+        shopId: userSettings.etsyShopId,
+        shopName: `Shop ${userSettings.etsyShopId}`,
+        accessToken: userSettings.etsyAccessToken,
+        refreshToken: userSettings.etsyRefreshToken,
+        tokenExpiresAt: userSettings.etsyTokenExpiresAt,
+        isLegacy: true
+      };
+    }
+  }
+
+  if (!targetShop || !targetShop.accessToken) {
+    throw new Error('No suitable Etsy shop found for this order. Please connect an Etsy shop first.');
+  }
+
+  logger.info('Found target Etsy shop for order', {
+    orderId: order.id,
+    orderShopId,
+    targetShopId: targetShop.shopId,
+    targetShopName: targetShop.shopName,
+    isLegacy: targetShop.isLegacy || false
+  });
+
   const etsyCredentials: EtsyCredentials = {
-    accessToken: userSettings.etsyAccessToken,
-    refreshToken: userSettings.etsyRefreshToken || undefined,
-    shopId: userSettings.etsyShopId,
-    tokenExpiresAt: userSettings.etsyTokenExpiresAt || undefined
+    accessToken: targetShop.accessToken,
+    refreshToken: targetShop.refreshToken || undefined,
+    shopId: targetShop.shopId,
+    tokenExpiresAt: targetShop.tokenExpiresAt || undefined
   };
 
   // Create token refresh callback to update database
   const onTokenRefresh = async (newCredentials: EtsyCredentials) => {
-    await prisma.credential.update({
-      where: { userId },
-      data: {
-        etsyAccessToken: newCredentials.accessToken,
-        etsyRefreshToken: newCredentials.refreshToken,
-        etsyTokenExpiresAt: newCredentials.tokenExpiresAt
-      }
-    });
+    if (targetShop.isLegacy) {
+      // Update legacy credential
+      await prisma.credential.update({
+        where: { userId },
+        data: {
+          etsyAccessToken: newCredentials.accessToken,
+          etsyRefreshToken: newCredentials.refreshToken,
+          etsyTokenExpiresAt: newCredentials.tokenExpiresAt
+        }
+      });
+    } else {
+      // Update EtsyShop model
+      await prisma.etsyShop.update({
+        where: {
+          userId_shopId: {
+            userId,
+            shopId: targetShop.shopId
+          }
+        },
+        data: {
+          accessToken: newCredentials.accessToken,
+          refreshToken: newCredentials.refreshToken,
+          tokenExpiresAt: newCredentials.tokenExpiresAt
+        }
+      });
+    }
 
     logger.info('Updated Etsy credentials after token refresh', {
       userId,
-      shopId: newCredentials.shopId
+      shopId: newCredentials.shopId,
+      isLegacy: targetShop.isLegacy || false
     });
   };
 
@@ -366,9 +446,9 @@ async function submitEtsyTracking(
     throw new Error(`Invalid Etsy receipt ID format. Expected numeric ID, got: ${order.marketplaceKey}`);
   }
   
-  // Submit tracking to Etsy
+  // Submit tracking to Etsy using the correct shop
   const trackingData: EtsyTrackingData = {
-    shopId: userSettings.etsyShopId,
+    shopId: targetShop.shopId,
     receiptId: etsyReceiptId,
     trackingNumber,
     carrier: carrierName
@@ -376,7 +456,7 @@ async function submitEtsyTracking(
 
   // First, let's try to get the receipt details to debug access issues
   try {
-    const receiptUrl = `https://openapi.etsy.com/v3/application/shops/${userSettings.etsyShopId}/receipts/${etsyReceiptId}`;
+    const receiptUrl = `https://openapi.etsy.com/v3/application/shops/${targetShop.shopId}/receipts/${etsyReceiptId}`;
     const receiptCheckResponse = await fetch(receiptUrl, {
       method: 'GET',
       headers: {

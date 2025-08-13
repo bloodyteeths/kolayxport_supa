@@ -62,9 +62,8 @@ export default async function handler(
             isActive: true,
             tokenExpiresAt: legacyCredential.etsyTokenExpiresAt,
             createdAt: new Date(),
-            updatedAt: new Date(),
-            isLegacy: true
-          });
+            updatedAt: new Date()
+          } as any);
         }
       }
 

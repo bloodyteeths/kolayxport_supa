@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../../lib/prisma';
 import { getSupabaseServerClient } from '../../../../lib/supabase';
 import { logger } from '../../../../lib/logger';
+import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '../../../../lib/integrations/etsyClient';
 
 interface VeeqoAllocation {
   id: number;
@@ -63,10 +64,10 @@ export default async function handler(
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Determine source from marketplace for logging purposes only
+    // Determine source from marketplace
+    const marketplace = (order.marketplace || '').toLowerCase();
     const source = (() => {
-      const marketplace = (order.marketplace || '').toLowerCase();
-      if (marketplace.includes('etsy')) return 'shippo';
+      if (marketplace.includes('etsy')) return 'etsy';
       if (marketplace.includes('trendyol')) return 'trendyol';
       return 'veeqo';
     })();
@@ -76,22 +77,33 @@ export default async function handler(
       where: { userId: user.id } 
     });
 
-    if (!userSettings?.veeqoApiKey) {
-      return res.status(400).json({ 
-        error: 'Veeqo API key not found. Please configure your integration settings.' 
-      });
-    }
+    // Route to appropriate tracking submission based on marketplace
+    if (source === 'etsy') {
+      // Submit tracking to Etsy directly
+      await submitEtsyTracking(
+        userSettings,
+        order,
+        trackingNumber,
+        carrierId,
+        user.id
+      );
+    } else {
+      // Submit through Veeqo for other marketplaces
+      if (!userSettings?.veeqoApiKey) {
+        return res.status(400).json({ 
+          error: 'Veeqo API key not found. Please configure your integration settings.' 
+        });
+      }
 
-    // Always submit tracking through Veeqo API regardless of original marketplace
-    // This ensures consistent tracking management through our primary integration
-    await submitVeeqoTracking(
-      userSettings.veeqoApiKey,
-      order.marketplaceKey,
-      trackingNumber,
-      carrierId,
-      notifyCustomer,
-      updateRemoteOrder
-    );
+      await submitVeeqoTracking(
+        userSettings.veeqoApiKey,
+        order.marketplaceKey,
+        trackingNumber,
+        carrierId,
+        notifyCustomer,
+        updateRemoteOrder
+      );
+    }
 
     // Create TrackingSubmission record
     await prisma.trackingSubmission.create({
@@ -233,5 +245,70 @@ async function submitVeeqoTracking(
     allocationId,
     trackingNumber,
     carrierId
+  });
+}
+
+async function submitEtsyTracking(
+  userSettings: any,
+  order: any,
+  trackingNumber: string,
+  carrierId: number,
+  userId: string
+): Promise<void> {
+  if (!userSettings?.etsyAccessToken || !userSettings?.etsyShopId) {
+    throw new Error('Etsy not connected. Please connect your Etsy shop first.');
+  }
+
+  const etsyCredentials: EtsyCredentials = {
+    accessToken: userSettings.etsyAccessToken,
+    refreshToken: userSettings.etsyRefreshToken || undefined,
+    shopId: userSettings.etsyShopId,
+    tokenExpiresAt: userSettings.etsyTokenExpiresAt || undefined
+  };
+
+  // Create token refresh callback to update database
+  const onTokenRefresh = async (newCredentials: EtsyCredentials) => {
+    await prisma.credential.update({
+      where: { userId },
+      data: {
+        etsyAccessToken: newCredentials.accessToken,
+        etsyRefreshToken: newCredentials.refreshToken,
+        etsyTokenExpiresAt: newCredentials.tokenExpiresAt
+      }
+    });
+
+    logger.info('Updated Etsy credentials after token refresh', {
+      userId,
+      shopId: newCredentials.shopId
+    });
+  };
+
+  // Initialize Etsy client
+  const etsyClient = new EtsyClient(etsyCredentials, onTokenRefresh);
+
+  // Validate credentials
+  const isValid = await etsyClient.validateCredentials();
+  if (!isValid) {
+    throw new Error('Invalid Etsy credentials. Please re-authenticate.');
+  }
+
+  // Map carrier ID to carrier name
+  const carrierName = getCarrierName(carrierId);
+  
+  // Submit tracking to Etsy
+  const trackingData: EtsyTrackingData = {
+    shopId: userSettings.etsyShopId,
+    receiptId: order.marketplaceKey, // Etsy receipt ID
+    trackingNumber,
+    carrier: carrierName
+  };
+
+  const result = await etsyClient.submitTracking(trackingData);
+
+  logger.info('Etsy tracking submitted successfully', {
+    receiptId: order.marketplaceKey,
+    trackingNumber,
+    carrier: carrierName,
+    receiptShippingId: result.receipt_shipping_id
   });
 }

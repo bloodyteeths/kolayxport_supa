@@ -52,7 +52,7 @@
     "iyzipay": "^2.0.64",
     "lucide-react": "^0.507.0",
     "micro": "^10.0.1",
-    "next": "^15.3.2",
+    "next": "^16.1.6",
     "next-auth": "^4.24.11",
     "next-seo": "^6.6.0",
     "next-sitemap": "^4.2.3",

@@ -66,3 +66,4 @@ export default async function handler(
         res.status(500).json({ error: error.message });
     }
 }
+// Force rebuild Fri Jan 30 22:50:07 CET 2026

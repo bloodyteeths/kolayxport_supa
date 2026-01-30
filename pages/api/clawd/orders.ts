@@ -26,7 +26,7 @@ export default async function handler(
 
     try {
         // 3. fetch orders
-        const { id, status, limit, userId } = req.query;
+        const { id, status, limit, userId, customer } = req.query;
 
         const where: any = {};
 
@@ -45,6 +45,14 @@ export default async function handler(
         // or strictly forbidden depending on privacy. Assuming admin access for now.)
         if (userId) {
             where.userId = String(userId);
+        }
+
+        // Optional: Filter by Customer Name (case-insensitive search)
+        if (customer) {
+            where.customerName = {
+                contains: String(customer),
+                mode: 'insensitive'
+            };
         }
 
         const take = limit ? parseInt(String(limit)) : 50;

@@ -36,7 +36,7 @@ async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<s
         body: new URLSearchParams({
             grant_type: 'refresh_token',
             refresh_token: refreshToken,
-            client_id: process.env.ETSY_CLIENT_ID || '',
+            client_id: process.env.ETSY_API_KEY || '',
         }),
     });
 
@@ -98,7 +98,7 @@ async function callEtsyAPI(endpoint: string, accessToken: string, options: Reque
         ...options,
         headers: {
             'Authorization': `Bearer ${accessToken}`,
-            'x-api-key': process.env.ETSY_CLIENT_ID || '',
+            'x-api-key': process.env.ETSY_API_KEY || '',
             'Content-Type': 'application/json',
             ...options.headers,
         },

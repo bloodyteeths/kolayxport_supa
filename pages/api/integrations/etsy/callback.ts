@@ -79,38 +79,73 @@ export default async function handler(
 
     logger.info('Token exchange successful', { userId, hasAccessToken: !!tokens.access_token });
 
-    // Get shop info to store shop ID (using working API endpoint)
-    const shopResponse = await fetch('https://api.etsy.com/v3/application/users/me', {
+    // Step 1: Get user_id from /users/me
+    const userResponse = await fetch('https://api.etsy.com/v3/application/users/me', {
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
         'x-api-key': process.env.ETSY_API_KEY!
       }
     });
 
-    let shopId = '';
-    if (shopResponse.ok) {
-      const userData = await shopResponse.json() as any;
-      shopId = userData.user_id?.toString() || '';
-      
-      // Create shopData object for compatibility with multi-store logic
-      shopData = {
-        shop_id: shopId,
-        shop_name: `Shop ${shopId}` // Default name since /users/me doesn't provide shop name
-      };
-      
-      logger.info('Etsy user info retrieved', {
-        userId,
-        etsyUserId: shopId
-      });
-    } else {
-      const errorBody = await shopResponse.text();
+    if (!userResponse.ok) {
+      const errorBody = await userResponse.text();
       logger.error('Failed to fetch Etsy user info', undefined, {
-        status: shopResponse.status,
+        status: userResponse.status,
         body: errorBody,
         userId
       });
-      throw new Error(`Failed to get Etsy user info: ${shopResponse.status} - ${errorBody}`);
+      throw new Error(`Failed to get Etsy user info: ${userResponse.status} - ${errorBody}`);
     }
+
+    const userData = await userResponse.json() as any;
+    const etsyUserId = userData.user_id?.toString() || '';
+
+    logger.info('Etsy user info retrieved', {
+      userId,
+      etsyUserId
+    });
+
+    // Step 2: Get actual shop_id from /users/{user_id}/shops
+    const shopsResponse = await fetch(`https://api.etsy.com/v3/application/users/${etsyUserId}/shops`, {
+      headers: {
+        'Authorization': `Bearer ${tokens.access_token}`,
+        'x-api-key': process.env.ETSY_API_KEY!
+      }
+    });
+
+    if (!shopsResponse.ok) {
+      const errorBody = await shopsResponse.text();
+      logger.error('Failed to fetch Etsy shops', undefined, {
+        status: shopsResponse.status,
+        body: errorBody,
+        userId,
+        etsyUserId
+      });
+      throw new Error(`Failed to get Etsy shops: ${shopsResponse.status} - ${errorBody}`);
+    }
+
+    const shopsData = await shopsResponse.json() as any;
+
+    // Use the first shop (most users have one shop)
+    const firstShop = shopsData.results?.[0] || shopsData;
+    const actualShopId = firstShop.shop_id?.toString() || '';
+    const shopName = firstShop.shop_name || `Shop ${actualShopId}`;
+
+    if (!actualShopId) {
+      throw new Error('No shop found for this Etsy user');
+    }
+
+    shopData = {
+      shop_id: actualShopId,
+      shop_name: shopName
+    };
+
+    logger.info('Etsy shop info retrieved', {
+      userId,
+      etsyUserId,
+      shopId: actualShopId,
+      shopName
+    });
 
     // Calculate token expiration
     const tokenExpiresAt = new Date(Date.now() + (tokens.expires_in * 1000));

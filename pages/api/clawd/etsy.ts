@@ -106,8 +106,9 @@ async function callEtsyAPI(endpoint: string, accessToken: string, options: Reque
 
     if (!response.ok) {
         const errorText = await response.text();
-        logger.error('Etsy API error', { status: response.status, error: errorText });
-        throw new Error(`Etsy API error: ${response.status} - ${errorText}`);
+        const error = new Error(`Etsy API error: ${response.status} - ${errorText}`);
+        logger.error('Etsy API error', error);
+        throw error;
     }
 
     return response.json();

@@ -19,12 +19,25 @@ interface EtsyReceipt {
         state: string | null;
         zip: string;
         country_iso: string;
+        formatted_address?: string;
     };
     items: any[];
     tracking?: {
         tracking_code: string | null;
         carrier_name: string | null;
     };
+}
+
+// Helper function to parse full name into first and last name
+function parseFullName(fullName: string): { firstName: string; lastName: string } {
+    const trimmed = (fullName || '').trim();
+    if (!trimmed) return { firstName: '', lastName: '' };
+
+    const parts = trimmed.split(/\s+/);
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || '';
+
+    return { firstName, lastName };
 }
 
 async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<string> {
@@ -164,24 +177,28 @@ export default async function handler(
             }
 
             // Format receipts for response
-            const formattedReceipts = receipts.map((receipt: any) => ({
-                receipt_id: receipt.receipt_id,
-                customer: {
-                    name: receipt.name || '',
-                    first_name: receipt.first_line || '',
-                    last_name: receipt.last_line || '',
-                },
-                shipping_address: {
-                    first_line: receipt.first_line || '',
-                    second_line: receipt.second_line || null,
-                    city: receipt.city || '',
-                    state: receipt.state || null,
-                    zip: receipt.zip || '',
-                    country: receipt.country_iso || 'US',
-                },
-                order_date: receipt.created_timestamp,
-                total_price: receipt.grandtotal || 0,
-            }));
+            const formattedReceipts = receipts.map((receipt: any) => {
+                const { firstName, lastName } = parseFullName(receipt.name);
+                return {
+                    receipt_id: receipt.receipt_id,
+                    customer: {
+                        name: receipt.name || '',
+                        first_name: firstName,
+                        last_name: lastName,
+                    },
+                    shipping_address: {
+                        first_line: receipt.first_line || '',
+                        second_line: receipt.second_line || null,
+                        city: receipt.city || '',
+                        state: receipt.state || null,
+                        zip: receipt.zip || '',
+                        country: receipt.country_iso || 'US',
+                        formatted_address: receipt.formatted_address || '',
+                    },
+                    order_date: receipt.created_timestamp,
+                    total_price: receipt.grandtotal || 0,
+                };
+            });
 
             return res.status(200).json(formattedReceipts);
         }
@@ -193,6 +210,22 @@ export default async function handler(
                 `/shops/${shopId}/receipts/${receipt_id}`,
                 accessToken
             );
+
+            // Debug: Log raw receipt data to see address structure
+            logger.info('Raw Etsy receipt data', {
+                receipt_id: receipt.receipt_id,
+                name: receipt.name,
+                first_line: receipt.first_line,
+                second_line: receipt.second_line,
+                city: receipt.city,
+                state: receipt.state,
+                zip: receipt.zip,
+                country_iso: receipt.country_iso,
+                formatted_address: receipt.formatted_address,
+                // Check for nested structures
+                has_shipping_address: !!receipt.shipping_address,
+                raw_keys: Object.keys(receipt || {}).slice(0, 30),
+            });
 
             // Fetch shipments for tracking info
             let trackingInfo = { tracking_code: null, carrier_name: null };
@@ -230,12 +263,21 @@ export default async function handler(
                 logger.warn('Could not fetch receipt transactions', { receipt_id, error });
             }
 
+            // If debug=true, return raw receipt data
+            if (req.query.debug === 'true') {
+                return res.status(200).json({
+                    raw_receipt: receipt,
+                    raw_keys: Object.keys(receipt || {}),
+                });
+            }
+
+            const { firstName, lastName } = parseFullName(receipt.name);
             const formatted: EtsyReceipt = {
                 receipt_id: receipt.receipt_id,
                 customer: {
                     name: receipt.name || '',
-                    first_name: receipt.first_line || '',
-                    last_name: receipt.last_line || '',
+                    first_name: firstName,
+                    last_name: lastName,
                 },
                 shipping_address: {
                     first_line: receipt.first_line || '',
@@ -244,6 +286,7 @@ export default async function handler(
                     state: receipt.state || null,
                     zip: receipt.zip || '',
                     country_iso: receipt.country_iso || 'US',
+                    formatted_address: receipt.formatted_address || '',
                 },
                 items,
                 tracking: trackingInfo,

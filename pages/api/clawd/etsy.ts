@@ -717,6 +717,73 @@ export default async function handler(
             });
         }
 
+        // GET /api/clawd/etsy?action=get_shipping_profiles - Get shop shipping profiles
+        if (req.method === 'GET' && action === 'get_shipping_profiles') {
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/shipping-profiles`,
+                accessToken
+            );
+
+            const profiles = (data.results || []).map((profile: any) => ({
+                shipping_profile_id: profile.shipping_profile_id,
+                title: profile.title || '',
+                user_id: profile.user_id,
+                min_processing_days: profile.min_processing_days,
+                max_processing_days: profile.max_processing_days,
+                processing_days_display_label: profile.processing_days_display_label,
+                origin_country_iso: profile.origin_country_iso,
+                is_deleted: profile.is_deleted || false,
+                // Include destination info if available
+                shipping_profile_destinations: profile.shipping_profile_destinations || [],
+                shipping_profile_upgrades: profile.shipping_profile_upgrades || [],
+            }));
+
+            return res.status(200).json({
+                count: data.count || profiles.length,
+                shipping_profiles: profiles,
+            });
+        }
+
+        // GET /api/clawd/etsy?action=get_return_policies - Get shop return policies
+        if (req.method === 'GET' && action === 'get_return_policies') {
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/policies/return`,
+                accessToken
+            );
+
+            const policies = (data.results || []).map((policy: any) => ({
+                return_policy_id: policy.return_policy_id,
+                accepts_returns: policy.accepts_returns,
+                accepts_exchanges: policy.accepts_exchanges,
+                return_deadline: policy.return_deadline,
+            }));
+
+            return res.status(200).json({
+                count: data.count || policies.length,
+                return_policies: policies,
+            });
+        }
+
+        // GET /api/clawd/etsy?action=get_shop_sections - Get shop sections (categories)
+        if (req.method === 'GET' && action === 'get_shop_sections') {
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/sections`,
+                accessToken
+            );
+
+            const sections = (data.results || []).map((section: any) => ({
+                shop_section_id: section.shop_section_id,
+                title: section.title || '',
+                rank: section.rank,
+                active_listing_count: section.active_listing_count,
+            }));
+
+            return res.status(200).json({
+                count: data.count || sections.length,
+                shop_sections: sections,
+            });
+        }
+
         // Invalid request
         return res.status(400).json({ error: 'Invalid request parameters' });
 

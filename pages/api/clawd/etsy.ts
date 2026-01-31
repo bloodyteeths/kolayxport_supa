@@ -1141,6 +1141,95 @@ export default async function handler(
             });
         }
 
+        // GET /api/clawd/etsy?action=conversations - List shop conversations
+        if (req.method === 'GET' && action === 'conversations') {
+            const limit = parseInt((req.query.limit as string) || '25');
+            const offset = parseInt((req.query.offset as string) || '0');
+
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/conversations?limit=${limit}&offset=${offset}`,
+                accessToken
+            );
+
+            const conversations = (data.results || []).map((conv: any) => ({
+                conversation_id: conv.conversation_id,
+                subject: conv.subject,
+                last_message_time: conv.last_message_time,
+                created_timestamp: conv.created_timestamp,
+                update_timestamp: conv.update_timestamp,
+                buyer_user_id: conv.buyer_user_id,
+                seller_user_id: conv.seller_user_id,
+                message_count: conv.message_count,
+                unread: conv.unread,
+                has_attachments: conv.has_attachments,
+            }));
+
+            return res.status(200).json({
+                count: data.count || conversations.length,
+                conversations,
+            });
+        }
+
+        // GET /api/clawd/etsy?action=conversation&conversation_id=XXX - Get conversation details
+        const conversation_id = req.query.conversation_id as string;
+        if (req.method === 'GET' && action === 'conversation' && conversation_id) {
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/conversations/${conversation_id}`,
+                accessToken
+            );
+
+            // Format messages if included
+            const messages = (data.messages || []).map((msg: any) => ({
+                message_id: msg.message_id,
+                sender_user_id: msg.sender_user_id,
+                message: msg.message,
+                created_timestamp: msg.created_timestamp,
+            }));
+
+            return res.status(200).json({
+                conversation_id: data.conversation_id,
+                subject: data.subject,
+                buyer_user_id: data.buyer_user_id,
+                seller_user_id: data.seller_user_id,
+                created_timestamp: data.created_timestamp,
+                update_timestamp: data.update_timestamp,
+                message_count: data.message_count,
+                unread: data.unread,
+                messages,
+            });
+        }
+
+        // POST /api/clawd/etsy?action=send_message&conversation_id=XXX - Send message in conversation
+        if (req.method === 'POST' && action === 'send_message' && conversation_id) {
+            const { message } = req.body;
+
+            if (!message) {
+                return res.status(400).json({ error: 'message is required' });
+            }
+
+            logger.info('Sending Etsy message', {
+                shopId,
+                conversation_id,
+                message_length: message.length,
+            });
+
+            const result = await callEtsyAPI(
+                `/shops/${shopId}/conversations/${conversation_id}/messages`,
+                accessToken,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ message }),
+                }
+            );
+
+            return res.status(200).json({
+                success: true,
+                conversation_id,
+                message_id: result.message_id,
+                message: 'Message sent successfully',
+            });
+        }
+
         // Invalid request
         return res.status(400).json({ error: 'Invalid request parameters' });
 

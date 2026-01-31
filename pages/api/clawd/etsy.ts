@@ -516,8 +516,9 @@ export default async function handler(
                 taxonomy_id,
             });
 
+            // legacy=false is required for new processing profiles system (Sept 2025)
             const result = await callEtsyAPI(
-                `/shops/${shopId}/listings`,
+                `/shops/${shopId}/listings?legacy=false`,
                 accessToken,
                 {
                     method: 'POST',
@@ -798,13 +799,68 @@ export default async function handler(
             const states = (data.results || []).map((state: any) => ({
                 readiness_state_id: state.readiness_state_id,
                 readiness_state: state.readiness_state,
-                description: state.description || state.readiness_state,
+                min_processing_time: state.min_processing_time,
+                max_processing_time: state.max_processing_time,
+                processing_time_unit: state.processing_time_unit,
             }));
 
             return res.status(200).json({
                 count: data.count || states.length,
                 readiness_states: states,
-                note: 'Use readiness_state_id when creating listings. Common values: ready_to_ship, made_to_order',
+                note: 'Use readiness_state_id when creating listings. readiness_state values: ready_to_ship, made_to_order',
+            });
+        }
+
+        // POST /api/clawd/etsy?action=create_readiness_state - Create a new processing profile
+        if (req.method === 'POST' && action === 'create_readiness_state') {
+            const {
+                readiness_state,  // "ready_to_ship" or "made_to_order"
+                min_processing_time = 1,
+                max_processing_time = 3,
+                processing_time_unit = 'business_days',  // "business_days" or "weeks"
+            } = req.body;
+
+            if (!readiness_state) {
+                return res.status(400).json({
+                    error: 'readiness_state is required ("ready_to_ship" or "made_to_order")'
+                });
+            }
+
+            if (!['ready_to_ship', 'made_to_order'].includes(readiness_state)) {
+                return res.status(400).json({
+                    error: 'readiness_state must be "ready_to_ship" or "made_to_order"'
+                });
+            }
+
+            logger.info('Creating Etsy readiness state definition', {
+                shopId,
+                readiness_state,
+                min_processing_time,
+                max_processing_time,
+            });
+
+            const result = await callEtsyAPI(
+                `/shops/${shopId}/readiness-state-definitions`,
+                accessToken,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        readiness_state,
+                        min_processing_time,
+                        max_processing_time,
+                        processing_time_unit,
+                    }),
+                }
+            );
+
+            return res.status(201).json({
+                success: true,
+                readiness_state_id: result.readiness_state_id,
+                readiness_state: result.readiness_state,
+                min_processing_time: result.min_processing_time,
+                max_processing_time: result.max_processing_time,
+                processing_time_unit: result.processing_time_unit,
+                message: 'Processing profile created. Use this readiness_state_id when creating listings.',
             });
         }
 

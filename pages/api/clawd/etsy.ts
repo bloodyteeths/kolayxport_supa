@@ -985,6 +985,39 @@ export default async function handler(
             });
         }
 
+        // GET /api/clawd/etsy?action=test_video_endpoint - Test if video upload endpoint exists
+        if (req.method === 'GET' && action === 'test_video_endpoint' && listing_id) {
+            // Test 1: Try to get listing videos
+            let listingVideos = null;
+            try {
+                listingVideos = await callEtsyAPI(
+                    `/listings/${listing_id}/videos`,
+                    accessToken
+                );
+            } catch (e: any) {
+                listingVideos = { error: e.message };
+            }
+
+            // Test 2: Try shop videos endpoint
+            let shopVideos = null;
+            try {
+                shopVideos = await callEtsyAPI(
+                    `/shops/${shopId}/listings/${listing_id}/videos`,
+                    accessToken
+                );
+            } catch (e: any) {
+                shopVideos = { error: e.message };
+            }
+
+            return res.status(200).json({
+                test_results: {
+                    listing_videos_endpoint: listingVideos,
+                    shop_listing_videos_endpoint: shopVideos,
+                },
+                conclusion: 'Check if any endpoint returned data instead of 404',
+            });
+        }
+
         // Invalid request
         return res.status(400).json({ error: 'Invalid request parameters' });
 

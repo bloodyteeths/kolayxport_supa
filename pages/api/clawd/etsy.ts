@@ -1005,56 +1005,139 @@ export default async function handler(
             });
         }
 
-        // POST /api/clawd/etsy?action=upload_video - Test video upload endpoint
+        // POST /api/clawd/etsy?action=upload_video&listing_id=XXX - Upload video to listing
         if (req.method === 'POST' && action === 'upload_video' && listing_id) {
-            const { video_url } = req.body;
+            const { video_url, video_id, name } = req.body;
 
-            if (!video_url) {
-                return res.status(400).json({
-                    error: 'video_url is required',
-                    note: 'Etsy may not support video upload via API - testing endpoint availability',
+            // Option 1: Link existing video by ID
+            if (video_id) {
+                logger.info('Linking existing video to listing', { listing_id, video_id });
+
+                const uploadUrl = `${ETSY_API_BASE}/shops/${shopId}/listings/${listing_id}/videos`;
+                const response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'x-api-key': process.env.ETSY_API_KEY || '',
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({ video_id: String(video_id) }),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    return res.status(response.status).json({
+                        error: `Video link failed: ${response.status}`,
+                        details: errorText,
+                    });
+                }
+
+                const result = await response.json();
+                return res.status(200).json({
+                    success: true,
+                    listing_id,
+                    video_id: result.video_id,
+                    message: 'Video linked to listing successfully',
                 });
             }
 
-            // Test various potential endpoints
-            const endpoints = [
-                `/shops/${shopId}/listings/${listing_id}/videos`,
-                `/listings/${listing_id}/videos`,
-            ];
-
-            const results: any[] = [];
-
-            for (const endpoint of endpoints) {
-                try {
-                    // First try just checking if POST is allowed with empty body
-                    const uploadUrl = `${ETSY_API_BASE}${endpoint}`;
-                    const testResponse = await fetch(uploadUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'x-api-key': process.env.ETSY_API_KEY || '',
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ video: video_url }),
-                    });
-
-                    const responseText = await testResponse.text();
-                    results.push({
-                        endpoint,
-                        status: testResponse.status,
-                        response: responseText.substring(0, 500),
-                    });
-                } catch (e: any) {
-                    results.push({
-                        endpoint,
-                        error: e.message,
-                    });
-                }
+            // Option 2: Upload video from URL
+            if (!video_url) {
+                return res.status(400).json({
+                    error: 'Either video_url or video_id is required',
+                    usage: {
+                        video_url: 'URL to fetch and upload video (MP4, MOV, max 100MB, 5-60 seconds)',
+                        video_id: 'Existing Etsy video ID to link to listing',
+                    },
+                });
             }
 
+            logger.info('Uploading video to Etsy listing', {
+                listing_id,
+                video_url: video_url.substring(0, 100),
+            });
+
+            // Fetch the video from URL
+            const videoResponse = await fetch(video_url);
+            if (!videoResponse.ok) {
+                return res.status(400).json({
+                    error: `Failed to fetch video from URL: ${videoResponse.status} ${videoResponse.statusText}`
+                });
+            }
+
+            const videoBuffer = await videoResponse.arrayBuffer();
+            const contentType = videoResponse.headers.get('content-type') || 'video/mp4';
+
+            // Check file size (max 100MB)
+            if (videoBuffer.byteLength > 100 * 1024 * 1024) {
+                return res.status(400).json({
+                    error: 'Video file too large. Maximum size is 100MB.',
+                    size: `${(videoBuffer.byteLength / 1024 / 1024).toFixed(2)}MB`,
+                });
+            }
+
+            // Determine file extension
+            const extMap: Record<string, string> = {
+                'video/mp4': 'mp4',
+                'video/quicktime': 'mov',
+                'video/x-msvideo': 'avi',
+                'video/mpeg': 'mpeg',
+                'video/x-flv': 'flv',
+            };
+            const ext = extMap[contentType] || 'mp4';
+            const filename = name || `listing_${listing_id}_video.${ext}`;
+
+            // Create multipart form data for video upload
+            const boundary = '----EtsyVideoUpload' + Date.now();
+
+            // Build multipart body
+            const textEncoder = new TextEncoder();
+            let headerPart = `--${boundary}\r\n`;
+            headerPart += `Content-Disposition: form-data; name="video"; filename="${filename}"\r\n`;
+            headerPart += `Content-Type: ${contentType}\r\n\r\n`;
+            const headerBytes = textEncoder.encode(headerPart);
+
+            const footerPart = `\r\n--${boundary}--\r\n`;
+            const footerBytes = textEncoder.encode(footerPart);
+
+            // Combine all parts
+            const bodyParts = new Uint8Array(headerBytes.length + videoBuffer.byteLength + footerBytes.length);
+            bodyParts.set(headerBytes, 0);
+            bodyParts.set(new Uint8Array(videoBuffer), headerBytes.length);
+            bodyParts.set(footerBytes, headerBytes.length + videoBuffer.byteLength);
+
+            // Upload to Etsy
+            const uploadUrl = `${ETSY_API_BASE}/shops/${shopId}/listings/${listing_id}/videos`;
+            const uploadResponse = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'x-api-key': process.env.ETSY_API_KEY || '',
+                    'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                },
+                body: bodyParts,
+            });
+
+            if (!uploadResponse.ok) {
+                const errorText = await uploadResponse.text();
+                logger.error('Etsy video upload failed', new Error(errorText), {
+                    listing_id,
+                    status: uploadResponse.status,
+                });
+                return res.status(uploadResponse.status).json({
+                    error: `Video upload failed: ${uploadResponse.status}`,
+                    details: errorText,
+                });
+            }
+
+            const uploadResult = await uploadResponse.json();
+
             return res.status(200).json({
-                test_results: results,
-                conclusion: 'Status 404 = endpoint does not exist. Status 400/422 = endpoint exists but request format is wrong.',
+                success: true,
+                listing_id,
+                video_id: uploadResult.video_id,
+                video_state: uploadResult.video_state,
+                message: 'Video uploaded successfully. Etsy will process and strip audio automatically.',
             });
         }
 

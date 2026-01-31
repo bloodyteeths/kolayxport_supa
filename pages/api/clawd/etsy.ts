@@ -450,6 +450,272 @@ export default async function handler(
             });
         }
 
+        // POST /api/clawd/etsy?action=create_listing - Create a draft listing
+        if (req.method === 'POST' && action === 'create_listing') {
+            const {
+                title,
+                description,
+                price,
+                quantity = 1,
+                tags = [],
+                taxonomy_id,
+                who_made = 'i_did',
+                when_made = 'made_to_order',
+                is_supply = false,
+                shipping_profile_id,
+                return_policy_id,
+                materials = [],
+                shop_section_id,
+                processing_min,
+                processing_max,
+            } = req.body;
+
+            // Validate required fields
+            if (!title) {
+                return res.status(400).json({ error: 'title is required' });
+            }
+            if (!description) {
+                return res.status(400).json({ error: 'description is required' });
+            }
+            if (price === undefined || price === null) {
+                return res.status(400).json({ error: 'price is required' });
+            }
+            if (!taxonomy_id) {
+                return res.status(400).json({ error: 'taxonomy_id is required (category ID)' });
+            }
+
+            // Build the listing payload
+            const listingPayload: Record<string, any> = {
+                title,
+                description,
+                price: typeof price === 'number' ? price : parseFloat(price),
+                quantity,
+                taxonomy_id,
+                who_made,
+                when_made,
+                is_supply,
+                state: 'draft', // Create as draft first
+            };
+
+            // Add optional fields if provided
+            if (tags && tags.length > 0) listingPayload.tags = tags.slice(0, 13); // Etsy max 13 tags
+            if (materials && materials.length > 0) listingPayload.materials = materials.slice(0, 13);
+            if (shipping_profile_id) listingPayload.shipping_profile_id = shipping_profile_id;
+            if (return_policy_id) listingPayload.return_policy_id = return_policy_id;
+            if (shop_section_id) listingPayload.shop_section_id = shop_section_id;
+            if (processing_min) listingPayload.processing_min = processing_min;
+            if (processing_max) listingPayload.processing_max = processing_max;
+
+            logger.info('Creating draft Etsy listing', {
+                shopId,
+                title: title.substring(0, 50),
+                taxonomy_id,
+            });
+
+            const result = await callEtsyAPI(
+                `/shops/${shopId}/listings`,
+                accessToken,
+                {
+                    method: 'POST',
+                    body: JSON.stringify(listingPayload),
+                }
+            );
+
+            return res.status(201).json({
+                success: true,
+                listing_id: result.listing_id,
+                state: result.state,
+                title: result.title,
+                url: result.url,
+                message: 'Draft listing created. Add images then publish when ready.',
+            });
+        }
+
+        // POST /api/clawd/etsy?action=upload_image&listing_id=XXXXX - Upload image to listing
+        if (req.method === 'POST' && action === 'upload_image' && listing_id) {
+            const { image_url, rank = 1, overwrite = true, is_watermarked = false, alt_text } = req.body;
+
+            if (!image_url) {
+                return res.status(400).json({
+                    error: 'image_url is required. Provide a publicly accessible image URL.'
+                });
+            }
+
+            logger.info('Uploading image to Etsy listing', {
+                listing_id,
+                image_url: image_url.substring(0, 100),
+                rank,
+            });
+
+            // Fetch the image from URL
+            const imageResponse = await fetch(image_url);
+            if (!imageResponse.ok) {
+                return res.status(400).json({
+                    error: `Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}`
+                });
+            }
+
+            const imageBuffer = await imageResponse.arrayBuffer();
+            const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+            // Determine file extension from content type
+            const extMap: Record<string, string> = {
+                'image/jpeg': 'jpg',
+                'image/jpg': 'jpg',
+                'image/png': 'png',
+                'image/gif': 'gif',
+                'image/webp': 'webp',
+            };
+            const ext = extMap[contentType] || 'jpg';
+            const filename = `listing_${listing_id}_${rank}.${ext}`;
+
+            // Create multipart form data
+            const boundary = '----EtsyImageUpload' + Date.now();
+            const formDataParts: string[] = [];
+
+            // Add image file part
+            formDataParts.push(`--${boundary}`);
+            formDataParts.push(`Content-Disposition: form-data; name="image"; filename="${filename}"`);
+            formDataParts.push(`Content-Type: ${contentType}`);
+            formDataParts.push('');
+
+            // Add other fields
+            const addField = (name: string, value: string | number | boolean) => {
+                formDataParts.push(`--${boundary}`);
+                formDataParts.push(`Content-Disposition: form-data; name="${name}"`);
+                formDataParts.push('');
+                formDataParts.push(String(value));
+            };
+
+            // Build the multipart body manually with binary image
+            const textEncoder = new TextEncoder();
+            const headerPart = formDataParts.join('\r\n') + '\r\n';
+            const headerBytes = textEncoder.encode(headerPart);
+
+            // Build footer with additional fields
+            let footerPart = '\r\n';
+            footerPart += `--${boundary}\r\n`;
+            footerPart += `Content-Disposition: form-data; name="rank"\r\n\r\n${rank}\r\n`;
+            footerPart += `--${boundary}\r\n`;
+            footerPart += `Content-Disposition: form-data; name="overwrite"\r\n\r\n${overwrite}\r\n`;
+            footerPart += `--${boundary}\r\n`;
+            footerPart += `Content-Disposition: form-data; name="is_watermarked"\r\n\r\n${is_watermarked}\r\n`;
+            if (alt_text) {
+                footerPart += `--${boundary}\r\n`;
+                footerPart += `Content-Disposition: form-data; name="alt_text"\r\n\r\n${alt_text}\r\n`;
+            }
+            footerPart += `--${boundary}--\r\n`;
+            const footerBytes = textEncoder.encode(footerPart);
+
+            // Combine all parts
+            const bodyParts = new Uint8Array(headerBytes.length + imageBuffer.byteLength + footerBytes.length);
+            bodyParts.set(headerBytes, 0);
+            bodyParts.set(new Uint8Array(imageBuffer), headerBytes.length);
+            bodyParts.set(footerBytes, headerBytes.length + imageBuffer.byteLength);
+
+            // Upload to Etsy
+            const uploadUrl = `${ETSY_API_BASE}/shops/${shopId}/listings/${listing_id}/images`;
+            const uploadResponse = await fetch(uploadUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'x-api-key': process.env.ETSY_API_KEY || '',
+                    'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                },
+                body: bodyParts,
+            });
+
+            if (!uploadResponse.ok) {
+                const errorText = await uploadResponse.text();
+                logger.error('Etsy image upload failed', new Error(errorText), {
+                    listing_id,
+                    status: uploadResponse.status,
+                });
+                return res.status(uploadResponse.status).json({
+                    error: `Image upload failed: ${uploadResponse.status}`,
+                    details: errorText,
+                });
+            }
+
+            const uploadResult = await uploadResponse.json();
+
+            return res.status(200).json({
+                success: true,
+                listing_id,
+                listing_image_id: uploadResult.listing_image_id,
+                rank: uploadResult.rank,
+                url_fullxfull: uploadResult.url_fullxfull,
+                message: 'Image uploaded successfully',
+            });
+        }
+
+        // POST /api/clawd/etsy?action=publish&listing_id=XXXXX - Publish draft listing
+        if (req.method === 'POST' && action === 'publish' && listing_id) {
+            logger.info('Publishing Etsy listing', { listing_id });
+
+            // First check if listing has at least one image
+            try {
+                const images = await callEtsyAPI(
+                    `/listings/${listing_id}/images`,
+                    accessToken
+                );
+
+                if (!images.results || images.results.length === 0) {
+                    return res.status(400).json({
+                        error: 'Cannot publish listing without at least one image',
+                        listing_id,
+                    });
+                }
+            } catch (imgError) {
+                logger.warn('Could not verify listing images', { listing_id, error: imgError });
+            }
+
+            // Activate the listing
+            const result = await callEtsyAPI(
+                `/listings/${listing_id}`,
+                accessToken,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({ state: 'active' }),
+                }
+            );
+
+            return res.status(200).json({
+                success: true,
+                listing_id: result.listing_id,
+                state: result.state,
+                title: result.title,
+                url: result.url,
+                message: 'Listing published successfully',
+            });
+        }
+
+        // GET /api/clawd/etsy?action=drafts - List draft listings
+        if (req.method === 'GET' && action === 'drafts') {
+            const limit = parseInt((req.query.limit as string) || '25');
+            const offset = parseInt((req.query.offset as string) || '0');
+
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/listings/draft?limit=${limit}&offset=${offset}`,
+                accessToken
+            );
+
+            const drafts = (data.results || []).map((listing: any) => ({
+                listing_id: listing.listing_id,
+                title: listing.title || '',
+                state: listing.state,
+                price: listing.price,
+                quantity: listing.quantity,
+                created_timestamp: listing.created_timestamp,
+                updated_timestamp: listing.updated_timestamp,
+            }));
+
+            return res.status(200).json({
+                count: data.count || drafts.length,
+                drafts,
+            });
+        }
+
         // Invalid request
         return res.status(400).json({ error: 'Invalid request parameters' });
 

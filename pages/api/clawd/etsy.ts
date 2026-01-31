@@ -695,8 +695,9 @@ export default async function handler(
             const limit = parseInt((req.query.limit as string) || '25');
             const offset = parseInt((req.query.offset as string) || '0');
 
+            // Etsy v3 uses findAllListingsByShop with state filter
             const data = await callEtsyAPI(
-                `/shops/${shopId}/listings/draft?limit=${limit}&offset=${offset}`,
+                `/shops/${shopId}/listings?state=draft&limit=${limit}&offset=${offset}`,
                 accessToken
             );
 

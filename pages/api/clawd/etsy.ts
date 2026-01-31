@@ -326,6 +326,130 @@ export default async function handler(
             });
         }
 
+        // GET /api/clawd/etsy?action=listings - List active listings
+        if (req.method === 'GET' && action === 'listings') {
+            const limit = parseInt((req.query.limit as string) || '25');
+            const offset = parseInt((req.query.offset as string) || '0');
+
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}`,
+                accessToken
+            );
+
+            const listings = (data.results || []).map((listing: any) => ({
+                listing_id: listing.listing_id,
+                title: listing.title || '',
+                description: listing.description || '',
+                tags: listing.tags || [],
+                price: listing.price ? {
+                    amount: listing.price.amount,
+                    divisor: listing.price.divisor,
+                    currency_code: listing.price.currency_code,
+                } : null,
+                views: listing.views || 0,
+                num_favorers: listing.num_favorers || 0,
+                quantity: listing.quantity || 0,
+                state: listing.state || '',
+                url: listing.url || '',
+                created_timestamp: listing.created_timestamp,
+                updated_timestamp: listing.updated_timestamp,
+            }));
+
+            return res.status(200).json({
+                count: data.count || listings.length,
+                listings,
+            });
+        }
+
+        // GET /api/clawd/etsy?action=listing&listing_id=XXXXX - Get single listing details
+        const listing_id = req.query.listing_id as string;
+        if (req.method === 'GET' && action === 'listing' && listing_id) {
+            const listing = await callEtsyAPI(
+                `/listings/${listing_id}`,
+                accessToken
+            );
+
+            // If debug=true, return raw listing data
+            if (req.query.debug === 'true') {
+                return res.status(200).json({
+                    raw_listing: listing,
+                    raw_keys: Object.keys(listing || {}),
+                });
+            }
+
+            return res.status(200).json({
+                listing_id: listing.listing_id,
+                title: listing.title || '',
+                description: listing.description || '',
+                tags: listing.tags || [],
+                materials: listing.materials || [],
+                price: listing.price ? {
+                    amount: listing.price.amount,
+                    divisor: listing.price.divisor,
+                    currency_code: listing.price.currency_code,
+                } : null,
+                views: listing.views || 0,
+                num_favorers: listing.num_favorers || 0,
+                quantity: listing.quantity || 0,
+                state: listing.state || '',
+                url: listing.url || '',
+                taxonomy_id: listing.taxonomy_id,
+                shop_section_id: listing.shop_section_id,
+                processing_min: listing.processing_min,
+                processing_max: listing.processing_max,
+                who_made: listing.who_made,
+                when_made: listing.when_made,
+                is_supply: listing.is_supply,
+                item_weight: listing.item_weight,
+                item_dimensions_unit: listing.item_dimensions_unit,
+                created_timestamp: listing.created_timestamp,
+                updated_timestamp: listing.updated_timestamp,
+            });
+        }
+
+        // PATCH /api/clawd/etsy?action=update_listing&listing_id=XXXXX - Update listing SEO
+        if ((req.method === 'PATCH' || req.method === 'PUT') && action === 'update_listing' && listing_id) {
+            const { title, description, tags } = req.body;
+
+            // Build update payload with only provided fields
+            const updatePayload: Record<string, any> = {};
+            if (title !== undefined) updatePayload.title = title;
+            if (description !== undefined) updatePayload.description = description;
+            if (tags !== undefined) updatePayload.tags = tags;
+
+            if (Object.keys(updatePayload).length === 0) {
+                return res.status(400).json({
+                    error: 'At least one field (title, description, or tags) is required'
+                });
+            }
+
+            logger.info('Updating Etsy listing', {
+                listing_id,
+                fields: Object.keys(updatePayload),
+            });
+
+            const result = await callEtsyAPI(
+                `/listings/${listing_id}`,
+                accessToken,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify(updatePayload),
+                }
+            );
+
+            return res.status(200).json({
+                success: true,
+                listing_id,
+                updated_fields: Object.keys(updatePayload),
+                listing: {
+                    listing_id: result.listing_id,
+                    title: result.title,
+                    description: result.description,
+                    tags: result.tags,
+                },
+            });
+        }
+
         // Invalid request
         return res.status(400).json({ error: 'Invalid request parameters' });
 

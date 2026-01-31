@@ -39,7 +39,7 @@ export default async function handler(
       response_type: 'code',
       client_id: process.env.ETSY_API_KEY!,
       redirect_uri: process.env.ETSY_REDIRECT_URI!,
-      scope: 'transactions_r transactions_w shops_r address_r email_r',
+      scope: 'transactions_r transactions_w shops_r address_r email_r listings_r listings_w',
       state,
       code_challenge: codeChallenge,
       code_challenge_method: 'S256'

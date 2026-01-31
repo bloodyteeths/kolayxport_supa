@@ -985,36 +985,76 @@ export default async function handler(
             });
         }
 
-        // GET /api/clawd/etsy?action=test_video_endpoint - Test if video upload endpoint exists
-        if (req.method === 'GET' && action === 'test_video_endpoint' && listing_id) {
-            // Test 1: Try to get listing videos
-            let listingVideos: any = null;
-            try {
-                listingVideos = await callEtsyAPI(
-                    `/listings/${listing_id}/videos`,
-                    accessToken
-                );
-            } catch (e: any) {
-                listingVideos = { error: e.message };
+        // GET /api/clawd/etsy?action=get_listing_videos - Get videos for a listing
+        if (req.method === 'GET' && action === 'get_listing_videos' && listing_id) {
+            const videos = await callEtsyAPI(
+                `/listings/${listing_id}/videos`,
+                accessToken
+            );
+
+            return res.status(200).json({
+                count: videos.count || 0,
+                videos: (videos.results || []).map((v: any) => ({
+                    video_id: v.video_id,
+                    video_url: v.video_url,
+                    thumbnail_url: v.thumbnail_url,
+                    height: v.height,
+                    width: v.width,
+                    video_state: v.video_state,
+                })),
+            });
+        }
+
+        // POST /api/clawd/etsy?action=upload_video - Test video upload endpoint
+        if (req.method === 'POST' && action === 'upload_video' && listing_id) {
+            const { video_url } = req.body;
+
+            if (!video_url) {
+                return res.status(400).json({
+                    error: 'video_url is required',
+                    note: 'Etsy may not support video upload via API - testing endpoint availability',
+                });
             }
 
-            // Test 2: Try shop videos endpoint
-            let shopVideos: any = null;
-            try {
-                shopVideos = await callEtsyAPI(
-                    `/shops/${shopId}/listings/${listing_id}/videos`,
-                    accessToken
-                );
-            } catch (e: any) {
-                shopVideos = { error: e.message };
+            // Test various potential endpoints
+            const endpoints = [
+                `/shops/${shopId}/listings/${listing_id}/videos`,
+                `/listings/${listing_id}/videos`,
+            ];
+
+            const results: any[] = [];
+
+            for (const endpoint of endpoints) {
+                try {
+                    // First try just checking if POST is allowed with empty body
+                    const uploadUrl = `${ETSY_API_BASE}${endpoint}`;
+                    const testResponse = await fetch(uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'x-api-key': process.env.ETSY_API_KEY || '',
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ video: video_url }),
+                    });
+
+                    const responseText = await testResponse.text();
+                    results.push({
+                        endpoint,
+                        status: testResponse.status,
+                        response: responseText.substring(0, 500),
+                    });
+                } catch (e: any) {
+                    results.push({
+                        endpoint,
+                        error: e.message,
+                    });
+                }
             }
 
             return res.status(200).json({
-                test_results: {
-                    listing_videos_endpoint: listingVideos,
-                    shop_listing_videos_endpoint: shopVideos,
-                },
-                conclusion: 'Check if any endpoint returned data instead of 404',
+                test_results: results,
+                conclusion: 'Status 404 = endpoint does not exist. Status 400/422 = endpoint exists but request format is wrong.',
             });
         }
 

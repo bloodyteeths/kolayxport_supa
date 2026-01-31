@@ -470,7 +470,6 @@ export default async function handler(
                 processing_max,
                 // New Sept 2025 requirement for processing profiles
                 readiness_state_id,
-                processing_profile_id,
             } = req.body;
 
             // Validate required fields
@@ -510,7 +509,6 @@ export default async function handler(
             if (processing_max) listingPayload.processing_max = processing_max;
             // Sept 2025 processing profile requirements
             if (readiness_state_id) listingPayload.readiness_state_id = readiness_state_id;
-            if (processing_profile_id) listingPayload.processing_profile_id = processing_profile_id;
 
             logger.info('Creating draft Etsy listing', {
                 shopId,
@@ -807,27 +805,6 @@ export default async function handler(
                 count: data.count || states.length,
                 readiness_states: states,
                 note: 'Use readiness_state_id when creating listings. Common values: ready_to_ship, made_to_order',
-            });
-        }
-
-        // GET /api/clawd/etsy?action=get_processing_profiles - Get shop processing profiles
-        if (req.method === 'GET' && action === 'get_processing_profiles') {
-            const data = await callEtsyAPI(
-                `/shops/${shopId}/processing-profiles`,
-                accessToken
-            );
-
-            const profiles = (data.results || []).map((profile: any) => ({
-                processing_profile_id: profile.processing_profile_id,
-                title: profile.title,
-                min_processing_days: profile.min_processing_days,
-                max_processing_days: profile.max_processing_days,
-                readiness_state_id: profile.readiness_state_id,
-            }));
-
-            return res.status(200).json({
-                count: data.count || profiles.length,
-                processing_profiles: profiles,
             });
         }
 

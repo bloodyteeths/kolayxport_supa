@@ -536,6 +536,127 @@ export default async function handler(
             });
         }
 
+        // POST /api/clawd/etsy?action=copy_listing - Duplicate an existing listing as a new draft
+        if (req.method === 'POST' && action === 'copy_listing') {
+            const { source_listing_id, title_prefix = 'COPY - ' } = req.body;
+
+            if (!source_listing_id) {
+                return res.status(400).json({ error: 'source_listing_id is required' });
+            }
+
+            logger.info('Copying Etsy listing', {
+                shopId,
+                source_listing_id,
+            });
+
+            // Step 1: Fetch the source listing with images
+            const sourceListing = await callEtsyAPI(
+                `/listings/${source_listing_id}?includes=Images`,
+                accessToken
+            );
+
+            if (!sourceListing || !sourceListing.listing_id) {
+                return res.status(404).json({
+                    error: `Source listing ${source_listing_id} not found`
+                });
+            }
+
+            // Step 2: Get a valid readiness_state_id from shop's processing profiles
+            let readinessStateId = null;
+            try {
+                const readinessStates = await callEtsyAPI(
+                    `/shops/${shopId}/readiness-state-definitions`,
+                    accessToken
+                );
+                if (readinessStates.results && readinessStates.results.length > 0) {
+                    // Use the first available readiness state
+                    readinessStateId = readinessStates.results[0].readiness_state_id;
+                }
+            } catch (readinessError) {
+                logger.warn('Could not fetch readiness states', { error: readinessError });
+            }
+
+            // Step 3: Build the new listing payload
+            const newTitle = `${title_prefix}${sourceListing.title}`;
+
+            // Calculate price from Etsy's amount/divisor format
+            let price = 0;
+            if (sourceListing.price) {
+                price = sourceListing.price.amount / (sourceListing.price.divisor || 100);
+            }
+
+            const copyPayload: Record<string, any> = {
+                title: newTitle.substring(0, 140), // Etsy title max 140 chars
+                description: sourceListing.description || '',
+                price: price,
+                quantity: sourceListing.quantity || 1,
+                taxonomy_id: sourceListing.taxonomy_id,
+                who_made: sourceListing.who_made || 'i_did',
+                when_made: sourceListing.when_made || 'made_to_order',
+                is_supply: sourceListing.is_supply || false,
+                state: 'draft',
+            };
+
+            // Add optional fields if present in source
+            if (sourceListing.tags && sourceListing.tags.length > 0) {
+                copyPayload.tags = sourceListing.tags.slice(0, 13);
+            }
+            if (sourceListing.materials && sourceListing.materials.length > 0) {
+                copyPayload.materials = sourceListing.materials.slice(0, 13);
+            }
+            if (sourceListing.shipping_profile_id) {
+                copyPayload.shipping_profile_id = sourceListing.shipping_profile_id;
+            }
+            if (sourceListing.shop_section_id) {
+                copyPayload.shop_section_id = sourceListing.shop_section_id;
+            }
+            if (readinessStateId) {
+                copyPayload.readiness_state_id = readinessStateId;
+            }
+
+            // Personalization fields
+            if (sourceListing.is_personalizable) {
+                copyPayload.is_personalizable = sourceListing.is_personalizable;
+            }
+            if (sourceListing.personalization_is_required !== undefined) {
+                copyPayload.personalization_is_required = sourceListing.personalization_is_required;
+            }
+            if (sourceListing.personalization_instructions) {
+                copyPayload.personalization_instructions = sourceListing.personalization_instructions;
+            }
+            if (sourceListing.personalization_char_count_max) {
+                copyPayload.personalization_char_count_max = sourceListing.personalization_char_count_max;
+            }
+
+            // Step 4: Create the new draft listing
+            const newListing = await callEtsyAPI(
+                `/shops/${shopId}/listings?legacy=false`,
+                accessToken,
+                {
+                    method: 'POST',
+                    body: JSON.stringify(copyPayload),
+                }
+            );
+
+            // Gather image URLs from source for reference
+            const sourceImages = (sourceListing.images || []).map((img: any) => ({
+                listing_image_id: img.listing_image_id,
+                url_fullxfull: img.url_fullxfull,
+                rank: img.rank,
+            }));
+
+            return res.status(201).json({
+                success: true,
+                source_listing_id: parseInt(source_listing_id),
+                new_listing_id: newListing.listing_id,
+                title: newListing.title,
+                state: newListing.state,
+                url: newListing.url,
+                source_images: sourceImages,
+                message: 'Listing copied as draft. Edit title/description/price, upload images (not copied automatically), then publish.',
+            });
+        }
+
         // POST /api/clawd/etsy?action=upload_image&listing_id=XXXXX - Upload image to listing
         if (req.method === 'POST' && action === 'upload_image' && listing_id) {
             const { image_url, rank = 1, overwrite = true, is_watermarked = false, alt_text } = req.body;

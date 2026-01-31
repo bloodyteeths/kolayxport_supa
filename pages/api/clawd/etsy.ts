@@ -988,7 +988,7 @@ export default async function handler(
         // GET /api/clawd/etsy?action=test_video_endpoint - Test if video upload endpoint exists
         if (req.method === 'GET' && action === 'test_video_endpoint' && listing_id) {
             // Test 1: Try to get listing videos
-            let listingVideos = null;
+            let listingVideos: any = null;
             try {
                 listingVideos = await callEtsyAPI(
                     `/listings/${listing_id}/videos`,
@@ -999,7 +999,7 @@ export default async function handler(
             }
 
             // Test 2: Try shop videos endpoint
-            let shopVideos = null;
+            let shopVideos: any = null;
             try {
                 shopVideos = await callEtsyAPI(
                     `/shops/${shopId}/listings/${listing_id}/videos`,

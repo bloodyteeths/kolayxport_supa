@@ -429,7 +429,7 @@ export default async function handler(
             });
 
             const result = await callEtsyAPI(
-                `/listings/${listing_id}`,
+                `/shops/${shopId}/listings/${listing_id}`,
                 accessToken,
                 {
                     method: 'PATCH',

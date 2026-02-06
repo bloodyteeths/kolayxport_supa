@@ -36,6 +36,11 @@ interface PersonalizationDropdownOption {
     label: string; // 1-20 chars
 }
 
+interface PersonalizationValidation {
+    type: string; // e.g. 'min_length', 'max_length'
+    value: string;
+}
+
 interface PersonalizationQuestion {
     question_id?: number; // present in responses, omit for creation
     question_type: PersonalizationQuestionType;
@@ -45,6 +50,7 @@ interface PersonalizationQuestion {
     max_allowed_characters?: number; // 1-1024, for text_input
     max_allowed_files?: number; // 1-10, for upload types
     options?: PersonalizationDropdownOption[]; // for dropdown, 1-30 options
+    validations?: PersonalizationValidation[]; // Etsy requires min 2 items for text_input
 }
 
 interface PersonalizationPayload {
@@ -165,6 +171,12 @@ function validatePersonalizationQuestions(questions: PersonalizationQuestion[]):
             if (q.max_allowed_characters !== undefined) {
                 if (q.max_allowed_characters < 1 || q.max_allowed_characters > 1024) {
                     return `Question ${i + 1}: max_allowed_characters must be 1-1024 for text_input`;
+                }
+            }
+            // Etsy requires validations array with at least 2 items for text_input
+            if (q.validations) {
+                if (!Array.isArray(q.validations) || q.validations.length < 2) {
+                    return `Question ${i + 1}: text_input validations must have at least 2 items (min_length and max_length)`;
                 }
             }
         }
@@ -580,6 +592,10 @@ export default async function handler(
                     if (q.question_type === 'labeled_upload' && q.options) {
                         question.options = q.options;
                     }
+                    // Pass through validations array (Etsy requires min 2 items for text_input)
+                    if (q.validations && Array.isArray(q.validations) && q.validations.length > 0) {
+                        question.validations = q.validations;
+                    }
                     // Preserve question_id for updates
                     if (q.question_id) question.question_id = q.question_id;
                     return question;
@@ -635,12 +651,17 @@ export default async function handler(
                 return res.status(400).json({ error: 'question_text must be max 45 characters' });
             }
 
+            const maxChars = Math.min(Math.max(max_characters, 1), 1024);
             const question: PersonalizationQuestion = {
                 question_type: 'text_input',
                 question_text,
                 instructions: instructions.substring(0, 120),
                 required,
-                max_allowed_characters: Math.min(Math.max(max_characters, 1), 1024),
+                max_allowed_characters: maxChars,
+                validations: [
+                    { type: 'min_length', value: '1' },
+                    { type: 'max_length', value: String(maxChars) },
+                ],
             };
 
             logger.info('Setting simple personalization for listing', { listing_id, shopId, question_text });
@@ -785,12 +806,17 @@ export default async function handler(
             let personalizationSet = false;
             if (req.body.is_personalizable) {
                 try {
+                    const maxChars = req.body.personalization_char_count_max || 256;
                     const legacyQuestion: PersonalizationQuestion = {
                         question_type: 'text_input',
                         question_text: 'Personalization',
                         required: req.body.personalization_is_required || false,
                         instructions: req.body.personalization_instructions || '',
-                        max_allowed_characters: req.body.personalization_char_count_max || 256,
+                        max_allowed_characters: maxChars,
+                        validations: [
+                            { type: 'min_length', value: '1' },
+                            { type: 'max_length', value: String(maxChars) },
+                        ],
                     };
                     await callEtsyAPI(
                         `/shops/${shopId}/listings/${result.listing_id}/personalization?supports_multiple_personalization_questions=true`,

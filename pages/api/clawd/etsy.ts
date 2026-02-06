@@ -472,11 +472,11 @@ export default async function handler(
                 });
             }
 
-            // Fetch personalization data via new endpoint
+            // Fetch personalization data via new dedicated GET endpoint (no shop_id in path)
             let personalization_questions: any[] = [];
             try {
                 const personalizationData = await callEtsyAPI(
-                    `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                    `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                     accessToken
                 );
                 personalization_questions = personalizationData.personalization_questions || [];
@@ -521,8 +521,9 @@ export default async function handler(
             logger.info('Fetching personalization for listing', { listing_id, shopId });
 
             try {
+                // GET endpoint does NOT include shop_id in path (per Etsy docs)
                 const data = await callEtsyAPI(
-                    `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                    `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                     accessToken
                 );
 
@@ -587,11 +588,12 @@ export default async function handler(
                 }),
             };
 
+            // Write endpoint uses PUT with shop_id in path (per Etsy docs)
             const result = await callEtsyAPI(
                 `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
-                    method: 'POST',
+                    method: 'PUT',
                     body: JSON.stringify(payload),
                 }
             );
@@ -650,7 +652,7 @@ export default async function handler(
                 `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
-                    method: 'POST',
+                    method: 'PUT',
                     body: JSON.stringify({ personalization_questions: [question] }),
                 }
             );
@@ -797,7 +799,7 @@ export default async function handler(
                         `/shops/${shopId}/listings/${result.listing_id}/personalization?supports_multiple_personalization_questions=true`,
                         accessToken,
                         {
-                            method: 'POST',
+                            method: 'PUT',
                             body: JSON.stringify({ personalization_questions: [legacyQuestion] }),
                         }
                     );
@@ -913,8 +915,9 @@ export default async function handler(
             // Step 5: Copy personalization from source listing using new dedicated endpoint
             let copiedPersonalization: any[] = [];
             try {
+                // GET uses /listings/{id}/personalization (no shop_id)
                 const sourcePersonalization = await callEtsyAPI(
-                    `/shops/${shopId}/listings/${source_listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                    `/listings/${source_listing_id}/personalization?supports_multiple_personalization_questions=true`,
                     accessToken
                 );
 
@@ -925,11 +928,12 @@ export default async function handler(
                         return rest;
                     });
 
+                    // PUT uses /shops/{shopId}/listings/{id}/personalization (with shop_id)
                     const personalizationResult = await callEtsyAPI(
                         `/shops/${shopId}/listings/${newListing.listing_id}/personalization?supports_multiple_personalization_questions=true`,
                         accessToken,
                         {
-                            method: 'POST',
+                            method: 'PUT',
                             body: JSON.stringify({ personalization_questions: questionsForCopy }),
                         }
                     );

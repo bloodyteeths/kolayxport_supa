@@ -588,12 +588,11 @@ export default async function handler(
                 }),
             };
 
-            // Write endpoint uses PUT with shop_id in path (per Etsy docs)
             const result = await callEtsyAPI(
                 `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
-                    method: 'PUT',
+                    method: 'POST',
                     body: JSON.stringify(payload),
                 }
             );
@@ -652,7 +651,7 @@ export default async function handler(
                 `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
-                    method: 'PUT',
+                    method: 'POST',
                     body: JSON.stringify({ personalization_questions: [question] }),
                 }
             );
@@ -799,7 +798,7 @@ export default async function handler(
                         `/shops/${shopId}/listings/${result.listing_id}/personalization?supports_multiple_personalization_questions=true`,
                         accessToken,
                         {
-                            method: 'PUT',
+                            method: 'POST',
                             body: JSON.stringify({ personalization_questions: [legacyQuestion] }),
                         }
                     );
@@ -928,12 +927,11 @@ export default async function handler(
                         return rest;
                     });
 
-                    // PUT uses /shops/{shopId}/listings/{id}/personalization (with shop_id)
                     const personalizationResult = await callEtsyAPI(
                         `/shops/${shopId}/listings/${newListing.listing_id}/personalization?supports_multiple_personalization_questions=true`,
                         accessToken,
                         {
-                            method: 'PUT',
+                            method: 'POST',
                             body: JSON.stringify({ personalization_questions: questionsForCopy }),
                         }
                     );

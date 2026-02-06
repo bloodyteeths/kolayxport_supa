@@ -28,6 +28,29 @@ interface EtsyReceipt {
     };
 }
 
+// === Etsy Personalization Types (New Multi-Question API - Feb 2026) ===
+
+type PersonalizationQuestionType = 'text_input' | 'dropdown' | 'unlabeled_upload' | 'labeled_upload';
+
+interface PersonalizationDropdownOption {
+    label: string; // 1-20 chars
+}
+
+interface PersonalizationQuestion {
+    question_id?: number; // present in responses, omit for creation
+    question_type: PersonalizationQuestionType;
+    question_text: string; // 1-45 chars
+    instructions?: string; // max 120 chars
+    required: boolean;
+    max_allowed_characters?: number; // 1-1024, for text_input
+    max_allowed_files?: number; // 1-10, for upload types
+    options?: PersonalizationDropdownOption[]; // for dropdown, 1-30 options
+}
+
+interface PersonalizationPayload {
+    personalization_questions: PersonalizationQuestion[];
+}
+
 // Helper function to parse full name into first and last name
 function parseFullName(fullName: string): { firstName: string; lastName: string } {
     const trimmed = (fullName || '').trim();
@@ -102,6 +125,77 @@ async function getEtsyAccessToken(shopId: string): Promise<string> {
     }
 
     return etsyShop.accessToken;
+}
+
+function validatePersonalizationQuestions(questions: PersonalizationQuestion[]): string | null {
+    if (!Array.isArray(questions) || questions.length === 0) {
+        return 'personalization_questions must be a non-empty array';
+    }
+    if (questions.length > 5) {
+        return 'Maximum 5 personalization questions per listing';
+    }
+
+    const uploadCount = questions.filter(q =>
+        q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload'
+    ).length;
+    if (uploadCount > 1) {
+        return 'Maximum 1 upload question per listing';
+    }
+
+    const validTypes: PersonalizationQuestionType[] = ['text_input', 'dropdown', 'unlabeled_upload', 'labeled_upload'];
+
+    for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+
+        if (!validTypes.includes(q.question_type)) {
+            return `Question ${i + 1}: invalid question_type "${q.question_type}". Must be one of: ${validTypes.join(', ')}`;
+        }
+        if (!q.question_text || q.question_text.length < 1 || q.question_text.length > 45) {
+            return `Question ${i + 1}: question_text must be 1-45 characters`;
+        }
+        if (q.instructions && q.instructions.length > 120) {
+            return `Question ${i + 1}: instructions must be max 120 characters`;
+        }
+        if (q.required === undefined || typeof q.required !== 'boolean') {
+            return `Question ${i + 1}: required must be a boolean`;
+        }
+
+        // Type-specific validation
+        if (q.question_type === 'text_input') {
+            if (q.max_allowed_characters !== undefined) {
+                if (q.max_allowed_characters < 1 || q.max_allowed_characters > 1024) {
+                    return `Question ${i + 1}: max_allowed_characters must be 1-1024 for text_input`;
+                }
+            }
+        }
+        if (q.question_type === 'dropdown') {
+            if (q.instructions) {
+                return `Question ${i + 1}: dropdown questions must not have instructions`;
+            }
+            if (!q.options || !Array.isArray(q.options) || q.options.length < 1 || q.options.length > 30) {
+                return `Question ${i + 1}: dropdown requires 1-30 options`;
+            }
+            for (let j = 0; j < q.options.length; j++) {
+                if (!q.options[j].label || q.options[j].label.length < 1 || q.options[j].label.length > 20) {
+                    return `Question ${i + 1}, option ${j + 1}: label must be 1-20 characters`;
+                }
+            }
+        }
+        if (q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload') {
+            if (q.max_allowed_files !== undefined) {
+                if (q.max_allowed_files < 1 || q.max_allowed_files > 10) {
+                    return `Question ${i + 1}: max_allowed_files must be 1-10 for upload types`;
+                }
+            }
+            if (q.question_type === 'labeled_upload' && q.options && q.max_allowed_files) {
+                if (q.options.length !== q.max_allowed_files) {
+                    return `Question ${i + 1}: labeled_upload options count must equal max_allowed_files`;
+                }
+            }
+        }
+    }
+
+    return null; // valid
 }
 
 async function callEtsyAPI(endpoint: string, accessToken: string, options: RequestInit = {}) {
@@ -377,6 +471,18 @@ export default async function handler(
                 });
             }
 
+            // Fetch personalization data via new endpoint
+            let personalization_questions: any[] = [];
+            try {
+                const personalizationData = await callEtsyAPI(
+                    `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                    accessToken
+                );
+                personalization_questions = personalizationData.personalization_questions || [];
+            } catch {
+                // Listing may not have personalization configured
+            }
+
             return res.status(200).json({
                 listing_id: listing.listing_id,
                 title: listing.title || '',
@@ -404,6 +510,155 @@ export default async function handler(
                 item_dimensions_unit: listing.item_dimensions_unit,
                 created_timestamp: listing.created_timestamp,
                 updated_timestamp: listing.updated_timestamp,
+                is_personalizable: personalization_questions.length > 0,
+                personalization_questions,
+            });
+        }
+
+        // GET /api/clawd/etsy?action=get_personalization&listing_id=XXXXX - Get listing personalization questions
+        if (req.method === 'GET' && action === 'get_personalization' && listing_id) {
+            logger.info('Fetching personalization for listing', { listing_id, shopId });
+
+            try {
+                const data = await callEtsyAPI(
+                    `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                    accessToken
+                );
+
+                return res.status(200).json({
+                    listing_id: parseInt(listing_id),
+                    personalization_questions: data.personalization_questions || [],
+                    count: (data.personalization_questions || []).length,
+                });
+            } catch (error: any) {
+                // If listing has no personalization, Etsy may return 404
+                if (error.message && error.message.includes('404')) {
+                    return res.status(200).json({
+                        listing_id: parseInt(listing_id),
+                        personalization_questions: [],
+                        count: 0,
+                        note: 'No personalization configured for this listing',
+                    });
+                }
+                throw error;
+            }
+        }
+
+        // POST /api/clawd/etsy?action=set_personalization&listing_id=XXXXX - Set listing personalization questions
+        if (req.method === 'POST' && action === 'set_personalization' && listing_id) {
+            const { personalization_questions } = req.body;
+
+            const validationError = validatePersonalizationQuestions(personalization_questions);
+            if (validationError) {
+                return res.status(400).json({ error: validationError });
+            }
+
+            logger.info('Setting personalization for listing', {
+                listing_id,
+                shopId,
+                question_count: personalization_questions.length,
+                question_types: personalization_questions.map((q: PersonalizationQuestion) => q.question_type),
+            });
+
+            const payload: PersonalizationPayload = {
+                personalization_questions: personalization_questions.map((q: PersonalizationQuestion) => {
+                    const question: Record<string, any> = {
+                        question_type: q.question_type,
+                        question_text: q.question_text,
+                        required: q.required,
+                    };
+                    if (q.instructions) question.instructions = q.instructions;
+                    if (q.question_type === 'text_input' && q.max_allowed_characters) {
+                        question.max_allowed_characters = q.max_allowed_characters;
+                    }
+                    if (q.question_type === 'dropdown' && q.options) {
+                        question.options = q.options;
+                    }
+                    if ((q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload') && q.max_allowed_files) {
+                        question.max_allowed_files = q.max_allowed_files;
+                    }
+                    if (q.question_type === 'labeled_upload' && q.options) {
+                        question.options = q.options;
+                    }
+                    // Preserve question_id for updates
+                    if (q.question_id) question.question_id = q.question_id;
+                    return question;
+                }),
+            };
+
+            const result = await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                accessToken,
+                {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                }
+            );
+
+            return res.status(200).json({
+                success: true,
+                listing_id: parseInt(listing_id),
+                personalization_questions: result.personalization_questions || [],
+                message: `Personalization set with ${personalization_questions.length} question(s)`,
+            });
+        }
+
+        // POST /api/clawd/etsy?action=remove_personalization&listing_id=XXXXX - Remove all personalization
+        if ((req.method === 'POST' || req.method === 'DELETE') && action === 'remove_personalization' && listing_id) {
+            logger.info('Removing personalization from listing', { listing_id, shopId });
+
+            const result = await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                accessToken,
+                {
+                    method: 'DELETE',
+                }
+            );
+
+            return res.status(200).json({
+                success: true,
+                listing_id: parseInt(listing_id),
+                message: 'Personalization removed from listing',
+            });
+        }
+
+        // POST /api/clawd/etsy?action=set_simple_personalization&listing_id=XXXXX - Quick single text question
+        if (req.method === 'POST' && action === 'set_simple_personalization' && listing_id) {
+            const {
+                question_text = 'Personalization',
+                instructions = '',
+                required = false,
+                max_characters = 256,
+            } = req.body;
+
+            if (question_text.length > 45) {
+                return res.status(400).json({ error: 'question_text must be max 45 characters' });
+            }
+
+            const question: PersonalizationQuestion = {
+                question_type: 'text_input',
+                question_text,
+                instructions: instructions.substring(0, 120),
+                required,
+                max_allowed_characters: Math.min(Math.max(max_characters, 1), 1024),
+            };
+
+            logger.info('Setting simple personalization for listing', { listing_id, shopId, question_text });
+
+            const result = await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                accessToken,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ personalization_questions: [question] }),
+                }
+            );
+
+            return res.status(200).json({
+                success: true,
+                listing_id: parseInt(listing_id),
+                personalization_questions: result.personalization_questions || [],
+                message: 'Simple text personalization set',
             });
         }
 
@@ -526,12 +781,42 @@ export default async function handler(
                 }
             );
 
+            // Migration bridge: if legacy personalization fields were passed, convert to new API
+            let personalizationSet = false;
+            if (req.body.is_personalizable) {
+                try {
+                    const legacyQuestion: PersonalizationQuestion = {
+                        question_type: 'text_input',
+                        question_text: 'Personalization',
+                        required: req.body.personalization_is_required || false,
+                        instructions: req.body.personalization_instructions || '',
+                        max_allowed_characters: req.body.personalization_char_count_max || 256,
+                    };
+                    await callEtsyAPI(
+                        `/shops/${shopId}/listings/${result.listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                        accessToken,
+                        {
+                            method: 'POST',
+                            body: JSON.stringify({ personalization_questions: [legacyQuestion] }),
+                        }
+                    );
+                    personalizationSet = true;
+                    logger.info('Converted legacy personalization to new API', { listing_id: result.listing_id });
+                } catch (err) {
+                    logger.warn('Failed to set personalization via new API after create', {
+                        listing_id: result.listing_id,
+                        error: err,
+                    });
+                }
+            }
+
             return res.status(201).json({
                 success: true,
                 listing_id: result.listing_id,
                 state: result.state,
                 title: result.title,
                 url: result.url,
+                personalization_set: personalizationSet,
                 message: 'Draft listing created. Add images then publish when ready.',
             });
         }
@@ -614,21 +899,7 @@ export default async function handler(
                 copyPayload.readiness_state_id = readinessStateId;
             }
 
-            // Personalization fields
-            if (sourceListing.is_personalizable) {
-                copyPayload.is_personalizable = sourceListing.is_personalizable;
-            }
-            if (sourceListing.personalization_is_required !== undefined) {
-                copyPayload.personalization_is_required = sourceListing.personalization_is_required;
-            }
-            if (sourceListing.personalization_instructions) {
-                copyPayload.personalization_instructions = sourceListing.personalization_instructions;
-            }
-            if (sourceListing.personalization_char_count_max) {
-                copyPayload.personalization_char_count_max = sourceListing.personalization_char_count_max;
-            }
-
-            // Step 4: Create the new draft listing
+            // Step 4: Create the new draft listing (personalization handled separately via new endpoint)
             const newListing = await callEtsyAPI(
                 `/shops/${shopId}/listings?legacy=false`,
                 accessToken,
@@ -637,6 +908,44 @@ export default async function handler(
                     body: JSON.stringify(copyPayload),
                 }
             );
+
+            // Step 5: Copy personalization from source listing using new dedicated endpoint
+            let copiedPersonalization: any[] = [];
+            try {
+                const sourcePersonalization = await callEtsyAPI(
+                    `/shops/${shopId}/listings/${source_listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                    accessToken
+                );
+
+                if (sourcePersonalization.personalization_questions && sourcePersonalization.personalization_questions.length > 0) {
+                    // Strip question_ids from source (Etsy assigns new ones)
+                    const questionsForCopy = sourcePersonalization.personalization_questions.map((q: any) => {
+                        const { question_id, ...rest } = q;
+                        return rest;
+                    });
+
+                    const personalizationResult = await callEtsyAPI(
+                        `/shops/${shopId}/listings/${newListing.listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                        accessToken,
+                        {
+                            method: 'POST',
+                            body: JSON.stringify({ personalization_questions: questionsForCopy }),
+                        }
+                    );
+                    copiedPersonalization = personalizationResult.personalization_questions || [];
+                    logger.info('Personalization copied to new listing', {
+                        source_listing_id,
+                        new_listing_id: newListing.listing_id,
+                        questions_copied: copiedPersonalization.length,
+                    });
+                }
+            } catch (personalizationError) {
+                logger.warn('Could not copy personalization to new listing', {
+                    source_listing_id,
+                    new_listing_id: newListing.listing_id,
+                    error: personalizationError,
+                });
+            }
 
             // Gather image URLs from source for reference
             const sourceImages = (sourceListing.images || []).map((img: any) => ({
@@ -653,6 +962,8 @@ export default async function handler(
                 state: newListing.state,
                 url: newListing.url,
                 source_images: sourceImages,
+                personalization_copied: copiedPersonalization.length > 0,
+                personalization_questions: copiedPersonalization,
                 message: 'Listing copied as draft. Edit title/description/price, upload images (not copied automatically), then publish.',
             });
         }

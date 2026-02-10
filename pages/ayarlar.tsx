@@ -552,7 +552,7 @@ const AyarlarPage = () => {
                               size="small"
                               variant="outlined"
                               color="error"
-                              onClick={() => handleDisconnectEtsyShop(shop.shopId)}
+                              onClick={() => handleDisconnectEtsyShop(shop.id)}
                             >
                               Bağlantıyı Kes
                             </Button>

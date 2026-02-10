@@ -183,6 +183,7 @@ export default async function handler(
     const isFirstShop = userShopCount === 0 && !hasLegacyCredentials;
 
     // Store/update shop in new EtsyShop model
+    let etsyShopSaved = false;
     try {
       await prisma.etsyShop.upsert({
         where: {
@@ -211,6 +212,7 @@ export default async function handler(
         }
       });
 
+      etsyShopSaved = true;
       logger.info('Successfully stored shop in EtsyShop model', {
         userId,
         shopId: shopData.shop_id,
@@ -222,12 +224,10 @@ export default async function handler(
         userId,
         shopId: shopData.shop_id
       });
-      // Continue to legacy storage even if new model fails
     }
 
-    // Only update Credential table if this is the user's first Etsy shop
-    // This maintains backward compatibility for the first shop only
-    if (isFirstShop) {
+    // Update Credential table if this is the first shop OR if EtsyShop save failed (fallback)
+    if (isFirstShop || !etsyShopSaved) {
       await prisma.credential.upsert({
         where: { userId },
         update: {
@@ -245,6 +245,13 @@ export default async function handler(
           etsyTokenExpiresAt: tokenExpiresAt
         }
       });
+
+      if (!etsyShopSaved) {
+        logger.warn('Fell back to Credential table for Etsy shop storage', {
+          userId,
+          shopId: shopData.shop_id
+        });
+      }
     }
 
     logger.info('Etsy OAuth completed successfully', {

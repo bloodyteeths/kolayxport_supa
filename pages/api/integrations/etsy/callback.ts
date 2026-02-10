@@ -79,11 +79,24 @@ export default async function handler(
 
     logger.info('Token exchange successful', { userId, hasAccessToken: !!tokens.access_token });
 
+    // Validate API key is available before making API calls
+    const etsyApiKey = process.env.ETSY_API_KEY;
+    if (!etsyApiKey) {
+      logger.error('ETSY_API_KEY environment variable is not set', undefined, { userId });
+      throw new Error('ETSY_API_KEY environment variable is not configured');
+    }
+
+    logger.info('Etsy API key check', {
+      userId,
+      keyLength: etsyApiKey.length,
+      keyPrefix: etsyApiKey.substring(0, 4) + '...'
+    });
+
     // Step 1: Get user_id from /users/me
     const userResponse = await fetch('https://api.etsy.com/v3/application/users/me', {
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
-        'x-api-key': process.env.ETSY_API_KEY!
+        'x-api-key': etsyApiKey
       }
     });
 
@@ -92,7 +105,9 @@ export default async function handler(
       logger.error('Failed to fetch Etsy user info', undefined, {
         status: userResponse.status,
         body: errorBody,
-        userId
+        userId,
+        apiKeySet: !!etsyApiKey,
+        apiKeyLength: etsyApiKey.length
       });
       throw new Error(`Failed to get Etsy user info: ${userResponse.status} - ${errorBody}`);
     }
@@ -109,7 +124,7 @@ export default async function handler(
     const shopsResponse = await fetch(`https://api.etsy.com/v3/application/users/${etsyUserId}/shops`, {
       headers: {
         'Authorization': `Bearer ${tokens.access_token}`,
-        'x-api-key': process.env.ETSY_API_KEY!
+        'x-api-key': etsyApiKey
       }
     });
 

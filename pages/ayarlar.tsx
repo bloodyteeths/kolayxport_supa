@@ -263,8 +263,19 @@ const AyarlarPage = () => {
   useEffect(() => {
     fetchSyncHistory();
     fetchEtsyShops();
+
+    // Show Etsy OAuth callback result from query params
+    const { success, error, details } = router.query;
+    if (success === 'etsy_connected') {
+      setSnackbar({ open: true, message: 'Etsy shop başarıyla bağlandı!', severity: 'success' });
+      router.replace('/ayarlar', undefined, { shallow: true });
+    } else if (error === 'etsy_callback_failed' || error === 'etsy_auth_failed' || error === 'etsy_token_failed') {
+      const detailMsg = details ? ` Detay: ${decodeURIComponent(details as string)}` : '';
+      setSnackbar({ open: true, message: `Etsy bağlantısı başarısız oldu.${detailMsg}`, severity: 'error' });
+      router.replace('/ayarlar', undefined, { shallow: true });
+    }
     // eslint-disable-next-line
-  }, []);
+  }, [router.query]);
 
   useEffect(() => {
     const fetchSettings = async () => {

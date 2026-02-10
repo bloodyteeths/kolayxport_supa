@@ -45,10 +45,19 @@ export default async function handler(
   }
 
   const { orderId } = req.query;
-  const { trackingNumber, carrierId = 3, notifyCustomer = true, updateRemoteOrder = true } = req.body;
+  const { trackingNumber: rawTrackingNumber, carrierId = 3, notifyCustomer = true, updateRemoteOrder = true } = req.body;
 
-  if (!orderId || !trackingNumber) {
+  if (!orderId || !rawTrackingNumber) {
     return res.status(400).json({ error: 'Order ID and tracking number are required' });
+  }
+
+  // Trim whitespace and validate tracking number format
+  const trackingNumber = String(rawTrackingNumber).trim();
+  const trackingNumberRegex = /^[A-Za-z0-9]{8,40}$/;
+  if (!trackingNumberRegex.test(trackingNumber)) {
+    return res.status(400).json({
+      error: 'Invalid tracking number format. Tracking number must be 8-40 alphanumeric characters.',
+    });
   }
 
   try {
@@ -385,7 +394,7 @@ async function submitEtsyTracking(
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${shop.accessToken}`,
-            'x-api-key': process.env.ETSY_API_KEY || ''
+            'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
           }
         });
 
@@ -431,7 +440,7 @@ async function submitEtsyTracking(
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${shop.accessToken}`,
-              'x-api-key': process.env.ETSY_API_KEY || ''
+              'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
             }
           });
 
@@ -596,7 +605,7 @@ async function submitEtsyTracking(
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${etsyCredentials.accessToken}`,
-        'x-api-key': process.env.ETSY_API_KEY || ''
+        'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
       }
     });
 

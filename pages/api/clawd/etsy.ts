@@ -206,7 +206,7 @@ async function callEtsyAPI(endpoint: string, accessToken: string, options: Reque
         ...options,
         headers: {
             'Authorization': `Bearer ${accessToken}`,
-            'x-api-key': process.env.ETSY_API_KEY || '',
+            'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`,
             'Content-Type': 'application/json',
             ...options.headers,
         },
@@ -1059,7 +1059,7 @@ export default async function handler(
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
-                    'x-api-key': process.env.ETSY_API_KEY || '',
+                    'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`,
                     'Content-Type': `multipart/form-data; boundary=${boundary}`,
                 },
                 body: bodyParts,
@@ -1332,7 +1332,7 @@ export default async function handler(
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
-                        'x-api-key': process.env.ETSY_API_KEY || '',
+                        'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`,
                         'Content-Type': 'application/x-www-form-urlencoded',
                     },
                     body: new URLSearchParams({ video_id: String(video_id) }),
@@ -1426,7 +1426,7 @@ export default async function handler(
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
-                    'x-api-key': process.env.ETSY_API_KEY || '',
+                    'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`,
                     'Content-Type': `multipart/form-data; boundary=${boundary}`,
                 },
                 body: bodyParts,

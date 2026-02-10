@@ -78,21 +78,23 @@ export default async function handler(
 
     logger.info('Token exchange successful', { userId, hasAccessToken: !!tokens.access_token });
 
-    // Validate API key is available before making API calls
-    const etsyApiKeyRaw = process.env.ETSY_API_KEY;
-    if (!etsyApiKeyRaw) {
+    // Validate API credentials - Etsy v3 requires keystring:shared_secret in x-api-key header
+    const etsyKeystring = (process.env.ETSY_API_KEY || '').trim();
+    const etsySharedSecret = (process.env.ETSY_CLIENT_SECRET || '').trim();
+    if (!etsyKeystring) {
       logger.error('ETSY_API_KEY environment variable is not set', undefined, { userId });
       throw new Error('ETSY_API_KEY environment variable is not configured');
     }
-    // Trim whitespace/newlines that may be introduced when pasting env vars in Vercel UI
-    const etsyApiKey = etsyApiKeyRaw.trim();
+    if (!etsySharedSecret) {
+      logger.error('ETSY_CLIENT_SECRET environment variable is not set', undefined, { userId });
+      throw new Error('ETSY_CLIENT_SECRET environment variable is not configured');
+    }
+    const etsyApiKey = `${etsyKeystring}:${etsySharedSecret}`;
 
     logger.info('Etsy API key check', {
       userId,
-      keyLength: etsyApiKey.length,
-      keyRawLength: etsyApiKeyRaw.length,
-      keyPrefix: etsyApiKey.substring(0, 4) + '...',
-      hadWhitespace: etsyApiKey !== etsyApiKeyRaw
+      keystringLength: etsyKeystring.length,
+      hasSharedSecret: !!etsySharedSecret
     });
 
     // Step 1: Get user_id from /users/me

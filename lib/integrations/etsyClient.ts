@@ -41,6 +41,7 @@ export class EtsyClient {
   private tokenExpiresAt?: Date;
   private baseUrl = 'https://openapi.etsy.com/v3';
   private onTokenRefresh?: (newCredentials: EtsyCredentials) => Promise<void>;
+  private refreshPromise: Promise<void> | null = null;
 
   constructor(credentials: EtsyCredentials, onTokenRefresh?: (newCredentials: EtsyCredentials) => Promise<void>) {
     this.accessToken = credentials.accessToken;
@@ -60,19 +61,36 @@ export class EtsyClient {
   }
 
   /**
-   * Refresh the access token using the refresh token
+   * Refresh the access token using the refresh token.
+   * Uses a lock to prevent concurrent refresh attempts (race condition fix).
    */
   private async refreshAccessToken(): Promise<void> {
+    // If a refresh is already in progress, wait for it instead of starting another
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = this.doRefreshAccessToken().finally(() => {
+      this.refreshPromise = null;
+    });
+
+    return this.refreshPromise;
+  }
+
+  /**
+   * Performs the actual token refresh against the Etsy OAuth endpoint.
+   */
+  private async doRefreshAccessToken(): Promise<void> {
     if (!this.refreshToken) {
       throw new Error('No refresh token available for token refresh');
     }
 
     const url = 'https://api.etsy.com/v3/public/oauth/token';
-    
+
     if (!process.env.ETSY_API_KEY) {
       throw new Error('ETSY_API_KEY environment variable is not set');
     }
-    
+
     const payload = {
       grant_type: 'refresh_token',
       client_id: process.env.ETSY_API_KEY,
@@ -103,7 +121,7 @@ export class EtsyClient {
       }
 
       const tokenData = await response.json() as EtsyTokenRefreshResponse;
-      
+
       // Update internal state
       this.accessToken = tokenData.access_token;
       this.refreshToken = tokenData.refresh_token;
@@ -125,7 +143,7 @@ export class EtsyClient {
       }
 
     } catch (error) {
-      logger.error('Failed to refresh Etsy access token', 
+      logger.error('Failed to refresh Etsy access token',
         error instanceof Error ? error : new Error(String(error)), {
           shopId: this.shopId
         });
@@ -147,7 +165,7 @@ export class EtsyClient {
       headers: {
         ...options.headers,
         'Authorization': `Bearer ${this.accessToken}`,
-        'x-api-key': process.env.ETSY_API_KEY || ''
+        'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
       }
     });
 
@@ -165,7 +183,7 @@ export class EtsyClient {
         headers: {
           ...options.headers,
           'Authorization': `Bearer ${this.accessToken}`,
-          'x-api-key': process.env.ETSY_API_KEY || ''
+          'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
         }
       });
     }

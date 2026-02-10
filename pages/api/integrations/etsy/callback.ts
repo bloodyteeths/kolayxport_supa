@@ -2,7 +2,6 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getSupabaseServerClient } from '@/lib/supabase';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import fetch from 'node-fetch';
 
 export default async function handler(
   req: NextApiRequest,
@@ -46,8 +45,8 @@ export default async function handler(
     // Exchange authorization code for access token
     const tokenParams = new URLSearchParams({
       grant_type: 'authorization_code',
-      client_id: process.env.ETSY_API_KEY!,
-      redirect_uri: process.env.ETSY_REDIRECT_URI!,
+      client_id: (process.env.ETSY_API_KEY || '').trim(),
+      redirect_uri: (process.env.ETSY_REDIRECT_URI || '').trim(),
       code: code as string,
       code_verifier: codeVerifier
     });
@@ -57,7 +56,7 @@ export default async function handler(
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: tokenParams
+      body: tokenParams.toString()
     });
 
     if (!tokenResponse.ok) {
@@ -80,16 +79,20 @@ export default async function handler(
     logger.info('Token exchange successful', { userId, hasAccessToken: !!tokens.access_token });
 
     // Validate API key is available before making API calls
-    const etsyApiKey = process.env.ETSY_API_KEY;
-    if (!etsyApiKey) {
+    const etsyApiKeyRaw = process.env.ETSY_API_KEY;
+    if (!etsyApiKeyRaw) {
       logger.error('ETSY_API_KEY environment variable is not set', undefined, { userId });
       throw new Error('ETSY_API_KEY environment variable is not configured');
     }
+    // Trim whitespace/newlines that may be introduced when pasting env vars in Vercel UI
+    const etsyApiKey = etsyApiKeyRaw.trim();
 
     logger.info('Etsy API key check', {
       userId,
       keyLength: etsyApiKey.length,
-      keyPrefix: etsyApiKey.substring(0, 4) + '...'
+      keyRawLength: etsyApiKeyRaw.length,
+      keyPrefix: etsyApiKey.substring(0, 4) + '...',
+      hadWhitespace: etsyApiKey !== etsyApiKeyRaw
     });
 
     // Step 1: Get user_id from /users/me

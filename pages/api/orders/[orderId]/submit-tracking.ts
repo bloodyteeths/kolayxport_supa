@@ -394,7 +394,7 @@ async function submitEtsyTracking(
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${shop.accessToken}`,
-            'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
+            'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`
           }
         });
 
@@ -440,7 +440,7 @@ async function submitEtsyTracking(
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${shop.accessToken}`,
-              'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
+              'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`
             }
           });
 
@@ -605,7 +605,7 @@ async function submitEtsyTracking(
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${etsyCredentials.accessToken}`,
-        'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
+        'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`
       }
     });
 

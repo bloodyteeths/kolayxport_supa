@@ -80,14 +80,14 @@ export default async function handler(
 
     // Validate API credentials - Etsy v3 requires keystring:shared_secret in x-api-key header
     const etsyKeystring = (process.env.ETSY_API_KEY || '').trim();
-    const etsySharedSecret = (process.env.ETSY_CLIENT_SECRET || '').trim();
+    const etsySharedSecret = (process.env.ETSY_API_SECRET || '').trim();
     if (!etsyKeystring) {
       logger.error('ETSY_API_KEY environment variable is not set', undefined, { userId });
       throw new Error('ETSY_API_KEY environment variable is not configured');
     }
     if (!etsySharedSecret) {
-      logger.error('ETSY_CLIENT_SECRET environment variable is not set', undefined, { userId });
-      throw new Error('ETSY_CLIENT_SECRET environment variable is not configured');
+      logger.error('ETSY_API_SECRET environment variable is not set', undefined, { userId });
+      throw new Error('ETSY_API_SECRET environment variable is not configured');
     }
     const etsyApiKey = `${etsyKeystring}:${etsySharedSecret}`;
 

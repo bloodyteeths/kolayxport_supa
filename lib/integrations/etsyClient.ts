@@ -165,7 +165,7 @@ export class EtsyClient {
       headers: {
         ...options.headers,
         'Authorization': `Bearer ${this.accessToken}`,
-        'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
+        'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`
       }
     });
 
@@ -183,7 +183,7 @@ export class EtsyClient {
         headers: {
           ...options.headers,
           'Authorization': `Bearer ${this.accessToken}`,
-          'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_CLIENT_SECRET || '').trim()}`
+          'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`
         }
       });
     }

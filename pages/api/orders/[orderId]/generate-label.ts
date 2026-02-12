@@ -10,21 +10,26 @@ import { withUsageLimiter } from '../../../../lib/middleware/withUsageLimiter';
 // Utility to parse phone number and extension - handles Amazon format like "+1 415-851-9136 ext. 96793"
 // Same logic as UPS but adapted for FedEx (max 6 chars extension vs UPS 4 chars)
 function parsePhoneNumberWithExt(raw: string): { phone: string, ext?: string } {
-  if (!raw) return { phone: '' };
-  
+  const FALLBACK_PHONE = '0000000000';
+
+  if (!raw) {
+    console.warn(`[FEDEX PHONE] Warning: Empty phone number provided, using fallback "${FALLBACK_PHONE}"`);
+    return { phone: FALLBACK_PHONE };
+  }
+
   // Extract extension - matches "ext. 96793", "ext 96793", "x96793", "x 96793", etc.
   const extMatch = raw.match(/(?:ext\.?\s*|x\s*)(\d+)/i);
   let ext = extMatch ? extMatch[1] : undefined;
-  
+
   // Remove extension part from the phone number
   let phoneWithoutExt = raw;
   if (extMatch) {
     phoneWithoutExt = raw.substring(0, extMatch.index).trim();
   }
-  
+
   // Extract only digits from the phone number
   let phone = phoneWithoutExt.replace(/\D/g, '');
-  
+
   // Handle different phone number lengths
   if (phone.length === 11 && phone.startsWith('1')) {
     // Remove country code for US numbers (1-xxx-xxx-xxxx)
@@ -33,18 +38,20 @@ function parsePhoneNumberWithExt(raw: string): { phone: string, ext?: string } {
     // Take the last 15 digits for any other long numbers (FedEx max)
     phone = phone.slice(-15);
   }
-  
+
   // FedEx accepts 10-15 digits for phone numbers
+  // If invalid, use sanitized fallback instead of passing bad data to FedEx
   if (phone.length < 10 || phone.length > 15) {
-    console.warn(`[FEDEX PHONE] Warning: Phone number "${raw}" normalized to "${phone}" with ${phone.length} digits (expected 10-15)`);
+    console.warn(`[FEDEX PHONE] Warning: Phone number "${raw}" normalized to "${phone}" with ${phone.length} digits (expected 10-15). Using fallback "${FALLBACK_PHONE}"`);
+    phone = FALLBACK_PHONE;
   }
-  
+
   // FedEx supports up to 6 character extensions (vs UPS 4 chars)
   if (ext && ext.length > 6) {
     console.warn(`[FEDEX PHONE] Warning: Extension "${ext}" is ${ext.length} characters (FedEx max 6), truncating`);
     ext = ext.substring(0, 6);
   }
-  
+
   return { phone, ext };
 }
 
@@ -140,7 +147,16 @@ async function handler(
     return res.status(400).json({ error: 'Request body must contain a valid line_items array.' });
   }
 
+  // Pre-fetch OrderItems once to avoid duplicate queries in success and error paths
+  let actualOrderItems: { id: string; productName: string | null }[] = [];
+
   try {
+    // Fetch order items early so both success and catch paths can reuse the result
+    actualOrderItems = await prisma.orderItem.findMany({
+      where: { orderId: orderId },
+      select: { id: true, productName: true }
+    });
+
     const orderRecord = await prisma.order.findUnique({
       where: { id: orderId, userId: authUser.id },
       include: {
@@ -234,7 +250,13 @@ async function handler(
     }
      if (!parsedShippingAddress.street1 || !parsedShippingAddress.city || !parsedShippingAddress.postal || !parsedShippingAddress.country) {
          logger.warn('[API generate-label] Shipping address from DB is incomplete.', { parsedShippingAddress });
-         return res.status(400).json({ error: 'Shipping address is incomplete (street, city, postal, country required). Details from DB: street1=' + parsedShippingAddress.street1 + ', city=' + parsedShippingAddress.city + ', postal=' + parsedShippingAddress.postal + ', country=' + parsedShippingAddress.country });
+         const missingFields = [
+           !parsedShippingAddress.street1 && 'street1',
+           !parsedShippingAddress.city && 'city',
+           !parsedShippingAddress.postal && 'postal',
+           !parsedShippingAddress.country && 'country',
+         ].filter(Boolean);
+         return res.status(400).json({ error: `Shipping address is incomplete. Missing fields: ${missingFields.join(', ')}.` });
      }
 
     // --- Determine Effective Values (Overrides > Order DB > Shipper Profile Default > Hardcoded Default) ---
@@ -467,15 +489,19 @@ async function handler(
     // --- Call the unified FedEx service ---
     const fedexResult: FedexShipmentResult = await createFedexShipment(orderDataForFedex, shipperData);
 
+    // --- Validate FedEx response before writing to DB ---
+    if (!fedexResult.trackingNumber || !fedexResult.labelUrl) {
+      logger.error(`[API generate-label] FedEx API returned incomplete response for order ${orderId}`, undefined, {
+        hasTrackingNumber: !!fedexResult.trackingNumber,
+        hasLabelUrl: !!fedexResult.labelUrl,
+        alerts: fedexResult.alerts,
+      });
+      return res.status(502).json({ error: 'FedEx API returned incomplete response' });
+    }
+
     // --- Create LabelJob record for each line item (tracking info, label URL, etc) ---
     // Debug: Log the item IDs we're trying to use
     logger.info(`[API generate-label] Line items from request:`, lineItemsFromRequest.map(item => ({id: item.id, title: item.title})));
-    
-    // Get actual OrderItems for this order to see what IDs exist
-    let actualOrderItems = await prisma.orderItem.findMany({
-      where: { orderId: orderId },
-      select: { id: true, productName: true }
-    });
     logger.info(`[API generate-label] Actual OrderItems in DB:`, actualOrderItems);
 
     // RACE CONDITION FIX: If no OrderItems exist, recreate them from request data
@@ -562,17 +588,12 @@ async function handler(
   } catch (error: any) {
     logger.error(`[API generate-label] Error generating label for order ${orderId}:`, error);
 
-    // Create failed LabelJob records for each actual OrderItem
+    // Create failed LabelJob records for each actual OrderItem (reusing pre-fetched list)
     try {
-      let actualOrderItems = await prisma.orderItem.findMany({
-        where: { orderId: orderId },
-        select: { id: true }
-      });
-      
       // RACE CONDITION FIX: If no OrderItems exist, recreate them from request data
       if (actualOrderItems.length === 0 && lineItemsFromRequest.length > 0) {
         logger.warn(`[API generate-label] No OrderItems found for failed label, recreating from request data`);
-        
+
         const createdItems = await Promise.all(
           lineItemsFromRequest.map(async (item) => {
             return prisma.orderItem.create({
@@ -593,10 +614,10 @@ async function handler(
             });
           })
         );
-        
-        actualOrderItems = createdItems.map(item => ({ id: item.id }));
+
+        actualOrderItems = createdItems.map(item => ({ id: item.id, productName: item.productName }));
       }
-      
+
       if (actualOrderItems.length > 0) {
         await Promise.all(
           actualOrderItems.map(async (orderItem) => {

@@ -41,19 +41,50 @@ export async function fetchVeeqoOrders(options: { apiKey: string; page?: number,
 
     const url = `https://api.veeqo.com/orders?${params.toString()}`;
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'x-api-key': apiKey
-      }
-    });
+    let lastError: Error | null = null;
 
-    if (!response.ok) {
-      throw new Error(`Veeqo API error: ${response.status} ${await response.text()}`);
+    for (let attempt = 0; attempt <= VEEQO_MAX_RETRIES; attempt++) {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'x-api-key': apiKey
+        }
+      });
+
+      // Auth errors: throw immediately without retry
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`Veeqo API auth error: ${response.status} ${await response.text()}`);
+      }
+
+      // Rate limit (429) or server errors (5xx): retry with exponential backoff
+      if (response.status === 429 || response.status >= 500) {
+        lastError = new Error(`Veeqo API error: ${response.status} ${await response.text()}`);
+        if (attempt < VEEQO_MAX_RETRIES) {
+          const delay = Math.min(VEEQO_MIN_DELAY * Math.pow(2, attempt), VEEQO_MAX_DELAY);
+          logger.warn(`Veeqo rate limited or server error (${response.status}), retrying in ${delay}ms (attempt ${attempt + 1}/${VEEQO_MAX_RETRIES})`, {
+            status: response.status,
+            attempt: attempt + 1,
+            delay,
+          });
+          await sleep(delay);
+          continue;
+        }
+        // Exhausted retries
+        throw lastError;
+      }
+
+      // Other client errors (4xx except 429): throw without retry
+      if (!response.ok) {
+        throw new Error(`Veeqo API error: ${response.status} ${await response.text()}`);
+      }
+
+      // Success
+      return await response.json();
     }
-    
-    return await response.json();
+
+    // Should not reach here, but safety net
+    throw lastError || new Error('Veeqo API request failed after retries');
   } catch (error) {
     logger.error('Failed to fetch Veeqo orders', error);
     return [];
@@ -88,20 +119,54 @@ export async function fetchAllVeeqoOrders(options: { apiKey: string, lastSync?: 
       }
 
       const url = `https://api.veeqo.com/orders?${params.toString()}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'x-api-key': apiKey
+
+      let fetchResponse: any = null;
+      let lastFetchError: Error | null = null;
+
+      for (let attempt = 0; attempt <= VEEQO_MAX_RETRIES; attempt++) {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'x-api-key': apiKey
+          }
+        });
+
+        // Auth errors: throw immediately without retry
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(`Veeqo API auth error: ${response.status} ${await response.text()}`);
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Veeqo API error: ${response.status} ${await response.text()}`);
+
+        // Rate limit (429) or server errors (5xx): retry with exponential backoff
+        if (response.status === 429 || response.status >= 500) {
+          lastFetchError = new Error(`Veeqo API error: ${response.status} ${await response.text()}`);
+          if (attempt < VEEQO_MAX_RETRIES) {
+            const delay = Math.min(VEEQO_MIN_DELAY * Math.pow(2, attempt), VEEQO_MAX_DELAY);
+            logger.warn(`Veeqo rate limited or server error (${response.status}), retrying in ${delay}ms (attempt ${attempt + 1}/${VEEQO_MAX_RETRIES})`, {
+              status: response.status,
+              attempt: attempt + 1,
+              delay,
+            });
+            await sleep(delay);
+            continue;
+          }
+          throw lastFetchError;
+        }
+
+        // Other client errors (4xx except 429): throw without retry
+        if (!response.ok) {
+          throw new Error(`Veeqo API error: ${response.status} ${await response.text()}`);
+        }
+
+        fetchResponse = response;
+        break;
       }
-      
-      const orders: VeeqoOrder[] = await response.json();
+
+      if (!fetchResponse) {
+        throw lastFetchError || new Error('Veeqo API request failed after retries');
+      }
+
+      const orders: VeeqoOrder[] = await fetchResponse.json();
       
       if (orders.length > 0) {
         allOrders = allOrders.concat(orders);

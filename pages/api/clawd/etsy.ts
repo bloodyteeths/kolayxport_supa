@@ -472,16 +472,33 @@ export default async function handler(
                 });
             }
 
-            // Fetch personalization data via new dedicated GET endpoint (no shop_id in path)
+            // Fetch personalization and images in parallel
             let personalization_questions: any[] = [];
-            try {
-                const personalizationData = await callEtsyAPI(
+            let images: any[] = [];
+
+            const [personalizationResult, imagesResult] = await Promise.allSettled([
+                callEtsyAPI(
                     `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                     accessToken
-                );
-                personalization_questions = personalizationData.personalization_questions || [];
-            } catch {
-                // Listing may not have personalization configured
+                ),
+                callEtsyAPI(
+                    `/listings/${listing_id}/images`,
+                    accessToken
+                ),
+            ]);
+
+            if (personalizationResult.status === 'fulfilled') {
+                personalization_questions = personalizationResult.value.personalization_questions || [];
+            }
+            if (imagesResult.status === 'fulfilled') {
+                images = (imagesResult.value.results || []).map((img: any) => ({
+                    listing_image_id: img.listing_image_id,
+                    url_75x75: img.url_75x75,
+                    url_170x135: img.url_170x135,
+                    url_570xN: img.url_570xN,
+                    url_fullxfull: img.url_fullxfull,
+                    rank: img.rank,
+                }));
             }
 
             return res.status(200).json({
@@ -513,6 +530,7 @@ export default async function handler(
                 updated_timestamp: listing.updated_timestamp,
                 is_personalizable: personalization_questions.length > 0,
                 personalization_questions,
+                images,
             });
         }
 

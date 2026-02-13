@@ -1421,22 +1421,34 @@ export default async function handler(
 
             // Create multipart form data for video upload
             const boundary = '----EtsyVideoUpload' + Date.now();
+            const videoName = name || `Video for listing ${listing_id}`;
 
-            // Build multipart body
+            // Build multipart body with name field and video file
             const textEncoder = new TextEncoder();
-            let headerPart = `--${boundary}\r\n`;
-            headerPart += `Content-Disposition: form-data; name="video"; filename="${filename}"\r\n`;
-            headerPart += `Content-Type: ${contentType}\r\n\r\n`;
-            const headerBytes = textEncoder.encode(headerPart);
+
+            // Part 1: name field (required by Etsy)
+            let namePart = `--${boundary}\r\n`;
+            namePart += `Content-Disposition: form-data; name="name"\r\n\r\n`;
+            namePart += `${videoName}\r\n`;
+            const nameBytes = textEncoder.encode(namePart);
+
+            // Part 2: video file
+            let videoPart = `--${boundary}\r\n`;
+            videoPart += `Content-Disposition: form-data; name="video"; filename="${filename}"\r\n`;
+            videoPart += `Content-Type: ${contentType}\r\n\r\n`;
+            const videoHeaderBytes = textEncoder.encode(videoPart);
 
             const footerPart = `\r\n--${boundary}--\r\n`;
             const footerBytes = textEncoder.encode(footerPart);
 
             // Combine all parts
-            const bodyParts = new Uint8Array(headerBytes.length + videoBuffer.byteLength + footerBytes.length);
-            bodyParts.set(headerBytes, 0);
-            bodyParts.set(new Uint8Array(videoBuffer), headerBytes.length);
-            bodyParts.set(footerBytes, headerBytes.length + videoBuffer.byteLength);
+            const totalLength = nameBytes.length + videoHeaderBytes.length + videoBuffer.byteLength + footerBytes.length;
+            const bodyParts = new Uint8Array(totalLength);
+            let offset = 0;
+            bodyParts.set(nameBytes, offset); offset += nameBytes.length;
+            bodyParts.set(videoHeaderBytes, offset); offset += videoHeaderBytes.length;
+            bodyParts.set(new Uint8Array(videoBuffer), offset); offset += videoBuffer.byteLength;
+            bodyParts.set(footerBytes, offset);
 
             // Upload to Etsy
             const uploadUrl = `${ETSY_API_BASE}/shops/${shopId}/listings/${listing_id}/videos`;

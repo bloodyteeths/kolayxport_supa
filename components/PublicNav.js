@@ -131,8 +131,8 @@ const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
                   </Link>
                 </motion.div>
               ))}
-              <motion.div variants={linkVariants} className="mt-8 space-y-4 flex flex-col items-center">
-                <Link href="/login" className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7 text-slate-900 hover:bg-slate-50 w-full text-left">
+              <motion.div variants={linkVariants} className="mt-8">
+                <Link href="/login" className="btn-primary text-center">
                   {ctaLabel}
                 </Link>
               </motion.div>

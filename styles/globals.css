@@ -11,7 +11,44 @@ html {
   font-family: var(--font-sans);
 }
 
-/* Custom Button Styles (Updated) - Temporarily removed for troubleshooting */ 
+/* Brand color */
+.text-primary {
+  color: #2563eb;
+}
+
+/* Button styles */
+.btn-primary {
+  display: inline-block;
+  padding: 0.75rem 1.75rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff;
+  background: linear-gradient(to right, #2563eb, #4f46e5);
+  border-radius: 9999px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 9999px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.btn-secondary:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
 
 @keyframes fadeIn {
   from {

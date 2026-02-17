@@ -117,7 +117,7 @@ const StarRating = ({ rating }) => (
 const HeroSection = () => (
   <motion.section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-sky-50 to-indigo-50">
     <div aria-hidden className="absolute inset-0 -z-10 bg-[url('/noise.png')] opacity-10" />
-    <div className="mx-auto max-w-7xl px-6 py-32 text-center">
+    <div className="mx-auto max-w-7xl px-6 pt-28 pb-20 sm:pt-36 sm:pb-24 text-center">
       <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900">
         Bütün Marketplacelere <span className="text-primary">Tek Panelden</span> Hükmedin.
       </h1>
@@ -125,7 +125,7 @@ const HeroSection = () => (
         Sipariş yönetimi, kargo, envanter senkronizasyonu—%100 Türkçe, hepsi tek tıkla.
       </p>
 
-      <div className="mt-10 flex items-center justify-center gap-x-6">
+      <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-x-6">
         <Link href="/login" className="btn-primary">
           Ücretsiz Dene
         </Link>
@@ -249,7 +249,8 @@ export default function HomePage() {
             </p>
           </div>
           <div className="shadow-xl shadow-slate-900/[.05] rounded-xl overflow-hidden ring-1 ring-slate-200">
-            <table className="min-w-full divide-y divide-slate-200">
+            <div className="overflow-x-auto -mx-px">
+            <table className="min-w-[600px] w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
                   {comparisonData.headers.map((header) => (
@@ -279,6 +280,7 @@ export default function HomePage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </motion.section>
@@ -295,29 +297,27 @@ export default function HomePage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Müşterilerimiz Ne Diyor?</h2>
           </div>
-          <div className="flex -mx-4 overflow-x-auto pb-8 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
-            <div className="flex flex-none px-2">
-              {testimonials.map((testimonial, i) => (
-                <motion.div 
-                  key={i} 
-                  className="flex-none w-[300px] sm:w-[360px] snap-center bg-white p-8 rounded-2xl shadow-lg mr-6 last:mr-0"
-                  variants={sectionVariants}
-                >
-                  <div className="flex items-center mb-4">
-                    <Image src={testimonial.image} alt={`${testimonial.name} - ${testimonial.company} müşteri görüşü`} width={56} height={56} className="w-14 h-14 rounded-full mr-4 object-cover" loading="lazy" />
-                    <div>
-                      <h4 className="font-semibold text-slate-800">{testimonial.name}</h4>
-                      <p className="text-sm text-slate-500">{testimonial.company}</p>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {testimonials.map((testimonial, i) => (
+              <motion.div
+                key={i}
+                className="bg-white p-8 rounded-2xl shadow-lg"
+                variants={sectionVariants}
+              >
+                <div className="flex items-center mb-4">
+                  <Image src={testimonial.image} alt={`${testimonial.name} - ${testimonial.company} müşteri görüşü`} width={56} height={56} className="w-14 h-14 rounded-full mr-4 object-cover" loading="lazy" />
+                  <div>
+                    <h4 className="font-semibold text-slate-800">{testimonial.name}</h4>
+                    <p className="text-sm text-slate-500">{testimonial.company}</p>
                   </div>
-                  <StarRating rating={testimonial.stars} />
-                  <blockquote className="mt-4 text-slate-600 italic relative">
-                    <span className="absolute -left-4 -top-2 text-5xl text-slate-200 font-serif">“</span>
-                    {testimonial.quote}
-                  </blockquote>
-                </motion.div>
-              ))}
-            </div>
+                </div>
+                <StarRating rating={testimonial.stars} />
+                <blockquote className="mt-4 text-slate-600 italic relative pl-5">
+                  <span className="absolute left-0 -top-2 text-5xl text-slate-200 font-serif">"</span>
+                  {testimonial.quote}
+                </blockquote>
+              </motion.div>
+            ))}
           </div>
         </div>
       </motion.section>
@@ -338,11 +338,11 @@ export default function HomePage() {
             KolayXport\'un gücünü keşfedin ve e-ticaret operasyonlarınızı bir üst seviyeye taşıyın. <Link href="/fiyatlandirma" className="text-blue-100 hover:text-white underline">Fiyatlandırma planlarını</Link> inceleyin.
           </p>
           <div className="mt-8">
-            <Link href="/login" className="px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+            <Link href="/login" className="inline-block px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
               Hemen Kayıt Ol
             </Link>
-            <p className="mt-6 text-sm text-slate-500">
-              Sorularınız mı var? <Link href="/iletisim" className="text-blue-600 hover:underline">Bize Ulaşın</Link>.
+            <p className="mt-6 text-sm text-blue-200">
+              Sorularınız mı var? <Link href="/iletisim" className="text-white underline hover:text-blue-100">Bize Ulaşın</Link>.
             </p>
           </div>
         </div>
@@ -410,10 +410,10 @@ export default function HomePage() {
             Sadece birkaç adımda e-ticaretinizi yeni bir seviyeye taşıyın. Kaydolun ve potansiyeli keşfedin. Daha fazla bilgi için <Link href="/nasil-kullanirim" className="text-blue-600 hover:underline">kullanım rehberimizi</Link> inceleyin.
           </p>
           <div className="mt-8">
-            <Link href="/login" className="px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+            <Link href="/login" className="inline-block px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
               Hemen Kayıt Ol
             </Link>
-            <p className="mt-6 text-sm text-slate-500">
+            <p className="mt-6 text-sm text-slate-400">
               Sorularınız mı var? <Link href="/iletisim" className="text-blue-600 hover:underline">Bize Ulaşın</Link>.
             </p>
           </div>

@@ -1574,6 +1574,54 @@ export default async function handler(
             });
         }
 
+        // GET /api/clawd/etsy?action=get_listing_inventory&listing_id=XXXXX - Get listing inventory
+        if (req.method === 'GET' && action === 'get_listing_inventory' && listing_id) {
+            logger.info('Fetching inventory for listing', { listing_id });
+
+            const data = await callEtsyAPI(
+                `/listings/${listing_id}/inventory`,
+                accessToken
+            );
+
+            return res.status(200).json({
+                listing_id: parseInt(listing_id),
+                products: data.products || [],
+                listing_offering_id: data.listing_offering_id,
+            });
+        }
+
+        // PUT /api/clawd/etsy?action=update_listing_inventory&listing_id=XXXXX - Update listing inventory
+        if (req.method === 'PUT' && action === 'update_listing_inventory' && listing_id) {
+            const { products } = req.body;
+
+            if (!products || !Array.isArray(products)) {
+                return res.status(400).json({
+                    error: 'products array is required',
+                });
+            }
+
+            logger.info('Updating inventory for listing', {
+                listing_id,
+                product_count: products.length,
+            });
+
+            const result = await callEtsyAPI(
+                `/listings/${listing_id}/inventory`,
+                accessToken,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({ products }),
+                }
+            );
+
+            return res.status(200).json({
+                success: true,
+                listing_id: parseInt(listing_id),
+                products: result.products || [],
+                message: 'Listing inventory updated',
+            });
+        }
+
         // Invalid request
         return res.status(400).json({ error: 'Invalid request parameters' });
 

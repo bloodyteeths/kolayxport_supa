@@ -11,7 +11,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import { toast, Toaster, Toast } from 'react-hot-toast';
 import { useOrders } from '@/lib/hooks/useOrders';
 import { useMarketplaceOptions } from '@/lib/hooks/useMarketplaceOptions';
-import Layout from '@/components/Layout';
+// Layout import removed - using AppLayout only
 import AppLayout from '@/components/AppLayout';
 import CircleIcon from '@mui/icons-material/Circle';
 import UPSLabelDrawer from '@/components/UPSLabelDrawer';

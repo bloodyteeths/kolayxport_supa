@@ -24,7 +24,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import Layout from '../components/Layout';
+import Layout from '../components/AppLayout';
 import { useRouter } from 'next/router';
 
 interface Invoice {

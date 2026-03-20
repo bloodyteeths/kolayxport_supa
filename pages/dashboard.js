@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/router';
-import Layout from '@/components/Layout';
+import Layout from '@/components/AppLayout';
 import Head from 'next/head';
 
 // This could be a more sophisticated Layout component for authenticated users

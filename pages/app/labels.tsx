@@ -2456,9 +2456,128 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         </Box>
       </Box>
 
-      <Box sx={{ flexGrow: 1, width: '100%', overflow: 'auto', minHeight: 0 }}>
-        <div 
-          onSubmit={(e) => e.preventDefault()} 
+      {/* Mobile Card Layout */}
+      <Box sx={{ display: { xs: 'block', md: 'none' }, flexGrow: 1, overflow: 'auto', minHeight: 0 }}>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress size={32} />
+          </Box>
+        ) : filteredAndPaginatedItems.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+            <Typography variant="body2">Sipariş bulunamadı</Typography>
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {filteredAndPaginatedItems.map((row) => {
+              const hasLabel = row.labelCreated || row.labelJobStatus === 'completed';
+              const isPending = row.labelJobStatus === 'pending' || row.labelJobStatus === 'processing';
+              const hasFailed = row.labelJobStatus === 'failed';
+              return (
+                <Paper
+                  key={row.itemId || row.orderId}
+                  onClick={() => openDrawer(row)}
+                  sx={{
+                    p: 1.5,
+                    cursor: 'pointer',
+                    '&:active': { bgcolor: 'action.selected' },
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                    {row.itemImageUrl ? (
+                      <Box
+                        component="img"
+                        src={row.itemImageUrl}
+                        sx={{ width: 48, height: 48, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }}
+                      />
+                    ) : (
+                      <Box sx={{ width: 48, height: 48, borderRadius: 1, bgcolor: 'grey.100', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Typography variant="caption" color="text.disabled">-</Typography>
+                      </Box>
+                    )}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 0.5 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap>
+                          {row.recipientFirstName} {row.recipientLastName}
+                        </Typography>
+                        <Typography variant="caption" sx={{ bgcolor: 'grey.100', px: 0.75, py: 0.25, borderRadius: 1, flexShrink: 0, fontSize: '0.65rem' }}>
+                          {row.marketplace || '-'}
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                        #{row.orderNumber} · {row.title || row.sku || '-'}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                        {row.orderDate && (
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                            {new Date(row.orderDate).toLocaleDateString('tr-TR')}
+                          </Typography>
+                        )}
+                        {row.orderTotalPrice > 0 && (
+                          <Typography variant="caption" fontWeight={600} sx={{ fontSize: '0.65rem' }}>
+                            {row.currency === 'TRY' ? '₺' : row.currency === 'EUR' ? '€' : row.currency === 'GBP' ? '£' : '$'}{row.orderTotalPrice.toFixed(2)}
+                          </Typography>
+                        )}
+                        {hasLabel && (
+                          <Typography variant="caption" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', px: 0.75, py: 0.15, borderRadius: 1, fontSize: '0.6rem' }}>
+                            Etiket Alındı
+                          </Typography>
+                        )}
+                        {isPending && (
+                          <Typography variant="caption" sx={{ bgcolor: '#fff3e0', color: '#e65100', px: 0.75, py: 0.15, borderRadius: 1, fontSize: '0.6rem' }}>
+                            İşleniyor
+                          </Typography>
+                        )}
+                        {hasFailed && (
+                          <Typography variant="caption" sx={{ bgcolor: '#ffebee', color: '#c62828', px: 0.75, py: 0.15, borderRadius: 1, fontSize: '0.6rem' }}>
+                            Hata
+                          </Typography>
+                        )}
+                        {!hasLabel && !isPending && !hasFailed && (
+                          <Typography variant="caption" sx={{ bgcolor: 'grey.100', color: 'text.secondary', px: 0.75, py: 0.15, borderRadius: 1, fontSize: '0.6rem' }}>
+                            Etiketsiz
+                          </Typography>
+                        )}
+                        {row.trackingNumber && (
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
+                            {row.lastCarrier}: {row.trackingNumber}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  </Box>
+                </Paper>
+              );
+            })}
+            {/* Mobile pagination */}
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, py: 1 }}>
+              <Button
+                size="small"
+                disabled={paginationModel.page === 0}
+                onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page - 1 }))}
+              >
+                Önceki
+              </Button>
+              <Typography variant="caption">
+                {paginationModel.page + 1} / {Math.ceil(total / paginationModel.pageSize) || 1}
+              </Typography>
+              <Button
+                size="small"
+                disabled={(paginationModel.page + 1) * paginationModel.pageSize >= total}
+                onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page + 1 }))}
+              >
+                Sonraki
+              </Button>
+            </Box>
+          </Box>
+        )}
+      </Box>
+
+      {/* Desktop DataGrid */}
+      <Box sx={{ flexGrow: 1, width: '100%', overflow: 'auto', minHeight: 0, display: { xs: 'none', md: 'block' } }}>
+        <div
+          onSubmit={(e) => e.preventDefault()}
           onClick={(e) => {
             // Only stop propagation for specific pagination elements
             const target = e.target as HTMLElement;

@@ -2480,6 +2480,54 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                           </Typography>
                         )}
                       </Box>
+                      {/* Action buttons */}
+                      <Box sx={{ display: 'flex', gap: 0.5, mt: 0.75 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDrawer(row);
+                          }}
+                          sx={{ fontSize: '0.65rem', py: 0.25, px: 1, minWidth: 0, textTransform: 'none' }}
+                        >
+                          FedEx
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const originalOrder = row.originalOrder as LocalUIOrder | undefined;
+                            const uiOrder: UIOrder = {
+                              orderId: row.orderId,
+                              orderNumber: row.orderNumber,
+                              recipientFirstName: row.recipientFirstName,
+                              recipientLastName: row.recipientLastName,
+                              recipientStreet1: row.recipientStreet1,
+                              recipientStreet2: row.recipientStreet2,
+                              recipientCity: row.recipientCity,
+                              recipientState: row.recipientState,
+                              recipientPostal: row.recipientPostal,
+                              recipientCountry: row.recipientCountry,
+                              recipientPhone: row.recipientPhone,
+                              recipientEmail: row.recipientEmail,
+                              orderTotalPrice: row.orderTotalPrice,
+                              currency: row.currency,
+                              title: row.title,
+                              weight: row.weight,
+                              hsCode: row.hsCode,
+                              countryOfOrigin: row.countryOfOrigin,
+                              shipments: originalOrder?.shipments || [],
+                            };
+                            setSelectedOrderForUPS(uiOrder);
+                            setUpsDrawerOpen(true);
+                          }}
+                          sx={{ fontSize: '0.65rem', py: 0.25, px: 1, minWidth: 0, textTransform: 'none' }}
+                        >
+                          UPS
+                        </Button>
+                      </Box>
                     </Box>
                   </Box>
                 </Paper>

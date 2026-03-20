@@ -126,7 +126,8 @@ const MARKETPLACE_COLORS_FIXED: Record<string, string> = {
   outletemporiumus: '#84CC16',
   manual: '#9CA3AF',
 };
-const getMarketplaceColor = (name: string, index: number): string => {
+const getMarketplaceColor = (name: string | null | undefined, index: number): string => {
+  if (!name) return MARKETPLACE_PALETTE[index % MARKETPLACE_PALETTE.length];
   return MARKETPLACE_COLORS_FIXED[name.toLowerCase()] || MARKETPLACE_PALETTE[index % MARKETPLACE_PALETTE.length];
 };
 const MARKETPLACE_COLORS: Record<string, string> = MARKETPLACE_COLORS_FIXED;
@@ -170,20 +171,21 @@ const EmptyState = ({ message = 'Veri yok' }: { message?: string }) => (
   <div className="flex items-center justify-center py-8 text-gray-400 text-sm">{message}</div>
 );
 
-const MarketplaceBadge = ({ name }: { name: string }) => {
-  const key = name.toLowerCase();
+const MarketplaceBadge = ({ name }: { name: string | null | undefined }) => {
+  const safeName = name || 'Unknown';
+  const key = safeName.toLowerCase();
   const cls = MARKETPLACE_BG[key] || 'bg-gray-100 text-gray-800';
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{name}</span>;
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{safeName}</span>;
 };
 
-const StatusBadge = ({ status }: { status: string }) => {
-  const s = status.toLowerCase();
+const StatusBadge = ({ status }: { status: string | null | undefined }) => {
+  const s = (status || '').toLowerCase();
   let cls = 'bg-gray-100 text-gray-800';
   if (s.includes('deliver') || s.includes('teslim')) cls = 'bg-green-100 text-green-800';
   else if (s.includes('ship') || s.includes('kargo')) cls = 'bg-blue-100 text-blue-800';
   else if (s.includes('pending') || s.includes('bekle')) cls = 'bg-yellow-100 text-yellow-800';
   else if (s.includes('cancel') || s.includes('iptal')) cls = 'bg-red-100 text-red-800';
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{status}</span>;
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{status || '-'}</span>;
 };
 
 // ---------------------------------------------------------------------------
@@ -402,7 +404,7 @@ export default function AnalyticsPage() {
 
   // Marketplace donut — prefer marketplaceBreakdown, fallback to topMarketplaces
   const mpData = data?.marketplaceBreakdown ?? data?.topMarketplaces?.map((m) => ({
-    marketplace: m.name,
+    marketplace: m.name || 'Unknown',
     orders: m.orders,
     revenue: m.revenue,
     customers: 0,
@@ -410,12 +412,12 @@ export default function AnalyticsPage() {
     percentage: 0,
   })) ?? [];
 
-  const donutColors = mpData.map((m, i) => getMarketplaceColor(m.marketplace, i));
+  const donutColors = mpData.map((m, i) => getMarketplaceColor(m.marketplace || 'Unknown', i));
 
   const donutOptions: ApexCharts.ApexOptions = {
     chart: { type: 'donut' },
     colors: donutColors,
-    labels: mpData.map((m) => m.marketplace),
+    labels: mpData.map((m) => m.marketplace || 'Unknown'),
     legend: { position: 'bottom' },
     plotOptions: { pie: { donut: { size: '70%' } } },
     tooltip: { y: { formatter: (v: number) => `${formatNumber(v)} siparis` } },

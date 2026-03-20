@@ -283,20 +283,27 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('month');
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [selectedMonth, setSelectedMonth] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Initialize selectedMonth on client only to avoid hydration mismatch
+  useEffect(() => {
+    if (!selectedMonth) {
+      const now = new Date();
+      setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+    }
+  }, []);
 
   // Navigate months
   const navigateMonth = (direction: -1 | 1) => {
+    if (!selectedMonth) return;
     const [y, m] = selectedMonth.split('-').map(Number);
     const d = new Date(y, m - 1 + direction, 1);
     setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   };
 
   const selectedMonthLabel = useMemo(() => {
+    if (!selectedMonth) return '';
     const [y, m] = selectedMonth.split('-').map(Number);
     return `${TR_MONTHS_FULL[m - 1]} ${y}`;
   }, [selectedMonth]);
@@ -304,7 +311,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace('/app');
-    } else if (user) {
+    } else if (user && (dateRange !== 'month' || selectedMonth)) {
       fetchAnalyticsData();
     }
   }, [authLoading, user, router, dateRange, selectedMonth]);

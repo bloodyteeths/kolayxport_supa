@@ -5,17 +5,15 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Verify this is called by Vercel Cron or internal job
+  // Allow Vercel Cron (GET with x-vercel-cron header) and secured calls (POST with Bearer token)
+  const isVercelCron = req.headers["x-vercel-cron"] !== undefined;
   const authHeader = req.headers.authorization;
-  if (!process.env.CRON_SECRET) {
-    return res.status(500).json({ error: 'CRON_SECRET not configured' });
-  }
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  if (req.method !== 'POST') {
+  const methodAllowed = req.method === 'GET' || req.method === 'POST';
+  if (!methodAllowed) {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+  if (!isVercelCron && process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {

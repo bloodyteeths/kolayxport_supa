@@ -3,7 +3,16 @@
   "buildCommand": "prisma db push --accept-data-loss && prisma generate && next build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "crons": [],
+  "crons": [
+    {
+      "path": "/api/cron/sync-orders",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/reset-usage",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "build": {
     "env": {
       "NODE_ENV": "production"

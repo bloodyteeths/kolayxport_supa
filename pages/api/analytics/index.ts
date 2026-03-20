@@ -81,7 +81,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     let startDate = new Date();
     let endDate = now;
 
-    if (dateRange === 'month' && monthParam) {
+    const dayParam = req.query.day as string | undefined; // e.g. "2026-03-20"
+
+    if (dateRange === 'day' && dayParam) {
+      // Specific day: "2026-03-20" → start=2026-03-20 00:00:00, end=2026-03-20 23:59:59
+      const d = new Date(dayParam + 'T00:00:00');
+      startDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+      endDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+    } else if (dateRange === 'month' && monthParam) {
       // Specific month: "2026-03" → start=2026-03-01, end=2026-03-31 23:59:59
       const [year, month] = monthParam.split('-').map(Number);
       startDate = new Date(year, month - 1, 1);
@@ -373,7 +380,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Calculate trends (compare with previous period)
     let previousPeriodStart: Date;
     let previousPeriodEnd: Date;
-    if (dateRange === 'month' && monthParam) {
+    if (dateRange === 'day' && dayParam) {
+      // Previous day (yesterday relative to selected day)
+      const d = new Date(dayParam + 'T00:00:00');
+      previousPeriodStart = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 0, 0, 0, 0);
+      previousPeriodEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 23, 59, 59, 999);
+    } else if (dateRange === 'month' && monthParam) {
       // Previous month
       const [year, month] = monthParam.split('-').map(Number);
       previousPeriodStart = new Date(year, month - 2, 1);
@@ -593,6 +605,61 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }))
     };
 
+    // Hourly breakdown for day mode — query both selected day and previous day
+    let hourlyBreakdown: { hour: number; orders: number; revenue: number; prevOrders: number; prevRevenue: number }[] | undefined;
+    if (dateRange === 'day' && dayParam) {
+      const [hourlyCurrentRaw, hourlyPrevRaw] = await Promise.all([
+        prisma.$queryRaw<Array<{ hour: number; orders: bigint; revenue: number; currency: string | null }>>`
+          SELECT EXTRACT(HOUR FROM COALESCE("uiOrderDate", "createdAt"))::int as hour,
+                 COUNT(*) as orders,
+                 SUM("totalPrice") as revenue,
+                 "currency"
+          FROM "Order"
+          WHERE "userId" = ${dbUser.id}
+            AND COALESCE("uiOrderDate", "createdAt") >= ${startDate}
+            AND COALESCE("uiOrderDate", "createdAt") <= ${endDate}
+          GROUP BY EXTRACT(HOUR FROM COALESCE("uiOrderDate", "createdAt"))::int, "currency"
+          ORDER BY hour ASC
+        `,
+        prisma.$queryRaw<Array<{ hour: number; orders: bigint; revenue: number; currency: string | null }>>`
+          SELECT EXTRACT(HOUR FROM COALESCE("uiOrderDate", "createdAt"))::int as hour,
+                 COUNT(*) as orders,
+                 SUM("totalPrice") as revenue,
+                 "currency"
+          FROM "Order"
+          WHERE "userId" = ${dbUser.id}
+            AND COALESCE("uiOrderDate", "createdAt") >= ${previousPeriodStart}
+            AND COALESCE("uiOrderDate", "createdAt") <= ${previousPeriodEnd}
+          GROUP BY EXTRACT(HOUR FROM COALESCE("uiOrderDate", "createdAt"))::int, "currency"
+          ORDER BY hour ASC
+        `,
+      ]);
+
+      // Aggregate by hour with currency conversion
+      const currentByHour = new Map<number, { orders: number; revenue: number }>();
+      for (const row of hourlyCurrentRaw) {
+        const existing = currentByHour.get(row.hour) || { orders: 0, revenue: 0 };
+        existing.orders += Number(row.orders);
+        existing.revenue += convertToTRY(Number(row.revenue) || 0, row.currency);
+        currentByHour.set(row.hour, existing);
+      }
+      const prevByHour = new Map<number, { orders: number; revenue: number }>();
+      for (const row of hourlyPrevRaw) {
+        const existing = prevByHour.get(row.hour) || { orders: 0, revenue: 0 };
+        existing.orders += Number(row.orders);
+        existing.revenue += convertToTRY(Number(row.revenue) || 0, row.currency);
+        prevByHour.set(row.hour, existing);
+      }
+
+      hourlyBreakdown = Array.from({ length: 24 }, (_, h) => ({
+        hour: h,
+        orders: currentByHour.get(h)?.orders || 0,
+        revenue: Math.round((currentByHour.get(h)?.revenue || 0) * 100) / 100,
+        prevOrders: prevByHour.get(h)?.orders || 0,
+        prevRevenue: Math.round((prevByHour.get(h)?.revenue || 0) * 100) / 100,
+      }));
+    }
+
     const analytics = {
       totalOrders,
       totalRevenue: currentRevenue,
@@ -616,7 +683,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       monthlyStats,
       marketplaceBreakdown: formattedMarketplaceBreakdown,
       shippingStats,
-      recentActivity: recentActivity.map(o => ({ ...o, marketplace: normalizeMarketplace(o.marketplace) }))
+      recentActivity: recentActivity.map(o => ({ ...o, marketplace: normalizeMarketplace(o.marketplace) })),
+      ...(hourlyBreakdown ? { hourlyBreakdown } : {}),
     };
 
     res.status(200).json(analytics);

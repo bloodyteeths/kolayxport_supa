@@ -101,6 +101,13 @@ interface AnalyticsData {
   marketplaceBreakdown?: MarketplaceBreakdownItem[];
   shippingStats?: ShippingStats;
   recentActivity?: RecentActivityItem[];
+  hourlyBreakdown?: {
+    hour: number;
+    orders: number;
+    revenue: number;
+    prevOrders: number;
+    prevRevenue: number;
+  }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -284,15 +291,19 @@ export default function AnalyticsPage() {
   const router = useRouter();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState('month');
+  const [dateRange, setDateRange] = useState('day');
   const [selectedMonth, setSelectedMonth] = useState('');
+  const [selectedDay, setSelectedDay] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  // Initialize selectedMonth on client only to avoid hydration mismatch
+  // Initialize selectedMonth and selectedDay on client only to avoid hydration mismatch
   useEffect(() => {
+    const now = new Date();
     if (!selectedMonth) {
-      const now = new Date();
       setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+    }
+    if (!selectedDay) {
+      setSelectedDay(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
     }
   }, []);
 
@@ -304,19 +315,36 @@ export default function AnalyticsPage() {
     setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   };
 
+  // Navigate days
+  const navigateDay = (direction: -1 | 1) => {
+    if (!selectedDay) return;
+    const d = new Date(selectedDay + 'T00:00:00');
+    d.setDate(d.getDate() + direction);
+    setSelectedDay(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
+
   const selectedMonthLabel = useMemo(() => {
     if (!selectedMonth) return '';
     const [y, m] = selectedMonth.split('-').map(Number);
     return `${TR_MONTHS_FULL[m - 1]} ${y}`;
   }, [selectedMonth]);
 
+  const selectedDayLabel = useMemo(() => {
+    if (!selectedDay) return '';
+    const d = new Date(selectedDay + 'T00:00:00');
+    const dayNames = ['Pazar', 'Pazartesi', 'Sali', 'Carsamba', 'Persembe', 'Cuma', 'Cumartesi'];
+    return `${d.getDate()} ${TR_MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}, ${dayNames[d.getDay()]}`;
+  }, [selectedDay]);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace('/app');
-    } else if (user && (dateRange !== 'month' || selectedMonth)) {
-      fetchAnalyticsData();
+    } else if (user) {
+      if (dateRange === 'day' && selectedDay) fetchAnalyticsData();
+      else if (dateRange === 'month' && selectedMonth) fetchAnalyticsData();
+      else if (dateRange !== 'day' && dateRange !== 'month') fetchAnalyticsData();
     }
-  }, [authLoading, user, router, dateRange, selectedMonth]);
+  }, [authLoading, user, router, dateRange, selectedMonth, selectedDay]);
 
   const fetchAnalyticsData = async () => {
     setLoading(true);
@@ -328,6 +356,7 @@ export default function AnalyticsPage() {
 
       const params = new URLSearchParams({ dateRange });
       if (dateRange === 'month') params.set('month', selectedMonth);
+      if (dateRange === 'day') params.set('day', selectedDay);
 
       const response = await fetch(`/api/analytics?${params.toString()}`, {
         headers: {
@@ -457,6 +486,47 @@ export default function AnalyticsPage() {
     { name: 'Gelir', type: 'line', data: monthlyStats.map((m) => Math.round(m.revenue)) },
   ];
 
+  // Hourly chart for day mode
+  const hourlyData = data?.hourlyBreakdown ?? [];
+  const hourlyLabels = hourlyData.map((h) => `${String(h.hour).padStart(2, '0')}:00`);
+
+  const hourlyChartOptions: ApexCharts.ApexOptions = {
+    chart: { type: 'bar', height: 300, toolbar: { show: false } },
+    colors: ['#3B82F6', '#94A3B8'],
+    plotOptions: { bar: { borderRadius: 3, columnWidth: '60%' } },
+    dataLabels: { enabled: false },
+    xaxis: { categories: hourlyLabels, labels: { style: { fontSize: '10px' } } },
+    yaxis: { title: { text: 'Siparis' }, labels: { formatter: (v: number) => Math.round(v).toString() } },
+    legend: { position: 'top' },
+    tooltip: {
+      y: { formatter: (v: number) => `${v} siparis` },
+    },
+  };
+
+  const hourlyChartSeries = [
+    { name: 'Secilen Gun', data: hourlyData.map((h) => h.orders) },
+    { name: 'Onceki Gun', data: hourlyData.map((h) => h.prevOrders) },
+  ];
+
+  const hourlyRevenueChartOptions: ApexCharts.ApexOptions = {
+    chart: { type: 'area', height: 300, toolbar: { show: false } },
+    colors: ['#10B981', '#94A3B8'],
+    dataLabels: { enabled: false },
+    stroke: { curve: 'smooth', width: 2 },
+    fill: { type: 'gradient', opacity: [0.4, 0.1], gradient: { shadeIntensity: 1, stops: [0, 100] } },
+    xaxis: { categories: hourlyLabels, labels: { style: { fontSize: '10px' } } },
+    yaxis: { title: { text: 'Gelir (TL)' }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
+    legend: { position: 'top' },
+    tooltip: {
+      y: { formatter: (v: number) => formatCurrency(v) },
+    },
+  };
+
+  const hourlyRevenueChartSeries = [
+    { name: 'Secilen Gun', data: hourlyData.map((h) => h.revenue) },
+    { name: 'Onceki Gun', data: hourlyData.map((h) => h.prevRevenue) },
+  ];
+
   // Order status helpers
   const totalStatusCount = data?.orderStatusBreakdown.reduce((a, b) => a + b.count, 0) || 1;
 
@@ -478,8 +548,12 @@ export default function AnalyticsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Analitik Dashboard</h1>
-            <p className="mt-1 text-gray-600">Pazaryeri satis performansinizi takip edin</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
+              {dateRange === 'day' ? 'Gunun Analizi' : 'Analitik Dashboard'}
+            </h1>
+            <p className="mt-1 text-gray-600">
+              {dateRange === 'day' ? selectedDayLabel : 'Pazaryeri satis performansinizi takip edin'}
+            </p>
           </div>
           <div className="mt-4 sm:mt-0 flex items-center space-x-3">
             <button
@@ -498,18 +572,26 @@ export default function AnalyticsPage() {
         {/* ============================================================= */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <StatCard
-            title="Toplam Siparis"
+            title={dateRange === 'day' ? 'Siparis' : 'Toplam Siparis'}
             value={data?.totalOrders ?? 0}
             trend={data?.orderTrend}
-            trendLabel={dateRange === 'month' ? `Onceki ay: ${formatNumber(data?.previousPeriod?.orders ?? 0)}` : 'Onceki doneme gore'}
+            trendLabel={
+              dateRange === 'day' ? `Onceki gun: ${formatNumber(data?.previousPeriod?.orders ?? 0)}`
+              : dateRange === 'month' ? `Onceki ay: ${formatNumber(data?.previousPeriod?.orders ?? 0)}`
+              : 'Onceki doneme gore'
+            }
             icon={ShoppingCart}
             color="blue"
           />
           <StatCard
-            title="Toplam Gelir"
+            title={dateRange === 'day' ? 'Ciro' : 'Toplam Gelir'}
             value={formatCurrency(data?.totalRevenue ?? 0)}
             trend={data?.revenueTrend}
-            trendLabel={dateRange === 'month' ? `Onceki ay: ${formatCurrency(data?.previousPeriod?.revenue ?? 0)}` : 'Onceki doneme gore'}
+            trendLabel={
+              dateRange === 'day' ? `Onceki gun: ${formatCurrency(data?.previousPeriod?.revenue ?? 0)}`
+              : dateRange === 'month' ? `Onceki ay: ${formatCurrency(data?.previousPeriod?.revenue ?? 0)}`
+              : 'Onceki doneme gore'
+            }
             icon={DollarSign}
             color="green"
           />
@@ -537,6 +619,7 @@ export default function AnalyticsPage() {
               onChange={(e) => setDateRange(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
             >
+              <option value="day">Gunun Analizi</option>
               <option value="month">Aya Gore</option>
               <option value="7days">Son 7 Gun</option>
               <option value="30days">Son 30 Gun</option>
@@ -545,6 +628,26 @@ export default function AnalyticsPage() {
               <option value="12months">Son 12 Ay</option>
               <option value="all">Tum Zamanlar</option>
             </select>
+            {dateRange === 'day' && (
+              <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-md">
+                <button
+                  onClick={() => navigateDay(-1)}
+                  className="p-2 hover:bg-gray-100 rounded-l-md transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4 text-gray-600" />
+                </button>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 min-w-[200px] justify-center">
+                  <Calendar className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-gray-900">{selectedDayLabel}</span>
+                </div>
+                <button
+                  onClick={() => navigateDay(1)}
+                  className="p-2 hover:bg-gray-100 rounded-r-md transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4 text-gray-600" />
+                </button>
+              </div>
+            )}
             {dateRange === 'month' && (
               <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-md">
                 <button
@@ -597,6 +700,30 @@ export default function AnalyticsPage() {
             </div>
           )}
         </div>
+
+        {/* ============================================================= */}
+        {/* DAY MODE: Hourly Breakdown Charts                             */}
+        {/* ============================================================= */}
+        {dateRange === 'day' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <SectionCard>
+              <SectionTitle>Saatlik Siparis Dagilimi</SectionTitle>
+              {hourlyData.some((h) => h.orders > 0 || h.prevOrders > 0) ? (
+                <Chart options={hourlyChartOptions} series={hourlyChartSeries} type="bar" height={300} />
+              ) : (
+                <EmptyState message="Bu gun icin siparis verisi yok" />
+              )}
+            </SectionCard>
+            <SectionCard>
+              <SectionTitle>Saatlik Ciro Karsilastirmasi</SectionTitle>
+              {hourlyData.some((h) => h.revenue > 0 || h.prevRevenue > 0) ? (
+                <Chart options={hourlyRevenueChartOptions} series={hourlyRevenueChartSeries} type="area" height={300} />
+              ) : (
+                <EmptyState message="Bu gun icin ciro verisi yok" />
+              )}
+            </SectionCard>
+          </div>
+        )}
 
         {/* ============================================================= */}
         {/* ROW 3: Revenue/Orders Trend + Marketplace Donut               */}

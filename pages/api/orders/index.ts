@@ -63,7 +63,8 @@ export default async function handler(
   const searchType = req.query.searchType as string || 'all';
   const source = req.query.source as string;
   const channel = req.query.channel as string;
-  const sort = req.query.sort as string || 'desc';
+  const sortRaw = req.query.sort as string || 'desc';
+  const sort = sortRaw.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
   // Filters
   const {
@@ -397,7 +398,7 @@ export default async function handler(
       FROM "Order" o
       LEFT JOIN "SenkronOrderData" sod ON sod."orderId" = o.id
       ${whereClause}
-      ORDER BY COALESCE(o."uiOrderDate", o."createdAt") ${sort === 'asc' ? 'ASC' : 'DESC'}
+      ORDER BY COALESCE(o."uiOrderDate", o."createdAt") ${sort}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     params.push(limit, offset);

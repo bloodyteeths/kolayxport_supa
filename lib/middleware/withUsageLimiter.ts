@@ -10,6 +10,7 @@ interface UserWithSubscription extends User {
   orderSyncCount: number;
   labelCount: number;
   trialExpiresAt: Date | null;
+  usageResetAt: Date | null;
 }
 
 const plans = {
@@ -26,6 +27,33 @@ const checkUsage = async (userId: string, limitType: 'orderSync' | 'label') => {
   if (!user) {
     logger.warn('User not found for usage check', { userId });
     return { allowed: false, error: 'User not found' };
+  }
+
+  // --- Usage counter reset logic ---
+  // Reset counters when the current time has passed the usageResetAt timestamp
+  // set by the webhook. This aligns with the billing-cycle-based reset that
+  // invoice.payment_succeeded sets. For legacy/trial users without usageResetAt,
+  // fall back to calendar month comparison.
+  const now = new Date();
+  const lastReset = user.usageResetAt ? new Date(user.usageResetAt) : null;
+  const needsReset = lastReset
+    ? now >= lastReset
+    : true; // No reset date at all — treat as needing reset
+
+  if (needsReset) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        orderSyncCount: 0,
+        labelCount: 0,
+        usageResetAt: now,
+      },
+    });
+    // Reflect the reset in the local copy so the limit check below uses 0
+    user.orderSyncCount = 0;
+    user.labelCount = 0;
+    user.usageResetAt = now;
+    logger.info('Monthly usage counters reset', { userId });
   }
 
   const { subscriptionPlan, subscriptionStatus, orderSyncCount, labelCount, trialExpiresAt } = user;

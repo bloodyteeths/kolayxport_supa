@@ -9,7 +9,6 @@ async function generateInvoicePdf(
   shipment: CreateShipmentInput,
   internationalForms: any
 ): Promise<Buffer> {
-  console.log('[UPS PDF DEBUG] generateInvoicePdf start');
   const doc = new PDFDocument();
   doc.text('Commercial Invoice', { align: 'center' });
   doc.moveDown();
@@ -23,7 +22,6 @@ async function generateInvoicePdf(
   doc.text(`Product: ${internationalForms.products?.[0]?.description}`);
   doc.end();
   const buffer = await getStream.buffer(doc);
-  console.log('[UPS PDF DEBUG] generateInvoicePdf end, buffer size:', buffer.length);
   return buffer;
 }
 
@@ -66,8 +64,6 @@ async function pushPaperlessDocument({
   const shipperNumber = shipper.upsAccountNumber;
   const pdfBase64 = pdfBuffer.toString('base64');
 
-  console.log('[UPS PDF DEBUG] pushPaperlessDocument start');
-
   const payload = {
     PushToImageRepositoryRequest: {
       Request: {
@@ -95,10 +91,6 @@ async function pushPaperlessDocument({
     ShipperNumber: shipperNumber,
   };
 
-  console.log('[UPS PDF DEBUG] pushPaperlessDocument POSTing to', pushUrl);
-  console.log('[UPS PDF DEBUG] Headers:', JSON.stringify(headers, null, 2));
-  console.log('[UPS PDF DEBUG] Payload:', JSON.stringify(payload, null, 2));
-
   try {
     const response = await fetchWithTimeout(pushUrl, {
       method: 'POST',
@@ -107,14 +99,6 @@ async function pushPaperlessDocument({
     });
 
     const responseBody = await response.json();
-    console.log(
-      '[UPS PDF DEBUG] pushPaperlessDocument got response, status:',
-      response.status
-    );
-    console.log(
-      '[UPS PDF DEBUG] Raw push response:',
-      JSON.stringify(responseBody)
-    );
 
     if (!response.ok) {
       throw new Error(

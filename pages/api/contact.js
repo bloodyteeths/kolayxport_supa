@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     const mailOptions = {
       from: `"${name}" <${email}>`, // Sender address (shows name and their email)
       replyTo: email, // So you can reply directly to the user
-      to: 'kolayxport@gmail.com', // Your receiving email address
+      to: 'destek@kolayxport.com', // Your receiving email address
       subject: `Yeni İletişim Formu Mesajı: ${subject}`,
       text: `Gönderen Adı: ${name}\nGönderen E-posta: ${email}\n\nMesaj:\n${message}`,
       html: `<p><strong>Gönderen Adı:</strong> ${name}</p>

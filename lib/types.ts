@@ -20,6 +20,7 @@ export interface NormalizedLineItem {
   title: string;
   value: number;
   quantity: number;
+  /** Weight in kg */
   weight: number;
   sku: string;
   hs_code?: string;
@@ -65,6 +66,7 @@ export interface UIOrder {
     title: string;
     value: number;
     quantity: number;
+    /** Weight in kg */
     weight: number;
     sku: string;
     hs_code?: string;
@@ -79,6 +81,7 @@ export interface UIOrder {
   shipByDate?: string; // Ship-by deadline date for the order (comes from Veeqo due_date)
   rawData: any;
   // Optional fields for label/fulfillment
+  /** Weight in kg */
   weight?: number;
   hsCode?: string;
   countryOfOrigin?: string;
@@ -106,7 +109,7 @@ export interface UIOrder {
   packageLength?: number;
   packageWidth?: number;
   packageHeight?: number;
-  dimensionUnits?: string;
+  dimensionUnits?: 'IN' | 'CM';
   labelStockType?: string;
   signatureType?: string;
   trackingNumber?: string;
@@ -226,7 +229,8 @@ export interface ShippoOrder {
     quantity: number;
     total_price: string;
     currency: string;
-    weight: string;
+    /** Weight - may be string from Shippo API */
+    weight: number | string;
     sku: string | null;
   }>;
   metadata?: { notes?: string };

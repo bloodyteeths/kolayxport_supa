@@ -72,7 +72,7 @@ function AppIndexPage() {
   if (status === 'loading') {
     return (
       <AppLayout title="Yükleniyor..." simpleHeader>
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-200px)]">
           <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
           <p className="text-slate-500 text-lg">Hesap durumu kontrol ediliyor...</p>
         </div>
@@ -91,7 +91,7 @@ function AppIndexPage() {
     }
     return (
       <AppLayout title="Yönlendiriliyor..." simpleHeader>
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-200px)]">
           <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
           <p className="text-slate-500 text-lg">Giriş sayfasına yönlendiriliyor...</p>
         </div>
@@ -109,7 +109,7 @@ function AppIndexPage() {
   
   return (
     <AppLayout title="Durum Belirsiz" simpleHeader>
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
+        <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-200px)]">
           <p className="text-slate-500 text-lg">Bir sorun oluştu, lütfen sayfayı yenileyin.</p>
         </div>
       </AppLayout>

@@ -221,7 +221,7 @@ export default function OperationsPage() {
       >
         {syncing ? 'Senkronize ediliyor...' : 'Siparişleri Senkronize Et'}
       </Button>
-      <Box sx={{ height: '80vh', width: '100%' }}>
+      <Box sx={{ height: '80dvh', width: '100%' }}>
         <DataGrid<UIOrder>
           rows={orders}
           columns={columns}

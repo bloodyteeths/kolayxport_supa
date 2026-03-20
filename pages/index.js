@@ -133,7 +133,7 @@ const HeroSection = () => (
       </div>
 
       <Image
-        src="/images/hero-macbook.png"
+        src="/images/hero-macbook.jpg"
         width={1600}
         height={1100}
         alt="KolayXport dashboard preview"

@@ -3,6 +3,17 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
 import { stripe } from '../../../lib/stripe';
 import prisma from '../../../lib/prisma';
+import { STRIPE_PRICES, type PlanKey, type IntervalKey } from '../../../lib/stripePrices';
+
+/** Reverse-lookup: given a Stripe price ID, return the plan name. */
+function planFromPriceId(priceId: string): PlanKey | null {
+  for (const [plan, intervals] of Object.entries(STRIPE_PRICES)) {
+    for (const id of Object.values(intervals)) {
+      if (id === priceId) return plan as PlanKey;
+    }
+  }
+  return null;
+}
 
 // Disable body parsing to verify the raw body
 export const config = {
@@ -14,6 +25,7 @@ export const config = {
 const relevantEvents = new Set([
   'checkout.session.completed',
   'invoice.payment_succeeded',
+  'invoice.payment_failed',
   'customer.subscription.updated',
   'customer.subscription.deleted',
 ]);
@@ -41,6 +53,17 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
+  // Idempotency: skip if this event was already processed
+  try {
+    await prisma.webhookEvent.create({ data: { id: event.id } });
+  } catch (err: any) {
+    // Unique constraint violation (P2002) means we already processed this event
+    if (err.code === 'P2002') {
+      return res.status(200).json({ received: true, duplicate: true });
+    }
+    throw err;
+  }
+
   if (relevantEvents.has(event.type)) {
     try {
       switch (event.type) {
@@ -50,23 +73,28 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             const subscriptionId = checkoutSession.subscription as string;
             const subscription = await stripe.subscriptions.retrieve(subscriptionId);
             
+            // Derive plan and interval from the subscription's price object
+            const priceId = subscription.items.data[0]?.price?.id;
+            const interval = (subscription.items.data[0]?.price?.recurring?.interval || 'month') as IntervalKey;
+            const plan = priceId ? planFromPriceId(priceId) : null;
+
             // Calculate usage reset date based on billing interval
             const now = new Date();
             const usageResetAt = new Date(now);
-            if (subscription.metadata.interval === 'month') {
+            if (interval === 'month') {
               usageResetAt.setMonth(usageResetAt.getMonth() + 1);
             } else {
               usageResetAt.setFullYear(usageResetAt.getFullYear() + 1);
             }
-            
+
             await prisma.user.update({
               where: { stripeCustomerId: subscription.customer as string },
               data: {
-                subscriptionPlan: subscription.metadata.plan as any,
-                billingInterval: subscription.metadata.interval as any,
+                subscriptionPlan: plan as any,
+                billingInterval: interval as any,
                 subscriptionStatus: subscription.status as any,
-                trialExpiresAt: subscription.status === 'trialing'
-                  ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                trialExpiresAt: subscription.trial_end
+                  ? new Date(subscription.trial_end * 1000)
                   : null,
                 usageResetAt: subscription.status === 'active' ? usageResetAt : null,
               },
@@ -80,10 +108,13 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id;
             const subscription = await stripe.subscriptions.retrieve(subscriptionId);
             
+            // Derive interval from the subscription's price object
+            const renewalInterval = subscription.items.data[0]?.price?.recurring?.interval || 'month';
+
             // Calculate next usage reset date
             const now = new Date();
             const nextResetDate = new Date(now);
-            if (subscription.metadata.interval === 'month') {
+            if (renewalInterval === 'month') {
               nextResetDate.setMonth(nextResetDate.getMonth() + 1);
             } else {
               nextResetDate.setFullYear(nextResetDate.getFullYear() + 1);
@@ -97,6 +128,25 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
                 usageResetAt: nextResetDate,
                 subscriptionStatus: 'active' as any,
               },
+            });
+          }
+          break;
+        case 'invoice.payment_failed':
+          const failedInvoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription };
+          if (failedInvoice.subscription) {
+            const failedSubId = typeof failedInvoice.subscription === 'string'
+              ? failedInvoice.subscription
+              : failedInvoice.subscription.id;
+            const failedSub = await stripe.subscriptions.retrieve(failedSubId);
+            const customerId = failedSub.customer as string;
+
+            console.error(
+              `Payment failed for subscription ${failedSubId}, customer ${customerId}`
+            );
+
+            await prisma.user.update({
+              where: { stripeCustomerId: customerId },
+              data: { subscriptionStatus: 'past_due' as any },
             });
           }
           break;
@@ -136,7 +186,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       }
     } catch (error) {
       console.error('Webhook handler failed:', error);
-      return res.status(400).send('Webhook handler failed. View logs.');
+      return res.status(500).send('Webhook handler failed. View logs.');
     }
   }
 

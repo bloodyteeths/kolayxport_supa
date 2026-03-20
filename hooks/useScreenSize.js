@@ -18,7 +18,7 @@ const useScreenSize = () => {
         height: newHeight,
       });
       
-      setIsMobile(newWidth < 768); // md breakpoint
+      setIsMobile(newWidth < 640); // sm breakpoint (Tailwind aligned)
     };
 
     // Set initial values

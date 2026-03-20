@@ -247,18 +247,12 @@ export default function IletisimPage() {
               
               <div>
                 <h3 className="text-xl font-bold text-slate-800 mb-4">Haritada Biz</h3>
-                <div className="aspect-w-16 aspect-h-9 rounded-lg overflow-hidden shadow-xl border border-slate-200">
-                  {/* Replace with your actual Google Maps embed code */}
-                  <iframe 
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3010.BUNCH.OF.RANDOM.NUMBERS!2dLONGITUDE!3dLATITUDE!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3AYOUR_PLACE_ID_IF_ANY!2sYOUR_BUSINESS_NAME!5e0!3m2!1str!2str!4vSOME_TIMESTAMP" 
-                    width="100%" 
-                    height="100%" 
-                    style={{ border:0 }}
-                    allowFullScreen=""
-                    loading="lazy" 
-                    referrerPolicy="no-referrer-when-downgrade"
-                    title="KolayXport Ofis Konumu"
-                  ></iframe>
+                <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center shadow-xl border border-slate-200">
+                  <div className="text-center">
+                    <MapPin className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                    <p className="text-gray-600 font-medium">Istanbul, Turkiye</p>
+                    <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 text-sm hover:underline mt-1 inline-block">Google Maps'te Ac</a>
+                  </div>
                 </div>
               </div>
             </motion.div>

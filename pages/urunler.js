@@ -249,7 +249,7 @@ export default function Products() {
           <p className="text-gray-400 mt-2">Yeni bir ürün eklemek için "Yeni Ürün Ekle" butonuna tıklayın.</p>
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-white shadow rounded-lg table-scroll-wrapper">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -332,7 +332,7 @@ export default function Products() {
       {/* Product Add/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-90vh overflow-y-auto">
+          <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 max-w-2xl mx-4 sm:mx-auto w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">
               {currentProduct ? 'Ürün Düzenle' : 'Yeni Ürün Ekle'}
             </h2>
@@ -428,7 +428,7 @@ export default function Products() {
                 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Boyutlar (cm)</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Uzunluk</label>
                       <input

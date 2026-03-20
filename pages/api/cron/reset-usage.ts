@@ -6,9 +6,11 @@ export default async function handler(
   res: NextApiResponse
 ) {
   // Verify this is called by Vercel Cron or internal job
-  // In production, you should verify the authorization header
   const authHeader = req.headers.authorization;
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET) {
+    return res.status(500).json({ error: 'CRON_SECRET not configured' });
+  }
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

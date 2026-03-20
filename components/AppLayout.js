@@ -219,7 +219,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
 
         {/* Main content area */}
         <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
-          isDesktop ? 'ml-16' : 'ml-0'
+          isDesktop ? (isOpen ? 'ml-64' : 'ml-16') : 'ml-0'
         }`}>
           {/* Mobile overlay when sidebar is open */}
           {isOpen && isMobile && (
@@ -229,7 +229,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
             />
           )}
           {/* Topbar */}
-          <header className="sticky top-0 z-20 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16 border-b border-gray-200">
+          <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16 border-b border-gray-200">
             <div className="flex items-center">
               {/* Mobile hamburger menu - 3 lines */}
               {isMobile && (

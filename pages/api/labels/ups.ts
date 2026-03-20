@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { getSupabaseServerClient } from '@/lib/supabase';
 import { getUpsCredentialsForUser } from '@/lib/ups/ups.credentials';
 import { createUpsShipment, CreateShipmentInput, getUpsAccessToken } from '@/lib/ups/createUpsShipment';
 import { saveUpsLabelToCache } from '@/lib/ups/cache';
@@ -44,30 +45,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // For now, get userId from body (replace with real auth in production)
-  const { userId, orderId, recipient, package: pkg, serviceType, isEdi = true, internationalForms, dutyPaymentType = 'RECEIVER', description } = req.body || {};
-  
-  console.log('[UPS LABEL DEBUG] Received description:', description);
+  // Authenticate user via Supabase session
+  const supabase = getSupabaseServerClient(req, res);
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-  if (!userId || !orderId || !recipient || !pkg || !serviceType) {
+  if (authError || !authUser) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  const userId = authUser.id;
+  const { orderId, recipient, package: pkg, serviceType, isEdi = true, internationalForms, dutyPaymentType = 'RECEIVER', description } = req.body || {};
+
+  if (!orderId || !recipient || !pkg || !serviceType) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
-    console.log('[UPS LABEL DEBUG] Handler start');
     // Load UPS credentials
     let upsCreds;
     try {
-      console.log('[UPS LABEL DEBUG] Getting UPS credentials for user', userId);
       upsCreds = await getUpsCredentialsForUser(userId);
-      console.log('[UPS LABEL DEBUG] Got UPS credentials');
     } catch (err: any) {
       console.error('[UPS LABEL DEBUG] Error getting UPS credentials:', err);
       return res.status(400).json({ success: false, error: 'Missing or invalid UPS credentials: ' + (err.message || 'Please check your UPS API key, secret, and account number.') });
     }
 
     // Load shipper profile
-    console.log('[UPS LABEL DEBUG] Loading shipper profile for user', userId);
     const shipperProfileDb = await prisma.shipperProfile.findUnique({ where: { userId } });
     if (!shipperProfileDb) {
       console.error('[UPS LABEL DEBUG] Missing shipper profile for user', userId);
@@ -75,7 +78,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Check for existing shipments to prevent multiple labels
-    console.log('[UPS LABEL DEBUG] Checking for existing shipments for order', orderId);
     const existingShipments = await prisma.shipment.findMany({
       where: {
         orderId: orderId,
@@ -92,7 +94,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Build shipper input for UPS
-    console.log('[UPS LABEL DEBUG] Building shipper input');
     const shipper = {
       ...upsCreds,
       shipperName: shipperProfileDb.shipperName || '',
@@ -112,15 +113,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     };
 
     // Normalize recipient phone and extract extension
-    console.log('[UPS LABEL DEBUG] Normalizing recipient phone:', recipient.phone);
     const { phone: normalizedPhone, ext: phoneExt } = parsePhoneNumberWithExt(recipient.phone);
     
     // Normalize postal code - remove dashes for UPS (e.g., "20903-2633" → "209032633")
     const normalizedPostalCode = recipient.postalCode?.replace(/-/g, '') || '';
-    if (recipient.postalCode !== normalizedPostalCode) {
-      console.log('[UPS LABEL DEBUG] Normalized postal code:', recipient.postalCode, '→', normalizedPostalCode);
-    }
-    
     const normalizedRecipient = { 
       ...recipient, 
       phone: normalizedPhone,
@@ -129,8 +125,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     
     if (phoneExt) {
       normalizedRecipient.ext = phoneExt; // Keep for database storage
-      console.log('[UPS LABEL DEBUG] Extracted phone extension:', phoneExt);
-      
+
       if (phoneExt.length <= 4) {
         // Use UPS extension field for 4 digits or less
         normalizedRecipient.phoneExtension = phoneExt;
@@ -138,12 +133,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // Add long extension to address line 2 for 5+ digits
         const extText = ` EXT ${phoneExt}`;
         normalizedRecipient.street2 = (normalizedRecipient.street2 || '').trim() + extText;
-        console.log('[UPS LABEL DEBUG] Long extension added to address line 2:', extText);
       }
     }
 
     // Overwrite order's shipping address in DB before label generation
-    console.log('[UPS LABEL DEBUG] Updating order shipping address in DB for order', orderId);
     await prisma.order.update({
       where: { id: orderId },
       data: {
@@ -160,7 +153,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         },
       },
     });
-    console.log('[UPS LABEL DEBUG] Order shipping address updated');
 
     const input: CreateShipmentInput = {
       shipper,
@@ -174,19 +166,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     };
 
     if (isEdi && internationalForms) {
-      console.log('[UPS LABEL DEBUG] EDI flow: using paperless helpers');
       const { generateInvoicePdf, pushPaperlessDocument } = await import('@/lib/ups/paperless');
 
       // Step 1: Create the shipment first, without a DocumentID.
-      console.log('[UPS API] Step 1: Calling createUpsShipment for EDI.');
       const shipmentResult = await createUpsShipment(input);
 
       if (!shipmentResult.success || !shipmentResult.trackingNumber) {
         console.error('[UPS API] Step 1 FAILED: Shipment creation failed.', shipmentResult.errors, shipmentResult.raw);
         return res.status(500).json({ success: false, message: 'UPS shipment creation failed.', errors: shipmentResult.errors, raw: shipmentResult.raw });
       }
-
-      console.log('[UPS API] Step 1 SUCCEEDED: Shipment created, tracking:', shipmentResult.trackingNumber);
 
       // Save the successful shipment to the database immediately.
       await prisma.shipment.create({
@@ -200,7 +188,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           isEdi: true,
         },
       });
-              console.log('[UPS API] Shipment record saved to DB.');
+
+      // Cache the label for quick retrieval
+      if (shipmentResult.labelUrl) {
+        saveUpsLabelToCache(orderId, shipmentResult.labelUrl);
+      }
 
       // Increment usage counter after successful label generation
       if (res.incrementUsage) {
@@ -211,11 +203,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(200).json(shipmentResult);
     } else {
       // Non-EDI flow
-      console.log('[UPS LABEL DEBUG] Calling createUpsShipment');
       const result = await createUpsShipment(input);
-      console.log('[UPS LABEL DEBUG] createUpsShipment result:', result);
       // Save to Shipment and update Order tables
-      console.log('[UPS LABEL DEBUG] Saving shipment to DB');
       await prisma.shipment.create({
         data: {
           order: { connect: { id: orderId } },
@@ -227,8 +216,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           isEdi: false,
         },
       });
-      console.log('[UPS LABEL DEBUG] Shipment record saved to DB');
-      
+
+      // Cache the label for quick retrieval
+      if (result.labelUrl) {
+        saveUpsLabelToCache(orderId, result.labelUrl);
+      }
+
       // Increment usage counter after successful label generation
       if (res.incrementUsage) {
         await res.incrementUsage();

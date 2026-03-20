@@ -96,7 +96,7 @@ export default function FaturalarPage() {
           <IconButton onClick={() => router.push('/ayarlar')} sx={{ mr: 2 }}>
             <ArrowBack />
           </IconButton>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          <Typography variant="h5" component="h1" sx={{ fontWeight: 'bold', fontSize: { xs: '1.25rem', sm: '1.5rem', md: '2rem' } }}>
             Fatura Geçmişi
           </Typography>
         </Box>
@@ -112,12 +112,12 @@ export default function FaturalarPage() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell><strong>Fatura Tarihi</strong></TableCell>
-                  <TableCell><strong>Açıklama</strong></TableCell>
-                  <TableCell><strong>Hizmet Dönemi</strong></TableCell>
-                  <TableCell><strong>Tutar</strong></TableCell>
-                  <TableCell><strong>Durum</strong></TableCell>
-                  <TableCell><strong>İşlemler</strong></TableCell>
+                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>Fatura Tarihi</strong></TableCell>
+                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>Açıklama</strong></TableCell>
+                  <TableCell sx={{ px: { xs: 1, sm: 2 }, whiteSpace: 'nowrap' }}><strong>Hizmet Dönemi</strong></TableCell>
+                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>Tutar</strong></TableCell>
+                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>Durum</strong></TableCell>
+                  <TableCell sx={{ px: { xs: 1, sm: 2 } }}><strong>İşlemler</strong></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -132,13 +132,13 @@ export default function FaturalarPage() {
                 ) : (
                   invoices.map((invoice) => (
                     <TableRow key={invoice.id}>
-                      <TableCell>
+                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
                         {formatDate(invoice.date)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
                         {invoice.description}
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ px: { xs: 1, sm: 2 }, whiteSpace: 'nowrap' }}>
                         {invoice.period.start && invoice.period.end ? (
                           <>
                             {formatDate(invoice.period.start)} - {formatDate(invoice.period.end)}
@@ -147,19 +147,19 @@ export default function FaturalarPage() {
                           '-'
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
                         <Typography variant="body2" fontWeight="bold">
                           {formatCurrency(invoice.amount, invoice.currency)}
                         </Typography>
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
                         <Chip
                           label={invoice.status === 'paid' ? 'Ödendi' : invoice.status}
                           color={invoice.status === 'paid' ? 'success' : 'default'}
                           size="small"
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={{ px: { xs: 1, sm: 2 } }}>
                         <Box sx={{ display: 'flex', gap: 1 }}>
                           {invoice.hostedInvoiceUrl && (
                             <IconButton

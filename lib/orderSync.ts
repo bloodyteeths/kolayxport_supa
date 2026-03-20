@@ -934,7 +934,7 @@ export async function syncAllOrders(userId: string, options: {
         );
       } else {
         // TEMPORARY: Disable Shippo sync for testing
-        const DISABLE_SHIPPO_SYNC = true; // Set to false to re-enable
+        const DISABLE_SHIPPO_SYNC = false; // Set to false to re-enable
         
         if (DISABLE_SHIPPO_SYNC) {
           logger.warn(`[FullSync] SHIPPO SYNC IS TEMPORARILY DISABLED FOR TESTING`, { userId });
@@ -1131,7 +1131,7 @@ export async function syncAllOrders(userId: string, options: {
         currency: order.currency,
         totalPrice: order.totalPrice,
         shippingAddress: order.to_address ? JSON.stringify(order.to_address) : Prisma.JsonNull,
-        rawData: order.rawData ? JSON.stringify(order.rawData) : Prisma.JsonNull,
+        rawData: order.rawData ? (typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData) : Prisma.JsonNull,
         createdAt: order.createdAt ? new Date(order.createdAt) : new Date(),
         updatedAt: new Date(),
         uiOrderDate: getUiOrderDate(order),
@@ -1204,7 +1204,7 @@ export async function syncAllOrders(userId: string, options: {
             currency: order.currency,
             totalPrice: order.totalPrice,
             shippingAddress: order.to_address ? JSON.stringify(order.to_address) : (order.shippingAddress ? order.shippingAddress : Prisma.JsonNull),
-            rawData: order.rawData ? order.rawData : Prisma.JsonNull,
+            rawData: order.rawData ? (typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData) : Prisma.JsonNull,
             uiOrderDate: order.uiOrderDate,
             commodityDesc: order.commodityDesc,
             // shipByDate, channel, and source are UI-only fields, not stored in database
@@ -1225,20 +1225,26 @@ export async function syncAllOrders(userId: string, options: {
           }
         }
 
-        // Bulk create new orders
+        // Bulk create new orders and their items in a transaction
         if (ordersToCreate.length > 0) {
           logger.info(`[Order Sync] Creating ${ordersToCreate.length} new orders in the database.`);
-          await prisma.order.createMany({
-            data: ordersToCreate,
-            skipDuplicates: true,
+          await prisma.$transaction(async (tx) => {
+            await tx.order.createMany({
+              data: ordersToCreate,
+              skipDuplicates: true,
+            });
+            await createOrderItemsForBatch(batch, existingOrdersMap, userId, tx as typeof prisma);
           });
           ordersCreated += ordersToCreate.length;
+        } else {
+          // No new orders to create, but still need to create items for updated orders
+          await createOrderItemsForBatch(batch, existingOrdersMap, userId);
         }
 
         // Process orders to update in smaller chunks to avoid overwhelming the connection pool
         if (ordersToUpdate.length > 0) {
           logger.info(`[Order Sync] Updating ${ordersToUpdate.length} orders in the database.`);
-          
+
           const updateChunkSize = 5; // Even smaller chunks for updates
           for (let i = 0; i < ordersToUpdate.length; i += updateChunkSize) {
             const chunk = ordersToUpdate.slice(i, i + updateChunkSize);
@@ -1249,13 +1255,10 @@ export async function syncAllOrders(userId: string, options: {
           ordersUpdated += ordersToUpdate.length;
         }
 
-        // Create OrderItems for new and updated orders
-        await createOrderItemsForBatch(batch, existingOrdersMap, userId);
-
         // Execute status update hook for all orders in this batch
         // This will check if any orders have "SHIPPED" status and update custom status to "Çıktı"
         const batchOrderIds = batch.map(order => {
-          const existingOrder = existingOrdersMap.get(order.orderNumber || '');
+          const existingOrder = existingOrdersMap.get(order.marketplaceKey);
           return existingOrder?.id || '';
         }).filter(Boolean);
         
@@ -1356,45 +1359,72 @@ export async function syncAllOrders(userId: string, options: {
 
 // Helper function to create OrderItems for a batch of orders
 async function createOrderItemsForBatch(
-  orders: UIOrder[], 
-  existingOrdersMap: Map<string, any>, 
-  userId: string
+  orders: UIOrder[],
+  existingOrdersMap: Map<string, any>,
+  userId: string,
+  db: typeof prisma = prisma
 ): Promise<void> {
   try {
     const orderItemsToCreate: any[] = [];
-    
+
     // Get the order IDs after they've been created/updated
     const orderMarketplaceKeys = orders.map(o => o.marketplaceKey);
-    const currentOrdersInDb = await prisma.order.findMany({
-      where: { 
-        userId, 
+    const currentOrdersInDb = await db.order.findMany({
+      where: {
+        userId,
         marketplaceKey: { in: orderMarketplaceKeys }
       },
       select: { id: true, marketplaceKey: true }
     });
     const orderIdMap = new Map(currentOrdersInDb.map(o => [o.marketplaceKey, o.id]));
-    
+
     for (const order of orders) {
       const orderId = orderIdMap.get(order.marketplaceKey);
       if (!orderId) {
         logger.warn(`[OrderItems] Could not find order ID for marketplaceKey: ${order.marketplaceKey}`);
         continue;
       }
-      
+
       // For existing orders, only recreate OrderItems if they don't exist or line items have changed
       const existingOrder = existingOrdersMap.get(order.marketplaceKey);
       if (existingOrder) {
-        const existingItemCount = await prisma.orderItem.count({
+        const existingItemCount = await db.orderItem.count({
           where: { orderId: existingOrder.id }
         });
-        
-        // Only recreate if no OrderItems exist (missing from previous sync issue)
-        // For orders with existing OrderItems, we preserve them to avoid deleting labels
+
+        // Always update OrderItems to reflect latest marketplace data (title, weight, hs_code, etc.)
         if (existingItemCount > 0) {
-          continue; // Skip if items already exist to preserve existing labels
+          await db.$transaction(async (tx) => {
+            await tx.orderItem.deleteMany({ where: { orderId } });
+            const lineItems = order.line_items || [];
+            const freshItems = lineItems.map((item, i) => ({
+              orderId,
+              productName: item.title || 'Unknown Product',
+              quantity: item.quantity || 1,
+              unitPrice: item.value || 0,
+              totalPrice: (item.value || 0) * (item.quantity || 1),
+              weightKg: item.weight || 0.5,
+              harmonizedCode: item.hs_code || '',
+              countryOfMfg: item.country_of_origin || '',
+              sku: item.sku || '',
+              image: item.image || '',
+              variantInfo: item.variantInfo || '',
+              notes: (item as any).notes || (item as any).description || (order as any).notes || '',
+              marketplaceKey: String(item.id || `${order.marketplaceKey}-${i}`),
+              orderNumber: order.orderNumber || '',
+              uniqueLineKey: String(item.id || `${order.marketplaceKey}-${i}`),
+              productId: null,
+              remoteLineId: String(item.id || ''),
+              shipBy: item.shipBy || order.shipByDate || null,
+            }));
+            if (freshItems.length > 0) {
+              await tx.orderItem.createMany({ data: freshItems, skipDuplicates: true });
+            }
+          });
+          continue; // Items already refreshed via transaction above
         }
       }
-      
+
       // Create OrderItems from line_items
       const lineItems = order.line_items || [];
       for (let i = 0; i < lineItems.length; i++) {
@@ -1421,16 +1451,16 @@ async function createOrderItemsForBatch(
         });
       }
     }
-    
+
     // Bulk create OrderItems
     if (orderItemsToCreate.length > 0) {
       logger.info(`[OrderItems] Creating ${orderItemsToCreate.length} OrderItems for ${orders.length} orders`);
-      await prisma.orderItem.createMany({
+      await db.orderItem.createMany({
         data: orderItemsToCreate,
         skipDuplicates: true,
       });
     }
-    
+
   } catch (error) {
     logger.error(`[OrderItems] Error creating OrderItems:`, error);
     // Don't throw - this shouldn't fail the entire sync

@@ -9,6 +9,10 @@ interface AnalyticsQuery {
   marketplace?: string;
 }
 
+// Simple module-level cache for exchange rates
+let cachedRates: Record<string, number> = {};
+let cacheExpiry = 0;
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -69,24 +73,42 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     console.log('[Analytics API] User authenticated:', supabaseUser.email);
 
     const dateRange = (req.query.dateRange as string) || '7days';
+    const monthParam = req.query.month as string | undefined; // e.g. "2026-03"
     const marketplace = req.query.marketplace as string | undefined;
 
     // Calculate date range
     const now = new Date();
     let startDate = new Date();
-    
-    switch (dateRange) {
-      case '7days':
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case '30days':
-        startDate.setDate(now.getDate() - 30);
-        break;
-      case '90days':
-        startDate.setDate(now.getDate() - 90);
-        break;
-      default:
-        startDate.setDate(now.getDate() - 7);
+    let endDate = now;
+
+    if (dateRange === 'month' && monthParam) {
+      // Specific month: "2026-03" → start=2026-03-01, end=2026-03-31 23:59:59
+      const [year, month] = monthParam.split('-').map(Number);
+      startDate = new Date(year, month - 1, 1);
+      endDate = new Date(year, month, 0, 23, 59, 59, 999); // last day of month
+    } else {
+      switch (dateRange) {
+        case '7days':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case '30days':
+          startDate.setDate(now.getDate() - 30);
+          break;
+        case '90days':
+          startDate.setDate(now.getDate() - 90);
+          break;
+        case '6months':
+          startDate.setMonth(now.getMonth() - 6);
+          break;
+        case '12months':
+          startDate.setFullYear(now.getFullYear() - 1);
+          break;
+        case 'all':
+          startDate = new Date('2020-01-01');
+          break;
+        default:
+          startDate = new Date('2020-01-01');
+      }
     }
 
     // Get user from database using Supabase user email
@@ -114,7 +136,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       userId: dbUser.id,
       uiOrderDate: {
         gte: startDate,
-        lte: now
+        lte: endDate
       }
     };
 
@@ -157,8 +179,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     };
 
-    // Get current exchange rates
-    const exchangeRates = await fetchExchangeRates();
+    // Get current exchange rates (with 1-hour cache)
+    async function getCachedExchangeRates() {
+      const now = Date.now();
+      if (now < cacheExpiry && Object.keys(cachedRates).length > 0) {
+        return cachedRates;
+      }
+      cachedRates = await fetchExchangeRates();
+      cacheExpiry = now + 3600000; // 1 hour
+      return cachedRates;
+    }
+    const exchangeRates = await getCachedExchangeRates();
     
     // Currency symbols
     const currencySymbols: Record<string, string> = {
@@ -189,11 +220,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     };
 
     // Get comprehensive order data in fewer queries to reduce connection pool usage
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
     const [
       ordersData,
       dailyStats,
       statusBreakdown,
-      topProducts
+      topProducts,
+      // New queries
+      monthlyStatsRaw,
+      marketplaceBreakdownRaw,
+      totalLabels,
+      labelsByCarrier,
+      pendingLabels,
+      recentActivity
     ] = await Promise.all([
       // Get all order data in one query
       prisma.order.findMany({
@@ -207,19 +248,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       }),
 
-      // Daily statistics
-      prisma.$queryRaw<Array<{ date: Date; orders: bigint; revenue: number }>>`
-        SELECT 
-          DATE("uiOrderDate") as date,
+      // Daily statistics (grouped by date and currency for proper conversion)
+      prisma.$queryRaw<Array<{ date: Date; orders: bigint; revenue: number; currency: string | null }>>`
+        SELECT
+          DATE(COALESCE("uiOrderDate", "createdAt")) as date,
           COUNT(*) as orders,
-          SUM("totalPrice") as revenue
-        FROM "Order" 
+          SUM("totalPrice") as revenue,
+          "currency" as currency
+        FROM "Order"
         WHERE "userId" = ${dbUser.id}
-          AND "uiOrderDate" >= ${startDate}
-          AND "uiOrderDate" <= ${now}
-        GROUP BY DATE("uiOrderDate")
+          AND COALESCE("uiOrderDate", "createdAt") >= ${startDate}
+          AND COALESCE("uiOrderDate", "createdAt") <= ${endDate}
+        GROUP BY DATE(COALESCE("uiOrderDate", "createdAt")), "currency"
         ORDER BY date DESC
-        LIMIT 30
+        LIMIT 90
       `,
 
       // Order status breakdown
@@ -231,24 +273,81 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       }),
 
-      // Top products by order count
-      prisma.orderItem.groupBy({
-        by: ['productName'],
+      // Top products - fetch with order currency for proper conversion
+      prisma.orderItem.findMany({
         where: {
           order: whereClause
         },
-        _count: {
-          productName: true
-        },
-        _sum: {
-          totalPrice: true
-        },
-        orderBy: {
-          _count: {
-            productName: 'desc'
+        select: {
+          productName: true,
+          totalPrice: true,
+          order: {
+            select: {
+              currency: true
+            }
           }
+        }
+      }),
+
+      // 1. Monthly stats — last 12 months
+      prisma.$queryRaw<Array<{ month: Date; orders: bigint; revenue: number; customers: bigint; currency: string | null }>>`
+        SELECT DATE_TRUNC('month', COALESCE("uiOrderDate", "createdAt")) as month,
+               COUNT(*) as orders,
+               SUM("totalPrice") as revenue,
+               COUNT(DISTINCT "customerName") as customers,
+               "currency"
+        FROM "Order"
+        WHERE "userId" = ${dbUser.id} AND COALESCE("uiOrderDate", "createdAt") >= ${twelveMonthsAgo}
+        GROUP BY DATE_TRUNC('month', COALESCE("uiOrderDate", "createdAt")), "currency"
+        ORDER BY month ASC
+      `,
+
+      // 2. Marketplace breakdown — detailed per-marketplace stats
+      prisma.$queryRaw<Array<{ marketplace: string | null; orders: bigint; revenue: number; customers: bigint; avg_order_value: number; currency: string | null }>>`
+        SELECT "marketplace",
+               COUNT(*) as orders,
+               SUM("totalPrice") as revenue,
+               COUNT(DISTINCT "customerName") as customers,
+               AVG("totalPrice") as avg_order_value,
+               "currency"
+        FROM "Order"
+        WHERE "userId" = ${dbUser.id}
+          AND COALESCE("uiOrderDate", "createdAt") >= ${startDate}
+          AND COALESCE("uiOrderDate", "createdAt") <= ${endDate}
+        GROUP BY "marketplace", "currency"
+        ORDER BY orders DESC
+      `,
+
+      // 3. Shipping stats — total labels
+      prisma.shipment.count({ where: { order: { userId: dbUser.id } } }),
+
+      // 3. Shipping stats — labels by carrier
+      prisma.shipment.groupBy({
+        by: ['carrier'],
+        where: { order: { userId: dbUser.id } },
+        _count: { _all: true }
+      }),
+
+      // 3. Shipping stats — pending labels
+      prisma.order.count({
+        where: { userId: dbUser.id, labelStatus: 'pending' }
+      }),
+
+      // 4. Recent activity — last 10 orders
+      prisma.order.findMany({
+        where: { userId: dbUser.id },
+        select: {
+          orderNumber: true,
+          customerName: true,
+          totalPrice: true,
+          currency: true,
+          marketplace: true,
+          externalStatus: true,
+          uiOrderDate: true,
+          labelStatus: true
         },
-        take: 5
+        orderBy: { uiOrderDate: 'desc' },
+        take: 10
       })
     ]);
 
@@ -271,17 +370,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return total + convertedAmount;
     }, 0);
 
-    // Calculate trends (compare with previous period) - single query optimization
-    const previousPeriodStart = new Date(startDate);
-    const periodLength = now.getTime() - startDate.getTime();
-    previousPeriodStart.setTime(previousPeriodStart.getTime() - periodLength);
+    // Calculate trends (compare with previous period)
+    let previousPeriodStart: Date;
+    let previousPeriodEnd: Date;
+    if (dateRange === 'month' && monthParam) {
+      // Previous month
+      const [year, month] = monthParam.split('-').map(Number);
+      previousPeriodStart = new Date(year, month - 2, 1);
+      previousPeriodEnd = new Date(year, month - 1, 0, 23, 59, 59, 999);
+    } else {
+      const periodLength = endDate.getTime() - startDate.getTime();
+      previousPeriodStart = new Date(startDate.getTime() - periodLength);
+      previousPeriodEnd = new Date(startDate.getTime() - 1);
+    }
 
     const previousOrdersData = await prisma.order.findMany({
       where: {
-        ...whereClause,
+        userId: dbUser.id,
+        ...(marketplace ? { marketplace } : {}),
         uiOrderDate: {
           gte: previousPeriodStart,
-          lt: startDate
+          lte: previousPeriodEnd
         }
       },
       select: {
@@ -307,17 +416,46 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       : 0;
 
     // Format marketplace data
-    const marketplaceColors = {
-      'veeqo': '#4F46E5',
-      'trendyol': '#F97316',
-      'hepsiburada': '#EF4444',
+    const marketplaceColorPalette = [
+      '#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#F97316',
+      '#8B5CF6', '#EC4899', '#14B8A6', '#6366F1', '#84CC16',
+      '#06B6D4', '#D946EF', '#F43F5E', '#0EA5E9', '#A855F7',
+    ];
+    const marketplaceColors: Record<string, string> = {
+      'trendyol': '#F59E0B',
+      'amazon': '#3B82F6',
+      'amazon fba': '#6366F1',
+      'etsy': '#F97316',
+      'veeqo': '#14B8A6',
       'shippo': '#10B981',
-      'other': '#6B7280'
+      'hepsiburada': '#EF4444',
+      'bellecouturegifts': '#EC4899',
+      'decorsweetart': '#8B5CF6',
+      'mybabybymerry': '#06B6D4',
+      'outletemporiumus': '#84CC16',
+      'manual': '#9CA3AF',
+    };
+
+    // Normalize marketplace names (case-insensitive grouping)
+    const normalizeMarketplace = (name: string | null | undefined): string => {
+      if (!name) return 'Unknown';
+      const lower = name.toLowerCase().trim();
+      // Group known variations
+      if (lower.includes('amazon') && lower.includes('fba')) return 'Amazon FBA';
+      if (lower.includes('amazon')) return 'Amazon';
+      if (lower.includes('etsy')) return 'Etsy';
+      if (lower.includes('trendyol')) return 'Trendyol';
+      if (lower.includes('hepsiburada')) return 'Hepsiburada';
+      if (lower.includes('shippo')) return 'Shippo';
+      if (lower.includes('veeqo')) return 'Veeqo';
+      if (lower === 'manual') return 'Manual';
+      // Title case for others
+      return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
     };
 
     // Calculate marketplace breakdown with currency conversion
     const marketplaceBreakdown = marketplaceOrders.reduce((acc, order) => {
-      const marketplace = order.marketplace || 'Unknown';
+      const marketplace = normalizeMarketplace(order.marketplace);
       const convertedRevenue = convertToTRY(order.totalPrice || 0, order.currency);
       
       if (!acc[marketplace]) {
@@ -328,19 +466,32 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return acc;
     }, {} as Record<string, { orders: number; revenue: number }>);
 
-    const topMarketplaces = Object.entries(marketplaceBreakdown).map(([name, stats]) => ({
+    const topMarketplaces = Object.entries(marketplaceBreakdown).map(([name, stats], index) => ({
       name,
       orders: stats.orders,
       revenue: stats.revenue,
-      color: marketplaceColors[name?.toLowerCase() as keyof typeof marketplaceColors] || marketplaceColors.other
+      color: marketplaceColors[name?.toLowerCase()] || marketplaceColorPalette[index % marketplaceColorPalette.length]
     }));
 
-    // Format daily stats
-    const formattedDailyStats = dailyStats.map(stat => ({
-      date: stat.date.toISOString().split('T')[0],
-      orders: Number(stat.orders),
-      revenue: Number(stat.revenue) || 0
-    }));
+    // Format daily stats - convert each currency row to TRY, then aggregate by date
+    const dailyStatsMap = new Map<string, { orders: number; revenue: number }>();
+    for (const stat of dailyStats) {
+      const dateKey = stat.date.toISOString().split('T')[0];
+      const convertedRevenue = convertToTRY(Number(stat.revenue) || 0, stat.currency);
+      const existing = dailyStatsMap.get(dateKey);
+      if (existing) {
+        existing.orders += Number(stat.orders);
+        existing.revenue += convertedRevenue;
+      } else {
+        dailyStatsMap.set(dateKey, {
+          orders: Number(stat.orders),
+          revenue: convertedRevenue
+        });
+      }
+    }
+    const formattedDailyStats = Array.from(dailyStatsMap.entries())
+      .map(([date, stats]) => ({ date, orders: stats.orders, revenue: stats.revenue }))
+      .sort((a, b) => b.date.localeCompare(a.date));
 
     // Format order status breakdown
     const statusColors = {
@@ -357,12 +508,90 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       color: statusColors[status.externalStatus?.toLowerCase() as keyof typeof statusColors] || statusColors.pending
     }));
 
-    // Format top products
-    const formattedTopProducts = topProducts.map(product => ({
-      name: product.productName || 'Unknown Product',
-      orders: product._count.productName,
-      revenue: product._sum.totalPrice || 0
-    }));
+    // Format top products - aggregate in JS with currency conversion
+    const productAggregation = new Map<string, { orders: number; revenue: number }>();
+    for (const item of topProducts) {
+      const name = item.productName || 'Unknown Product';
+      const convertedRevenue = convertToTRY(Number(item.totalPrice) || 0, item.order?.currency);
+      const existing = productAggregation.get(name);
+      if (existing) {
+        existing.orders += 1;
+        existing.revenue += convertedRevenue;
+      } else {
+        productAggregation.set(name, { orders: 1, revenue: convertedRevenue });
+      }
+    }
+    const formattedTopProducts = Array.from(productAggregation.entries())
+      .map(([name, stats]) => ({ name, orders: stats.orders, revenue: stats.revenue }))
+      .sort((a, b) => b.orders - a.orders)
+      .slice(0, 5);
+
+    // Format monthly stats — aggregate by month converting currencies to TRY
+    const monthlyStatsMap = new Map<string, { orders: number; revenue: number; customers: number }>();
+    for (const stat of monthlyStatsRaw) {
+      const monthKey = stat.month.toISOString().slice(0, 7); // "YYYY-MM"
+      const convertedRevenue = convertToTRY(Number(stat.revenue) || 0, stat.currency);
+      const existing = monthlyStatsMap.get(monthKey);
+      if (existing) {
+        existing.orders += Number(stat.orders);
+        existing.revenue += convertedRevenue;
+        existing.customers += Number(stat.customers);
+      } else {
+        monthlyStatsMap.set(monthKey, {
+          orders: Number(stat.orders),
+          revenue: convertedRevenue,
+          customers: Number(stat.customers)
+        });
+      }
+    }
+    const monthlyStats = Array.from(monthlyStatsMap.entries())
+      .map(([month, stats]) => ({ month, orders: stats.orders, revenue: Math.round(stats.revenue * 100) / 100, customers: stats.customers }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+
+    // Format marketplace breakdown — aggregate by marketplace converting currencies to TRY
+    const mpBreakdownMap = new Map<string, { orders: number; revenue: number; customers: number; avgOrderValueSum: number; avgOrderValueCount: number }>();
+    for (const row of marketplaceBreakdownRaw) {
+      const mp = normalizeMarketplace(row.marketplace);
+      const convertedRevenue = convertToTRY(Number(row.revenue) || 0, row.currency);
+      const convertedAvg = convertToTRY(Number(row.avg_order_value) || 0, row.currency);
+      const existing = mpBreakdownMap.get(mp);
+      if (existing) {
+        existing.orders += Number(row.orders);
+        existing.revenue += convertedRevenue;
+        existing.customers += Number(row.customers);
+        existing.avgOrderValueSum += convertedAvg * Number(row.orders);
+        existing.avgOrderValueCount += Number(row.orders);
+      } else {
+        mpBreakdownMap.set(mp, {
+          orders: Number(row.orders),
+          revenue: convertedRevenue,
+          customers: Number(row.customers),
+          avgOrderValueSum: convertedAvg * Number(row.orders),
+          avgOrderValueCount: Number(row.orders)
+        });
+      }
+    }
+    const totalOrdersForPercentage = Array.from(mpBreakdownMap.values()).reduce((sum, s) => sum + s.orders, 0);
+    const formattedMarketplaceBreakdown = Array.from(mpBreakdownMap.entries())
+      .map(([marketplace, stats]) => ({
+        marketplace,
+        orders: stats.orders,
+        revenue: Math.round(stats.revenue * 100) / 100,
+        customers: stats.customers,
+        avgOrderValue: stats.avgOrderValueCount > 0 ? Math.round((stats.avgOrderValueSum / stats.avgOrderValueCount) * 100) / 100 : 0,
+        percentage: totalOrdersForPercentage > 0 ? Math.round((stats.orders / totalOrdersForPercentage) * 10000) / 100 : 0
+      }))
+      .sort((a, b) => b.orders - a.orders);
+
+    // Format shipping stats
+    const shippingStats = {
+      totalLabels,
+      pendingLabels,
+      byCarrier: labelsByCarrier.map(item => ({
+        carrier: item.carrier,
+        count: item._count._all
+      }))
+    };
 
     const analytics = {
       totalOrders,
@@ -371,6 +600,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       averageOrderValue: totalOrders > 0 ? currentRevenue / totalOrders : 0,
       orderTrend: Math.round(orderTrend * 100) / 100,
       revenueTrend: Math.round(revenueTrend * 100) / 100,
+      previousPeriod: {
+        orders: previousOrders,
+        revenue: Math.round(prevRevenue * 100) / 100,
+      },
       exchangeRates: Object.keys(exchangeRates).length > 0 ? {
         USD: exchangeRates['USD'] || 0,
         EUR: exchangeRates['EUR'] || 0,
@@ -379,7 +612,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       topMarketplaces,
       dailyStats: formattedDailyStats,
       topProducts: formattedTopProducts,
-      orderStatusBreakdown
+      orderStatusBreakdown,
+      monthlyStats,
+      marketplaceBreakdown: formattedMarketplaceBreakdown,
+      shippingStats,
+      recentActivity: recentActivity.map(o => ({ ...o, marketplace: normalizeMarketplace(o.marketplace) }))
     };
 
     res.status(200).json(analytics);
@@ -390,13 +627,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
-  } finally {
-    // Ensure connection is returned to pool
-    try {
-      await prisma.$disconnect();
-    } catch (disconnectError) {
-      console.warn('Warning: Error during Prisma disconnect:', disconnectError);
-    }
   }
 }
 

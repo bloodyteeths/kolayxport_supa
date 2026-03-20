@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Image from 'next/image';
 import PublicLayout from '../components/PublicLayout';
 import { UserPlus, ShoppingBag, Truck, Send, FileText, PlayCircle, CheckSquare } from 'lucide-react';
 import Link from 'next/link';
@@ -14,8 +13,7 @@ const steps = [
       'Ad Soyad ve E-posta adresinizle kaydolun.',
       'Şirket bilgilerinizi (opsiyonel) girin.',
       'Gelen kutunuzdaki onay e-postasını tıklayın.'
-    ],
-    image: '/screenshots/hesap-olustur.png' // Placeholder screenshot
+    ]
   },
   {
     id: 2,
@@ -26,8 +24,7 @@ const steps = [
       'Entegrasyonlar sayfasından pazar yerinizi seçin.',
       'Gerekli API anahtarlarını veya yetkilendirmeleri sağlayın.',
       'Mağazanızın otomatik olarak senkronize olmasını izleyin.'
-    ],
-    image: '/screenshots/magaza-bagla.png' // Placeholder screenshot
+    ]
   },
   {
     id: 3,
@@ -38,8 +35,7 @@ const steps = [
       'Desteklenen kargo firmalarından birini seçin.',
       'Kendi anlaşma bilgilerinizi girin veya standart fiyatları kullanın.',
       'Otomatik kargo etiketi ve takip numarası oluşturmayı etkinleştirin.'
-    ],
-    image: '/screenshots/kargo-sec.png' // Placeholder screenshot
+    ]
   },
   {
     id: 4,
@@ -50,8 +46,7 @@ const steps = [
       'Yeni siparişler panelinize otomatik düşer.',
       'Tek tıkla kargo etiketlerini yazdırın.',
       'Gönderi durumu müşterilerinize otomatik bildirilir.'
-    ],
-    image: '/screenshots/gonder.png' // Placeholder screenshot
+    ]
   },
 ];
 
@@ -125,19 +120,13 @@ export default function NasilKullanirimPage() {
                   ))}
                 </ul>
               </div>
-              <div className="aspect-video bg-slate-200 rounded-lg overflow-hidden relative group">
-                <div className="w-full h-full animate-slideUp">
-                  <img 
-                    src={currentStepData.image || 'https://via.placeholder.com/1280x720.png?text=Adım+Görseli'} 
-                    alt={`${currentStepData.name} görseli`} 
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <PlayCircle size={64} className="text-white/80"/>
+              <div className="aspect-video bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg overflow-hidden relative flex items-center justify-center">
+                <div className="text-center animate-slideUp">
+                  <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-5xl font-black text-white">{currentStepData.id}</span>
                   </div>
-                  <span className="absolute bottom-2 right-3 text-xs bg-black/50 text-white px-2 py-1 rounded">
-                    Örnek Ekran Görüntüsü
-                  </span>
+                  <currentStepData.icon size={48} className="text-white/80 mx-auto mb-3" />
+                  <p className="text-white/90 font-semibold text-lg">{currentStepData.name}</p>
                 </div>
               </div>
             </div>
@@ -151,20 +140,13 @@ export default function NasilKullanirimPage() {
             <p className="text-lg text-slate-600 mb-8 max-w-xl mx-auto">
               KolayXport'un temel özelliklerini ve kullanım kolaylığını aşağıdaki videomuzda keşfedin.
             </p>
-            <div className="aspect-video bg-slate-200 rounded-xl shadow-xl overflow-hidden relative group cursor-pointer hover:shadow-2xl transition-shadow">
-              {/* Placeholder for Loom Video Embed */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                  <PlayCircle size={80} className="text-blue-500 opacity-70 group-hover:opacity-100 transition-opacity"/>
+            <div className="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl shadow-xl overflow-hidden relative flex items-center justify-center">
+              <div className="text-center">
+                <PlayCircle size={64} className="text-blue-400 mx-auto mb-4" />
+                <p className="text-slate-600 font-semibold text-lg">Video yakinda gelecek</p>
+                <p className="text-slate-400 text-sm mt-2">Tanitim videomuz hazirlanmaktadir</p>
               </div>
-              <Image src="https://via.placeholder.com/1280x720/E2E8F0/94A3B8?text=Loom+Video+Burada" alt="KolayXport kullanım rehberi tanıtım videosu" width={1280} height={720} className="w-full h-full object-cover" priority/>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-50 group-hover:opacity-20 transition-opacity"></div>
-              <p className="absolute bottom-4 left-4 text-white text-sm font-medium bg-black/50 px-2 py-1 rounded">
-                Loom Video (Yer Tutucu)
-              </p>
             </div>
-            <p className="mt-4 text-sm text-slate-500">
-              Videoyu izleyemiyor musunuz? <a href="#" onClick={(e) => e.preventDefault()} className="text-blue-600 hover:underline">Alternatif link</a>.
-            </p>
           </div>
         </section>
 

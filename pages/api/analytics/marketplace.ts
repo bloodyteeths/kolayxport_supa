@@ -83,7 +83,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const whereClause = {
       userId: dbUser.id,
       marketplace: marketplace,
-      orderDate: {
+      uiOrderDate: {
         gte: startDate,
         lte: now
       }

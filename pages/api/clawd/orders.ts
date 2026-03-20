@@ -12,7 +12,7 @@ export default async function handler(
     }
 
     // 2. Authentication: API Key
-    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    const apiKey = req.headers['x-api-key'];
     const envApiKey = process.env.CLAWD_API_KEY;
 
     if (!envApiKey) {
@@ -28,7 +28,14 @@ export default async function handler(
         // 3. fetch orders
         const { id, status, limit, userId, customer } = req.query;
 
-        const where: any = {};
+        // REQUIRED: userId must be provided to prevent cross-user data access
+        if (!userId) {
+            return res.status(400).json({ error: 'Bad Request: userId parameter is required' });
+        }
+
+        const where: any = {
+            userId: String(userId),
+        };
 
         // Optional: Filter by specific Order ID
         if (id) {
@@ -38,13 +45,6 @@ export default async function handler(
         // Optional: Filter by Status (e.g. pending, shipped)
         if (status) {
             where.status = String(status);
-        }
-
-        // Optional: Filter by UserId if the bot needs to scope to a specific user
-        // (If not provided, it might fetch ALL orders from ALL users, which might be intended for an admin bot,
-        // or strictly forbidden depending on privacy. Assuming admin access for now.)
-        if (userId) {
-            where.userId = String(userId);
         }
 
         // Optional: Filter by Customer Name (case-insensitive search)

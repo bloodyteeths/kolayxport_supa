@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { v4 as uuidv4 } from 'uuid';
 import prisma from '../../../lib/prisma';
 import { getIntegrationCreds } from '../../../lib/config';
 import { fetchVeeqoOrders, VeeqoOrder } from '@integrations/veeqo';
@@ -82,30 +81,36 @@ export default async function handler(
     let added = 0;
     let updated = 0;
 
+    // 1. Build normalised DTOs for all orders to import
+    type OrderDTO = {
+      marketplace: string;
+      marketplaceKey: string;
+      orderNumber: string;
+      customerName: string | null;
+      status: string;
+      currency?: string | null;
+      totalPrice?: number | null;
+    };
+    type ItemDTO = {
+      image?: string | null;
+      sku?: string | null;
+      productName?: string | null;
+      unitPrice?: number | null;
+      totalPrice?: number | null;
+      variantInfo?: string | null;
+      notes?: string | null;
+      quantity: number;
+      shipBy?: Date | null;
+      marketplaceKey?: string | null;
+      orderNumber?: string | null;
+      uniqueLineKey?: string | null;
+    };
+    type PreparedOrder = { norm: Normalised; orderDTO: OrderDTO; itemsDTO: ItemDTO[] };
+
+    const prepared: PreparedOrder[] = [];
     for (const norm of toImport) {
-      let orderDTO: {
-        marketplace: string;
-        marketplaceKey: string;
-        orderNumber: string;
-        customerName: string | null;
-        status: string;
-        currency?: string | null;
-        totalPrice?: number | null;
-      };
-      let itemsDTO: Array<{
-        image?: string | null;
-        sku?: string | null;
-        productName?: string | null;
-        unitPrice?: number | null;
-        totalPrice?: number | null;
-        variantInfo?: string | null;
-        notes?: string | null;
-        quantity: number;
-        shipBy?: Date | null;
-        marketplaceKey?: string | null;
-        orderNumber?: string | null;
-        uniqueLineKey?: string | null;
-      }> = [];
+      let orderDTO: OrderDTO;
+      let itemsDTO: ItemDTO[] = [];
 
       if (norm.marketplace === 'VEEQO') {
         const raw = norm.raw as VeeqoOrder;
@@ -169,73 +174,130 @@ export default async function handler(
         continue;
       }
 
-      // Find existing order by userId, marketplace, and marketplaceKey
-      const existingOrder = await prisma.order.findFirst({
-        where: {
-          userId,
-          marketplace: orderDTO.marketplace,
-          marketplaceKey: orderDTO.marketplaceKey
+      prepared.push({ norm, orderDTO, itemsDTO });
+    }
+
+    // 2. Batch-fetch all existing orders for this user that match the marketplaceKeys we care about
+    const marketplaceKeys = prepared.map(p => p.orderDTO.marketplaceKey);
+    const existingOrders = await prisma.order.findMany({
+      where: {
+        userId,
+        marketplaceKey: { in: marketplaceKeys },
+      },
+      select: { id: true, marketplace: true, marketplaceKey: true },
+    });
+    const existingOrderMap = new Map(
+      existingOrders.map(o => [`${o.marketplace}:${o.marketplaceKey}`, o])
+    );
+
+    // 3. Use a single transaction for all DB operations
+    const result = await prisma.$transaction(async (tx) => {
+      const orderIds: Array<{ key: string; orderId: string; isNew: boolean }> = [];
+
+      // 3a. Process updates and creates for orders
+      for (const { norm, orderDTO } of prepared) {
+        const key = `${orderDTO.marketplace}:${orderDTO.marketplaceKey}`;
+        const existing = existingOrderMap.get(key);
+
+        if (existing) {
+          await tx.order.update({
+            where: { id: existing.id },
+            data: {
+              customerName: orderDTO.customerName,
+              currency: orderDTO.currency,
+              totalPrice: orderDTO.totalPrice,
+              rawData: norm.raw as any,
+              updatedAt: new Date(),
+            },
+          });
+          orderIds.push({ key, orderId: existing.id, isNew: false });
+        } else {
+          const created = await tx.order.create({
+            data: {
+              userId,
+              marketplace: orderDTO.marketplace,
+              marketplaceKey: orderDTO.marketplaceKey,
+              orderNumber: orderDTO.orderNumber,
+              customerName: orderDTO.customerName,
+              status: orderDTO.status,
+              currency: orderDTO.currency,
+              totalPrice: orderDTO.totalPrice,
+              rawData: norm.raw as any,
+              updatedAt: new Date(),
+              createdAt: new Date(),
+            },
+          });
+          orderIds.push({ key, orderId: created.id, isNew: true });
         }
-      });
-      let orderId: string;
-      if (existingOrder) {
-        orderId = existingOrder.id;
-        await prisma.order.update({
-          where: { id: orderId },
-          data: {
-            customerName: orderDTO.customerName,
-            currency: orderDTO.currency,
-            totalPrice: orderDTO.totalPrice,
-            rawData: norm.raw as any,
-            updatedAt: new Date()
-          }
-        });
-      } else {
-        const created = await prisma.order.create({
-          data: {
-            userId,
-            marketplace: orderDTO.marketplace,
-            marketplaceKey: orderDTO.marketplaceKey,
-            orderNumber: orderDTO.orderNumber,
-            customerName: orderDTO.customerName,
-            status: orderDTO.status,
-            currency: orderDTO.currency,
-            totalPrice: orderDTO.totalPrice,
-            rawData: norm.raw as any,
-            updatedAt: new Date(),
-            createdAt: new Date()
-          }
-        });
-        orderId = created.id;
       }
 
-      // Delete existing items for this order:
-      await prisma.orderItem.deleteMany({ where: { orderId } });
+      // Build orderId lookup
+      const orderIdMap = new Map(orderIds.map(o => [o.key, o]));
 
-      // Insert new items:
-      for (const item of itemsDTO) {
-        await prisma.orderItem.create({
-          data: {
-            orderId,
+      // 3b. Batch delete all existing items for all affected orders
+      const allOrderIds = orderIds.map(o => o.orderId);
+      await tx.orderItem.deleteMany({
+        where: { orderId: { in: allOrderIds } },
+      });
+
+      // 3c. Batch create all items using createMany
+      const allItems: Array<{
+        orderId: string;
+        image?: string;
+        sku?: string;
+        productName?: string;
+        unitPrice?: number;
+        totalPrice?: number;
+        variantInfo?: string;
+        notes?: string;
+        quantity: number;
+        shipBy?: Date;
+        marketplaceKey?: string;
+        orderNumber?: string;
+        uniqueLineKey?: string;
+      }> = [];
+
+      for (const { orderDTO, itemsDTO } of prepared) {
+        const key = `${orderDTO.marketplace}:${orderDTO.marketplaceKey}`;
+        const entry = orderIdMap.get(key);
+        if (!entry) continue;
+
+        for (const item of itemsDTO) {
+          allItems.push({
+            orderId: entry.orderId,
             image: item.image || undefined,
             sku: item.sku || undefined,
             productName: item.productName || undefined,
-            unitPrice: item.unitPrice ?? 0,
-            totalPrice: item.totalPrice ?? 0,
+            unitPrice: (item.unitPrice ?? 0) as any,
+            totalPrice: (item.totalPrice ?? 0) as any,
             variantInfo: item.variantInfo || undefined,
             notes: item.notes || undefined,
             quantity: item.quantity ?? 1,
             shipBy: item.shipBy || undefined,
             marketplaceKey: item.marketplaceKey || undefined,
             orderNumber: item.orderNumber || undefined,
-            uniqueLineKey: item.uniqueLineKey || undefined
-          }
-        });
+            uniqueLineKey: item.uniqueLineKey || undefined,
+          });
+        }
       }
 
-      if (existingSet.has(orderDTO.orderNumber ?? '')) updated++;
-      else added++;
-    }
+      if (allItems.length > 0) {
+        await tx.orderItem.createMany({ data: allItems });
+      }
+
+      // 3d. Count added vs updated
+      let batchAdded = 0;
+      let batchUpdated = 0;
+      for (const { orderDTO } of prepared) {
+        if (existingSet.has(orderDTO.orderNumber ?? '')) batchUpdated++;
+        else batchAdded++;
+      }
+
+      return { added: batchAdded, updated: batchUpdated };
+    });
+
+    added = result.added;
+    updated = result.updated;
 
     res.status(200).json({ imported: added + updated });
   } catch (err) {

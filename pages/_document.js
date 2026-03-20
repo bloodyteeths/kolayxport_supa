@@ -17,7 +17,7 @@ export default function Document() {
         <link rel="dns-prefetch" href="https://www.google-analytics.com" />
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
       </Head>
-      <body style={{ scrollbarGutter: 'stable' }}>
+      <body>
         <Main />
         <NextScript />
       </body>

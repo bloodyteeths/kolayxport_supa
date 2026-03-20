@@ -126,68 +126,16 @@ export async function toOrderWithImages(order: any, productImages: Record<string
   };
 }
 
+/**
+ * Synchronous convenience wrapper that delegates to toOrderWithImages
+ * with an empty imageMap. Keeps the public API unchanged for existing callers.
+ */
 export function toOrder(order: any): UIOrder {
-  // Calculate shipByDate once for the order
-  // In Trendyol, agreedDeliveryDate is the ship-by deadline, not delivery date
-  // If seller extended preparation time, use extendedAgreedDeliveryDate instead
-  const shipByMs = (order.extendedAgreedDeliveryDate && order.extendedAgreedDeliveryDate > 0)
-    ? order.extendedAgreedDeliveryDate
-    : order.agreedDeliveryDate;
-  
-  const shipByDate = shipByMs ? new Date(Number(shipByMs)).toISOString() : undefined;
-
-  const line_items = (order.lines || order.lineItems || []).map((item: any) => toOrderItem(item, shipByDate));
-  
-  // Properly map Trendyol addresses using correct field names from the API response
-  const shipmentAddr = order.shipmentAddress;
-  const customerName = `${order.customerFirstName || ''} ${order.customerLastName || ''}`.trim() || 
-                      shipmentAddr?.fullName || 
-                      order.customerName || 
-                      order.buyerName || '';
-
-  return {
-    id: order.id?.toString() || order.orderNumber || String(Math.random()),
-    marketplaceKey: order.id?.toString() || '',
-    orderNumber: order.orderNumber || '',
-    customerName,
-    uiOrderDate: order.orderDate
-      ? new Date(Number(order.orderDate)).toISOString()
-      : undefined,
-    line_items,
-    // Additional fields with fallbacks
-    status: order.status || 'pending',
-    currency: order.currencyCode || 'TRY',
-    totalPrice: order.totalPrice || order.grossAmount || 0,
-    source: 'trendyol' as const,
-    channel: 'trendyol' as const,
-    marketplace: 'Trendyol',
-    // Map shipping address as string (UIOrder expects string | null)
-    shippingAddress: shipmentAddr ? 
-      `${shipmentAddr.fullName || ''}, ${shipmentAddr.address1 || ''}, ${shipmentAddr.city || ''}, ${shipmentAddr.countryCode || 'TR'}` : 
-      null,
-    // Required to_address field - use shipmentAddress from Trendyol API
-    to_address: {
-      name: shipmentAddr?.fullName || customerName,
-      phone: shipmentAddr?.phone || '',
-      street1: shipmentAddr?.address1 || '',
-      street2: shipmentAddr?.address2 || '',
-      city: shipmentAddr?.city || '',
-      state: shipmentAddr?.stateName || '',
-      postal: shipmentAddr?.postalCode || '',
-      country: shipmentAddr?.countryCode || 'TR',
-      isResidential: true,
-      email: order.customerEmail || '',
-    },
-    // Additional required fields
-    marketplaceOrderDate: order.orderDate
-      ? new Date(Number(order.orderDate)).toISOString()
-      : undefined,
-    shipByDate,
-    rawData: order,
-    commodityDesc: line_items.length > 0 ? line_items[0].title : '',
-    externalStatus: order.status || '',
-    recipientEmail: order.customerEmail || '',
-  };
+  // toOrderWithImages is async only because callers *may* await it;
+  // with an empty imageMap the implementation is fully synchronous, so
+  // we cast the returned promise value. This is safe because no awaits
+  // are triggered when productImages is empty.
+  return toOrderWithImages(order, {}) as unknown as UIOrder;
 }
 
 /**

@@ -2,6 +2,8 @@
 import prisma from '@/lib/prisma';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '@/lib/logger'; // Assuming you have a logger, changed to named import
+import { getSupabaseServerClient } from '../../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 // Define a more specific type for the updates if possible, based on LabelRow
 interface OrderUpdatePayload {
@@ -23,7 +25,7 @@ interface OrderUpdatePayload {
   fedexServiceType?: string;
   fedexPackagingType?: string;
   // Potentially commodityDesc if it's directly on the order level for shippoOptions
-  commodityDesc?: string; 
+  commodityDesc?: string;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -31,6 +33,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     logger.warn(`[API /orders/update] Method Not Allowed: ${req.method}`);
     res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+
+  // --- Authentication ---
+  let user, authError;
+  const supabase = getSupabaseServerClient(req, res);
+  const result = await supabase.auth.getUser();
+  user = result.data.user;
+  authError = result.error;
+  if (authError || !user) {
+    const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
+    let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
+    const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (token) {
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        const supabaseDirect = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+        const { data, error: userError } = await supabaseDirect.auth.getUser(token);
+        user = data.user;
+        authError = userError;
+      }
+    }
+  }
+  if (authError || !user) {
+    return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const {
@@ -56,6 +81,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // logger.info('[API /orders/update] received', { orderId, itemId, body: req.body })
 
   try {
+    // Check if a shipping label already exists for this order before updating address fields
+    let labelWarning: string | undefined;
+    const hasAddressChange = recipientFirstName !== undefined || recipientLastName !== undefined ||
+      recipientStreet1 !== undefined || recipientStreet2 !== undefined ||
+      recipientCity !== undefined || recipientState !== undefined ||
+      recipientPostal !== undefined || recipientCountry !== undefined;
+
+    if (hasAddressChange) {
+      const existingShipment = await prisma.shipment.findFirst({
+        where: {
+          orderId: orderId,
+          status: 'created',
+        },
+      });
+
+      if (existingShipment) {
+        logger.warn(`[API /orders/update] Order ${orderId} has an existing shipment (${existingShipment.id}) with status 'created'. Address is being updated anyway.`);
+        labelWarning = 'Address updated but a shipping label already exists. Consider regenerating the label.';
+      }
+    }
+
     // Prepare data for Order update, excluding fields not directly on Order model or handled separately
     const orderUpdateData: any = {
         // shippingAddress will be updated as a JSON object
@@ -88,7 +134,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     await prisma.order.update({
-      where: { id: orderId },
+      where: { id: orderId, userId: user.id },
       data: orderUpdateData,
     })
 
@@ -117,7 +163,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     logger.info(`[API /orders/update] Successfully updated order ${orderId}`);
-    return res.status(200).json({ ok: true })
+    return res.status(200).json({
+      success: true,
+      ok: true,
+      ...(labelWarning && { warning: labelWarning }),
+    })
   } catch (err: any) {
     logger.error('[API /orders/update] DB error', err)
     return res.status(500).json({ error: 'DB update failed', details: err.message || String(err) })

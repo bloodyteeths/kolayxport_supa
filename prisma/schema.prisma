@@ -133,7 +133,7 @@ model Order {
   externalStatus              String?
   uiOrderDate                 DateTime?
   items                       OrderItem[]    @relation("OrderToOrderItem")
-  user                        User           @relation(fields: [userId], references: [id])
+  user                        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   shipments                   Shipment[]     @relation("OrderToShipment")
   shipping                    OrderShipping? @relation("OrderToOrderShipping")
   trackingSubmissions         TrackingSubmission[] @relation("OrderTrackingSubmissions")
@@ -142,6 +142,11 @@ model Order {
   @@unique([userId, marketplace, marketplaceKey])
   @@index([userId])
   @@index([marketplace, marketplaceKey])
+  @@index([userId, labelStatus])
+  @@index([userId, createdAt])
+  @@index([userId, externalStatus])
+  @@index([userId, marketplace])
+  @@index([userId, uiOrderDate])
 }
 
 model OrderItem {
@@ -173,6 +178,7 @@ model OrderItem {
   @@unique([remoteLineId, orderId], name: "remoteLineId_orderId")
   @@index([orderId])
   @@index([sku])
+  @@index([orderId, sku])
 }
 
 model Product {
@@ -298,6 +304,7 @@ model LabelJob {
   orderItem      OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
 
   @@index([orderItemId])
+  @@index([status])
 }
 
 model SenkronOrderData {
@@ -336,6 +343,7 @@ model Shipment {
 
   @@index([orderId])
   @@index([orderItemId])
+  @@index([orderId, status])
 }
 
 model SyncLog {
@@ -427,9 +435,11 @@ model TrackingSubmission {
   order           Order    @relation("OrderTrackingSubmissions", fields: [orderId], references: [id], onDelete: Cascade)
   user            User     @relation("UserTrackingSubmissions", fields: [submittedBy], references: [id], onDelete: Cascade)
 
+  @@unique([orderId, trackingNumber])
   @@index([orderId])
   @@index([submittedBy])
   @@index([submittedAt])
+  @@index([orderId, trackingNumber])
 }
 
 model EtsyShop {
@@ -450,4 +460,9 @@ model EtsyShop {
   @@unique([userId, shopId])  // One record per user-shop combination
   @@index([userId])
   @@index([shopId])
+}
+
+model WebhookEvent {
+  id        String   @id
+  createdAt DateTime @default(now())
 }

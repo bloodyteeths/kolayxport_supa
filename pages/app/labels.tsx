@@ -19,6 +19,12 @@ import ManualOrderButton from '@/components/ManualOrderButton';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
 import withAuth from '@/components/withAuth';
 import { supabase } from '@/lib/supabase';
+import {
+  FEDEX_SERVICE_TYPES,
+  FEDEX_PACKAGING_TYPES,
+  ALLOWED_LABEL_STOCK_TYPES,
+  FEDEX_CURRENCY_CODES,
+} from '@/lib/fedex/fedex.config';
 
 // Minimal UIOrder type for UPS drawer
 interface UIOrder {
@@ -42,102 +48,6 @@ interface UIOrder {
   countryOfOrigin?: string;
   shipments?: any[];
 }
-
-// --- Constants for FedEx Dropdowns ---
-const FEDEX_SERVICE_TYPES = [
-  { value: 'INTERNATIONAL_PRIORITY', label: 'FedEx International Priority®' },
-  { value: 'INTERNATIONAL_ECONOMY', label: 'FedEx International Economy®' },
-  { value: 'FEDEX_EXPRESS_SAVER', label: 'FedEx Express Saver®' },
-  { value: 'FEDEX_GROUND', label: 'FedEx Ground®' },
-  { value: 'FEDEX_HOME_DELIVERY', label: 'FedEx Home Delivery®' },
-];
-
-const FEDEX_PACKAGING_TYPES = [
-  { value: 'FEDEX_PAK', label: 'FedEx Pak' },
-  { value: 'FEDEX_BOX', label: 'FedEx Box' },
-  { value: 'FEDEX_TUBE', label: 'FedEx Tube' },
-  { value: 'FEDEX_ENVELOPE', label: 'FedEx Envelope' },
-  { value: 'YOUR_PACKAGING', label: 'Your Packaging' },
-];
-
-const FEDEX_PREDEFINED_CONTAINERS = [
-  'FEDEX_PAK',
-  'FEDEX_ENVELOPE',
-  'FEDEX_BOX',
-  'FEDEX_SMALL_BOX',
-  'FEDEX_MEDIUM_BOX',
-  'FEDEX_LARGE_BOX',
-  'FEDEX_EXTRA_LARGE_BOX',
-  'FEDEX_TUBE'
-];
-
-// Allowed label stock types for PDF/PNG labels per FedEx Ship API
-const ALLOWED_LABEL_STOCK_TYPES = [
-  { value: 'PAPER_4X6',  label: '4 × 6 in' },
-  { value: 'PAPER_4X8',  label: '4 × 8 in' },
-  { value: 'PAPER_4X9',  label: '4 × 9 in' },
-  { value: 'PAPER_4X675', label: '4 × 6.75 in' },
-  { value: 'PAPER_85X11_TOP_HALF_LABEL',   label: 'Letter – top ½' },
-  { value: 'PAPER_85X11_BOTTOM_HALF_LABEL',label: 'Letter – bottom ½' },
-  { value: 'PAPER_LETTER',                 label: 'Letter – full page' },
-] as const;
-
-// FedEx Currency Codes
-const FEDEX_CURRENCY_CODES = [
-  { value: 'USD', label: 'ABD Doları (USD)' },
-  { value: 'EUR', label: 'Euro (EUR)' },
-  { value: 'GBP', label: 'İngiliz Sterlini (GBP)' },
-  { value: 'TRY', label: 'Türk Lirası (TRY)' },
-  { value: 'CAD', label: 'Kanada Doları (CAD)' },
-  { value: 'AUD', label: 'Avustralya Doları (AUD)' },
-  { value: 'JPY', label: 'Japon Yeni (JPY)' },
-  { value: 'CHF', label: 'İsviçre Frangı (CHF)' },
-  { value: 'CNY', label: 'Çin Yuanı (CNY)' },
-  { value: 'SEK', label: 'İsveç Kronu (SEK)' },
-  { value: 'NOK', label: 'Norveç Kronu (NOK)' },
-  { value: 'DKK', label: 'Danimarka Kronu (DKK)' },
-  { value: 'NZD', label: 'Yeni Zelanda Doları (NZD)' },
-  { value: 'SGD', label: 'Singapur Doları (SGD)' },
-  { value: 'HKD', label: 'Hong Kong Doları (HKD)' },
-  { value: 'KRW', label: 'Güney Kore Wonu (KRW)' },
-  { value: 'MXN', label: 'Meksika Pesosu (MXN)' },
-  { value: 'BRL', label: 'Brezilya Reali (BRL)' },
-  { value: 'INR', label: 'Hindistan Rupisi (INR)' },
-  { value: 'ZAR', label: 'Güney Afrika Randı (ZAR)' },
-  { value: 'AED', label: 'BAE Dirhemi (AED)' },
-  { value: 'SAR', label: 'Suudi Arabistan Riyali (SAR)' },
-  { value: 'PLN', label: 'Polonya Zlotisi (PLN)' },
-  { value: 'CZK', label: 'Çek Korunası (CZK)' },
-  { value: 'HUF', label: 'Macar Forinti (HUF)' },
-  { value: 'RON', label: 'Romen Leyi (RON)' },
-  { value: 'BGN', label: 'Bulgar Levası (BGN)' },
-  { value: 'HRK', label: 'Hırvat Kunası (HRK)' },
-  { value: 'RUB', label: 'Rus Rublesi (RUB)' },
-  { value: 'THB', label: 'Tayland Bahtı (THB)' },
-  { value: 'MYR', label: 'Malezya Ringgiti (MYR)' },
-  { value: 'IDR', label: 'Endonezya Rupisi (IDR)' },
-  { value: 'PHP', label: 'Filipin Pesosu (PHP)' },
-  { value: 'ILS', label: 'İsrail Şekeli (ILS)' },
-  { value: 'TWD', label: 'Tayvan Doları (TWD)' },
-  { value: 'VND', label: 'Vietnam Dongu (VND)' },
-  { value: 'CLP', label: 'Şili Pesosu (CLP)' },
-  { value: 'ARS', label: 'Arjantin Pesosu (ARS)' },
-  { value: 'COP', label: 'Kolombiya Pesosu (COP)' },
-  { value: 'PEN', label: 'Peru Solu (PEN)' },
-  { value: 'UAH', label: 'Ukrayna Grivnası (UAH)' },
-  { value: 'KZT', label: 'Kazakistan Tengesi (KZT)' },
-  { value: 'EGP', label: 'Mısır Lirası (EGP)' },
-  { value: 'MAD', label: 'Fas Dirhemi (MAD)' },
-  { value: 'QAR', label: 'Katar Riyali (QAR)' },
-  { value: 'KWD', label: 'Kuveyt Dinarı (KWD)' },
-  { value: 'OMR', label: 'Umman Riyali (OMR)' },
-  { value: 'BHD', label: 'Bahreyn Dinarı (BHD)' },
-  { value: 'JOD', label: 'Ürdün Dinarı (JOD)' },
-  { value: 'LBP', label: 'Lübnan Lirası (LBP)' },
-  { value: 'PKR', label: 'Pakistan Rupisi (PKR)' },
-  { value: 'BDT', label: 'Bangladeş Takası (BDT)' },
-  { value: 'LKR', label: 'Sri Lanka Rupisi (LKR)' },
-].sort((a, b) => a.label.localeCompare(b.label, 'tr'));
 
 // Veeqo Carrier IDs for tracking submission
 const VEEQO_CARRIERS = [
@@ -608,16 +518,6 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
   // The API will return null if no EtsyAddress record exists for this order
   const shouldTryEtsyEnrichment = isMissingCriticalAddress && order.orderNumber;
   
-  // Debug logging
-  console.log(`🔍 Debug order ${order.orderNumber}:`, {
-    marketplace: order.marketplace,
-    shouldTryEtsyEnrichment,
-    isMissingCriticalAddress,
-    street1: extractedAddress.recipientStreet1,
-    city: extractedAddress.recipientCity,
-    extractedAddress
-  });
-  
   if (shouldTryEtsyEnrichment && order.orderNumber) {
     try {
       // Use pre-fetched enrichment first, fallback to individual API call if needed
@@ -625,10 +525,7 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
       
       // If no pre-fetched enrichment found, make individual API call as fallback
       if (!etsyEnrichment) {
-        console.log(`No batch enrichment found for ${order.orderNumber}, trying individual call`);
         etsyEnrichment = await fetchEtsyAddressEnrichment(order.orderNumber);
-      } else {
-        console.log(`Using batch enrichment for ${order.orderNumber}`);
       }
       
       if (etsyEnrichment?.shippingAddress) {
@@ -706,14 +603,7 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
           })(),
           _etsyOrderDate: etsyEnrichment.orderDate,
           // Extract customer note from Etsy notes
-          _etsyCustomerNote: (() => {
-            const customerNote = parseEtsyPersonalization(etsyEnrichment.notes);
-            console.log(`🔍 Etsy customer note extraction for order ${order.orderNumber}:`, {
-              originalNotes: etsyEnrichment.notes,
-              extractedNote: customerNote
-            });
-            return customerNote;
-          })()
+          _etsyCustomerNote: parseEtsyPersonalization(etsyEnrichment.notes)
         };
         
         return enrichedAddress;
@@ -814,7 +704,6 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
   const etsyEnrichments = new Map<string, any>();
   if (etsyOrderNumbers.length > 0) {
     try {
-      console.log(`Fetching Etsy enrichments for ${etsyOrderNumbers.length} orders in single batch call`);
       const response = await fetch(`/api/etsy-addresses?orderNumbers=${etsyOrderNumbers.join(',')}`, {
         cache: 'no-store',
         headers: {
@@ -824,20 +713,11 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
       
       if (response.ok || response.status === 304) {
         const data = await response.json();
-        console.log('Etsy batch API response:', data);
-        console.log('Lookup object keys:', data.lookup ? Object.keys(data.lookup) : 'no lookup');
-        console.log('Addresses array length:', data.addresses ? data.addresses.length : 'no addresses');
-        if (data.debug) {
-          console.log('DEBUG - Queried order numbers:', data.debug.queriedOrderNumbers);
-          console.log('DEBUG - Found order numbers:', data.debug.foundOrderNumbers);
-          console.log('DEBUG - User ID:', data.debug.userId);
-        }
         if (data.success && data.lookup) {
           // Use the lookup map to populate our enrichments
           for (const [orderNumber, enrichment] of Object.entries(data.lookup)) {
             etsyEnrichments.set(orderNumber, enrichment);
           }
-          console.log(`Successfully fetched ${Object.keys(data.lookup).length} Etsy enrichments`);
         } else {
           console.warn('Etsy batch API returned unexpected format:', data);
         }
@@ -861,9 +741,6 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
     
     // Pass the pre-fetched enrichment to extractAddress
     const etsyEnrichment = order.orderNumber ? etsyEnrichments.get(order.orderNumber) : null;
-    if (order.orderNumber && isEtsyOrderSync(order.marketplace)) {
-      console.log(`Processing order ${order.orderNumber}, has enrichment:`, !!etsyEnrichment);
-    }
     const addr = await extractAddress(order, etsyEnrichment);
     // Safe: Parse rawData ONLY for date mapping, do not mutate or affect other columns
     let safeRaw = order.rawData;
@@ -961,17 +838,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelJobStatus: hasOrderLabel ? 'created' : undefined,
         trackingNumber: latestShipment?.trackingNumber || order.trackingNumber || undefined,
         shipByDate: order.shipByDate || (addr as any)?._etsyShipByDate,
-        customerNote: (() => {
-          const note = (addr as any)?._etsyCustomerNote || '';
-          if (order.orderNumber === '3749610005') {
-            console.log(`🔍 Customer note for order ${order.orderNumber} (no line items):`, {
-              etsyCustomerNote: (addr as any)?._etsyCustomerNote,
-              finalNote: note,
-              addrObj: addr
-            });
-          }
-          return note;
-        })(),
+        customerNote: (addr as any)?._etsyCustomerNote || '',
         originalOrder: order,
         labelCreated: hasOrderLabel,
         shippingLabelUrl: hasOrderLabel ? (latestShipment?.pdfUrl || order.shippingLabelUrl) : undefined,
@@ -1034,17 +901,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelJobStatus: latestLabelJob?.status,
         trackingNumber: latestLabelJob?.trackingNumber,
         shipByDate: item.shipBy || order.shipByDate || (addr as any)?._etsyShipByDate,
-        customerNote: (() => {
-          const note = (addr as any)?._etsyCustomerNote || '';
-          if (order.orderNumber === '3749610005') {
-            console.log(`🔍 Customer note for order ${order.orderNumber} (with line items):`, {
-              etsyCustomerNote: (addr as any)?._etsyCustomerNote,
-              finalNote: note,
-              addrObj: addr
-            });
-          }
-          return note;
-        })(),
+        customerNote: (addr as any)?._etsyCustomerNote || '',
         originalOrder: order,
         labelCreated: latestLabelJob?.status === 'created' && !!latestLabelJob?.trackingNumber,
         shippingLabelUrl: latestLabelJob?.pdfUrl || (latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined),
@@ -1175,39 +1032,31 @@ function parseShippoNotes(notes: string): { to_address?: any; success: boolean }
 
 // Parse Etsy personalization from Chrome extension notes
 function parseEtsyPersonalization(notes: string): string {
-  console.log(`🔍 parseEtsyPersonalization called with:`, notes);
-  
   if (!notes || typeof notes !== 'string') {
-    console.log(`🔍 parseEtsyPersonalization: notes is empty or not string`);
     return '';
   }
-  
+
   try {
     // Look for "Personalization" followed by the actual personalization text
     // Examples:
     // "...PersonalizationLENA | Track package..."
     // "...PersonalizationNot requested on this item. | ..."
     // "...Personalizationit is a custom order | Track package..."
-    
+
     const personalizationMatch = notes.match(/Personalization([^|]*)/);
-    console.log(`🔍 parseEtsyPersonalization: regex match result:`, personalizationMatch);
-    
+
     if (personalizationMatch && personalizationMatch[1]) {
       const personalization = personalizationMatch[1].trim();
-      console.log(`🔍 parseEtsyPersonalization: extracted personalization:`, personalization);
-      
+
       // Handle common cases
-      if (personalization.toLowerCase().includes('not requested') || 
+      if (personalization.toLowerCase().includes('not requested') ||
           personalization.toLowerCase().includes('no personalization')) {
-        console.log(`🔍 parseEtsyPersonalization: filtered out "not requested" case`);
         return '';
       }
-      
-      console.log(`🔍 parseEtsyPersonalization: returning:`, personalization);
+
       return personalization;
     }
-    
-    console.log(`🔍 parseEtsyPersonalization: no match found, returning empty`);
+
     return '';
   } catch (error) {
     console.warn('Failed to parse Etsy personalization:', error);
@@ -1785,7 +1634,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     {
       field: 'customerSevk',
       headerName: 'Müşteri Sevk',
-      width: 160,
+      minWidth: 130,
+      flex: 1,
       valueGetter: (_value, row) => `${row.recipientFirstName || ''} ${row.recipientLastName || ''}`.trim() || row.originalOrder?.customerName || '—'
     },
     { 
@@ -1802,9 +1652,10 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       )
     },
     { 
-      field: 'title', 
-      headerName: 'Ürün Adı', 
-      width: 180,
+      field: 'title',
+      headerName: 'Ürün Adı',
+      minWidth: 150,
+      flex: 1,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
         <Tooltip title={params.value || ''} placement="bottom-start">
           <Box 
@@ -1832,9 +1683,10 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       )
     },
     { 
-      field: 'variantInfo', 
-      headerName: 'Varyasyon', 
-      width: 140,
+      field: 'variantInfo',
+      headerName: 'Varyasyon',
+      minWidth: 120,
+      flex: 1,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
         <Tooltip title={params.value || ''} placement="bottom-start">
           <Box 
@@ -1869,9 +1721,10 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       valueFormatter: (value: string | undefined) => value ? formatDate(value) : '—',
     },
     { 
-      field: 'customerNote', 
+      field: 'customerNote',
       headerName: 'Müşteri Notu',
-      width: 140,
+      minWidth: 120,
+      flex: 1,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         const note = params.row.customerNote;
         if (!note || note.trim() === '') {
@@ -2496,7 +2349,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   };
 
   return (
-    <Box sx={{ height: 'calc(100vh - 64px - 48px)', display: 'flex', flexDirection: 'column', p: 2 }}>
+    <Box sx={{ height: 'calc(100dvh - 64px - 48px)', display: 'flex', flexDirection: 'column', p: 2, overflow: 'hidden' }}>
   {/* ...content... */}
 
       <Toaster position="top-right" reverseOrder={false} />
@@ -2528,20 +2381,20 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
               {searchTypeOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
             </Select>
           </FormControl>
-          <TextField size="small" label="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" /> }} sx={{ minWidth: 200, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}/>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
+          <TextField size="small" label="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" /> }} sx={{ minWidth: 140, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}/>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
             <InputLabel shrink={true}>Sipariş Durumu</InputLabel>
             <Select value={statusFilter} label="Sipariş Durumu" onChange={e => setStatusFilter(e.target.value)} displayEmpty>
             {orderStatusFilterOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
             <InputLabel shrink={true}>Etiket Durumu</InputLabel>
             <Select value={labelStatusFilter} label="Etiket Durumu" onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty>
             {labelStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 170, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
             <InputLabel shrink={true}>Mağaza</InputLabel>
             <Select 
               multiple
@@ -2622,7 +2475,6 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             paginationModel={paginationModel}
             paginationMode="server"
             onPaginationModelChange={(newModel, details) => {
-              console.log('Pagination change:', newModel, 'Details:', details);
               // Use requestAnimationFrame to ensure state update happens after current event
               requestAnimationFrame(() => {
                 setPaginationModel(newModel);
@@ -2630,8 +2482,8 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             }}
             getRowId={(row) => row.itemId || row.orderId}
             disableRowSelectionOnClick
-            rowHeight={90}
-            disableColumnResize
+            rowHeight={72}
+            disableColumnResize={false}
             disableColumnMenu
             keepNonExistentRowsSelected={etgbEnabled}
             checkboxSelection={etgbEnabled}
@@ -2666,6 +2518,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
               height: '100%',
               border: 0,
               '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' },
+              '& .MuiDataGrid-cell': { py: 1 },
               '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cell:focus': {
                 outline: 'none !important',
               },
@@ -2676,7 +2529,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
       {drawerOrder && (
         <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer}>
-          <Box sx={{ width: { xs: '95vw', sm: 500, md: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <Box sx={{ width: { xs: '100%', sm: 500, md: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
             <Box sx={{ p: { xs: 1.5, sm: 2 }, borderBottom: '1px solid', borderColor: 'divider' }}>
               <Typography variant="h6">Etiket Oluştur</Typography>
               <Typography variant="body2" color="text.secondary">Sipariş No: {drawerOrder.orderNumber}</Typography>

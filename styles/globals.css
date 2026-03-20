@@ -11,6 +11,12 @@ html {
   font-family: var(--font-sans);
 }
 
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Brand color */
 .text-primary {
   color: #2563eb;
@@ -114,6 +120,26 @@ html {
     min-height: 48px;
     padding: 12px 16px;
   }
+}
+
+/* Scroll shadow indicators for tables */
+.table-scroll-wrapper {
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, rgba(0,0,0,0.06));
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.3s;
 }
 
 /* Mobile sidebar improvements */

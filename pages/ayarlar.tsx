@@ -423,41 +423,41 @@ const AyarlarPage = () => {
                 API Entegrasyonları
               </Typography>
               <Grid container spacing={3}>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Veeqo API Key" name="veeqoApiKey" type="password" value={formData.integrationSettings?.veeqoApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} sm={6} md={6}>
                   <TextField fullWidth label="Shippo Token" name="shippoToken" type="password" value={formData.integrationSettings?.shippoToken || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
 
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Trendyol API Key" name="trendyolApiKey" type="password" value={formData.integrationSettings?.trendyolApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Trendyol API Secret" name="trendyolApiSecret" type="password" value={formData.integrationSettings?.trendyolApiSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Trendyol Supplier ID" name="trendyolSupplierId" value={formData.integrationSettings?.trendyolSupplierId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
 
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="FedEx API Key" name="fedexApiKey" type="password" value={formData.integrationSettings?.fedexApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="FedEx API Secret" name="fedexApiSecret" type="password" value={formData.integrationSettings?.fedexApiSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="FedEx Account Number" name="fedexAccountNumber" value={formData.integrationSettings?.fedexAccountNumber || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
 
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="UPS API Key" name="upsApiKey" type="password" value={formData.integrationSettings?.upsApiKey || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="UPS API Secret" name="upsApiSecret" type="password" value={formData.integrationSettings?.upsApiSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="UPS Account Number" name="upsAccountNumber" value={formData.integrationSettings?.upsAccountNumber || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
 
@@ -465,25 +465,25 @@ const AyarlarPage = () => {
                 <Grid item xs={12}>
                   <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Paraşüt Entegrasyonu</Typography>
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Paraşüt Client ID" name="parasutClientId" value={formData.integrationSettings?.parasutClientId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Paraşüt Client Secret" name="parasutClientSecret" type="password" value={formData.integrationSettings?.parasutClientSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Paraşüt Username" name="parasutUsername" value={formData.integrationSettings?.parasutUsername || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Paraşüt Password" name="parasutPassword" type="password" value={formData.integrationSettings?.parasutPassword || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Paraşüt Company ID" name="parasutCompanyId" value={formData.integrationSettings?.parasutCompanyId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} sm={6} md={6}>
                   <TextField fullWidth label="Paraşüt Base URL (opsiyonel)" name="parasutBaseUrl" placeholder="https://api.parasut.com veya https://api.heroku-staging.parasut.com" value={formData.integrationSettings?.parasutBaseUrl || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} sm={6} md={6}>
                   <TextField fullWidth label="Paraşüt Redirect URI (opsiyonel)" name="parasutRedirectUri" placeholder="urn:ietf:wg:oauth:2.0:oob" value={formData.integrationSettings?.parasutRedirectUri || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
               </Grid>
@@ -585,7 +585,7 @@ const AyarlarPage = () => {
               </Typography>
               
               <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} sm={6} md={6}>
                   <TextField
                     fullWidth
                     label="ETGB Alıcı E-posta Adresi"
@@ -596,7 +596,7 @@ const AyarlarPage = () => {
                     helperText="ETGB Excel dosyaları bu adrese gönderilecektir"
                   />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} sm={6} md={6}>
                   <FormControl fullWidth>
                     <InputLabel id="etgb-enabled-label">ETGB Özelliği</InputLabel>
                     <Select
@@ -627,16 +627,16 @@ const AyarlarPage = () => {
                 Gönderici Profili
               </Typography>
               <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} sm={6} md={6}>
                   <TextField fullWidth label="Şirket Adı" name="shipperName" value={formData.shipperProfile?.shipperName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} sm={6} md={6}>
                   <TextField fullWidth label="Yetkili Kişi" name="shipperPersonName" value={formData.shipperProfile?.shipperPersonName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} sm={6} md={6}>
                   <TextField fullWidth label="Telefon" name="shipperPhoneNumber" value={formData.shipperProfile?.shipperPhoneNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} sm={6} md={6}>
                   <TextField fullWidth label="FedEx Klasör ID" name="fedexFolderId" value={formData.shipperProfile?.fedexFolderId || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12}>
@@ -645,17 +645,17 @@ const AyarlarPage = () => {
                 <Grid item xs={12}>
                   <TextField fullWidth label="Adres 2" name="shipperStreet2" value={formData.shipperProfile?.shipperStreet2 || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Şehir" name="shipperCity" value={formData.shipperProfile?.shipperCity || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Eyalet/Bölge Kodu" name="shipperStateCode" value={formData.shipperProfile?.shipperStateCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Posta Kodu" name="shipperPostalCode" value={formData.shipperProfile?.shipperPostalCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
-                
-                <Grid item xs={12} md={4}>
+
+                <Grid item xs={12} sm={6} md={4}>
                   <FormControl fullWidth required>
                     <InputLabel id="shipperCountryCode-label">Ülke Kodu</InputLabel>
                     <Select
@@ -669,10 +669,10 @@ const AyarlarPage = () => {
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="Vergi No" name="shipperTinNumber" value={formData.shipperProfile?.shipperTinNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <FormControl fullWidth required>
                     <InputLabel id="shipperTinType-label">Vergi Tipi</InputLabel>
                     <Select
@@ -687,7 +687,7 @@ const AyarlarPage = () => {
                   </FormControl>
                 </Grid>
 
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <FormControl fullWidth required>
                     <InputLabel id="defaultCurrencyCode-label">Varsayılan Para Birimi</InputLabel>
                     <Select
@@ -701,7 +701,7 @@ const AyarlarPage = () => {
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <FormControl fullWidth required>
                     <InputLabel id="dutiesPaymentType-label">Gümrük Ödeme Tipi</InputLabel>
                     <Select
@@ -716,7 +716,7 @@ const AyarlarPage = () => {
                   </FormControl>
                 </Grid>
 
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} sm={6} md={4}>
                   <FormControl fullWidth required>
                     <InputLabel id="defaultShippingChargesPaymentType-label">Default Shipping Charges Payment Type</InputLabel>
                     <Select
@@ -753,8 +753,8 @@ const AyarlarPage = () => {
                   <RefreshIcon />
                 </IconButton>
               </Box>
-              <TableContainer>
-                <Table size="small">
+              <TableContainer sx={{ overflowX: 'auto' }}>
+                <Table size="small" sx={{ minWidth: 700 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Eşitleme Türü</TableCell>

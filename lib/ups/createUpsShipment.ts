@@ -174,8 +174,6 @@ export async function getUpsAccessToken(apiKey: string, apiSecret: string): Prom
   params.append('grant_type', 'client_credentials');
   params.append('scope', 'shipment');  // Requesting shipment scope which includes paperless documents
 
-  console.log('[UPS OAUTH] Requesting OAuth 2.0 token from:', tokenUrl);
-  
   try {
     const response = await fetch(tokenUrl, {
       method: 'POST',
@@ -188,8 +186,7 @@ export async function getUpsAccessToken(apiKey: string, apiSecret: string): Prom
     });
 
     const responseData = await response.json();
-    console.log('[UPS OAUTH] Token response:', JSON.stringify(responseData, null, 2));
-    
+
     if (!response.ok) {
       console.error('[UPS OAUTH] Error response:', responseData);
       throw new Error(`UPS OAuth 2.0 error: ${response.status} – ${JSON.stringify(responseData)}`);
@@ -200,7 +197,6 @@ export async function getUpsAccessToken(apiKey: string, apiSecret: string): Prom
       throw new Error('No access_token in UPS OAuth 2.0 response');
     }
 
-    console.log('[UPS OAUTH] Successfully obtained access token');
     return responseData.access_token;
   } catch (error) {
     console.error('[UPS OAUTH] Exception during token request:', error);
@@ -415,12 +411,6 @@ function buildUpsShipmentPayload(
         })
       };
 
-      // Debug log
-      console.log(
-        `[UPS PRODUCT ${index + 1}] Built product payload:`,
-        JSON.stringify(productPayload, null, 2)
-      );
-
       return productPayload;
     });
     // Calculate and validate invoice totals
@@ -428,16 +418,11 @@ function buildUpsShipmentPayload(
       const qty = Number(p.Unit.Number);
       const val = Number(p.Unit.Value); // Unit.Value is now a numeric string
       const productTotal = qty * val;
-      console.log(`[UPS INVOICE] Product ${p.Description}: ${qty} × ${val} = ${productTotal.toFixed(6)}`);
       return sum + productTotal;
     }, 0);
     
     const declaredTotal = Number(internationalForms.invoiceLineTotal?.monetaryValue || 0);
     const totalDifference = Math.abs(invoiceLineTotal - declaredTotal);
-    
-    console.log(`[UPS INVOICE] Calculated total: ${invoiceLineTotal.toFixed(6)}`);
-    console.log(`[UPS INVOICE] Declared total: ${declaredTotal.toFixed(6)}`);
-    console.log(`[UPS INVOICE] Difference: ${totalDifference.toFixed(6)}`);
     
     // Allow small floating point differences (1 cent tolerance)
     if (totalDifference > 0.01) {
@@ -529,12 +514,8 @@ function buildUpsShipmentPayload(
 }
 
 async function callUpsApi(url: string, options: any, label: string) {
-  console.log(`[UPS API CALL] ${label} URL: ${url}`);
-  console.log(`[UPS API CALL] ${label} REQUEST:`, JSON.stringify(redactSensitive(options), null, 2));
   const res = await fetch(url, options);
   const rawResponse = await res.text();
-  console.log(`[UPS API CALL] ${label} RESPONSE STATUS: ${res.status}`);
-  console.log(`[UPS API CALL] ${label} RAW RESPONSE:`, rawResponse);
 
   if (!res.ok) {
     throw new Error(`API call for ${label} failed with status ${res.status}: ${rawResponse}`);
@@ -559,15 +540,6 @@ export async function createUpsShipment(input: CreateShipmentInput): Promise<Cre
     }
   }
 
-  console.log('[createUpsShipment] Received input:', JSON.stringify({
-    ...input,
-    shipper: {
-      ...shipper,
-      upsApiKey: '[REDACTED]',
-      upsApiSecret: '[REDACTED]',
-    }
-  }, null, 2));
-
   // Validate required fields for US addresses
   if (input.recipient.countryCode === 'US') {
     const normalizedState = normalizeStateCode(input.recipient.stateCode || '', input.recipient.countryCode);
@@ -581,13 +553,11 @@ export async function createUpsShipment(input: CreateShipmentInput): Promise<Cre
       throw new Error(`Invalid or missing postal code for US address. Received: "${input.recipient.postalCode}", normalized to: "${normalizedPostal}"`);
     }
     
-    console.log(`[UPS VALIDATION] US address validation passed - State: "${input.recipient.stateCode}" → "${normalizedState}", Postal: "${input.recipient.postalCode}" → "${normalizedPostal}"`);
   }
 
   try {
     const token = await getUpsAccessToken(shipper.upsApiKey, shipper.upsApiSecret);
     const payload = buildUpsShipmentPayload(shipper, recipient, pkg, serviceType, isEdi, description, internationalForms, dutyPaymentType);
-    console.log('[createUpsShipment] Built payload:', JSON.stringify(payload, null, 2));
     const url = `${UPS_BASE_URL}/api/shipments/v1/ship`;
     const res = await callUpsApi(url, {
       method: 'POST',

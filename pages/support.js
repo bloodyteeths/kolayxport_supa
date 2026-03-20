@@ -54,8 +54,8 @@ export default function SupportPage() {
               <p className="text-slate-600 mb-4">
                 Genel sorularınız, teknik destek veya geri bildirimleriniz için bize e-posta gönderebilirsiniz.
               </p>
-              <a href="mailto:kolayxport@gmail.com" className="font-medium text-blue-600 hover:text-blue-700 transition-colors">
-                kolayxport@gmail.com
+              <a href="mailto:destek@kolayxport.com" className="font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                destek@kolayxport.com
               </a>
             </div>
             <div className="bg-white p-8 rounded-lg shadow-lg">

@@ -267,7 +267,7 @@ export default function LabelsPage() {
           {healthChecking ? 'Kontrol Ediliyor...' : 'Sağlık Kontrolü'}
         </Button>
       </Box>
-      <Box sx={{ height: 'calc(80vh - 40px)', width: '100%' }}>
+      <Box sx={{ height: 'calc(80dvh - 40px)', width: '100%' }}>
         <DataGrid<UIOrder>
           rows={orders}
           columns={columns}

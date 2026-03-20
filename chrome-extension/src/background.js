@@ -61,8 +61,23 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
 });
 
-// Message handling
+// Message handling with sender validation
+const allowedOrigins = ['https://www.etsy.com', 'https://etsy.com'];
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Allow messages from the extension itself
+  if (sender.id !== chrome.runtime.id) {
+    return; // Ignore messages from other extensions
+  }
+
+  // For content script messages (sender.url present), validate the origin
+  if (sender.url && !allowedOrigins.some(origin => sender.url.startsWith(origin))) {
+    // Also allow messages from our own app domain
+    if (!sender.url.startsWith(`https://${KOLAYXPORT_DOMAIN}`)) {
+      return; // Ignore messages from unauthorized origins
+    }
+  }
+
   handleMessage(request, sender, sendResponse);
   return true; // Keep channel open for async response
 });

@@ -11,51 +11,37 @@ const featureSections = [
   {
     icon: Zap,
     title: 'Otomatik Sipariş Senkronizasyonu',
-    description: 'Trendyol, Hepsiburada, Amazon, n11, Shopify gibi popüler pazaryerlerinden ve e-ticaret platformlarından siparişlerinizi otomatik olarak merkezi bir sisteme aktarın. Manuel veri girişine son verin, zamandan kazanın.',
-    imgSrc: 'https://via.placeholder.com/500x300.png?text=Sipariş+Senkronizasyonu', // Placeholder
-    alt: 'Otomatik Sipariş Senkronizasyonu Animasyonu'
+    description: 'Trendyol, Hepsiburada, Amazon, n11, Shopify gibi popüler pazaryerlerinden ve e-ticaret platformlarından siparişlerinizi otomatik olarak merkezi bir sisteme aktarın. Manuel veri girişine son verin, zamandan kazanın.'
   },
   {
     icon: Package,
     title: 'Merkezi Sipariş ve Stok Yönetimi',
-    description: 'Tüm kanallardan gelen siparişlerinizi tek bir yerden yönetin. Temel stok yönetimi özellikleriyle ürünlerinizin takibini yapın, fazla satışı engelleyin.',
-    imgSrc: 'https://via.placeholder.com/500x300.png?text=Stok+Yönetimi', // Placeholder
-    alt: 'Merkezi Sipariş ve Stok Yönetimi Arayüzü'
+    description: 'Tüm kanallardan gelen siparişlerinizi tek bir yerden yönetin. Temel stok yönetimi özellikleriyle ürünlerinizin takibini yapın, fazla satışı engelleyin.'
   },
   {
     icon: Edit3,
     title: 'Kargo Etiketi Oluşturma Asistanı',
-    description: 'Anlaşmalı kargo firmalarınız için kargo etiketi oluşturma süreçlerinizi hızlandırın. Tek tıkla etiket bilgileri hazırlama ve yazdırmaya hazır hale getirme kolaylığı.',
-    imgSrc: 'https://via.placeholder.com/500x300.png?text=Kargo+Etiketi', // Placeholder
-    alt: 'Kargo Etiketi Oluşturma Ekranı'
+    description: 'Anlaşmalı kargo firmalarınız için kargo etiketi oluşturma süreçlerinizi hızlandırın. Tek tıkla etiket bilgileri hazırlama ve yazdırmaya hazır hale getirme kolaylığı.'
   },
   {
     icon: Link2,
     title: 'Geniş Entegrasyon Yelpazesi',
-    description: 'Türkiye\'nin önde gelen pazaryerleri ve e-ticaret altyapılarıyla (Trendyol, Hepsiburada, Amazon, n11, PTTAvm, Shopify, WooCommerce vb.) sorunsuz entegrasyon. Kargo firmalarıyla entegre çalışın.',
-    imgSrc: 'https://via.placeholder.com/500x300.png?text=Entegrasyonlar', // Placeholder
-    alt: 'Entegrasyon Logoları'
+    description: 'Türkiye\'nin önde gelen pazaryerleri ve e-ticaret altyapılarıyla (Trendyol, Hepsiburada, Amazon, n11, PTTAvm, Shopify, WooCommerce vb.) sorunsuz entegrasyon. Kargo firmalarıyla entegre çalışın.'
   },
   {
     icon: Settings,
     title: 'Kolay Kurulum ve Kullanım',
-    description: 'Google hesabınızla saniyeler içinde kaydolun. Kullanıcı dostu arayüzümüz sayesinde karmaşık ayarlarla uğraşmadan otomasyona başlayın.',
-    imgSrc: 'https://via.placeholder.com/500x300.png?text=Kolay+Kurulum', // Placeholder
-    alt: 'Kolay Kurulum Adımları'
+    description: 'Google hesabınızla saniyeler içinde kaydolun. Kullanıcı dostu arayüzümüz sayesinde karmaşık ayarlarla uğraşmadan otomasyona başlayın.'
   },
   {
     icon: ShieldCheck,
     title: 'Güvenli Veri Saklama',
-    description: 'API anahtarlarınız ve hassas verileriniz gelişmiş şifreleme yöntemleriyle korunur. Google Cloud altyapısının sunduğu güvenlik standartlarından faydalanın.',
-    imgSrc: 'https://via.placeholder.com/500x300.png?text=Veri+Güvenliği', // Placeholder
-    alt: 'Veri Güvenliği Kalkanı'
+    description: 'API anahtarlarınız ve hassas verileriniz gelişmiş şifreleme yöntemleriyle korunur. Google Cloud altyapısının sunduğu güvenlik standartlarından faydalanın.'
   },
   {
     icon: Gift,
     title: 'Esnek ve Ücretsiz Başlangıç Planı',
-    description: 'Temel entegrasyon ve sipariş yönetimi özelliklerimiz her zaman ücretsiz. Sınırsız sipariş ve ürün listeleme ile işletmenizi özgürce büyütün.',
-    imgSrc: 'https://via.placeholder.com/500x300.png?text=Ücretsiz+Plan', // Placeholder
-    alt: 'Ücretsiz Plan Avantajları'
+    description: 'Temel entegrasyon ve sipariş yönetimi özelliklerimiz her zaman ücretsiz. Sınırsız sipariş ve ürün listeleme ile işletmenizi özgürce büyütün.'
   }
 ];
 
@@ -156,8 +142,6 @@ export default function OzelliklerPage() {
                 </div>
                 <h3 className="text-2xl font-bold text-slate-800 mb-3">{feature.title}</h3>
                 <p className="text-slate-600 leading-relaxed text-sm">{feature.description}</p>
-                {/* Placeholder for image, you might want to add it here if needed */}
-                {/* <img src={feature.imgSrc} alt={feature.alt} className="mt-4 rounded-lg shadow-md" /> */}
               </motion.div>
             ))}
           </div>

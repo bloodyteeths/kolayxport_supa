@@ -217,7 +217,7 @@ export default function Inventory() {
           <p className="text-gray-400 mt-2">Envanter eklemek için önce <a href="/urunler" className="text-blue-500 hover:underline">ürün eklemelisiniz</a>.</p>
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-white shadow rounded-lg table-scroll-wrapper">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -276,7 +276,7 @@ export default function Inventory() {
       {/* Adjust Inventory Modal */}
       {isAdjustingInventory && currentProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full">
+          <div className="bg-white rounded-lg p-4 sm:p-6 md:p-8 max-w-md mx-4 sm:mx-auto w-full">
             <h2 className="text-xl font-bold mb-4">
               Envanter Düzenle: {currentProduct.name}
             </h2>

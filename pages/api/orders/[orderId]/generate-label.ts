@@ -107,14 +107,15 @@ async function handler(
     const existingShipments = await prisma.shipment.findMany({
       where: {
         orderId: orderId,
+        carrier: 'FEDEX',
         status: 'created'
       }
     });
 
     if (existingShipments.length > 0) {
-      logger.warn(`[API generate-label] Order ${orderId} already has existing shipments: ${existingShipments.length}`);
-      return res.status(400).json({ 
-        error: 'Bu sipariş için zaten bir etiket mevcut. Yeni etiket oluşturmak için mevcut etiketi silin.' 
+      logger.warn(`[API generate-label] Order ${orderId} already has existing FedEx shipments: ${existingShipments.length}`);
+      return res.status(400).json({
+        error: 'A FedEx label already exists for this order'
       });
     }
   } catch (error) {
@@ -505,32 +506,34 @@ async function handler(
     logger.info(`[API generate-label] Actual OrderItems in DB:`, actualOrderItems);
 
     // RACE CONDITION FIX: If no OrderItems exist, recreate them from request data
+    // Uses createMany with skipDuplicates to prevent concurrent requests from creating duplicates
     if (actualOrderItems.length === 0 && lineItemsFromRequest.length > 0) {
       logger.warn(`[API generate-label] No OrderItems found for order ${orderId}, recreating from request data`);
-      
-      const createdItems = await Promise.all(
-        lineItemsFromRequest.map(async (item) => {
-          return prisma.orderItem.create({
-            data: {
-              orderId: orderId,
-              productName: item.title || 'Unknown Product',
-              quantity: item.quantity || 1,
-              unitPrice: item.unitPrice || 0,
-              totalPrice: (item.unitPrice || 0) * (item.quantity || 1),
-              weightKg: item.weight || 0.5,
-              harmonizedCode: item.hs_code || '',
-              countryOfMfg: item.country_of_origin || 'TR',
-              sku: item.sku || '',
-              marketplaceKey: String(item.id),
-              orderNumber: orderRecord.orderNumber || orderId,
-              uniqueLineKey: String(item.id)
-            }
-          });
-        })
-      );
-      
-      actualOrderItems = createdItems.map(item => ({ id: item.id, productName: item.productName }));
-      logger.info(`[API generate-label] Recreated ${createdItems.length} OrderItems for order ${orderId}`);
+
+      await prisma.orderItem.createMany({
+        data: lineItemsFromRequest.map((item: any) => ({
+          orderId: orderId,
+          productName: item.title || 'Unknown Product',
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || 0,
+          totalPrice: (item.unitPrice || 0) * (item.quantity || 1),
+          weightKg: item.weight || 0.5,
+          harmonizedCode: item.hs_code || '',
+          countryOfMfg: item.country_of_origin || 'TR',
+          sku: item.sku || '',
+          marketplaceKey: String(item.id),
+          orderNumber: orderRecord.orderNumber || orderId,
+          uniqueLineKey: String(item.id)
+        })),
+        skipDuplicates: true,
+      });
+
+      // Re-fetch to get the actual IDs (whether created by this request or a concurrent one)
+      actualOrderItems = await prisma.orderItem.findMany({
+        where: { orderId: orderId },
+        select: { id: true, productName: true }
+      });
+      logger.info(`[API generate-label] Ensured ${actualOrderItems.length} OrderItems for order ${orderId}`);
     }
 
     // Create labelJobs for each OrderItem
@@ -591,31 +594,32 @@ async function handler(
     // Create failed LabelJob records for each actual OrderItem (reusing pre-fetched list)
     try {
       // RACE CONDITION FIX: If no OrderItems exist, recreate them from request data
+      // Uses createMany with skipDuplicates to prevent concurrent requests from creating duplicates
       if (actualOrderItems.length === 0 && lineItemsFromRequest.length > 0) {
         logger.warn(`[API generate-label] No OrderItems found for failed label, recreating from request data`);
 
-        const createdItems = await Promise.all(
-          lineItemsFromRequest.map(async (item) => {
-            return prisma.orderItem.create({
-              data: {
-                orderId: orderId,
-                productName: item.title || 'Unknown Product',
-                quantity: item.quantity || 1,
-                unitPrice: item.unitPrice || 0,
-                totalPrice: (item.unitPrice || 0) * (item.quantity || 1),
-                weightKg: item.weight || 0.5,
-                harmonizedCode: item.hs_code || '',
-                countryOfMfg: item.country_of_origin || 'TR',
-                sku: item.sku || '',
-                marketplaceKey: String(item.id),
-                orderNumber: orderId,
-                uniqueLineKey: String(item.id)
-              }
-            });
-          })
-        );
+        await prisma.orderItem.createMany({
+          data: lineItemsFromRequest.map((item: any) => ({
+            orderId: orderId,
+            productName: item.title || 'Unknown Product',
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || 0,
+            totalPrice: (item.unitPrice || 0) * (item.quantity || 1),
+            weightKg: item.weight || 0.5,
+            harmonizedCode: item.hs_code || '',
+            countryOfMfg: item.country_of_origin || 'TR',
+            sku: item.sku || '',
+            marketplaceKey: String(item.id),
+            orderNumber: orderId,
+            uniqueLineKey: String(item.id)
+          })),
+          skipDuplicates: true,
+        });
 
-        actualOrderItems = createdItems.map(item => ({ id: item.id, productName: item.productName }));
+        actualOrderItems = await prisma.orderItem.findMany({
+          where: { orderId: orderId },
+          select: { id: true, productName: true }
+        });
       }
 
       if (actualOrderItems.length > 0) {

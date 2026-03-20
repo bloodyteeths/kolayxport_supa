@@ -193,9 +193,9 @@ export default function Orders() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-wrap justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Siparişler</h1>
-        <div className="space-x-2">
+        <div className="space-x-2 flex flex-wrap">
           <button
             onClick={handleSyncOrders}
             className="bg-blue-600 text-white py-2 px-4 rounded"
@@ -226,7 +226,7 @@ export default function Orders() {
           <p className="text-gray-400 mt-2">Siparişleri senkronize etmek için "Siparişleri Senkronize Et" butonuna tıklayın.</p>
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-white shadow rounded-lg table-scroll-wrapper">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>

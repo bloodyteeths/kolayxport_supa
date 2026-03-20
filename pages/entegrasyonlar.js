@@ -59,7 +59,7 @@ export default function EntegrasyonlarPage() {
 
       {/* Hero Section */}
       <motion.section
-        className="relative py-20 md:py-32 text-center px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-slate-50 to-sky-100"
+        className="relative py-12 md:py-20 text-center px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-slate-50 to-sky-100"
         variants={sectionVariants}
         initial="hidden"
         animate="visible"
@@ -67,7 +67,7 @@ export default function EntegrasyonlarPage() {
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-multiply pointer-events-none" />
         <div className="relative z-10">
           <motion.h1
-            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-800 tracking-tight mb-6"
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-800 tracking-tight mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
@@ -93,7 +93,7 @@ export default function EntegrasyonlarPage() {
         viewport={{ once: true, amount: 0.1 }}
         variants={sectionVariants}
       >
-        <div className="container max-w-7xl mx-auto px-6 lg:px-8">
+        <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-center mb-12 space-x-2 md:space-x-4">
             {categories.map(category => (
               <button

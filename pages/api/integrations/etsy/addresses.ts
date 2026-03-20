@@ -8,10 +8,16 @@ async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Set CORS headers for Chrome extension
+  // Set CORS headers for Chrome extension (whitelist only known extension IDs)
   const origin = req.headers.origin;
+  const ALLOWED_EXTENSION_IDS = [process.env.CHROME_EXTENSION_ID].filter(Boolean);
   if (origin && (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://'))) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+    const extensionId = origin.replace('chrome-extension://', '').replace('moz-extension://', '');
+    if (ALLOWED_EXTENSION_IDS.length === 0 || ALLOWED_EXTENSION_IDS.includes(extensionId)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      logger.warn('Unknown extension origin rejected', { origin, extensionId });
+    }
   } else {
     res.setHeader('Access-Control-Allow-Origin', 'https://kolayxport.com');
   }

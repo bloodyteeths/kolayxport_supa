@@ -167,7 +167,7 @@ const formatNumber = (value: number): string => value.toLocaleString('tr-TR');
 // ---------------------------------------------------------------------------
 
 const SectionCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 ${className}`}>{children}</div>
+  <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-6 ${className}`}>{children}</div>
 );
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
@@ -226,24 +226,24 @@ const StatCard = ({
   };
 
   return (
-    <div className="bg-white p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-white p-3 sm:p-5 rounded-lg shadow-sm border border-gray-200">
       <div className="flex items-center justify-between">
-        <div className={`p-3 rounded-lg ${colorMap[color]?.bg ?? 'bg-blue-100'}`}>
-          <Icon className={`h-6 w-6 ${colorMap[color]?.text ?? 'text-blue-600'}`} />
+        <div className={`p-2 sm:p-3 rounded-lg ${colorMap[color]?.bg ?? 'bg-blue-100'}`}>
+          <Icon className={`h-4 w-4 sm:h-6 sm:w-6 ${colorMap[color]?.text ?? 'text-blue-600'}`} />
         </div>
         {trend !== undefined && (
           <div className={`flex items-center ${trendColor}`}>
-            <TrendIcon className="h-4 w-4 mr-1" />
-            <span className="text-sm font-medium">{Math.abs(trend).toFixed(1)}%</span>
+            <TrendIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5" />
+            <span className="text-xs sm:text-sm font-medium">{Math.abs(trend).toFixed(1)}%</span>
           </div>
         )}
       </div>
-      <div className="mt-4">
-        <h3 className="text-lg font-semibold text-gray-900">
+      <div className="mt-2 sm:mt-4">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
           {typeof value === 'number' ? formatNumber(value) : value}
         </h3>
-        <p className="text-sm text-gray-600">{title}</p>
-        {trendLabel && <p className="text-xs text-gray-500 mt-1">{trendLabel}</p>}
+        <p className="text-xs sm:text-sm text-gray-600">{title}</p>
+        {trendLabel && <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">{trendLabel}</p>}
       </div>
     </div>
   );
@@ -548,20 +548,20 @@ export default function AnalyticsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">
+            <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900">
               {dateRange === 'day' ? 'Gunun Analizi' : 'Analitik Dashboard'}
             </h1>
-            <p className="mt-1 text-gray-600">
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-600">
               {dateRange === 'day' ? selectedDayLabel : 'Pazaryeri satis performansinizi takip edin'}
             </p>
           </div>
-          <div className="mt-4 sm:mt-0 flex items-center space-x-3">
+          <div className="mt-2 sm:mt-0 flex items-center space-x-3">
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center px-2.5 py-1.5 sm:px-3 sm:py-2 bg-blue-600 text-white rounded-md text-xs sm:text-sm hover:bg-blue-700 disabled:opacity-50"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
               Yenile
             </button>
           </div>
@@ -570,7 +570,7 @@ export default function AnalyticsPage() {
         {/* ============================================================= */}
         {/* ROW 1: KPI Cards                                              */}
         {/* ============================================================= */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           <StatCard
             title={dateRange === 'day' ? 'Siparis' : 'Toplam Siparis'}
             value={data?.totalOrders ?? 0}
@@ -612,12 +612,12 @@ export default function AnalyticsPage() {
         {/* ============================================================= */}
         {/* ROW 2: Date Range + Exchange Rates                            */}
         {/* ============================================================= */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+              className="px-2 py-1.5 sm:px-3 sm:py-2 border border-gray-300 rounded-md text-xs sm:text-sm focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="day">Gunun Analizi</option>
               <option value="month">Aya Gore</option>
@@ -629,40 +629,40 @@ export default function AnalyticsPage() {
               <option value="all">Tum Zamanlar</option>
             </select>
             {dateRange === 'day' && (
-              <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-md">
+              <div className="flex items-center bg-white border border-gray-300 rounded-md">
                 <button
                   onClick={() => navigateDay(-1)}
-                  className="p-2 hover:bg-gray-100 rounded-l-md transition-colors"
+                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-l-md transition-colors"
                 >
                   <ChevronLeft className="h-4 w-4 text-gray-600" />
                 </button>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 min-w-[200px] justify-center">
-                  <Calendar className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-900">{selectedDayLabel}</span>
+                <div className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 justify-center">
+                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium text-gray-900 whitespace-nowrap">{selectedDayLabel}</span>
                 </div>
                 <button
                   onClick={() => navigateDay(1)}
-                  className="p-2 hover:bg-gray-100 rounded-r-md transition-colors"
+                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-r-md transition-colors"
                 >
                   <ChevronRight className="h-4 w-4 text-gray-600" />
                 </button>
               </div>
             )}
             {dateRange === 'month' && (
-              <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-md">
+              <div className="flex items-center bg-white border border-gray-300 rounded-md">
                 <button
                   onClick={() => navigateMonth(-1)}
-                  className="p-2 hover:bg-gray-100 rounded-l-md transition-colors"
+                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-l-md transition-colors"
                 >
                   <ChevronLeft className="h-4 w-4 text-gray-600" />
                 </button>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 min-w-[140px] justify-center">
-                  <Calendar className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-900">{selectedMonthLabel}</span>
+                <div className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 justify-center">
+                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium text-gray-900 whitespace-nowrap">{selectedMonthLabel}</span>
                 </div>
                 <button
                   onClick={() => navigateMonth(1)}
-                  className="p-2 hover:bg-gray-100 rounded-r-md transition-colors"
+                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-r-md transition-colors"
                 >
                   <ChevronRight className="h-4 w-4 text-gray-600" />
                 </button>

@@ -192,93 +192,139 @@ export default function Orders() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-wrap justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Siparişler</h1>
-        <div className="space-x-2 flex flex-wrap">
+    <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold">Siparisler</h1>
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={handleSyncOrders}
-            className="bg-blue-600 text-white py-2 px-4 rounded"
+            className="bg-blue-600 text-white py-1.5 px-3 sm:py-2 sm:px-4 rounded text-xs sm:text-sm"
           >
-            Siparişleri Senkronize Et
+            Senkronize Et
           </button>
           <button
             onClick={handleGenerateLabels}
             disabled={selectedItems.length === 0 || isGeneratingLabels}
-            className="bg-green-600 text-white py-2 px-4 rounded disabled:bg-green-300"
+            className="bg-green-600 text-white py-1.5 px-3 sm:py-2 sm:px-4 rounded text-xs sm:text-sm disabled:bg-green-300"
           >
-            {isGeneratingLabels ? 'Etiketler Oluşturuluyor...' : 'Etiket Oluştur'}
+            {isGeneratingLabels ? 'Olusturuluyor...' : 'Etiket Olustur'}
           </button>
         </div>
       </div>
-      
+
       {isLoadingOrders ? (
         <div className="text-center py-10">
-          <svg className="animate-spin h-10 w-10 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-8 w-8 sm:h-10 sm:w-10 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <p className="mt-2 text-gray-600">Siparişler yükleniyor...</p>
+          <p className="mt-2 text-gray-600 text-sm">Siparisler yukleniyor...</p>
         </div>
       ) : orders.length === 0 ? (
-        <div className="text-center py-10 bg-gray-50 rounded-lg">
-          <p className="text-gray-500 text-lg">Henüz hiç sipariş yok.</p>
-          <p className="text-gray-400 mt-2">Siparişleri senkronize etmek için "Siparişleri Senkronize Et" butonuna tıklayın.</p>
+        <div className="text-center py-8 sm:py-10 bg-gray-50 rounded-lg px-4">
+          <p className="text-gray-500 text-base sm:text-lg">Henuz hic siparis yok.</p>
+          <p className="text-gray-400 mt-2 text-sm">Siparisleri senkronize etmek icin butona tiklayin.</p>
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg table-scroll-wrapper">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th>Görsel</th>
-                <th>Müşteri Adı</th>
-                <th>Varyant</th>
-                <th>Not</th>
-                <th>Durum</th>
-                <th>Ship-by</th>
-                <th>Marketplace</th>
-                <th>Sipariş No</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Etiket
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {orders.map(order => (
-                <tr key={order.id}>
-                  <td>
-                    {order.items && order.items[0]?.image ? (
-                      <img src={order.items[0].image} alt="Görsel" className="w-12 h-12 object-cover" />
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td>{order.customerName || '-'}</td>
-                  <td>{order.items && order.items[0]?.variantInfo || '-'}</td>
-                  <td>{order.notes || '-'}</td>
-                  <td>{order.status || '-'}</td>
-                  <td>{order.shipByDate ? new Date(order.shipByDate).toLocaleDateString() : '-'}</td>
-                  <td>{order.marketplace || '-'}</td>
-                  <td>{order.marketplaceKey || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getLabelStatusBadge(order.items && order.items[0])}
-                    {order.items && order.items[0]?.labelJobs && order.items[0].labelJobs.length > 0 && 
-                     order.items[0].labelJobs.some(job => job.status === 'completed' && job.pdf_url) && (
-                      <a 
-                        href={order.items[0].labelJobs.find(job => job.status === 'completed' && job.pdf_url).pdf_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 ml-2 text-xs underline"
-                      >
-                        PDF
-                      </a>
-                    )}
-                  </td>
+        <>
+          {/* Mobile: Card layout */}
+          <div className="space-y-3 md:hidden">
+            {orders.map(order => (
+              <div key={order.id} className="bg-white shadow-sm rounded-lg border border-gray-200 p-3">
+                <div className="flex items-start gap-3">
+                  {order.items && order.items[0]?.image ? (
+                    <img src={order.items[0].image} alt="" className="w-12 h-12 object-cover rounded flex-shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                      <span className="text-gray-400 text-xs">-</span>
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-gray-900 truncate">{order.customerName || '-'}</p>
+                      <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded flex-shrink-0">{order.marketplace || '-'}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{order.items && order.items[0]?.variantInfo || '-'}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      <span className="text-[10px] text-gray-400">#{order.marketplaceKey || '-'}</span>
+                      {order.status && <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{order.status}</span>}
+                      {order.shipByDate && (
+                        <span className="text-[10px] text-gray-500">Ship: {new Date(order.shipByDate).toLocaleDateString('tr-TR')}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {getLabelStatusBadge(order.items && order.items[0])}
+                      {order.items && order.items[0]?.labelJobs && order.items[0].labelJobs.length > 0 &&
+                       order.items[0].labelJobs.some(job => job.status === 'completed' && job.pdf_url) && (
+                        <a
+                          href={order.items[0].labelJobs.find(job => job.status === 'completed' && job.pdf_url).pdf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 text-xs underline"
+                        >
+                          PDF
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop: Table layout */}
+          <div className="hidden md:block bg-white shadow rounded-lg overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Gorsel</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Musteri</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Varyant</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Not</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ship-by</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Marketplace</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Siparis No</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Etiket</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {orders.map(order => (
+                  <tr key={order.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2">
+                      {order.items && order.items[0]?.image ? (
+                        <img src={order.items[0].image} alt="" className="w-10 h-10 object-cover rounded" />
+                      ) : (
+                        <span className="text-gray-400 text-sm">-</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-900 max-w-[150px] truncate">{order.customerName || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-gray-600 max-w-[120px] truncate">{order.items && order.items[0]?.variantInfo || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-gray-600 max-w-[100px] truncate hidden lg:table-cell">{order.notes || '-'}</td>
+                    <td className="px-3 py-2 text-sm">{order.status || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{order.shipByDate ? new Date(order.shipByDate).toLocaleDateString('tr-TR') : '-'}</td>
+                    <td className="px-3 py-2 text-sm text-gray-600">{order.marketplace || '-'}</td>
+                    <td className="px-3 py-2 text-sm text-gray-600 whitespace-nowrap">{order.marketplaceKey || '-'}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {getLabelStatusBadge(order.items && order.items[0])}
+                      {order.items && order.items[0]?.labelJobs && order.items[0].labelJobs.length > 0 &&
+                       order.items[0].labelJobs.some(job => job.status === 'completed' && job.pdf_url) && (
+                        <a
+                          href={order.items[0].labelJobs.find(job => job.status === 'completed' && job.pdf_url).pdf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 ml-2 text-xs underline"
+                        >
+                          PDF
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

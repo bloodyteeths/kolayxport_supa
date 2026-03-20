@@ -1144,6 +1144,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   const [hasFedexCredentials, setHasFedexCredentials] = useState(false);
   const [checkingFedexCredentials, setCheckingFedexCredentials] = useState(true);
   const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [shipmentDeleteConfirmation, setShipmentDeleteConfirmation] = useState<string | null>(null);
@@ -2313,7 +2314,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   };
 
   return (
-    <Box sx={{ height: 'calc(100dvh - 64px - 48px)', display: 'flex', flexDirection: 'column', p: { xs: 1, sm: 2 }, overflow: 'hidden' }}>
+    <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px - 48px)' }, display: 'flex', flexDirection: 'column', p: { xs: 0.5, sm: 2 }, overflow: 'hidden' }}>
       <Toaster position="top-right" reverseOrder={false} />
       <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: { xs: 1, sm: 2 }, fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
         Etiket Yonetimi
@@ -2391,7 +2392,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       </Box>
 
       {/* Mobile Card Layout */}
-      <Box sx={{ display: { xs: 'block', md: 'none' }, flexGrow: 1, overflow: 'auto', minHeight: 0 }}>
+      <Box sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', flexGrow: 1, overflow: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress size={32} />
@@ -2401,103 +2402,107 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             <Typography variant="body2">Sipariş bulunamadı</Typography>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, pb: 1 }}>
             {filteredAndPaginatedItems.map((row) => {
-              const status = getLabelStatus(row);
-              const hasLabel = status === 'labeled';
-              const isPending = status === 'pending';
-              const hasFailed = status === 'failed';
+              const cardId = row.itemId || row.orderId;
+              const isExpanded = expandedCardId === cardId;
+              const labelSt = getLabelStatus(row);
+              const statusConfig = statusColors[row.status?.toUpperCase() || ''] || { bg: '#eee', text: '#333' };
+              const statusLabel = orderStatusOptions.find(o => o.value === row.status?.toUpperCase())?.label || row.status || '-';
+              const currSymbol = row.currency === 'TRY' ? '₺' : row.currency === 'EUR' ? '€' : row.currency === 'GBP' ? '£' : '$';
+
               return (
                 <Paper
-                  key={row.itemId || row.orderId}
-                  onClick={() => openDrawer(row)}
-                  sx={{
-                    p: 1.5,
-                    cursor: 'pointer',
-                    '&:active': { bgcolor: 'action.selected' },
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
+                  key={cardId}
+                  elevation={isExpanded ? 3 : 1}
+                  sx={{ border: '1px solid', borderColor: isExpanded ? 'primary.light' : 'divider', borderRadius: 1.5, overflow: 'hidden' }}
                 >
-                  <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
-                    {row.itemImageUrl ? (
-                      <Box
-                        component="img"
-                        src={row.itemImageUrl}
-                        sx={{ width: 48, height: 48, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }}
-                      />
+                  {/* Collapsed header — always visible */}
+                  <Box
+                    onClick={() => setExpandedCardId(isExpanded ? null : cardId)}
+                    sx={{ display: 'flex', gap: 1.5, p: 1.25, cursor: 'pointer', alignItems: 'center' }}
+                  >
+                    {row.itemImageUrl && row.itemImageUrl !== '/placeholder.png' ? (
+                      <Box component="img" src={row.itemImageUrl} sx={{ width: 44, height: 44, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }} />
                     ) : (
-                      <Box sx={{ width: 48, height: 48, borderRadius: 1, bgcolor: 'grey.100', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Box sx={{ width: 44, height: 44, borderRadius: 1, bgcolor: 'grey.100', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Typography variant="caption" color="text.disabled">-</Typography>
                       </Box>
                     )}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 0.5 }}>
-                        <Typography variant="body2" fontWeight={600} noWrap>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: '0.8rem' }}>
                           {row.recipientFirstName} {row.recipientLastName}
                         </Typography>
-                        <Typography variant="caption" sx={{ bgcolor: 'grey.100', px: 0.75, py: 0.25, borderRadius: 1, flexShrink: 0, fontSize: '0.65rem' }}>
-                          {row.marketplace || '-'}
-                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                          <Chip label={labelSt === 'labeled' ? 'Alındı' : labelSt === 'pending' ? 'Bekliyor' : labelSt === 'failed' ? 'Hata' : 'Etiketsiz'}
+                            size="small"
+                            sx={{
+                              height: 18, fontSize: '0.6rem', fontWeight: 600,
+                              bgcolor: labelSt === 'labeled' ? '#e8f5e9' : labelSt === 'pending' ? '#fff3e0' : labelSt === 'failed' ? '#ffebee' : 'grey.100',
+                              color: labelSt === 'labeled' ? '#2e7d32' : labelSt === 'pending' ? '#e65100' : labelSt === 'failed' ? '#c62828' : 'text.secondary',
+                            }}
+                          />
+                          <ExpandMoreIcon sx={{ fontSize: 18, color: 'text.disabled', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                        </Box>
                       </Box>
-                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                        #{row.orderNumber} · {row.title || row.sku || '-'}
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.7rem' }}>
+                        #{row.orderNumber} · {row.marketplace || '-'} · {row.orderDate ? new Date(row.orderDate).toLocaleDateString('tr-TR') : '-'}
+                        {row.orderTotalPrice > 0 && ` · ${currSymbol}${row.orderTotalPrice.toFixed(2)}`}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
-                        {row.orderDate && (
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                            {new Date(row.orderDate).toLocaleDateString('tr-TR')}
-                          </Typography>
-                        )}
-                        {row.orderTotalPrice > 0 && (
-                          <Typography variant="caption" fontWeight={600} sx={{ fontSize: '0.65rem' }}>
-                            {row.currency === 'TRY' ? '₺' : row.currency === 'EUR' ? '€' : row.currency === 'GBP' ? '£' : '$'}{row.orderTotalPrice.toFixed(2)}
-                          </Typography>
-                        )}
-                        {hasLabel && (
-                          <Typography variant="caption" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', px: 0.75, py: 0.15, borderRadius: 1, fontSize: '0.6rem' }}>
-                            Etiket Alındı
-                          </Typography>
-                        )}
-                        {isPending && (
-                          <Typography variant="caption" sx={{ bgcolor: '#fff3e0', color: '#e65100', px: 0.75, py: 0.15, borderRadius: 1, fontSize: '0.6rem' }}>
-                            İşleniyor
-                          </Typography>
-                        )}
-                        {hasFailed && (
-                          <Typography variant="caption" sx={{ bgcolor: '#ffebee', color: '#c62828', px: 0.75, py: 0.15, borderRadius: 1, fontSize: '0.6rem' }}>
-                            Hata
-                          </Typography>
-                        )}
-                        {!hasLabel && !isPending && !hasFailed && (
-                          <Typography variant="caption" sx={{ bgcolor: 'grey.100', color: 'text.secondary', px: 0.75, py: 0.15, borderRadius: 1, fontSize: '0.6rem' }}>
-                            Etiketsiz
-                          </Typography>
-                        )}
-                        {row.trackingNumber && (
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
-                            {row.lastCarrier}: {row.trackingNumber}
-                          </Typography>
-                        )}
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.65rem' }}>
+                        {row.title || row.sku || '-'}{row.variantInfo && row.variantInfo !== '—' ? ` · ${row.variantInfo}` : ''}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <Box sx={{ px: 1.25, pb: 1.25, pt: 0, borderTop: '1px solid', borderColor: 'divider' }}>
+                      {/* Customer note / Personalization */}
+                      {row.customerNote && row.customerNote.trim() !== '' && (
+                        <Box sx={{ py: 0.75 }}>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>Müşteri Notu</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.78rem', mt: 0.25, bgcolor: '#fffde7', p: 0.75, borderRadius: 1, whiteSpace: 'pre-wrap' }}>{row.customerNote}</Typography>
+                        </Box>
+                      )}
+
+                      {/* Address */}
+                      <Box sx={{ py: 0.75, borderTop: '1px dashed', borderColor: 'divider' }}>
+                        <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>Teslimat Adresi</Typography>
+                        <Box sx={{ mt: 0.25 }}>
+                          <Typography variant="body2" sx={{ fontSize: '0.78rem' }}>{row.recipientFirstName} {row.recipientLastName}</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{row.recipientStreet1}{row.recipientStreet2 ? `, ${row.recipientStreet2}` : ''}</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{row.recipientCity}{row.recipientState ? `, ${row.recipientState}` : ''} {row.recipientPostal}</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{row.recipientCountry}</Typography>
+                          {row.recipientPhone && <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>Tel: {row.recipientPhone}</Typography>}
+                          {row.recipientEmail && <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>E-posta: {row.recipientEmail}</Typography>}
+                        </Box>
                       </Box>
+
+                      {/* Order status & shipping info */}
+                      <Box sx={{ py: 0.75, borderTop: '1px dashed', borderColor: 'divider', display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Chip label={statusLabel} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: statusConfig.bg, color: statusConfig.text }} />
+                        {row.shipByDate && <Typography variant="caption" color="text.secondary">Son Kargo: {formatDateTr(row.shipByDate)}</Typography>}
+                        {row.trackingNumber && <Typography variant="caption" color="text.secondary">Takip: {row.lastCarrier} {row.trackingNumber}</Typography>}
+                      </Box>
+
                       {/* Action buttons */}
-                      <Box sx={{ display: 'flex', gap: 0.5, mt: 0.75 }}>
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
                         <Button
+                          variant="contained"
                           size="small"
-                          variant="outlined"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDrawer(row);
-                          }}
-                          sx={{ fontSize: '0.65rem', py: 0.25, px: 1, minWidth: 0, textTransform: 'none' }}
+                          fullWidth
+                          onClick={() => openDrawer(row)}
+                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
                         >
-                          FedEx
+                          FedEx Etiket
                         </Button>
                         <Button
-                          size="small"
                           variant="outlined"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          size="small"
+                          fullWidth
+                          onClick={() => {
                             const originalOrder = row.originalOrder as LocalUIOrder | undefined;
                             const uiOrder: UIOrder = {
                               orderId: row.orderId,
@@ -2523,35 +2528,21 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                             setSelectedOrderForUPS(uiOrder);
                             setUpsDrawerOpen(true);
                           }}
-                          sx={{ fontSize: '0.65rem', py: 0.25, px: 1, minWidth: 0, textTransform: 'none' }}
+                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
                         >
-                          UPS
+                          UPS Etiket
                         </Button>
                       </Box>
                     </Box>
-                  </Box>
+                  )}
                 </Paper>
               );
             })}
             {/* Mobile pagination */}
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, py: 1 }}>
-              <Button
-                size="small"
-                disabled={paginationModel.page === 0}
-                onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page - 1 }))}
-              >
-                Önceki
-              </Button>
-              <Typography variant="caption">
-                {paginationModel.page + 1} / {Math.ceil(total / paginationModel.pageSize) || 1}
-              </Typography>
-              <Button
-                size="small"
-                disabled={(paginationModel.page + 1) * paginationModel.pageSize >= total}
-                onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page + 1 }))}
-              >
-                Sonraki
-              </Button>
+              <Button size="small" disabled={paginationModel.page === 0} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page - 1 }))}>Önceki</Button>
+              <Typography variant="caption">{paginationModel.page + 1} / {Math.ceil(total / paginationModel.pageSize) || 1}</Typography>
+              <Button size="small" disabled={(paginationModel.page + 1) * paginationModel.pageSize >= total} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page + 1 }))}>Sonraki</Button>
             </Box>
           </Box>
         )}

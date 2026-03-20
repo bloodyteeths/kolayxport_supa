@@ -120,17 +120,16 @@ const enterprisePlan = {
 
 
 const comparisonData = {
-  headers: ['Özellik', 'KolayXport (Ücretsiz)', 'Rakip A (XYZ CRM)', 'Rakip B (ABC Sync)'],
+  headers: ['Özellik', 'Başlangıç', 'Büyüme', 'Kurumsal'],
   rows: [
-    ['Temel Fiyat', '₺0 / ay', '₺199 / ay', '₺249 / ay'],
-    ['Sipariş Limiti', 'Limitsiz', '500 / ay', '1000 / ay'],
-    ['Pazaryeri Entegrasyonu', 'Tümü Aktif', '3 Adet Seçmeli', '5 Adet Seçmeli'],
-    ['Kargo Entegrasyonu', 'Tümü Aktif', '1 Adet Seçmeli', '2 Adet Seçmeli'],
-    ['Stok Senkronizasyonu', <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />, <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />, 'Kısmi'],
-    ['Otomatik Kargo Etiketi', <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />, 'Ek Ücretli', <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />],
-    ['API Erişimi', 'Growth Plan ile', 'Kurumsal Plan', 'Yok'],
-    ['Kullanıcı Sayısı', '1 (Starter), 5 (Growth)', '1 Kullanıcı', '3 Kullanıcı'],
-    ['Türkçe Destek', <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />, 'Sınırlı', <CheckCircle className="w-5 h-5 text-green-500 mx-auto" />],
+    ['Sipariş Limiti', '200/ay', '2.000/ay', 'Sınırsız'],
+    ['Kargo Etiketi', '100/ay', '500/ay', 'Sınırsız'],
+    ['Pazaryeri Entegrasyonları', 'Tümü', 'Tümü', 'Tümü + Özel'],
+    ['Kargo Entegrasyonları', 'Tümü', 'Tümü', 'Tümü + Özel'],
+    ['Kullanıcı Sayısı', '1', '5', 'Sınırsız'],
+    ['API Erişimi', '\u2014', '\u2713', '\u2713'],
+    ['Öncelikli Destek', '\u2014', '\u2713', '\u2713'],
+    ['Özel Hesap Yöneticisi', '\u2014', '\u2014', '\u2713'],
   ],
 };
 
@@ -168,10 +167,8 @@ export default function FiyatlandirmaPage() {
 
       // Get current session from Supabase
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('Auth check:', { session: !!session, error: sessionError, user: session?.user?.email });
-      
+
       if (sessionError || !session) {
-        console.log('No session, redirecting to auth');
         // Redirect to sign in instead of showing error
         await supabase.auth.signInWithOAuth({ 
           provider: 'google',
@@ -179,8 +176,6 @@ export default function FiyatlandirmaPage() {
         });
         return;
       }
-
-      console.log('Session found, proceeding to checkout for plan:', plan, 'interval:', interval);
 
       const res = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
@@ -191,17 +186,12 @@ export default function FiyatlandirmaPage() {
         body: JSON.stringify({ plan, interval }),
       });
 
-      console.log('API response status:', res.status);
-      
       if (!res.ok) {
         const errorText = await res.text();
-        console.error('API error response:', errorText);
         throw new Error(`API error: ${res.status} - ${errorText}`);
       }
 
       const data = await res.json();
-      console.log('API response data:', data);
-      
       const { sessionId, error } = data;
       if (error) {
         throw new Error(error);
@@ -210,16 +200,13 @@ export default function FiyatlandirmaPage() {
         throw new Error('Could not create checkout session');
       }
 
-      console.log('Redirecting to Stripe checkout with session:', sessionId);
       const stripe = await stripePromise;
       const { error: redirectError } = await stripe.redirectToCheckout({ sessionId });
       
       if (redirectError) {
-        console.error('Stripe redirect error:', redirectError);
         throw redirectError;
       }
     } catch (error) {
-      console.error('Error during checkout:', error);
       alert(`Bir hata oluştu: ${error.message}`);
     }
   };
@@ -394,7 +381,7 @@ export default function FiyatlandirmaPage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Özellik Karşılaştırması</h2>
             <p className="max-w-xl mx-auto text-lg text-slate-600">
-              KolayXport ve alternatiflerin sunduğu temel özellikleri inceleyin.
+              Planlar arasındaki farkları inceleyin.
             </p>
           </div>
           <div className="overflow-x-auto lg:overflow-visible rounded-xl shadow-xl shadow-slate-900/[.07] ring-1 ring-slate-200">
@@ -402,12 +389,11 @@ export default function FiyatlandirmaPage() {
               <thead className="bg-slate-50">
                 <tr>
                   {comparisonData.headers.map((header, index) => (
-                    <th 
-                      key={header} 
-                      scope="col" 
-                      className={`px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap 
-                        ${index === 0 ? 'sticky left-0 bg-slate-50 z-10' : ''} 
-                        ${index === 1 ? 'text-blue-600' : ''}`}
+                    <th
+                      key={header}
+                      scope="col"
+                      className={`px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap
+                        ${index === 0 ? 'text-left sticky left-0 bg-slate-50 z-10' : 'text-center'}`}
                     >
                       {header}
                     </th>
@@ -418,11 +404,12 @@ export default function FiyatlandirmaPage() {
                 {comparisonData.rows.map((row, rowIndex) => (
                   <tr key={rowIndex} className="hover:bg-slate-50/50 transition-colors">
                     {row.map((cell, cellIndex) => (
-                      <td 
-                        key={cellIndex} 
-                        className={`px-6 py-4 whitespace-nowrap text-sm 
-                          ${cellIndex === 0 ? 'font-medium text-slate-800 sticky left-0 bg-white group-hover:bg-slate-50/50 z-10' : 'text-slate-600 text-center'} 
-                          ${cellIndex === 1 ? 'font-semibold text-blue-700' : ''}`
+                      <td
+                        key={cellIndex}
+                        className={`px-6 py-4 whitespace-nowrap text-sm
+                          ${cellIndex === 0 ? 'font-medium text-slate-800 text-left sticky left-0 bg-white group-hover:bg-slate-50/50 z-10' : 'text-center'}
+                          ${cell === '\u2713' ? 'text-green-600 font-bold text-base' : ''}
+                          ${cell === '\u2014' ? 'text-slate-300' : 'text-slate-600'}`
                         }
                       >
                         {cell}
@@ -433,9 +420,6 @@ export default function FiyatlandirmaPage() {
               </tbody>
             </table>
           </div>
-           <p className="text-xs text-slate-400 mt-4 text-center">
-            * Rakip A ve Rakip B bilgileri genel pazar araştırmalarına dayanmaktadır ve değişiklik gösterebilir. Güncel bilgiler için ilgili servis sağlayıcıların web sitelerini kontrol ediniz.
-          </p>
         </div>
       </motion.section>
 

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/router';
 import Layout from '@/components/AppLayout';
 import Head from 'next/head';
@@ -24,6 +23,7 @@ export default function Dashboard() {
   });
   const [dateRange, setDateRange] = useState('7days');
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -35,63 +35,21 @@ export default function Dashboard() {
 
   const fetchStats = async () => {
     setIsLoadingStats(true);
-    
+    setStatsError(null);
+
     try {
-      // This would be a real API call in production
-      // For now we'll simulate statistics
-      
-      // In a real implementation, you would:
-      // 1. Set up an API endpoint like /api/stats
-      // 2. Query your Prisma DB for aggregated data based on date range
-      // 3. Return formatted statistics
-      
-      // Create date range for filtering
-      const now = new Date();
-      let startDate = new Date();
-      
-      switch (dateRange) {
-        case '7days':
-          startDate.setDate(now.getDate() - 7);
-          break;
-        case '30days':
-          startDate.setDate(now.getDate() - 30);
-          break;
-        case '90days':
-          startDate.setDate(now.getDate() - 90);
-          break;
-        default:
-          startDate.setDate(now.getDate() - 7);
+      const response = await fetch('/api/stats?range=' + dateRange);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'İstatistikler yüklenirken bir hata oluştu');
       }
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Mock data for now
-      const mockStats = {
-        totalOrders: Math.floor(Math.random() * 100) + 50,
-        pendingOrders: Math.floor(Math.random() * 30) + 10,
-        shippedOrders: Math.floor(Math.random() * 70) + 30,
-        totalRevenue: Math.floor(Math.random() * 10000) + 5000,
-        marketplaceBreakdown: [
-          { name: 'Veeqo', orders: Math.floor(Math.random() * 60) + 20, color: '#4F46E5' },
-          { name: 'Trendyol', orders: Math.floor(Math.random() * 60) + 10, color: '#F97316' },
-          { name: 'Other', orders: Math.floor(Math.random() * 10) + 5, color: '#6B7280' }
-        ],
-        // Simulated daily data for the chart
-        dailyData: Array.from({ length: 7 }, (_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - (6 - i));
-          return {
-            date: date.toISOString().split('T')[0],
-            orders: Math.floor(Math.random() * 15) + 5,
-            revenue: Math.floor(Math.random() * 1500) + 500
-          };
-        })
-      };
-      
-      setStats(mockStats);
+
+      const data = await response.json();
+      setStats(data);
     } catch (error) {
       console.error('Error fetching stats:', error);
+      setStatsError(error.message || 'İstatistikler yüklenirken bir hata oluştu');
     } finally {
       setIsLoadingStats(false);
     }
@@ -125,7 +83,14 @@ export default function Dashboard() {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <svg className="animate-spin h-10 w-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+    );
   }
 
   return (
@@ -135,15 +100,15 @@ export default function Dashboard() {
       </Head>
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <h1 className="text-3xl font-bold">Kontrol Paneli</h1>
           <select
             value={dateRange}
             onChange={handleDateRangeChange}
             className="border rounded p-2"
           >
-            <option value="7days">Last 7 Days</option>
-            <option value="30days">Last 30 Days</option>
-            <option value="90days">Last 90 Days</option>
+            <option value="7days">Son 7 Gün</option>
+            <option value="30days">Son 30 Gün</option>
+            <option value="90days">Son 90 Gün</option>
           </select>
         </div>
         
@@ -153,39 +118,49 @@ export default function Dashboard() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <p className="mt-2 text-gray-600">Loading statistics...</p>
+            <p className="mt-2 text-gray-600">İstatistikler yükleniyor...</p>
+          </div>
+        ) : statsError ? (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+            <p className="text-red-700 font-medium">{statsError}</p>
+            <button
+              onClick={fetchStats}
+              className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            >
+              Tekrar Dene
+            </button>
           </div>
         ) : (
           <>
             {/* Key Metrics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <div className="bg-white p-4 rounded-lg shadow">
-                <h3 className="text-gray-500 text-sm font-medium">Total Orders</h3>
+                <h3 className="text-gray-500 text-sm font-medium">Toplam Sipariş</h3>
                 <p className="text-3xl font-bold mt-2">{stats.totalOrders}</p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow">
-                <h3 className="text-gray-500 text-sm font-medium">Pending Orders</h3>
+                <h3 className="text-gray-500 text-sm font-medium">Bekleyen Siparişler</h3>
                 <p className="text-3xl font-bold mt-2 text-yellow-500">{stats.pendingOrders}</p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow">
-                <h3 className="text-gray-500 text-sm font-medium">Shipped Orders</h3>
+                <h3 className="text-gray-500 text-sm font-medium">Gönderilen Siparişler</h3>
                 <p className="text-3xl font-bold mt-2 text-green-500">{stats.shippedOrders}</p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow">
-                <h3 className="text-gray-500 text-sm font-medium">Total Revenue</h3>
-                <p className="text-3xl font-bold mt-2">${stats.totalRevenue.toLocaleString()}</p>
+                <h3 className="text-gray-500 text-sm font-medium">Toplam Gelir</h3>
+                <p className="text-3xl font-bold mt-2">₺{(stats.totalRevenue || 0).toLocaleString()}</p>
               </div>
             </div>
             
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-lg font-medium mb-4">Daily Orders</h3>
+                <h3 className="text-lg font-medium mb-4">Günlük Siparişler</h3>
                 {renderBarChart(stats.dailyData)}
               </div>
               
               <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-lg font-medium mb-4">Marketplace Breakdown</h3>
+                <h3 className="text-lg font-medium mb-4">Pazaryeri Dağılımı</h3>
                 <div className="space-y-4">
                   {stats.marketplaceBreakdown.map((marketplace, i) => (
                     <div key={i} className="flex items-center">
@@ -212,7 +187,7 @@ export default function Dashboard() {
             
             {/* Quick Links */}
             <div className="mt-8 bg-white p-6 rounded-lg shadow">
-              <h3 className="text-lg font-medium mb-4">Quick Links</h3>
+              <h3 className="text-lg font-medium mb-4">Hızlı Erişim</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <a 
                   href="/siparisler" 
@@ -224,8 +199,8 @@ export default function Dashboard() {
                     </svg>
                   </div>
                   <div>
-                    <h4 className="font-medium">View Orders</h4>
-                    <p className="text-sm text-gray-500">Manage and process all orders</p>
+                    <h4 className="font-medium">Siparişleri Görüntüle</h4>
+                    <p className="text-sm text-gray-500">Tüm siparişleri yönetin ve işleyin</p>
                   </div>
                 </a>
                 <a 
@@ -239,8 +214,8 @@ export default function Dashboard() {
                     </svg>
                   </div>
                   <div>
-                    <h4 className="font-medium">Settings</h4>
-                    <p className="text-sm text-gray-500">Configure marketplace connections</p>
+                    <h4 className="font-medium">Ayarlar</h4>
+                    <p className="text-sm text-gray-500">Pazaryeri bağlantılarını yapılandırın</p>
                   </div>
                 </a>
                 <a 
@@ -253,8 +228,8 @@ export default function Dashboard() {
                     </svg>
                   </div>
                   <div>
-                    <h4 className="font-medium">Support</h4>
-                    <p className="text-sm text-gray-500">Get help and report issues</p>
+                    <h4 className="font-medium">Destek</h4>
+                    <p className="text-sm text-gray-500">Yardım alın ve sorun bildirin</p>
                   </div>
                 </a>
               </div>

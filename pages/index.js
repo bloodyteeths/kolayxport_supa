@@ -36,17 +36,16 @@ const features = [
   },
 ];
 
-const comparisonData = {
-  headers: ['Özellik', 'KolayXport', 'Rakip A', 'Rakip B'],
-  rows: [
-    ['Fiyatlandırma', 'Ücretsiz Plan Mevcut', '€29/ay', '€49/ay'],
-    ['Sipariş Limiti', 'Limitsiz', '500/ay', '1000/ay'],
-    ['Entegrasyon Sayısı', '10+', '5', '7'],
-    ['Otomatik Kargo Etiketi', 'Var', 'Kısmi', 'Var'],
-    ['Envanter Yönetimi', 'Var', 'Var', 'Kısmi'],
-    ['Türkçe Destek', 'Var', 'Yok', 'Var'],
-  ],
-};
+const includedFeatures = [
+  'Sınırsız Sipariş Yönetimi',
+  'Tüm Pazaryeri Entegrasyonları',
+  'Otomatik Kargo Etiketi',
+  'Gerçek Zamanlı Envanter Senkronizasyonu',
+  'Türkçe Arayüz & Destek',
+  'SSL ile Şifreli Bağlantı',
+  'Çoklu Kargo Firması Desteği',
+  'Detaylı Raporlama',
+];
 
 const testimonials = [
   {
@@ -233,8 +232,8 @@ export default function HomePage() {
         </div>
       </motion.section>
 
-      {/* Section 4: COMPARISON TABLE */}
-      <motion.section 
+      {/* Section 4: WHAT'S INCLUDED */}
+      <motion.section
         className="py-20 md:py-28 bg-white"
         initial={{ opacity: 0, y: 50 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -243,44 +242,20 @@ export default function HomePage() {
       >
         <div className="container max-w-5xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Karşılaştırma Tablosu</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Neler Dahil?</h2>
             <p className="max-w-xl mx-auto text-lg text-slate-600">
-              Neden KolayXport\'u tercih etmelisiniz?
+              Tüm planlarda standart olarak sunulan özellikler
             </p>
           </div>
-          <div className="shadow-xl shadow-slate-900/[.05] rounded-xl overflow-hidden ring-1 ring-slate-200">
-            <div className="overflow-x-auto -mx-px">
-            <table className="min-w-[600px] w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
-                <tr>
-                  {comparisonData.headers.map((header) => (
-                    <th key={header} scope="col" className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
-                {comparisonData.rows.map((row, rowIndex) => (
-                  <tr key={rowIndex} className={rowIndex % 2 === 0 ? undefined : 'bg-slate-50/50'}>
-                    {row.map((cell, cellIndex) => (
-                      <td key={cellIndex} className={`px-6 py-4 whitespace-nowrap text-sm ${cellIndex === 0 ? 'font-medium text-slate-800' : 'text-slate-600'}`}>
-                        {cellIndex === 1 && typeof cell === 'string' && cell.includes('Var') ? (
-                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                             {cell}
-                           </span>
-                        ) : cellIndex === 1 && typeof cell === 'string' && cell.includes('Mevcut') ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {cell}
-                          </span>
-                        ) : (cell) }
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {includedFeatures.map((feature) => (
+              <div key={feature} className="flex items-center gap-3 bg-slate-50 rounded-xl px-5 py-4">
+                <svg className="w-6 h-6 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-sm font-medium text-slate-700">{feature}</span>
+              </div>
+            ))}
           </div>
         </div>
       </motion.section>
@@ -395,30 +370,6 @@ export default function HomePage() {
         </div>
       </motion.section>
 
-      {/* Section 8: CONTACT PREVIEW / SIGNUP FORM (Simplified) */}
-      <motion.section
-        id="signup-form" 
-        className="py-20 md:py-28 bg-white"
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, amount: 0.2 }}
-        variants={sectionVariants}
-      >
-        <div className="container max-w-3xl mx-auto px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">KolayXport\'u Denemeye Hazır Olun</h2>
-          <p className="max-w-xl mx-auto text-lg text-slate-600 mb-10">
-            Sadece birkaç adımda e-ticaretinizi yeni bir seviyeye taşıyın. Kaydolun ve potansiyeli keşfedin. Daha fazla bilgi için <Link href="/nasil-kullanirim" className="text-blue-600 hover:underline">kullanım rehberimizi</Link> inceleyin.
-          </p>
-          <div className="mt-8">
-            <Link href="/login" className="inline-block px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
-              Hemen Kayıt Ol
-            </Link>
-            <p className="mt-6 text-sm text-slate-400">
-              Sorularınız mı var? <Link href="/iletisim" className="text-blue-600 hover:underline">Bize Ulaşın</Link>.
-            </p>
-          </div>
-        </div>
-      </motion.section>
 
     </PublicLayout>
   );

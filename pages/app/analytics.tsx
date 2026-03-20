@@ -449,10 +449,10 @@ export default function AnalyticsPage() {
     labels: mpData.map((m) => m.marketplace || 'Unknown'),
     legend: { position: 'bottom' },
     plotOptions: { pie: { donut: { size: '70%' } } },
-    tooltip: { y: { formatter: (v: number) => `${formatNumber(v)} siparis` } },
+    tooltip: { y: { formatter: (v: number) => formatCurrency(v) } },
   };
 
-  const donutSeries = mpData.map((m) => m.orders);
+  const donutSeries = mpData.map((m) => Math.round(m.revenue));
 
   // Monthly chart
   const monthlyStats = data?.monthlyStats ?? [];

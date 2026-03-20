@@ -2349,17 +2349,17 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   };
 
   return (
-    <Box sx={{ height: 'calc(100dvh - 64px - 48px)', display: 'flex', flexDirection: 'column', p: 2, overflow: 'hidden' }}>
+    <Box sx={{ height: 'calc(100dvh - 64px - 48px)', display: 'flex', flexDirection: 'column', p: { xs: 1, sm: 2 }, overflow: 'hidden' }}>
   {/* ...content... */}
 
       <Toaster position="top-right" reverseOrder={false} />
-      <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
-        Etiket Yönetimi
+      <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: { xs: 1, sm: 2 }, fontSize: { xs: '1.1rem', sm: '1.5rem' } }}>
+        Etiket Yonetimi
       </Typography>
-      <Box sx={{ display:'flex', flexDirection:'column', gap:1, mb:2 }}>
-        <Paper elevation={1} sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 2 }}>
-          <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} sx={{ textTransform: 'none', height: '40px', minWidth: 180, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>
-          {syncingOrders ? 'Senkronize Ediliyor...' : 'Siparişleri Senkron Et'}
+      <Box sx={{ display:'flex', flexDirection:'column', gap:1, mb: { xs: 1, sm: 2 } }}>
+        <Paper elevation={1} sx={{ p: { xs: 1, sm: 2 }, display: 'flex', gap: { xs: 1, sm: 2 }, alignItems: 'center', flexWrap: 'wrap', rowGap: { xs: 0.5, sm: 2 } }}>
+          <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} sx={{ textTransform: 'none', height: { xs: '34px', sm: '40px' }, minWidth: { xs: 120, sm: 180 }, fontSize: { xs: '0.75rem', sm: '0.875rem' }, flexGrow: 1, mb: { xs: 0.5, sm: 0 } }}>
+          {syncingOrders ? 'Senkronize...' : 'Senkron Et'}
         </Button>
         <ManualOrderButton onOrderCreated={() => { mutate(); toast.success('Sipariş listesi yenilendi'); }} />
         
@@ -2375,54 +2375,54 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             {processingEtgb ? 'İşleniyor...' : `ETGB İşle (${etgbSelectedRows.length})`}
           </Button>
         )}
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, height: '40px', mb: { xs: 1, sm: 0 } }}>
-            <InputLabel shrink={true}>Arama Türü</InputLabel>
-            <Select value={searchType} label="Arama Türü" onChange={e => setSearchType(e.target.value)} displayEmpty>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: { xs: 80, sm: 120 }, height: { xs: '34px', sm: '40px' }, mb: { xs: 0.5, sm: 0 } }}>
+            <InputLabel shrink={true} sx={{ fontSize: { xs: '0.75rem', sm: '1rem' } }}>Arama</InputLabel>
+            <Select value={searchType} label="Arama" onChange={e => setSearchType(e.target.value)} displayEmpty sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
               {searchTypeOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
             </Select>
           </FormControl>
-          <TextField size="small" label="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" /> }} sx={{ minWidth: 140, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}/>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
-            <InputLabel shrink={true}>Sipariş Durumu</InputLabel>
-            <Select value={statusFilter} label="Sipariş Durumu" onChange={e => setStatusFilter(e.target.value)} displayEmpty>
+          <TextField size="small" label="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" /> }} sx={{ minWidth: { xs: 100, sm: 140 }, flexGrow: 1, height: { xs: '34px', sm: '40px' }, mb: { xs: 0.5, sm: 0 }, '& .MuiInputBase-input': { fontSize: { xs: '0.75rem', sm: '0.875rem' } } }}/>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: { xs: 80, sm: 120 }, flexGrow: 1, height: { xs: '34px', sm: '40px' }, mb: { xs: 0.5, sm: 0 }, display: { xs: 'none', sm: 'inline-flex' } }}>
+            <InputLabel shrink={true}>Siparis Durumu</InputLabel>
+            <Select value={statusFilter} label="Siparis Durumu" onChange={e => setStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
             {orderStatusFilterOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: { xs: 80, sm: 120 }, flexGrow: 1, height: { xs: '34px', sm: '40px' }, mb: { xs: 0.5, sm: 0 }, display: { xs: 'none', sm: 'inline-flex' } }}>
             <InputLabel shrink={true}>Etiket Durumu</InputLabel>
-            <Select value={labelStatusFilter} label="Etiket Durumu" onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty>
+            <Select value={labelStatusFilter} label="Etiket Durumu" onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
             {labelStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }}>
-            <InputLabel shrink={true}>Mağaza</InputLabel>
-            <Select 
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, flexGrow: 1, height: { xs: '34px', sm: '40px' }, mb: { xs: 0.5, sm: 0 }, display: { xs: 'none', md: 'inline-flex' } }}>
+            <InputLabel shrink={true}>Magaza</InputLabel>
+            <Select
               multiple
-              value={marketplaceFilter} 
-              label="Mağaza" 
+              value={marketplaceFilter}
+              label="Magaza"
               onChange={(e) => setMarketplaceFilter(typeof e.target.value === 'string' ? [e.target.value] : e.target.value)}
               displayEmpty
               renderValue={(selected) => {
                 if (selected.length === 0) {
-                  return <em>Tümü</em>;
+                  return <em>Tumu</em>;
                 }
                 if (selected.length === 1) {
                   return selected[0];
                 }
-                return `${selected.length} mağaza seçildi`;
+                return `${selected.length} magaza`;
               }}
               disabled={isLoadingMarketplaces}
               MenuProps={{
                 PaperProps: {
                   style: {
-                    maxHeight: 7 * 48 + 8, // 7 items × 48px height + 8px padding
+                    maxHeight: 7 * 48 + 8,
                     width: 250,
                   },
                 },
               }}
             >
               <MenuItem value="">
-                <em>Tümü</em>
+                <em>Tumu</em>
               </MenuItem>
               {dbMarketplaceOptions.map(opt => (
                 <MenuItem key={opt.value} value={opt.value}>
@@ -2431,11 +2431,11 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
               ))}
             </Select>
           </FormControl>
-          <TextField label="Başlangıç Tarihi" type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: 150, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }} />
-          <TextField label="Bitiş Tarihi" type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: 150, flexGrow: 1, height: '40px', mb: { xs: 1, sm: 0 } }} />
-          <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="outlined" sx={{ ml: 'auto', height: '40px', minWidth: 100, flexGrow: 1, mb: { xs: 1, sm: 0 } }}>Sıfırla</Button>
-        <Tooltip title="Sipariş Listesini Yenile">
-            <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" sx={{ height: '40px', width: '40px', mb: { xs: 1, sm: 0 } }}><RefreshIcon /></IconButton></span>
+          <TextField label="Baslangic" type="date" value={filterStartDate} onChange={e => { setFilterStartDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: { xs: 110, sm: 150 }, flexGrow: 1, height: { xs: '34px', sm: '40px' }, mb: { xs: 0.5, sm: 0 }, display: { xs: 'none', md: 'inline-flex' } }} />
+          <TextField label="Bitis" type="date" value={filterEndDate} onChange={e => { setFilterEndDate(e.target.value); }} size="small" InputLabelProps={{ shrink: true }} sx={{ minWidth: { xs: 110, sm: 150 }, flexGrow: 1, height: { xs: '34px', sm: '40px' }, mb: { xs: 0.5, sm: 0 }, display: { xs: 'none', md: 'inline-flex' } }} />
+          <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="outlined" sx={{ height: { xs: '34px', sm: '40px' }, minWidth: { xs: 60, sm: 100 }, fontSize: { xs: '0.7rem', sm: '0.875rem' }, mb: { xs: 0.5, sm: 0 } }}>Sifirla</Button>
+        <Tooltip title="Yenile">
+            <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" sx={{ height: { xs: '34px', sm: '40px' }, width: { xs: '34px', sm: '40px' }, mb: { xs: 0.5, sm: 0 } }}><RefreshIcon /></IconButton></span>
         </Tooltip>
       </Paper>
         
@@ -2446,10 +2446,11 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             value={labelFilter}
             onChange={handleLabelFilter}
             aria-label="Etiket filtresi"
+            sx={{ '& .MuiToggleButton-root': { fontSize: { xs: '0.65rem', sm: '0.8rem' }, px: { xs: 1, sm: 2 }, py: { xs: 0.3, sm: 0.5 } } }}
           >
-            <ToggleButton value="all" aria-label="Tümü">Tümü</ToggleButton>
+            <ToggleButton value="all" aria-label="Tumu">Tumu</ToggleButton>
             <ToggleButton value="unlabeled" aria-label="Etiketsiz">Etiketsiz</ToggleButton>
-            <ToggleButton value="labeled" aria-label="Etiket Alındı">Alındı</ToggleButton>
+            <ToggleButton value="labeled" aria-label="Alindi">Alindi</ToggleButton>
           </ToggleButtonGroup>
           {/* Placeholder for any other controls on the right if needed */}
         </Box>
@@ -2482,7 +2483,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             }}
             getRowId={(row) => row.itemId || row.orderId}
             disableRowSelectionOnClick
-            rowHeight={72}
+            rowHeight={60}
             disableColumnResize={false}
             disableColumnMenu
             keepNonExistentRowsSelected={etgbEnabled}
@@ -2514,11 +2515,13 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
               },
             }}
             density="compact"
-            sx={{ 
+            sx={{
               height: '100%',
               border: 0,
-              '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5' },
-              '& .MuiDataGrid-cell': { py: 1 },
+              fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' },
+              '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontSize: { xs: '0.65rem', sm: '0.75rem' } },
+              '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600 },
+              '& .MuiDataGrid-cell': { py: 0.5, px: { xs: 0.5, sm: 1 } },
               '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cell:focus': {
                 outline: 'none !important',
               },

@@ -259,6 +259,9 @@ model Credential {
   etsyRefreshToken      String?
   etsyShopId            String?
   etsyTokenExpiresAt    DateTime?
+  ebayAccessToken       String?
+  ebayRefreshToken      String?
+  ebayTokenExpiresAt    DateTime?
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

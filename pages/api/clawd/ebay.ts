@@ -1,0 +1,1089 @@
+import type { NextApiRequest, NextApiResponse } from 'next';
+import prisma from '../../../lib/prisma';
+import { logger } from '../../../lib/logger';
+import { getSupabaseServerClient } from '../../../lib/supabase';
+import {
+  refreshUserToken,
+  getApplicationToken,
+} from '../../../lib/integrations/ebayClient';
+
+// eBay REST API base URL
+const EBAY_API_BASE = 'https://api.ebay.com';
+
+// ---------------------------------------------------------------------------
+// Token management
+// ---------------------------------------------------------------------------
+
+async function refreshEbayToken(userId: string, refreshToken: string): Promise<string> {
+  const data = await refreshUserToken(refreshToken);
+
+  // Update the token in database
+  await prisma.credential.update({
+    where: { userId },
+    data: {
+      ebayAccessToken: data.access_token,
+      ebayRefreshToken: data.refresh_token || refreshToken,
+      ebayTokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+    },
+  });
+
+  return data.access_token;
+}
+
+async function getEbayAccessToken(userId: string): Promise<string> {
+  const credential = await prisma.credential.findUnique({
+    where: { userId },
+    select: {
+      ebayAccessToken: true,
+      ebayRefreshToken: true,
+      ebayTokenExpiresAt: true,
+    },
+  });
+
+  if (!credential || !credential.ebayAccessToken) {
+    throw new Error('eBay not connected. Please connect your eBay account in settings.');
+  }
+
+  // Check if token is expired or about to expire (within 5 minutes)
+  const now = new Date();
+  const expiresAt = credential.ebayTokenExpiresAt;
+
+  if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
+    if (!credential.ebayRefreshToken) {
+      throw new Error('eBay refresh token not available. Please reconnect your eBay account.');
+    }
+    return await refreshEbayToken(userId, credential.ebayRefreshToken);
+  }
+
+  return credential.ebayAccessToken;
+}
+
+// ---------------------------------------------------------------------------
+// API caller
+// ---------------------------------------------------------------------------
+
+async function callEbayAPI(endpoint: string, accessToken: string, options: RequestInit = {}) {
+  const url = endpoint.startsWith('http') ? endpoint : `${EBAY_API_BASE}${endpoint}`;
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...((options.headers as Record<string, string>) || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const error = new Error(`eBay API error: ${response.status} - ${errorText}`);
+    logger.error('eBay API error', error, {
+      endpoint,
+      status: response.status,
+    });
+    throw error;
+  }
+
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return { success: true };
+  }
+
+  return response.json();
+}
+
+// ---------------------------------------------------------------------------
+// Handler
+// ---------------------------------------------------------------------------
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // 1. Authenticate --- accept API key OR session auth
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const envApiKey = process.env.CLAWD_API_KEY;
+  let authenticated = false;
+  let sessionUserId: string | null = null;
+
+  // Try API key auth first
+  if (envApiKey && apiKey === envApiKey) {
+    authenticated = true;
+  }
+
+  // Fall back to session auth
+  if (!authenticated) {
+    try {
+      const supabase = getSupabaseServerClient(req, res);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        authenticated = true;
+        sessionUserId = user.id;
+      }
+    } catch {
+      // Session auth failed, continue
+    }
+  }
+
+  if (!authenticated) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or missing authentication' });
+  }
+
+  // Get userId from query param or session
+  const userId = (req.query.userId as string) || sessionUserId;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required' });
+  }
+
+  // Marketplace ID (default EBAY_US, configurable via query)
+  const marketplaceId = (req.query.marketplace_id as string) || 'EBAY_US';
+
+  try {
+    const { action } = req.query;
+
+    // =====================================================================
+    // Actions that use application token (no user auth needed)
+    // =====================================================================
+
+    // GET ?action=category_tree&category_tree_id=0
+    if (req.method === 'GET' && action === 'category_tree') {
+      const categoryTreeId = (req.query.category_tree_id as string) || '0';
+      const appToken = await getApplicationToken();
+
+      const data = await callEbayAPI(
+        `/commerce/taxonomy/v1/category_tree/${categoryTreeId}`,
+        appToken
+      );
+
+      return res.status(200).json(data);
+    }
+
+    // GET ?action=category_suggestions&q=shoes&category_tree_id=0
+    if (req.method === 'GET' && action === 'category_suggestions') {
+      const q = req.query.q as string;
+      if (!q) {
+        return res.status(400).json({ error: 'q (query) is required' });
+      }
+      const categoryTreeId = (req.query.category_tree_id as string) || '0';
+      const appToken = await getApplicationToken();
+
+      const data = await callEbayAPI(
+        `/commerce/taxonomy/v1/category_tree/${categoryTreeId}/get_category_suggestions?q=${encodeURIComponent(q)}`,
+        appToken
+      );
+
+      return res.status(200).json(data);
+    }
+
+    // GET ?action=item_aspects&category_id=XXX&category_tree_id=0
+    if (req.method === 'GET' && action === 'item_aspects') {
+      const categoryId = req.query.category_id as string;
+      if (!categoryId) {
+        return res.status(400).json({ error: 'category_id is required' });
+      }
+      const categoryTreeId = (req.query.category_tree_id as string) || '0';
+      const appToken = await getApplicationToken();
+
+      const data = await callEbayAPI(
+        `/commerce/taxonomy/v1/category_tree/${categoryTreeId}/get_item_aspects_for_category?category_id=${categoryId}`,
+        appToken
+      );
+
+      return res.status(200).json(data);
+    }
+
+    // =====================================================================
+    // Actions that require user access token
+    // =====================================================================
+    const accessToken = await getEbayAccessToken(userId);
+
+    // -----------------------------------------------------------------
+    // LISTING MANAGEMENT
+    // -----------------------------------------------------------------
+
+    // GET ?action=listings — Get all offers/listings
+    if (req.method === 'GET' && action === 'listings') {
+      const limit = parseInt((req.query.limit as string) || '200');
+      const offset = parseInt((req.query.offset as string) || '0');
+
+      const data = await callEbayAPI(
+        `/sell/inventory/v1/offer?marketplace_id=${marketplaceId}&limit=${limit}&offset=${offset}`,
+        accessToken
+      );
+
+      return res.status(200).json({
+        total: data.total || 0,
+        size: data.size || 0,
+        offset: data.offset || offset,
+        offers: data.offers || [],
+      });
+    }
+
+    // GET ?action=inventory_items — Get all inventory items
+    if (req.method === 'GET' && action === 'inventory_items') {
+      const limit = parseInt((req.query.limit as string) || '200');
+      const offset = parseInt((req.query.offset as string) || '0');
+
+      const data = await callEbayAPI(
+        `/sell/inventory/v1/inventory_item?limit=${limit}&offset=${offset}`,
+        accessToken
+      );
+
+      return res.status(200).json({
+        total: data.total || 0,
+        size: data.size || 0,
+        offset: data.offset || offset,
+        inventoryItems: data.inventoryItems || [],
+      });
+    }
+
+    // GET ?action=get_inventory_items — Alias for inventory_items
+    if (req.method === 'GET' && action === 'get_inventory_items') {
+      const limit = parseInt((req.query.limit as string) || '200');
+      const offset = parseInt((req.query.offset as string) || '0');
+
+      const data = await callEbayAPI(
+        `/sell/inventory/v1/inventory_item?limit=${limit}&offset=${offset}`,
+        accessToken
+      );
+
+      return res.status(200).json({
+        total: data.total || 0,
+        size: data.size || 0,
+        offset: data.offset || offset,
+        inventoryItems: data.inventoryItems || [],
+      });
+    }
+
+    // GET ?action=listing&sku=XXX — Get single inventory item + its offers
+    if (req.method === 'GET' && action === 'listing') {
+      const sku = req.query.sku as string;
+      if (!sku) {
+        return res.status(400).json({ error: 'sku is required' });
+      }
+
+      const encodedSku = encodeURIComponent(sku);
+
+      // Fetch inventory item and its offers in parallel
+      const [inventoryItem, offersData] = await Promise.all([
+        callEbayAPI(`/sell/inventory/v1/inventory_item/${encodedSku}`, accessToken),
+        callEbayAPI(`/sell/inventory/v1/offer?sku=${encodedSku}`, accessToken).catch(() => ({ offers: [] })),
+      ]);
+
+      return res.status(200).json({
+        sku,
+        inventoryItem,
+        offers: offersData.offers || [],
+      });
+    }
+
+    // POST ?action=create_listing — Create inventory item + offer (optionally publish)
+    if (req.method === 'POST' && action === 'create_listing') {
+      const {
+        sku,
+        // Inventory item fields
+        title,
+        description,
+        aspects,
+        imageUrls,
+        upc,
+        ean,
+        condition = 'NEW',
+        conditionDescription,
+        quantity = 1,
+        // Offer fields
+        format = 'FIXED_PRICE',
+        price,
+        currency = 'USD',
+        categoryId,
+        paymentPolicyId,
+        returnPolicyId,
+        fulfillmentPolicyId,
+        merchantLocationKey,
+        // Auto-publish
+        publish = false,
+      } = req.body;
+
+      if (!sku) {
+        return res.status(400).json({ error: 'sku is required' });
+      }
+      if (!title) {
+        return res.status(400).json({ error: 'title is required' });
+      }
+      if (price === undefined || price === null) {
+        return res.status(400).json({ error: 'price is required' });
+      }
+
+      logger.info('Creating eBay listing', {
+        userId,
+        sku,
+        title: title.substring(0, 50),
+        publish,
+      });
+
+      // Step 1: Create/update inventory item
+      const inventoryItemPayload: Record<string, any> = {
+        product: {
+          title,
+        },
+        condition,
+        availability: {
+          shipToLocationAvailability: {
+            quantity: parseInt(quantity),
+          },
+        },
+      };
+
+      if (description) inventoryItemPayload.product.description = description;
+      if (aspects) inventoryItemPayload.product.aspects = aspects;
+      if (imageUrls && imageUrls.length > 0) inventoryItemPayload.product.imageUrls = imageUrls;
+      if (upc) inventoryItemPayload.product.upc = [upc];
+      if (ean) inventoryItemPayload.product.ean = [ean];
+      if (conditionDescription) inventoryItemPayload.conditionDescription = conditionDescription;
+
+      const encodedSku = encodeURIComponent(sku);
+      await callEbayAPI(
+        `/sell/inventory/v1/inventory_item/${encodedSku}`,
+        accessToken,
+        {
+          method: 'PUT',
+          body: JSON.stringify(inventoryItemPayload),
+        }
+      );
+
+      logger.info('eBay inventory item created', { sku });
+
+      // Step 2: Create offer
+      const offerPayload: Record<string, any> = {
+        sku,
+        marketplaceId: marketplaceId,
+        format,
+        pricingSummary: {
+          price: {
+            value: String(price),
+            currency,
+          },
+        },
+      };
+
+      // Listing policies are required for publishing
+      const listingPolicies: Record<string, string> = {};
+      if (paymentPolicyId) listingPolicies.paymentPolicyId = paymentPolicyId;
+      if (returnPolicyId) listingPolicies.returnPolicyId = returnPolicyId;
+      if (fulfillmentPolicyId) listingPolicies.fulfillmentPolicyId = fulfillmentPolicyId;
+      if (Object.keys(listingPolicies).length > 0) {
+        offerPayload.listingPolicies = listingPolicies;
+      }
+
+      if (categoryId) offerPayload.categoryId = categoryId;
+      if (merchantLocationKey) offerPayload.merchantLocationKey = merchantLocationKey;
+
+      const offerResult = await callEbayAPI(
+        '/sell/inventory/v1/offer',
+        accessToken,
+        {
+          method: 'POST',
+          body: JSON.stringify(offerPayload),
+        }
+      );
+
+      const offerId = offerResult.offerId;
+      logger.info('eBay offer created', { sku, offerId });
+
+      // Step 3: Optionally publish
+      let listingId = null;
+      if (publish && offerId) {
+        try {
+          const publishResult = await callEbayAPI(
+            `/sell/inventory/v1/offer/${offerId}/publish`,
+            accessToken,
+            { method: 'POST' }
+          );
+          listingId = publishResult.listingId;
+          logger.info('eBay listing published', { sku, offerId, listingId });
+        } catch (publishError) {
+          logger.error('Failed to auto-publish eBay listing', publishError instanceof Error ? publishError : new Error(String(publishError)), {
+            sku,
+            offerId,
+          });
+        }
+      }
+
+      return res.status(201).json({
+        success: true,
+        sku,
+        offerId,
+        listingId,
+        published: !!listingId,
+        message: listingId
+          ? 'Listing created and published.'
+          : 'Listing created. Use the publish action to make it live.',
+      });
+    }
+
+    // PUT ?action=update_listing&sku=XXX — Update inventory item
+    if ((req.method === 'PUT' || req.method === 'PATCH') && action === 'update_listing') {
+      const sku = req.query.sku as string;
+      if (!sku) {
+        return res.status(400).json({ error: 'sku is required' });
+      }
+
+      const {
+        title,
+        description,
+        aspects,
+        imageUrls,
+        upc,
+        ean,
+        condition,
+        conditionDescription,
+        quantity,
+      } = req.body;
+
+      // First get the existing item to merge
+      const encodedSku = encodeURIComponent(sku);
+      let existingItem: Record<string, any> = {};
+      try {
+        existingItem = await callEbayAPI(
+          `/sell/inventory/v1/inventory_item/${encodedSku}`,
+          accessToken
+        );
+      } catch {
+        // Item doesn't exist yet, will create fresh
+      }
+
+      // Build update payload, merging with existing
+      const product = { ...(existingItem.product || {}) };
+      if (title !== undefined) product.title = title;
+      if (description !== undefined) product.description = description;
+      if (aspects !== undefined) product.aspects = aspects;
+      if (imageUrls !== undefined) product.imageUrls = imageUrls;
+      if (upc !== undefined) product.upc = [upc];
+      if (ean !== undefined) product.ean = [ean];
+
+      const updatePayload: Record<string, any> = {
+        product,
+        condition: condition || existingItem.condition || 'NEW',
+        availability: existingItem.availability || {
+          shipToLocationAvailability: { quantity: 1 },
+        },
+      };
+
+      if (quantity !== undefined) {
+        updatePayload.availability = {
+          shipToLocationAvailability: { quantity: parseInt(quantity) },
+        };
+      }
+      if (conditionDescription !== undefined) {
+        updatePayload.conditionDescription = conditionDescription;
+      }
+
+      logger.info('Updating eBay inventory item', { sku, userId });
+
+      await callEbayAPI(
+        `/sell/inventory/v1/inventory_item/${encodedSku}`,
+        accessToken,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updatePayload),
+        }
+      );
+
+      return res.status(200).json({
+        success: true,
+        sku,
+        message: 'Inventory item updated.',
+      });
+    }
+
+    // PUT ?action=update_offer&offerId=XXX — Update offer (pricing, policies)
+    if ((req.method === 'PUT' || req.method === 'PATCH') && action === 'update_offer') {
+      const offerId = req.query.offerId as string;
+      if (!offerId) {
+        return res.status(400).json({ error: 'offerId is required' });
+      }
+
+      const {
+        price,
+        currency = 'USD',
+        categoryId,
+        paymentPolicyId,
+        returnPolicyId,
+        fulfillmentPolicyId,
+        merchantLocationKey,
+        format,
+      } = req.body;
+
+      // Fetch existing offer to merge
+      const existingOffer = await callEbayAPI(
+        `/sell/inventory/v1/offer/${offerId}`,
+        accessToken
+      );
+
+      const updatePayload: Record<string, any> = {
+        ...existingOffer,
+      };
+
+      // Remove read-only fields
+      delete updatePayload.offerId;
+      delete updatePayload.status;
+      delete updatePayload.listing;
+
+      if (price !== undefined) {
+        updatePayload.pricingSummary = {
+          ...updatePayload.pricingSummary,
+          price: {
+            value: String(price),
+            currency: currency || updatePayload.pricingSummary?.price?.currency || 'USD',
+          },
+        };
+      }
+
+      if (categoryId !== undefined) updatePayload.categoryId = categoryId;
+      if (format !== undefined) updatePayload.format = format;
+      if (merchantLocationKey !== undefined) updatePayload.merchantLocationKey = merchantLocationKey;
+
+      // Update listing policies
+      if (paymentPolicyId || returnPolicyId || fulfillmentPolicyId) {
+        updatePayload.listingPolicies = updatePayload.listingPolicies || {};
+        if (paymentPolicyId) updatePayload.listingPolicies.paymentPolicyId = paymentPolicyId;
+        if (returnPolicyId) updatePayload.listingPolicies.returnPolicyId = returnPolicyId;
+        if (fulfillmentPolicyId) updatePayload.listingPolicies.fulfillmentPolicyId = fulfillmentPolicyId;
+      }
+
+      logger.info('Updating eBay offer', { offerId, userId });
+
+      const result = await callEbayAPI(
+        `/sell/inventory/v1/offer/${offerId}`,
+        accessToken,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updatePayload),
+        }
+      );
+
+      return res.status(200).json({
+        success: true,
+        offerId,
+        result,
+        message: 'Offer updated.',
+      });
+    }
+
+    // DELETE ?action=delete_listing&sku=XXX — Delete inventory item
+    if (req.method === 'DELETE' && action === 'delete_listing') {
+      const sku = req.query.sku as string;
+      if (!sku) {
+        return res.status(400).json({ error: 'sku is required' });
+      }
+
+      const encodedSku = encodeURIComponent(sku);
+
+      logger.info('Deleting eBay inventory item', { sku, userId });
+
+      await callEbayAPI(
+        `/sell/inventory/v1/inventory_item/${encodedSku}`,
+        accessToken,
+        { method: 'DELETE' }
+      );
+
+      return res.status(200).json({
+        success: true,
+        sku,
+        message: 'Inventory item deleted.',
+      });
+    }
+
+    // POST ?action=publish&offerId=XXX — Publish an offer
+    if (req.method === 'POST' && action === 'publish') {
+      const offerId = (req.query.offerId as string) || (req.body?.offerId as string);
+      if (!offerId) {
+        return res.status(400).json({ error: 'offerId is required' });
+      }
+
+      logger.info('Publishing eBay offer', { offerId, userId });
+
+      const result = await callEbayAPI(
+        `/sell/inventory/v1/offer/${offerId}/publish`,
+        accessToken,
+        { method: 'POST' }
+      );
+
+      return res.status(200).json({
+        success: true,
+        offerId,
+        listingId: result.listingId,
+        message: 'Offer published.',
+      });
+    }
+
+    // POST ?action=withdraw&offerId=XXX — Withdraw/end a listing
+    if (req.method === 'POST' && action === 'withdraw') {
+      const offerId = (req.query.offerId as string) || (req.body?.offerId as string);
+      if (!offerId) {
+        return res.status(400).json({ error: 'offerId is required' });
+      }
+
+      logger.info('Withdrawing eBay offer', { offerId, userId });
+
+      const result = await callEbayAPI(
+        `/sell/inventory/v1/offer/${offerId}/withdraw`,
+        accessToken,
+        { method: 'POST' }
+      );
+
+      return res.status(200).json({
+        success: true,
+        offerId,
+        listingId: result.listingId,
+        message: 'Listing withdrawn.',
+      });
+    }
+
+    // POST ?action=end_listing&offerId=XXX — End a listing (alias for withdraw)
+    if (req.method === 'POST' && action === 'end_listing') {
+      const offerId = (req.query.offerId as string) || (req.body?.offerId as string);
+      if (!offerId) {
+        return res.status(400).json({ error: 'offerId is required' });
+      }
+
+      logger.info('Ending eBay listing', { offerId, userId });
+
+      const result = await callEbayAPI(
+        `/sell/inventory/v1/offer/${offerId}/withdraw`,
+        accessToken,
+        { method: 'POST' }
+      );
+
+      return res.status(200).json({
+        success: true,
+        offerId,
+        listingId: result.listingId,
+        message: 'Listing ended.',
+      });
+    }
+
+    // -----------------------------------------------------------------
+    // ACCOUNT POLICIES
+    // -----------------------------------------------------------------
+
+    // GET ?action=fulfillment_policies — Shipping policies
+    if (req.method === 'GET' && action === 'fulfillment_policies') {
+      const data = await callEbayAPI(
+        `/sell/account/v1/fulfillment_policy?marketplace_id=${marketplaceId}`,
+        accessToken
+      );
+
+      return res.status(200).json({
+        total: data.total || 0,
+        fulfillmentPolicies: data.fulfillmentPolicies || [],
+      });
+    }
+
+    // GET ?action=return_policies — Return policies
+    if (req.method === 'GET' && action === 'return_policies') {
+      const data = await callEbayAPI(
+        `/sell/account/v1/return_policy?marketplace_id=${marketplaceId}`,
+        accessToken
+      );
+
+      return res.status(200).json({
+        total: data.total || 0,
+        returnPolicies: data.returnPolicies || [],
+      });
+    }
+
+    // GET ?action=payment_policies — Payment policies
+    if (req.method === 'GET' && action === 'payment_policies') {
+      const data = await callEbayAPI(
+        `/sell/account/v1/payment_policy?marketplace_id=${marketplaceId}`,
+        accessToken
+      );
+
+      return res.status(200).json({
+        total: data.total || 0,
+        paymentPolicies: data.paymentPolicies || [],
+      });
+    }
+
+    // -----------------------------------------------------------------
+    // BULK OPERATIONS
+    // -----------------------------------------------------------------
+
+    // POST ?action=bulk_update_price — Bulk price/quantity update
+    if (req.method === 'POST' && action === 'bulk_update_price') {
+      const { requests } = req.body;
+
+      if (!requests || !Array.isArray(requests) || requests.length === 0) {
+        return res.status(400).json({ error: 'requests array is required' });
+      }
+
+      logger.info('Bulk updating eBay prices/quantities', {
+        userId,
+        count: requests.length,
+      });
+
+      const payload = {
+        requests: requests.map((r: any) => {
+          const entry: Record<string, any> = {
+            sku: r.sku,
+          };
+
+          if (r.quantity !== undefined) {
+            entry.shipToLocationAvailability = {
+              quantity: parseInt(r.quantity),
+            };
+          }
+
+          if (r.offers) {
+            entry.offers = r.offers.map((o: any) => {
+              const offer: Record<string, any> = {
+                offerId: o.offerId,
+              };
+              if (o.availableQuantity !== undefined) {
+                offer.availableQuantity = parseInt(o.availableQuantity);
+              }
+              if (o.price) {
+                offer.price = {
+                  value: String(o.price.value),
+                  currency: o.price.currency || 'USD',
+                };
+              }
+              return offer;
+            });
+          }
+
+          return entry;
+        }),
+      };
+
+      const result = await callEbayAPI(
+        '/sell/inventory/v1/bulk_update_price_quantity',
+        accessToken,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+
+      return res.status(200).json({
+        success: true,
+        responses: result.responses || [],
+        message: `Bulk update completed for ${requests.length} item(s).`,
+      });
+    }
+
+    // -----------------------------------------------------------------
+    // ORDERS (for future use)
+    // -----------------------------------------------------------------
+
+    // GET ?action=orders — Get orders
+    if (req.method === 'GET' && action === 'orders') {
+      const limit = parseInt((req.query.limit as string) || '50');
+      const offset = parseInt((req.query.offset as string) || '0');
+      const filter = req.query.filter as string;
+
+      let url = `/sell/fulfillment/v1/order?limit=${limit}&offset=${offset}`;
+      if (filter) {
+        url += `&filter=${encodeURIComponent(filter)}`;
+      }
+
+      const data = await callEbayAPI(url, accessToken);
+
+      return res.status(200).json({
+        total: data.total || 0,
+        offset: data.offset || offset,
+        limit: data.limit || limit,
+        orders: data.orders || [],
+      });
+    }
+
+    // GET ?action=order&orderId=XXX — Get single order
+    if (req.method === 'GET' && action === 'order') {
+      const orderId = req.query.orderId as string;
+      if (!orderId) {
+        return res.status(400).json({ error: 'orderId is required' });
+      }
+
+      const data = await callEbayAPI(
+        `/sell/fulfillment/v1/order/${encodeURIComponent(orderId)}`,
+        accessToken
+      );
+
+      return res.status(200).json(data);
+    }
+
+    // =================================================================
+    // BROWSE API — Market Research (uses application token, no user auth)
+    // =================================================================
+
+    // GET ?action=search_market&q=KEYWORD&limit=50&filter=...
+    // Search active eBay listings for pricing & SEO research
+    if (req.method === 'GET' && action === 'search_market') {
+      const q = req.query.q as string;
+      if (!q) {
+        return res.status(400).json({ error: 'q (search query) is required' });
+      }
+
+      const appToken = await getApplicationToken();
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const sort = (req.query.sort as string) || 'BEST_MATCH';
+      const filter = req.query.filter as string || '';
+      const categoryId = req.query.category_id as string || '';
+      const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
+
+      let url = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}&fieldgroups=MATCHING_ITEMS,ASPECT_REFINEMENTS`;
+
+      if (sort !== 'BEST_MATCH') url += `&sort=${sort}`;
+      if (filter) url += `&filter=${encodeURIComponent(filter)}`;
+      if (categoryId) url += `&category_ids=${categoryId}`;
+
+      const response = await fetch(`${EBAY_API_BASE}${url}`, {
+        headers: {
+          'Authorization': `Bearer ${appToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': marketplace,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        logger.error('eBay Browse API error', undefined, { status: response.status, body: errText });
+        return res.status(response.status).json({ error: `Browse API error: ${response.status}`, details: errText });
+      }
+
+      const data = await response.json();
+      const items = data.itemSummaries || [];
+
+      // Compute price statistics
+      const prices = items
+        .map((item: any) => parseFloat(item.price?.value || '0'))
+        .filter((p: number) => p > 0)
+        .sort((a: number, b: number) => a - b);
+
+      const priceStats = prices.length > 0 ? {
+        min: prices[0],
+        max: prices[prices.length - 1],
+        avg: Math.round((prices.reduce((a: number, b: number) => a + b, 0) / prices.length) * 100) / 100,
+        median: prices.length % 2 === 0
+          ? Math.round(((prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2) * 100) / 100
+          : prices[Math.floor(prices.length / 2)],
+        count: prices.length,
+      } : null;
+
+      // Extract keyword frequency from titles
+      const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+        'of', 'with', 'by', 'from', 'is', 'it', 'as', 'be', 'are', 'was', 'were', 'has', 'have',
+        'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can',
+        'not', 'no', 'new', 'set', '&', '-', '/', '|', '+', 'x']);
+
+      const wordFreq: Record<string, number> = {};
+      items.forEach((item: any) => {
+        const words = (item.title || '').toLowerCase().split(/[\s,;:!?()[\]{}]+/).filter(Boolean);
+        words.forEach((word: string) => {
+          if (word.length > 2 && !stopWords.has(word) && !/^\d+$/.test(word)) {
+            wordFreq[word] = (wordFreq[word] || 0) + 1;
+          }
+        });
+      });
+
+      const topKeywords = Object.entries(wordFreq)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 30)
+        .map(([keyword, count]) => ({ keyword, count, percentage: Math.round((count / items.length) * 100) }));
+
+      return res.status(200).json({
+        total: data.total || 0,
+        offset: data.offset || offset,
+        limit: data.limit || limit,
+        items: items.map((item: any) => ({
+          itemId: item.itemId,
+          title: item.title,
+          price: item.price,
+          condition: item.condition,
+          image: item.image,
+          itemWebUrl: item.itemWebUrl,
+          seller: item.seller,
+          categories: item.categories,
+          buyingOptions: item.buyingOptions,
+          shippingOptions: item.shippingOptions,
+          itemLocation: item.itemLocation,
+        })),
+        priceStats,
+        topKeywords,
+        aspectDistributions: data.refinement?.aspectDistributions || [],
+      });
+    }
+
+    // GET ?action=analyze_seo&q=KEYWORD&my_title=...&my_aspects=...
+    // Compare user's listing against market for SEO optimization
+    if (req.method === 'GET' && action === 'analyze_seo') {
+      const q = req.query.q as string;
+      const myTitle = req.query.my_title as string || '';
+
+      if (!q) {
+        return res.status(400).json({ error: 'q (search query) is required' });
+      }
+
+      const appToken = await getApplicationToken();
+      const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
+      const categoryId = req.query.category_id as string || '';
+
+      let url = `/buy/browse/v1/item_summary/search?q=${encodeURIComponent(q)}&limit=200&fieldgroups=MATCHING_ITEMS,ASPECT_REFINEMENTS`;
+      if (categoryId) url += `&category_ids=${categoryId}`;
+
+      const response = await fetch(`${EBAY_API_BASE}${url}`, {
+        headers: {
+          'Authorization': `Bearer ${appToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': marketplace,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: `Browse API error: ${response.status}`, details: errText });
+      }
+
+      const data = await response.json();
+      const items = data.itemSummaries || [];
+
+      // Word frequency from competitor titles
+      const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+        'of', 'with', 'by', 'from', 'is', 'it', 'as', 'be', 'are', 'was', 'were', 'has', 'have',
+        'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can',
+        'not', 'no', 'new', 'set', '&', '-', '/', '|', '+', 'x']);
+
+      const wordFreq: Record<string, number> = {};
+      items.forEach((item: any) => {
+        const words = (item.title || '').toLowerCase().split(/[\s,;:!?()[\]{}]+/).filter(Boolean);
+        const seen = new Set<string>(); // count once per title
+        words.forEach((word: string) => {
+          if (word.length > 2 && !stopWords.has(word) && !/^\d+$/.test(word) && !seen.has(word)) {
+            seen.add(word);
+            wordFreq[word] = (wordFreq[word] || 0) + 1;
+          }
+        });
+      });
+
+      const topKeywords = Object.entries(wordFreq)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 50)
+        .map(([keyword, count]) => ({ keyword, count, percentage: Math.round((count / items.length) * 100) }));
+
+      // Analyze user's title against top keywords
+      const myTitleWords = new Set(myTitle.toLowerCase().split(/[\s,;:!?()[\]{}]+/).filter(Boolean));
+      const keywordCoverage = topKeywords.map(kw => ({
+        ...kw,
+        inMyTitle: myTitleWords.has(kw.keyword),
+      }));
+
+      const coveredCount = keywordCoverage.filter(k => k.inMyTitle).length;
+      const seoScore = topKeywords.length > 0
+        ? Math.round((coveredCount / Math.min(topKeywords.length, 20)) * 100)
+        : 0;
+
+      // Average title length, image count from competitors
+      const avgTitleLength = items.length > 0
+        ? Math.round(items.reduce((sum: number, i: any) => sum + (i.title || '').length, 0) / items.length)
+        : 0;
+
+      // Price stats
+      const prices = items
+        .map((item: any) => parseFloat(item.price?.value || '0'))
+        .filter((p: number) => p > 0)
+        .sort((a: number, b: number) => a - b);
+
+      const priceStats = prices.length > 0 ? {
+        min: prices[0],
+        max: prices[prices.length - 1],
+        avg: Math.round((prices.reduce((a: number, b: number) => a + b, 0) / prices.length) * 100) / 100,
+        median: prices.length % 2 === 0
+          ? Math.round(((prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2) * 100) / 100
+          : prices[Math.floor(prices.length / 2)],
+      } : null;
+
+      // Most common aspects from results
+      const aspectAnalysis = (data.refinement?.aspectDistributions || []).map((aspect: any) => ({
+        name: aspect.localizedAspectName,
+        topValues: (aspect.aspectValueDistributions || [])
+          .slice(0, 10)
+          .map((v: any) => ({ value: v.localizedAspectValue, count: v.matchCount })),
+      }));
+
+      return res.status(200).json({
+        totalCompetitors: data.total || 0,
+        seoScore,
+        keywordCoverage,
+        priceStats,
+        avgTitleLength,
+        myTitleLength: myTitle.length,
+        aspectAnalysis,
+        recommendations: [
+          ...(myTitle.length < avgTitleLength - 10
+            ? [`Başlığınız rakiplere göre kısa (${myTitle.length} vs ortalama ${avgTitleLength} karakter). Daha uzun başlık kullanmayı deneyin.`]
+            : []),
+          ...(coveredCount < 5
+            ? [`Rakiplerin en popüler anahtar kelimelerinin sadece ${coveredCount} tanesini kullanıyorsunuz. Eksik kelimeleri eklemeyi deneyin.`]
+            : []),
+          ...(topKeywords.length > 0
+            ? [`En popüler anahtar kelimeler: ${topKeywords.slice(0, 5).map(k => k.keyword).join(', ')}`]
+            : []),
+        ],
+      });
+    }
+
+    // -----------------------------------------------------------------
+    // No matching action
+    // -----------------------------------------------------------------
+    return res.status(400).json({
+      error: `Unknown action: ${action || 'none'}`,
+      available_actions: [
+        // Listings
+        'listings',
+        'inventory_items',
+        'get_inventory_items',
+        'listing',
+        'create_listing',
+        'update_listing',
+        'update_offer',
+        'delete_listing',
+        'publish',
+        'withdraw',
+        'end_listing',
+        // Taxonomy
+        'category_tree',
+        'category_suggestions',
+        'item_aspects',
+        // Policies
+        'fulfillment_policies',
+        'return_policies',
+        'payment_policies',
+        // Bulk
+        'bulk_update_price',
+        // Research
+        'search_market',
+        'analyze_seo',
+        // Orders
+        'orders',
+        'order',
+      ],
+    });
+
+  } catch (error) {
+    logger.error('eBay API handler error',
+      error instanceof Error ? error : new Error(String(error)), {
+        userId,
+        action: req.query.action,
+        method: req.method,
+      });
+
+    const message = error instanceof Error ? error.message : String(error);
+    const status = message.includes('not connected') || message.includes('refresh token') ? 403 : 500;
+
+    return res.status(status).json({
+      error: message,
+    });
+  }
+}

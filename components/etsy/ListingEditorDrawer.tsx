@@ -110,6 +110,9 @@ interface ListingData {
   created_timestamp?: number;
   updated_timestamp?: number;
   is_personalizable: boolean;
+  personalization_is_required: boolean;
+  personalization_instructions: string;
+  personalization_char_count_max: number;
   personalization_questions: PersonalizationQuestion[];
   images: ImageInfo[];
 }
@@ -996,6 +999,12 @@ export default function ListingEditorDrawer({
                   shopId={shopId}
                   apiKey={apiKey}
                   questions={listing.personalization_questions}
+                  legacy={{
+                    is_personalizable: listing.is_personalizable || false,
+                    personalization_is_required: listing.personalization_is_required || false,
+                    personalization_instructions: listing.personalization_instructions || '',
+                    personalization_char_count_max: listing.personalization_char_count_max || 0,
+                  }}
                   onSaved={fetchListing}
                 />
               </AccordionDetails>

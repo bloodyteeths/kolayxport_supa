@@ -541,7 +541,10 @@ export default async function handler(
                 return_policy_id: listing.return_policy_id,
                 created_timestamp: listing.created_timestamp,
                 updated_timestamp: listing.updated_timestamp,
-                is_personalizable: personalization_questions.length > 0,
+                is_personalizable: listing.is_personalizable || personalization_questions.length > 0,
+                personalization_is_required: listing.personalization_is_required || false,
+                personalization_instructions: listing.personalization_instructions || '',
+                personalization_char_count_max: listing.personalization_char_count_max || 0,
                 personalization_questions,
                 images,
             });
@@ -705,6 +708,8 @@ export default async function handler(
                 item_weight, item_weight_unit,
                 item_length, item_width, item_height, item_dimensions_unit,
                 processing_min, processing_max, state,
+                is_personalizable, personalization_is_required,
+                personalization_instructions, personalization_char_count_max,
             } = req.body;
 
             // Build update payload with only provided fields
@@ -731,6 +736,10 @@ export default async function handler(
             if (processing_min !== undefined) updatePayload.processing_min = processing_min;
             if (processing_max !== undefined) updatePayload.processing_max = processing_max;
             if (state !== undefined) updatePayload.state = state;
+            if (is_personalizable !== undefined) updatePayload.is_personalizable = is_personalizable;
+            if (personalization_is_required !== undefined) updatePayload.personalization_is_required = personalization_is_required;
+            if (personalization_instructions !== undefined) updatePayload.personalization_instructions = personalization_instructions;
+            if (personalization_char_count_max !== undefined) updatePayload.personalization_char_count_max = personalization_char_count_max;
 
             if (Object.keys(updatePayload).length === 0) {
                 return res.status(400).json({

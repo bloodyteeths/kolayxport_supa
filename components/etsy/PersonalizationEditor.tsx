@@ -16,6 +16,7 @@ import {
   FormControl,
   InputLabel,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -41,11 +42,19 @@ export interface PersonalizationQuestion {
   options?: PersonalizationDropdownOption[];
 }
 
+interface LegacyPersonalization {
+  is_personalizable: boolean;
+  personalization_is_required: boolean;
+  personalization_instructions: string;
+  personalization_char_count_max: number;
+}
+
 interface PersonalizationEditorProps {
   listingId: string;
   shopId: string;
   apiKey: string;
   questions: PersonalizationQuestion[];
+  legacy: LegacyPersonalization;
   onSaved: () => void;
 }
 
@@ -130,13 +139,174 @@ function validateQuestions(questions: PersonalizationQuestion[]): string | null 
   return null;
 }
 
-export default function PersonalizationEditor({
+// ─── Legacy Mode Component ───────────────────────────────────────────────────
+
+function LegacyModeEditor({
   listingId,
   shopId,
   apiKey,
-  questions: initialQuestions,
+  legacy,
   onSaved,
-}: PersonalizationEditorProps) {
+}: {
+  listingId: string;
+  shopId: string;
+  apiKey: string;
+  legacy: LegacyPersonalization;
+  onSaved: () => void;
+}) {
+  const [isPersonalizable, setIsPersonalizable] = useState(legacy.is_personalizable);
+  const [isRequired, setIsRequired] = useState(legacy.personalization_is_required);
+  const [instructions, setInstructions] = useState(legacy.personalization_instructions || '');
+  const [charCountMax, setCharCountMax] = useState(legacy.personalization_char_count_max || 256);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async (overrideOff?: boolean) => {
+    const personalizable = overrideOff ? false : isPersonalizable;
+
+    setSaving(true);
+    try {
+      const body: Record<string, any> = {
+        is_personalizable: personalizable,
+      };
+
+      if (personalizable) {
+        body.personalization_is_required = isRequired;
+        body.personalization_instructions = instructions;
+        body.personalization_char_count_max = Math.min(Math.max(charCountMax, 1), 1024);
+      }
+
+      const res = await fetch(
+        `/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${shopId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+          },
+          body: JSON.stringify(body),
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Kisisellestirme kaydedilemedi');
+      }
+
+      if (overrideOff) {
+        setIsPersonalizable(false);
+      }
+
+      toast.success(
+        overrideOff ? 'Kisisellestirme kapatildi' : 'Kisisellestirme kaydedildi'
+      );
+      onSaved();
+    } catch (err: any) {
+      toast.error(err.message || 'Bir hata olustu');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <FormControlLabel
+        control={
+          <Switch
+            checked={isPersonalizable}
+            onChange={(e) => setIsPersonalizable(e.target.checked)}
+            disabled={saving}
+          />
+        }
+        label="Kisisellestirme"
+      />
+
+      {isPersonalizable && (
+        <>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isRequired}
+                onChange={(e) => setIsRequired(e.target.checked)}
+                size="small"
+                disabled={saving}
+              />
+            }
+            label="Zorunlu"
+          />
+
+          <TextField
+            label="Talimatlar"
+            size="small"
+            fullWidth
+            multiline
+            rows={3}
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Orn: Lutfen istediginiz ismi yazin"
+            disabled={saving}
+          />
+
+          <TextField
+            label="Maksimum Karakter"
+            size="small"
+            type="number"
+            fullWidth
+            value={charCountMax}
+            onChange={(e) => {
+              const val = parseInt(e.target.value) || 0;
+              setCharCountMax(Math.min(Math.max(val, 0), 1024));
+            }}
+            inputProps={{ min: 1, max: 1024 }}
+            helperText="Varsayilan: 256, Maksimum: 1024"
+            disabled={saving}
+          />
+        </>
+      )}
+
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+          onClick={() => handleSave()}
+          disabled={saving}
+        >
+          Kaydet
+        </Button>
+
+        {isPersonalizable && (
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            onClick={() => handleSave(true)}
+            disabled={saving}
+          >
+            Kisisellestirmeyi Kapat
+          </Button>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+// ─── Advanced Mode Component ─────────────────────────────────────────────────
+
+function AdvancedModeEditor({
+  listingId,
+  shopId,
+  apiKey,
+  initialQuestions,
+  onSaved,
+  onFallbackToLegacy,
+}: {
+  listingId: string;
+  shopId: string;
+  apiKey: string;
+  initialQuestions: PersonalizationQuestion[];
+  onSaved: () => void;
+  onFallbackToLegacy: () => void;
+}) {
   const [questions, setQuestions] = useState<PersonalizationQuestion[]>(
     initialQuestions.length > 0 ? initialQuestions : []
   );
@@ -302,6 +472,12 @@ export default function PersonalizationEditor({
 
       const data = await res.json();
       if (!res.ok) {
+        // If multi-question API is not available, fall back to legacy
+        if (res.status === 400 || res.status === 404) {
+          toast.error('Coklu soru API\'si henuz aktif degil. Lutfen standart modu kullanin.');
+          onFallbackToLegacy();
+          return;
+        }
         throw new Error(data.error || 'Kisisellestirme kaydedilemedi');
       }
 
@@ -346,6 +522,10 @@ export default function PersonalizationEditor({
 
   return (
     <Box>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Bu ozellik Etsy&apos;nin yeni coklu soru API&apos;sini kullanir. Henuz tum magazalarda aktif olmayabilir.
+      </Alert>
+
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="subtitle1" fontWeight={600}>
           Kisisellestirme Sorulari ({questions.length}/{MAX_QUESTIONS})
@@ -639,6 +819,69 @@ export default function PersonalizationEditor({
       >
         Soru Ekle
       </Button>
+    </Box>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
+export default function PersonalizationEditor({
+  listingId,
+  shopId,
+  apiKey,
+  questions: initialQuestions,
+  legacy,
+  onSaved,
+}: PersonalizationEditorProps) {
+  const [advancedMode, setAdvancedMode] = useState(false);
+
+  const handleFallbackToLegacy = useCallback(() => {
+    setAdvancedMode(false);
+  }, []);
+
+  return (
+    <Box>
+      {/* Mode toggle */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="subtitle1" fontWeight={600}>
+          Kisisellestirme
+        </Typography>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={advancedMode}
+              onChange={(e) => setAdvancedMode(e.target.checked)}
+              size="small"
+            />
+          }
+          label={
+            <Typography variant="body2" color="text.secondary">
+              Gelismis Mod (Beta)
+            </Typography>
+          }
+          labelPlacement="start"
+          sx={{ mr: 0 }}
+        />
+      </Box>
+
+      {advancedMode ? (
+        <AdvancedModeEditor
+          listingId={listingId}
+          shopId={shopId}
+          apiKey={apiKey}
+          initialQuestions={initialQuestions}
+          onSaved={onSaved}
+          onFallbackToLegacy={handleFallbackToLegacy}
+        />
+      ) : (
+        <LegacyModeEditor
+          listingId={listingId}
+          shopId={shopId}
+          apiKey={apiKey}
+          legacy={legacy}
+          onSaved={onSaved}
+        />
+      )}
     </Box>
   );
 }

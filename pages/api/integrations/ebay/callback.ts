@@ -50,7 +50,7 @@ export default async function handler(
     }
 
     const basicAuth = Buffer.from(`${clientId}:${certId}`).toString('base64');
-    const redirectUri = 'https://kolayxport.com/api/integrations/ebay/callback';
+    const redirectUri = process.env.EBAY_RU_NAME || 'Tamsar__Inc.-TamsarIn-kolayx-fejubx';
 
     const tokenResponse = await fetch('https://api.ebay.com/identity/v1/oauth2/token', {
       method: 'POST',

@@ -202,56 +202,68 @@ function EtsyListingsPage() {
   }, [(user as any)?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Fetch listings ---
+  const mapListing = (l: any): EtsyListingRow => {
+    const images = l.images || [];
+    const firstImage = images.length > 0 ? images[0] : null;
+    return {
+      id: l.listing_id,
+      listing_id: l.listing_id,
+      title: l.title || '',
+      description: l.description || '',
+      tags: l.tags || [],
+      materials: l.materials || [],
+      price: l.price || null,
+      views: l.views || 0,
+      num_favorers: l.num_favorers || 0,
+      quantity: l.quantity || 0,
+      state: l.state || 'draft',
+      url: l.url || '',
+      taxonomy_id: l.taxonomy_id || null,
+      shop_section_id: l.shop_section_id || null,
+      who_made: l.who_made || '',
+      when_made: l.when_made || '',
+      is_supply: l.is_supply || false,
+      created_timestamp: l.created_timestamp || 0,
+      updated_timestamp: l.updated_timestamp || 0,
+      thumbnail: firstImage
+        ? {
+            listing_image_id: firstImage.listing_image_id,
+            url_75x75: firstImage.url_75x75,
+            url_170x135: firstImage.url_170x135,
+            url_570xN: firstImage.url_570xN,
+          }
+        : null,
+      image_count: images.length,
+    };
+  };
+
   const fetchListings = useCallback(async () => {
     if (!selectedShopId) return;
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&limit=100&state=${statusFilter}`,
-        {}
-      );
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      const results: any[] = data.results || [];
-      const rows: EtsyListingRow[] = results.map((l: any) => {
-        const images = l.images || [];
-        const firstImage = images.length > 0 ? images[0] : null;
-        return {
-          id: l.listing_id,
-          listing_id: l.listing_id,
-          title: l.title || '',
-          description: l.description || '',
-          tags: l.tags || [],
-          materials: l.materials || [],
-          price: l.price || null,
-          views: l.views || 0,
-          num_favorers: l.num_favorers || 0,
-          quantity: l.quantity || 0,
-          state: l.state || 'draft',
-          url: l.url || '',
-          taxonomy_id: l.taxonomy_id || null,
-          shop_section_id: l.shop_section_id || null,
-          who_made: l.who_made || '',
-          when_made: l.when_made || '',
-          is_supply: l.is_supply || false,
-          created_timestamp: l.created_timestamp || 0,
-          updated_timestamp: l.updated_timestamp || 0,
-          thumbnail: firstImage
-            ? {
-                listing_image_id: firstImage.listing_image_id,
-                url_75x75: firstImage.url_75x75,
-                url_170x135: firstImage.url_170x135,
-                url_570xN: firstImage.url_570xN,
-              }
-            : null,
-          image_count: images.length,
-        };
-      });
-      setListings(rows);
-      setTotalCount(data.count || rows.length);
+      const allRows: EtsyListingRow[] = [];
+      let offset = 0;
+      const limit = 100;
+      let total = 0;
+
+      // Paginate through all listings (Etsy max 100 per request)
+      do {
+        const res = await fetch(
+          `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&limit=${limit}&offset=${offset}&state=${statusFilter}`
+        );
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        const results: any[] = data.listings || data.results || [];
+        total = data.count || 0;
+        allRows.push(...results.map(mapListing));
+        offset += limit;
+      } while (offset < total);
+
+      setListings(allRows);
+      setTotalCount(total || allRows.length);
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
       toast.error(`Listing'lar yüklenemedi: ${err.message}`);

@@ -42,7 +42,6 @@ interface ListingCreatorDialogProps {
   open: boolean;
   onClose: () => void;
   userId: string;
-  apiKey: string;
   fulfillmentPolicies: Policy[];
   returnPolicies: Policy[];
   paymentPolicies: Policy[];
@@ -80,7 +79,6 @@ export default function ListingCreatorDialog({
   open,
   onClose,
   userId,
-  apiKey,
   fulfillmentPolicies,
   returnPolicies,
   paymentPolicies,
@@ -142,9 +140,6 @@ export default function ListingCreatorDialog({
       try {
         const res = await fetch(
           `/api/clawd/ebay?action=category_suggestions&q=${encodeURIComponent(query)}&user_id=${userId}`,
-          {
-            headers: { 'x-api-key': apiKey },
-          }
         );
         if (res.ok) {
           const data = await res.json();
@@ -171,9 +166,6 @@ export default function ListingCreatorDialog({
     try {
       const res = await fetch(
         `/api/clawd/ebay?action=item_aspects&category_id=${categoryId}&user_id=${userId}`,
-        {
-          headers: { 'x-api-key': apiKey },
-        }
       );
       if (res.ok) {
         const data = await res.json();
@@ -306,7 +298,6 @@ export default function ListingCreatorDialog({
         {
           method: 'PUT',
           headers: {
-            'x-api-key': apiKey,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(inventoryPayload),
@@ -343,7 +334,6 @@ export default function ListingCreatorDialog({
         {
           method: 'POST',
           headers: {
-            'x-api-key': apiKey,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(offerPayload),
@@ -363,7 +353,6 @@ export default function ListingCreatorDialog({
           `/api/clawd/ebay?action=publish_offer&offer_id=${offerData.offerId}&user_id=${userId}`,
           {
             method: 'POST',
-            headers: { 'x-api-key': apiKey },
           }
         );
 

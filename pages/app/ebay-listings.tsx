@@ -126,8 +126,6 @@ function EbayListingsPage() {
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<EbayListingRow | null>(null);
 
-  const API_KEY = process.env.NEXT_PUBLIC_CLAWD_API_KEY || '';
-
   // --- Fetch listings ---
   const fetchListings = useCallback(async () => {
     if (!userId) return;
@@ -135,7 +133,6 @@ function EbayListingsPage() {
     try {
       const res = await fetch(
         `/api/clawd/ebay?action=listings&user_id=${userId}&marketplace_id=EBAY_US`,
-        { headers: { 'x-api-key': API_KEY } }
       );
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -171,22 +168,16 @@ function EbayListingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [userId, API_KEY]);
+  }, [userId]);
 
   // --- Fetch policies ---
   const fetchPolicies = useCallback(async () => {
     if (!userId) return;
     try {
       const [fulfillmentRes, returnRes, paymentRes] = await Promise.all([
-        fetch(`/api/clawd/ebay?action=fulfillment_policies&user_id=${userId}`, {
-          headers: { 'x-api-key': API_KEY },
-        }),
-        fetch(`/api/clawd/ebay?action=return_policies&user_id=${userId}`, {
-          headers: { 'x-api-key': API_KEY },
-        }),
-        fetch(`/api/clawd/ebay?action=payment_policies&user_id=${userId}`, {
-          headers: { 'x-api-key': API_KEY },
-        }),
+        fetch(`/api/clawd/ebay?action=fulfillment_policies&user_id=${userId}`),
+        fetch(`/api/clawd/ebay?action=return_policies&user_id=${userId}`),
+        fetch(`/api/clawd/ebay?action=payment_policies&user_id=${userId}`),
       ]);
 
       if (fulfillmentRes.ok) {
@@ -204,7 +195,7 @@ function EbayListingsPage() {
     } catch (err) {
       console.error('Failed to fetch eBay policies:', err);
     }
-  }, [userId, API_KEY]);
+  }, [userId]);
 
   useEffect(() => {
     if (userId) {
@@ -243,7 +234,7 @@ function EbayListingsPage() {
       try {
         const res = await fetch(
           `/api/clawd/ebay?action=delete_listing&user_id=${userId}&sku=${encodeURIComponent(row.sku)}`,
-          { method: 'DELETE', headers: { 'x-api-key': API_KEY } }
+          { method: 'DELETE' }
         );
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
@@ -256,7 +247,7 @@ function EbayListingsPage() {
         toast.error(`Silinemedi: ${err.message}`);
       }
     },
-    [userId, API_KEY, fetchListings]
+    [userId, fetchListings]
   );
 
   // --- CSV Export ---
@@ -547,7 +538,7 @@ function EbayListingsPage() {
 
       {/* Market Research Tab */}
       {pageTab === 1 && (
-        <MarketResearch apiKey={API_KEY} userId={userId} />
+        <MarketResearch userId={userId} />
       )}
 
       {/* Listings Tab */}
@@ -713,7 +704,6 @@ function EbayListingsPage() {
         onClose={() => setEditorOpen(false)}
         sku={editorSku}
         userId={userId}
-        apiKey={API_KEY}
         fulfillmentPolicies={fulfillmentPolicies}
         returnPolicies={returnPolicies}
         paymentPolicies={paymentPolicies}
@@ -725,7 +715,6 @@ function EbayListingsPage() {
         open={creatorOpen}
         onClose={() => setCreatorOpen(false)}
         userId={userId}
-        apiKey={API_KEY}
         fulfillmentPolicies={fulfillmentPolicies}
         returnPolicies={returnPolicies}
         paymentPolicies={paymentPolicies}
@@ -738,7 +727,6 @@ function EbayListingsPage() {
         onClose={() => setFindReplaceOpen(false)}
         listings={filteredListings}
         userId={userId}
-        apiKey={API_KEY}
         onCompleted={() => { setFindReplaceOpen(false); fetchListings(); }}
       />
 
@@ -750,8 +738,7 @@ function EbayListingsPage() {
             Array.from((selectedIds as any).ids || []).includes(l.sku)
           )}
           userId={userId}
-          apiKey={API_KEY}
-          fulfillmentPolicies={fulfillmentPolicies}
+            fulfillmentPolicies={fulfillmentPolicies}
           returnPolicies={returnPolicies}
           onCompleted={() => {
             setSelectedIds({ type: 'include' as const, ids: new Set() });

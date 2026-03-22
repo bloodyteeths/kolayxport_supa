@@ -53,7 +53,6 @@ interface BulkOperationsBarProps {
   selectedCount: number;
   selectedListings: SelectedEbayListing[];
   userId: string;
-  apiKey: string;
   fulfillmentPolicies: Policy[];
   returnPolicies: Policy[];
   onCompleted: () => void;
@@ -71,7 +70,6 @@ export default function BulkOperationsBar({
   selectedCount,
   selectedListings,
   userId,
-  apiKey,
   fulfillmentPolicies,
   returnPolicies,
   onCompleted,
@@ -198,7 +196,6 @@ export default function BulkOperationsBar({
           {
             method: 'PUT',
             headers: {
-              'x-api-key': apiKey,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -237,7 +234,6 @@ export default function BulkOperationsBar({
           {
             method: 'PUT',
             headers: {
-              'x-api-key': apiKey,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -272,7 +268,6 @@ export default function BulkOperationsBar({
           `/api/clawd/ebay?action=publish_offer&offer_id=${listing.offerId}&user_id=${userId}`,
           {
             method: 'POST',
-            headers: { 'x-api-key': apiKey },
           }
         );
       },
@@ -298,7 +293,6 @@ export default function BulkOperationsBar({
           `/api/clawd/ebay?action=withdraw_offer&offer_id=${listing.offerId}&user_id=${userId}`,
           {
             method: 'POST',
-            headers: { 'x-api-key': apiKey },
           }
         );
       },
@@ -317,7 +311,6 @@ export default function BulkOperationsBar({
           `/api/clawd/ebay?action=delete_inventory_item&sku=${encodeURIComponent(listing.sku)}&user_id=${userId}`,
           {
             method: 'DELETE',
-            headers: { 'x-api-key': apiKey },
           }
         );
       },

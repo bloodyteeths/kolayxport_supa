@@ -9,7 +9,6 @@ import { Search, TrendingUp, DollarSign, Tag, BarChart2, ExternalLink, CheckCirc
 import { toast } from 'react-hot-toast';
 
 interface MarketResearchProps {
-  apiKey: string;
   userId: string;
   /** Pre-fill search with listing title for SEO analysis */
   initialQuery?: string;
@@ -46,7 +45,7 @@ interface AspectAnalysis {
   topValues: { value: string; count: number }[];
 }
 
-export default function MarketResearch({ apiKey, userId, initialQuery, initialTitle }: MarketResearchProps) {
+export default function MarketResearch({ userId, initialQuery, initialTitle }: MarketResearchProps) {
   const [tab, setTab] = useState(0);
   const [query, setQuery] = useState(initialQuery || '');
   const [myTitle, setMyTitle] = useState(initialTitle || '');
@@ -79,7 +78,6 @@ export default function MarketResearch({ apiKey, userId, initialQuery, initialTi
       });
 
       const res = await fetch(`/api/clawd/ebay?${params}`, {
-        headers: { 'x-api-key': apiKey },
       });
 
       if (!res.ok) {
@@ -113,7 +111,6 @@ export default function MarketResearch({ apiKey, userId, initialQuery, initialTi
       });
 
       const res = await fetch(`/api/clawd/ebay?${params}`, {
-        headers: { 'x-api-key': apiKey },
       });
 
       if (!res.ok) {

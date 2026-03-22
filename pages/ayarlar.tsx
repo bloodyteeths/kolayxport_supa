@@ -269,6 +269,13 @@ const AyarlarPage = () => {
     if (success === 'etsy_connected') {
       setSnackbar({ open: true, message: 'Etsy shop başarıyla bağlandı!', severity: 'success' });
       router.replace('/ayarlar', undefined, { shallow: true });
+    } else if (success === 'ebay_connected') {
+      setSnackbar({ open: true, message: 'eBay hesabı başarıyla bağlandı!', severity: 'success' });
+      router.replace('/ayarlar', undefined, { shallow: true });
+    } else if (error === 'ebay_auth_failed' || error === 'ebay_token_failed' || error === 'ebay_callback_failed') {
+      const detailMsg = details ? ` Detay: ${decodeURIComponent(details as string)}` : '';
+      setSnackbar({ open: true, message: `eBay bağlantısı başarısız oldu.${detailMsg}`, severity: 'error' });
+      router.replace('/ayarlar', undefined, { shallow: true });
     } else if (error === 'etsy_callback_failed' || error === 'etsy_auth_failed' || error === 'etsy_token_failed') {
       const detailMsg = details ? ` Detay: ${decodeURIComponent(details as string)}` : '';
       setSnackbar({ open: true, message: `Etsy bağlantısı başarısız oldu.${detailMsg}`, severity: 'error' });
@@ -573,6 +580,26 @@ const AyarlarPage = () => {
                     ))}
                   </Box>
                 )}
+              </Box>
+
+              {/* eBay Connection */}
+              <Box sx={{ mb: 3, mt: 4, pt: 3, borderTop: '1px solid #e0e0e0' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">
+                    eBay Hesap Bağlantısı
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    href="/api/integrations/ebay/connect"
+                    sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
+                  >
+                    🔗 eBay Hesabını Bağla
+                  </Button>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  eBay hesabınızı bağlayarak ürünlerinizi yönetebilir, fiyat araştırması yapabilir ve SEO analizi gerçekleştirebilirsiniz.
+                </Typography>
               </Box>
             </Paper>
 

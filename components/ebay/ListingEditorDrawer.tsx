@@ -57,7 +57,6 @@ interface ListingEditorDrawerProps {
   onClose: () => void;
   sku: string;
   userId: string;
-  apiKey: string;
   fulfillmentPolicies: Policy[];
   returnPolicies: Policy[];
   paymentPolicies: Policy[];
@@ -231,7 +230,6 @@ export default function ListingEditorDrawer({
   onClose,
   sku,
   userId,
-  apiKey,
   fulfillmentPolicies,
   returnPolicies,
   paymentPolicies,
@@ -282,9 +280,6 @@ export default function ListingEditorDrawer({
     try {
       const res = await fetch(
         `/api/clawd/ebay?action=listing&sku=${encodeURIComponent(sku)}&user_id=${userId}`,
-        {
-          headers: { 'x-api-key': apiKey },
-        }
       );
 
       if (!res.ok) {
@@ -310,7 +305,7 @@ export default function ListingEditorDrawer({
     } finally {
       setLoading(false);
     }
-  }, [sku, userId, apiKey]);
+  }, [sku, userId]);
 
   // --------------------------------------------------
   // Fetch item aspects for category
@@ -319,9 +314,6 @@ export default function ListingEditorDrawer({
     try {
       const res = await fetch(
         `/api/clawd/ebay?action=item_aspects&category_id=${categoryId}&user_id=${userId}`,
-        {
-          headers: { 'x-api-key': apiKey },
-        }
       );
       if (!res.ok) return;
 
@@ -354,10 +346,7 @@ export default function ListingEditorDrawer({
       setCategorySearching(true);
       try {
         const res = await fetch(
-          `/api/clawd/ebay?action=category_suggestions&q=${encodeURIComponent(query)}&user_id=${userId}`,
-          {
-            headers: { 'x-api-key': apiKey },
-          }
+          `/api/clawd/ebay?action=category_suggestions&q=${encodeURIComponent(query)}&user_id=${userId}`
         );
         if (res.ok) {
           const data = await res.json();
@@ -483,7 +472,6 @@ export default function ListingEditorDrawer({
           {
             method: 'PUT',
             headers: {
-              'x-api-key': apiKey,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(inventoryPayload),
@@ -528,7 +516,6 @@ export default function ListingEditorDrawer({
             {
               method: 'PUT',
               headers: {
-                'x-api-key': apiKey,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify(offerPayload),
@@ -568,7 +555,6 @@ export default function ListingEditorDrawer({
         `/api/clawd/ebay?action=publish_offer&offer_id=${offer.offerId}&user_id=${userId}`,
         {
           method: 'POST',
-          headers: { 'x-api-key': apiKey },
         }
       );
 
@@ -600,7 +586,6 @@ export default function ListingEditorDrawer({
         `/api/clawd/ebay?action=withdraw_offer&offer_id=${offer.offerId}&user_id=${userId}`,
         {
           method: 'POST',
-          headers: { 'x-api-key': apiKey },
         }
       );
 
@@ -649,7 +634,6 @@ export default function ListingEditorDrawer({
         {
           method: 'PUT',
           headers: {
-            'x-api-key': apiKey,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(inventoryPayload),
@@ -682,7 +666,6 @@ export default function ListingEditorDrawer({
         `/api/clawd/ebay?action=delete_inventory_item&sku=${encodeURIComponent(sku)}&user_id=${userId}`,
         {
           method: 'DELETE',
-          headers: { 'x-api-key': apiKey },
         }
       );
 
@@ -1044,7 +1027,6 @@ export default function ListingEditorDrawer({
                 <VariationEditor
                   sku={sku}
                   userId={userId}
-                  apiKey={apiKey}
                   onSaved={fetchListing}
                 />
               </AccordionDetails>

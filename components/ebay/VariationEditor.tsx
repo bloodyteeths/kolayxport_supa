@@ -27,11 +27,10 @@ interface VariationItem {
 interface VariationEditorProps {
   sku: string;
   userId: string;
-  apiKey: string;
   onSaved: () => void;
 }
 
-export default function VariationEditor({ sku, userId, apiKey, onSaved }: VariationEditorProps) {
+export default function VariationEditor({ sku, userId, onSaved }: VariationEditorProps) {
   const [variations, setVariations] = useState<VariationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,9 +41,6 @@ export default function VariationEditor({ sku, userId, apiKey, onSaved }: Variat
     try {
       const res = await fetch(
         `/api/clawd/ebay?action=get_inventory_item_group&sku=${encodeURIComponent(sku)}&user_id=${userId}`,
-        {
-          headers: { 'x-api-key': apiKey },
-        }
       );
 
       if (res.status === 404) {
@@ -66,9 +62,6 @@ export default function VariationEditor({ sku, userId, apiKey, onSaved }: Variat
           try {
             const itemRes = await fetch(
               `/api/clawd/ebay?action=listing&sku=${encodeURIComponent(variantSku)}&user_id=${userId}`,
-              {
-                headers: { 'x-api-key': apiKey },
-              }
             );
             if (itemRes.ok) {
               const itemData = await itemRes.json();
@@ -97,7 +90,7 @@ export default function VariationEditor({ sku, userId, apiKey, onSaved }: Variat
     } finally {
       setLoading(false);
     }
-  }, [sku, userId, apiKey]);
+  }, [sku, userId]);
 
   useEffect(() => {
     fetchVariations();
@@ -145,7 +138,6 @@ export default function VariationEditor({ sku, userId, apiKey, onSaved }: Variat
             {
               method: 'PUT',
               headers: {
-                'x-api-key': apiKey,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify(body),

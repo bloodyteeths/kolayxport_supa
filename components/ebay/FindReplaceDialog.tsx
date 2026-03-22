@@ -32,7 +32,6 @@ interface FindReplaceDialogProps {
   onClose: () => void;
   listings: EbayListingRow[];
   userId: string;
-  apiKey: string;
   onCompleted: () => void;
 }
 
@@ -106,7 +105,6 @@ export default function FindReplaceDialog({
   onClose,
   listings,
   userId,
-  apiKey,
   onCompleted,
 }: FindReplaceDialogProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -182,7 +180,6 @@ export default function FindReplaceDialog({
           {
             method: 'PUT',
             headers: {
-              'x-api-key': apiKey,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({

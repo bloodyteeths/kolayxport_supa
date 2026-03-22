@@ -1720,13 +1720,7 @@ export default async function handler(
             const offset = parseInt((req.query.offset as string) || '0');
             const state = (req.query.state as string) || 'active';
 
-            const endpoint = state === 'draft'
-                ? `/shops/${shopId}/listings?state=draft&limit=${limit}&offset=${offset}`
-                : state === 'inactive'
-                ? `/shops/${shopId}/listings?state=inactive&limit=${limit}&offset=${offset}`
-                : state === 'expired'
-                ? `/shops/${shopId}/listings?state=expired&limit=${limit}&offset=${offset}`
-                : `/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}`;
+            const endpoint = `/shops/${shopId}/listings?state=${state}&limit=${limit}&offset=${offset}`;
 
             const data = await callEtsyAPI(endpoint, accessToken);
 
@@ -1768,11 +1762,8 @@ export default async function handler(
             const offset = parseInt((req.query.offset as string) || '0');
             const state = (req.query.state as string) || 'active';
 
-            const endpoint = state === 'draft'
-                ? `/shops/${shopId}/listings?state=draft&limit=${limit}&offset=${offset}&includes=images`
-                : state === 'inactive'
-                ? `/shops/${shopId}/listings?state=inactive&limit=${limit}&offset=${offset}&includes=images`
-                : `/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}&includes=images`;
+            // Use /listings?state= (not /listings/active) because only the former supports includes=images
+            const endpoint = `/shops/${shopId}/listings?state=${state}&limit=${limit}&offset=${offset}&includes=images`;
 
             const data = await callEtsyAPI(endpoint, accessToken);
 

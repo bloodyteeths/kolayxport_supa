@@ -219,6 +219,10 @@ async function callEtsyAPI(endpoint: string, accessToken: string, options: Reque
         throw error;
     }
 
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+        return { success: true };
+    }
+
     return response.json();
 }
 
@@ -458,6 +462,9 @@ export default async function handler(
 
         // GET /api/clawd/etsy?action=listing&listing_id=XXXXX - Get single listing details
         const listing_id = req.query.listing_id as string;
+        const image_id = req.query.image_id as string;
+        const video_id = req.query.video_id as string;
+        const section_id = req.query.section_id as string;
         if (req.method === 'GET' && action === 'listing' && listing_id) {
             const listing = await callEtsyAPI(
                 `/listings/${listing_id}`,
@@ -525,7 +532,13 @@ export default async function handler(
                 when_made: listing.when_made,
                 is_supply: listing.is_supply,
                 item_weight: listing.item_weight,
+                item_weight_unit: listing.item_weight_unit,
+                item_length: listing.item_length,
+                item_width: listing.item_width,
+                item_height: listing.item_height,
                 item_dimensions_unit: listing.item_dimensions_unit,
+                shipping_profile_id: listing.shipping_profile_id,
+                return_policy_id: listing.return_policy_id,
                 created_timestamp: listing.created_timestamp,
                 updated_timestamp: listing.updated_timestamp,
                 is_personalizable: personalization_questions.length > 0,
@@ -682,19 +695,46 @@ export default async function handler(
             });
         }
 
-        // PATCH /api/clawd/etsy?action=update_listing&listing_id=XXXXX - Update listing SEO
+        // PATCH /api/clawd/etsy?action=update_listing&listing_id=XXXXX - Update listing
         if ((req.method === 'PATCH' || req.method === 'PUT') && action === 'update_listing' && listing_id) {
-            const { title, description, tags } = req.body;
+            const {
+                title, description, tags, materials,
+                price, quantity, shop_section_id,
+                who_made, when_made, is_supply, taxonomy_id,
+                shipping_profile_id, return_policy_id,
+                item_weight, item_weight_unit,
+                item_length, item_width, item_height, item_dimensions_unit,
+                processing_min, processing_max, state,
+            } = req.body;
 
             // Build update payload with only provided fields
             const updatePayload: Record<string, any> = {};
             if (title !== undefined) updatePayload.title = title;
             if (description !== undefined) updatePayload.description = description;
             if (tags !== undefined) updatePayload.tags = tags;
+            if (materials !== undefined) updatePayload.materials = materials;
+            if (price !== undefined) updatePayload.price = parseFloat(price);
+            if (quantity !== undefined) updatePayload.quantity = quantity;
+            if (shop_section_id !== undefined) updatePayload.shop_section_id = shop_section_id;
+            if (who_made !== undefined) updatePayload.who_made = who_made;
+            if (when_made !== undefined) updatePayload.when_made = when_made;
+            if (is_supply !== undefined) updatePayload.is_supply = is_supply;
+            if (taxonomy_id !== undefined) updatePayload.taxonomy_id = taxonomy_id;
+            if (shipping_profile_id !== undefined) updatePayload.shipping_profile_id = shipping_profile_id;
+            if (return_policy_id !== undefined) updatePayload.return_policy_id = return_policy_id;
+            if (item_weight !== undefined) updatePayload.item_weight = item_weight;
+            if (item_weight_unit !== undefined) updatePayload.item_weight_unit = item_weight_unit;
+            if (item_length !== undefined) updatePayload.item_length = item_length;
+            if (item_width !== undefined) updatePayload.item_width = item_width;
+            if (item_height !== undefined) updatePayload.item_height = item_height;
+            if (item_dimensions_unit !== undefined) updatePayload.item_dimensions_unit = item_dimensions_unit;
+            if (processing_min !== undefined) updatePayload.processing_min = processing_min;
+            if (processing_max !== undefined) updatePayload.processing_max = processing_max;
+            if (state !== undefined) updatePayload.state = state;
 
             if (Object.keys(updatePayload).length === 0) {
                 return res.status(400).json({
-                    error: 'At least one field (title, description, or tags) is required'
+                    error: 'At least one field is required'
                 });
             }
 
@@ -716,12 +756,7 @@ export default async function handler(
                 success: true,
                 listing_id,
                 updated_fields: Object.keys(updatePayload),
-                listing: {
-                    listing_id: result.listing_id,
-                    title: result.title,
-                    description: result.description,
-                    tags: result.tags,
-                },
+                result,
             });
         }
 
@@ -1619,6 +1654,185 @@ export default async function handler(
                 listing_id: parseInt(listing_id),
                 products: result.products || [],
                 message: 'Listing inventory updated',
+            });
+        }
+
+        // DELETE /api/clawd/etsy?action=delete_listing&listing_id=XXXXX
+        if (req.method === 'DELETE' && action === 'delete_listing' && listing_id) {
+            logger.info('Deleting Etsy listing', { listing_id, shopId });
+            await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}`,
+                accessToken,
+                { method: 'DELETE' }
+            );
+            return res.status(200).json({ success: true, listing_id, message: 'Listing deleted' });
+        }
+
+        // DELETE /api/clawd/etsy?action=delete_image&listing_id=XXXXX&image_id=YYYYY
+        if (req.method === 'DELETE' && action === 'delete_image' && listing_id && image_id) {
+            logger.info('Deleting image from listing', { listing_id, image_id, shopId });
+            await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}/images/${image_id}`,
+                accessToken,
+                { method: 'DELETE' }
+            );
+            return res.status(200).json({ success: true, listing_id, image_id, message: 'Image deleted' });
+        }
+
+        // DELETE /api/clawd/etsy?action=delete_video&listing_id=XXXXX&video_id=YYYYY
+        if (req.method === 'DELETE' && action === 'delete_video' && listing_id && video_id) {
+            logger.info('Deleting video from listing', { listing_id, video_id, shopId });
+            await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}/videos/${video_id}`,
+                accessToken,
+                { method: 'DELETE' }
+            );
+            return res.status(200).json({ success: true, listing_id, video_id, message: 'Video deleted' });
+        }
+
+        // GET /api/clawd/etsy?action=all_listings&state=active|draft|inactive|expired
+        if (req.method === 'GET' && action === 'all_listings') {
+            const limit = parseInt((req.query.limit as string) || '100');
+            const offset = parseInt((req.query.offset as string) || '0');
+            const state = (req.query.state as string) || 'active';
+
+            const endpoint = state === 'draft'
+                ? `/shops/${shopId}/listings?state=draft&limit=${limit}&offset=${offset}`
+                : state === 'inactive'
+                ? `/shops/${shopId}/listings?state=inactive&limit=${limit}&offset=${offset}`
+                : state === 'expired'
+                ? `/shops/${shopId}/listings?state=expired&limit=${limit}&offset=${offset}`
+                : `/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}`;
+
+            const data = await callEtsyAPI(endpoint, accessToken);
+
+            const listings = (data.results || []).map((listing: any) => ({
+                listing_id: listing.listing_id,
+                title: listing.title || '',
+                description: listing.description || '',
+                tags: listing.tags || [],
+                materials: listing.materials || [],
+                price: listing.price ? {
+                    amount: listing.price.amount,
+                    divisor: listing.price.divisor,
+                    currency_code: listing.price.currency_code,
+                } : null,
+                views: listing.views || 0,
+                num_favorers: listing.num_favorers || 0,
+                quantity: listing.quantity || 0,
+                state: listing.state || '',
+                url: listing.url || '',
+                taxonomy_id: listing.taxonomy_id,
+                shop_section_id: listing.shop_section_id,
+                who_made: listing.who_made,
+                when_made: listing.when_made,
+                is_supply: listing.is_supply,
+                created_timestamp: listing.created_timestamp,
+                updated_timestamp: listing.updated_timestamp,
+                original_creation_timestamp: listing.original_creation_timestamp,
+            }));
+
+            return res.status(200).json({
+                count: data.count || listings.length,
+                listings,
+            });
+        }
+
+        // GET /api/clawd/etsy?action=listings_with_images
+        if (req.method === 'GET' && action === 'listings_with_images') {
+            const limit = parseInt((req.query.limit as string) || '100');
+            const offset = parseInt((req.query.offset as string) || '0');
+            const state = (req.query.state as string) || 'active';
+
+            const endpoint = state === 'draft'
+                ? `/shops/${shopId}/listings?state=draft&limit=${limit}&offset=${offset}&includes=images`
+                : state === 'inactive'
+                ? `/shops/${shopId}/listings?state=inactive&limit=${limit}&offset=${offset}&includes=images`
+                : `/shops/${shopId}/listings/active?limit=${limit}&offset=${offset}&includes=images`;
+
+            const data = await callEtsyAPI(endpoint, accessToken);
+
+            const listings = (data.results || []).map((listing: any) => {
+                const firstImage = listing.images && listing.images.length > 0 ? listing.images[0] : null;
+                return {
+                    listing_id: listing.listing_id,
+                    title: listing.title || '',
+                    description: listing.description || '',
+                    tags: listing.tags || [],
+                    materials: listing.materials || [],
+                    price: listing.price ? {
+                        amount: listing.price.amount,
+                        divisor: listing.price.divisor,
+                        currency_code: listing.price.currency_code,
+                    } : null,
+                    views: listing.views || 0,
+                    num_favorers: listing.num_favorers || 0,
+                    quantity: listing.quantity || 0,
+                    state: listing.state || '',
+                    url: listing.url || '',
+                    taxonomy_id: listing.taxonomy_id,
+                    shop_section_id: listing.shop_section_id,
+                    who_made: listing.who_made,
+                    when_made: listing.when_made,
+                    is_supply: listing.is_supply,
+                    created_timestamp: listing.created_timestamp,
+                    updated_timestamp: listing.updated_timestamp,
+                    thumbnail: firstImage ? {
+                        listing_image_id: firstImage.listing_image_id,
+                        url_75x75: firstImage.url_75x75,
+                        url_170x135: firstImage.url_170x135,
+                        url_570xN: firstImage.url_570xN,
+                    } : null,
+                    image_count: listing.images ? listing.images.length : 0,
+                };
+            });
+
+            return res.status(200).json({
+                count: data.count || listings.length,
+                listings,
+            });
+        }
+
+        // POST /api/clawd/etsy?action=create_shop_section
+        if (req.method === 'POST' && action === 'create_shop_section') {
+            const { title } = req.body;
+            if (!title) return res.status(400).json({ error: 'title is required' });
+            const result = await callEtsyAPI(
+                `/shops/${shopId}/sections`,
+                accessToken,
+                { method: 'POST', body: JSON.stringify({ title }) }
+            );
+            return res.status(201).json({ success: true, section: result });
+        }
+
+        // PUT /api/clawd/etsy?action=update_shop_section&section_id=XXXXX
+        if (req.method === 'PUT' && action === 'update_shop_section' && section_id) {
+            const { title } = req.body;
+            if (!title) return res.status(400).json({ error: 'title is required' });
+            const result = await callEtsyAPI(
+                `/shops/${shopId}/sections/${section_id}`,
+                accessToken,
+                { method: 'PUT', body: JSON.stringify({ title }) }
+            );
+            return res.status(200).json({ success: true, section: result });
+        }
+
+        // DELETE /api/clawd/etsy?action=delete_shop_section&section_id=XXXXX
+        if (req.method === 'DELETE' && action === 'delete_shop_section' && section_id) {
+            await callEtsyAPI(
+                `/shops/${shopId}/sections/${section_id}`,
+                accessToken,
+                { method: 'DELETE' }
+            );
+            return res.status(200).json({ success: true, section_id, message: 'Section deleted' });
+        }
+
+        // GET /api/clawd/etsy?action=taxonomy
+        if (req.method === 'GET' && action === 'taxonomy') {
+            const data = await callEtsyAPI('/seller-taxonomy/nodes', accessToken);
+            return res.status(200).json({
+                count: data.count || (data.results || []).length,
+                categories: data.results || [],
             });
         }
 

@@ -32,7 +32,6 @@ import {
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 
 import SEOIndicator from '@/components/etsy/SEOIndicator';
@@ -100,29 +99,29 @@ interface ReturnPolicy {
 // ---------------------------------------------------------------------------
 
 function formatTimestamp(ts: number): string {
-  if (!ts) return '\u2014';
+  if (!ts) return '—';
   try {
     const d = new Date(ts * 1000);
-    if (isNaN(d.getTime())) return '\u2014';
+    if (isNaN(d.getTime())) return '—';
     const pad = (n: number) => n.toString().padStart(2, '0');
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)}`;
   } catch {
-    return '\u2014';
+    return '—';
   }
 }
 
 function formatPrice(price: EtsyListingRow['price']): string {
-  if (!price) return '\u2014';
+  if (!price) return '—';
   const value = price.amount / price.divisor;
   const symbol =
     price.currency_code === 'USD'
       ? '$'
       : price.currency_code === 'EUR'
-        ? '\u20AC'
+        ? '€'
         : price.currency_code === 'GBP'
-          ? '\u00A3'
+          ? '£'
           : price.currency_code === 'TRY'
-            ? '\u20BA'
+            ? '₺'
             : price.currency_code + ' ';
   return `${symbol}${value.toFixed(2)}`;
 }
@@ -138,7 +137,7 @@ const STATE_LABELS: Record<string, string> = {
   active: 'Aktif',
   draft: 'Taslak',
   inactive: 'Deaktif',
-  expired: 'S\u00FCr. Dolmu\u015F',
+  expired: 'Sür. Dolmuş',
 };
 
 // ---------------------------------------------------------------------------
@@ -177,26 +176,28 @@ function EtsyListingsPage() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
-  // --- Fetch shops from database ---
+  // --- Fetch shops via API ---
   useEffect(() => {
     if (!(user as any)?.id) return;
     (async () => {
-      const { data, error } = await (supabase as any)
-        .from('EtsyShop')
-        .select('shopId, shopName, isActive')
-        .eq('userId', (user as any).id);
-      if (error) {
-        console.error('Failed to fetch Etsy shops:', error);
-        return;
-      }
-      const shopList: ShopInfo[] = (data || []).map((s: any) => ({
-        shopId: s.shopId,
-        shopName: s.shopName || s.shopId,
-        isActive: s.isActive,
-      }));
-      setShops(shopList);
-      if (shopList.length > 0 && !selectedShopId) {
-        setSelectedShopId(shopList[0].shopId);
+      try {
+        const res = await fetch('/api/integrations/etsy/shops');
+        if (!res.ok) {
+          console.error('Failed to fetch Etsy shops:', res.status);
+          return;
+        }
+        const data = await res.json();
+        const shopList: ShopInfo[] = (data.shops || []).map((s: any) => ({
+          shopId: s.shopId,
+          shopName: s.shopName || s.shopId,
+          isActive: s.isActive,
+        }));
+        setShops(shopList);
+        if (shopList.length > 0 && !selectedShopId) {
+          setSelectedShopId(shopList[0].shopId);
+        }
+      } catch (err) {
+        console.error('Failed to fetch Etsy shops:', err);
       }
     })();
   }, [(user as any)?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -254,7 +255,7 @@ function EtsyListingsPage() {
       setTotalCount(data.count || rows.length);
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
-      toast.error(`Listing\u2019lar y\u00FCklenemedi: ${err.message}`);
+      toast.error(`Listing'lar yüklenemedi: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -432,7 +433,7 @@ function EtsyListingsPage() {
       },
       {
         field: 'title',
-        headerName: 'Ba\u015Fl\u0131k',
+        headerName: 'Başlık',
         flex: 1,
         minWidth: 200,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
@@ -510,7 +511,7 @@ function EtsyListingsPage() {
       },
       {
         field: 'views',
-        headerName: 'G\u00F6r\u00FCnt\u00FC',
+        headerName: 'Görüntü',
         width: 80,
         type: 'number',
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
@@ -543,7 +544,7 @@ function EtsyListingsPage() {
       },
       {
         field: 'updated_timestamp',
-        headerName: 'G\u00FCncelleme',
+        headerName: 'Güncelleme',
         width: 100,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
           <Typography variant="body2" color="text.secondary">
@@ -621,7 +622,7 @@ function EtsyListingsPage() {
         </Paper>
         <Paper sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
           <Typography variant="caption" color="text.secondary">
-            Toplam G\u00F6r\u00FCnt\u00FClenme
+            Toplam Görüntülenme
           </Typography>
           <Typography variant="h6" fontWeight={700}>
             {totalViews.toLocaleString()}
@@ -656,7 +657,7 @@ function EtsyListingsPage() {
           >
             {shops.length === 0 && (
               <MenuItem value="" disabled>
-                Ma\u011Faza yok
+                Bağlı mağaza yok
               </MenuItem>
             )}
             {shops.map((s) => (
@@ -694,7 +695,7 @@ function EtsyListingsPage() {
             <MenuItem value="active">Aktif</MenuItem>
             <MenuItem value="draft">Taslak</MenuItem>
             <MenuItem value="inactive">Deaktif</MenuItem>
-            <MenuItem value="expired">S\u00FCresi Dolmu\u015F</MenuItem>
+            <MenuItem value="expired">Süresi Dolmuş</MenuItem>
           </Select>
         </FormControl>
 
@@ -705,7 +706,7 @@ function EtsyListingsPage() {
             onChange={(e) => setSectionFilter(e.target.value)}
             displayEmpty
           >
-            <MenuItem value="">T\u00FCm B\u00F6l\u00FCmler</MenuItem>
+            <MenuItem value="">Tüm Bölümler</MenuItem>
             {shopSections.map((s) => (
               <MenuItem key={s.shop_section_id} value={String(s.shop_section_id)}>
                 {s.title}
@@ -718,10 +719,10 @@ function EtsyListingsPage() {
 
         {/* Action buttons */}
         <Button variant="outlined" size="small" onClick={() => setFindReplaceOpen(true)}>
-          Bul ve De\u011Fi\u015Ftir
+          Bul ve Değiştir
         </Button>
         <Button variant="outlined" size="small" onClick={handleExportCSV}>
-          CSV \u0130ndir
+          CSV İndir
         </Button>
         <Button variant="contained" size="small" onClick={() => setCreateDialogOpen(true)}>
           + Yeni Listing
@@ -730,6 +731,25 @@ function EtsyListingsPage() {
           <RefreshIcon />
         </IconButton>
       </Box>
+
+      {/* No shops message */}
+      {shops.length === 0 && !(loading) && (
+        <Paper sx={{ p: 3, mb: 2, textAlign: 'center' }}>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+            Henüz bağlı bir Etsy mağazanız yok.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Etsy mağazanızı bağlamak için Ayarlar sayfasına gidin.
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            href="/ayarlar"
+          >
+            Ayarlar Sayfasına Git
+          </Button>
+        </Paper>
+      )}
 
       {/* Bulk operations bar */}
       {('ids' in selectedIds ? selectedIds.ids.size : 0) > 0 && (
@@ -786,7 +806,7 @@ function EtsyListingsPage() {
                 }}
               >
                 <Typography color="text.secondary">
-                  {selectedShopId ? 'Listing bulunamad\u0131' : 'L\u00FCtfen bir ma\u011Faza se\u00E7in'}
+                  {selectedShopId ? 'Listing bulunamadı' : 'Lütfen bir mağaza seçin'}
                 </Typography>
               </Box>
             ),
@@ -828,11 +848,11 @@ function EtsyListingsPage() {
               Listing Sil
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Bu listing&apos;i silmek istedi\u011Finizden emin misiniz? Bu i\u015Flem geri al\u0131namaz.
+              Bu listing&apos;i silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
               <Button size="small" onClick={() => setDeleteConfirmId(null)}>
-                \u0130ptal
+                İptal
               </Button>
               <Button
                 size="small"
@@ -906,7 +926,7 @@ function EtsyListingsPage() {
 // --- Layout wrapper (follows labels.tsx pattern) ---
 function EtsyListingsPageWithLayout(props: any): JSX.Element {
   return (
-    <AppLayout title="Etsy Listings \u2014 KolayXport">
+    <AppLayout title="Etsy Listings — KolayXport">
       <EtsyListingsPage {...props} />
     </AppLayout>
   );

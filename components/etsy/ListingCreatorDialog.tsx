@@ -33,7 +33,6 @@ interface ListingCreatorDialogProps {
   open: boolean;
   onClose: () => void;
   shopId: string;
-  apiKey: string;
   shopSections: Array<{ shop_section_id: number; title: string }>;
   shippingProfiles: Array<{ shipping_profile_id: number; title: string }>;
   returnPolicies: Array<{ return_policy_id: number; description?: string }>;
@@ -96,7 +95,6 @@ export default function ListingCreatorDialog({
   open,
   onClose,
   shopId,
-  apiKey,
   shopSections,
   shippingProfiles,
   returnPolicies,
@@ -138,9 +136,7 @@ export default function ListingCreatorDialog({
   useEffect(() => {
     if (open && taxonomyOptions.length === 0) {
       setTaxonomyLoading(true);
-      fetch(`/api/clawd/etsy?action=taxonomy&shop_id=${shopId}`, {
-          headers: { 'x-api-key': apiKey },
-        })
+      fetch(`/api/clawd/etsy?action=taxonomy&shop_id=${shopId}`)
         .then((res) => res.json())
         .then((data) => {
           const nodes: TaxonomyNode[] = data.results || data;
@@ -152,7 +148,7 @@ export default function ListingCreatorDialog({
         })
         .finally(() => setTaxonomyLoading(false));
     }
-  }, [open, shopId, apiKey, taxonomyOptions.length]);
+  }, [open, shopId, taxonomyOptions.length]);
 
   // Generate previews for selected files
   useEffect(() => {
@@ -289,7 +285,7 @@ export default function ListingCreatorDialog({
         `/api/clawd/etsy?action=create_listing&shop_id=${shopId}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         }
       );
@@ -313,7 +309,7 @@ export default function ListingCreatorDialog({
 
           const uploadRes = await fetch(
             `/api/clawd/etsy?action=upload_image&listing_id=${newId}&shop_id=${shopId}`,
-            { method: 'POST', headers: { 'x-api-key': apiKey }, body: formData }
+            { method: 'POST', body: formData }
           );
 
           if (!uploadRes.ok) {
@@ -326,7 +322,7 @@ export default function ListingCreatorDialog({
       if (publish) {
         const pubRes = await fetch(
           `/api/clawd/etsy?action=publish&listing_id=${newId}&shop_id=${shopId}`,
-          { method: 'POST', headers: { 'x-api-key': apiKey } }
+          { method: 'POST' }
         );
         if (!pubRes.ok) {
           toast.error('Listing yayınlanamadı, taslak olarak kaydedildi');

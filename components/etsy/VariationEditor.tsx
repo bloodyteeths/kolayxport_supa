@@ -46,11 +46,10 @@ interface Product {
 interface VariationEditorProps {
   listingId: string;
   shopId: string;
-  apiKey: string;
   onSaved: () => void;
 }
 
-export default function VariationEditor({ listingId, shopId, apiKey, onSaved }: VariationEditorProps) {
+export default function VariationEditor({ listingId, shopId, onSaved }: VariationEditorProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -59,8 +58,7 @@ export default function VariationEditor({ listingId, shopId, apiKey, onSaved }: 
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/clawd/etsy?action=get_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`,
-        { headers: { 'x-api-key': apiKey } }
+        `/api/clawd/etsy?action=get_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`
       );
       if (!res.ok) throw new Error('Envanter verileri alinamadi');
       const data = await res.json();
@@ -70,7 +68,7 @@ export default function VariationEditor({ listingId, shopId, apiKey, onSaved }: 
     } finally {
       setLoading(false);
     }
-  }, [listingId, shopId, apiKey]);
+  }, [listingId, shopId]);
 
   useEffect(() => {
     fetchInventory();
@@ -137,7 +135,6 @@ export default function VariationEditor({ listingId, shopId, apiKey, onSaved }: 
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
           },
           body: JSON.stringify({ products }),
         }

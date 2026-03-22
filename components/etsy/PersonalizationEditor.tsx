@@ -52,7 +52,6 @@ interface LegacyPersonalization {
 interface PersonalizationEditorProps {
   listingId: string;
   shopId: string;
-  apiKey: string;
   questions: PersonalizationQuestion[];
   legacy: LegacyPersonalization;
   onSaved: () => void;
@@ -144,13 +143,11 @@ function validateQuestions(questions: PersonalizationQuestion[]): string | null 
 function LegacyModeEditor({
   listingId,
   shopId,
-  apiKey,
   legacy,
   onSaved,
 }: {
   listingId: string;
   shopId: string;
-  apiKey: string;
   legacy: LegacyPersonalization;
   onSaved: () => void;
 }) {
@@ -181,7 +178,6 @@ function LegacyModeEditor({
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
           },
           body: JSON.stringify(body),
         }
@@ -295,14 +291,12 @@ function LegacyModeEditor({
 function AdvancedModeEditor({
   listingId,
   shopId,
-  apiKey,
   initialQuestions,
   onSaved,
   onFallbackToLegacy,
 }: {
   listingId: string;
   shopId: string;
-  apiKey: string;
   initialQuestions: PersonalizationQuestion[];
   onSaved: () => void;
   onFallbackToLegacy: () => void;
@@ -464,7 +458,6 @@ function AdvancedModeEditor({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
           },
           body: JSON.stringify({ personalization_questions: payload }),
         }
@@ -501,7 +494,6 @@ function AdvancedModeEditor({
         `/api/clawd/etsy?action=remove_personalization&listing_id=${listingId}&shop_id=${shopId}`,
         {
           method: 'POST',
-          headers: { 'x-api-key': apiKey },
         }
       );
 
@@ -828,7 +820,6 @@ function AdvancedModeEditor({
 export default function PersonalizationEditor({
   listingId,
   shopId,
-  apiKey,
   questions: initialQuestions,
   legacy,
   onSaved,
@@ -868,7 +859,6 @@ export default function PersonalizationEditor({
         <AdvancedModeEditor
           listingId={listingId}
           shopId={shopId}
-          apiKey={apiKey}
           initialQuestions={initialQuestions}
           onSaved={onSaved}
           onFallbackToLegacy={handleFallbackToLegacy}
@@ -877,7 +867,6 @@ export default function PersonalizationEditor({
         <LegacyModeEditor
           listingId={listingId}
           shopId={shopId}
-          apiKey={apiKey}
           legacy={legacy}
           onSaved={onSaved}
         />

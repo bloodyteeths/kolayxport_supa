@@ -15,12 +15,11 @@ interface VideoInfo {
 interface VideoUploaderProps {
   listingId: string;
   shopId: string;
-  apiKey: string;
   videos: VideoInfo[];
   onVideoChanged: () => void;
 }
 
-export default function VideoUploader({ listingId, shopId, apiKey, videos, onVideoChanged }: VideoUploaderProps) {
+export default function VideoUploader({ listingId, shopId, videos, onVideoChanged }: VideoUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<VideoInfo | null>(null);
@@ -65,7 +64,6 @@ export default function VideoUploader({ listingId, shopId, apiKey, videos, onVid
         `/api/clawd/etsy?action=upload_video&listing_id=${listingId}&shop_id=${shopId}`,
         {
           method: 'POST',
-          headers: { 'x-api-key': apiKey },
           body: formData,
         }
       );
@@ -97,7 +95,6 @@ export default function VideoUploader({ listingId, shopId, apiKey, videos, onVid
         `/api/clawd/etsy?action=delete_video&listing_id=${listingId}&video_id=${deleteConfirm.video_id}&shop_id=${shopId}`,
         {
           method: 'DELETE',
-          headers: { 'x-api-key': apiKey },
         }
       );
 

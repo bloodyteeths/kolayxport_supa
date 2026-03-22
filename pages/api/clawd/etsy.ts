@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
+import { getSupabaseServerClient } from '../../../lib/supabase';
 
 // Etsy API base URL
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
@@ -230,17 +231,31 @@ export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse
 ) {
-    // 1. Authenticate with API Key
+    // 1. Authenticate — accept API key OR session auth
     const apiKey = req.headers['x-api-key'] || req.query.apiKey;
     const envApiKey = process.env.CLAWD_API_KEY;
+    let authenticated = false;
 
-    if (!envApiKey) {
-        logger.error('CLAWD_API_KEY is not defined in environment variables.');
-        return res.status(500).json({ error: 'Server configuration error: API Key not set.' });
+    // Try API key auth first
+    if (envApiKey && apiKey === envApiKey) {
+        authenticated = true;
     }
 
-    if (!apiKey || apiKey !== envApiKey) {
-        return res.status(401).json({ error: 'Unauthorized: Invalid or missing API Key' });
+    // Fall back to session auth
+    if (!authenticated) {
+        try {
+            const supabase = getSupabaseServerClient(req, res);
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                authenticated = true;
+            }
+        } catch {
+            // Session auth failed, continue
+        }
+    }
+
+    if (!authenticated) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid or missing authentication' });
     }
 
     // Get shop ID from query parameter (default to user's shop)

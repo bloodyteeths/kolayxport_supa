@@ -61,7 +61,6 @@ interface BulkOperationsBarProps {
   selectedListings: SelectedListing[];
   shopSections: ShopSection[];
   shopId: string;
-  apiKey: string;
   onCompleted: () => void;
 }
 
@@ -71,7 +70,6 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function callUpdateListing(
   shopId: string,
-  apiKey: string,
   listingId: number,
   body: Record<string, any>
 ): Promise<Response> {
@@ -81,7 +79,6 @@ async function callUpdateListing(
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
       },
       body: JSON.stringify(body),
     }
@@ -90,14 +87,12 @@ async function callUpdateListing(
 
 async function callDeleteListing(
   shopId: string,
-  apiKey: string,
   listingId: number
 ): Promise<Response> {
   return fetch(
     `/api/clawd/etsy?action=delete_listing&listing_id=${listingId}&shop_id=${shopId}`,
     {
       method: 'DELETE',
-      headers: { 'x-api-key': apiKey },
     }
   );
 }
@@ -107,7 +102,6 @@ export default function BulkOperationsBar({
   selectedListings,
   shopSections,
   shopId,
-  apiKey,
   onCompleted,
 }: BulkOperationsBarProps) {
   // Dialog states
@@ -237,7 +231,7 @@ export default function BulkOperationsBar({
             break;
         }
         newPrice = Math.max(0.01, Math.round(newPrice * 100) / 100);
-        return callUpdateListing(shopId, apiKey, listing.listing_id, { price: newPrice });
+        return callUpdateListing(shopId, listing.listing_id, { price: newPrice });
       },
       'Fiyat guncelleme'
     );
@@ -275,7 +269,7 @@ export default function BulkOperationsBar({
       selectedListings,
       (listing) => {
         const mergedTags = Array.from(new Set([...listing.tags, ...tagsToAdd])).slice(0, 13);
-        return callUpdateListing(shopId, apiKey, listing.listing_id, { tags: mergedTags });
+        return callUpdateListing(shopId, listing.listing_id, { tags: mergedTags });
       },
       'Etiket ekleme'
     );
@@ -296,7 +290,7 @@ export default function BulkOperationsBar({
       selectedListings,
       (listing) => {
         const filtered = listing.tags.filter((t) => !tagsToRemove.has(t));
-        return callUpdateListing(shopId, apiKey, listing.listing_id, { tags: filtered });
+        return callUpdateListing(shopId, listing.listing_id, { tags: filtered });
       },
       'Etiket kaldirma'
     );
@@ -316,7 +310,7 @@ export default function BulkOperationsBar({
     await executeBulk(
       selectedListings,
       (listing) =>
-        callUpdateListing(shopId, apiKey, listing.listing_id, {
+        callUpdateListing(shopId, listing.listing_id, {
           shop_section_id: targetSectionId,
         }),
       'Bolum tasima'
@@ -331,7 +325,7 @@ export default function BulkOperationsBar({
 
     await executeBulk(
       selectedListings,
-      (listing) => callDeleteListing(shopId, apiKey, listing.listing_id),
+      (listing) => callDeleteListing(shopId, listing.listing_id),
       'Silme'
     );
   };
@@ -343,7 +337,7 @@ export default function BulkOperationsBar({
     await executeBulk(
       selectedListings,
       (listing) =>
-        callUpdateListing(shopId, apiKey, listing.listing_id, { state: targetState }),
+        callUpdateListing(shopId, listing.listing_id, { state: targetState }),
       label
     );
   };

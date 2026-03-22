@@ -146,7 +146,6 @@ const STATE_LABELS: Record<string, string> = {
 
 function EtsyListingsPage() {
   const { user } = useAuth();
-  const apiKey = process.env.NEXT_PUBLIC_CLAWD_API_KEY || '';
 
   // --- State ---
   const [listings, setListings] = useState<EtsyListingRow[]>([]);
@@ -204,12 +203,12 @@ function EtsyListingsPage() {
 
   // --- Fetch listings ---
   const fetchListings = useCallback(async () => {
-    if (!selectedShopId || !apiKey) return;
+    if (!selectedShopId) return;
     setLoading(true);
     try {
       const res = await fetch(
         `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&limit=100&state=${statusFilter}`,
-        { headers: { 'x-api-key': apiKey } }
+        {}
       );
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -259,22 +258,19 @@ function EtsyListingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedShopId, apiKey, statusFilter]);
+  }, [selectedShopId, statusFilter]);
 
   // --- Fetch shop metadata (sections, shipping profiles, return policies) ---
   const fetchShopMeta = useCallback(async () => {
-    if (!selectedShopId || !apiKey) return;
+    if (!selectedShopId) return;
     try {
       const [sectionsRes, shippingRes, returnRes] = await Promise.all([
         fetch(`/api/clawd/etsy?action=shop_sections&shop_id=${selectedShopId}`, {
-          headers: { 'x-api-key': apiKey },
-        }),
+                  }),
         fetch(`/api/clawd/etsy?action=shipping_profiles&shop_id=${selectedShopId}`, {
-          headers: { 'x-api-key': apiKey },
-        }),
+                  }),
         fetch(`/api/clawd/etsy?action=return_policies&shop_id=${selectedShopId}`, {
-          headers: { 'x-api-key': apiKey },
-        }),
+                  }),
       ]);
 
       if (sectionsRes.ok) {
@@ -292,7 +288,7 @@ function EtsyListingsPage() {
     } catch (err) {
       console.error('Failed to fetch shop metadata:', err);
     }
-  }, [selectedShopId, apiKey]);
+  }, [selectedShopId]);
 
   useEffect(() => {
     if (selectedShopId) {
@@ -321,7 +317,7 @@ function EtsyListingsPage() {
       try {
         const res = await fetch(
           `/api/clawd/etsy?action=delete_listing&listing_id=${listingId}&shop_id=${selectedShopId}`,
-          { method: 'DELETE', headers: { 'x-api-key': apiKey } }
+          { method: 'DELETE' }
         );
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
@@ -334,7 +330,7 @@ function EtsyListingsPage() {
         toast.error(`Silinemedi: ${err.message}`);
       }
     },
-    [selectedShopId, apiKey, fetchListings]
+    [selectedShopId, fetchListings]
   );
 
   // --- CSV Export ---
@@ -758,7 +754,7 @@ function EtsyListingsPage() {
           selectedListings={selectedListings}
           shopSections={shopSections}
           shopId={selectedShopId}
-          apiKey={apiKey}
+
           onCompleted={() => {
             setSelectedIds({ type: 'include' as const, ids: new Set<GridRowId>() });
             fetchListings();
@@ -876,7 +872,6 @@ function EtsyListingsPage() {
         }}
         listingId={drawerListingId}
         shopId={selectedShopId}
-        apiKey={apiKey}
         shopSections={shopSections}
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}
@@ -890,7 +885,6 @@ function EtsyListingsPage() {
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
         shopId={selectedShopId}
-        apiKey={apiKey}
         shopSections={shopSections}
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}
@@ -913,7 +907,6 @@ function EtsyListingsPage() {
           materials: l.materials,
         }))}
         shopId={selectedShopId}
-        apiKey={apiKey}
         onCompleted={() => {
           setFindReplaceOpen(false);
           fetchListings();

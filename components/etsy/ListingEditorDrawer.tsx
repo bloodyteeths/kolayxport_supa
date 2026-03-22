@@ -51,7 +51,6 @@ interface ListingEditorDrawerProps {
   onClose: () => void;
   listingId: string | null;
   shopId: string;
-  apiKey: string;
   shopSections: Array<{ shop_section_id: number; title: string }>;
   shippingProfiles: Array<{ shipping_profile_id: number; title: string }>;
   returnPolicies: Array<{ return_policy_id: number; description?: string }>;
@@ -248,7 +247,6 @@ export default function ListingEditorDrawer({
   onClose,
   listingId,
   shopId,
-  apiKey,
   shopSections,
   shippingProfiles,
   returnPolicies,
@@ -290,7 +288,6 @@ export default function ListingEditorDrawer({
     try {
       const res = await fetch(
         `/api/clawd/etsy?action=listing&listing_id=${listingId}&shop_id=${shopId}`,
-        { headers: { 'x-api-key': apiKey } },
       );
 
       if (!res.ok) {
@@ -310,7 +307,7 @@ export default function ListingEditorDrawer({
     } finally {
       setLoading(false);
     }
-  }, [listingId, shopId, apiKey]);
+  }, [listingId, shopId]);
 
   // --------------------------------------------------
   // Fetch videos
@@ -322,7 +319,6 @@ export default function ListingEditorDrawer({
     try {
       const res = await fetch(
         `/api/clawd/etsy?action=get_listing_videos&listing_id=${listingId}&shop_id=${shopId}`,
-        { headers: { 'x-api-key': apiKey } },
       );
       if (res.ok) {
         const data = await res.json();
@@ -333,7 +329,7 @@ export default function ListingEditorDrawer({
     } finally {
       setVideosLoading(false);
     }
-  }, [listingId, shopId, apiKey]);
+  }, [listingId, shopId]);
 
   // --------------------------------------------------
   // Trigger fetch on open / listingId change
@@ -442,7 +438,6 @@ export default function ListingEditorDrawer({
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
           },
           body: JSON.stringify(payload),
         },
@@ -477,7 +472,6 @@ export default function ListingEditorDrawer({
         `/api/clawd/etsy?action=publish&listing_id=${listingId}&shop_id=${shopId}`,
         {
           method: 'POST',
-          headers: { 'x-api-key': apiKey },
         },
       );
 
@@ -510,7 +504,6 @@ export default function ListingEditorDrawer({
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
           },
           body: JSON.stringify({ state: 'inactive' }),
         },
@@ -545,7 +538,6 @@ export default function ListingEditorDrawer({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': apiKey,
           },
           body: JSON.stringify({ source_listing_id: listingId }),
         },
@@ -577,7 +569,6 @@ export default function ListingEditorDrawer({
         `/api/clawd/etsy?action=delete_listing&listing_id=${listingId}&shop_id=${shopId}`,
         {
           method: 'DELETE',
-          headers: { 'x-api-key': apiKey },
         },
       );
 
@@ -933,7 +924,7 @@ export default function ListingEditorDrawer({
                 <ImageManager
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
-                  apiKey={apiKey}
+
                   images={listing.images}
                   onImagesChanged={fetchListing}
                 />
@@ -967,7 +958,7 @@ export default function ListingEditorDrawer({
                   <VideoUploader
                     listingId={String(listing.listing_id)}
                     shopId={shopId}
-                    apiKey={apiKey}
+  
                     videos={videos}
                     onVideoChanged={fetchVideos}
                   />
@@ -997,7 +988,7 @@ export default function ListingEditorDrawer({
                 <PersonalizationEditor
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
-                  apiKey={apiKey}
+
                   questions={listing.personalization_questions}
                   legacy={{
                     is_personalizable: listing.is_personalizable || false,
@@ -1027,7 +1018,7 @@ export default function ListingEditorDrawer({
                 <VariationEditor
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
-                  apiKey={apiKey}
+
                   onSaved={fetchListing}
                 />
               </AccordionDetails>

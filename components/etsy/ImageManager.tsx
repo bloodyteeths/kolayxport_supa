@@ -16,12 +16,11 @@ interface ImageInfo {
 interface ImageManagerProps {
   listingId: string;
   shopId: string;
-  apiKey: string;
   images: ImageInfo[];
   onImagesChanged: () => void;
 }
 
-export default function ImageManager({ listingId, shopId, apiKey, images, onImagesChanged }: ImageManagerProps) {
+export default function ImageManager({ listingId, shopId, images, onImagesChanged }: ImageManagerProps) {
   const [uploading, setUploading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<ImageInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -55,7 +54,6 @@ export default function ImageManager({ listingId, shopId, apiKey, images, onImag
         `/api/clawd/etsy?action=upload_image&listing_id=${listingId}&shop_id=${shopId}`,
         {
           method: 'POST',
-          headers: { 'x-api-key': apiKey },
           body: formData,
         }
       );
@@ -83,7 +81,6 @@ export default function ImageManager({ listingId, shopId, apiKey, images, onImag
         `/api/clawd/etsy?action=delete_image&listing_id=${listingId}&image_id=${deleteConfirm.listing_image_id}&shop_id=${shopId}`,
         {
           method: 'DELETE',
-          headers: { 'x-api-key': apiKey },
         }
       );
 

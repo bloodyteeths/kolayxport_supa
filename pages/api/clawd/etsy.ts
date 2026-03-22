@@ -520,6 +520,7 @@ export default async function handler(
                     url_570xN: img.url_570xN,
                     url_fullxfull: img.url_fullxfull,
                     rank: img.rank,
+                    alt_text: img.alt_text || '',
                 }));
             }
 
@@ -1049,31 +1050,62 @@ export default async function handler(
         }
 
         // POST /api/clawd/etsy?action=upload_image&listing_id=XXXXX - Upload image to listing
+        // Accepts EITHER:
+        //   - image_url (string): publicly accessible URL to fetch image from
+        //   - image_base64 (string) + image_content_type (string): base64-encoded image data
+        // Optional: rank (number), overwrite (bool), is_watermarked (bool), alt_text (string)
         if (req.method === 'POST' && action === 'upload_image' && listing_id) {
-            const { image_url, rank = 1, overwrite = true, is_watermarked = false, alt_text } = req.body;
+            const {
+                image_url,
+                image_base64,
+                image_content_type,
+                image_filename,
+                rank = 1,
+                overwrite = true,
+                is_watermarked = false,
+                alt_text,
+            } = req.body;
 
-            if (!image_url) {
+            if (!image_url && !image_base64) {
                 return res.status(400).json({
-                    error: 'image_url is required. Provide a publicly accessible image URL.'
+                    error: 'Either image_url or image_base64 is required. Provide a publicly accessible image URL or base64-encoded image data.'
                 });
             }
 
-            logger.info('Uploading image to Etsy listing', {
-                listing_id,
-                image_url: image_url.substring(0, 100),
-                rank,
-            });
+            let imageBuffer: ArrayBuffer;
+            let contentType: string;
 
-            // Fetch the image from URL
-            const imageResponse = await fetch(image_url);
-            if (!imageResponse.ok) {
-                return res.status(400).json({
-                    error: `Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}`
+            if (image_base64) {
+                // Decode base64 image data
+                logger.info('Uploading base64 image to Etsy listing', {
+                    listing_id,
+                    content_type: image_content_type || 'image/jpeg',
+                    rank,
+                    has_alt_text: !!alt_text,
                 });
-            }
 
-            const imageBuffer = await imageResponse.arrayBuffer();
-            const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+                const buffer = Buffer.from(image_base64, 'base64');
+                imageBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+                contentType = image_content_type || 'image/jpeg';
+            } else {
+                // Fetch image from URL (existing flow)
+                logger.info('Uploading image to Etsy listing from URL', {
+                    listing_id,
+                    image_url: image_url.substring(0, 100),
+                    rank,
+                    has_alt_text: !!alt_text,
+                });
+
+                const imageResponse = await fetch(image_url);
+                if (!imageResponse.ok) {
+                    return res.status(400).json({
+                        error: `Failed to fetch image from URL: ${imageResponse.status} ${imageResponse.statusText}`
+                    });
+                }
+
+                imageBuffer = await imageResponse.arrayBuffer();
+                contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+            }
 
             // Determine file extension from content type
             const extMap: Record<string, string> = {
@@ -1084,7 +1116,7 @@ export default async function handler(
                 'image/webp': 'webp',
             };
             const ext = extMap[contentType] || 'jpg';
-            const filename = `listing_${listing_id}_${rank}.${ext}`;
+            const filename = image_filename || `listing_${listing_id}_${rank}.${ext}`;
 
             // Create multipart form data
             const boundary = '----EtsyImageUpload' + Date.now();
@@ -1095,14 +1127,6 @@ export default async function handler(
             formDataParts.push(`Content-Disposition: form-data; name="image"; filename="${filename}"`);
             formDataParts.push(`Content-Type: ${contentType}`);
             formDataParts.push('');
-
-            // Add other fields
-            const addField = (name: string, value: string | number | boolean) => {
-                formDataParts.push(`--${boundary}`);
-                formDataParts.push(`Content-Disposition: form-data; name="${name}"`);
-                formDataParts.push('');
-                formDataParts.push(String(value));
-            };
 
             // Build the multipart body manually with binary image
             const textEncoder = new TextEncoder();
@@ -1162,6 +1186,7 @@ export default async function handler(
                 listing_image_id: uploadResult.listing_image_id,
                 rank: uploadResult.rank,
                 url_fullxfull: uploadResult.url_fullxfull,
+                alt_text: uploadResult.alt_text || alt_text || null,
                 message: 'Image uploaded successfully',
             });
         }

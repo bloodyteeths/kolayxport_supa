@@ -6,7 +6,7 @@ import {
   InputLabel, Tooltip, IconButton, CircularProgress,
 } from '@mui/material';
 import { Search, TrendingUp, DollarSign, Tag, BarChart2, ExternalLink, CheckCircle, XCircle } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 interface MarketResearchProps {
   apiKey: string;

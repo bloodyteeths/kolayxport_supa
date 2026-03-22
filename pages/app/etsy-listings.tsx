@@ -203,8 +203,13 @@ function EtsyListingsPage() {
 
   // --- Fetch listings ---
   const mapListing = (l: any): EtsyListingRow => {
-    const images = l.images || [];
-    const firstImage = images.length > 0 ? images[0] : null;
+    // Backend already extracts thumbnail; also handle raw images array as fallback
+    const thumb = l.thumbnail || (l.images?.[0] ? {
+      listing_image_id: l.images[0].listing_image_id,
+      url_75x75: l.images[0].url_75x75,
+      url_170x135: l.images[0].url_170x135,
+      url_570xN: l.images[0].url_570xN,
+    } : null);
     return {
       id: l.listing_id,
       listing_id: l.listing_id,
@@ -225,15 +230,8 @@ function EtsyListingsPage() {
       is_supply: l.is_supply || false,
       created_timestamp: l.created_timestamp || 0,
       updated_timestamp: l.updated_timestamp || 0,
-      thumbnail: firstImage
-        ? {
-            listing_image_id: firstImage.listing_image_id,
-            url_75x75: firstImage.url_75x75,
-            url_170x135: firstImage.url_170x135,
-            url_570xN: firstImage.url_570xN,
-          }
-        : null,
-      image_count: images.length,
+      thumbnail: thumb,
+      image_count: l.image_count || (l.images ? l.images.length : 0),
     };
   };
 
@@ -408,7 +406,7 @@ function EtsyListingsPage() {
       {
         field: 'thumbnail',
         headerName: '',
-        width: 60,
+        width: 90,
         sortable: false,
         filterable: false,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
@@ -416,17 +414,17 @@ function EtsyListingsPage() {
           return thumb ? (
             <Box
               component="img"
-              src={thumb.url_75x75}
+              src={thumb.url_170x135}
               alt=""
-              sx={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 1 }}
+              sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1 }}
             />
           ) : (
             <Box
               sx={{
-                width: 50,
-                height: 50,
+                width: 72,
+                height: 72,
                 borderRadius: 1,
-                backgroundColor: '#e0e0e0',
+                backgroundColor: '#f5f5f5',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -782,7 +780,7 @@ function EtsyListingsPage() {
           loading={loading}
           checkboxSelection
           disableRowSelectionOnClick
-          rowHeight={60}
+          rowHeight={82}
           rowSelectionModel={selectedIds}
           onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}
           paginationModel={paginationModel}

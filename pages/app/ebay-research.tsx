@@ -1913,10 +1913,27 @@ function EbayResearchPage() {
   useEffect(() => {
     if (!userId) return;
     setUserListingsLoading(true);
-    fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`)
-      .then(r => r.json())
-      .then(data => setUserListings(data.listings || []))
-      .catch(() => setUserListings([]))
+    console.log('[eBay Research] Fetching user listings for userId:', userId);
+    fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`, {
+      credentials: 'same-origin',
+    })
+      .then(async (r) => {
+        console.log('[eBay Research] Listings response status:', r.status);
+        if (!r.ok) {
+          const errText = await r.text().catch(() => '');
+          console.error('[eBay Research] Listings fetch failed:', r.status, errText);
+          return { listings: [] };
+        }
+        return r.json();
+      })
+      .then(data => {
+        console.log('[eBay Research] Got listings:', data.listings?.length || 0);
+        setUserListings(data.listings || []);
+      })
+      .catch((err) => {
+        console.error('[eBay Research] Listings fetch error:', err);
+        setUserListings([]);
+      })
       .finally(() => setUserListingsLoading(false));
   }, [userId]);
 
@@ -2015,6 +2032,42 @@ function EbayResearchPage() {
           />
         ))}
       </Box>
+
+      {/* User listings status bar */}
+      {userListingsLoading && (
+        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0f7ff' }}>
+          <CircularProgress size={16} />
+          <Typography variant="body2" color="text.secondary">
+            eBay listeleriniz yukleniyor...
+          </Typography>
+        </Paper>
+      )}
+      {!userListingsLoading && userListings.length > 0 && (
+        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0fff4' }}>
+          <Typography variant="body2" color="success.main" fontWeight={600}>
+            {userListings.length} aktif listelemeniz yuklendi — araclar otomatik olarak verilerinizi kullanacak.
+          </Typography>
+        </Paper>
+      )}
+      {!userListingsLoading && userListings.length === 0 && (
+        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#fff8f0' }}>
+          <Typography variant="body2" color="warning.main">
+            eBay listeleriniz yuklenemedi. Araclar manual arama ile calisir.
+          </Typography>
+          <Button size="small" variant="outlined" onClick={() => {
+            setUserListingsLoading(true);
+            fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`, {
+              credentials: 'same-origin',
+            })
+              .then(async (r) => r.ok ? r.json() : { listings: [] })
+              .then(data => setUserListings(data.listings || []))
+              .catch(() => setUserListings([]))
+              .finally(() => setUserListingsLoading(false));
+          }}>
+            Tekrar Dene
+          </Button>
+        </Paper>
+      )}
 
       {/* Welcome state or active tool */}
       {subTab === -1 && <SectionWelcome section={currentSection} userListings={userListings} sectionIndex={mainTab} />}

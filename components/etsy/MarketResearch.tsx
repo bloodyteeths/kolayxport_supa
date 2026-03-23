@@ -347,7 +347,9 @@ function TrendChart({ data, height = 200, color = '#667eea' }: {
 
 export default function EtsyMarketResearch({ userId, shopId, userListings }: EtsyMarketResearchProps) {
   // --- controls ---
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(9); // Default to Kâr Hesaplama (My Shop)
+  const [section, setSection] = useState(0); // 0=Mağazam, 1=Pazar Araştırma, 2=Keşif
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [query, setQuery] = useState('');
   const [myTitle, setMyTitle] = useState('');
   const [myTags, setMyTags] = useState('');
@@ -386,6 +388,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
   const [sellingPrice, setSellingPrice] = useState('');
   const [shippingCost, setShippingCost] = useState('');
   const [includeOffsiteAds, setIncludeOffsiteAds] = useState(false);
+  const [shopRegion, setShopRegion] = useState<'us' | 'tr'>('tr'); // US vs Turkey fee structure
 
   // --- keyword filter ---
   const [kwShowMissing, setKwShowMissing] = useState(false);
@@ -406,6 +409,64 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
   const [seasonalLoading, setSeasonalLoading] = useState(false);
 
   useEffect(() => { setSavedSearches(loadSavedSearches()); }, []);
+
+  // --- Section/Tab navigation ---
+  const SECTIONS = useMemo(() => [
+    {
+      label: 'Mağazam',
+      icon: <Store size={16} />,
+      desc: 'Kendi listelemelerinizi optimize edin',
+      tabs: [
+        { idx: 9, label: 'Kâr Hesaplama', icon: <Calculator size={14} />, tip: 'Etsy komisyonları dahil net kârınızı hesaplayın' },
+        { idx: 10, label: 'SEO Karşılaştırma', icon: <TrendingUp size={14} />, tip: 'Başlık ve taglarınızı rakiplerle kıyaslayın' },
+      ],
+    },
+    {
+      label: 'Pazar Araştırma',
+      icon: <BarChart2 size={16} />,
+      desc: 'Rakipleri ve piyasayı analiz edin',
+      tabs: [
+        { idx: 2, label: 'Fiyat Analizi', icon: <DollarSign size={14} />, tip: 'Piyasadaki fiyat aralığını ve en kârlı noktayı görün' },
+        { idx: 3, label: 'Tag İstihbaratı', icon: <Hash size={14} />, tip: 'Rakiplerin hangi tagleri kullandığını ve eksiklerinizi görün' },
+        { idx: 4, label: 'Anahtar Kelimeler', icon: <Tag size={14} />, tip: 'Başlıklarda en çok kullanılan kelimeleri analiz edin' },
+        { idx: 5, label: 'Rakip Ürünleri', icon: <ShoppingBag size={14} />, tip: 'Rakip ürünlerini fiyat, favori ve görüntülenmeyle inceleyin' },
+        { idx: 6, label: 'Mağaza Analizi', icon: <Users size={14} />, tip: 'Aynı nişte satan mağazaları ve performanslarını görün' },
+        { idx: 7, label: 'Mağaza Detayı', icon: <Store size={14} />, tip: 'Belirli bir mağazanın tüm ürünlerini derinlemesine inceleyin' },
+        { idx: 8, label: 'Talep Skoru', icon: <Gauge size={14} />, tip: 'Bu nişte talep mi çok, arz mı çok? Fırsat skoru görün' },
+        { idx: 11, label: 'AI Analizi', icon: <Sparkles size={14} />, tip: 'Yapay zeka ile pazar özeti, strateji ve aksiyon önerileri alın' },
+      ],
+    },
+    {
+      label: 'Keşif & Trendler',
+      icon: <Compass size={16} />,
+      desc: 'Yeni fırsatlar ve trendler keşfedin',
+      tabs: [
+        { idx: 0, label: 'Kelime Keşif', icon: <Compass size={14} />, tip: 'Google + Amazon verileriyle yeni anahtar kelimeler bulun' },
+        { idx: 1, label: 'Trend Analizi', icon: <Activity size={14} />, tip: 'Google Trends ile mevsimsel talep ve yükselen aramaları görün' },
+      ],
+    },
+  ], []);
+
+  const handleSectionChange = useCallback((newSection: number) => {
+    setSection(newSection);
+    setTab(SECTIONS[newSection].tabs[0].idx);
+  }, [SECTIONS]);
+
+  // --- Suggested keywords from existing listings ---
+  const suggestedKeywords = useMemo(() => {
+    if (!userListings?.length) return [];
+    const tagFreq: Record<string, number> = {};
+    userListings.forEach((l: any) => {
+      (l.tags || []).forEach((t: string) => {
+        const tag = t.toLowerCase().trim();
+        if (tag.length > 2) tagFreq[tag] = (tagFreq[tag] || 0) + 1;
+      });
+    });
+    return Object.entries(tagFreq)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 8)
+      .map(([tag]) => tag);
+  }, [userListings]);
 
   // ---------------------------------------------------------------------------
   // Search
@@ -801,29 +862,61 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
   // Computed: Profit Calculator
   // ---------------------------------------------------------------------------
 
+  // Fee structures by region
+  const FEE_PROFILES = useMemo(() => ({
+    us: {
+      label: 'ABD Mağaza',
+      currency: '$',
+      listingFee: 0.20,
+      transactionRate: 0.065,     // 6.5%
+      paymentProcessingRate: 0.03, // 3% + fixed
+      paymentProcessingFixed: 0.25,
+      offsiteAdsRate: 0.15,       // 15% (under $10k annual)
+      regulatoryFee: 0,
+      vatRate: 0,
+      notes: 'İşlem ücreti %6.5, ödeme işleme %3 + $0.25',
+    },
+    tr: {
+      label: 'Türkiye Mağaza',
+      currency: '$',
+      listingFee: 0.20,
+      transactionRate: 0.065,     // 6.5%
+      paymentProcessingRate: 0.04, // 4% + fixed (higher for non-US)
+      paymentProcessingFixed: 0.25,
+      offsiteAdsRate: 0.15,       // 15%
+      regulatoryFee: 0.005,       // 0.5% regulatory operating fee for non-US
+      vatRate: 0,                 // VAT handled separately by seller
+      notes: 'İşlem ücreti %6.5, ödeme işleme %4 + $0.25, düzenleyici ücret %0.5',
+    },
+  }), []);
+
   const profitCalc = useMemo(() => {
+    const fees = FEE_PROFILES[shopRegion];
     const cost = parseFloat(purchaseCost) || 0;
     const sell = parseFloat(sellingPrice) || (priceStats?.avg || 0);
     const ship = parseFloat(shippingCost) || 0;
-    const listingFee = 0.20;
-    const transactionFee = sell * 0.065;
-    const paymentProcessing = sell * 0.03 + 0.25;
-    const offsiteAdsFee = includeOffsiteAds ? sell * 0.15 : 0;
-    const totalFees = listingFee + transactionFee + paymentProcessing + offsiteAdsFee;
+    const listingFee = fees.listingFee;
+    const transactionFee = sell * fees.transactionRate;
+    const paymentProcessing = sell * fees.paymentProcessingRate + fees.paymentProcessingFixed;
+    const regulatoryFee = sell * fees.regulatoryFee;
+    const offsiteAdsFee = includeOffsiteAds ? sell * fees.offsiteAdsRate : 0;
+    const totalFees = listingFee + transactionFee + paymentProcessing + regulatoryFee + offsiteAdsFee;
     const profit = sell - cost - ship - totalFees;
     const margin = sell > 0 ? (profit / sell) * 100 : 0;
     const compare = [-20, 0, 20].map(delta => {
       const p = sell * (1 + delta / 100);
-      const tf = p * 0.065; const pp = p * 0.03 + 0.25;
-      const oa = includeOffsiteAds ? p * 0.15 : 0;
-      const pr = p - cost - ship - 0.20 - tf - pp - oa;
+      const tf = p * fees.transactionRate;
+      const pp = p * fees.paymentProcessingRate + fees.paymentProcessingFixed;
+      const rf = p * fees.regulatoryFee;
+      const oa = includeOffsiteAds ? p * fees.offsiteAdsRate : 0;
+      const pr = p - cost - ship - fees.listingFee - tf - pp - rf - oa;
       return {
         label: delta === 0 ? 'Ortalama' : delta < 0 ? `${delta}%` : `+${delta}%`,
         price: p, profit: pr, margin: p > 0 ? (pr / p) * 100 : 0,
       };
     });
-    return { cost, sell, ship, listingFee, transactionFee, paymentProcessing, offsiteAdsFee, totalFees, profit, margin, compare };
-  }, [purchaseCost, sellingPrice, shippingCost, priceStats, includeOffsiteAds]);
+    return { cost, sell, ship, listingFee, transactionFee, paymentProcessing, regulatoryFee, offsiteAdsFee, totalFees, profit, margin, compare, fees };
+  }, [purchaseCost, sellingPrice, shippingCost, priceStats, includeOffsiteAds, shopRegion, FEE_PROFILES]);
 
   useEffect(() => {
     if (priceStats && !sellingPrice) setSellingPrice(priceStats.avg.toFixed(2));
@@ -876,89 +969,170 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
   return (
     <Box>
       {/* ================================================================ */}
-      {/* HERO SEARCH BAR                                                  */}
+      {/* SECTION NAVIGATION (3 groups)                                    */}
       {/* ================================================================ */}
-      <Box sx={{
-        background: GRADIENTS.primary, borderRadius: '20px', p: { xs: 2, md: 3 }, mb: 3,
-        position: 'relative', overflow: 'hidden',
-      }}>
-        {/* Decorative circles */}
-        <Box sx={{ position: 'absolute', top: -40, right: -40, width: 120, height: 120, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.1)' }} />
-        <Box sx={{ position: 'absolute', bottom: -20, left: -20, width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.08)' }} />
-
-        <Paper sx={{ p: { xs: 2, md: 2.5 }, borderRadius: '14px', position: 'relative', zIndex: 1 }}>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <TextField
-              label="Anahtar Kelime Ara"
-              value={query} onChange={e => setQuery(e.target.value)}
-              size="small" sx={{ flex: 2, minWidth: 200 }}
-              placeholder="flower girl dress, personalized gift..."
-              onKeyDown={handleKeyDown}
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><Search size={16} color="#667eea" /></InputAdornment>,
-              }}
-            />
-            <TextField label="Min $" value={minPrice} onChange={e => setMinPrice(e.target.value)}
-              size="small" type="number" sx={{ width: 80 }}
-              InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            />
-            <TextField label="Max $" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
-              size="small" type="number" sx={{ width: 80 }}
-              InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            />
-            <TextField label="Siralama" value={sortOn} onChange={e => setSortOn(e.target.value)}
-              size="small" select sx={{ width: 130 }} SelectProps={{ native: true }}>
-              <option value="score">En Iyi Eslesme</option>
-              <option value="price">Fiyat</option>
-              <option value="created">Yeni Eklenen</option>
-              <option value="updated">Son Guncellenen</option>
-            </TextField>
-            <Button variant="contained" onClick={searchMarket}
-              disabled={loading || !query.trim()}
-              startIcon={loading ? <CircularProgress size={16} /> : <Search size={16} />}
-              sx={{
-                background: GRADIENTS.primary, borderRadius: '10px', px: 3,
-                boxShadow: '0 4px 12px rgba(102,126,234,0.4)',
-                '&:hover': { boxShadow: '0 6px 16px rgba(102,126,234,0.5)' },
-              }}
-            >
-              Arastir
-            </Button>
-          </Box>
-
-          {/* My Title + Tags */}
-          <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
-            <TextField label="Benim Basligim (SEO karsilastirma)" value={myTitle}
-              onChange={e => setMyTitle(e.target.value)} size="small"
-              sx={{ flex: 2, minWidth: 200 }} placeholder="Listeleme basliginizi girin..."
-              helperText={`${myTitle.length}/140 karakter`}
-            />
-            <TextField label="Benim Taglarim (virgul ile)" value={myTags}
-              onChange={e => setMyTags(e.target.value)} size="small"
-              sx={{ flex: 2, minWidth: 200 }} placeholder="personalized gift, baby shower..."
-              helperText={`${myTags.split(',').filter(t => t.trim()).length}/13 tag`}
-            />
-          </Box>
-        </Paper>
+      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+        {SECTIONS.map((s, i) => (
+          <Button
+            key={i}
+            onClick={() => handleSectionChange(i)}
+            variant={section === i ? 'contained' : 'outlined'}
+            startIcon={s.icon}
+            sx={{
+              flex: { xs: 1, md: 'none' },
+              minWidth: { xs: 0, md: 160 },
+              borderRadius: '14px',
+              textTransform: 'none',
+              fontWeight: section === i ? 700 : 500,
+              py: 1.2,
+              px: 2,
+              fontSize: '0.85rem',
+              ...(section === i ? {
+                background: GRADIENTS.primary,
+                boxShadow: '0 4px 16px rgba(102,126,234,0.35)',
+                '&:hover': { boxShadow: '0 6px 20px rgba(102,126,234,0.45)' },
+              } : {
+                borderColor: '#e0e0e0',
+                color: '#666',
+                '&:hover': { borderColor: '#667eea', color: '#667eea', bgcolor: 'rgba(102,126,234,0.04)' },
+              }),
+            }}
+          >
+            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{s.label}</Box>
+            <Box sx={{ display: { xs: 'block', sm: 'none' }, fontSize: '0.75rem' }}>{s.label.split(' ')[0]}</Box>
+          </Button>
+        ))}
       </Box>
 
-      {/* ================================================================ */}
-      {/* PILL TABS                                                        */}
-      {/* ================================================================ */}
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" sx={pillTabsSx}>
-        <Tab icon={<Compass size={14} />} iconPosition="start" label="Kelime Kesif" />
-        <Tab icon={<Activity size={14} />} iconPosition="start" label="Trend Analizi" />
-        <Tab icon={<DollarSign size={14} />} iconPosition="start" label="Fiyat Analizi" />
-        <Tab icon={<Hash size={14} />} iconPosition="start" label="Tag Istihbarati" />
-        <Tab icon={<Tag size={14} />} iconPosition="start" label="Anahtar Kelimeler" />
-        <Tab icon={<BarChart2 size={14} />} iconPosition="start" label="Rakip Listeleri" />
-        <Tab icon={<Users size={14} />} iconPosition="start" label="Magaza Analizi" />
-        <Tab icon={<Store size={14} />} iconPosition="start" label="Magaza Derinlemesine" />
-        <Tab icon={<Gauge size={14} />} iconPosition="start" label="Talep Skoru" />
-        <Tab icon={<Calculator size={14} />} iconPosition="start" label="Kar Hesaplama" />
-        <Tab icon={<TrendingUp size={14} />} iconPosition="start" label="SEO Karsilastirma" />
-        <Tab icon={<Sparkles size={14} />} iconPosition="start" label="AI Pazar Analizi" />
+      {/* Section description */}
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5, pl: 0.5 }}>
+        {SECTIONS[section].desc}
+      </Typography>
+
+      {/* Sub-tabs for current section */}
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={pillTabsSx}
+      >
+        {SECTIONS[section].tabs.map(t => (
+          <Tab
+            key={t.idx}
+            value={t.idx}
+            icon={t.icon}
+            iconPosition="start"
+            label={
+              <Tooltip title={t.tip} arrow placement="top">
+                <span>{t.label}</span>
+              </Tooltip>
+            }
+          />
+        ))}
       </Tabs>
+
+      {/* ================================================================ */}
+      {/* SEARCH BAR (shown for Pazar Araştırma & Keşif sections)          */}
+      {/* ================================================================ */}
+      {(section === 1 || section === 2) && (
+        <Box sx={{
+          background: GRADIENTS.primary, borderRadius: '16px', p: { xs: 1.5, md: 2 }, mb: 2,
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <Box sx={{ position: 'absolute', top: -30, right: -30, width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.1)' }} />
+
+          <Paper sx={{ p: { xs: 1.5, md: 2 }, borderRadius: '12px', position: 'relative', zIndex: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <TextField
+                label="Ne satıyorsunuz? Ürün kategorinizi arayın"
+                value={query} onChange={e => setQuery(e.target.value)}
+                size="small" sx={{ flex: 2, minWidth: 200 }}
+                placeholder="flower girl dress, personalized gift, baby blanket..."
+                onKeyDown={handleKeyDown}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start"><Search size={16} color="#667eea" /></InputAdornment>,
+                }}
+              />
+              <TextField label="Min $" value={minPrice} onChange={e => setMinPrice(e.target.value)}
+                size="small" type="number" sx={{ width: 80 }}
+                InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              />
+              <TextField label="Max $" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
+                size="small" type="number" sx={{ width: 80 }}
+                InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              />
+              <TextField label="Sıralama" value={sortOn} onChange={e => setSortOn(e.target.value)}
+                size="small" select sx={{ width: 130 }} SelectProps={{ native: true }}>
+                <option value="score">En İyi Eşleşme</option>
+                <option value="price">Fiyat</option>
+                <option value="created">Yeni Eklenen</option>
+                <option value="updated">Son Güncellenen</option>
+              </TextField>
+              <Button variant="contained" onClick={searchMarket}
+                disabled={loading || !query.trim()}
+                startIcon={loading ? <CircularProgress size={16} /> : <Search size={16} />}
+                sx={{
+                  background: GRADIENTS.primary, borderRadius: '10px', px: 3,
+                  boxShadow: '0 4px 12px rgba(102,126,234,0.4)',
+                  '&:hover': { boxShadow: '0 6px 16px rgba(102,126,234,0.5)' },
+                }}
+              >
+                Araştır
+              </Button>
+            </Box>
+
+            {/* Suggested keywords from existing listings */}
+            {suggestedKeywords.length > 0 && !query && (
+              <Box sx={{ mt: 1.5 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                  Mağazanızdan öneriler:
+                </Typography>
+                {suggestedKeywords.map(kw => (
+                  <Chip
+                    key={kw}
+                    label={kw}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setQuery(kw)}
+                    sx={{
+                      mr: 0.5, mb: 0.5, cursor: 'pointer', borderRadius: '8px',
+                      fontSize: '0.72rem', borderColor: '#667eea', color: '#667eea',
+                      '&:hover': { bgcolor: 'rgba(102,126,234,0.08)' },
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+
+            {/* My Title + Tags — collapsible advanced section */}
+            <Box sx={{ mt: 1 }}>
+              <Button
+                size="small"
+                onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#999', px: 0 }}
+                endIcon={<ArrowUpDown size={12} />}
+              >
+                {showAdvancedSearch ? 'Gelişmiş ayarları gizle' : 'SEO karşılaştırma için başlık/tag girin'}
+              </Button>
+              {showAdvancedSearch && (
+                <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                  <TextField label="Benim Başlığım" value={myTitle}
+                    onChange={e => setMyTitle(e.target.value)} size="small"
+                    sx={{ flex: 2, minWidth: 200 }} placeholder="Listeleme başlığınızı girin..."
+                    helperText={`${myTitle.length}/140 karakter`}
+                  />
+                  <TextField label="Benim Taglarım (virgülle)" value={myTags}
+                    onChange={e => setMyTags(e.target.value)} size="small"
+                    sx={{ flex: 2, minWidth: 200 }} placeholder="personalized gift, baby shower..."
+                    helperText={`${myTags.split(',').filter(t => t.trim()).length}/13 tag`}
+                  />
+                </Box>
+              )}
+            </Box>
+          </Paper>
+        </Box>
+      )}
 
       {loading && <LinearProgress sx={{ mb: 2, borderRadius: 4, height: 4 }} />}
 
@@ -1088,8 +1262,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
           {!kwExplorerLoading && kwSuggestions.length === 0 && (
             <PremiumEmptyState
               icon={<Compass size={48} />}
-              title="Anahtar Kelime Kesfet"
-              desc="Google, Amazon ve Etsy'den anahtar kelime onerileri alin. A-Z genisleme ile uzun kuyruk kelimeleri bulun."
+              title="Anahtar Kelime Keşfet"
+              desc="Hangi kelimeleri kullanmalısınız? Google ve Amazon'dan öneriler alın."
+              steps={['Yukarıya satmak istediğiniz ürünü yazın (ör. "baby blanket")', '"A-Z Genişlet" ile uzun kuyruk kelimeler bulun', 'Yüksek skorlu kelimeleri başlık ve taglarınıza ekleyin']}
             />
           )}
         </Box>
@@ -1241,7 +1416,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
             <PremiumEmptyState
               icon={<Activity size={48} />}
               title="Trend Analizi"
-              desc="Google Trends ve Wikipedia verileriyle arama trendlerini, mevsimsellik ve yukselen kelimeleri analiz edin."
+              desc="Ürün kategoriniz yılın hangi aylarında popüler? Ne zaman stok yapmalısınız?"
+              steps={['Önce "Pazar Araştırma" bölümünde bir anahtar kelime arayın', 'Bu sekmeye gelin ve "Trend Analizi Başlat" butonuna tıklayın', 'Mevsimsel takvim ve yükselen aramaları görün']}
             />
           )}
         </Box>
@@ -1337,7 +1513,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                 </TableContainer>
               </Paper>
             </>
-          ) : !loading && <PremiumEmptyState icon={<DollarSign size={48} />} title="Fiyat Analizi" desc="Anahtar kelime arayarak fiyat dagilimi, tatli nokta ve rekabet analizi yapin." />}
+          ) : !loading && <PremiumEmptyState icon={<DollarSign size={48} />} title="Fiyat Analizi"
+              desc="Rakiplerinizin fiyat stratejisini analiz edin."
+              steps={['Yukarıdaki arama çubuğuna ürün kategorinizi yazın (ör. "personalized necklace")', 'Araştır butonuna tıklayın', 'Fiyat dağılımı, en kârlı fiyat aralığı ve histogramı görün']}
+            />}
         </Box>
       )}
 
@@ -1443,7 +1622,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                 </Paper>
               )}
             </>
-          ) : !loading && <PremiumEmptyState icon={<Hash size={48} />} title="Tag Istihbarati" desc="Arama yapin ve rakiplerin tag stratejilerini analiz edin." />}
+          ) : !loading && <PremiumEmptyState icon={<Hash size={48} />} title="Tag İstihbaratı"
+              desc="Rakiplerin hangi tagleri kullandığını görün, eksiklerinizi bulun."
+              steps={['Önce bir anahtar kelime araması yapın', 'Rakiplerin en çok kullandığı taglar listelenir', 'Yeşil = sizde var, Kırmızı = eksik — tıklayarak kopyalayın']}
+            />}
         </Box>
       )}
 
@@ -1526,7 +1708,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                 ))}
               </Paper>
             </>
-          ) : !loading && <PremiumEmptyState icon={<Tag size={48} />} title="Anahtar Kelimeler" desc="Arama yapin ve rakiplerin en cok kullandigi kelimeleri kesfet." />}
+          ) : !loading && <PremiumEmptyState icon={<Tag size={48} />} title="Anahtar Kelimeler"
+              desc="Başlıklarda en sık geçen kelimeleri ve ifadeleri keşfedin."
+              steps={['Bir anahtar kelime araması yapın', 'Rakip başlıklarında en çok tekrar eden kelimeler gösterilir', 'Kendi başlığınızla karşılaştırarak eksiklerinizi görün']}
+            />}
         </Box>
       )}
 
@@ -1630,7 +1815,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                 </Box>
               )}
             </>
-          ) : !loading && <PremiumEmptyState icon={<BarChart2 size={48} />} title="Rakip Listeleri" desc="Arama yapin ve rakip urunleri karsilastirin." />}
+          ) : !loading && <PremiumEmptyState icon={<BarChart2 size={48} />} title="Rakip Ürünleri"
+              desc="Rakip ürünlerini fiyat, favori ve görüntülenme ile karşılaştırın."
+              steps={['Bir anahtar kelime araması yapın', 'Rakip ürünleri liste halinde gösterilir', 'Fiyat, favori veya görüntülenmeye göre sıralayın']}
+            />}
         </Box>
       )}
 
@@ -1722,7 +1910,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
           ) : !shopsLoading && (
             hasData
               ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Magaza bilgileri yukleniyor...</Alert>
-              : <PremiumEmptyState icon={<Users size={48} />} title="Magaza Analizi" desc="Arama yapin ve rakip magazalari analiz edin." />
+              : <PremiumEmptyState icon={<Users size={48} />} title="Mağaza Analizi"
+                  desc="Aynı nişte satan mağazaları keşfedin."
+                  steps={['Bir anahtar kelime araması yapın', 'Aramanızla ilgili mağazalar otomatik bulunur', 'Satış sayısı, puan ve ortalama fiyatlarını karşılaştırın']}
+                />
           )}
         </Box>
       )}
@@ -1839,8 +2030,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
           )}
 
           {!deepDiveLoading && !deepDiveShop && (
-            <PremiumEmptyState icon={<Store size={48} />} title="Magaza Derinlemesine"
-              desc="Magaza ID girin veya Magaza Analizi tabindan magaza secin." />
+            <PremiumEmptyState icon={<Store size={48} />} title="Mağaza Detayı"
+              desc="Belirli bir rakip mağazayı derinlemesine inceleyin."
+              steps={['Yukarıya bir Etsy mağaza ID veya adı girin', '"Analiz Et" butonuna tıklayın', 'Fiyat stratejisi, en popüler ürünleri ve tag kullanımını görün']} />
           )}
         </Box>
       )}
@@ -1904,7 +2096,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                 ))}
               </Paper>
             </>
-          ) : !loading && <PremiumEmptyState icon={<Gauge size={48} />} title="Talep Skoru" desc="Arama yapin ve pazar firsatini puanlayin." />}
+          ) : !loading && <PremiumEmptyState icon={<Gauge size={48} />} title="Talep Skoru"
+              desc="Bu nişte fırsat var mı? Arz/talep dengesiyle puan alın."
+              steps={['Bir anahtar kelime araması yapın', 'Arz, rekabet, talep ve etkileşim otomatik puanlanır', '70+ = güçlü fırsat, 40-70 = orta, 40 altı = kalabalık niş']}
+            />}
         </Box>
       )}
 
@@ -1914,18 +2109,48 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
       {tab === 9 && (
         <Box>
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Etsy Kar Hesaplayici</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Etsy Kâr Hesaplayıcı</Typography>
+              {/* Region selector */}
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <Button
+                  size="small"
+                  variant={shopRegion === 'tr' ? 'contained' : 'outlined'}
+                  onClick={() => setShopRegion('tr')}
+                  sx={{
+                    borderRadius: '10px', textTransform: 'none', fontSize: '0.75rem', px: 2,
+                    ...(shopRegion === 'tr' ? { background: GRADIENTS.primary } : {}),
+                  }}
+                >
+                  Türkiye Mağaza
+                </Button>
+                <Button
+                  size="small"
+                  variant={shopRegion === 'us' ? 'contained' : 'outlined'}
+                  onClick={() => setShopRegion('us')}
+                  sx={{
+                    borderRadius: '10px', textTransform: 'none', fontSize: '0.75rem', px: 2,
+                    ...(shopRegion === 'us' ? { background: GRADIENTS.primary } : {}),
+                  }}
+                >
+                  ABD Mağaza
+                </Button>
+              </Box>
+            </Box>
+            <Alert severity="info" sx={{ mb: 2, borderRadius: '10px', py: 0.5 }}>
+              <Typography variant="caption">{profitCalc.fees.notes}</Typography>
+            </Alert>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-              <TextField label="Alis Maliyeti ($)" value={purchaseCost}
+              <TextField label="Alış Maliyeti ($)" value={purchaseCost}
                 onChange={e => setPurchaseCost(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
               />
-              <TextField label="Satis Fiyati ($)" value={sellingPrice || (priceStats?.avg.toFixed(2) || '')}
+              <TextField label="Satış Fiyatı ($)" value={sellingPrice || (priceStats?.avg.toFixed(2) || '')}
                 onChange={e => setSellingPrice(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-                helperText={priceStats ? `Pazar ortalamasi: ${fmt(priceStats.avg)}` : ''}
+                helperText={priceStats ? `Pazar ortalaması: ${fmt(priceStats.avg)}` : 'Fiyat girin veya pazar araştırması yapın'}
               />
               <TextField label="Kargo Maliyeti ($)" value={shippingCost}
                 onChange={e => setShippingCost(e.target.value)}
@@ -1935,25 +2160,27 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
             </Box>
             <FormControlLabel
               control={<Switch checked={includeOffsiteAds} onChange={e => setIncludeOffsiteAds(e.target.checked)} size="small" />}
-              label="Offsite Ads dahil et (15%)"
+              label={<Typography variant="body2">Offsite Ads dahil et (%15) — yıllık $10K altında zorunlu</Typography>}
             />
           </Paper>
 
           <Paper sx={{ ...glassCard, overflow: 'hidden', mb: 2 }}>
             <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Etsy Ucret Detaylari</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                Etsy Ücret Detayları ({shopRegion === 'tr' ? 'Türkiye' : 'ABD'} Mağaza)
+              </Typography>
             </Box>
             <TableContainer>
               <Table size="small">
                 <TableBody>
                   <TableRow>
-                    <TableCell>Satis Fiyati</TableCell>
+                    <TableCell>Satış Fiyatı</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>{fmt(profitCalc.sell)}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        Listeleme Ucreti <Tooltip title="Her listeleme icin $0.20"><Info size={14} color="#999" /></Tooltip>
+                        Listeleme Ücreti <Tooltip title="Her listeleme için $0.20 (4 ay geçerli)"><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.listingFee)}</TableCell>
@@ -1961,7 +2188,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        Islem Komisyonu (6.5%) <Tooltip title="Her satis icin %6.5"><Info size={14} color="#999" /></Tooltip>
+                        İşlem Komisyonu (%6.5) <Tooltip title="Her satış için fiyatın %6.5'i"><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.transactionFee)}</TableCell>
@@ -1969,29 +2196,45 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        Odeme Isleme (3% + $0.25) <Tooltip title="Etsy Payments ucreti"><Info size={14} color="#999" /></Tooltip>
+                        Ödeme İşleme ({shopRegion === 'tr' ? '%4' : '%3'} + $0.25)
+                        <Tooltip title={shopRegion === 'tr'
+                          ? 'ABD dışı mağazalar için %4 + $0.25'
+                          : 'ABD mağazaları için %3 + $0.25'
+                        }><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.paymentProcessing)}</TableCell>
                   </TableRow>
+                  {shopRegion === 'tr' && profitCalc.regulatoryFee > 0 && (
+                    <TableRow>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          Düzenleyici İşletim Ücreti (%0.5)
+                          <Tooltip title="ABD dışı mağazalar için düzenleyici ücret"><Info size={14} color="#999" /></Tooltip>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.regulatoryFee)}</TableCell>
+                    </TableRow>
+                  )}
                   {includeOffsiteAds && (
                     <TableRow>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          Offsite Ads (15%) <Tooltip title="Etsy dis site reklam ucreti"><Info size={14} color="#999" /></Tooltip>
+                          Offsite Ads (%15)
+                          <Tooltip title="Etsy'nin dış site reklamları üzerinden satış olursa kesilir"><Info size={14} color="#999" /></Tooltip>
                         </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.offsiteAdsFee)}</TableCell>
                     </TableRow>
                   )}
-                  <TableRow><TableCell>Alis Maliyeti</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.cost)}</TableCell></TableRow>
+                  <TableRow><TableCell>Alış Maliyeti</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.cost)}</TableCell></TableRow>
                   <TableRow><TableCell>Kargo Maliyeti</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.ship)}</TableCell></TableRow>
                   <TableRow sx={{
                     background: profitCalc.profit >= 0
                       ? 'linear-gradient(135deg, rgba(17,153,142,0.08) 0%, rgba(56,239,125,0.08) 100%)'
                       : 'linear-gradient(135deg, rgba(235,51,73,0.08) 0%, rgba(244,92,67,0.08) 100%)',
                   }}>
-                    <TableCell sx={{ fontWeight: 800 }}>Net Kar</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>Net Kâr</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: profitCalc.profit >= 0 ? '#11998e' : '#eb3349' }}>
                       {fmt(profitCalc.profit)}
                     </TableCell>
@@ -2001,7 +2244,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                       ? 'linear-gradient(135deg, rgba(17,153,142,0.08) 0%, rgba(56,239,125,0.08) 100%)'
                       : 'linear-gradient(135deg, rgba(235,51,73,0.08) 0%, rgba(244,92,67,0.08) 100%)',
                   }}>
-                    <TableCell sx={{ fontWeight: 800 }}>Kar Marji</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>Kâr Marjı</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: profitCalc.profit >= 0 ? '#11998e' : '#eb3349' }}>
                       {pct(profitCalc.margin)}
                     </TableCell>
@@ -2013,7 +2256,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
 
           <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
             <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Farkli Fiyat Noktalari</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Farklı Fiyat Noktaları</Typography>
             </Box>
             <TableContainer>
               <Table size="small">
@@ -2021,7 +2264,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                   <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                     <TableCell>Senaryo</TableCell>
                     <TableCell align="right">Fiyat</TableCell>
-                    <TableCell align="right">Kar</TableCell>
+                    <TableCell align="right">Kâr</TableCell>
                     <TableCell align="right">Marj</TableCell>
                   </TableRow>
                 </TableHead>
@@ -2154,11 +2397,17 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
               )}
             </>
           ) : !loading && (
-            <Alert severity="info" sx={{ borderRadius: '12px' }}>
-              {myTitle
-                ? 'Oncelikle bir arama yapin, ardindan SEO skorunuz otomatik hesaplanacak.'
-                : 'SEO analizi icin yukaridaki "Benim Basligim" ve "Benim Taglarim" alanlarini doldurun ve arama yapin.'}
-            </Alert>
+            <PremiumEmptyState
+              icon={<TrendingUp size={48} />}
+              title="SEO Karşılaştırma"
+              desc="Başlığınız ve taglarınız rakiplere kıyasla ne kadar güçlü?"
+              steps={[
+                '"Pazar Araştırma" bölümüne geçin ve bir anahtar kelime arayın',
+                'Arama çubuğundaki "SEO karşılaştırma için başlık/tag girin" bölümünü açın',
+                'Kendi listeleme başlığınızı ve taglarınızı girin',
+                'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
+              ]}
+            />
           )}
         </Box>
       )}
@@ -2315,10 +2564,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
 // Premium Empty State
 // ---------------------------------------------------------------------------
 
-function PremiumEmptyState({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function PremiumEmptyState({ icon, title, desc, steps }: {
+  icon: React.ReactNode; title: string; desc: string; steps?: string[];
+}) {
   return (
     <Paper sx={{
-      ...glassCard, p: 5, textAlign: 'center',
+      ...glassCard, p: 4, textAlign: 'center',
     }}>
       <Box sx={{ opacity: 0.2, mb: 2 }}>{icon}</Box>
       <Typography variant="h6" sx={{
@@ -2329,9 +2580,25 @@ function PremiumEmptyState({ icon, title, desc }: { icon: React.ReactNode; title
       }}>
         {title}
       </Typography>
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="body2" color="text.secondary" sx={{ mb: steps ? 2 : 0 }}>
         {desc}
       </Typography>
+      {steps && steps.length > 0 && (
+        <Box sx={{ display: 'inline-flex', flexDirection: 'column', gap: 1, textAlign: 'left', mt: 1 }}>
+          {steps.map((step, i) => (
+            <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{
+                width: 24, height: 24, borderRadius: '50%', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                background: GRADIENTS.primary, color: '#fff', fontSize: '0.7rem', fontWeight: 700,
+              }}>
+                {i + 1}
+              </Box>
+              <Typography variant="body2" color="text.secondary">{step}</Typography>
+            </Box>
+          ))}
+        </Box>
+      )}
     </Paper>
   );
 }

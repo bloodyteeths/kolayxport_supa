@@ -1101,6 +1101,8 @@ export default async function handler(
                 shop_section_id,
                 processing_min,
                 processing_max,
+                item_weight, item_weight_unit,
+                item_length, item_width, item_height, item_dimensions_unit,
                 // New Sept 2025 requirement for processing profiles
                 readiness_state_id,
             } = req.body;
@@ -1140,6 +1142,12 @@ export default async function handler(
             if (shop_section_id) listingPayload.shop_section_id = shop_section_id;
             if (processing_min) listingPayload.processing_min = processing_min;
             if (processing_max) listingPayload.processing_max = processing_max;
+            if (item_weight !== undefined) listingPayload.item_weight = item_weight;
+            if (item_weight_unit) listingPayload.item_weight_unit = item_weight_unit;
+            if (item_length !== undefined) listingPayload.item_length = item_length;
+            if (item_width !== undefined) listingPayload.item_width = item_width;
+            if (item_height !== undefined) listingPayload.item_height = item_height;
+            if (item_dimensions_unit) listingPayload.item_dimensions_unit = item_dimensions_unit;
             // Sept 2025 processing profile requirements
             if (readiness_state_id) listingPayload.readiness_state_id = readiness_state_id;
 

@@ -198,7 +198,6 @@ const DIMENSION_UNITS = [
   { value: 'ft', label: 'ft' },
   { value: 'mm', label: 'mm' },
   { value: 'cm', label: 'cm' },
-  { value: 'm', label: 'm' },
 ];
 
 const DRAWER_WIDTH = 550;
@@ -789,6 +788,16 @@ export default function ListingEditorDrawer({
   // --------------------------------------------------
   const handleSave = async () => {
     if (!listingId || !fields || !originalFieldsRef.current) return;
+
+    // Validate processing days
+    if (fields.processing_min && fields.processing_max) {
+      const min = Number(fields.processing_min);
+      const max = Number(fields.processing_max);
+      if (min > 0 && max > 0 && min > max) {
+        toast.error('Hazirlama suresi: minimum, maksimumdan buyuk olamaz');
+        return;
+      }
+    }
 
     const changed = getChangedFields(originalFieldsRef.current, fields);
     if (Object.keys(changed).length === 0) {

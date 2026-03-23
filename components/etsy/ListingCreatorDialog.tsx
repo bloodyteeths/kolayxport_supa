@@ -101,7 +101,6 @@ const DIMENSION_UNITS = [
   { value: 'ft', label: 'ft' },
   { value: 'mm', label: 'mm' },
   { value: 'cm', label: 'cm' },
-  { value: 'm', label: 'm' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -549,6 +548,16 @@ export default function ListingCreatorDialog({
       if (shopSectionId) body.shop_section_id = shopSectionId;
       if (processingMin) body.processing_min = Number(processingMin);
       if (processingMax) body.processing_max = Number(processingMax);
+      if (itemWeight) {
+        body.item_weight = parseFloat(itemWeight);
+        body.item_weight_unit = itemWeightUnit;
+      }
+      if (itemLength || itemWidth || itemHeight) {
+        if (itemLength) body.item_length = parseFloat(itemLength);
+        if (itemWidth) body.item_width = parseFloat(itemWidth);
+        if (itemHeight) body.item_height = parseFloat(itemHeight);
+        body.item_dimensions_unit = itemDimensionsUnit;
+      }
 
       const createRes = await fetch(
         `/api/clawd/etsy?action=create_listing&shop_id=${shopId}`,

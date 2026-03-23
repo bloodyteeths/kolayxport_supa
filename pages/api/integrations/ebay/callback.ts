@@ -2,6 +2,11 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
+// Force serverless runtime (not edge) — Prisma requires Node.js
+export const config = {
+  runtime: 'nodejs',
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse

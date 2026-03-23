@@ -2,6 +2,11 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getSupabaseServerClient } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 
+// Force serverless runtime (not edge)
+export const config = {
+  runtime: 'nodejs',
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse

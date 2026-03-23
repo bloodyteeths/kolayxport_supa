@@ -4,6 +4,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   LinearProgress, Alert, Tabs, Tab, Tooltip, IconButton,
   CircularProgress, InputAdornment, Switch, FormControlLabel,
+  Autocomplete, Avatar,
 } from '@mui/material';
 import {
   Search, TrendingUp, DollarSign, Tag, BarChart2, ExternalLink,
@@ -390,6 +391,28 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
   const [includeOffsiteAds, setIncludeOffsiteAds] = useState(false);
   const [shopRegion, setShopRegion] = useState<'us' | 'tr'>('tr'); // US vs Turkey fee structure
 
+  // --- selected listing from user's shop ---
+  const [selectedListingId, setSelectedListingId] = useState<number | null>(null);
+
+  const selectedListing = useMemo(() => {
+    if (!selectedListingId || !userListings?.length) return null;
+    return userListings.find((l: any) => (l.listing_id || l.id) === selectedListingId) || null;
+  }, [selectedListingId, userListings]);
+
+  // Auto-fill fields when a listing is selected
+  useEffect(() => {
+    if (!selectedListing) return;
+    const price = selectedListing.price;
+    const priceVal = price ? (typeof price === 'object' ? (price.amount / (price.divisor || 100)) : price) : '';
+    if (priceVal) setSellingPrice(String(priceVal.toFixed ? priceVal.toFixed(2) : priceVal));
+    setMyTitle(selectedListing.title || '');
+    setMyTags((selectedListing.tags || []).join(', '));
+    // Set first tag as search query for market research
+    if (selectedListing.tags?.length) {
+      setQuery(selectedListing.tags[0]);
+    }
+  }, [selectedListing]);
+
   // --- keyword filter ---
   const [kwShowMissing, setKwShowMissing] = useState(false);
 
@@ -426,14 +449,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
       icon: <BarChart2 size={16} />,
       desc: 'Rakipleri ve piyasayı analiz edin',
       tabs: [
-        { idx: 2, label: 'Fiyat Analizi', icon: <DollarSign size={14} />, tip: 'Piyasadaki fiyat aralığını ve en kârlı noktayı görün' },
-        { idx: 3, label: 'Tag İstihbaratı', icon: <Hash size={14} />, tip: 'Rakiplerin hangi tagleri kullandığını ve eksiklerinizi görün' },
-        { idx: 4, label: 'Anahtar Kelimeler', icon: <Tag size={14} />, tip: 'Başlıklarda en çok kullanılan kelimeleri analiz edin' },
-        { idx: 5, label: 'Rakip Ürünleri', icon: <ShoppingBag size={14} />, tip: 'Rakip ürünlerini fiyat, favori ve görüntülenmeyle inceleyin' },
-        { idx: 6, label: 'Mağaza Analizi', icon: <Users size={14} />, tip: 'Aynı nişte satan mağazaları ve performanslarını görün' },
-        { idx: 7, label: 'Mağaza Detayı', icon: <Store size={14} />, tip: 'Belirli bir mağazanın tüm ürünlerini derinlemesine inceleyin' },
-        { idx: 8, label: 'Talep Skoru', icon: <Gauge size={14} />, tip: 'Bu nişte talep mi çok, arz mı çok? Fırsat skoru görün' },
-        { idx: 11, label: 'AI Analizi', icon: <Sparkles size={14} />, tip: 'Yapay zeka ile pazar özeti, strateji ve aksiyon önerileri alın' },
+        { idx: 100, label: 'Sonuçlar', icon: <BarChart2 size={14} />, tip: 'Fiyat analizi, talep skoru ve rakip ürünleri — tek sayfada' },
+        { idx: 101, label: 'Kelime & Tag', icon: <Hash size={14} />, tip: 'Rakiplerin kullandığı taglar ve anahtar kelime analizi' },
+        { idx: 102, label: 'Mağaza & AI', icon: <Store size={14} />, tip: 'Rakip mağazalar, derinlemesine analiz ve AI önerileri' },
       ],
     },
     {
@@ -1009,6 +1027,81 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
         {SECTIONS[section].desc}
       </Typography>
 
+      {/* Listing picker for Mağazam section */}
+      {section === 0 && userListings && userListings.length > 0 && (
+        <Paper sx={{ ...glassCard, p: 2, mb: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ShoppingBag size={16} color="#667eea" />
+            Listelemenizi Seçin
+          </Typography>
+          <Autocomplete
+            options={userListings}
+            getOptionLabel={(opt: any) => opt.title || `Listing #${opt.listing_id || opt.id}`}
+            value={selectedListing}
+            onChange={(_, val: any) => setSelectedListingId(val ? (val.listing_id || val.id) : null)}
+            renderOption={(props, opt: any) => {
+              const thumb = opt.thumbnail?.url_75x75 || opt.thumbnail?.url_170x135 || '';
+              const priceObj = opt.price;
+              const priceStr = priceObj
+                ? (typeof priceObj === 'object' ? `$${(priceObj.amount / (priceObj.divisor || 100)).toFixed(2)}` : `$${priceObj}`)
+                : '';
+              return (
+                <li {...props} key={opt.listing_id || opt.id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%', py: 0.5 }}>
+                    <Avatar
+                      src={thumb}
+                      variant="rounded"
+                      sx={{ width: 40, height: 40, bgcolor: '#f5f5f5' }}
+                    >
+                      <ShoppingBag size={18} />
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {opt.title || `Listing #${opt.listing_id || opt.id}`}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {priceStr} · {opt.views || 0} görüntülenme · {opt.num_favorers || 0} favori
+                      </Typography>
+                    </Box>
+                  </Box>
+                </li>
+              );
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                size="small"
+                placeholder="Listeleme arayın veya seçin..."
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <>
+                      <InputAdornment position="start"><Search size={16} color="#999" /></InputAdornment>
+                      {params.InputProps.startAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
+            isOptionEqualToValue={(opt: any, val: any) => (opt.listing_id || opt.id) === (val.listing_id || val.id)}
+            noOptionsText="Listeleme bulunamadı"
+            sx={{ mb: 1 }}
+          />
+          {selectedListing && (
+            <Alert severity="success" sx={{ borderRadius: '10px', py: 0.5 }}>
+              <Typography variant="caption">
+                Fiyat, başlık ve taglar otomatik dolduruldu. Aşağıdaki araçları kullanarak analiz edin.
+              </Typography>
+            </Alert>
+          )}
+          {!selectedListing && (
+            <Typography variant="caption" color="text.secondary">
+              Bir listeleme seçin — fiyat, başlık ve taglar otomatik olarak doldurulur.
+            </Typography>
+          )}
+        </Paper>
+      )}
+
       {/* Sub-tabs for current section */}
       <Tabs
         value={tab}
@@ -1110,10 +1203,13 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
               <Button
                 size="small"
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#999', px: 0 }}
+                sx={{ textTransform: 'none', fontSize: '0.75rem', color: selectedListing ? '#667eea' : '#999', px: 0, fontWeight: selectedListing ? 600 : 400 }}
                 endIcon={<ArrowUpDown size={12} />}
               >
-                {showAdvancedSearch ? 'Gelişmiş ayarları gizle' : 'SEO karşılaştırma için başlık/tag girin'}
+                {selectedListing
+                  ? `✓ "${selectedListing.title?.slice(0, 30)}..." başlık/tagları yüklendi`
+                  : showAdvancedSearch ? 'Gelişmiş ayarları gizle' : 'SEO karşılaştırma için başlık/tag girin'
+                }
               </Button>
               {showAdvancedSearch && (
                 <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
@@ -1424,9 +1520,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
       )}
 
       {/* ================================================================ */}
-      {/* TAB 2: PRICE ANALYSIS                                            */}
+      {/* TAB 100: SONUÇLAR (Price + Demand + Competitors combined)         */}
       {/* ================================================================ */}
-      {tab === 2 && (
+      {tab === 100 && (
         <Box>
           {priceStats ? (
             <>
@@ -1513,17 +1609,140 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                 </TableContainer>
               </Paper>
             </>
-          ) : !loading && <PremiumEmptyState icon={<DollarSign size={48} />} title="Fiyat Analizi"
-              desc="Rakiplerinizin fiyat stratejisini analiz edin."
-              steps={['Yukarıdaki arama çubuğuna ürün kategorinizi yazın (ör. "personalized necklace")', 'Araştır butonuna tıklayın', 'Fiyat dağılımı, en kârlı fiyat aralığı ve histogramı görün']}
+          ) : !loading && <PremiumEmptyState icon={<BarChart2 size={48} />} title="Pazar Sonuçları"
+              desc="Fiyat analizi, talep skoru ve rakip ürünleri tek sayfada."
+              steps={['Yukarıdaki arama çubuğuna ürün kategorinizi yazın (ör. "personalized necklace")', 'Araştır butonuna tıklayın', 'Fiyat dağılımı, talep skoru ve rakip listesi otomatik görünür']}
             />}
+
+          {/* --- Demand Score (merged from tab 8) --- */}
+          {demandScore && (
+            <Box sx={{ mt: 3 }}>
+              <Divider sx={{ mb: 2 }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Gauge size={18} color="#667eea" /> Talep & Fırsat Skoru
+              </Typography>
+              <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
+                <ScoreRing score={demandScore.score} size={120} label="Firsat" />
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  {demandScore.score >= 70 ? 'Bu niş iyi bir fırsat! Rekabet makul ve talep yüksek.' :
+                    demandScore.score >= 40 ? 'Orta seviye fırsat. Rekabet analizi yaparak stratejinizi belirleyin.' :
+                      'Bu pazar çok rekabetçi veya doygun olabilir. Niş bir alt kategori bulmaya çalışın.'}
+                </Typography>
+              </Paper>
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
+                {[
+                  { label: 'Toplam Sonuç', value: demandScore.totalResults.toLocaleString(), desc: 'Arz miktarı' },
+                  { label: 'Benzersiz Mağaza', value: String(demandScore.uniqueShops), desc: 'Rekabet' },
+                  { label: 'Ort. Favori', value: String(demandScore.avgFavorites), desc: 'Talep sinyali' },
+                  { label: 'Ort. Görüntülenme', value: String(demandScore.avgViews), desc: 'Görünürlük' },
+                  { label: 'Etkileşim', value: `${demandScore.avgEngagement}%`, desc: 'Fav/Görünt.' },
+                  { label: 'Fiyat Yayılımı', value: `${demandScore.priceSpread}x`, desc: 'Çeşitlilik' },
+                ].map(m => (
+                  <Paper key={m.label} sx={{ ...glassCard, p: 1.5, flex: 1, minWidth: 100 }}>
+                    <Typography variant="caption" sx={{ opacity: 0.7, fontWeight: 500 }}>{m.label}</Typography>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{m.value}</Typography>
+                    <Typography variant="caption" color="text.secondary">{m.desc}</Typography>
+                  </Paper>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* --- Competitor Products (merged from tab 5) --- */}
+          {hasData && (
+            <Box sx={{ mt: 3 }}>
+              <Divider sx={{ mb: 2 }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ShoppingBag size={18} color="#667eea" /> Rakip Ürünleri ({items.length})
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                {(['none', 'price_asc', 'price_desc', 'favorites', 'views', 'engagement'] as const).map(s => (
+                  <Chip key={s}
+                    label={{ none: 'Varsayılan', price_asc: 'Fiyat ↑', price_desc: 'Fiyat ↓', favorites: 'Favori', views: 'Görüntülenme', engagement: 'Etkileşim' }[s]}
+                    size="small" variant={compSort === s ? 'filled' : 'outlined'}
+                    color={compSort === s ? 'primary' : 'default'}
+                    onClick={() => setCompSort(s)} sx={{ cursor: 'pointer', borderRadius: '8px' }}
+                  />
+                ))}
+              </Box>
+              <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
+                <TableContainer sx={{ maxHeight: 400 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
+                        <TableCell sx={{ width: 50 }} />
+                        <TableCell>Başlık</TableCell>
+                        <TableCell align="right">Fiyat</TableCell>
+                        <TableCell align="center"><Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}><Heart size={12} /> Fav</Box></TableCell>
+                        <TableCell align="center">Etkl.</TableCell>
+                        <TableCell sx={{ width: 40 }} />
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {sortedItems.slice(0, visibleCount).map((item, idx) => {
+                        const engagement = item.views > 0 ? (item.num_favorers / item.views) * 100 : 0;
+                        return (
+                          <TableRow key={item.listing_id} hover sx={{
+                            '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
+                            borderLeft: idx < 3 ? '3px solid #667eea' : 'none',
+                          }}>
+                            <TableCell>
+                              {item.image_url && (
+                                <img src={item.image_url} alt="" style={{
+                                  width: 40, height: 40, objectFit: 'cover', borderRadius: 8,
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                }} />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {item.title}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmt(item.price)}</Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: item.num_favorers > 100 ? '#11998e' : 'text.secondary' }}>
+                                {item.num_favorers.toLocaleString()}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip label={`${engagement.toFixed(1)}%`} size="small" sx={{
+                                fontWeight: 600, borderRadius: '6px',
+                                bgcolor: engagement > 5 ? '#e8f5e9' : '#fafafa',
+                                color: engagement > 5 ? '#2e7d32' : '#999',
+                              }} />
+                            </TableCell>
+                            <TableCell>
+                              <IconButton size="small" onClick={() => window.open(item.url, '_blank')}>
+                                <ExternalLink size={14} />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Paper>
+              {visibleCount < items.length && (
+                <Box sx={{ textAlign: 'center', mt: 1.5 }}>
+                  <Button variant="outlined" size="small" onClick={() => setVisibleCount(c => c + 20)}
+                    sx={{ borderRadius: '10px' }}>
+                    Daha Fazla ({items.length - visibleCount} kalan)
+                  </Button>
+                </Box>
+              )}
+            </Box>
+          )}
         </Box>
       )}
 
       {/* ================================================================ */}
-      {/* TAB 3: TAG INTELLIGENCE                                          */}
+      {/* TAB 101: KELIME & TAG (Tags + Keywords combined)                 */}
       {/* ================================================================ */}
-      {tab === 3 && (
+      {tab === 101 && (
         <Box>
           {enrichedTags.length > 0 ? (
             <>
@@ -1622,22 +1841,20 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                 </Paper>
               )}
             </>
-          ) : !loading && <PremiumEmptyState icon={<Hash size={48} />} title="Tag İstihbaratı"
-              desc="Rakiplerin hangi tagleri kullandığını görün, eksiklerinizi bulun."
-              steps={['Önce bir anahtar kelime araması yapın', 'Rakiplerin en çok kullandığı taglar listelenir', 'Yeşil = sizde var, Kırmızı = eksik — tıklayarak kopyalayın']}
+          ) : !loading && <PremiumEmptyState icon={<Hash size={48} />} title="Kelime & Tag Analizi"
+              desc="Rakiplerin kullandığı tagları ve anahtar kelimeleri keşfedin."
+              steps={['Önce bir anahtar kelime araması yapın', 'Rakiplerin en çok kullandığı taglar ve kelimeler listelenir', 'Eksiklerinizi görün — tıklayarak kopyalayın']}
             />}
-        </Box>
-      )}
 
-      {/* ================================================================ */}
-      {/* TAB 4: KEYWORDS                                                  */}
-      {/* ================================================================ */}
-      {tab === 4 && (
-        <Box>
-          {hasData ? (
-            <>
+          {/* --- Keywords (merged from tab 4) --- */}
+          {hasData && (
+            <Box sx={{ mt: 3 }}>
+              <Divider sx={{ mb: 2 }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Tag size={18} color="#667eea" /> Anahtar Kelimeler
+              </Typography>
               <Alert severity="info" sx={{ mb: 2, borderRadius: '12px' }}>
-                Rakiplerin basliklarindan cikarilan en populer anahtar kelimeler. Tiklayin ve kopyalayin.
+                Rakiplerin başlıklarından çıkarılan en popüler anahtar kelimeler. Tıklayın ve kopyalayın.
               </Alert>
 
               {myTitle && (
@@ -1707,125 +1924,15 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                   </Box>
                 ))}
               </Paper>
-            </>
-          ) : !loading && <PremiumEmptyState icon={<Tag size={48} />} title="Anahtar Kelimeler"
-              desc="Başlıklarda en sık geçen kelimeleri ve ifadeleri keşfedin."
-              steps={['Bir anahtar kelime araması yapın', 'Rakip başlıklarında en çok tekrar eden kelimeler gösterilir', 'Kendi başlığınızla karşılaştırarak eksiklerinizi görün']}
-            />}
+            </Box>
+          )}
         </Box>
       )}
 
       {/* ================================================================ */}
-      {/* TAB 5: COMPETITOR LISTINGS                                       */}
+      {/* TAB 102: MAĞAZA & AI (Shops + Deep Dive + AI combined)           */}
       {/* ================================================================ */}
-      {tab === 5 && (
-        <Box>
-          {hasData ? (
-            <>
-              <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">{items.length} urun listeleniyor</Typography>
-                <Box sx={{ flex: 1 }} />
-                {(['none', 'price_asc', 'price_desc', 'favorites', 'views', 'engagement'] as const).map(s => (
-                  <Chip key={s}
-                    label={{ none: 'Varsayilan', price_asc: 'Fiyat ↑', price_desc: 'Fiyat ↓', favorites: 'Favori', views: 'Goruntulenme', engagement: 'Etkilesim' }[s]}
-                    size="small" variant={compSort === s ? 'filled' : 'outlined'}
-                    color={compSort === s ? 'primary' : 'default'}
-                    onClick={() => setCompSort(s)} sx={{ cursor: 'pointer', borderRadius: '8px' }}
-                  />
-                ))}
-              </Box>
-
-              <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
-                <TableContainer sx={{ maxHeight: 600 }}>
-                  <Table size="small" stickyHeader>
-                    <TableHead>
-                      <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
-                        <TableCell sx={{ width: 50 }} />
-                        <TableCell>Baslik</TableCell>
-                        <TableCell align="right">Fiyat</TableCell>
-                        <TableCell align="center"><Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}><Eye size={12} /> Grnm</Box></TableCell>
-                        <TableCell align="center"><Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}><Heart size={12} /> Fav</Box></TableCell>
-                        <TableCell align="center">Etkl.</TableCell>
-                        <TableCell align="center">Tag</TableCell>
-                        <TableCell sx={{ width: 40 }} />
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {sortedItems.slice(0, visibleCount).map((item, idx) => {
-                        const engagement = item.views > 0 ? (item.num_favorers / item.views) * 100 : 0;
-                        return (
-                          <TableRow key={item.listing_id} hover sx={{
-                            '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
-                            borderLeft: idx < 3 ? '3px solid #667eea' : 'none',
-                          }}>
-                            <TableCell>
-                              {item.image_url && (
-                                <img src={item.image_url} alt="" style={{
-                                  width: 44, height: 44, objectFit: 'cover', borderRadius: 8,
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                                }} />
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {item.title}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="right">
-                              <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmt(item.price)}</Typography>
-                            </TableCell>
-                            <TableCell align="center">{item.views.toLocaleString()}</TableCell>
-                            <TableCell align="center">
-                              <Typography variant="body2" sx={{
-                                fontWeight: 700,
-                                color: item.num_favorers > 100 ? '#11998e' : item.num_favorers > 20 ? '#ff9800' : 'text.secondary',
-                              }}>
-                                {item.num_favorers.toLocaleString()}
-                              </Typography>
-                            </TableCell>
-                            <TableCell align="center">
-                              <Chip label={`${engagement.toFixed(1)}%`} size="small"
-                                sx={{
-                                  fontWeight: 600, borderRadius: '6px',
-                                  bgcolor: engagement > 5 ? '#e8f5e9' : engagement > 2 ? '#fff3e0' : '#fafafa',
-                                  color: engagement > 5 ? '#2e7d32' : engagement > 2 ? '#e65100' : '#999',
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell align="center">{(item.tags || []).length}</TableCell>
-                            <TableCell>
-                              <IconButton size="small" onClick={() => window.open(item.url, '_blank')}>
-                                <ExternalLink size={14} />
-                              </IconButton>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Paper>
-
-              {visibleCount < items.length && (
-                <Box sx={{ textAlign: 'center', mt: 2 }}>
-                  <Button variant="outlined" onClick={() => setVisibleCount(c => c + 20)}
-                    sx={{ borderRadius: '10px' }}>
-                    Daha Fazla Goster ({items.length - visibleCount} kalan)
-                  </Button>
-                </Box>
-              )}
-            </>
-          ) : !loading && <PremiumEmptyState icon={<BarChart2 size={48} />} title="Rakip Ürünleri"
-              desc="Rakip ürünlerini fiyat, favori ve görüntülenme ile karşılaştırın."
-              steps={['Bir anahtar kelime araması yapın', 'Rakip ürünleri liste halinde gösterilir', 'Fiyat, favori veya görüntülenmeye göre sıralayın']}
-            />}
-        </Box>
-      )}
-
-      {/* ================================================================ */}
-      {/* TAB 6: SHOP ANALYSIS                                             */}
-      {/* ================================================================ */}
-      {tab === 6 && (
+      {tab === 102 && (
         <Box>
           {shopsLoading && <LinearProgress sx={{ mb: 2, borderRadius: 4, height: 4 }} />}
           {shopStats && shopStats.shops.length > 0 ? (
@@ -1915,16 +2022,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                   steps={['Bir anahtar kelime araması yapın', 'Aramanızla ilgili mağazalar otomatik bulunur', 'Satış sayısı, puan ve ortalama fiyatlarını karşılaştırın']}
                 />
           )}
-        </Box>
-      )}
-
-      {/* ================================================================ */}
-      {/* TAB 7: SHOP DEEP DIVE                                            */}
-      {/* ================================================================ */}
-      {tab === 7 && (
-        <Box>
+          {/* --- Shop Deep Dive (merged from tab 7) --- */}
+          <Divider sx={{ my: 3 }} />
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Magaza Derinlemesine Analiz</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Mağaza Derinlemesine Analiz</Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               <TextField label="Magaza ID" value={deepDiveShopId}
                 onChange={e => setDeepDiveShopId(e.target.value)} size="small"
@@ -2029,77 +2130,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
             </>
           )}
 
-          {!deepDiveLoading && !deepDiveShop && (
-            <PremiumEmptyState icon={<Store size={48} />} title="Mağaza Detayı"
-              desc="Belirli bir rakip mağazayı derinlemesine inceleyin."
-              steps={['Yukarıya bir Etsy mağaza ID veya adı girin', '"Analiz Et" butonuna tıklayın', 'Fiyat stratejisi, en popüler ürünleri ve tag kullanımını görün']} />
+          {!deepDiveLoading && !deepDiveShop && !discoveredShops.length && !shopsLoading && (
+            <PremiumEmptyState icon={<Store size={48} />} title="Mağaza & AI Analizi"
+              desc="Rakip mağazaları keşfedin ve AI ile pazar analizi alın."
+              steps={['Önce bir anahtar kelime araması yapın', 'Rakip mağazalar otomatik keşfedilir', 'Bir mağazayı derinlemesine analiz edin veya AI özeti alın']} />
           )}
-        </Box>
-      )}
-
-      {/* ================================================================ */}
-      {/* TAB 8: DEMAND SCORE                                              */}
-      {/* ================================================================ */}
-      {tab === 8 && (
-        <Box>
-          {demandScore ? (
-            <>
-              <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
-                <ScoreRing score={demandScore.score} size={140} label="Firsat" />
-                <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-                  {demandScore.score >= 70 ? 'Bu nis iyi bir firsat! Rekabet makul ve talep yuksek.' :
-                    demandScore.score >= 40 ? 'Orta seviye firsat. Rekabet analizi yaparak stratejinizi belirleyin.' :
-                      'Bu pazar cok rekabetci veya doygun olabilir. Nis bir alt kategori bulmaya calisin.'}
-                </Typography>
-              </Paper>
-
-              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                {[
-                  { label: 'Toplam Sonuc', value: demandScore.totalResults.toLocaleString(), desc: 'Arz miktari' },
-                  { label: 'Benzersiz Magaza', value: String(demandScore.uniqueShops), desc: 'Rekabet' },
-                  { label: 'Ort. Favori', value: String(demandScore.avgFavorites), desc: 'Talep sinyali' },
-                  { label: 'Ort. Grnm', value: String(demandScore.avgViews), desc: 'Gorunurluk' },
-                  { label: 'Etkilesim', value: `${demandScore.avgEngagement}%`, desc: 'Fav/Grnm' },
-                  { label: 'Fiyat Yayilimi', value: `${demandScore.priceSpread}x`, desc: 'Cesitlilik' },
-                ].map(m => (
-                  <Paper key={m.label} sx={{ ...glassCard, p: 2, flex: 1, minWidth: 130 }}>
-                    <Typography variant="caption" sx={{ opacity: 0.7, fontWeight: 500 }}>{m.label}</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{m.value}</Typography>
-                    <Typography variant="caption" color="text.secondary">{m.desc}</Typography>
-                  </Paper>
-                ))}
-              </Box>
-
-              <Paper sx={{ ...glassCard, p: 2.5 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Skor Detayi</Typography>
-                {[
-                  { label: 'Arz Skoru', score: demandScore.breakdown.supplyScore, max: 25, desc: 'Dusuk arz = yuksek firsat' },
-                  { label: 'Rekabet Skoru', score: demandScore.breakdown.compScore, max: 25, desc: 'Az magaza = kolay giris' },
-                  { label: 'Talep Skoru', score: demandScore.breakdown.demandPts, max: 20, desc: 'Yuksek favori = guclu talep' },
-                  { label: 'Etkilesim Skoru', score: demandScore.breakdown.engScore, max: 15, desc: 'Yuksek oran = ilgi cekici nis' },
-                  { label: 'Fiyat Cesitliligi', score: demandScore.breakdown.spreadScore, max: 15, desc: 'Genis aralik = nis firsat' },
-                ].map(b => (
-                  <Box key={b.label} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="body2" sx={{ minWidth: 140, fontWeight: 500 }}>{b.label}</Typography>
-                    <Box sx={{ flex: 1 }}>
-                      <Box sx={{ width: '100%', bgcolor: '#f0f0f0', borderRadius: 5, height: 10, overflow: 'hidden' }}>
-                        <Box sx={{
-                          width: `${(b.score / b.max) * 100}%`, height: 10, borderRadius: 5,
-                          background: b.score / b.max >= 0.7 ? GRADIENTS.success : b.score / b.max >= 0.4 ? GRADIENTS.warning : GRADIENTS.danger,
-                          transition: 'width 0.5s ease-out',
-                        }} />
-                      </Box>
-                    </Box>
-                    <Typography variant="caption" sx={{ minWidth: 40, fontWeight: 600 }}>{b.score}/{b.max}</Typography>
-                    <Tooltip title={b.desc}><Info size={14} color="#999" /></Tooltip>
-                  </Box>
-                ))}
-              </Paper>
-            </>
-          ) : !loading && <PremiumEmptyState icon={<Gauge size={48} />} title="Talep Skoru"
-              desc="Bu nişte fırsat var mı? Arz/talep dengesiyle puan alın."
-              steps={['Bir anahtar kelime araması yapın', 'Arz, rekabet, talep ve etkileşim otomatik puanlanır', '70+ = güçlü fırsat, 40-70 = orta, 40 altı = kalabalık niş']}
-            />}
         </Box>
       )}
 
@@ -2400,31 +2435,38 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
             <PremiumEmptyState
               icon={<TrendingUp size={48} />}
               title="SEO Karşılaştırma"
-              desc="Başlığınız ve taglarınız rakiplere kıyasla ne kadar güçlü?"
-              steps={[
-                '"Pazar Araştırma" bölümüne geçin ve bir anahtar kelime arayın',
-                'Arama çubuğundaki "SEO karşılaştırma için başlık/tag girin" bölümünü açın',
-                'Kendi listeleme başlığınızı ve taglarınızı girin',
-                'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
-              ]}
+              desc={userListings?.length
+                ? 'Üstten bir listeleme seçin, sonra "Pazar Araştırma" bölümünden arama yapın — başlık ve taglar otomatik doldurulur.'
+                : 'Başlığınız ve taglarınız rakiplere kıyasla ne kadar güçlü?'
+              }
+              steps={userListings?.length
+                ? [
+                    'Üstteki "Listelemenizi Seçin" kutusundan bir ürün seçin',
+                    '"Pazar Araştırma" bölümüne geçip rakiplerinizi aratın',
+                    'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
+                  ]
+                : [
+                    '"Pazar Araştırma" bölümüne geçin ve bir anahtar kelime arayın',
+                    'Arama çubuğundaki "SEO karşılaştırma için başlık/tag girin" bölümünü açın',
+                    'Kendi listeleme başlığınızı ve taglarınızı girin',
+                    'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
+                  ]
+              }
             />
           )}
         </Box>
       )}
 
       {/* ================================================================ */}
-      {/* TAB 11: AI MARKET ANALYSIS                                       */}
+      {/* AI MARKET ANALYSIS (part of tab 102)                              */}
       {/* ================================================================ */}
-      {tab === 11 && (
-        <Box>
+      {tab === 102 && (
+        <Box sx={{ mt: 3 }}>
+          <Divider sx={{ mb: 2 }} />
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Sparkles size={18} color="#9c27b0" /> AI Pazar Analizi
+          </Typography>
           <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
-            <Box sx={{
-              width: 56, height: 56, borderRadius: '16px', display: 'inline-flex',
-              alignItems: 'center', justifyContent: 'center', background: GRADIENTS.purple, mb: 1.5,
-            }}>
-              <Sparkles size={28} color="#fff" />
-            </Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>AI Destekli Pazar Analizi</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Gemini AI ile pazar verilerinizi analiz edin
             </Typography>

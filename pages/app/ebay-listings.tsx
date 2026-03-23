@@ -422,9 +422,19 @@ function EbayListingsPage() {
     try {
       // Fetch both Inventory API offers AND legacy listings in parallel
       const [inventoryRes, legacyRes] = await Promise.all([
-        fetch(`/api/clawd/ebay?action=listings&user_id=${userId}&marketplace_id=EBAY_US`).catch(() => null),
-        fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`).catch(() => null),
+        fetch(`/api/clawd/ebay?action=listings&user_id=${userId}&marketplace_id=EBAY_US`).catch((e) => {
+          console.error('Inventory fetch failed:', e);
+          return null;
+        }),
+        fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`).catch((e) => {
+          console.error('Legacy listings fetch failed:', e);
+          return null;
+        }),
       ]);
+
+      // Debug: log response statuses
+      console.log('Inventory response:', inventoryRes?.status, inventoryRes?.ok);
+      console.log('Legacy response:', legacyRes?.status, legacyRes?.ok);
 
       const rows: EbayListingRow[] = [];
       const seenIds = new Set<string>();

@@ -27,7 +27,8 @@ import {
   Link2,
   TrendingUp,
   Store,
-  ShoppingBag
+  ShoppingBag,
+  Target
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context'; // Changed from next-auth/react
 import { supabase } from '@/lib/supabase'; // Added for direct Supabase calls if needed for signout
@@ -45,6 +46,7 @@ const navItems = [
   { href: '/app/labels', icon: FileText, label: 'Label' },
   { href: '/app/etsy-listings', icon: Store, label: 'Etsy Listings' },
   { href: '/app/ebay-listings', icon: ShoppingBag, label: 'eBay Listings' },
+  { href: '/app/ebay-research', icon: Target, label: 'eBay Research' },
   { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: 'Entegrasyonlar' },
   { href: '/ayarlar', icon: Settings, label: 'Ayarlar' },
   { href: '/app/senkron', icon: ShoppingCart, label: 'Senkron' },

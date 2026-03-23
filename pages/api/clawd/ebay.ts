@@ -105,6 +105,10 @@ async function callEbayAPI(endpoint: string, accessToken: string, options: Reque
 // Handler
 // ---------------------------------------------------------------------------
 
+export const config = {
+  maxDuration: 60, // Allow up to 60s for legacy listing fetches
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -1272,7 +1276,7 @@ export default async function handler(
         logger.warn('Analytics API failed, falling back to orders', { error: String(err) });
       }
 
-      // Step 2: Also get listing IDs from orders (catches items not in analytics)
+      // Step 2: Get listing IDs from orders (catches items not in analytics)
       try {
         const ordersData = await callEbayAPI(
           `/sell/fulfillment/v1/order?limit=200`,
@@ -1284,24 +1288,65 @@ export default async function handler(
             if (li.legacyItemId) orderIds.add(li.legacyItemId);
           }
         }
-        // Merge, deduplicate
-        const allIds = new Set([...listingIds, ...orderIds]);
-        listingIds = [...allIds];
+        for (const id of orderIds) {
+          if (!listingIds.includes(id)) listingIds.push(id);
+        }
       } catch {
         // Orders failed, use analytics only
+      }
+
+      // Step 3: Search by seller name via Browse API to find ALL active listings
+      // This catches listings not in analytics or orders
+      try {
+        // Get seller username from any existing item
+        let sellerUsername = '';
+        if (listingIds.length > 0) {
+          try {
+            const sampleItem = await callEbayAPI(
+              `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${listingIds[0]}`,
+              appToken
+            );
+            sellerUsername = sampleItem.seller?.username || '';
+          } catch { /* skip */ }
+        }
+
+        if (sellerUsername) {
+          // Search all items from this seller (up to 200)
+          const sellerSearch = await fetch(`${EBAY_API_BASE}/buy/browse/v1/item_summary/search?limit=200&filter=sellers:{${encodeURIComponent(sellerUsername)}}&fieldgroups=MATCHING_ITEMS`, {
+            headers: {
+              'Authorization': `Bearer ${appToken}`,
+              'X-EBAY-C-MARKETPLACE-ID': marketplace,
+              'Content-Type': 'application/json',
+            },
+          });
+          if (sellerSearch.ok) {
+            const sellerData = await sellerSearch.json();
+            for (const item of sellerData.itemSummaries || []) {
+              const legacyId = item.legacyItemId;
+              if (legacyId && !listingIds.includes(legacyId)) {
+                listingIds.push(legacyId);
+              }
+            }
+            logger.info('Found seller listings via Browse API', {
+              seller: sellerUsername,
+              browseCount: sellerData.itemSummaries?.length || 0,
+              totalIds: listingIds.length,
+            });
+          }
+        }
+      } catch (err) {
+        logger.info('Seller search fallback failed', { error: String(err) });
       }
 
       if (listingIds.length === 0) {
         return res.status(200).json({ total: 0, listings: [] });
       }
 
-      // Step 3: Get full details via Browse API (parallel, batched)
-      const batchSize = 10;
-      const listings: any[] = [];
-      for (let i = 0; i < listingIds.length; i += batchSize) {
-        const batch = listingIds.slice(i, i + batchSize);
-        const results = await Promise.allSettled(
-          batch.map(async (legacyId) => {
+      // Step 3: Get full details via Browse API — ALL in parallel for speed
+      // Vercel has a 10s timeout, so we must be fast
+      const results = await Promise.allSettled(
+        listingIds.map(async (legacyId) => {
+          try {
             const item = await callEbayAPI(
               `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyId}`,
               appToken
@@ -1337,12 +1382,17 @@ export default async function handler(
               mpn: item.mpn,
               epid: item.epid,
             };
-          })
-        );
-        for (const r of results) {
-          if (r.status === 'fulfilled') listings.push(r.value);
-        }
-      }
+          } catch (err) {
+            // Some items may be variation groups — skip gracefully
+            logger.info('Failed to fetch legacy item', { legacyId, error: String(err) });
+            return null;
+          }
+        })
+      );
+
+      const listings = results
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value !== null)
+        .map(r => r.value);
 
       return res.status(200).json({
         total: listings.length,

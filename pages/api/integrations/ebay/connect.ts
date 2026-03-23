@@ -36,13 +36,19 @@ export default async function handler(
       userId: user.id,
     })).toString('base64url');
 
-    // eBay OAuth scopes — only request scopes enabled in eBay Developer Portal
+    // eBay OAuth scopes — must match scopes enabled in eBay Developer Portal
     const scopes = [
       'https://api.ebay.com/oauth/api_scope',
       'https://api.ebay.com/oauth/api_scope/sell.inventory',
+      'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
       'https://api.ebay.com/oauth/api_scope/sell.marketing',
+      'https://api.ebay.com/oauth/api_scope/sell.marketing.readonly',
       'https://api.ebay.com/oauth/api_scope/sell.account',
+      'https://api.ebay.com/oauth/api_scope/sell.account.readonly',
       'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
+      'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
+      'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
+      'https://api.ebay.com/oauth/api_scope/sell.finances',
     ].join(' ');
 
     // Build eBay OAuth URL

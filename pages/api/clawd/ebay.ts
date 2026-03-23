@@ -138,8 +138,8 @@ export default async function handler(
     return res.status(401).json({ error: 'Unauthorized: Invalid or missing authentication' });
   }
 
-  // Get userId from query param or session
-  const userId = (req.query.userId as string) || sessionUserId;
+  // Get userId from query param or session (support both user_id and userId)
+  const userId = (req.query.userId as string) || (req.query.user_id as string) || sessionUserId;
   if (!userId) {
     return res.status(400).json({ error: 'userId is required' });
   }
@@ -147,8 +147,20 @@ export default async function handler(
   // Marketplace ID (default EBAY_US, configurable via query)
   const marketplaceId = (req.query.marketplace_id as string) || 'EBAY_US';
 
+  // Support both offerId and offer_id param names
+  const queryOfferId = (req.query.offerId as string) || (req.query.offer_id as string);
+
   try {
-    const { action } = req.query;
+    let { action } = req.query;
+
+    // Action aliases — map component action names to handler names
+    const actionAliases: Record<string, string> = {
+      'publish_offer': 'publish',
+      'withdraw_offer': 'withdraw',
+    };
+    if (typeof action === 'string' && actionAliases[action]) {
+      action = actionAliases[action];
+    }
 
     // =====================================================================
     // Actions that use application token (no user auth needed)
@@ -210,23 +222,86 @@ export default async function handler(
     // LISTING MANAGEMENT
     // -----------------------------------------------------------------
 
-    // GET ?action=listings — Get all offers/listings
+    // GET ?action=listings — Get all offers enriched with inventory item data
     if (req.method === 'GET' && action === 'listings') {
       const limit = parseInt((req.query.limit as string) || '200');
       const offset = parseInt((req.query.offset as string) || '0');
 
-      const data = await callEbayAPI(
-        `/sell/inventory/v1/offer?limit=${limit}&offset=${offset}`,
-        accessToken,
-        {},
-        marketplaceId
+      // Step 1: Fetch offers
+      let offersData: any;
+      try {
+        offersData = await callEbayAPI(
+          `/sell/inventory/v1/offer?limit=${limit}&offset=${offset}`,
+          accessToken,
+          {},
+          marketplaceId
+        );
+      } catch (err: any) {
+        // Return empty list on validation errors (no inventory)
+        if (err.message?.includes('25707') || err.message?.includes('25710')) {
+          return res.status(200).json({ total: 0, size: 0, offset, offers: [] });
+        }
+        throw err;
+      }
+
+      const offers = offersData.offers || [];
+      if (offers.length === 0) {
+        return res.status(200).json({ total: offersData.total || 0, size: 0, offset, offers: [] });
+      }
+
+      // Step 2: Fetch inventory items in parallel to enrich offers
+      const skus = [...new Set(offers.map((o: any) => o.sku))];
+      const inventoryMap: Record<string, any> = {};
+
+      await Promise.all(
+        skus.map(async (sku: string) => {
+          try {
+            const item = await callEbayAPI(
+              `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`,
+              accessToken,
+              {},
+              marketplaceId
+            );
+            inventoryMap[sku] = item;
+          } catch {
+            // SKU may have special chars or not exist — skip gracefully
+          }
+        })
       );
 
+      // Step 3: Merge and normalize for frontend
+      const enrichedOffers = offers.map((offer: any) => {
+        const inv = inventoryMap[offer.sku] || {};
+        const product = inv.product || {};
+        const images = product.imageUrls || [];
+
+        return {
+          sku: offer.sku,
+          offerId: offer.offerId,
+          listingId: offer.listing?.listingId || null,
+          title: product.title || offer.sku,
+          description: product.description || offer.listingDescription || '',
+          price: offer.pricingSummary?.price || { value: '0', currency: 'USD' },
+          quantity: inv.availability?.shipToLocationAvailability?.quantity ?? offer.availableQuantity ?? 0,
+          status: offer.status || 'UNPUBLISHED',
+          condition: inv.condition || 'NEW',
+          categoryId: offer.categoryId || '',
+          imageUrl: images[0] || null,
+          imageCount: images.length,
+          aspects: product.aspects || {},
+          format: offer.format || 'FIXED_PRICE',
+          marketplaceId: offer.marketplaceId || marketplaceId,
+          listingUrl: offer.listing?.listingId
+            ? `https://www.ebay.com/itm/${offer.listing.listingId}`
+            : null,
+        };
+      });
+
       return res.status(200).json({
-        total: data.total || 0,
-        size: data.size || 0,
-        offset: data.offset || offset,
-        offers: data.offers || [],
+        total: offersData.total || 0,
+        size: enrichedOffers.length,
+        offset: offersData.offset || offset,
+        offers: enrichedOffers,
       });
     }
 
@@ -519,7 +594,7 @@ export default async function handler(
 
     // PUT ?action=update_offer&offerId=XXX — Update offer (pricing, policies)
     if ((req.method === 'PUT' || req.method === 'PATCH') && action === 'update_offer') {
-      const offerId = req.query.offerId as string;
+      const offerId = queryOfferId;
       if (!offerId) {
         return res.status(400).json({ error: 'offerId is required' });
       }
@@ -621,7 +696,7 @@ export default async function handler(
 
     // POST ?action=publish&offerId=XXX — Publish an offer
     if (req.method === 'POST' && action === 'publish') {
-      const offerId = (req.query.offerId as string) || (req.body?.offerId as string);
+      const offerId = queryOfferId || (req.body?.offerId as string);
       if (!offerId) {
         return res.status(400).json({ error: 'offerId is required' });
       }
@@ -645,7 +720,7 @@ export default async function handler(
 
     // POST ?action=withdraw&offerId=XXX — Withdraw/end a listing
     if (req.method === 'POST' && action === 'withdraw') {
-      const offerId = (req.query.offerId as string) || (req.body?.offerId as string);
+      const offerId = queryOfferId || (req.body?.offerId as string);
       if (!offerId) {
         return res.status(400).json({ error: 'offerId is required' });
       }
@@ -669,7 +744,7 @@ export default async function handler(
 
     // POST ?action=end_listing&offerId=XXX — End a listing (alias for withdraw)
     if (req.method === 'POST' && action === 'end_listing') {
-      const offerId = (req.query.offerId as string) || (req.body?.offerId as string);
+      const offerId = queryOfferId || (req.body?.offerId as string);
       if (!offerId) {
         return res.status(400).json({ error: 'offerId is required' });
       }
@@ -689,6 +764,102 @@ export default async function handler(
         listingId: result.listingId,
         message: 'Listing ended.',
       });
+    }
+
+    // -----------------------------------------------------------------
+    // COMPONENT-SPECIFIC ACTIONS (inventory items + offers as separate calls)
+    // -----------------------------------------------------------------
+
+    // PUT ?action=create_inventory_item&sku=XXX — Create/update inventory item only
+    if (req.method === 'PUT' && action === 'create_inventory_item') {
+      const sku = req.query.sku as string;
+      if (!sku) return res.status(400).json({ error: 'sku is required' });
+
+      await callEbayAPI(
+        `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`,
+        accessToken,
+        { method: 'PUT', body: JSON.stringify(req.body) },
+        marketplaceId
+      );
+
+      return res.status(200).json({ success: true, sku });
+    }
+
+    // PUT ?action=update_inventory_item&sku=XXX — Update inventory item only
+    if ((req.method === 'PUT' || req.method === 'PATCH') && action === 'update_inventory_item') {
+      const sku = req.query.sku as string;
+      if (!sku) return res.status(400).json({ error: 'sku is required' });
+
+      // Merge with existing item
+      const encodedSku = encodeURIComponent(sku);
+      let existingItem: any = {};
+      try {
+        existingItem = await callEbayAPI(
+          `/sell/inventory/v1/inventory_item/${encodedSku}`,
+          accessToken, {}, marketplaceId
+        );
+      } catch { /* item doesn't exist, will create */ }
+
+      const merged = { ...existingItem, ...req.body };
+      // Remove read-only fields
+      delete merged.sku;
+      delete merged.groupIds;
+      delete merged.inventoryItemGroupKeys;
+
+      await callEbayAPI(
+        `/sell/inventory/v1/inventory_item/${encodedSku}`,
+        accessToken,
+        { method: 'PUT', body: JSON.stringify(merged) },
+        marketplaceId
+      );
+
+      return res.status(200).json({ success: true, sku });
+    }
+
+    // POST ?action=create_offer — Create offer only (body contains offer payload)
+    if (req.method === 'POST' && action === 'create_offer') {
+      const result = await callEbayAPI(
+        '/sell/inventory/v1/offer',
+        accessToken,
+        { method: 'POST', body: JSON.stringify(req.body) },
+        marketplaceId
+      );
+
+      return res.status(201).json({
+        success: true,
+        offerId: result.offerId,
+      });
+    }
+
+    // DELETE ?action=delete_inventory_item&sku=XXX — Delete inventory item
+    if (req.method === 'DELETE' && action === 'delete_inventory_item') {
+      const sku = req.query.sku as string;
+      if (!sku) return res.status(400).json({ error: 'sku is required' });
+
+      await callEbayAPI(
+        `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`,
+        accessToken,
+        { method: 'DELETE' },
+        marketplaceId
+      );
+
+      return res.status(200).json({ success: true, sku });
+    }
+
+    // GET ?action=get_inventory_item_group&sku=XXX — Get inventory item group
+    if (req.method === 'GET' && action === 'get_inventory_item_group') {
+      const sku = req.query.sku as string;
+      if (!sku) return res.status(400).json({ error: 'sku is required' });
+
+      try {
+        const data = await callEbayAPI(
+          `/sell/inventory/v1/inventory_item_group/${encodeURIComponent(sku)}`,
+          accessToken, {}, marketplaceId
+        );
+        return res.status(200).json(data);
+      } catch {
+        return res.status(200).json({ variantSKUs: [] });
+      }
     }
 
     // -----------------------------------------------------------------

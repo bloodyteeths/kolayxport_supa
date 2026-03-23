@@ -139,12 +139,12 @@ function EbayListingsPage() {
         throw new Error(errData.error || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      const rows: EbayListingRow[] = (data.listings || []).map((l: any) => ({
-        id: l.sku || l.offerId || String(l.listingId),
+      const rows: EbayListingRow[] = (data.offers || []).map((l: any) => ({
+        id: l.offerId || l.sku || String(l.listingId),
         sku: l.sku || '',
         offerId: l.offerId,
         listingId: l.listingId,
-        title: l.title || '',
+        title: l.title || l.sku || '',
         description: l.description || '',
         price: l.price || { value: '0', currency: 'USD' },
         quantity: l.quantity ?? 0,

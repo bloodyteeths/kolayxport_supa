@@ -938,6 +938,7 @@ export default function ListingEditorDrawer({
                   images={fields.images}
                   onImagesChanged={(newImages) => updateField('images', newImages)}
                   maxImages={24}
+                  productTitle={fields.title}
                 />
               </AccordionDetails>
             </Accordion>

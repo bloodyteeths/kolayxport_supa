@@ -1023,6 +1023,7 @@ export default function ListingCreatorDialog({
         images={images}
         onImagesChanged={setImages}
         maxImages={24}
+        productTitle={title}
       />
 
       <Divider />

@@ -10,28 +10,43 @@ import {
   DialogActions,
   Button,
   LinearProgress,
+  TextField,
+  Collapse,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import ImageIcon from '@mui/icons-material/Image';
 import { toast } from 'react-hot-toast';
 
 interface ImageManagerProps {
   images: string[];
   onImagesChanged: (newImages: string[]) => void;
   maxImages?: number;
+  /** Optional product title for auto-prompting */
+  productTitle?: string;
 }
 
 const VALID_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_SIZE = 12 * 1024 * 1024; // 12MB
 
-export default function ImageManager({ images, onImagesChanged, maxImages = 24 }: ImageManagerProps) {
+export default function ImageManager({ images, onImagesChanged, maxImages = 24, productTitle }: ImageManagerProps) {
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0); // 0-100
   const [dragOver, setDragOver] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const refImageInputRef = useRef<HTMLInputElement>(null);
+
+  // AI Image Generation state
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiPreview, setAiPreview] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [aiRefImage, setAiRefImage] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [aiUploading, setAiUploading] = useState(false);
 
   const sortedImages = images || [];
   const remaining = maxImages - sortedImages.length;
@@ -157,6 +172,119 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24 }
     const newImages = sortedImages.filter((_, i) => i !== deleteConfirmIndex);
     onImagesChanged(newImages);
     setDeleteConfirmIndex(null);
+  };
+
+  // ---- AI Image Generation ----
+
+  const handleOpenAI = () => {
+    setAiOpen(true);
+    setAiPreview(null);
+    setAiRefImage(null);
+    // Auto-fill prompt from product title if available
+    if (productTitle && !aiPrompt) {
+      setAiPrompt(productTitle);
+    }
+  };
+
+  const handleRefImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Referans gorsel 10MB\'dan kucuk olmali');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Extract base64 and mime
+      const match = result.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (match) {
+        setAiRefImage({ base64: match[2], mimeType: match[1] });
+      }
+    };
+    reader.readAsDataURL(file);
+    if (refImageInputRef.current) refImageInputRef.current.value = '';
+  };
+
+  const handleAIGenerate = async () => {
+    if (!aiPrompt.trim()) {
+      toast.error('Prompt gereklidir');
+      return;
+    }
+
+    setAiGenerating(true);
+    setAiPreview(null);
+
+    try {
+      const body: Record<string, any> = {
+        prompt: aiPrompt.trim(),
+      };
+
+      if (aiRefImage) {
+        body.reference_image = aiRefImage.base64;
+        body.reference_mime_type = aiRefImage.mimeType;
+      }
+
+      const res = await fetch('/api/ai/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || `Gorsel uretilemedi: ${res.status}`);
+      }
+
+      if (data.image_base64) {
+        setAiPreview({
+          base64: data.image_base64,
+          mimeType: data.mime_type || 'image/jpeg',
+        });
+      } else {
+        throw new Error('Gorsel donmedi');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'AI gorsel olusturma basarisiz');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  // Upload the AI-generated image (base64 → File → upload-image endpoint → URL)
+  const handleAcceptAIImage = async () => {
+    if (!aiPreview) return;
+    if (remaining <= 0) {
+      toast.error(`Maksimum ${maxImages} gorsel`);
+      return;
+    }
+
+    setAiUploading(true);
+    try {
+      // Convert base64 to Blob then File
+      const byteString = atob(aiPreview.base64);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const ext = aiPreview.mimeType === 'image/png' ? '.png' : '.jpg';
+      const blob = new Blob([ab], { type: aiPreview.mimeType });
+      const file = new File([blob], `ai-generated-${Date.now()}${ext}`, { type: aiPreview.mimeType });
+
+      const url = await uploadFile(file);
+      if (url) {
+        onImagesChanged([...sortedImages, url]);
+        toast.success('AI gorsel listeye eklendi');
+        setAiPreview(null);
+        setAiOpen(false);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Gorsel yuklenemedi');
+    } finally {
+      setAiUploading(false);
+    }
   };
 
   return (
@@ -299,7 +427,20 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24 }
         </>
       )}
 
-      {/* Hidden file input — multiple files */}
+      {/* AI Generate button */}
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<AutoFixHighIcon />}
+          onClick={handleOpenAI}
+          disabled={remaining <= 0}
+        >
+          AI ile Gorsel Olustur
+        </Button>
+      </Box>
+
+      {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
         type="file"
@@ -307,6 +448,13 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24 }
         multiple
         style={{ display: 'none' }}
         onChange={handleFileInput}
+      />
+      <input
+        ref={refImageInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        style={{ display: 'none' }}
+        onChange={handleRefImageSelect}
       />
 
       {/* Delete confirmation dialog */}
@@ -330,6 +478,118 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24 }
             Sil
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* AI Image Generation Dialog */}
+      <Dialog
+        open={aiOpen}
+        onClose={() => !aiGenerating && !aiUploading && setAiOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AutoFixHighIcon color="primary" />
+            AI Gorsel Olusturucu
+          </Box>
+          <IconButton size="small" onClick={() => setAiOpen(false)} disabled={aiGenerating || aiUploading}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            {/* Prompt */}
+            <TextField
+              label="Ne olusturmak istiyorsunuz?"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              multiline
+              rows={3}
+              fullWidth
+              size="small"
+              placeholder="Ornegin: Beyaz arka planda profesyonel urun fotografi, ahsap bebek oyuncagi"
+              disabled={aiGenerating}
+            />
+
+            {/* Reference image */}
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                Referans Gorsel (istege bagli)
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<ImageIcon />}
+                  onClick={() => refImageInputRef.current?.click()}
+                  disabled={aiGenerating}
+                >
+                  {aiRefImage ? 'Degistir' : 'Referans Ekle'}
+                </Button>
+                {aiRefImage && (
+                  <>
+                    <img
+                      src={`data:${aiRefImage.mimeType};base64,${aiRefImage.base64}`}
+                      alt="Referans"
+                      style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
+                    />
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => setAiRefImage(null)}
+                      disabled={aiGenerating}
+                      sx={{ minWidth: 0, px: 1 }}
+                    >
+                      <CloseIcon sx={{ fontSize: 16 }} />
+                    </Button>
+                  </>
+                )}
+              </Box>
+            </Box>
+
+            {/* Generate button */}
+            <Button
+              variant="contained"
+              onClick={handleAIGenerate}
+              disabled={aiGenerating || !aiPrompt.trim()}
+              startIcon={aiGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
+              fullWidth
+            >
+              {aiGenerating ? 'Olusturuluyor...' : 'Gorsel Olustur'}
+            </Button>
+
+            {/* Preview */}
+            {aiPreview && (
+              <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                <img
+                  src={`data:${aiPreview.mimeType};base64,${aiPreview.base64}`}
+                  alt="AI Generated"
+                  style={{ width: '100%', display: 'block' }}
+                />
+                <Box sx={{ display: 'flex', gap: 1, p: 1.5, bgcolor: '#f9fafb' }}>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={handleAcceptAIImage}
+                    disabled={aiUploading}
+                    startIcon={aiUploading ? <CircularProgress size={16} color="inherit" /> : <AddPhotoAlternateIcon />}
+                    fullWidth
+                  >
+                    {aiUploading ? 'Ekleniyor...' : 'Listeye Ekle'}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={handleAIGenerate}
+                    disabled={aiGenerating}
+                    fullWidth
+                  >
+                    Yeniden Olustur
+                  </Button>
+                </Box>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
       </Dialog>
     </Box>
   );

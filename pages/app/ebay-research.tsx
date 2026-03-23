@@ -40,6 +40,7 @@ interface SearchFilters {
 
 interface ProductResult {
   itemId: string;
+  legacyItemId?: string;
   title: string;
   price: number;
   currency: string;
@@ -137,6 +138,21 @@ const MARKETPLACES = [
   { value: 'EBAY_IT', label: 'İtalya', flag: '🇮🇹' },
   { value: 'EBAY_ES', label: 'İspanya', flag: '🇪🇸' },
   { value: 'EBAY_AU', label: 'Avustralya', flag: '🇦🇺' },
+];
+
+const POPULAR_CATEGORIES = [
+  { id: '11450', name: 'Giyim & Aksesuar', emoji: '👗' },
+  { id: '58058', name: 'Cep Telefonu & Aksesuar', emoji: '📱' },
+  { id: '11700', name: 'Ev & Bahce', emoji: '🏠' },
+  { id: '220', name: 'Oyuncak & Hobi', emoji: '🧸' },
+  { id: '26395', name: 'Saglik & Guzellik', emoji: '💄' },
+  { id: '6000', name: 'Motorlar & Parca', emoji: '🚗' },
+  { id: '64482', name: 'Spor Malzemesi', emoji: '⚽' },
+  { id: '293', name: 'Elektronik', emoji: '🔌' },
+  { id: '12576', name: 'Bebek Urunleri', emoji: '👶' },
+  { id: '625', name: 'Kamera & Foto', emoji: '📷' },
+  { id: '175672', name: 'Mucevher & Saat', emoji: '💎' },
+  { id: '15032', name: 'Evcil Hayvan', emoji: '🐾' },
 ];
 
 const SCORE_COLOR = (score: number, invert = false) => {
@@ -281,6 +297,27 @@ function SimpleHistogram({ data }: { data: { range: string; count: number }[] })
 // API Helper
 // ---------------------------------------------------------------------------
 
+function mapEbayItem(item: any): ProductResult {
+  return {
+    itemId: item.itemId || item.legacyItemId || '',
+    legacyItemId: item.legacyItemId,
+    title: item.title || '',
+    price: typeof item.price === 'number' ? item.price : parseFloat(item.price?.value || '0'),
+    currency: item.price?.currency || item.currency || 'USD',
+    imageUrl: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl || item.imageUrl || '',
+    condition: item.condition || '',
+    seller: item.seller?.username || item.seller || '',
+    sellerFeedback: item.seller?.feedbackScore || item.sellerFeedback || 0,
+    shippingCost: item.shippingOptions?.[0]?.shippingCost?.value ? parseFloat(item.shippingOptions[0].shippingCost.value) : null,
+    freeShipping: item.shippingOptions?.[0]?.shippingCost?.value === '0.00' || item.freeShipping || false,
+    topRated: item.topRatedBuyingExperience || item.topRated || false,
+    estimatedSold: item.estimatedSoldQuantity || item.estimatedSold || 0,
+    listingDate: item.itemCreationDate || item.listingDate || '',
+    itemUrl: item.itemWebUrl || item.itemUrl || '',
+    location: item.itemLocation?.postalCode || item.location || '',
+  };
+}
+
 async function apiCall(action: string, userId: string, params: Record<string, any> = {}) {
   const query = new URLSearchParams({ action, user_id: userId, ...Object.fromEntries(
     Object.entries(params).filter(([, v]) => v !== '' && v !== undefined && v !== null).map(([k, v]) => [k, String(v)])
@@ -349,18 +386,18 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
     setSearched(true);
     const newOffset = append ? offset : 0;
     try {
-      const data = await apiCall('search', userId, {
-        keyword: filters.keyword,
-        categoryId: filters.categoryId,
-        priceMin: filters.priceMin > 0 ? filters.priceMin : '',
-        priceMax: filters.priceMax < 10000 ? filters.priceMax : '',
+      const data = await apiCall('product_database', userId, {
+        q: filters.keyword,
+        category_id: filters.categoryId,
+        min_price: filters.priceMin > 0 ? filters.priceMin : '',
+        max_price: filters.priceMax < 10000 ? filters.priceMax : '',
         condition: filters.condition,
-        sortBy: filters.sortBy,
-        marketplace: filters.marketplace,
+        sort: filters.sortBy,
+        marketplace_id: filters.marketplace,
         offset: newOffset,
         limit: 50,
       });
-      const items: ProductResult[] = data.results || [];
+      const items: ProductResult[] = (data.items || []).map(mapEbayItem);
       if (append) {
         setResults(prev => [...prev, ...items]);
       } else {
@@ -368,7 +405,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
       }
       setPriceStats(data.priceStats || null);
       setOffset(newOffset + items.length);
-      setHasMore(data.hasMore ?? items.length >= 50);
+      setHasMore((data.total || 0) > newOffset + items.length);
     } catch (err: any) {
       toast.error(err.message || 'Arama başarısız');
     } finally {
@@ -379,11 +416,8 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
   const handleTrack = useCallback(async (product: ProductResult) => {
     try {
       await apiPost('track_product', userId, {
-        itemId: product.itemId,
+        legacyItemId: product.legacyItemId || product.itemId,
         title: product.title,
-        imageUrl: product.imageUrl,
-        price: product.price,
-        currency: product.currency,
       });
       setTrackingIds(prev => new Set(prev).add(product.itemId));
       toast.success('Ürün takibe alındı');
@@ -787,7 +821,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
   const fetchTracked = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiCall('get_tracked_products', userId);
+      const data = await apiCall('tracked_products', userId);
       setTracked(data.products || []);
     } catch (err: any) {
       toast.error(err.message || 'Takip edilen ürünler yüklenemedi');
@@ -801,7 +835,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
   const handleRefreshAll = useCallback(async () => {
     setRefreshing(true);
     try {
-      await apiPost('refresh_tracked_products', userId);
+      await apiPost('refresh_tracked', userId);
       toast.success('Tüm ürünler güncellendi');
       await fetchTracked();
     } catch (err: any) {
@@ -822,7 +856,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
       const idMatch = itemId.match(/(\d{10,14})/);
       if (idMatch) itemId = idMatch[1];
 
-      await apiPost('track_product_by_id', userId, { itemId });
+      await apiPost('track_product', userId, { legacyItemId: itemId });
       toast.success('Ürün takibe alındı');
       setAddDialogOpen(false);
       setAddItemId('');
@@ -836,7 +870,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
 
   const handleRemove = useCallback(async (id: string) => {
     try {
-      await apiPost('remove_tracked_product', userId, { id });
+      await apiPost('untrack_product', userId, { id });
       setTracked(prev => prev.filter(p => p.id !== id));
       toast.success('Ürün takipten çıkarıldı');
     } catch (err: any) {
@@ -846,7 +880,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
 
   const handleSaveNotes = useCallback(async (id: string) => {
     try {
-      await apiPost('update_tracked_product_notes', userId, { id, notes: notesText });
+      await apiPost('update_product', userId, { id, notes: notesText });
       setTracked(prev => prev.map(p => p.id === id ? { ...p, notes: notesText } : p));
       setEditingNotes(null);
       toast.success('Not kaydedildi');
@@ -859,7 +893,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
     if (!newTag.trim() || !tagDialog) return;
     const updated = [...tagDialog.tags, newTag.trim()];
     try {
-      await apiPost('update_tracked_product_tags', userId, { id, tags: updated });
+      await apiPost('update_product', userId, { id, tags: updated });
       setTracked(prev => prev.map(p => p.id === id ? { ...p, tags: updated } : p));
       setTagDialog({ id, tags: updated });
       setNewTag('');
@@ -872,7 +906,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
     if (!tagDialog) return;
     const updated = tagDialog.tags.filter(t => t !== tag);
     try {
-      await apiPost('update_tracked_product_tags', userId, { id, tags: updated });
+      await apiPost('update_product', userId, { id, tags: updated });
       setTracked(prev => prev.map(p => p.id === id ? { ...p, tags: updated } : p));
       setTagDialog({ id, tags: updated });
     } catch (err: any) {
@@ -1224,11 +1258,12 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
   const [savedNiches, setSavedNiches] = useState<NicheReport[]>([]);
   const [loadingNiches, setLoadingNiches] = useState(true);
   const [savingNiche, setSavingNiche] = useState(false);
+  const [categoryAnalyzing, setCategoryAnalyzing] = useState<string | null>(null);
 
   const fetchSavedNiches = useCallback(async () => {
     setLoadingNiches(true);
     try {
-      const data = await apiCall('get_saved_niches', userId);
+      const data = await apiCall('saved_niches', userId);
       setSavedNiches(data.niches || []);
     } catch {
       // silent
@@ -1247,11 +1282,24 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
     setLoading(true);
     setReport(null);
     try {
-      const data = await apiCall('niche_analysis', userId, { keyword, marketplace });
-      setReport(data.report || null);
-      if (!data.report) {
-        toast.error('Analiz sonucu alınamadı');
-      }
+      const data = await apiCall('niche_analyze', userId, { q: keyword, marketplace_id: marketplace });
+      const mapped: NicheReport = {
+        keyword: data.query || keyword,
+        demandScore: data.demandScore || 0,
+        competitionScore: data.competitionScore || 0,
+        totalListings: data.totalResults || 0,
+        uniqueSellers: data.uniqueSellers || 0,
+        avgPrice: data.avgPrice || 0,
+        medianPrice: data.medianPrice || 0,
+        priceMin: data.priceSpread?.min || 0,
+        priceMax: data.priceSpread?.max || 0,
+        freeShippingPct: data.freeShippingPct || 0,
+        sellerConcentration: data.sellerConcentration || 0,
+        topProducts: (data.topProducts || []).filter(Boolean),
+        aspects: [],
+        priceDistribution: [],
+      };
+      setReport(mapped);
     } catch (err: any) {
       toast.error(err.message || 'Analiz başarısız');
     } finally {
@@ -1259,11 +1307,52 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
     }
   }, [keyword, marketplace, userId]);
 
+  const handleCategoryAnalyze = useCallback(async (categoryId: string, categoryName: string) => {
+    setCategoryAnalyzing(categoryId);
+    setLoading(true);
+    setReport(null);
+    setKeyword(categoryName);
+    try {
+      const data = await apiCall('niche_analyze', userId, { category_id: categoryId, marketplace_id: marketplace });
+      const mapped: NicheReport = {
+        keyword: categoryName,
+        demandScore: data.demandScore || 0,
+        competitionScore: data.competitionScore || 0,
+        totalListings: data.totalResults || 0,
+        uniqueSellers: data.uniqueSellers || 0,
+        avgPrice: data.avgPrice || 0,
+        medianPrice: data.medianPrice || 0,
+        priceMin: data.priceSpread?.min || 0,
+        priceMax: data.priceSpread?.max || 0,
+        freeShippingPct: data.freeShippingPct || 0,
+        sellerConcentration: data.sellerConcentration || 0,
+        topProducts: (data.topProducts || []).filter(Boolean),
+        aspects: [],
+        priceDistribution: [],
+      };
+      setReport(mapped);
+    } catch (err: any) {
+      toast.error(err.message || 'Kategori analizi basarisiz');
+    } finally {
+      setLoading(false);
+      setCategoryAnalyzing(null);
+    }
+  }, [marketplace, userId]);
+
   const handleSaveNiche = useCallback(async () => {
     if (!report) return;
     setSavingNiche(true);
     try {
-      await apiPost('save_niche', userId, { report });
+      await apiPost('save_niche', userId, {
+        query: report.keyword,
+        marketplace: marketplace || 'EBAY_US',
+        totalResults: report.totalListings,
+        avgPrice: report.avgPrice,
+        medianPrice: report.medianPrice,
+        uniqueSellers: report.uniqueSellers,
+        demandScore: report.demandScore,
+        competitionScore: report.competitionScore,
+      });
       toast.success('Niş kaydedildi');
       await fetchSavedNiches();
     } catch (err: any) {
@@ -1283,9 +1372,28 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
     }
   }, [userId]);
 
-  const handleLoadNiche = (niche: NicheReport) => {
-    setReport(niche);
-    setKeyword(niche.keyword);
+  const handleLoadNiche = (niche: any) => {
+    // Saved niches from DB have `query` field, mapped niches have `keyword`
+    const mapped: NicheReport = {
+      id: niche.id,
+      keyword: niche.keyword || niche.query || '',
+      demandScore: niche.demandScore || 0,
+      competitionScore: niche.competitionScore || 0,
+      totalListings: niche.totalListings || niche.totalResults || 0,
+      uniqueSellers: niche.uniqueSellers || 0,
+      avgPrice: niche.avgPrice || 0,
+      medianPrice: niche.medianPrice || 0,
+      priceMin: niche.priceMin || niche.priceSpread?.min || 0,
+      priceMax: niche.priceMax || niche.priceSpread?.max || 0,
+      freeShippingPct: niche.freeShippingPct || 0,
+      sellerConcentration: niche.sellerConcentration || 0,
+      topProducts: niche.topProducts || [],
+      aspects: niche.aspects || [],
+      priceDistribution: niche.priceDistribution || [],
+      savedAt: niche.savedAt || niche.createdAt,
+    };
+    setReport(mapped);
+    setKeyword(mapped.keyword);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1323,6 +1431,39 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
         </Box>
       </Paper>
 
+      {/* Trending Categories — shown when no report */}
+      {!report && !loading && (
+        <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+            <TrendingUp size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+            Populer Kategoriler — Tikla, Analiz Otomatik Baslasin
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+            Anahtar kelime bilmene gerek yok! Bir kategori sec, o niste neler satiliyor gorelim.
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+            {POPULAR_CATEGORIES.map(cat => (
+              <Paper
+                key={cat.id}
+                variant="outlined"
+                onClick={() => handleCategoryAnalyze(cat.id, cat.name)}
+                sx={{
+                  p: 2, cursor: 'pointer', textAlign: 'center',
+                  minWidth: isMobile ? '43%' : 130, flex: '1 1 130px', maxWidth: 170,
+                  transition: 'all 0.2s',
+                  '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover', transform: 'translateY(-2px)', boxShadow: 1 },
+                  opacity: categoryAnalyzing === cat.id ? 0.6 : 1,
+                }}
+              >
+                <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>{cat.emoji}</Typography>
+                <Typography variant="caption" fontWeight={600} sx={{ lineHeight: 1.2 }}>{cat.name}</Typography>
+                {categoryAnalyzing === cat.id && <CircularProgress size={14} sx={{ mt: 0.5, display: 'block', mx: 'auto' }} />}
+              </Paper>
+            ))}
+          </Box>
+        </Paper>
+      )}
+
       {loading && <LinearProgress sx={{ mb: 2 }} />}
 
       {/* Niche Report Card */}
@@ -1334,15 +1475,24 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
               <Typography variant="h6" fontWeight={700}>
                 &ldquo;{report.keyword}&rdquo; Niş Raporu
               </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={savingNiche ? <CircularProgress size={14} /> : <Save size={14} />}
-                onClick={handleSaveNiche}
-                disabled={savingNiche}
-              >
-                Kaydet
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => { setReport(null); setKeyword(''); }}
+                >
+                  Kesfetmeye Don
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={savingNiche ? <CircularProgress size={14} /> : <Save size={14} />}
+                  onClick={handleSaveNiche}
+                  disabled={savingNiche}
+                >
+                  Kaydet
+                </Button>
+              </Box>
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap', mb: 2 }}>
@@ -1480,9 +1630,9 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
           {savedNiches.map(niche => (
             <Paper key={niche.id} variant="outlined" sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
               <Box sx={{ flex: 1, minWidth: 150 }}>
-                <Typography variant="body2" fontWeight={600}>{niche.keyword}</Typography>
+                <Typography variant="body2" fontWeight={600}>{(niche as any).keyword || (niche as any).query || '—'}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {niche.savedAt ? new Date(niche.savedAt).toLocaleDateString('tr-TR') : ''}
+                  {(niche.savedAt || (niche as any).createdAt) ? new Date(niche.savedAt || (niche as any).createdAt).toLocaleDateString('tr-TR') : ''}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -1536,7 +1686,7 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
   const fetchSellers = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiCall('get_tracked_sellers', userId);
+      const data = await apiCall('tracked_sellers', userId);
       setSellers(data.sellers || []);
     } catch (err: any) {
       toast.error(err.message || 'Satıcılar yüklenemedi');
@@ -1564,7 +1714,7 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
 
   const handleRemoveSeller = useCallback(async (id: string) => {
     try {
-      await apiPost('remove_tracked_seller', userId, { id });
+      await apiPost('untrack_seller', userId, { id });
       setSellers(prev => prev.filter(s => s.id !== id));
       toast.success('Satıcı takipten çıkarıldı');
     } catch (err: any) {
@@ -1574,7 +1724,7 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
 
   const handleSaveNotes = useCallback(async (id: string) => {
     try {
-      await apiPost('update_seller_notes', userId, { id, notes: notesText });
+      await apiPost('update_seller', userId, { id, notes: notesText });
       setSellers(prev => prev.map(s => s.id === id ? { ...s, notes: notesText } : s));
       setEditingNotes(null);
       toast.success('Not kaydedildi');

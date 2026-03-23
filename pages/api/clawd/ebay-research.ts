@@ -576,15 +576,17 @@ export default async function handler(
         // track_product — Add a product to tracker
         // -----------------------------------------------------------------
         case 'track_product': {
-          const { legacyItemId, title, notes, tags } = body as {
+          const { legacyItemId: rawLegacyId, itemId: altItemId, title, notes, tags } = body as {
             legacyItemId?: string;
+            itemId?: string;
             title?: string;
             notes?: string;
             tags?: string[];
           };
 
+          const legacyItemId = rawLegacyId || altItemId;
           if (!legacyItemId) {
-            return res.status(400).json({ error: 'legacyItemId is required' });
+            return res.status(400).json({ error: 'legacyItemId or itemId is required' });
           }
 
           // Check if already tracked
@@ -760,14 +762,68 @@ export default async function handler(
         // -----------------------------------------------------------------
         // track_seller — Add seller to tracker
         // -----------------------------------------------------------------
+        // -----------------------------------------------------------------
+        // update_product — Update notes/tags on a tracked product
+        // -----------------------------------------------------------------
+        case 'update_product': {
+          const { id, notes, tags } = body as {
+            id?: string;
+            notes?: string;
+            tags?: string[];
+          };
+          if (!id) {
+            return res.status(400).json({ error: 'id is required' });
+          }
+          const product = await prisma.ebayTrackedProduct.findFirst({
+            where: { id, userId },
+          });
+          if (!product) {
+            return res.status(404).json({ error: 'Tracked product not found' });
+          }
+          const updateData: Record<string, unknown> = {};
+          if (notes !== undefined) updateData.notes = notes;
+          if (tags !== undefined) updateData.tags = tags;
+          const updated = await prisma.ebayTrackedProduct.update({
+            where: { id },
+            data: updateData,
+          });
+          return res.status(200).json({ product: updated });
+        }
+
+        // -----------------------------------------------------------------
+        // update_seller — Update notes on a tracked seller
+        // -----------------------------------------------------------------
+        case 'update_seller': {
+          const { id: sellerId2, notes: sellerNotes } = body as {
+            id?: string;
+            notes?: string;
+          };
+          if (!sellerId2) {
+            return res.status(400).json({ error: 'id is required' });
+          }
+          const sellerRec = await prisma.ebayTrackedSeller.findFirst({
+            where: { id: sellerId2, userId },
+          });
+          if (!sellerRec) {
+            return res.status(404).json({ error: 'Tracked seller not found' });
+          }
+          const updatedSeller = await prisma.ebayTrackedSeller.update({
+            where: { id: sellerId2 },
+            data: { notes: sellerNotes ?? null },
+          });
+          return res.status(200).json({ seller: updatedSeller });
+        }
+
         case 'track_seller': {
-          const { sellerUsername, notes } = body as {
+          const { sellerUsername: rawUsername, username: altUsername, notes } = body as {
             sellerUsername?: string;
+            username?: string;
             notes?: string;
           };
 
+          const sellerUsername = rawUsername || altUsername;
           if (!sellerUsername) {
-            return res.status(400).json({ error: 'sellerUsername is required' });
+            return res.status(400).json({ error: 'sellerUsername or username is required' });
           }
 
           // Check if already tracked
@@ -811,6 +867,66 @@ export default async function handler(
         // -----------------------------------------------------------------
         // save_niche — Save a niche research session
         // -----------------------------------------------------------------
+        // -----------------------------------------------------------------
+        // untrack_product (via POST) — Soft delete tracked product
+        // -----------------------------------------------------------------
+        case 'untrack_product': {
+          const { id: prodId } = body as { id?: string };
+          if (!prodId) {
+            return res.status(400).json({ error: 'id is required' });
+          }
+          const prodRec = await prisma.ebayTrackedProduct.findFirst({
+            where: { id: prodId, userId },
+          });
+          if (!prodRec) {
+            return res.status(404).json({ error: 'Tracked product not found' });
+          }
+          await prisma.ebayTrackedProduct.update({
+            where: { id: prodId },
+            data: { isActive: false },
+          });
+          return res.status(200).json({ success: true, productId: prodId });
+        }
+
+        // -----------------------------------------------------------------
+        // untrack_seller (via POST) — Soft delete tracked seller
+        // -----------------------------------------------------------------
+        case 'untrack_seller': {
+          const { id: selId } = body as { id?: string };
+          if (!selId) {
+            return res.status(400).json({ error: 'id is required' });
+          }
+          const selRec = await prisma.ebayTrackedSeller.findFirst({
+            where: { id: selId, userId },
+          });
+          if (!selRec) {
+            return res.status(404).json({ error: 'Tracked seller not found' });
+          }
+          await prisma.ebayTrackedSeller.update({
+            where: { id: selId },
+            data: { isActive: false },
+          });
+          return res.status(200).json({ success: true, sellerId: selId });
+        }
+
+        // -----------------------------------------------------------------
+        // delete_niche (via POST) — Hard delete saved niche
+        // -----------------------------------------------------------------
+        case 'delete_niche': {
+          const { id: nicheId2 } = body as { id?: string };
+          if (!nicheId2) {
+            return res.status(400).json({ error: 'id is required' });
+          }
+          const nicheRec = await prisma.ebayNicheResearch.findFirst({
+            where: { id: nicheId2, userId },
+          });
+          if (!nicheRec) {
+            return res.status(404).json({ error: 'Saved niche not found' });
+          }
+          await prisma.ebayNicheResearch.delete({ where: { id: nicheId2 } });
+          return res.status(200).json({ success: true, nicheId: nicheId2 });
+        }
+
         case 'save_niche': {
           const {
             query,

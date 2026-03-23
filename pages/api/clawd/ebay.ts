@@ -62,15 +62,24 @@ async function getEbayAccessToken(userId: string): Promise<string> {
 // API caller
 // ---------------------------------------------------------------------------
 
-async function callEbayAPI(endpoint: string, accessToken: string, options: RequestInit = {}) {
+async function callEbayAPI(endpoint: string, accessToken: string, options: RequestInit = {}, marketplaceId?: string) {
   const url = endpoint.startsWith('http') ? endpoint : `${EBAY_API_BASE}${endpoint}`;
+
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'Accept-Language': 'en-US',
+    'Content-Language': 'en-US',
+  };
+  if (marketplaceId) {
+    headers['X-EBAY-C-MARKETPLACE-ID'] = marketplaceId;
+  }
 
   const response = await fetch(url, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      ...headers,
       ...((options.headers as Record<string, string>) || {}),
     },
   });
@@ -207,8 +216,10 @@ export default async function handler(
       const offset = parseInt((req.query.offset as string) || '0');
 
       const data = await callEbayAPI(
-        `/sell/inventory/v1/offer?marketplace_id=${marketplaceId}&limit=${limit}&offset=${offset}`,
-        accessToken
+        `/sell/inventory/v1/offer?limit=${limit}&offset=${offset}`,
+        accessToken,
+        {},
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -226,7 +237,9 @@ export default async function handler(
 
       const data = await callEbayAPI(
         `/sell/inventory/v1/inventory_item?limit=${limit}&offset=${offset}`,
-        accessToken
+        accessToken,
+        {},
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -244,7 +257,9 @@ export default async function handler(
 
       const data = await callEbayAPI(
         `/sell/inventory/v1/inventory_item?limit=${limit}&offset=${offset}`,
-        accessToken
+        accessToken,
+        {},
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -266,8 +281,8 @@ export default async function handler(
 
       // Fetch inventory item and its offers in parallel
       const [inventoryItem, offersData] = await Promise.all([
-        callEbayAPI(`/sell/inventory/v1/inventory_item/${encodedSku}`, accessToken),
-        callEbayAPI(`/sell/inventory/v1/offer?sku=${encodedSku}`, accessToken).catch(() => ({ offers: [] })),
+        callEbayAPI(`/sell/inventory/v1/inventory_item/${encodedSku}`, accessToken, {}, marketplaceId),
+        callEbayAPI(`/sell/inventory/v1/offer?sku=${encodedSku}`, accessToken, {}, marketplaceId).catch(() => ({ offers: [] })),
       ]);
 
       return res.status(200).json({
@@ -348,7 +363,8 @@ export default async function handler(
         {
           method: 'PUT',
           body: JSON.stringify(inventoryItemPayload),
-        }
+        },
+        marketplaceId
       );
 
       logger.info('eBay inventory item created', { sku });
@@ -384,7 +400,8 @@ export default async function handler(
         {
           method: 'POST',
           body: JSON.stringify(offerPayload),
-        }
+        },
+        marketplaceId
       );
 
       const offerId = offerResult.offerId;
@@ -397,7 +414,8 @@ export default async function handler(
           const publishResult = await callEbayAPI(
             `/sell/inventory/v1/offer/${offerId}/publish`,
             accessToken,
-            { method: 'POST' }
+            { method: 'POST' },
+            marketplaceId
           );
           listingId = publishResult.listingId;
           logger.info('eBay listing published', { sku, offerId, listingId });
@@ -446,7 +464,9 @@ export default async function handler(
       try {
         existingItem = await callEbayAPI(
           `/sell/inventory/v1/inventory_item/${encodedSku}`,
-          accessToken
+          accessToken,
+          {},
+          marketplaceId
         );
       } catch {
         // Item doesn't exist yet, will create fresh
@@ -486,7 +506,8 @@ export default async function handler(
         {
           method: 'PUT',
           body: JSON.stringify(updatePayload),
-        }
+        },
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -517,7 +538,9 @@ export default async function handler(
       // Fetch existing offer to merge
       const existingOffer = await callEbayAPI(
         `/sell/inventory/v1/offer/${offerId}`,
-        accessToken
+        accessToken,
+        {},
+        marketplaceId
       );
 
       const updatePayload: Record<string, any> = {
@@ -559,7 +582,8 @@ export default async function handler(
         {
           method: 'PUT',
           body: JSON.stringify(updatePayload),
-        }
+        },
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -584,7 +608,8 @@ export default async function handler(
       await callEbayAPI(
         `/sell/inventory/v1/inventory_item/${encodedSku}`,
         accessToken,
-        { method: 'DELETE' }
+        { method: 'DELETE' },
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -606,7 +631,8 @@ export default async function handler(
       const result = await callEbayAPI(
         `/sell/inventory/v1/offer/${offerId}/publish`,
         accessToken,
-        { method: 'POST' }
+        { method: 'POST' },
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -629,7 +655,8 @@ export default async function handler(
       const result = await callEbayAPI(
         `/sell/inventory/v1/offer/${offerId}/withdraw`,
         accessToken,
-        { method: 'POST' }
+        { method: 'POST' },
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -652,7 +679,8 @@ export default async function handler(
       const result = await callEbayAPI(
         `/sell/inventory/v1/offer/${offerId}/withdraw`,
         accessToken,
-        { method: 'POST' }
+        { method: 'POST' },
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -671,7 +699,9 @@ export default async function handler(
     if (req.method === 'GET' && action === 'fulfillment_policies') {
       const data = await callEbayAPI(
         `/sell/account/v1/fulfillment_policy?marketplace_id=${marketplaceId}`,
-        accessToken
+        accessToken,
+        {},
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -684,7 +714,9 @@ export default async function handler(
     if (req.method === 'GET' && action === 'return_policies') {
       const data = await callEbayAPI(
         `/sell/account/v1/return_policy?marketplace_id=${marketplaceId}`,
-        accessToken
+        accessToken,
+        {},
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -697,7 +729,9 @@ export default async function handler(
     if (req.method === 'GET' && action === 'payment_policies') {
       const data = await callEbayAPI(
         `/sell/account/v1/payment_policy?marketplace_id=${marketplaceId}`,
-        accessToken
+        accessToken,
+        {},
+        marketplaceId
       );
 
       return res.status(200).json({
@@ -763,7 +797,8 @@ export default async function handler(
         {
           method: 'POST',
           body: JSON.stringify(payload),
-        }
+        },
+        marketplaceId
       );
 
       return res.status(200).json({

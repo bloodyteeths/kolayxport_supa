@@ -172,6 +172,11 @@ const AyarlarPage = () => {
   };
 
 
+  // --- eBay Connection State ---
+  const [ebayConnected, setEbayConnected] = useState(false);
+  const [ebayTokenExpires, setEbayTokenExpires] = useState<string | null>(null);
+  const [ebayLoading, setEbayLoading] = useState(false);
+
   // --- Etsy Shops State ---
   const [etsyShops, setEtsyShops] = useState<any[]>([]);
   const [etsyShopsLoading, setEtsyShopsLoading] = useState(false);
@@ -228,6 +233,40 @@ const AyarlarPage = () => {
     }
   };
 
+  // --- eBay Functions ---
+  const fetchEbayStatus = async () => {
+    setEbayLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      const response = await axios.get('/api/integrations/ebay/status', {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+      setEbayConnected(response.data.connected);
+      setEbayTokenExpires(response.data.tokenExpiresAt);
+    } catch {
+      setEbayConnected(false);
+    } finally {
+      setEbayLoading(false);
+    }
+  };
+
+  const handleDisconnectEbay = async () => {
+    if (!window.confirm('eBay hesap bağlantısını kesmek istediğinize emin misiniz?')) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      await axios.delete('/api/integrations/ebay/status', {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+      setEbayConnected(false);
+      setEbayTokenExpires(null);
+      setSnackbar({ open: true, message: 'eBay hesap bağlantısı kesildi.', severity: 'success' });
+    } catch {
+      setSnackbar({ open: true, message: 'eBay bağlantısı kesilemedi.', severity: 'error' });
+    }
+  };
+
   const [syncHistoryLoading, setSyncHistoryLoading] = useState(false);
   const [syncHistoryError, setSyncHistoryError] = useState<string | null>(null);
   const [syncHistoryCursor, setSyncHistoryCursor] = useState<string | null>(null);
@@ -263,6 +302,7 @@ const AyarlarPage = () => {
   useEffect(() => {
     fetchSyncHistory();
     fetchEtsyShops();
+    fetchEbayStatus();
 
     // Show Etsy OAuth callback result from query params
     const { success, error, details } = router.query;
@@ -588,18 +628,69 @@ const AyarlarPage = () => {
                   <Typography variant="h6">
                     eBay Hesap Bağlantısı
                   </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    href="/api/integrations/ebay/connect"
-                    sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
-                  >
-                    🔗 eBay Hesabını Bağla
-                  </Button>
+                  {!ebayConnected && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      href="/api/integrations/ebay/connect"
+                      sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
+                    >
+                      eBay Hesabını Bağla
+                    </Button>
+                  )}
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   eBay hesabınızı bağlayarak ürünlerinizi yönetebilir, fiyat araştırması yapabilir ve SEO analizi gerçekleştirebilirsiniz.
                 </Typography>
+
+                {ebayLoading ? (
+                  <Typography>eBay bağlantı durumu kontrol ediliyor...</Typography>
+                ) : ebayConnected ? (
+                  <Paper elevation={1} sx={{ p: 2, border: '1px solid #e0e0e0' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight="bold" color="success.main" sx={{ mb: 0.5 }}>
+                          eBay Hesabı Bağlı
+                        </Typography>
+                        {ebayTokenExpires && (
+                          <Typography variant="caption" color="text.secondary">
+                            Token geçerlilik: {new Date(ebayTokenExpires).toLocaleString('tr-TR')}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          href="/api/integrations/ebay/connect"
+                        >
+                          Yeniden Bağla
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={handleDisconnectEbay}
+                        >
+                          Bağlantıyı Kes
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Paper>
+                ) : (
+                  <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Henüz eBay hesabınız bağlı değil.
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      href="/api/integrations/ebay/connect"
+                    >
+                      eBay Hesabınızı Bağlayın
+                    </Button>
+                  </Box>
+                )}
               </Box>
             </Paper>
 

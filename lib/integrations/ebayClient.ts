@@ -113,9 +113,13 @@ export async function refreshUserToken(refreshToken: string): Promise<EbayTokenR
     'https://api.ebay.com/oauth/api_scope/sell.inventory',
     'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
     'https://api.ebay.com/oauth/api_scope/sell.marketing',
+    'https://api.ebay.com/oauth/api_scope/sell.marketing.readonly',
     'https://api.ebay.com/oauth/api_scope/sell.account',
+    'https://api.ebay.com/oauth/api_scope/sell.account.readonly',
     'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
-    'https://api.ebay.com/oauth/api_scope/commerce.taxonomy.readonly',
+    'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
+    'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
+    'https://api.ebay.com/oauth/api_scope/sell.finances',
   ].join(' ');
 
   const response = await fetch(EBAY_TOKEN_URL, {

@@ -350,6 +350,7 @@ export default async function handler(
     }
 
     // GET ?action=listing&sku=XXX — Get single inventory item + its offers
+    // Falls back to Browse API for legacy listings that don't exist in Inventory API
     if (req.method === 'GET' && action === 'listing') {
       const sku = req.query.sku as string;
       if (!sku) {
@@ -358,17 +359,90 @@ export default async function handler(
 
       const encodedSku = encodeURIComponent(sku);
 
-      // Fetch inventory item and its offers in parallel
-      const [inventoryItem, offersData] = await Promise.all([
-        callEbayAPI(`/sell/inventory/v1/inventory_item/${encodedSku}`, accessToken, {}, marketplaceId),
-        callEbayAPI(`/sell/inventory/v1/offer?sku=${encodedSku}`, accessToken, {}, marketplaceId).catch(() => ({ offers: [] })),
-      ]);
+      try {
+        // Try Inventory API first
+        const [inventoryItem, offersData] = await Promise.all([
+          callEbayAPI(`/sell/inventory/v1/inventory_item/${encodedSku}`, accessToken, {}, marketplaceId),
+          callEbayAPI(`/sell/inventory/v1/offer?sku=${encodedSku}`, accessToken, {}, marketplaceId).catch(() => ({ offers: [] })),
+        ]);
 
-      return res.status(200).json({
-        sku,
-        inventoryItem,
-        offers: offersData.offers || [],
-      });
+        // Flatten inventoryItem fields to top level for consistent editor shape
+        return res.status(200).json({
+          sku,
+          isLegacy: false,
+          product: inventoryItem.product,
+          condition: inventoryItem.condition,
+          conditionDescription: inventoryItem.conditionDescription,
+          availability: inventoryItem.availability,
+          packageWeightAndSize: inventoryItem.packageWeightAndSize,
+          offers: offersData.offers || [],
+        });
+      } catch (inventoryErr: any) {
+        // If Inventory API returns 404, try Browse API with SKU as legacy item ID
+        if (!inventoryErr.message?.includes('404')) {
+          throw inventoryErr;
+        }
+
+        logger.info('Inventory item not found, falling back to Browse API', { sku });
+
+        try {
+          const appToken = await getApplicationToken();
+          const browseItem = await callEbayAPI(
+            `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${sku}`,
+            appToken
+          );
+
+          // Map Browse API response to EbayListingData shape
+          const aspects: Record<string, string[]> = {};
+          for (const a of browseItem.localizedAspects || []) {
+            if (a.name && a.value) {
+              if (!aspects[a.name]) aspects[a.name] = [];
+              aspects[a.name].push(a.value);
+            }
+          }
+
+          const imageUrls: string[] = [];
+          if (browseItem.image?.imageUrl) imageUrls.push(browseItem.image.imageUrl);
+          for (const img of browseItem.additionalImages || []) {
+            if (img.imageUrl) imageUrls.push(img.imageUrl);
+          }
+
+          return res.status(200).json({
+            sku,
+            isLegacy: true,
+            legacyItemId: browseItem.legacyItemId || sku,
+            itemWebUrl: browseItem.itemWebUrl,
+            product: {
+              title: browseItem.title || '',
+              description: browseItem.description || browseItem.shortDescription || '',
+              aspects,
+              imageUrls,
+            },
+            condition: browseItem.condition || browseItem.conditionId || '',
+            conditionDescription: browseItem.conditionDescription || '',
+            availability: {
+              shipToLocationAvailability: {
+                quantity: (browseItem.estimatedAvailabilities?.[0]?.estimatedAvailableQuantity) ?? 0,
+              },
+            },
+            offers: [{
+              offerId: null,
+              status: browseItem.itemWebUrl ? 'ACTIVE' : 'ENDED',
+              pricingSummary: {
+                price: browseItem.price || { value: '0', currency: 'USD' },
+              },
+              listingPolicies: {},
+              categoryId: browseItem.categoryId || '',
+            }],
+          });
+        } catch (browseErr: any) {
+          logger.error('Browse API fallback also failed', browseErr, { sku });
+          return res.status(404).json({
+            error: 'Listing not found in Inventory or Browse API',
+            details: browseErr.message,
+          });
+        }
+      }
     }
 
     // POST ?action=create_listing — Create inventory item + offer (optionally publish)
@@ -699,7 +773,7 @@ export default async function handler(
     }
 
     // POST ?action=publish&offerId=XXX — Publish an offer
-    if (req.method === 'POST' && action === 'publish') {
+    if (req.method === 'POST' && (action === 'publish' || action === 'publish_offer')) {
       const offerId = queryOfferId || (req.body?.offerId as string);
       if (!offerId) {
         return res.status(400).json({ error: 'offerId is required' });
@@ -723,7 +797,7 @@ export default async function handler(
     }
 
     // POST ?action=withdraw&offerId=XXX — Withdraw/end a listing
-    if (req.method === 'POST' && action === 'withdraw') {
+    if (req.method === 'POST' && (action === 'withdraw' || action === 'withdraw_offer')) {
       const offerId = queryOfferId || (req.body?.offerId as string);
       if (!offerId) {
         return res.status(400).json({ error: 'offerId is required' });
@@ -864,6 +938,21 @@ export default async function handler(
       } catch {
         return res.status(200).json({ variantSKUs: [] });
       }
+    }
+
+    // PUT ?action=create_inventory_item_group&sku=XXX — Create/update inventory item group
+    if (req.method === 'PUT' && action === 'create_inventory_item_group') {
+      const sku = req.query.sku as string;
+      if (!sku) return res.status(400).json({ error: 'sku (group key) is required' });
+
+      const data = await callEbayAPI(
+        `/sell/inventory/v1/inventory_item_group/${encodeURIComponent(sku)}`,
+        accessToken,
+        { method: 'PUT', body: JSON.stringify(req.body) },
+        marketplaceId
+      );
+
+      return res.status(200).json(data);
     }
 
     // -----------------------------------------------------------------
@@ -1654,6 +1743,34 @@ export default async function handler(
       });
     }
 
+    // GET ?action=store_categories — Get seller's eBay Store custom categories
+    if (req.method === 'GET' && action === 'store_categories') {
+      try {
+        // eBay Sell Inventory API: get offers to extract unique store category names
+        // OR use the older Trading API GetStore call — but Inventory API is simpler
+        const offersData = await callEbayAPI(
+          `/sell/inventory/v1/offer?limit=200`,
+          accessToken,
+          {},
+          marketplaceId
+        );
+
+        const storeCategories = new Set<string>();
+        for (const offer of offersData.offers || []) {
+          for (const cat of offer.storeCategoryNames || []) {
+            if (cat) storeCategories.add(cat);
+          }
+        }
+
+        return res.status(200).json({
+          categories: Array.from(storeCategories).sort(),
+        });
+      } catch (err: any) {
+        // Store categories are optional — seller might not have an eBay Store
+        return res.status(200).json({ categories: [] });
+      }
+    }
+
     // -----------------------------------------------------------------
     // No matching action
     // -----------------------------------------------------------------
@@ -1682,6 +1799,8 @@ export default async function handler(
         'payment_policies',
         // Bulk
         'bulk_update_price',
+        // Store
+        'store_categories',
         // Research
         'search_market',
         'analyze_seo',

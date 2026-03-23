@@ -74,6 +74,9 @@ interface AspectMetadata {
 
 interface EbayListingData {
   sku: string;
+  isLegacy?: boolean;
+  legacyItemId?: string;
+  itemWebUrl?: string;
   product?: {
     title?: string;
     description?: string;
@@ -688,7 +691,9 @@ export default function ListingEditorDrawer({
   // --------------------------------------------------
   // Render helpers
   // --------------------------------------------------
-  const offerStatus = listing?.offers?.[0]?.status;
+  const rawStatus = listing?.offers?.[0]?.status;
+  // Normalize: eBay Browse API returns 'ACTIVE', Inventory API returns 'PUBLISHED'
+  const offerStatus = rawStatus === 'ACTIVE' ? 'PUBLISHED' : rawStatus;
 
   const renderHeader = () => {
     const truncatedTitle = fields?.title
@@ -744,12 +749,12 @@ export default function ListingEditorDrawer({
         </Box>
 
         <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-          {listing?.offers?.[0]?.offerId && offerStatus === 'PUBLISHED' && (
+          {(listing?.itemWebUrl || listing?.legacyItemId || (listing?.offers?.[0]?.offerId && offerStatus === 'PUBLISHED')) && (
             <Tooltip title="eBay'de Görüntüle">
               <IconButton
                 size="small"
                 component="a"
-                href={`https://www.ebay.com/itm/${listing.offers[0].offerId}`}
+                href={listing?.itemWebUrl || (listing?.legacyItemId ? `https://www.ebay.com/itm/${listing.legacyItemId}` : `https://www.ebay.com/itm/${listing?.offers?.[0]?.offerId}`)}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -811,6 +816,32 @@ export default function ListingEditorDrawer({
           renderErrorState()
         ) : fields && listing ? (
           <Box sx={{ overflow: 'auto', flex: 1, pb: 10 }}>
+            {listing.isLegacy && (
+              <Box sx={{ mx: 2, mt: 1, mb: 0, p: 1.5, bgcolor: 'warning.light', borderRadius: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <BlockIcon sx={{ color: 'warning.dark', fontSize: 20 }} />
+                <Box>
+                  <Typography variant="body2" fontWeight={600} sx={{ color: 'warning.dark' }}>
+                    Eski Liste (Salt Okunur)
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'warning.dark' }}>
+                    Bu liste eBay Envanter API'si dışında oluşturulmuş. Düzenlemek için eBay Seller Hub'ı kullanın.
+                  </Typography>
+                </Box>
+                {listing.itemWebUrl && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    href={listing.itemWebUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{ ml: 'auto', flexShrink: 0, color: 'warning.dark', borderColor: 'warning.dark' }}
+                    startIcon={<OpenInNewIcon />}
+                  >
+                    eBay
+                  </Button>
+                )}
+              </Box>
+            )}
             {/* 1. Temel Bilgiler */}
             <Accordion
               expanded={expanded === 'basics'}
@@ -1234,72 +1265,74 @@ export default function ListingEditorDrawer({
               </AccordionDetails>
             </Accordion>
 
-            {/* İşlemler */}
-            <Accordion
-              expanded={expanded === 'actions'}
-              onChange={handleAccordionChange('actions')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>İşlemler</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {offerStatus !== 'PUBLISHED' && listing?.offers?.[0]?.offerId && (
-                    <Button
-                      variant="contained"
-                      color="success"
-                      startIcon={publishing ? <CircularProgress size={18} color="inherit" /> : <PublishIcon />}
-                      onClick={handlePublish}
-                      disabled={publishing}
-                      fullWidth
-                    >
-                      {publishing ? 'Yayınlanıyor...' : 'Yayınla'}
-                    </Button>
-                  )}
+            {/* İşlemler — hidden for legacy listings */}
+            {!listing?.isLegacy && (
+              <Accordion
+                expanded={expanded === 'actions'}
+                onChange={handleAccordionChange('actions')}
+                disableGutters
+                elevation={0}
+                sx={{ '&:before': { display: 'none' } }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography fontWeight={600}>İşlemler</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {offerStatus !== 'PUBLISHED' && listing?.offers?.[0]?.offerId && (
+                      <Button
+                        variant="contained"
+                        color="success"
+                        startIcon={publishing ? <CircularProgress size={18} color="inherit" /> : <PublishIcon />}
+                        onClick={handlePublish}
+                        disabled={publishing}
+                        fullWidth
+                      >
+                        {publishing ? 'Yayınlanıyor...' : 'Yayınla'}
+                      </Button>
+                    )}
 
-                  {offerStatus === 'PUBLISHED' && (
+                    {offerStatus === 'PUBLISHED' && (
+                      <Button
+                        variant="outlined"
+                        color="warning"
+                        startIcon={withdrawing ? <CircularProgress size={18} color="inherit" /> : <BlockIcon />}
+                        onClick={handleWithdraw}
+                        disabled={withdrawing}
+                        fullWidth
+                      >
+                        {withdrawing ? 'Geri çekiliyor...' : 'Geri Çek'}
+                      </Button>
+                    )}
+
                     <Button
                       variant="outlined"
-                      color="warning"
-                      startIcon={withdrawing ? <CircularProgress size={18} color="inherit" /> : <BlockIcon />}
-                      onClick={handleWithdraw}
-                      disabled={withdrawing}
+                      startIcon={copying ? <CircularProgress size={18} /> : <ContentCopyIcon />}
+                      onClick={handleCopy}
+                      disabled={copying}
                       fullWidth
                     >
-                      {withdrawing ? 'Geri çekiliyor...' : 'Geri Çek'}
+                      {copying ? 'Kopyalanıyor...' : 'Kopyala'}
                     </Button>
-                  )}
 
-                  <Button
-                    variant="outlined"
-                    startIcon={copying ? <CircularProgress size={18} /> : <ContentCopyIcon />}
-                    onClick={handleCopy}
-                    disabled={copying}
-                    fullWidth
-                  >
-                    {copying ? 'Kopyalanıyor...' : 'Kopyala'}
-                  </Button>
-
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                    onClick={() => setDeleteDialogOpen(true)}
-                    fullWidth
-                  >
-                    Sil
-                  </Button>
-                </Box>
-              </AccordionDetails>
-            </Accordion>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteIcon />}
+                      onClick={() => setDeleteDialogOpen(true)}
+                      fullWidth
+                    >
+                      Sil
+                    </Button>
+                  </Box>
+                </AccordionDetails>
+              </Accordion>
+            )}
           </Box>
         ) : null}
 
         {/* Footer — Save button */}
-        {fields && listing && !loading && !fetchError && (
+        {fields && listing && !loading && !fetchError && !listing.isLegacy && (
           <Box
             sx={{
               position: 'sticky',

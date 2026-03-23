@@ -109,17 +109,23 @@ async function handleOptimizeTitle(body: any) {
 
 ETSY TITLE OPTIMIZATION BEST PRACTICES (2026):
 - Etsy uses a hybrid AI + keyword matching search (XWalk system). Titles are the MOST important ranking factor.
-- Keep under 140 characters but USE most of the space — longer, keyword-rich titles rank better.
+- Keep under 140 characters but aim for AT LEAST 100 characters — longer, keyword-rich titles rank significantly better.
 - Front-load the most important, high-search-volume keywords in the first 40 characters (shown in search results).
 - Use natural, readable phrasing — Etsy's AI penalizes keyword stuffing and unnatural word salads.
 - Include long-tail keyword phrases that match buyer search intent (e.g., "personalized gift for mom" not just "gift").
-- Separate keyword phrases with natural connectors: commas, pipes (|), dashes, or "for".
+
+CRITICAL FORMATTING RULES:
+- CAPITALIZATION: Only capitalize the FIRST letter of the title. The rest must be lowercase. Example: "Personalized baby name sign, nursery wall decor, custom wood sign for newborn" — NOT "Personalized Baby Name Sign".
+- SEPARATORS: Use ONLY commas (,) to separate keyword phrases. Do NOT use dashes (-), pipes (|), slashes (/), colons (:), or other special characters — they waste character count and hurt readability.
+- Every character counts. Maximize keyword space by avoiding unnecessary punctuation or symbols.
+
 - Include: product type, material, style/aesthetic, occasion/use-case, and recipient where relevant.
 - Do NOT repeat words already covered by tags — Etsy indexes title and tags together.
 - Regional spelling matters: prefer the marketplace's primary language/spelling.
 - Etsy now weighs listing quality score (conversion, reviews) so titles must also be buyer-appealing, not just keyword-dense.
 
 Optimize the following Etsy listing title for maximum search visibility and click-through rate.
+The optimized title MUST be at least 100 characters and under 140 characters.
 Return a JSON object: { "optimized_title": "...", "explanation": "..." }
 
 Current title: ${title}
@@ -131,10 +137,25 @@ Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
   const text = result.response.text();
   const parsed = JSON.parse(text);
 
+  // Post-process: enforce formatting rules
+  let optimizedTitle = (parsed.optimized_title || '').trim();
+  if (optimizedTitle) {
+    // Replace dashes, pipes, slashes, colons used as separators with commas
+    optimizedTitle = optimizedTitle.replace(/\s*[|/:\\-–—]\s*/g, ', ');
+    // Clean up double commas
+    optimizedTitle = optimizedTitle.replace(/,\s*,/g, ',');
+    // Enforce lowercase except first letter
+    optimizedTitle = optimizedTitle.charAt(0).toUpperCase() + optimizedTitle.slice(1).toLowerCase();
+    // Trim to 140 chars
+    if (optimizedTitle.length > 140) {
+      optimizedTitle = optimizedTitle.substring(0, 140).replace(/,\s*$/, '');
+    }
+  }
+
   return {
     status: 200,
     data: {
-      optimized_title: parsed.optimized_title,
+      optimized_title: optimizedTitle,
       explanation: parsed.explanation,
     },
   };
@@ -288,7 +309,9 @@ async function handleBulkOptimize(body: any) {
 
 ETSY SEO BEST PRACTICES (2026):
 - Etsy uses a hybrid AI + keyword matching search (XWalk system). Tags, titles, and descriptions all contribute to ranking.
-- TITLES: Front-load high-volume keywords in the first 40 chars. Use up to 140 chars. Natural, readable phrasing — no keyword stuffing.
+- TITLES: Front-load high-volume keywords in first 40 chars. Aim for 100-140 chars. Natural, readable phrasing — no keyword stuffing.
+  - CAPITALIZATION: Only capitalize the FIRST letter. Rest lowercase. Example: "Personalized baby name sign, nursery wall decor, custom wood sign"
+  - SEPARATORS: Use ONLY commas to separate phrases. No dashes, pipes, slashes, or colons — they waste characters.
 - TAGS: Each tag up to 20 characters, use all 13 slots. Multi-word long-tail tags outperform single words. Don't repeat title words in tags.
 - DESCRIPTIONS: First 160 chars = meta preview. Include keywords naturally in first 2 paragraphs. Short paragraphs, mobile-friendly.
 - Include a mix of: product type, material, style, occasion, recipient, and trending seasonal terms.
@@ -298,7 +321,7 @@ ETSY SEO BEST PRACTICES (2026):
 
 Optimize the following listings for maximum search visibility and conversion.
 For each listing provide:
-- An improved title (max 140 chars, front-loaded keywords)
+- An improved title (100-140 chars, front-loaded keywords, only first letter capitalized, commas as separators)
 - 13 SEO tags (multi-word long-tail, no title word repetition)
 - An improved description (first 160 chars compelling, keyword-rich)
 Return a JSON object: { "optimizations": [ { "listing_id": ..., "title": "...", "tags": ["..."], "description": "..." }, ... ] }

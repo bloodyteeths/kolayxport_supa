@@ -424,7 +424,7 @@ function EtsyListingsPage() {
           case 'issues': return h.overall < 70;
           case 'missing_images': return l.image_count < 10;
           case 'missing_tags': return (l.tags?.length || 0) < 13;
-          case 'short_title': return (l.title?.length || 0) < 60;
+          case 'short_title': return (l.title?.length || 0) < 100;
           case 'no_description': return (l.description?.length || 0) < 200;
           case 'no_video': return !l.has_video;
           case 'no_stock': return l.quantity === 0;
@@ -1118,7 +1118,7 @@ function EtsyListingsPage() {
               </MenuItem>
               <MenuItem value="missing_images">Resim Eksik (&lt;10)</MenuItem>
               <MenuItem value="missing_tags">Etiket Eksik (&lt;13)</MenuItem>
-              <MenuItem value="short_title">Kısa Başlık (&lt;60)</MenuItem>
+              <MenuItem value="short_title">Kısa Başlık (&lt;100)</MenuItem>
               <MenuItem value="no_description">Açıklama Yok</MenuItem>
               <MenuItem value="no_video">Video Yok</MenuItem>
               <MenuItem value="no_stock">Stok Yok</MenuItem>

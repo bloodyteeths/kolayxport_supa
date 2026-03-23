@@ -15,7 +15,7 @@ export default function SEOIndicator({ tags, title, description, compact = false
 
   // Score calculation
   const tagScore = Math.min(tagCount / 13, 1) * 40; // 40 points max
-  const titleScore = titleLength >= 80 && titleLength <= 140 ? 30 : titleLength >= 40 ? 20 : titleLength > 0 ? 10 : 0; // 30 points max
+  const titleScore = titleLength >= 100 && titleLength <= 140 ? 30 : titleLength >= 80 ? 20 : titleLength >= 40 ? 15 : titleLength > 0 ? 5 : 0; // 30 points max
   const descScore = descLength >= 300 ? 30 : descLength >= 100 ? 20 : descLength > 0 ? 10 : 0; // 30 points max
   const totalScore = Math.round(tagScore + titleScore + descScore);
 
@@ -66,7 +66,7 @@ export default function SEOIndicator({ tags, title, description, compact = false
         </Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="caption" color="text.secondary">Başlık uzunluğu</Typography>
-          <Typography variant="caption" sx={{ color: titleLength >= 80 && titleLength <= 140 ? '#22c55e' : titleLength >= 40 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
+          <Typography variant="caption" sx={{ color: titleLength >= 100 && titleLength <= 140 ? '#22c55e' : titleLength >= 80 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
             {titleLength}/140
           </Typography>
         </Box>

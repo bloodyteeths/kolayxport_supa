@@ -6,7 +6,7 @@ import {
   MenuItem, FormControl, InputLabel, CircularProgress, Divider,
   InputAdornment, Dialog, DialogTitle, DialogContent, DialogActions,
   Slider, Card, CardContent, Collapse, useMediaQuery, useTheme,
-  Grid, Badge, Skeleton,
+  Grid, Badge, Skeleton, TableSortLabel,
 } from '@mui/material';
 import {
   Search, TrendingUp, TrendingDown, Star, ExternalLink,
@@ -113,6 +113,37 @@ interface TrackedSeller {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+
+type SortDir = 'asc' | 'desc';
+
+function useTableSort<T>(items: T[], defaultKey: string = '', defaultDir: SortDir = 'desc') {
+  const [sortKey, setSortKey] = useState(defaultKey);
+  const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
+
+  const handleSort = useCallback((key: string) => {
+    if (sortKey === key) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  }, [sortKey]);
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return items;
+    return [...items].sort((a: any, b: any) => {
+      let va = a[sortKey] ?? 0;
+      let vb = b[sortKey] ?? 0;
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [items, sortKey, sortDir]);
+
+  return { sorted, sortKey, sortDir, handleSort };
+}
 
 const CONDITIONS = [
   { value: '', label: 'Tümü' },
@@ -396,6 +427,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
   const [searched, setSearched] = useState(false);
   const [showFilters, setShowFilters] = useState(!isMobile);
   const [trackingIds, setTrackingIds] = useState<Set<string>>(new Set());
+  const productSort = useTableSort<ProductResult>(results, '', 'desc');
 
   const handleSearch = useCallback(async (append = false) => {
     if (!filters.keyword.trim() && !filters.categoryId.trim()) {
@@ -635,8 +667,16 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
               <TableRow sx={{ bgcolor: '#f5f5f5' }}>
                 <TableCell sx={{ width: 60 }}>Resim</TableCell>
                 <TableCell>Başlık</TableCell>
-                <TableCell align="right">Fiyat</TableCell>
-                <TableCell align="center">Satış</TableCell>
+                <TableCell align="right" sortDirection={productSort.sortKey === 'price' ? productSort.sortDir : false}>
+                  <TableSortLabel active={productSort.sortKey === 'price'} direction={productSort.sortKey === 'price' ? productSort.sortDir : 'desc'} onClick={() => productSort.handleSort('price')}>
+                    Fiyat
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell align="center" sortDirection={productSort.sortKey === 'estimatedSold' ? productSort.sortDir : false}>
+                  <TableSortLabel active={productSort.sortKey === 'estimatedSold'} direction={productSort.sortKey === 'estimatedSold' ? productSort.sortDir : 'desc'} onClick={() => productSort.handleSort('estimatedSold')}>
+                    Satış
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell>Durum</TableCell>
                 <TableCell>Satıcı</TableCell>
                 <TableCell>Kargo</TableCell>
@@ -644,7 +684,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
               </TableRow>
             </TableHead>
             <TableBody>
-              {results.map(product => (
+              {productSort.sorted.map(product => (
                 <TableRow key={product.itemId} hover sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
                   <TableCell>
                     <Box
@@ -837,6 +877,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
   const [notesText, setNotesText] = useState('');
   const [tagDialog, setTagDialog] = useState<{ id: string; tags: string[] } | null>(null);
   const [newTag, setNewTag] = useState('');
+  const trackedSort = useTableSort<TrackedProduct>(tracked, 'currentPrice', 'desc');
 
   const fetchTracked = useCallback(async () => {
     setLoading(true);
@@ -989,9 +1030,17 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
               <TableRow sx={{ bgcolor: '#f5f5f5' }}>
                 <TableCell sx={{ width: 60 }}>Resim</TableCell>
                 <TableCell>Başlık</TableCell>
-                <TableCell align="right">Fiyat</TableCell>
+                <TableCell align="right" sortDirection={trackedSort.sortKey === 'currentPrice' ? trackedSort.sortDir : false}>
+                  <TableSortLabel active={trackedSort.sortKey === 'currentPrice'} direction={trackedSort.sortKey === 'currentPrice' ? trackedSort.sortDir : 'desc'} onClick={() => trackedSort.handleSort('currentPrice')}>
+                    Fiyat
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell align="center">Değişim</TableCell>
-                <TableCell align="center">Satış</TableCell>
+                <TableCell align="center" sortDirection={trackedSort.sortKey === 'totalSold' ? trackedSort.sortDir : false}>
+                  <TableSortLabel active={trackedSort.sortKey === 'totalSold'} direction={trackedSort.sortKey === 'totalSold' ? trackedSort.sortDir : 'desc'} onClick={() => trackedSort.handleSort('totalSold')}>
+                    Satış
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell>Fiyat Geçmişi</TableCell>
                 <TableCell>Notlar</TableCell>
                 <TableCell>Etiketler</TableCell>
@@ -1000,7 +1049,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
               </TableRow>
             </TableHead>
             <TableBody>
-              {tracked.map(product => (
+              {trackedSort.sorted.map(product => (
                 <TableRow key={product.id} hover>
                   <TableCell>
                     <Box
@@ -1301,6 +1350,7 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
   const [loadingNiches, setLoadingNiches] = useState(true);
   const [savingNiche, setSavingNiche] = useState(false);
   const [categoryAnalyzing, setCategoryAnalyzing] = useState<string | null>(null);
+  const nicheProductSort = useTableSort<ProductResult>(report?.topProducts || [], 'estimatedSold', 'desc');
 
   const fetchSavedNiches = useCallback(async () => {
     setLoadingNiches(true);
@@ -1605,13 +1655,21 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
                   <TableHead>
                     <TableRow sx={{ bgcolor: '#f5f5f5' }}>
                       <TableCell>Başlık</TableCell>
-                      <TableCell align="right">Fiyat</TableCell>
-                      <TableCell align="center">Satış</TableCell>
+                      <TableCell align="right" sortDirection={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : false}>
+                        <TableSortLabel active={nicheProductSort.sortKey === 'price'} direction={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : 'desc'} onClick={() => nicheProductSort.handleSort('price')}>
+                          Fiyat
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell align="center" sortDirection={nicheProductSort.sortKey === 'estimatedSold' ? nicheProductSort.sortDir : false}>
+                        <TableSortLabel active={nicheProductSort.sortKey === 'estimatedSold'} direction={nicheProductSort.sortKey === 'estimatedSold' ? nicheProductSort.sortDir : 'desc'} onClick={() => nicheProductSort.handleSort('estimatedSold')}>
+                          Satış
+                        </TableSortLabel>
+                      </TableCell>
                       <TableCell>Satıcı</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {report.topProducts.slice(0, isMobile ? 10 : 20).map(p => (
+                    {nicheProductSort.sorted.slice(0, isMobile ? 10 : 20).map(p => (
                       <TableRow key={p.itemId} hover>
                         <TableCell sx={{ maxWidth: isMobile ? 180 : 350 }}>
                           <Typography
@@ -1724,6 +1782,7 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
   const [adding, setAdding] = useState(false);
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
   const [notesText, setNotesText] = useState('');
+  const sellerSort = useTableSort<TrackedSeller>(sellers, 'feedbackScore', 'desc');
 
   const fetchSellers = useCallback(async () => {
     setLoading(true);
@@ -1913,7 +1972,11 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
             <TableHead>
               <TableRow sx={{ bgcolor: '#f5f5f5' }}>
                 <TableCell>Kullanıcı Adı</TableCell>
-                <TableCell align="center">Puan</TableCell>
+                <TableCell align="center" sortDirection={sellerSort.sortKey === 'feedbackScore' ? sellerSort.sortDir : false}>
+                  <TableSortLabel active={sellerSort.sortKey === 'feedbackScore'} direction={sellerSort.sortKey === 'feedbackScore' ? sellerSort.sortDir : 'desc'} onClick={() => sellerSort.handleSort('feedbackScore')}>
+                    Puan
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell align="center">Olumlu %</TableCell>
                 <TableCell>Notlar</TableCell>
                 <TableCell align="center">Son Kontrol</TableCell>
@@ -1921,7 +1984,7 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
               </TableRow>
             </TableHead>
             <TableBody>
-              {sellers.map(seller => (
+              {sellerSort.sorted.map(seller => (
                 <TableRow key={seller.id} hover>
                   <TableCell>
                     <Typography variant="body2" fontWeight={600}>{seller.sellerUsername}</Typography>

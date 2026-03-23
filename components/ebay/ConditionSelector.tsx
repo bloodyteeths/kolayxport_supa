@@ -68,6 +68,7 @@ export default function ConditionSelector({
           value={condition}
           label="Ürün Durumu"
           onChange={handleConditionChange}
+          MenuProps={{ sx: { zIndex: 1600 } }}
         >
           {conditions.map((c) => (
             <MenuItem key={c.value} value={c.value}>

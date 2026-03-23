@@ -94,13 +94,18 @@ KEYWORD SELECTION (CRITICAL):
 - Find underused competitor tags that have demand but low competition.
 - Regional spelling variations if relevant (jewelry/jewellery, color/colour).
 
+HARD LIMITS:
+- MAXIMUM 20 CHARACTERS per tag. This is an Etsy API limit — tags over 20 chars will be REJECTED.
+- Count characters carefully. If a phrase is too long, shorten it (e.g., "personalized wooden sign" → "custom wooden sign").
+
 WHAT NOT TO DO:
 - NO single-word tags (waste of a slot)
 - NO repeating ANY word from the title
 - NO generic tags like "gift" or "handmade" alone — always combine into long-tail phrases
 - NO duplicate meaning across tags (e.g., "mom gift" and "gift for mom" cover the same search)
+- NO tags longer than 20 characters
 
-Suggest exactly 13 tags. Do NOT repeat any current tags.
+Suggest exactly 13 tags, each MAXIMUM 20 characters. Do NOT repeat any current tags.
 Return JSON: { "suggestions": ["tag1", "tag2", ...] }
 
 Title: ${title}
@@ -112,7 +117,18 @@ Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
   const text = result.response.text();
   const parsed = JSON.parse(text);
 
-  return { status: 200, data: { suggestions: parsed.suggestions } };
+  // Post-process: enforce Etsy's 20-char tag limit
+  const suggestions = (parsed.suggestions || []).map((tag: string) => {
+    let t = tag.trim().toLowerCase();
+    if (t.length > 20) {
+      // Try to cut at last space before 20 chars
+      const cut = t.substring(0, 20).lastIndexOf(' ');
+      t = cut > 10 ? t.substring(0, cut).trim() : t.substring(0, 20).trim();
+    }
+    return t;
+  }).filter((t: string) => t.length > 0 && t.length <= 20);
+
+  return { status: 200, data: { suggestions } };
 }
 
 async function handleOptimizeTitle(body: any) {

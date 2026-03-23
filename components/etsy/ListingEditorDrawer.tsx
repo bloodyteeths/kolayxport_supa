@@ -529,9 +529,35 @@ export default function ListingEditorDrawer({
   }, [listingId, shopId]);
 
   // --------------------------------------------------
-  // AI helper
+  // AI helper — auto-fetches market research if missing
   // --------------------------------------------------
-  const callAI = useCallback(async (action: string): Promise<any> => {
+  const localResearchRef = useRef<{ query: string; topTags: any[]; topKeywords: any[]; priceStats: any } | null>(null);
+
+  const fetchQuickResearch = useCallback(async (query: string) => {
+    try {
+      const params = new URLSearchParams({
+        action: 'search_market', keywords: query.trim(),
+        limit: '100', sort_on: 'score', sort_order: 'desc',
+      });
+      const res = await fetch(`/api/clawd/etsy?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const tagFreq = data.tagFrequency || [];
+      const keywords = data.titleKeywords || [];
+      const items = data.items || [];
+      const prices = items.map((i: any) => i.price?.amount && i.price?.divisor ? i.price.amount / i.price.divisor : 0).filter((p: number) => p > 0);
+      const priceStats = prices.length > 0
+        ? { min: Math.min(...prices).toFixed(2), max: Math.max(...prices).toFixed(2), avg: (prices.reduce((a: number, b: number) => a + b, 0) / prices.length).toFixed(2) }
+        : null;
+      const research = { query, topTags: tagFreq.slice(0, 20), topKeywords: keywords.slice(0, 15), priceStats };
+      localResearchRef.current = research;
+      return research;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const callAI = useCallback(async (action: string, overrides?: Record<string, any>): Promise<any> => {
     if (!fields) return null;
 
     setAiLoading((prev) => ({ ...prev, [action]: true }));
@@ -544,14 +570,23 @@ export default function ListingEditorDrawer({
         tags_current: fields.tags,
         materials: fields.materials,
         price: fields.price,
+        category: listing?.taxonomy_id ? String(listing.taxonomy_id) : undefined,
+        ...overrides,
       };
-      if (marketResearchData) {
-        payload.market_context = {
-          query: marketResearchData.query,
-          topTags: marketResearchData.topTags.slice(0, 20),
-          topKeywords: marketResearchData.topKeywords.slice(0, 15),
-          priceStats: marketResearchData.priceStats,
-        };
+
+      // Use prop research data, local cache, or auto-fetch
+      let research = marketResearchData
+        ? { query: marketResearchData.query, topTags: marketResearchData.topTags.slice(0, 20), topKeywords: marketResearchData.topKeywords.slice(0, 15), priceStats: marketResearchData.priceStats }
+        : localResearchRef.current;
+
+      if (!research && fields.title.trim().length >= 10) {
+        // Extract first meaningful phrase from title for research query
+        const searchQuery = fields.title.split(',')[0].trim().substring(0, 60);
+        research = await fetchQuickResearch(searchQuery);
+      }
+
+      if (research) {
+        payload.market_context = research;
       }
 
       const res = await fetch('/api/ai/etsy', {
@@ -572,7 +607,7 @@ export default function ListingEditorDrawer({
     } finally {
       setAiLoading((prev) => ({ ...prev, [action]: false }));
     }
-  }, [fields, marketResearchData]);
+  }, [fields, marketResearchData, fetchQuickResearch]);
 
   const handleAIOptimizeTitle = useCallback(async () => {
     const result = await callAI('optimize_title');

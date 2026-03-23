@@ -219,26 +219,61 @@ export default function ListingCreatorDialog({
   // --------------------------------------------------
   // AI helper
   // --------------------------------------------------
+  const localResearchRef = useRef<{ query: string; topTags: any[]; topKeywords: any[]; priceStats: any } | null>(null);
+
+  const fetchQuickResearch = useCallback(async (query: string) => {
+    try {
+      const params = new URLSearchParams({
+        action: 'search_market', keywords: query.trim(),
+        limit: '100', sort_on: 'score', sort_order: 'desc',
+      });
+      const res = await fetch(`/api/clawd/etsy?${params}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const tagFreq = data.tagFrequency || [];
+      const keywords = data.titleKeywords || [];
+      const items = data.items || [];
+      const prices = items.map((i: any) => i.price?.amount && i.price?.divisor ? i.price.amount / i.price.divisor : 0).filter((p: number) => p > 0);
+      const priceStats = prices.length > 0
+        ? { min: Math.min(...prices).toFixed(2), max: Math.max(...prices).toFixed(2), avg: (prices.reduce((a: number, b: number) => a + b, 0) / prices.length).toFixed(2) }
+        : null;
+      const research = { query, topTags: tagFreq.slice(0, 20), topKeywords: keywords.slice(0, 15), priceStats };
+      localResearchRef.current = research;
+      return research;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const callAI = useCallback(async (action: string, overrides?: Record<string, any>): Promise<any> => {
     setAiLoading((prev) => ({ ...prev, [action]: true }));
     try {
+      const currentTitle = overrides?.title ?? title;
       const payload: Record<string, any> = {
         action,
-        title: overrides?.title ?? title,
+        title: currentTitle,
         description: overrides?.description ?? description,
         tags: overrides?.tags ?? tags,
         tags_current: overrides?.tags_current ?? tags,
         materials,
         price,
+        category: selectedTaxonomy?.label || undefined,
       };
-      if (marketResearchData) {
-        payload.market_context = {
-          query: marketResearchData.query,
-          topTags: marketResearchData.topTags.slice(0, 20),
-          topKeywords: marketResearchData.topKeywords.slice(0, 15),
-          priceStats: marketResearchData.priceStats,
-        };
+
+      // Use prop research data, local cache, or auto-fetch
+      let research = marketResearchData
+        ? { query: marketResearchData.query, topTags: marketResearchData.topTags.slice(0, 20), topKeywords: marketResearchData.topKeywords.slice(0, 15), priceStats: marketResearchData.priceStats }
+        : localResearchRef.current;
+
+      if (!research && currentTitle.trim().length >= 10) {
+        const searchQuery = currentTitle.split(',')[0].trim().substring(0, 60);
+        research = await fetchQuickResearch(searchQuery);
       }
+
+      if (research) {
+        payload.market_context = research;
+      }
+
       const res = await fetch('/api/ai/etsy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -255,7 +290,7 @@ export default function ListingCreatorDialog({
     } finally {
       setAiLoading((prev) => ({ ...prev, [action]: false }));
     }
-  }, [title, description, tags, materials, price, marketResearchData]);
+  }, [title, description, tags, materials, price, marketResearchData, selectedTaxonomy, fetchQuickResearch]);
 
   const handleAIOptimizeTitle = useCallback(async () => {
     const result = await callAI('optimize_title');

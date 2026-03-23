@@ -55,6 +55,62 @@ async function askClaude<T>(
 }
 
 // ---------------------------------------------------------------------------
+// Market research context — passed optionally by frontend
+// ---------------------------------------------------------------------------
+
+interface MarketResearch {
+  avgPrice?: number;
+  medianPrice?: number;
+  priceRange?: { min: number; max: number };
+  totalResults?: number;
+  demandScore?: number;
+  competitionScore?: number;
+  topSellers?: { username: string; listings: number }[];
+  topProducts?: { title: string; price: number; soldQuantity?: number }[];
+  freeShippingPct?: number;
+  conditionBreakdown?: Record<string, number>;
+}
+
+function formatMarketContext(mr: MarketResearch): string {
+  const lines: string[] = ['--- MARKET RESEARCH DATA (from real eBay analysis) ---'];
+
+  if (mr.avgPrice !== undefined)
+    lines.push(`Average market price: $${mr.avgPrice.toFixed(2)}`);
+  if (mr.medianPrice !== undefined)
+    lines.push(`Median market price: $${mr.medianPrice.toFixed(2)}`);
+  if (mr.priceRange)
+    lines.push(`Price range: $${mr.priceRange.min.toFixed(2)} – $${mr.priceRange.max.toFixed(2)}`);
+  if (mr.totalResults !== undefined)
+    lines.push(`Total competing listings: ${mr.totalResults}`);
+  if (mr.demandScore !== undefined)
+    lines.push(`Demand score: ${mr.demandScore}/100`);
+  if (mr.competitionScore !== undefined)
+    lines.push(`Competition score: ${mr.competitionScore}/100`);
+  if (mr.freeShippingPct !== undefined)
+    lines.push(`Free shipping: ${mr.freeShippingPct.toFixed(1)}% of listings`);
+  if (mr.conditionBreakdown) {
+    const top = Object.entries(mr.conditionBreakdown)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([cond, count]) => `${cond}: ${count}`)
+      .join(', ');
+    lines.push(`Condition breakdown: ${top}`);
+  }
+  if (mr.topProducts?.length) {
+    lines.push('Top selling products:');
+    mr.topProducts.slice(0, 5).forEach((p, i) => {
+      lines.push(`  ${i + 1}. "${p.title}" — $${p.price.toFixed(2)}${p.soldQuantity ? ` (${p.soldQuantity} sold)` : ''}`);
+    });
+  }
+  if (mr.topSellers?.length) {
+    lines.push(`Top sellers: ${mr.topSellers.slice(0, 5).map(s => `${s.username} (${s.listings} listings)`).join(', ')}`);
+  }
+
+  lines.push('--- END MARKET DATA ---');
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // Action handlers
 // ---------------------------------------------------------------------------
 
@@ -62,6 +118,7 @@ interface OptimizeTitleInput {
   title: string;
   categoryName?: string;
   keywords?: string[];
+  marketResearch?: MarketResearch;
 }
 
 interface OptimizeTitleOutput {
@@ -71,7 +128,7 @@ interface OptimizeTitleOutput {
 }
 
 async function handleOptimizeTitle(body: OptimizeTitleInput): Promise<OptimizeTitleOutput> {
-  const { title, categoryName, keywords } = body;
+  const { title, categoryName, keywords, marketResearch } = body;
 
   if (!title || typeof title !== 'string') {
     throw new InputError('title is required and must be a string');
@@ -87,6 +144,7 @@ Rules for eBay title optimization:
 - Include brand, model, size, color, condition when relevant
 - Use spaces, not special characters, to separate keywords
 - Do NOT use all caps for entire title
+${marketResearch ? '\nWhen market research data is provided, study competitor titles to identify high-performing keywords and patterns. Incorporate proven keywords from top-selling listings.' : ''}
 
 You MUST respond with ONLY valid JSON in this exact format:
 {
@@ -101,6 +159,7 @@ Score is 0-100 based on: keyword relevance (30%), keyword placement (20%), lengt
     `Current title: "${title}"`,
     categoryName ? `Category: ${categoryName}` : '',
     keywords?.length ? `Additional keywords to consider: ${keywords.join(', ')}` : '',
+    marketResearch ? '\n' + formatMarketContext(marketResearch) : '',
     'Optimize this eBay listing title.',
   ]
     .filter(Boolean)
@@ -116,6 +175,7 @@ interface GenerateDescriptionInput {
   aspects?: Record<string, string[]>;
   condition?: string;
   price?: number;
+  marketResearch?: MarketResearch;
 }
 
 interface GenerateDescriptionOutput {
@@ -125,7 +185,7 @@ interface GenerateDescriptionOutput {
 async function handleGenerateDescription(
   body: GenerateDescriptionInput
 ): Promise<GenerateDescriptionOutput> {
-  const { title, aspects, condition, price } = body;
+  const { title, aspects, condition, price, marketResearch } = body;
 
   if (!title || typeof title !== 'string') {
     throw new InputError('title is required and must be a string');
@@ -143,6 +203,7 @@ Rules:
 - Use inline styles sparingly for readability (font-family, padding)
 - Do NOT include external CSS links or JavaScript
 - The HTML should render well in eBay's description viewer
+${marketResearch ? '\nWhen market research data is provided, use competitive insights to highlight differentiators. If the item is priced below average, emphasize value. Reference features that top-selling competitors highlight.' : ''}
 
 You MUST respond with ONLY valid JSON in this exact format:
 {
@@ -160,6 +221,7 @@ You MUST respond with ONLY valid JSON in this exact format:
     condition ? `Condition: ${condition}` : '',
     price ? `Price: $${price}` : '',
     aspectLines ? `Item Specifics:\n${aspectLines}` : '',
+    marketResearch ? '\n' + formatMarketContext(marketResearch) : '',
     'Generate a professional eBay listing description in HTML.',
   ]
     .filter(Boolean)
@@ -177,6 +239,7 @@ interface AnalyzeListingInput {
   imageCount?: number;
   aspects?: Record<string, string[]>;
   categoryName?: string;
+  marketResearch?: MarketResearch;
 }
 
 interface ListingIssue {
@@ -193,7 +256,7 @@ interface AnalyzeListingOutput {
 }
 
 async function handleAnalyzeListing(body: AnalyzeListingInput): Promise<AnalyzeListingOutput> {
-  const { title, description, price, imageCount, aspects, categoryName } = body;
+  const { title, description, price, imageCount, aspects, categoryName, marketResearch } = body;
 
   if (!title || typeof title !== 'string') {
     throw new InputError('title is required and must be a string');
@@ -209,6 +272,7 @@ Evaluate these areas:
 - Item specifics completeness
 - Category relevance
 - Overall listing quality
+${marketResearch ? '\nWhen market research data is provided, compare the listing against real competitor data. Flag if the price is significantly above/below market average. Compare title keywords against top sellers. Give specific, data-driven recommendations.' : ''}
 
 Issue severity levels: "critical", "warning", "info"
 Issue types: "title", "description", "price", "images", "aspects", "category", "general"
@@ -237,6 +301,7 @@ You MUST respond with ONLY valid JSON in this exact format:
     imageCount !== undefined ? `Number of images: ${imageCount}` : '',
     aspectLines ? `Item Specifics:\n${aspectLines}` : '',
     description ? `Description (first 500 chars): ${description.substring(0, 500)}` : 'No description provided.',
+    marketResearch ? '\n' + formatMarketContext(marketResearch) : '',
     'Analyze this eBay listing and provide improvement suggestions.',
   ]
     .filter(Boolean)
@@ -252,6 +317,7 @@ interface SuggestPriceInput {
   condition?: string;
   categoryName?: string;
   competitorPrices?: number[];
+  marketResearch?: MarketResearch;
 }
 
 interface SuggestPriceOutput {
@@ -261,7 +327,7 @@ interface SuggestPriceOutput {
 }
 
 async function handleSuggestPrice(body: SuggestPriceInput): Promise<SuggestPriceOutput> {
-  const { title, condition, categoryName, competitorPrices } = body;
+  const { title, condition, categoryName, competitorPrices, marketResearch } = body;
 
   if (!title || typeof title !== 'string') {
     throw new InputError('title is required and must be a string');
@@ -270,11 +336,12 @@ async function handleSuggestPrice(body: SuggestPriceInput): Promise<SuggestPrice
   const systemPrompt = `You are an expert eBay pricing analyst. Based on the item details and any competitor pricing data, suggest an optimal price.
 
 Rules:
-- If competitor prices are provided, use them as strong signals
+- If market research data is provided, use the real market average, median, and price range as the PRIMARY basis for your suggestion
+- If competitor prices are also provided, use them as additional signals
 - Consider item condition when pricing
 - Factor in category-specific pricing patterns
 - Provide a reasonable price range (min/max)
-- Give clear reasoning for the suggested price
+- Give clear reasoning for the suggested price referencing actual market data when available
 - Prices should be in USD unless otherwise specified
 - Be conservative – it's better to price competitively than too high
 
@@ -292,6 +359,7 @@ You MUST respond with ONLY valid JSON in this exact format:
     competitorPrices?.length
       ? `Competitor prices: ${competitorPrices.map((p) => `$${p}`).join(', ')}`
       : '',
+    marketResearch ? '\n' + formatMarketContext(marketResearch) : '',
     'Suggest an optimal price for this eBay listing.',
   ]
     .filter(Boolean)

@@ -24,6 +24,9 @@ import {
   Tooltip,
   useMediaQuery,
   useTheme,
+  Alert,
+  Collapse,
+  Paper,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import CloseIcon from '@mui/icons-material/Close';
@@ -34,6 +37,9 @@ import SaveIcon from '@mui/icons-material/Save';
 import PublishIcon from '@mui/icons-material/Publish';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BlockIcon from '@mui/icons-material/Block';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import { toast } from 'react-hot-toast';
 
 import SEOIndicator from './SEOIndicator';
@@ -271,6 +277,13 @@ export default function ListingEditorDrawer({
   // Accordion expanded state
   const [expanded, setExpanded] = useState<string | false>('basics');
 
+  // AI & Market Research
+  const [marketResearch, setMarketResearch] = useState<Record<string, any> | null>(null);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState<string | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<{ score: number; issues: any[]; tips: string[] } | null>(null);
+  const [showMarketInsights, setShowMarketInsights] = useState(false);
+
   // --------------------------------------------------
   // Fetch listing details
   // --------------------------------------------------
@@ -397,6 +410,147 @@ export default function ListingEditorDrawer({
   const handleAccordionChange = (panel: string) => (_: React.SyntheticEvent, isExpanded: boolean) => {
     setExpanded(isExpanded ? panel : false);
   };
+
+  // --------------------------------------------------
+  // Market Research & AI
+  // --------------------------------------------------
+  const fetchMarketResearch = useCallback(async (query: string) => {
+    if (!query.trim() || !userId) return null;
+    setMarketLoading(true);
+    try {
+      const res = await fetch(
+        `/api/clawd/ebay-research?action=niche_analyze&q=${encodeURIComponent(query)}&marketplace_id=EBAY_US&user_id=${userId}`,
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      const research = {
+        avgPrice: data.avgPrice,
+        medianPrice: data.medianPrice,
+        priceRange: data.priceSpread,
+        totalResults: data.totalResults,
+        demandScore: data.demandScore,
+        competitionScore: data.competitionScore,
+        topSellers: data.topSellers,
+        topProducts: data.topProducts,
+        freeShippingPct: data.freeShippingPct,
+        conditionBreakdown: data.conditionBreakdown,
+      };
+      setMarketResearch(research);
+      return research;
+    } catch {
+      return null;
+    } finally {
+      setMarketLoading(false);
+    }
+  }, [userId]);
+
+  const callAI = useCallback(async (action: string, body: Record<string, any>) => {
+    const res = await fetch(`/api/clawd/ebay-ai?action=${action}&user_id=${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `AI error: ${res.status}`);
+    }
+    return res.json();
+  }, [userId]);
+
+  const handleAIOptimizeTitle = async () => {
+    if (!fields?.title?.trim()) return;
+    setAiLoading('title');
+    try {
+      const research = marketResearch || await fetchMarketResearch(fields.title);
+      const data = await callAI('optimize_title', {
+        title: fields.title.trim(),
+        categoryName: fields.categoryId,
+        marketResearch: research,
+      });
+      if (data.optimizedTitle) {
+        updateField('title', data.optimizedTitle);
+        toast.success(`Başlık optimize edildi (${data.score?.before || '?'} → ${data.score?.after || '?'})`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Başlık optimizasyonu başarısız');
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
+  const handleAIGenerateDescription = async () => {
+    if (!fields?.title?.trim()) return;
+    setAiLoading('description');
+    try {
+      const research = marketResearch || await fetchMarketResearch(fields.title);
+      const data = await callAI('generate_description', {
+        title: fields.title.trim(),
+        aspects: Object.keys(fields.aspects).length > 0 ? fields.aspects : undefined,
+        condition: fields.condition,
+        price: fields.price ? parseFloat(fields.price) : undefined,
+        marketResearch: research,
+      });
+      if (data.description) {
+        updateField('description', data.description);
+        toast.success('Açıklama oluşturuldu');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Açıklama oluşturma başarısız');
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
+  const handleAISuggestPrice = async () => {
+    if (!fields?.title?.trim()) return;
+    setAiLoading('price');
+    try {
+      const research = marketResearch || await fetchMarketResearch(fields.title);
+      const data = await callAI('suggest_price', {
+        title: fields.title.trim(),
+        condition: fields.condition,
+        marketResearch: research,
+      });
+      if (data.suggestedPrice) {
+        updateField('price', String(data.suggestedPrice));
+        toast.success(`Önerilen: ${data.suggestedPrice} (${data.priceRange?.min}-${data.priceRange?.max})`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Fiyat önerisi başarısız');
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
+  const handleAIAnalyzeListing = async () => {
+    if (!fields?.title?.trim()) return;
+    setAiLoading('analyze');
+    try {
+      const research = marketResearch || await fetchMarketResearch(fields.title);
+      const data = await callAI('analyze_listing', {
+        title: fields.title.trim(),
+        description: fields.description?.trim(),
+        price: fields.price ? parseFloat(fields.price) : undefined,
+        imageCount: fields.images.length,
+        aspects: Object.keys(fields.aspects).length > 0 ? fields.aspects : undefined,
+        categoryName: fields.categoryId,
+        marketResearch: research,
+      });
+      setAiAnalysis(data);
+      setExpanded('ai');
+    } catch (err: any) {
+      toast.error(err.message || 'Analiz başarısız');
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
+  // Auto-fetch market research when listing loads
+  useEffect(() => {
+    if (listing && fields?.title && !marketResearch && !listing.isLegacy) {
+      fetchMarketResearch(fields.title);
+    }
+  }, [listing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --------------------------------------------------
   // Has changes?
@@ -855,30 +1009,80 @@ export default function ListingEditorDrawer({
               </AccordionSummary>
               <AccordionDetails>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <TextField
-                    label="Başlık"
-                    value={fields.title}
-                    onChange={(e) => {
-                      if (e.target.value.length <= 80) {
-                        updateField('title', e.target.value);
-                      }
-                    }}
-                    fullWidth
-                    size="small"
-                    helperText={`${fields.title.length}/80 karakter`}
-                    inputProps={{ maxLength: 80 }}
-                  />
+                  {/* Market insights bar */}
+                  {(marketResearch || marketLoading) && (
+                    <Paper variant="outlined" sx={{ p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                        <TrendingUpIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                        <Typography variant="caption" fontWeight={600} sx={{ mr: 0.5 }}>Pazar:</Typography>
+                        {marketLoading && <CircularProgress size={12} />}
+                        {marketResearch && (
+                          <>
+                            <Chip label={`Ort. ${marketResearch.avgPrice?.toFixed(0) || '?'} ${fields.currency}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            <Chip label={`Talep ${marketResearch.demandScore || '?'}`} size="small" color={marketResearch.demandScore > 60 ? 'success' : 'warning'} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            <Chip label={`Rekabet ${marketResearch.competitionScore || '?'}`} size="small" color={marketResearch.competitionScore < 50 ? 'success' : 'error'} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                          </>
+                        )}
+                      </Box>
+                    </Paper>
+                  )}
 
-                  <TextField
-                    label="Açıklama"
-                    value={fields.description}
-                    onChange={(e) => updateField('description', e.target.value)}
-                    fullWidth
-                    multiline
-                    rows={6}
-                    size="small"
-                    helperText={`${fields.description.length} karakter`}
-                  />
+                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end' }}>
+                    <TextField
+                      label="Başlık"
+                      value={fields.title}
+                      onChange={(e) => {
+                        if (e.target.value.length <= 80) {
+                          updateField('title', e.target.value);
+                        }
+                      }}
+                      fullWidth
+                      size="small"
+                      helperText={`${fields.title.length}/80 karakter`}
+                      inputProps={{ maxLength: 80 }}
+                    />
+                    {!listing?.isLegacy && (
+                      <Tooltip title="AI ile başlığı optimize et">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={handleAIOptimizeTitle}
+                            disabled={!!aiLoading}
+                            sx={{ mb: 2.5 }}
+                          >
+                            {aiLoading === 'title' ? <CircularProgress size={18} /> : <AutoFixHighIcon fontSize="small" color="primary" />}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start' }}>
+                    <TextField
+                      label="Açıklama"
+                      value={fields.description}
+                      onChange={(e) => updateField('description', e.target.value)}
+                      fullWidth
+                      multiline
+                      rows={6}
+                      size="small"
+                      helperText={`${fields.description.length} karakter`}
+                    />
+                    {!listing?.isLegacy && (
+                      <Tooltip title="AI ile açıklama oluştur">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={handleAIGenerateDescription}
+                            disabled={!!aiLoading}
+                            sx={{ mt: 0.5 }}
+                          >
+                            {aiLoading === 'description' ? <CircularProgress size={18} /> : <AutoFixHighIcon fontSize="small" color="primary" />}
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
+                  </Box>
 
                   <TextField
                     label="Alt Başlık (İsteğe Bağlı)"
@@ -1006,7 +1210,7 @@ export default function ListingEditorDrawer({
                 <Typography fontWeight={600}>Fiyat ve Stok</Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                   <TextField
                     label="Fiyat"
                     value={fields.price}
@@ -1017,8 +1221,23 @@ export default function ListingEditorDrawer({
                       }
                     }}
                     size="small"
-                    sx={{ flex: 1, minWidth: 120 }}
+                    sx={{ flex: 1, minWidth: 100 }}
+                    helperText={marketResearch?.avgPrice ? `Pazar ort: ${marketResearch.avgPrice.toFixed(2)}` : undefined}
                   />
+                  {!listing?.isLegacy && (
+                    <Tooltip title="AI fiyat önerisi">
+                      <span>
+                        <IconButton
+                          size="small"
+                          onClick={handleAISuggestPrice}
+                          disabled={!!aiLoading}
+                          sx={{ mb: marketResearch?.avgPrice ? 2.5 : 0 }}
+                        >
+                          {aiLoading === 'price' ? <CircularProgress size={18} /> : <TrendingUpIcon fontSize="small" color="primary" />}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
                   <FormControl size="small" sx={{ minWidth: 90 }}>
                     <InputLabel>Para Birimi</InputLabel>
                     <Select
@@ -1262,6 +1481,88 @@ export default function ListingEditorDrawer({
                       </Select>
                     </FormControl>
                   </Box>
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+
+            {/* AI Analiz */}
+            <Accordion
+              expanded={expanded === 'ai'}
+              onChange={handleAccordionChange('ai')}
+              disableGutters
+              elevation={0}
+              sx={{ '&:before': { display: 'none' } }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography fontWeight={600}>AI Analiz</Typography>
+                  {aiAnalysis && (
+                    <Chip
+                      label={`${aiAnalysis.score}/100`}
+                      size="small"
+                      color={aiAnalysis.score >= 80 ? 'success' : aiAnalysis.score >= 50 ? 'warning' : 'error'}
+                      sx={{ height: 20, fontSize: '0.7rem' }}
+                    />
+                  )}
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={aiLoading === 'analyze' ? <CircularProgress size={16} /> : <AssessmentIcon />}
+                    onClick={handleAIAnalyzeListing}
+                    disabled={!!aiLoading || !fields?.title?.trim()}
+                    fullWidth
+                  >
+                    {aiLoading === 'analyze' ? 'Analiz ediliyor...' : aiAnalysis ? 'Tekrar Analiz Et' : 'Listeyi Analiz Et'}
+                  </Button>
+
+                  {aiAnalysis && (
+                    <>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.5 }}>
+                        <Box
+                          sx={{
+                            width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            bgcolor: aiAnalysis.score >= 80 ? 'success.light' : aiAnalysis.score >= 50 ? 'warning.light' : 'error.light',
+                            color: aiAnalysis.score >= 80 ? 'success.dark' : aiAnalysis.score >= 50 ? 'warning.dark' : 'error.dark',
+                          }}
+                        >
+                          <Typography variant="h6" fontWeight={700}>{aiAnalysis.score}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={600}>Kalite Skoru</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {aiAnalysis.score >= 80 ? 'Harika!' : aiAnalysis.score >= 50 ? 'İyileştirme önerileri var' : 'Önemli sorunlar'}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      {(aiAnalysis.issues || []).length > 0 && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          {aiAnalysis.issues.map((issue: any, i: number) => (
+                            <Alert
+                              key={i}
+                              severity={issue.severity === 'critical' ? 'error' : issue.severity === 'warning' ? 'warning' : 'info'}
+                              sx={{ py: 0, '& .MuiAlert-message': { fontSize: '0.75rem' } }}
+                            >
+                              <strong>{issue.message}</strong>{issue.fix ? ` — ${issue.fix}` : ''}
+                            </Alert>
+                          ))}
+                        </Box>
+                      )}
+
+                      {(aiAnalysis.tips || []).length > 0 && (
+                        <Box>
+                          <Typography variant="caption" fontWeight={600}>İpuçları:</Typography>
+                          {aiAnalysis.tips.map((tip: string, i: number) => (
+                            <Typography key={i} variant="caption" display="block" sx={{ ml: 1 }}>• {tip}</Typography>
+                          ))}
+                        </Box>
+                      )}
+                    </>
+                  )}
                 </Box>
               </AccordionDetails>
             </Accordion>

@@ -73,6 +73,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const [aiResult, setAiResult] = useState<{ base64: string; mimeType: string } | null>(null);
   const [aiUploading, setAiUploading] = useState(false);
   const [aiFollowUp, setAiFollowUp] = useState('');
+  const [aiRefUrl, setAiRefUrl] = useState<string | null>(null); // URL of existing listing image used as reference
   const aiRefInputRef = useRef<HTMLInputElement>(null);
 
   const sortedImages = [...(images || [])].sort((a, b) => a.rank - b.rank);
@@ -231,6 +232,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     setAiPrompt('');
     setAiRefFile(null);
     setAiRefPreview(null);
+    setAiRefUrl(null);
     setAiResult(null);
     setAiFollowUp('');
     setAiDialogOpen(true);
@@ -256,11 +258,13 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         prompt: aiPrompt.trim(),
       };
 
-      // Add reference image if provided
+      // Add reference image if provided (uploaded file or existing listing image URL)
       if (aiRefFile) {
         const base64 = await fileToBase64(aiRefFile);
         payload.reference_image = base64;
         payload.reference_mime_type = aiRefFile.type;
+      } else if (aiRefUrl) {
+        payload.reference_image_url = aiRefUrl;
       }
 
       const res = await fetch('/api/ai/generate-image', {
@@ -690,35 +694,85 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
               Referans Gorsel (opsiyonel)
             </Typography>
-            {!aiRefPreview ? (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => aiRefInputRef.current?.click()}
-                disabled={aiGenerating}
-                startIcon={<AddPhotoAlternateIcon />}
-              >
-                Referans Gorsel Sec
-              </Button>
-            ) : (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+
+            {/* Selected reference preview */}
+            {aiRefPreview ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <img
                   src={aiRefPreview}
                   alt="Referans"
-                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '2px solid #a855f7' }}
                 />
-                <Button
-                  size="small"
-                  color="error"
-                  onClick={() => {
-                    setAiRefFile(null);
-                    setAiRefPreview(null);
-                    if (aiRefInputRef.current) aiRefInputRef.current.value = '';
-                  }}
-                >
-                  Kaldir
-                </Button>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    {aiRefFile ? 'Yuklenen gorsel' : 'Listing gorseli'}
+                  </Typography>
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={() => {
+                      setAiRefFile(null);
+                      setAiRefPreview(null);
+                      setAiRefUrl(null);
+                      if (aiRefInputRef.current) aiRefInputRef.current.value = '';
+                    }}
+                  >
+                    Kaldir
+                  </Button>
+                </Box>
               </Box>
+            ) : (
+              <>
+                {/* Existing listing images as selectable references */}
+                {sortedImages.length > 0 && (
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                      Mevcut gorsellerden sec:
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      {sortedImages.map((img) => (
+                        <Box
+                          key={img.listing_image_id}
+                          onClick={() => {
+                            if (aiGenerating) return;
+                            const fullUrl = img.url_fullxfull || img.url_570xN;
+                            setAiRefUrl(fullUrl);
+                            setAiRefPreview(img.url_570xN);
+                            setAiRefFile(null);
+                          }}
+                          sx={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 1,
+                            overflow: 'hidden',
+                            border: '2px solid #e5e7eb',
+                            cursor: aiGenerating ? 'not-allowed' : 'pointer',
+                            '&:hover': { borderColor: '#a855f7', transform: 'scale(1.05)' },
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <img
+                            src={img.url_170x135 || img.url_75x75}
+                            alt={img.alt_text || `Gorsel ${img.rank}`}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Upload new reference image */}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => aiRefInputRef.current?.click()}
+                  disabled={aiGenerating}
+                  startIcon={<AddPhotoAlternateIcon />}
+                >
+                  Bilgisayardan Yukle
+                </Button>
+              </>
             )}
           </Box>
 

@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'GEMINI_API_KEY ortam degiskeni tanimli degil' });
   }
 
-  const { prompt, reference_image, reference_mime_type, aspect_ratio } = req.body;
+  const { prompt, reference_image, reference_mime_type, reference_image_url, aspect_ratio } = req.body;
 
   if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
     return res.status(400).json({ error: 'prompt is required' });
@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Build content parts
     const parts: any[] = [];
 
-    // Add reference image if provided
+    // Add reference image — either from base64 or URL
     if (reference_image && reference_mime_type) {
       // Strip data URI prefix if present
       const base64Data = reference_image.replace(/^data:image\/\w+;base64,/, '');
@@ -48,10 +48,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           data: base64Data,
         },
       });
+    } else if (reference_image_url) {
+      // Fetch image from URL (e.g. existing Etsy listing image)
+      try {
+        const imgRes = await fetch(reference_image_url);
+        if (!imgRes.ok) throw new Error(`Failed to fetch reference image: ${imgRes.status}`);
+        const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+        const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+        parts.push({
+          inlineData: {
+            mimeType: contentType,
+            data: imgBuffer.toString('base64'),
+          },
+        });
+      } catch (fetchErr: any) {
+        console.warn('Failed to fetch reference image URL, proceeding without reference:', fetchErr.message);
+      }
     }
 
     // Enhance prompt for e-commerce product images
-    const enhancedPrompt = reference_image
+    const hasReference = parts.some((p) => p.inlineData);
+    const enhancedPrompt = hasReference
       ? `Using the reference image above as inspiration, create a professional e-commerce product photo: ${prompt.trim()}. Clean white background, high resolution, no text or watermarks on the image.`
       : `Create a professional e-commerce product photo: ${prompt.trim()}. Clean white background, high resolution, no text or watermarks on the image.`;
 

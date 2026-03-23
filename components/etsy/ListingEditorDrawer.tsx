@@ -1304,10 +1304,12 @@ export default function ListingEditorDrawer({
                       <Typography variant="caption" color="text.secondary" fontWeight={600}>
                         Etiketler
                       </Typography>
-                      <TagProfileMenu
-                        currentTags={fields.tags}
-                        onApplyTags={(tags) => updateField('tags', tags)}
-                      />
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <TagProfileMenu
+                          currentTags={fields.tags}
+                          onApplyTags={(tags) => updateField('tags', tags)}
+                        />
+                      </Box>
                     </Box>
                     <Autocomplete
                       multiple
@@ -1339,6 +1341,121 @@ export default function ListingEditorDrawer({
                         />
                       )}
                     />
+
+                    {/* AI Tag Buttons — right under the tags field */}
+                    <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
+                        onClick={handleAISuggestTags}
+                        disabled={!!aiLoading.suggest_tags || !fields.title}
+                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                      >
+                        AI Etiket Oner
+                      </Button>
+                      {fields.tags.length > 0 && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="secondary"
+                          startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
+                          onClick={async () => {
+                            const result = await callAI('suggest_tags');
+                            const suggested = result?.suggestions || result?.tags;
+                            if (suggested && Array.isArray(suggested)) {
+                              updateField('tags', suggested.slice(0, 13));
+                              toast.success(`${Math.min(suggested.length, 13)} etiket ile degistirildi`);
+                            }
+                          }}
+                          disabled={!!aiLoading.suggest_tags || !fields.title}
+                          sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                        >
+                          AI ile Tumunu Degistir
+                        </Button>
+                      )}
+                    </Box>
+
+                    {/* AI Tag Suggestions */}
+                    {aiTagSuggestions.length > 0 && (
+                      <Box sx={{ mt: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Onerilen etiketler:
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            {fields.tags.length >= 13 && (
+                              <Button
+                                size="small"
+                                color="secondary"
+                                onClick={() => {
+                                  updateField('tags', aiTagSuggestions.slice(0, 13));
+                                  setAiTagSuggestions([]);
+                                  toast.success('Tum etiketler degistirildi');
+                                }}
+                                sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
+                              >
+                                Tumunu Degistir
+                              </Button>
+                            )}
+                            <Button
+                              size="small"
+                              onClick={() => {
+                                const newTags = aiTagSuggestions.filter((t) => !fields.tags.includes(t));
+                                const merged = [...fields.tags, ...newTags].slice(0, 13);
+                                updateField('tags', merged);
+                                setAiTagSuggestions([]);
+                                toast.success(`${merged.length - fields.tags.length} etiket eklendi`);
+                              }}
+                              disabled={fields.tags.length >= 13 || aiTagSuggestions.every((t) => fields.tags.includes(t))}
+                              sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
+                            >
+                              Bosluklara Ekle
+                            </Button>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {aiTagSuggestions.map((tag) => {
+                            const alreadyExists = fields.tags.includes(tag);
+                            return (
+                              <Chip
+                                key={tag}
+                                label={tag}
+                                size="small"
+                                variant={alreadyExists ? 'filled' : 'outlined'}
+                                color={alreadyExists ? 'default' : 'primary'}
+                                disabled={alreadyExists}
+                                onClick={
+                                  alreadyExists
+                                    ? undefined
+                                    : () => {
+                                        if (fields.tags.length < 13) {
+                                          updateField('tags', [...fields.tags, tag]);
+                                        } else {
+                                          // Replace the last tag when full
+                                          const newTags = [...fields.tags];
+                                          newTags[newTags.length - 1] = tag;
+                                          updateField('tags', newTags);
+                                          toast.success(`Son etiket "${tag}" ile degistirildi`);
+                                        }
+                                      }
+                                }
+                                sx={{
+                                  cursor: alreadyExists ? 'default' : 'pointer',
+                                  opacity: alreadyExists ? 0.5 : 1,
+                                  maxWidth: 180,
+                                }}
+                              />
+                            );
+                          })}
+                        </Box>
+                        {fields.tags.length >= 13 && (
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                            Etiketler dolu — tikladiginiz oneri son etiketi degistirir
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
                   </Box>
 
                   {/* Materials */}
@@ -1398,75 +1515,6 @@ export default function ListingEditorDrawer({
                   compact={false}
                 />
 
-                {/* AI Tag Suggestions */}
-                <Box sx={{ mt: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
-                      onClick={handleAISuggestTags}
-                      disabled={!!aiLoading.suggest_tags || !fields.title}
-                      sx={{ textTransform: 'none', fontSize: '0.75rem' }}
-                    >
-                      AI Etiket Oner
-                    </Button>
-                  </Box>
-
-                  {aiTagSuggestions.length > 0 && (
-                    <Box sx={{ mt: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          Onerilen etiketler:
-                        </Typography>
-                        <Button
-                          size="small"
-                          onClick={() => {
-                            const newTags = aiTagSuggestions.filter(
-                              (t) => !fields.tags.includes(t),
-                            );
-                            const merged = [...fields.tags, ...newTags].slice(0, 13);
-                            updateField('tags', merged);
-                            setAiTagSuggestions([]);
-                            toast.success(`${merged.length - fields.tags.length} etiket eklendi`);
-                          }}
-                          disabled={aiTagSuggestions.every((t) => fields.tags.includes(t))}
-                          sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
-                        >
-                          Tumunu Ekle
-                        </Button>
-                      </Box>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {aiTagSuggestions.map((tag) => {
-                          const alreadyExists = fields.tags.includes(tag);
-                          const isFull = fields.tags.length >= 13;
-                          return (
-                            <Chip
-                              key={tag}
-                              label={tag}
-                              size="small"
-                              variant={alreadyExists ? 'filled' : 'outlined'}
-                              color={alreadyExists ? 'default' : 'primary'}
-                              disabled={alreadyExists}
-                              onClick={
-                                alreadyExists || isFull
-                                  ? undefined
-                                  : () => {
-                                      updateField('tags', [...fields.tags, tag]);
-                                    }
-                              }
-                              sx={{
-                                cursor: alreadyExists || isFull ? 'default' : 'pointer',
-                                opacity: alreadyExists ? 0.5 : 1,
-                                maxWidth: 180,
-                              }}
-                            />
-                          );
-                        })}
-                      </Box>
-                    </Box>
-                  )}
-                </Box>
               </AccordionDetails>
             </Accordion>
 

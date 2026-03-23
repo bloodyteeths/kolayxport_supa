@@ -103,13 +103,41 @@ export default function PrivacyPolicyTR() {
           </ul>
           <p>Bu haklarınızı kullanmak için {supportEmail} adresinden bizimle iletişime geçebilirsiniz.</p>
 
-          <h2>8. Çerezler</h2>
+          <h2>8. Pazaryeri API Verileri (Etsy Dahil)</h2>
+          <p>
+            {appName}, hizmetlerini sunmak için Etsy dahil üçüncü taraf pazaryeri API&apos;leri ile entegre olur. Pazaryeri hesabınızı bağladığınızda:
+          </p>
+          <ul>
+            <li>
+              <strong>Erişilen Veriler:</strong> OAuth 2.0 yetkilendirilmiş API çağrıları aracılığıyla mağaza bilgilerinize, sipariş detaylarınıza, listeleme verilerinize ve ilgili meta verilerinize erişiriz. Etsy için özellikle mağaza profili, aktif listeler, siparişler ve kargo bilgileri erişilir.
+            </li>
+            <li>
+              <strong>Amaç:</strong> Bu veriler yalnızca {appName} içindeki sipariş yönetimi, kargo etiketi oluşturma, envanter senkronizasyonu ve pazar araştırma özelliklerini sağlamak için kullanılır.
+            </li>
+            <li>
+              <strong>Depolama ve Güvenlik:</strong> Pazaryeri verileri veritabanımızda şifreli olarak saklanır. API erişim tokenları şifreli olarak saklanır ve otomatik olarak yenilenir.
+            </li>
+            <li>
+              <strong>Paylaşılmaz:</strong> Pazaryeri API&apos;leri aracılığıyla elde edilen veriler üçüncü taraflarla reklam amacıyla paylaşılmaz veya satılmaz.
+            </li>
+            <li>
+              <strong>Önbellek:</strong> Listeleme verileri 6 saat içinde, diğer tüm içerikler ise 24 saat içinde yenilenir.
+            </li>
+            <li>
+              <strong>İptal:</strong> Pazaryeri hesabınızı istediğiniz zaman {appName} ayarlarınızdan çıkarabilirsiniz. Bağlantı kesildiğinde API tokenlarınız silinir.
+            </li>
+          </ul>
+          <p>
+            &ldquo;Etsy&rdquo; terimi Etsy, Inc.&apos;in tescilli markasıdır. Bu uygulama Etsy API&apos;sini kullanır ancak Etsy tarafından onaylanmamış veya sertifikalandırılmamıştır.
+          </p>
+
+          <h2>9. Çerezler</h2>
           <p>
             Sitemiz, kullanıcı deneyimini geliştirmek için çerezler kullanabilir. Tarayıcı ayarlarınızdan çerezleri reddedebilirsiniz,
             ancak bu, Sitenin bazı işlevlerinin düzgün çalışmamasına neden olabilir.
           </p>
 
-          <h2>9. Diğer Web Sitelerine Bağlantılar</h2>
+          <h2>10. Diğer Web Sitelerine Bağlantılar</h2>
           <p>
             Sitemiz, bizim tarafımızdan işletilmeyen diğer web sitelerine bağlantılar içerebilir.
             Bir üçüncü taraf bağlantısına tıklarsanız, o üçüncü tarafın sitesine yönlendirilirsiniz.
@@ -118,13 +146,13 @@ export default function PrivacyPolicyTR() {
             ve hiçbir sorumluluk kabul etmeyiz.
           </p>
 
-          <h2>10. Bu Gizlilik Politikasındaki Değişiklikler</h2>
+          <h2>11. Bu Gizlilik Politikasındaki Değişiklikler</h2>
           <p>
             Bu Gizlilik Politikasını zaman zaman güncelleyebiliriz. Herhangi bir değişikliği Sitede yeni Gizlilik Politikasını yayınlayarak size bildireceğiz.
             Değişiklikler için bu Gizlilik Politikasını periyodik olarak gözden geçirmeniz tavsiye edilir.
           </p>
 
-          <h2>11. İletişim</h2>
+          <h2>12. İletişim</h2>
           <p>
             Bu Gizlilik Politikası hakkında herhangi bir sorunuz varsa, lütfen bizimle iletişime geçin:
             <br />

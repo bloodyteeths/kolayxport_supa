@@ -103,13 +103,41 @@ export default function PrivacyPolicyEN() {
           </ul>
           <p>You can exercise these rights by contacting us at {supportEmail}.</p>
 
-          <h2>8. Cookies</h2>
+          <h2>8. Marketplace API Data (Including Etsy)</h2>
+          <p>
+            {appName} integrates with third-party marketplace APIs, including Etsy, to provide its services. When you connect your marketplace account:
+          </p>
+          <ul>
+            <li>
+              <strong>Data Accessed:</strong> We access your shop information, order details, listing data, and related metadata via OAuth 2.0 authorized API calls. For Etsy specifically, this includes shop profile, active listings, receipts/orders, and shipping information.
+            </li>
+            <li>
+              <strong>Purpose:</strong> This data is used exclusively to provide order management, shipping label generation, inventory synchronization, and market research features within {appName}.
+            </li>
+            <li>
+              <strong>Storage & Security:</strong> Marketplace data is stored encrypted in our database. API access tokens are encrypted at rest and refreshed automatically. We do not store marketplace data longer than reasonably necessary for the service.
+            </li>
+            <li>
+              <strong>No Sharing:</strong> Data obtained through marketplace APIs is never sold, shared with third parties for advertising, or used for purposes unrelated to the services you authorized.
+            </li>
+            <li>
+              <strong>Caching:</strong> Listing data is refreshed within 6 hours, and all other content within 24 hours, in compliance with marketplace API caching policies.
+            </li>
+            <li>
+              <strong>Revocation:</strong> You can disconnect your marketplace account at any time through your {appName} settings. Upon disconnection, we will delete your marketplace API tokens.
+            </li>
+          </ul>
+          <p>
+            The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy.
+          </p>
+
+          <h2>9. Cookies</h2>
           <p>
             Our Site may use cookies to enhance user experience. You can refuse cookies through your browser settings,
             but this may cause some functions of the Site to not operate properly.
           </p>
 
-          <h2>9. Links to Other Websites</h2>
+          <h2>10. Links to Other Websites</h2>
           <p>
             Our Site may contain links to other websites that are not operated by us.
             If you click on a third-party link, you will be directed to that third party's site.
@@ -117,13 +145,13 @@ export default function PrivacyPolicyEN() {
             We have no control over and assume no responsibility for the content, privacy policies, or practices of any third-party sites or services.
           </p>
 
-          <h2>10. Changes to This Privacy Policy</h2>
+          <h2>11. Changes to This Privacy Policy</h2>
           <p>
             We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on the Site.
             You are advised to review this Privacy Policy periodically for any changes.
           </p>
 
-          <h2>11. Contact Us</h2>
+          <h2>12. Contact Us</h2>
           <p>
             If you have any questions about this Privacy Policy, please contact us:
             <br />

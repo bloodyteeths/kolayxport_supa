@@ -43,16 +43,30 @@ export default function TermsOfServiceEN() {
           <h2>7. Disclaimer</h2>
           <p>All services are provided "as-is" without warranty of any kind.</p>
 
-          <h2>8. Termination</h2>
+          <h2>8. Third-Party API Integrations</h2>
+          <p>
+            {appName} integrates with various third-party marketplace APIs, including but not limited to Etsy, Amazon, Shopify, and others, to provide its services. By using our Service:
+          </p>
+          <ul>
+            <li>You authorize {appName} to access your marketplace accounts via OAuth 2.0 to retrieve and manage your orders, listings, and shop data on your behalf.</li>
+            <li>We comply with each marketplace&apos;s API Terms of Use, including Etsy&apos;s API Terms of Use (<a href="https://www.etsy.com/legal/api">https://www.etsy.com/legal/api</a>).</li>
+            <li>Listing data obtained through marketplace APIs is refreshed within 6 hours, and all other content is refreshed within 24 hours, in compliance with caching policies.</li>
+            <li>Data obtained through marketplace APIs is handled in accordance with our Privacy Policy and is never sold or shared with third parties for advertising purposes.</li>
+          </ul>
+          <p>
+            The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy.
+          </p>
+
+          <h2>9. Termination</h2>
           <p>We may suspend or terminate your access if you violate these Terms.</p>
 
-          <h2>9. Modifications</h2>
+          <h2>10. Modifications</h2>
           <p>We may update these Terms; updated versions will be posted with a revised date.</p>
 
-          <h2>10. Governing Law</h2>
+          <h2>11. Governing Law</h2>
           <p>These Terms are governed by the laws applicable where {companyName} is located.</p>
 
-          <h2>11. Contact</h2>
+          <h2>12. Contact</h2>
           <p>
             For questions, email us at <a href={`mailto:${supportEmail}`}>{supportEmail}</a>.
           </p>

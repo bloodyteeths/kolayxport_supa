@@ -43,16 +43,30 @@ export default function TermsOfServiceTR() {
           <h2>7. Feragatname</h2>
           <p>Tüm hizmetler, her türlü garanti olmaksızın "olduğu gibi" sağlanmaktadır.</p>
 
-          <h2>8. Fesih</h2>
+          <h2>8. Üçüncü Taraf API Entegrasyonları</h2>
+          <p>
+            {appName}, hizmetlerini sunmak için Etsy, Amazon, Shopify ve diğerleri dahil olmak üzere çeşitli üçüncü taraf pazaryeri API&apos;leri ile entegre olur. Hizmetimizi kullanarak:
+          </p>
+          <ul>
+            <li>Siparişlerinizi, listelerinizi ve mağaza verilerinizi sizin adınıza almak ve yönetmek için {appName}&apos;un OAuth 2.0 aracılığıyla pazaryeri hesaplarınıza erişmesine yetki verirsiniz.</li>
+            <li>Etsy API Kullanım Şartları (<a href="https://www.etsy.com/legal/api">https://www.etsy.com/legal/api</a>) dahil olmak üzere her pazaryerinin API Kullanım Şartlarına uyarız.</li>
+            <li>Pazaryeri API&apos;leri aracılığıyla elde edilen listeleme verileri 6 saat içinde, diğer tüm içerikler ise 24 saat içinde yenilenir.</li>
+            <li>Pazaryeri API&apos;leri aracılığıyla elde edilen veriler Gizlilik Politikamıza uygun olarak işlenir ve üçüncü taraflarla reklam amacıyla paylaşılmaz.</li>
+          </ul>
+          <p>
+            &ldquo;Etsy&rdquo; terimi Etsy, Inc.&apos;in tescilli markasıdır. Bu uygulama Etsy API&apos;sini kullanır ancak Etsy tarafından onaylanmamış veya sertifikalandırılmamıştır.
+          </p>
+
+          <h2>9. Fesih</h2>
           <p>Bu Şartları ihlal etmeniz durumunda erişiminizi askıya alabilir veya sonlandırabiliriz.</p>
 
-          <h2>9. Değişiklikler</h2>
+          <h2>10. Değişiklikler</h2>
           <p>Bu Şartları güncelleyebiliriz; güncellenen sürümler güncellenme tarihi ile yayınlanacaktır.</p>
 
-          <h2>10. Geçerli Hukuk</h2>
+          <h2>11. Geçerli Hukuk</h2>
           <p>Bu Şartlar, {companyName}'in bulunduğu yerin yasalarına tabidir.</p>
 
-          <h2>11. İletişim</h2>
+          <h2>12. İletişim</h2>
           <p>
             Sorular için <a href={`mailto:${supportEmail}`}>{supportEmail}</a> adresinden bize ulaşın.
           </p>

@@ -50,6 +50,9 @@ const PublicFooter = () => {
             <p className="text-sm text-slate-400">
               Tek panelde e-ticaret entegrasyonu
             </p>
+            <p className="text-sm text-slate-400">
+              <a href="mailto:destek@kolayxport.com" className="text-slate-300 hover:text-white transition-colors">destek@kolayxport.com</a>
+            </p>
             <div className="flex space-x-4">
               {socialLinks.map((social) => (
                 <Link
@@ -95,6 +98,9 @@ const PublicFooter = () => {
         <div className="border-t border-slate-700 pt-8 text-center text-sm">
           <p>
             &copy; {new Date().getFullYear()} {brandName}. Tüm hakları saklıdır.
+          </p>
+          <p className="mt-2 text-xs text-slate-500">
+            The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy.
           </p>
         </div>
       </div>

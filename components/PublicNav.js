@@ -94,6 +94,13 @@ const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
                   {ctaLabel}
               </Link>
             </motion.div>
+            <motion.div variants={linkVariants}>
+              <Link
+                href={router.asPath === '/en' ? '/' : '/en'}
+                className="text-xs font-semibold text-gray-500 hover:text-blue-600 border border-gray-300 rounded px-2 py-1 transition-colors">
+                  {router.asPath === '/en' ? 'TR' : 'EN'}
+              </Link>
+            </motion.div>
           </nav>
 
           {/* Mobile Menu Button */}

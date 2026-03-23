@@ -10,6 +10,9 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Log ALL query params for debugging
+  logger.info('eBay OAuth callback received', { query: req.query });
+
   const { code, state, error } = req.query;
 
   // Handle eBay OAuth errors
@@ -17,12 +20,18 @@ export default async function handler(
     logger.error('eBay OAuth error', undefined, {
       error: error as string,
       description: req.query.error_description as string,
+      allParams: JSON.stringify(req.query),
     });
     return res.redirect('/ayarlar?error=ebay_auth_failed');
   }
 
   if (!code || !state) {
-    return res.status(400).json({ error: 'Missing code or state parameter' });
+    logger.error('eBay callback missing params', undefined, {
+      hasCode: !!code,
+      hasState: !!state,
+      allParams: JSON.stringify(req.query),
+    });
+    return res.redirect(`/ayarlar?error=ebay_callback_failed&details=${encodeURIComponent('Missing code or state parameter')}`);
   }
 
   let userId: string = '';

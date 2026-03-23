@@ -45,6 +45,7 @@ import {
   Warning as WarningIcon,
   ErrorOutline as ErrorOutlineIcon,
   RemoveCircleOutline as RemoveCircleOutlineIcon,
+  ContentCopy as ContentCopyIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -391,6 +392,11 @@ function EtsyListingsPage() {
     }
   }, [selectedShopId, statusFilter, fetchListings, fetchShopMeta]);
 
+  // Reset pagination to page 0 when filters change
+  useEffect(() => {
+    setPaginationModel((prev) => (prev.page !== 0 ? { ...prev, page: 0 } : prev));
+  }, [searchTerm, sectionFilter, excludeTerm, healthFilter]);
+
   // --- Client-side filtering ---
   const filteredListings = useMemo(() => {
     let result = listings;
@@ -638,6 +644,31 @@ function EtsyListingsPage() {
     setDrawerOpen(true);
   };
 
+  // --- Copy listing ---
+  const [copyingId, setCopyingId] = useState<number | null>(null);
+  const handleCopyListing = async (listingId: number) => {
+    if (!selectedShopId) return;
+    setCopyingId(listingId);
+    try {
+      const res = await fetch(
+        `/api/clawd/etsy?action=copy_listing&shop_id=${selectedShopId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source_listing_id: listingId }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      toast.success(`Liste kopyalandı (taslak olarak) — ID: ${data.new_listing_id}`);
+      fetchListings();
+    } catch (err: any) {
+      toast.error(err.message || 'Kopyalama başarısız');
+    } finally {
+      setCopyingId(null);
+    }
+  };
+
   // --- Selected listing objects for bulk operations ---
   const selectedListings = useMemo(() => {
     const idSet = 'ids' in selectedIds ? selectedIds.ids : new Set<GridRowId>();
@@ -872,21 +903,41 @@ function EtsyListingsPage() {
       {
         field: 'actions',
         headerName: '',
-        width: 90,
+        width: 120,
         sortable: false,
         filterable: false,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
           <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <IconButton size="small" onClick={() => handleOpenEditor(params.row.listing_id)}>
-              <EditIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              color="error"
-              onClick={() => setDeleteConfirmId(params.row.listing_id)}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
+            <Tooltip title="Düzenle" arrow>
+              <IconButton size="small" onClick={() => handleOpenEditor(params.row.listing_id)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Kopyala (taslak)" arrow>
+              <span>
+                <IconButton
+                  size="small"
+                  color="primary"
+                  onClick={() => handleCopyListing(params.row.listing_id)}
+                  disabled={copyingId === params.row.listing_id}
+                >
+                  {copyingId === params.row.listing_id ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    <ContentCopyIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Sil" arrow>
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => setDeleteConfirmId(params.row.listing_id)}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
         ),
       },

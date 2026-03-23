@@ -897,6 +897,31 @@ function EbayListingsPage() {
     fetchListings();
   };
 
+  // --- Fetch market research for AI context ---
+  const fetchMarketResearch = async (query: string): Promise<Record<string, unknown> | null> => {
+    try {
+      const params = new URLSearchParams({ action: 'niche_analyze', q: query, marketplace_id: 'EBAY_US' });
+      if (userId) params.set('user_id', userId);
+      const res = await fetch(`/api/clawd/ebay-research?${params}`, { credentials: 'same-origin' });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return {
+        avgPrice: data.avgPrice,
+        medianPrice: data.medianPrice,
+        priceRange: data.priceSpread,
+        totalResults: data.totalResults,
+        demandScore: data.demandScore,
+        competitionScore: data.competitionScore,
+        topSellers: data.topSellers,
+        topProducts: data.topProducts,
+        freeShippingPct: data.freeShippingPct,
+        conditionBreakdown: data.conditionBreakdown,
+      };
+    } catch {
+      return null;
+    }
+  };
+
   // --- AI handlers ---
   const handleAIBulkOptimize = async () => {
     if (filteredListings.length === 0) {
@@ -912,10 +937,13 @@ function EbayListingsPage() {
         title: l.title,
         categoryName: l.categoryName || '',
       }));
+      // Fetch market research using first listing's category or title
+      const searchQuery = batch[0]?.categoryName || batch[0]?.title?.split(' ').slice(0, 3).join(' ') || '';
+      const marketResearch = searchQuery ? await fetchMarketResearch(searchQuery) : null;
       const res = await fetch('/api/clawd/ebay-ai?action=bulk_optimize_titles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listings: batch }),
+        body: JSON.stringify({ listings: batch, ...(marketResearch ? { marketResearch } : {}) }),
       });
       if (!res.ok) throw new Error('AI servisi yanit vermedi');
       const data = await res.json();
@@ -938,6 +966,9 @@ function EbayListingsPage() {
     setAiLoading(true);
     try {
       const l = filteredListings[0];
+      // Fetch market research for competitive analysis
+      const searchQuery = l.categoryName || l.title?.split(' ').slice(0, 3).join(' ') || '';
+      const marketResearch = searchQuery ? await fetchMarketResearch(searchQuery) : null;
       const res = await fetch('/api/clawd/ebay-ai?action=analyze_listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -948,6 +979,7 @@ function EbayListingsPage() {
           imageCount: l.imageCount,
           aspects: l.aspects,
           categoryName: l.categoryName,
+          ...(marketResearch ? { marketResearch } : {}),
         }),
       });
       if (!res.ok) throw new Error('AI servisi yanit vermedi');

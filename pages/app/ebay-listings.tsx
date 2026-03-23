@@ -29,6 +29,8 @@ import {
   Menu,
   ListItemText,
   ListItemIcon,
+  ListSubheader,
+  Divider,
 } from '@mui/material';
 import {
   DataGrid,
@@ -56,6 +58,9 @@ import {
   Backup as BackupIcon,
   Schedule as ScheduleIcon,
   Close as CloseIcon,
+  Build as BuildIcon,
+  AutoFixHigh as AutoFixHighIcon,
+  Psychology as PsychologyIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -414,6 +419,13 @@ function EbayListingsPage() {
   const [csvImporting, setCsvImporting] = useState(false);
   const [csvImportProgress, setCsvImportProgress] = useState(0);
 
+  // AI state
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResults, setAiResults] = useState<any>(null);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiDialogMode, setAiDialogMode] = useState<'titles' | 'analyze'>('titles');
+  const [appliedTitles, setAppliedTitles] = useState<Map<string, string>>(new Map()); // id -> original title
+
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false);
 
@@ -539,6 +551,50 @@ function EbayListingsPage() {
       setLoading(false);
     }
   }, [userId]);
+
+  // --- AI Apply / Undo handlers ---
+  const handleApplyAITitle = async (listingId: string, newTitle: string, originalTitle: string) => {
+    try {
+      const listing = listings.find(l => l.id === listingId);
+      if (!listing) return;
+
+      const res = await fetch(`/api/clawd/ebay?action=update_listing&user_id=${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku: listing.sku, offerId: listing.offerId, title: newTitle }),
+      });
+      if (!res.ok) throw new Error('Güncelleme başarısız');
+
+      setAppliedTitles(prev => new Map(prev).set(listingId, originalTitle));
+      toast.success('Başlık güncellendi');
+      fetchListings();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleUndoAITitle = async (listingId: string) => {
+    const originalTitle = appliedTitles.get(listingId);
+    if (!originalTitle) return;
+
+    const listing = listings.find(l => l.id === listingId);
+    if (!listing) return;
+
+    try {
+      const res = await fetch(`/api/clawd/ebay?action=update_listing&user_id=${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku: listing.sku, offerId: listing.offerId, title: originalTitle }),
+      });
+      if (!res.ok) throw new Error('Geri alma başarısız');
+
+      setAppliedTitles(prev => { const m = new Map(prev); m.delete(listingId); return m; });
+      toast.success('Başlık geri alındı');
+      fetchListings();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
 
   // --- Fetch policies ---
   const fetchPolicies = useCallback(async () => {
@@ -842,6 +898,70 @@ function EbayListingsPage() {
     }
 
     fetchListings();
+  };
+
+  // --- AI handlers ---
+  const handleAIBulkOptimize = async () => {
+    if (filteredListings.length === 0) {
+      toast.error('Optimize edilecek listeleme yok');
+      return;
+    }
+    setAiDialogMode('titles');
+    setAiDialogOpen(true);
+    setAiLoading(true);
+    try {
+      const batch = filteredListings.slice(0, 10).map(l => ({
+        id: l.id,
+        title: l.title,
+        categoryName: l.categoryName || '',
+      }));
+      const res = await fetch('/api/clawd/ebay-ai?action=bulk_optimize_titles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listings: batch }),
+      });
+      if (!res.ok) throw new Error('AI servisi yanit vermedi');
+      const data = await res.json();
+      setAiResults(data.results || []);
+    } catch (err: any) {
+      toast.error(`AI hatasi: ${err.message}`);
+      setAiDialogOpen(false);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAIAnalyze = async () => {
+    if (filteredListings.length === 0) {
+      toast.error('Analiz edilecek listeleme yok');
+      return;
+    }
+    setAiDialogMode('analyze');
+    setAiDialogOpen(true);
+    setAiLoading(true);
+    try {
+      const l = filteredListings[0];
+      const res = await fetch('/api/clawd/ebay-ai?action=analyze_listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: l.title,
+          description: l.description,
+          price: parseFloat(l.price?.value || '0'),
+          imageCount: l.imageCount,
+          aspects: l.aspects,
+          categoryName: l.categoryName,
+        }),
+      });
+      if (!res.ok) throw new Error('AI servisi yanit vermedi');
+      const data = await res.json();
+      setAiResults(data);
+    } catch (err: any) {
+      toast.error(`AI hatasi: ${err.message}`);
+      setAiDialogOpen(false);
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // --- Open editor ---
@@ -1257,116 +1377,109 @@ function EbayListingsPage() {
           + Yeni Listeleme
         </Button>
 
-        {isMobile ? (
-          <>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
-              endIcon={<MoreVertIcon />}
-            >
-              Daha Fazla
-            </Button>
-            <Menu
-              anchorEl={moreMenuAnchor}
-              open={Boolean(moreMenuAnchor)}
-              onClose={() => setMoreMenuAnchor(null)}
-            >
-              <MenuItem onClick={() => { setMoreMenuAnchor(null); setFindReplaceOpen(true); }}>
-                <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Bul &amp; Degistir</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setMoreMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
-                <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Tekrar Tespit</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setMoreMenuAnchor(null); setSmartPricingOpen(true); }}>
-                <ListItemIcon><AttachMoneyIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Smart Fiyatlandirma</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setMoreMenuAnchor(null); setTemplatesOpen(true); }}>
-                <ListItemIcon><ViewListIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Sablonlar</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setMoreMenuAnchor(null); handleExportCSV(); }}>
-                <ListItemIcon><DownloadIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>CSV Indir</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setMoreMenuAnchor(null); handleCSVFileSelect(); }}>
-                <ListItemIcon><UploadFileIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>CSV Iceri Aktar</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setMoreMenuAnchor(null); setBackupManagerOpen(true); }}>
-                <ListItemIcon><BackupIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Yedek Yonetimi</ListItemText>
-              </MenuItem>
-              <MenuItem onClick={() => { setMoreMenuAnchor(null); setScheduledOpen(true); }}>
-                <ListItemIcon><ScheduleIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>Zamanlanmis{scheduledCount > 0 ? ` (${scheduledCount})` : ''}</ListItemText>
-              </MenuItem>
-            </Menu>
-          </>
-        ) : (
-          <>
-            {/* Edit group */}
-            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-              <Tooltip title="Baslik, aciklama, item specificlerde ara ve degistir" arrow>
-                <Button variant="outlined" size="small" startIcon={<FindReplaceIcon />} onClick={() => setFindReplaceOpen(true)}>
-                  Bul &amp; Degistir
-                </Button>
-              </Tooltip>
-              <Tooltip title="Benzer/tekrarlanan listelemeleri bul" arrow>
-                <Button variant="outlined" size="small" color="warning" startIcon={<ContentCopyIcon />} onClick={() => setDuplicateDetectorOpen(true)}>
-                  Tekrar Tespit
-                </Button>
-              </Tooltip>
-            </Box>
+        {/* CSV Download — always visible */}
+        <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={handleExportCSV}>
+          CSV İndir
+        </Button>
 
-            {/* Tools group */}
-            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-              <Tooltip title="Rekabete gore otomatik fiyat ayarla" arrow>
-                <Button variant="outlined" size="small" startIcon={<AttachMoneyIcon />} onClick={() => setSmartPricingOpen(true)}>
-                  Smart Fiyatlandirma
-                </Button>
-              </Tooltip>
-              <Tooltip title="Kayitli sablonlardan hizlica listeleme olustur" arrow>
-                <Button variant="outlined" size="small" startIcon={<ViewListIcon />} onClick={() => setTemplatesOpen(true)}>
-                  Sablonlar
-                </Button>
-              </Tooltip>
-            </Box>
+        {/* Tools dropdown — shared by mobile & desktop */}
+        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+            startIcon={<BuildIcon />}
+            endIcon={<ExpandMoreIcon />}
+          >
+            Araçlar
+          </Button>
+        </Box>
 
-            {/* Data group */}
-            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-              <Tooltip title="Listeleme verilerini CSV olarak disa aktar" arrow>
-                <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={handleExportCSV}>
-                  CSV Indir
-                </Button>
-              </Tooltip>
-              <Tooltip title="CSV dosyasindan toplu listeleme olustur" arrow>
-                <Button variant="outlined" size="small" startIcon={<UploadFileIcon />} onClick={handleCSVFileSelect}>
-                  CSV Iceri Aktar
-                </Button>
-              </Tooltip>
-            </Box>
+        <Menu
+          anchorEl={moreMenuAnchor}
+          open={Boolean(moreMenuAnchor)}
+          onClose={() => setMoreMenuAnchor(null)}
+          slotProps={{ paper: { sx: { minWidth: 320 } } }}
+        >
+          <ListSubheader sx={{ lineHeight: '32px', fontSize: 12, fontWeight: 700, color: 'primary.main' }}>
+            🤖 AI Asistan
+          </ListSubheader>
+          <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIBulkOptimize(); }}>
+            <ListItemIcon><AutoFixHighIcon fontSize="small" /></ListItemIcon>
+            <ListItemText
+              primary="Başlıkları Optimize Et"
+              secondary="AI ile tüm başlıklarını eBay SEO'ya uygun hale getir"
+            />
+          </MenuItem>
+          <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIAnalyze(); }}>
+            <ListItemIcon><PsychologyIcon fontSize="small" /></ListItemIcon>
+            <ListItemText
+              primary="Listeleri Analiz Et"
+              secondary="AI en çok satış getirecek iyileştirmeleri önersin"
+            />
+          </MenuItem>
+          <Divider />
+          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>Düzenleme Araçları</ListSubheader>
+          <MenuItem onClick={() => { setMoreMenuAnchor(null); setFindReplaceOpen(true); }}>
+            <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
+            <ListItemText
+              primary="Bul & Değiştir"
+              secondary="Birden fazla listede aynı anda değişiklik yap"
+            />
+          </MenuItem>
+          <MenuItem onClick={() => { setMoreMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
+            <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
+            <ListItemText
+              primary="Tekrar Tespit"
+              secondary="Benzer veya kopya listeleri bul"
+            />
+          </MenuItem>
 
-            {/* Safety group */}
-            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-              <Tooltip title="Toplu islem yedeklerini goruntule ve geri yukle" arrow>
-                <Button variant="outlined" size="small" color="info" startIcon={<BackupIcon />} onClick={() => setBackupManagerOpen(true)}>
-                  Yedek Yonetimi
-                </Button>
-              </Tooltip>
-              <Tooltip title="Zamanlanmis guncellemeleri goruntule" arrow>
-                <Badge badgeContent={scheduledCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10 } }}>
-                  <Button variant="outlined" size="small" startIcon={<ScheduleIcon />} onClick={() => setScheduledOpen(true)}>
-                    Zamanlanmis
-                  </Button>
-                </Badge>
-              </Tooltip>
-            </Box>
-          </>
-        )}
+          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>Fiyat & Şablon</ListSubheader>
+          <MenuItem onClick={() => { setMoreMenuAnchor(null); setSmartPricingOpen(true); }}>
+            <ListItemIcon><AttachMoneyIcon fontSize="small" /></ListItemIcon>
+            <ListItemText
+              primary="Akıllı Fiyatlandırma"
+              secondary="Rakiplere göre fiyatını otomatik ayarla"
+            />
+          </MenuItem>
+          <MenuItem onClick={() => { setMoreMenuAnchor(null); setTemplatesOpen(true); }}>
+            <ListItemIcon><ViewListIcon fontSize="small" /></ListItemIcon>
+            <ListItemText
+              primary="Şablonlar"
+              secondary="Hazır şablonlardan hızlıca liste oluştur"
+            />
+          </MenuItem>
+
+          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>Veri</ListSubheader>
+          <MenuItem onClick={() => { setMoreMenuAnchor(null); handleCSVFileSelect(); }}>
+            <ListItemIcon><UploadFileIcon fontSize="small" /></ListItemIcon>
+            <ListItemText
+              primary="CSV İçeri Aktar"
+              secondary="Excel/CSV dosyasından toplu liste yükle"
+            />
+          </MenuItem>
+
+          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>Güvenlik</ListSubheader>
+          <MenuItem onClick={() => { setMoreMenuAnchor(null); setBackupManagerOpen(true); }}>
+            <ListItemIcon><BackupIcon fontSize="small" /></ListItemIcon>
+            <ListItemText
+              primary="Yedek Yönetimi"
+              secondary="Yaptığın değişiklikleri geri al"
+            />
+          </MenuItem>
+          <MenuItem onClick={() => { setMoreMenuAnchor(null); setScheduledOpen(true); }}>
+            <ListItemIcon>
+              <Badge badgeContent={scheduledCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10 } }}>
+                <ScheduleIcon fontSize="small" />
+              </Badge>
+            </ListItemIcon>
+            <ListItemText
+              primary={`Zamanlı Görevler${scheduledCount > 0 ? ` (${scheduledCount})` : ''}`}
+              secondary="İleri tarihli otomatik güncellemeler"
+            />
+          </MenuItem>
+        </Menu>
       </Box>
 
       {/* Mobile Card Layout */}
@@ -1753,6 +1866,151 @@ function EbayListingsPage() {
             {csvImporting ? 'Import ediliyor...' : `${csvImportRows.length} Listeleme Olustur`}
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* AI Results Dialog */}
+      <Dialog open={aiDialogOpen} onClose={() => setAiDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {aiDialogMode === 'titles' ? <AutoFixHighIcon color="primary" /> : <PsychologyIcon color="primary" />}
+            {aiDialogMode === 'titles' ? 'AI Başlık Optimizasyonu' : 'AI Liste Analizi'}
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {aiDialogMode === 'titles' && !aiLoading && Array.isArray(aiResults) && aiResults.length > 0 && (
+              appliedTitles.size > 0 ? (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="warning"
+                  onClick={async () => {
+                    const ids = Array.from(appliedTitles.keys());
+                    for (const id of ids) {
+                      await handleUndoAITitle(id);
+                    }
+                  }}
+                >
+                  Tümünü Geri Al
+                </Button>
+              ) : (
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={async () => {
+                    for (const r of aiResults) {
+                      if (!appliedTitles.has(r.id)) {
+                        await handleApplyAITitle(r.id, r.optimized, r.original);
+                      }
+                    }
+                  }}
+                >
+                  Tümünü Uygula
+                </Button>
+              )
+            )}
+            <IconButton size="small" onClick={() => setAiDialogOpen(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {aiLoading ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4, gap: 2 }}>
+              <CircularProgress />
+              <Typography color="text.secondary">AI analiz ediyor...</Typography>
+            </Box>
+          ) : aiDialogMode === 'titles' && Array.isArray(aiResults) ? (
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                AI, başlıklarınızı eBay SEO kurallarına göre optimize etti:
+              </Typography>
+              {aiResults.map((r: any, i: number) => {
+                // Build visual diff: highlight words that changed
+                const origWords = (r.original || '').split(' ');
+                const optWords = (r.optimized || '').split(' ');
+                const origSet = new Set(origWords.map((w: string) => w.toLowerCase()));
+                const optSet = new Set(optWords.map((w: string) => w.toLowerCase()));
+
+                return (
+                  <Paper key={i} sx={{ p: 2, mb: 1.5, borderLeft: appliedTitles.has(r.id) ? '3px solid #4caf50' : undefined }} variant="outlined">
+                    <Typography variant="caption" color="text.secondary">Mevcut:</Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      {origWords.map((w: string, wi: number) => (
+                        <span key={wi} style={{ color: optSet.has(w.toLowerCase()) ? undefined : '#f44336', textDecoration: optSet.has(w.toLowerCase()) ? undefined : 'line-through' }}>
+                          {wi > 0 ? ' ' : ''}{w}
+                        </span>
+                      ))}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">AI Önerisi:</Typography>
+                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+                      {optWords.map((w: string, wi: number) => (
+                        <span key={wi} style={{ color: origSet.has(w.toLowerCase()) ? undefined : '#4caf50', fontWeight: origSet.has(w.toLowerCase()) ? undefined : 700 }}>
+                          {wi > 0 ? ' ' : ''}{w}
+                        </span>
+                      ))}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                      {appliedTitles.has(r.id) ? (
+                        <Button size="small" variant="outlined" color="warning" onClick={() => handleUndoAITitle(r.id)}>
+                          Geri Al
+                        </Button>
+                      ) : (
+                        <Button size="small" variant="contained" color="primary" onClick={() => handleApplyAITitle(r.id, r.optimized, r.original)}>
+                          Uygula
+                        </Button>
+                      )}
+                      <Button size="small" variant="outlined" onClick={() => { navigator.clipboard.writeText(r.optimized); toast.success('Kopyalandı'); }}>
+                        Kopyala
+                      </Button>
+                    </Box>
+                  </Paper>
+                );
+              })}
+            </Box>
+          ) : aiDialogMode === 'analyze' && aiResults ? (
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                <Box sx={{
+                  width: 64, height: 64, borderRadius: '50%',
+                  border: `4px solid ${(aiResults.score || 0) >= 80 ? '#4caf50' : (aiResults.score || 0) >= 60 ? '#ff9800' : '#f44336'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Typography variant="h5" fontWeight={700} sx={{ color: (aiResults.score || 0) >= 80 ? '#4caf50' : (aiResults.score || 0) >= 60 ? '#ff9800' : '#f44336' }}>
+                    {aiResults.score || 0}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="h6" fontWeight={700}>AI Puanı: {aiResults.score}/100</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {filteredListings[0]?.title?.substring(0, 60)}...
+                  </Typography>
+                </Box>
+              </Box>
+
+              {aiResults.issues?.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Sorunlar:</Typography>
+                  {aiResults.issues.map((issue: any, i: number) => (
+                    <Paper key={i} sx={{ p: 1.5, mb: 1, borderLeft: `3px solid ${issue.severity === 'critical' ? '#f44336' : issue.severity === 'warning' ? '#ff9800' : '#2196f3'}` }} variant="outlined">
+                      <Typography variant="body2" fontWeight={600}>{issue.message}</Typography>
+                      <Typography variant="body2" color="text.secondary">{issue.fix}</Typography>
+                    </Paper>
+                  ))}
+                </Box>
+              )}
+
+              {aiResults.tips?.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>İpuçları:</Typography>
+                  {aiResults.tips.map((tip: string, i: number) => (
+                    <Typography key={i} variant="body2" sx={{ mb: 0.5 }}>
+                      • {tip}
+                    </Typography>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          ) : null}
+        </DialogContent>
       </Dialog>
 
       {/* Bulk Operations Bar */}

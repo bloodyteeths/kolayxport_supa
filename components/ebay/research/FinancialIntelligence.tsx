@@ -19,6 +19,7 @@ import { toast } from 'react-hot-toast';
 interface FinancialIntelligenceProps {
   userId: string;
   marketplace: string;
+  userListings?: any[];
 }
 
 interface EbayCategory {
@@ -131,8 +132,22 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 // Sub-tab 1: Revenue Calculator
 // ---------------------------------------------------------------------------
 
-function RevenueCalculator() {
-  const [sellingPrice, setSellingPrice] = useState<string>('29.99');
+function RevenueCalculator({ userListings }: { userListings?: any[] }) {
+  const avgUserPrice = useMemo(() => {
+    if (!userListings?.length) return 0;
+    const prices = userListings
+      .map(l => parseFloat(l.price?.value || '0'))
+      .filter(p => p > 0);
+    return prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0;
+  }, [userListings]);
+
+  const [sellingPrice, setSellingPrice] = useState<string>(avgUserPrice > 0 ? avgUserPrice.toFixed(2) : '29.99');
+
+  // Update selling price when user listings load
+  useEffect(() => {
+    if (avgUserPrice > 0) setSellingPrice(avgUserPrice.toFixed(2));
+  }, [avgUserPrice]);
+
   const [categoryIdx, setCategoryIdx] = useState<number>(0);
   const [shippingCharged, setShippingCharged] = useState<string>('5.99');
   const [actualShippingCost, setActualShippingCost] = useState<string>('4.50');
@@ -183,14 +198,27 @@ function RevenueCalculator() {
             </Select>
           </FormControl>
 
-          <TextField
-            label="Satış Fiyatı"
-            size="small"
-            type="number"
-            value={sellingPrice}
-            onChange={(e) => setSellingPrice(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-          />
+          <Box>
+            <TextField
+              label="Satış Fiyatı"
+              size="small"
+              type="number"
+              value={sellingPrice}
+              onChange={(e) => setSellingPrice(e.target.value)}
+              InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              fullWidth
+            />
+            {avgUserPrice > 0 && (
+              <Chip
+                icon={<Info size={12} />}
+                label={`Ortalama liste fiyatın: $${avgUserPrice.toFixed(2)}`}
+                size="small"
+                variant="outlined"
+                color="info"
+                sx={{ mt: 0.5 }}
+              />
+            )}
+          </Box>
 
           <TextField
             label="Alıcıya Yansıtılan Kargo"
@@ -1309,7 +1337,7 @@ function ROITracker() {
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function FinancialIntelligence({ userId, marketplace }: FinancialIntelligenceProps) {
+export default function FinancialIntelligence({ userId, marketplace, userListings }: FinancialIntelligenceProps) {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
@@ -1350,7 +1378,7 @@ export default function FinancialIntelligence({ userId, marketplace }: Financial
       </Paper>
 
       <TabPanel value={activeTab} index={0}>
-        <RevenueCalculator />
+        <RevenueCalculator userListings={userListings} />
       </TabPanel>
       <TabPanel value={activeTab} index={1}>
         <SourcingCalculator marketplace={marketplace} />

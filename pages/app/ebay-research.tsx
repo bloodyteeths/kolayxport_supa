@@ -318,7 +318,7 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 // TAB 1: Product Database
 // ---------------------------------------------------------------------------
 
-function ProductDatabase({ userId }: { userId: string }) {
+function ProductDatabase({ userId, userListings = [], userListingsLoading = false }: { userId: string; userListings?: any[]; userListingsLoading?: boolean }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -396,6 +396,30 @@ function ProductDatabase({ userId }: { userId: string }) {
     setFilters(prev => ({ ...prev, keyword: `seller:${seller}` }));
   }, []);
 
+  const [categoryChipClicked, setCategoryChipClicked] = useState(0);
+
+  // Trigger search when a category chip is clicked
+  useEffect(() => {
+    if (categoryChipClicked > 0) {
+      handleSearch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryChipClicked]);
+
+  const userCategories = useMemo(() => {
+    const cats = new Map<string, { id: string; name: string; count: number }>();
+    for (const l of userListings || []) {
+      const id = l.categoryId;
+      const name = l.categoryPath?.split('|').pop()?.trim() || l.categoryId || '';
+      if (id && name) {
+        const existing = cats.get(id);
+        if (existing) existing.count++;
+        else cats.set(id, { id, name, count: 1 });
+      }
+    }
+    return Array.from(cats.values()).sort((a, b) => b.count - a.count);
+  }, [userListings]);
+
   const updateFilter = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -415,6 +439,31 @@ function ProductDatabase({ userId }: { userId: string }) {
             </Button>
           )}
         </Box>
+
+        {/* User category quick-filter chips */}
+        {userCategories.length > 0 && (
+          <Box sx={{ mb: 2, mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Senin Kategorilerin:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {userCategories.slice(0, 8).map(cat => (
+                <Chip
+                  key={cat.id}
+                  label={`${cat.name} (${cat.count})`}
+                  size="small"
+                  variant={filters.categoryId === cat.id ? 'filled' : 'outlined'}
+                  color={filters.categoryId === cat.id ? 'primary' : 'default'}
+                  onClick={() => {
+                    setFilters(prev => ({ ...prev, categoryId: cat.id }));
+                    setCategoryChipClicked(c => c + 1);
+                  }}
+                  sx={{ cursor: 'pointer' }}
+                />
+              ))}
+            </Box>
+          </Box>
+        )}
 
         {/* Keyword + Category row - always visible */}
         <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
@@ -504,7 +553,16 @@ function ProductDatabase({ userId }: { userId: string }) {
       {loading && <LinearProgress sx={{ mb: 1 }} />}
 
       {/* Results */}
-      {!searched ? (
+      {!searched && userListings.length > 0 ? (
+        <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#f0f7ff' }}>
+          <Typography variant="body1" fontWeight={600} sx={{ mb: 1 }}>
+            Aramaya başla veya kategorilerinden birini seç
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {userListings.length} aktif listen var. Yukarıdaki kategorilerine tıklayarak pazarı keşfet.
+          </Typography>
+        </Paper>
+      ) : !searched ? (
         <EmptyState message="Aramaya başlayın" sub="Yukarıdaki alanları kullanarak eBay'de ürün arayın" />
       ) : results.length === 0 && !loading ? (
         <EmptyState message="Sonuç bulunamadı" sub="Filtrelerinizi değiştirerek tekrar deneyin" />
@@ -711,7 +769,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked }: {
 // TAB 2: Product Tracker
 // ---------------------------------------------------------------------------
 
-function ProductTracker({ userId }: { userId: string }) {
+function ProductTracker({ userId, userListings }: { userId: string; userListings?: any[] }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -1155,7 +1213,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags }
 // TAB 3: Niche Finder
 // ---------------------------------------------------------------------------
 
-function NicheFinder({ userId }: { userId: string }) {
+function NicheFinder({ userId, userListings }: { userId: string; userListings?: any[] }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -1464,7 +1522,7 @@ function NicheFinder({ userId }: { userId: string }) {
 // TAB 4: Seller Tracker
 // ---------------------------------------------------------------------------
 
-function SellerTracker({ userId }: { userId: string }) {
+function SellerTracker({ userId, userListings }: { userId: string; userListings?: any[] }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -1798,7 +1856,19 @@ const SECTIONS = [
   },
 ];
 
-function SectionWelcome({ section }: { section: typeof SECTIONS[number] }) {
+function SectionWelcome({ section, userListings = [], sectionIndex }: { section: typeof SECTIONS[number]; userListings?: any[]; sectionIndex?: number }) {
+  const hasListings = userListings.length > 0;
+
+  const personalizedMessage = hasListings
+    ? sectionIndex === 0
+      ? `${userListings.length} aktif listelemeniz var. Araclarimiz senin kategorilerin ve urunlerin uzerinden otomatik analiz yapacak.`
+      : sectionIndex === 1
+        ? 'Rakiplerini otomatik tespit ettik. Takip etmeye basla.'
+        : sectionIndex === 2
+          ? 'Listelerinizi analiz ettik. Iyilestirme onerilerimizi gorun.'
+          : null
+    : null;
+
   return (
     <Paper
       variant="outlined"
@@ -1818,6 +1888,11 @@ function SectionWelcome({ section }: { section: typeof SECTIONS[number] }) {
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 480, mx: 'auto' }}>
         {section.welcome}
       </Typography>
+      {personalizedMessage && (
+        <Typography variant="body2" color="primary.main" fontWeight={600} sx={{ mb: 2, maxWidth: 480, mx: 'auto' }}>
+          {personalizedMessage}
+        </Typography>
+      )}
       <Typography variant="body2" color="text.secondary">
         Baslamak icin yukaridaki araclardan birini secin.
       </Typography>
@@ -1832,6 +1907,18 @@ function EbayResearchPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mainTab, setMainTab] = useState(0);
   const [subTab, setSubTab] = useState(-1); // -1 = welcome state
+  const [userListings, setUserListings] = useState<any[]>([]);
+  const [userListingsLoading, setUserListingsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) return;
+    setUserListingsLoading(true);
+    fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`)
+      .then(r => r.json())
+      .then(data => setUserListings(data.listings || []))
+      .catch(() => setUserListings([]))
+      .finally(() => setUserListingsLoading(false));
+  }, [userId]);
 
   const handleMainTabChange = (_: any, v: number) => {
     setMainTab(v);
@@ -1930,21 +2017,21 @@ function EbayResearchPage() {
       </Box>
 
       {/* Welcome state or active tool */}
-      {subTab === -1 && <SectionWelcome section={currentSection} />}
+      {subTab === -1 && <SectionWelcome section={currentSection} userListings={userListings} sectionIndex={mainTab} />}
 
       {/* Section 0: Arastirma */}
-      {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} />}
-      {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} />}
-      {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" />}
+      {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} userListings={userListings} userListingsLoading={userListingsLoading} />}
+      {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} userListings={userListings} />}
+      {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
 
       {/* Section 1: Takip */}
-      {mainTab === 1 && subTab === 0 && <ProductTracker userId={userId} />}
-      {mainTab === 1 && subTab === 1 && <SellerTracker userId={userId} />}
-      {mainTab === 1 && subTab === 2 && <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" />}
+      {mainTab === 1 && subTab === 0 && <ProductTracker userId={userId} userListings={userListings} />}
+      {mainTab === 1 && subTab === 1 && <SellerTracker userId={userId} userListings={userListings} />}
+      {mainTab === 1 && subTab === 2 && <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
 
       {/* Section 2: Optimizasyon */}
-      {mainTab === 2 && subTab === 0 && <ListingOptimizer userId={userId} marketplace="EBAY_US" />}
-      {mainTab === 2 && subTab === 1 && <FinancialIntelligence userId={userId} marketplace="EBAY_US" />}
+      {mainTab === 2 && subTab === 0 && <ListingOptimizer userId={userId} marketplace="EBAY_US" userListings={userListings} />}
+      {mainTab === 2 && subTab === 1 && <FinancialIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
     </Box>
   );
 }

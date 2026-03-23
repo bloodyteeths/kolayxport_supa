@@ -18,6 +18,7 @@ import { toast } from 'react-hot-toast';
 interface CompetitiveIntelligenceProps {
   userId: string;
   marketplace: string;
+  userListings?: any[];
 }
 
 interface SellerItem {
@@ -197,7 +198,19 @@ const PIE_COLORS = ['#1976d2', '#e91e63', '#4caf50', '#ff9800', '#9c27b0', '#00b
 // Sub-tab 1: Seller Spy
 // ---------------------------------------------------------------------------
 
-function SellerSpy({ userId, marketplace }: { userId: string; marketplace: string }) {
+function SellerSpy({ userId, marketplace, userListings }: { userId: string; marketplace: string; userListings?: any[] }) {
+  const suggestedSellers = useMemo(() => {
+    if (!userListings?.length) return [];
+    const sellers = new Map<string, { username: string; feedback: number }>();
+    for (const l of userListings) {
+      const s = l.seller;
+      if (s?.username && !sellers.has(s.username)) {
+        sellers.set(s.username, { username: s.username, feedback: s.feedbackScore || 0 });
+      }
+    }
+    return Array.from(sellers.values()).slice(0, 5);
+  }, [userListings]);
+
   const [sellerInput, setSellerInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -296,6 +309,28 @@ function SellerSpy({ userId, marketplace }: { userId: string; marketplace: strin
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Suggested Sellers from user listings */}
+      {suggestedSellers.length > 0 && (
+        <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            <Users size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+            Senin satıcı hesabın:
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {suggestedSellers.map(({ username, feedback }) => (
+              <Chip
+                key={username}
+                label={`${username} (${feedback})`}
+                size="small"
+                variant="outlined"
+                onClick={() => setSellerInput(username)}
+                sx={{ cursor: 'pointer' }}
+              />
+            ))}
+          </Box>
+        </Paper>
+      )}
+
       {/* Search Input */}
       <Paper sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1188,7 +1223,7 @@ function MarketTrends({ marketplace }: { marketplace: string }) {
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function CompetitiveIntelligence({ userId, marketplace }: CompetitiveIntelligenceProps) {
+export default function CompetitiveIntelligence({ userId, marketplace, userListings }: CompetitiveIntelligenceProps) {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
@@ -1201,7 +1236,7 @@ export default function CompetitiveIntelligence({ userId, marketplace }: Competi
         </Tabs>
       </Paper>
 
-      {activeTab === 0 && <SellerSpy userId={userId} marketplace={marketplace} />}
+      {activeTab === 0 && <SellerSpy userId={userId} marketplace={marketplace} userListings={userListings} />}
       {activeTab === 1 && <ListingComparison marketplace={marketplace} />}
       {activeTab === 2 && <MarketTrends marketplace={marketplace} />}
     </Box>

@@ -21,6 +21,7 @@ import { toast } from 'react-hot-toast';
 interface ListingOptimizerProps {
   userId: string;
   marketplace: string;
+  userListings?: any[];
 }
 
 interface ListingImage {
@@ -332,7 +333,7 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function ListingOptimizer({ userId, marketplace }: ListingOptimizerProps) {
+export default function ListingOptimizer({ userId, marketplace, userListings }: ListingOptimizerProps) {
   // ── State ──
   const [subTab, setSubTab] = useState(0);
   const [listings, setListings] = useState<ScoredListing[]>([]);
@@ -381,8 +382,15 @@ export default function ListingOptimizer({ userId, marketplace }: ListingOptimiz
   }, [userId, marketplace]);
 
   useEffect(() => {
-    fetchListings();
-  }, [fetchListings]);
+    if (userListings?.length) {
+      // Use pre-loaded data instead of fetching again
+      const scored = userListings.map(l => scoreListing(l)).sort((a, b) => a.health.total - b.health.total);
+      setListings(scored);
+      setLoading(false);
+    } else {
+      fetchListings();
+    }
+  }, [userListings, fetchListings]);
 
   // ── Derived stats ──
   const stats = useMemo(() => {

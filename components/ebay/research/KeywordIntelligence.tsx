@@ -19,6 +19,7 @@ import { toast } from 'react-hot-toast';
 interface KeywordIntelligenceProps {
   userId: string;
   marketplace: string;
+  userListings?: any[];
 }
 
 interface MarketItem {
@@ -343,8 +344,22 @@ const TAB_LABELS = [
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function KeywordIntelligence({ userId, marketplace }: KeywordIntelligenceProps) {
+export default function KeywordIntelligence({ userId, marketplace, userListings }: KeywordIntelligenceProps) {
   const [activeTab, setActiveTab] = useState(0);
+
+  // --- User keywords from listings ---
+  const userKeywords = useMemo(() => {
+    if (!userListings?.length) return [];
+    const freq = new Map<string, number>();
+    for (const l of userListings) {
+      const words = (l.title || '').toLowerCase().split(/[\s,\-\/\(\)]+/).filter((w: string) => w.length > 2);
+      for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
+    }
+    return Array.from(freq.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([word, count]) => ({ word, count }));
+  }, [userListings]);
 
   // --- Keyword Research state ---
   const [query, setQuery] = useState('');
@@ -637,6 +652,28 @@ export default function KeywordIntelligence({ userId, marketplace }: KeywordInte
 
   const renderKeywordResearch = () => (
     <Box>
+      {/* User's own keywords */}
+      {userKeywords.length > 0 && (
+        <Paper sx={{ p: 2, mb: 2, bgcolor: 'action.hover' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            <Sparkles size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+            Listelerindeki popüler kelimeler:
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {userKeywords.map(({ word, count }) => (
+              <Chip
+                key={word}
+                label={`${word} (${count})`}
+                size="small"
+                variant="outlined"
+                onClick={() => setQuery(word)}
+                sx={{ cursor: 'pointer' }}
+              />
+            ))}
+          </Box>
+        </Paper>
+      )}
+
       {/* Search bar */}
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
         <TextField

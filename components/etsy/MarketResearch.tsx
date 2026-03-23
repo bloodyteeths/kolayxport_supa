@@ -2144,16 +2144,16 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                       <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                         <TableCell>#</TableCell>
                         <TableCell>Magaza</TableCell>
-                        <TableCell align="center">Satis</TableCell>
-                        <TableCell align="center">Puan</TableCell>
-                        <TableCell align="center">Yorum</TableCell>
-                        <TableCell align="center">Urun</TableCell>
-                        <TableCell align="center">Ort. Fiyat</TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='num_sales'} direction={shopSortKey==='num_sales'?shopSortDir:'desc'} onClick={()=>toggleSort('num_sales',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Satis</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='review_average'} direction={shopSortKey==='review_average'?shopSortDir:'desc'} onClick={()=>toggleSort('review_average',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Puan</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='review_count'} direction={shopSortKey==='review_count'?shopSortDir:'desc'} onClick={()=>toggleSort('review_count',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Yorum</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='listingCount'} direction={shopSortKey==='listingCount'?shopSortDir:'desc'} onClick={()=>toggleSort('listingCount',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Urun</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='avgPrice'} direction={shopSortKey==='avgPrice'?shopSortDir:'desc'} onClick={()=>toggleSort('avgPrice',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Ort. Fiyat</TableSortLabel></TableCell>
                         <TableCell sx={{ width: 40 }} />
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {shopStats.shops.map((s, i) => (
+                      {sortedShops.map((s, i) => (
                         <TableRow key={s.shop_id} hover sx={{
                           '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
                           borderLeft: i < 3 ? '3px solid #667eea' : 'none',
@@ -2275,14 +2275,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                       <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                         <TableCell>#</TableCell>
                         <TableCell>Baslik</TableCell>
-                        <TableCell align="right">Fiyat</TableCell>
-                        <TableCell align="center">Favori</TableCell>
-                        <TableCell align="center">Grnm</TableCell>
+                        <TableCell align="right"><TableSortLabel active={bestListingSortKey==='price'} direction={bestListingSortKey==='price'?bestListingSortDir:'desc'} onClick={()=>toggleSort('price',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Fiyat</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={bestListingSortKey==='num_favorers'} direction={bestListingSortKey==='num_favorers'?bestListingSortDir:'desc'} onClick={()=>toggleSort('num_favorers',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Favori</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={bestListingSortKey==='views'} direction={bestListingSortKey==='views'?bestListingSortDir:'desc'} onClick={()=>toggleSort('views',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Grnm</TableSortLabel></TableCell>
                         <TableCell sx={{ width: 40 }} />
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {deepDiveStats.bestListings.map((l, i) => (
+                      {sortedBestListings.map((l, i) => (
                         <TableRow key={l.listing_id} hover sx={{
                           '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
                           borderLeft: i < 3 ? '3px solid #667eea' : 'none',

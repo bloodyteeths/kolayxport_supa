@@ -73,7 +73,7 @@ import ListingEditorDrawer from '@/components/ebay/ListingEditorDrawer';
 import ListingCreatorDialog from '@/components/ebay/ListingCreatorDialog';
 import FindReplaceDialog from '@/components/ebay/FindReplaceDialog';
 import BulkOperationsBar from '@/components/ebay/BulkOperationsBar';
-import MarketResearch from '@/components/ebay/MarketResearch';
+// MarketResearch removed — now lives at /app/ebay-research
 import ListingTemplates from '@/components/ebay/ListingTemplates';
 import ScheduledUpdateDialog from '@/components/ebay/ScheduledUpdateDialog';
 import SmartPricing from '@/components/ebay/SmartPricing';
@@ -397,9 +397,6 @@ function EbayListingsPage() {
   const [fulfillmentPolicies, setFulfillmentPolicies] = useState<any[]>([]);
   const [returnPolicies, setReturnPolicies] = useState<any[]>([]);
   const [paymentPolicies, setPaymentPolicies] = useState<any[]>([]);
-
-  // Page-level tab: 0 = Listings, 1 = Market Research
-  const [pageTab, setPageTab] = useState(0);
 
   // Dialogs
   const [editorOpen, setEditorOpen] = useState(false);
@@ -1282,19 +1279,8 @@ function EbayListingsPage() {
         </Paper>
       </Box>
 
-      {/* Page Tabs: Listings | Market Research */}
-      <Tabs value={pageTab} onChange={(_, v) => setPageTab(v)} sx={{ mb: 2 }}>
-        <Tab label="Listelemeler" />
-        <Tab label="Pazar Arastirmasi" />
-      </Tabs>
-
-      {/* Market Research Tab */}
-      {pageTab === 1 && (
-        <MarketResearch userId={userId} />
-      )}
-
-      {/* Listings Tab */}
-      {pageTab === 0 && (<>
+      {/* Listings */}
+      <>
 
       {/* Toolbar Row 1: Search & Filters */}
       <Paper sx={{ p: 1.5, mb: 1 }}>
@@ -1639,7 +1625,7 @@ function EbayListingsPage() {
         </Box>
       )}
 
-      </>)}
+      </>
 
       {/* Listing Editor Drawer */}
       <ListingEditorDrawer

@@ -56,7 +56,9 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24 }
     toast.success('Görsel eklendi');
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -66,22 +68,40 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24 }
       return;
     }
 
+    if (file.size > 12 * 1024 * 1024) {
+      toast.error('Maksimum dosya boyutu 12MB');
+      return;
+    }
+
     if (sortedImages.length >= maxImages) {
       toast.error(`Maksimum ${maxImages} görsel eklenebilir`);
       return;
     }
 
-    // Convert to data URL
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      onImagesChanged([...sortedImages, dataUrl]);
-      toast.success('Görsel eklendi');
-    };
-    reader.onerror = () => {
-      toast.error('Dosya okunamadı');
-    };
-    reader.readAsDataURL(file);
+    // Upload to Supabase Storage via API
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/clawd/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Yükleme başarısız');
+      }
+
+      const data = await res.json();
+      onImagesChanged([...sortedImages, data.url]);
+      toast.success('Görsel yüklendi');
+    } catch (err: any) {
+      toast.error(err.message || 'Görsel yüklenemedi');
+    } finally {
+      setUploading(false);
+    }
 
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -166,7 +186,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24 }
           <>
             {/* File upload button */}
             <Box
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !uploading && fileInputRef.current?.click()}
               sx={{
                 aspectRatio: '1',
                 borderRadius: 1,
@@ -175,14 +195,19 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24 }
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
-                '&:hover': { borderColor: '#3b82f6', backgroundColor: '#f0f9ff' },
+                cursor: uploading ? 'wait' : 'pointer',
+                opacity: uploading ? 0.6 : 1,
+                '&:hover': uploading ? {} : { borderColor: '#3b82f6', backgroundColor: '#f0f9ff' },
                 transition: 'all 0.2s',
               }}
             >
-              <AddPhotoAlternateIcon sx={{ fontSize: 28, color: '#94a3b8' }} />
+              {uploading ? (
+                <CircularProgress size={24} />
+              ) : (
+                <AddPhotoAlternateIcon sx={{ fontSize: 28, color: '#94a3b8' }} />
+              )}
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                Dosya
+                {uploading ? 'Yükleniyor...' : 'Dosya'}
               </Typography>
             </Box>
 

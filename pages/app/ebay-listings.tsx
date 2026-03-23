@@ -26,6 +26,9 @@ import {
   TableRow,
   Collapse,
   Badge,
+  Menu,
+  ListItemText,
+  ListItemIcon,
 } from '@mui/material';
 import {
   DataGrid,
@@ -44,6 +47,15 @@ import {
   ErrorOutline as ErrorOutlineIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  MoreVert as MoreVertIcon,
+  FindReplace as FindReplaceIcon,
+  ContentCopy as ContentCopyIcon,
+  AttachMoney as AttachMoneyIcon,
+  ViewList as ViewListIcon,
+  Download as DownloadIcon,
+  Backup as BackupIcon,
+  Schedule as ScheduleIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -414,6 +426,9 @@ function EbayListingsPage() {
 
   // Scheduled updates count (placeholder - would come from API)
   const [scheduledCount, setScheduledCount] = useState(0);
+
+  // Mobile "More" menu anchor
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
 
   // --- Fetch listings ---
   const fetchListings = useCallback(async () => {
@@ -1236,69 +1251,122 @@ function EbayListingsPage() {
       </Paper>
 
       {/* Toolbar Row 2: Actions */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2, alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2, alignItems: 'center' }}>
         {/* Primary action */}
-        <Button variant="contained" size="small" onClick={() => setCreatorOpen(true)}>
+        <Button variant="contained" size="small" color="success" onClick={() => setCreatorOpen(true)}>
           + Yeni Listeleme
         </Button>
 
-        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
-
-        {/* Editing tools */}
-        <Tooltip title="Baslik, aciklama, item specificlerde ara ve degistir" arrow>
-          <Button variant="outlined" size="small" onClick={() => setFindReplaceOpen(true)}>
-            Bul &amp; Degistir
-          </Button>
-        </Tooltip>
-        <Tooltip title="Benzer/tekrarlanan listelemeleri bul" arrow>
-          <Button variant="outlined" size="small" color="warning" onClick={() => setDuplicateDetectorOpen(true)}>
-            Tekrar Tespit
-          </Button>
-        </Tooltip>
-
-        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
-
-        {/* Smart features */}
-        <Tooltip title="Rekabete gore otomatik fiyat ayarla" arrow>
-          <Button variant="outlined" size="small" onClick={() => setSmartPricingOpen(true)}>
-            Smart Fiyatlandirma
-          </Button>
-        </Tooltip>
-        <Tooltip title="Kayitli sablonlardan hizlica listeleme olustur" arrow>
-          <Button variant="outlined" size="small" onClick={() => setTemplatesOpen(true)}>
-            Sablonlar
-          </Button>
-        </Tooltip>
-
-        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
-
-        {/* Data import/export */}
-        <Tooltip title="Listeleme verilerini CSV olarak disa aktar" arrow>
-          <Button variant="outlined" size="small" onClick={handleExportCSV}>
-            CSV Indir
-          </Button>
-        </Tooltip>
-        <Tooltip title="CSV dosyasindan toplu listeleme olustur" arrow>
-          <Button variant="outlined" size="small" startIcon={<UploadFileIcon />} onClick={handleCSVFileSelect}>
-            CSV Iceri Aktar
-          </Button>
-        </Tooltip>
-
-        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
-
-        {/* Safety & scheduling */}
-        <Tooltip title="Toplu islem yedeklerini goruntule ve geri yukle" arrow>
-          <Button variant="outlined" size="small" color="info" onClick={() => setBackupManagerOpen(true)}>
-            Yedek Yonetimi
-          </Button>
-        </Tooltip>
-        <Tooltip title="Zamanlanmis guncellemeleri goruntule" arrow>
-          <Badge badgeContent={scheduledCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10 } }}>
-            <Button variant="outlined" size="small" onClick={() => setScheduledOpen(true)}>
-              Zamanlanmis
+        {isMobile ? (
+          <>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+              endIcon={<MoreVertIcon />}
+            >
+              Daha Fazla
             </Button>
-          </Badge>
-        </Tooltip>
+            <Menu
+              anchorEl={moreMenuAnchor}
+              open={Boolean(moreMenuAnchor)}
+              onClose={() => setMoreMenuAnchor(null)}
+            >
+              <MenuItem onClick={() => { setMoreMenuAnchor(null); setFindReplaceOpen(true); }}>
+                <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Bul &amp; Degistir</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setMoreMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
+                <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Tekrar Tespit</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setMoreMenuAnchor(null); setSmartPricingOpen(true); }}>
+                <ListItemIcon><AttachMoneyIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Smart Fiyatlandirma</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setMoreMenuAnchor(null); setTemplatesOpen(true); }}>
+                <ListItemIcon><ViewListIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Sablonlar</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setMoreMenuAnchor(null); handleExportCSV(); }}>
+                <ListItemIcon><DownloadIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>CSV Indir</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setMoreMenuAnchor(null); handleCSVFileSelect(); }}>
+                <ListItemIcon><UploadFileIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>CSV Iceri Aktar</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setMoreMenuAnchor(null); setBackupManagerOpen(true); }}>
+                <ListItemIcon><BackupIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Yedek Yonetimi</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => { setMoreMenuAnchor(null); setScheduledOpen(true); }}>
+                <ListItemIcon><ScheduleIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>Zamanlanmis{scheduledCount > 0 ? ` (${scheduledCount})` : ''}</ListItemText>
+              </MenuItem>
+            </Menu>
+          </>
+        ) : (
+          <>
+            {/* Edit group */}
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+              <Tooltip title="Baslik, aciklama, item specificlerde ara ve degistir" arrow>
+                <Button variant="outlined" size="small" startIcon={<FindReplaceIcon />} onClick={() => setFindReplaceOpen(true)}>
+                  Bul &amp; Degistir
+                </Button>
+              </Tooltip>
+              <Tooltip title="Benzer/tekrarlanan listelemeleri bul" arrow>
+                <Button variant="outlined" size="small" color="warning" startIcon={<ContentCopyIcon />} onClick={() => setDuplicateDetectorOpen(true)}>
+                  Tekrar Tespit
+                </Button>
+              </Tooltip>
+            </Box>
+
+            {/* Tools group */}
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+              <Tooltip title="Rekabete gore otomatik fiyat ayarla" arrow>
+                <Button variant="outlined" size="small" startIcon={<AttachMoneyIcon />} onClick={() => setSmartPricingOpen(true)}>
+                  Smart Fiyatlandirma
+                </Button>
+              </Tooltip>
+              <Tooltip title="Kayitli sablonlardan hizlica listeleme olustur" arrow>
+                <Button variant="outlined" size="small" startIcon={<ViewListIcon />} onClick={() => setTemplatesOpen(true)}>
+                  Sablonlar
+                </Button>
+              </Tooltip>
+            </Box>
+
+            {/* Data group */}
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+              <Tooltip title="Listeleme verilerini CSV olarak disa aktar" arrow>
+                <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={handleExportCSV}>
+                  CSV Indir
+                </Button>
+              </Tooltip>
+              <Tooltip title="CSV dosyasindan toplu listeleme olustur" arrow>
+                <Button variant="outlined" size="small" startIcon={<UploadFileIcon />} onClick={handleCSVFileSelect}>
+                  CSV Iceri Aktar
+                </Button>
+              </Tooltip>
+            </Box>
+
+            {/* Safety group */}
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+              <Tooltip title="Toplu islem yedeklerini goruntule ve geri yukle" arrow>
+                <Button variant="outlined" size="small" color="info" startIcon={<BackupIcon />} onClick={() => setBackupManagerOpen(true)}>
+                  Yedek Yonetimi
+                </Button>
+              </Tooltip>
+              <Tooltip title="Zamanlanmis guncellemeleri goruntule" arrow>
+                <Badge badgeContent={scheduledCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10 } }}>
+                  <Button variant="outlined" size="small" startIcon={<ScheduleIcon />} onClick={() => setScheduledOpen(true)}>
+                    Zamanlanmis
+                  </Button>
+                </Badge>
+              </Tooltip>
+            </Box>
+          </>
+        )}
       </Box>
 
       {/* Mobile Card Layout */}
@@ -1368,7 +1436,7 @@ function EbayListingsPage() {
             pageSizeOptions={[25, 50, 100]}
             columnVisibilityModel={columnVisibilityModel}
             onColumnVisibilityModelChange={(model) => setColumnVisibilityModel(model)}
-            getRowId={(row) => row.sku}
+            getRowId={(row) => row.id}
             autoHeight
             sx={{
               border: 'none',
@@ -1492,59 +1560,111 @@ function EbayListingsPage() {
         onCompleted={() => { setFindReplaceOpen(false); fetchListings(); }}
       />
 
-      {/* Smart Pricing */}
-      {smartPricingOpen && (
-        <SmartPricing
-          listings={filteredListings.map((l) => ({
-            sku: l.sku,
-            offerId: l.offerId,
-            title: l.title,
-            price: l.price,
-            quantity: l.quantity,
-          }))}
-          userId={userId}
-          onPriceUpdate={() => { setSmartPricingOpen(false); fetchListings(); }}
-        />
-      )}
+      {/* Smart Pricing Dialog */}
+      <Dialog
+        open={smartPricingOpen}
+        onClose={() => setSmartPricingOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Smart Fiyatlandirma
+          <IconButton size="small" onClick={() => setSmartPricingOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <SmartPricing
+            listings={filteredListings.map((l) => ({
+              sku: l.sku,
+              offerId: l.offerId,
+              title: l.title,
+              price: l.price,
+              quantity: l.quantity,
+            }))}
+            userId={userId}
+            onPriceUpdate={() => { setSmartPricingOpen(false); fetchListings(); }}
+          />
+        </DialogContent>
+      </Dialog>
 
-      {/* Duplicate Detector */}
-      {duplicateDetectorOpen && (
-        <DuplicateDetector
-          listings={filteredListings.map((l) => ({
-            sku: l.sku,
-            offerId: l.offerId,
-            title: l.title,
-            description: l.description,
-            price: l.price,
-            quantity: l.quantity,
-            status: l.status,
-            condition: l.condition,
-          }))}
-          onSelect={(sku) => handleOpenEditor(sku)}
-        />
-      )}
+      {/* Duplicate Detector Dialog */}
+      <Dialog
+        open={duplicateDetectorOpen}
+        onClose={() => setDuplicateDetectorOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Tekrar Tespit
+          <IconButton size="small" onClick={() => setDuplicateDetectorOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <DuplicateDetector
+            listings={filteredListings.map((l) => ({
+              sku: l.sku,
+              offerId: l.offerId,
+              title: l.title,
+              description: l.description,
+              price: l.price,
+              quantity: l.quantity,
+              status: l.status,
+              condition: l.condition,
+            }))}
+            onSelect={(sku) => handleOpenEditor(sku)}
+          />
+        </DialogContent>
+      </Dialog>
 
-      {/* Backup Manager */}
-      {backupManagerOpen && (
-        <BackupManager
-          listings={filteredListings}
-          userId={userId}
-        />
-      )}
+      {/* Backup Manager Dialog */}
+      <Dialog
+        open={backupManagerOpen}
+        onClose={() => setBackupManagerOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Yedek Yonetimi
+          <IconButton size="small" onClick={() => setBackupManagerOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <BackupManager
+            listings={filteredListings}
+            userId={userId}
+          />
+        </DialogContent>
+      </Dialog>
 
-      {/* Listing Templates */}
-      {templatesOpen && (
-        <ListingTemplates
-          listings={filteredListings.map(l => ({
-            ...l,
-            price: parseFloat(l.price?.value || '0'),
-          }))}
-          onApply={() => {
-            setTemplatesOpen(false);
-            fetchListings();
-          }}
-        />
-      )}
+      {/* Listing Templates Dialog */}
+      <Dialog
+        open={templatesOpen}
+        onClose={() => setTemplatesOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Sablonlar
+          <IconButton size="small" onClick={() => setTemplatesOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <ListingTemplates
+            listings={filteredListings.map(l => ({
+              ...l,
+              price: parseFloat(l.price?.value || '0'),
+            }))}
+            onApply={() => {
+              setTemplatesOpen(false);
+              fetchListings();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Scheduled Updates Dialog */}
       <ScheduledUpdateDialog

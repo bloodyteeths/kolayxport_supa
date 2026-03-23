@@ -1763,23 +1763,80 @@ function SellerTracker({ userId }: { userId: string }) {
 // Main Page Component
 // ---------------------------------------------------------------------------
 
-const TAB_LABELS = [
-  { label: 'Ürün Veritabanı', icon: <Search size={16} /> },
-  { label: 'Ürün Takipçisi', icon: <Bookmark size={16} /> },
-  { label: 'Niş Bulucu', icon: <Gauge size={16} /> },
-  { label: 'Satıcı Takipçisi', icon: <Users size={16} /> },
-  { label: 'Anahtar Kelime', icon: <Tag size={16} /> },
-  { label: 'Rakip Analizi', icon: <Eye size={16} /> },
-  { label: 'Liste Optimizasyonu', icon: <Target size={16} /> },
-  { label: 'Finansal', icon: <DollarSign size={16} /> },
+const SECTIONS = [
+  {
+    label: 'Arastirma',
+    icon: <Search size={18} />,
+    description: 'Pazar analizi ve urun kesfetme araclari',
+    welcome: 'eBay pazarini analiz edin, trendleri kesfet ve karli nisler bulun',
+    subTabs: [
+      { label: 'Urun Veritabani', icon: <Package size={14} /> },
+      { label: 'Kategori & Nis Bulucu', icon: <Gauge size={14} /> },
+      { label: 'Anahtar Kelime Analizi', icon: <Tag size={14} /> },
+    ],
+  },
+  {
+    label: 'Takip',
+    icon: <Bookmark size={18} />,
+    description: 'Urun ve satici takip merkezi',
+    welcome: 'Rakiplerinizi ve ilgilendiginiz urunleri yakindan takip edin',
+    subTabs: [
+      { label: 'Urun Takipcisi', icon: <Bookmark size={14} /> },
+      { label: 'Satici Takipcisi', icon: <Users size={14} /> },
+      { label: 'Rakip Analizi', icon: <Eye size={14} /> },
+    ],
+  },
+  {
+    label: 'Optimizasyon',
+    icon: <TrendingUp size={18} />,
+    description: 'Liste ve finansal iyilestirme',
+    welcome: 'Listelerinizi iyilestirin ve karliligimizi artirin',
+    subTabs: [
+      { label: 'Liste Iyilestirme', icon: <Target size={14} /> },
+      { label: 'Finansal Hesaplamalar', icon: <DollarSign size={14} /> },
+    ],
+  },
 ];
+
+function SectionWelcome({ section }: { section: typeof SECTIONS[number] }) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 4,
+        textAlign: 'center',
+        borderStyle: 'dashed',
+        borderColor: 'primary.light',
+        bgcolor: 'action.hover',
+        borderRadius: 3,
+      }}
+    >
+      <Box sx={{ color: 'primary.main', mb: 2 }}>{React.cloneElement(section.icon as React.ReactElement, { size: 40, strokeWidth: 1.5 })}</Box>
+      <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+        {section.label}
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 480, mx: 'auto' }}>
+        {section.welcome}
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Baslamak icin yukaridaki araclardan birini secin.
+      </Typography>
+    </Paper>
+  );
+}
 
 function EbayResearchPage() {
   const { user } = useAuth() as any;
   const userId = user?.id as string | undefined;
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [activeTab, setActiveTab] = useState(0);
+  const [mainTab, setMainTab] = useState(0);
+  const [subTab, setSubTab] = useState(-1); // -1 = welcome state
+
+  const handleMainTabChange = (_: any, v: number) => {
+    setMainTab(v);
+    setSubTab(-1); // reset to welcome when switching sections
+  };
 
   if (!userId) {
     return (
@@ -1789,6 +1846,8 @@ function EbayResearchPage() {
     );
   }
 
+  const currentSection = SECTIONS[mainTab];
+
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto', px: isMobile ? 1 : 3, py: 2 }}>
       <Toaster position="top-right" />
@@ -1796,37 +1855,42 @@ function EbayResearchPage() {
       {/* Header */}
       <Box sx={{ mb: 2 }}>
         <Typography variant={isMobile ? 'h6' : 'h5'} fontWeight={800}>
-          eBay Ürün Istihbaratı
+          eBay Urun Istihbarati
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Pazar araştırması, ürün takibi, niş analizi ve rakip izleme
+          Pazar arastirmasi, urun takibi, nis analizi ve rakip izleme
         </Typography>
       </Box>
 
-      {/* Tabs */}
+      {/* Main Section Tabs */}
       <Paper sx={{ mb: 2 }} variant="outlined">
         <Tabs
-          value={activeTab}
-          onChange={(_, v) => setActiveTab(v)}
-          variant={isMobile ? 'scrollable' : 'fullWidth'}
-          scrollButtons={isMobile ? 'auto' : false}
-          allowScrollButtonsMobile
+          value={mainTab}
+          onChange={handleMainTabChange}
+          variant="fullWidth"
           sx={{
             '& .MuiTab-root': {
               textTransform: 'none',
               fontWeight: 600,
-              minHeight: 48,
-              fontSize: isMobile ? '0.8rem' : '0.875rem',
+              minHeight: 64,
+              py: 1.5,
             },
           }}
         >
-          {TAB_LABELS.map((tab, i) => (
+          {SECTIONS.map((section, i) => (
             <Tab
               key={i}
               label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  {tab.icon}
-                  {(!isMobile || activeTab === i) && <span>{tab.label}</span>}
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    {section.icon}
+                    <span style={{ fontWeight: 700, fontSize: isMobile ? '0.85rem' : '0.95rem' }}>{section.label}</span>
+                  </Box>
+                  {!isMobile && (
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', lineHeight: 1.2 }}>
+                      {section.description}
+                    </Typography>
+                  )}
                 </Box>
               }
             />
@@ -1834,31 +1898,53 @@ function EbayResearchPage() {
         </Tabs>
       </Paper>
 
-      {/* Tab Panels */}
-      <TabPanel value={activeTab} index={0}>
-        <ProductDatabase userId={userId} />
-      </TabPanel>
-      <TabPanel value={activeTab} index={1}>
-        <ProductTracker userId={userId} />
-      </TabPanel>
-      <TabPanel value={activeTab} index={2}>
-        <NicheFinder userId={userId} />
-      </TabPanel>
-      <TabPanel value={activeTab} index={3}>
-        <SellerTracker userId={userId} />
-      </TabPanel>
-      <TabPanel value={activeTab} index={4}>
-        <KeywordIntelligence userId={userId} marketplace="EBAY_US" />
-      </TabPanel>
-      <TabPanel value={activeTab} index={5}>
-        <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" />
-      </TabPanel>
-      <TabPanel value={activeTab} index={6}>
-        <ListingOptimizer userId={userId} marketplace="EBAY_US" />
-      </TabPanel>
-      <TabPanel value={activeTab} index={7}>
-        <FinancialIntelligence userId={userId} marketplace="EBAY_US" />
-      </TabPanel>
+      {/* Sub-tab pills */}
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+        {currentSection.subTabs.map((st, i) => (
+          <Chip
+            key={i}
+            icon={st.icon as React.ReactElement}
+            label={st.label}
+            clickable
+            onClick={() => setSubTab(i)}
+            variant={subTab === i ? 'filled' : 'outlined'}
+            color={subTab === i ? 'primary' : 'default'}
+            sx={{
+              fontWeight: subTab === i ? 700 : 500,
+              fontSize: '0.8rem',
+              height: 36,
+              px: 0.5,
+              '& .MuiChip-icon': { fontSize: 14 },
+              transition: 'all 0.15s ease',
+              ...(subTab === i
+                ? {}
+                : {
+                    '&:hover': {
+                      bgcolor: 'action.hover',
+                      borderColor: 'primary.main',
+                    },
+                  }),
+            }}
+          />
+        ))}
+      </Box>
+
+      {/* Welcome state or active tool */}
+      {subTab === -1 && <SectionWelcome section={currentSection} />}
+
+      {/* Section 0: Arastirma */}
+      {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} />}
+      {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} />}
+      {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" />}
+
+      {/* Section 1: Takip */}
+      {mainTab === 1 && subTab === 0 && <ProductTracker userId={userId} />}
+      {mainTab === 1 && subTab === 1 && <SellerTracker userId={userId} />}
+      {mainTab === 1 && subTab === 2 && <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" />}
+
+      {/* Section 2: Optimizasyon */}
+      {mainTab === 2 && subTab === 0 && <ListingOptimizer userId={userId} marketplace="EBAY_US" />}
+      {mainTab === 2 && subTab === 1 && <FinancialIntelligence userId={userId} marketplace="EBAY_US" />}
     </Box>
   );
 }

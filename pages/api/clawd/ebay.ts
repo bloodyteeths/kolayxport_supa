@@ -1108,6 +1108,7 @@ export default async function handler(
           title: item.title,
           price: item.price,
           condition: item.condition,
+          conditionId: item.conditionId,
           image: item.image,
           itemWebUrl: item.itemWebUrl,
           seller: item.seller,
@@ -1115,6 +1116,11 @@ export default async function handler(
           buyingOptions: item.buyingOptions,
           shippingOptions: item.shippingOptions,
           itemLocation: item.itemLocation,
+          marketingPrice: item.marketingPrice,
+          topRatedBuyingExperience: item.topRatedBuyingExperience,
+          itemCreationDate: item.itemCreationDate,
+          leafCategoryIds: item.leafCategoryIds,
+          legacyItemId: item.legacyItemId,
         })),
         priceStats,
         topKeywords,
@@ -1240,6 +1246,364 @@ export default async function handler(
       });
     }
 
+    // GET ?action=my_legacy_listings — Get user's own legacy listings via Analytics + Browse API
+    if (req.method === 'GET' && action === 'my_legacy_listings') {
+      const appToken = await getApplicationToken();
+      const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
+
+      // Step 1: Get listing IDs from Analytics API (last 90 days)
+      const yesterday = new Date(Date.now() - 86400000);
+      const ninetyAgo = new Date(Date.now() - 90 * 86400000);
+      const endDate = yesterday.toISOString().split('T')[0].replace(/-/g, '');
+      const startDate = ninetyAgo.toISOString().split('T')[0].replace(/-/g, '');
+
+      let listingIds: string[] = [];
+      try {
+        const analyticsData = await callEbayAPI(
+          `/sell/analytics/v1/traffic_report?dimension=LISTING&metric=LISTING_IMPRESSION_TOTAL,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE&filter=date_range:[${startDate}..${endDate}]`,
+          accessToken,
+          {},
+          marketplace
+        );
+        if (analyticsData.records) {
+          listingIds = analyticsData.records.map((r: any) => r.dimensionValues?.[0]?.value).filter(Boolean);
+        }
+      } catch (err) {
+        logger.warn('Analytics API failed, falling back to orders', { error: String(err) });
+      }
+
+      // Step 2: Also get listing IDs from orders (catches items not in analytics)
+      try {
+        const ordersData = await callEbayAPI(
+          `/sell/fulfillment/v1/order?limit=200`,
+          accessToken
+        );
+        const orderIds = new Set<string>();
+        for (const order of ordersData.orders || []) {
+          for (const li of order.lineItems || []) {
+            if (li.legacyItemId) orderIds.add(li.legacyItemId);
+          }
+        }
+        // Merge, deduplicate
+        const allIds = new Set([...listingIds, ...orderIds]);
+        listingIds = [...allIds];
+      } catch {
+        // Orders failed, use analytics only
+      }
+
+      if (listingIds.length === 0) {
+        return res.status(200).json({ total: 0, listings: [] });
+      }
+
+      // Step 3: Get full details via Browse API (parallel, batched)
+      const batchSize = 10;
+      const listings: any[] = [];
+      for (let i = 0; i < listingIds.length; i += batchSize) {
+        const batch = listingIds.slice(i, i + batchSize);
+        const results = await Promise.allSettled(
+          batch.map(async (legacyId) => {
+            const item = await callEbayAPI(
+              `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyId}`,
+              appToken
+            );
+            return {
+              legacyItemId: legacyId,
+              itemId: item.itemId,
+              title: item.title,
+              shortDescription: item.shortDescription,
+              price: item.price,
+              condition: item.condition,
+              conditionId: item.conditionId,
+              conditionDescription: item.conditionDescription,
+              categoryPath: item.categoryPath,
+              categoryId: item.categoryId,
+              categoryIdPath: item.categoryIdPath,
+              image: item.image,
+              additionalImages: item.additionalImages || [],
+              brand: item.brand,
+              itemCreationDate: item.itemCreationDate,
+              seller: item.seller,
+              estimatedSoldQuantity: item.estimatedAvailabilities?.[0]?.estimatedSoldQuantity || 0,
+              estimatedRemainingQuantity: item.estimatedAvailabilities?.[0]?.estimatedRemainingQuantity || 0,
+              shippingOptions: item.shippingOptions,
+              returnTerms: item.returnTerms,
+              localizedAspects: item.localizedAspects,
+              itemWebUrl: item.itemWebUrl,
+              description: item.description,
+              buyingOptions: item.buyingOptions,
+              listingMarketplaceId: item.listingMarketplaceId,
+              topRatedBuyingExperience: item.topRatedBuyingExperience,
+              gtin: item.gtin,
+              mpn: item.mpn,
+              epid: item.epid,
+            };
+          })
+        );
+        for (const r of results) {
+          if (r.status === 'fulfilled') listings.push(r.value);
+        }
+      }
+
+      return res.status(200).json({
+        total: listings.length,
+        totalAnalytics: listingIds.length,
+        listings,
+      });
+    }
+
+    // GET ?action=get_item_details&legacy_item_id=XXX — Get full details for any legacy item
+    if (req.method === 'GET' && action === 'get_item_details') {
+      const legacyItemId = req.query.legacy_item_id as string;
+      if (!legacyItemId) {
+        return res.status(400).json({ error: 'legacy_item_id is required' });
+      }
+
+      const appToken = await getApplicationToken();
+      const item = await callEbayAPI(
+        `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyItemId}`,
+        appToken
+      );
+
+      return res.status(200).json(item);
+    }
+
+    // GET ?action=search_seller&seller=USERNAME&q=OPTIONAL_QUERY
+    if (req.method === 'GET' && action === 'search_seller') {
+      const sellerName = req.query.seller as string;
+      if (!sellerName) {
+        return res.status(400).json({ error: 'seller username is required' });
+      }
+
+      const appToken = await getApplicationToken();
+      const q = (req.query.q as string) || '';
+      const limit = parseInt(req.query.limit as string) || 50;
+      const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
+
+      // Browse API filter by seller
+      let url = `/buy/browse/v1/item_summary/search?limit=${limit}&fieldgroups=MATCHING_ITEMS,ASPECT_REFINEMENTS&filter=sellers:{${encodeURIComponent(sellerName)}}`;
+      if (q) url += `&q=${encodeURIComponent(q)}`;
+
+      const response = await fetch(`${EBAY_API_BASE}${url}`, {
+        headers: {
+          'Authorization': `Bearer ${appToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': marketplace,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: `Browse API error: ${response.status}`, details: errText });
+      }
+
+      const data = await response.json();
+      const items = data.itemSummaries || [];
+
+      // Get sold quantity for top items (first 10) in parallel
+      const enrichedItems = await Promise.all(
+        items.slice(0, 20).map(async (item: any) => {
+          let soldQuantity = 0;
+          try {
+            if (item.legacyItemId) {
+              const detail = await callEbayAPI(
+                `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${item.legacyItemId}`,
+                appToken
+              );
+              soldQuantity = detail.estimatedAvailabilities?.[0]?.estimatedSoldQuantity || 0;
+            }
+          } catch { /* skip */ }
+          return {
+            ...item,
+            estimatedSoldQuantity: soldQuantity,
+          };
+        })
+      );
+
+      // Append remaining items without enrichment
+      const remaining = items.slice(20).map((item: any) => ({ ...item, estimatedSoldQuantity: 0 }));
+
+      return res.status(200).json({
+        total: data.total || 0,
+        seller: sellerName,
+        items: [...enrichedItems, ...remaining],
+        aspectDistributions: data.refinement?.aspectDistributions || [],
+      });
+    }
+
+    // GET ?action=category_bestsellers&category_id=XXX — Find bestselling items in a category
+    if (req.method === 'GET' && action === 'category_bestsellers') {
+      const categoryId = req.query.category_id as string;
+      if (!categoryId) {
+        return res.status(400).json({ error: 'category_id is required' });
+      }
+
+      const appToken = await getApplicationToken();
+      const limit = parseInt(req.query.limit as string) || 50;
+      const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
+      const condition = req.query.condition as string || '';
+
+      let filter = '';
+      if (condition) filter = `conditionIds:{${condition}}`;
+
+      let url = `/buy/browse/v1/item_summary/search?category_ids=${categoryId}&limit=${limit}&fieldgroups=MATCHING_ITEMS,ASPECT_REFINEMENTS`;
+      if (filter) url += `&filter=${encodeURIComponent(filter)}`;
+
+      const response = await fetch(`${EBAY_API_BASE}${url}`, {
+        headers: {
+          'Authorization': `Bearer ${appToken}`,
+          'X-EBAY-C-MARKETPLACE-ID': marketplace,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: `Browse API error: ${response.status}`, details: errText });
+      }
+
+      const data = await response.json();
+      const items = data.itemSummaries || [];
+
+      // Get sold quantities for top items to rank by sales
+      const enrichedItems = await Promise.all(
+        items.slice(0, 20).map(async (item: any) => {
+          let soldQuantity = 0;
+          try {
+            if (item.legacyItemId) {
+              const detail = await callEbayAPI(
+                `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${item.legacyItemId}`,
+                appToken
+              );
+              soldQuantity = detail.estimatedAvailabilities?.[0]?.estimatedSoldQuantity || 0;
+            }
+          } catch { /* skip */ }
+          return {
+            itemId: item.itemId,
+            title: item.title,
+            price: item.price,
+            condition: item.condition,
+            image: item.image,
+            itemWebUrl: item.itemWebUrl,
+            seller: item.seller,
+            categories: item.categories,
+            buyingOptions: item.buyingOptions,
+            shippingOptions: item.shippingOptions,
+            topRatedBuyingExperience: item.topRatedBuyingExperience,
+            legacyItemId: item.legacyItemId,
+            estimatedSoldQuantity: soldQuantity,
+          };
+        })
+      );
+
+      // Sort by sold quantity descending
+      enrichedItems.sort((a: any, b: any) => b.estimatedSoldQuantity - a.estimatedSoldQuantity);
+
+      // Append remaining items
+      const remaining = items.slice(20).map((item: any) => ({
+        itemId: item.itemId,
+        title: item.title,
+        price: item.price,
+        condition: item.condition,
+        image: item.image,
+        itemWebUrl: item.itemWebUrl,
+        seller: item.seller,
+        categories: item.categories,
+        buyingOptions: item.buyingOptions,
+        shippingOptions: item.shippingOptions,
+        topRatedBuyingExperience: item.topRatedBuyingExperience,
+        legacyItemId: item.legacyItemId,
+        estimatedSoldQuantity: 0,
+      }));
+
+      // Price stats
+      const prices = items
+        .map((item: any) => parseFloat(item.price?.value || '0'))
+        .filter((p: number) => p > 0)
+        .sort((a: number, b: number) => a - b);
+
+      const priceStats = prices.length > 0 ? {
+        min: prices[0],
+        max: prices[prices.length - 1],
+        avg: Math.round((prices.reduce((a: number, b: number) => a + b, 0) / prices.length) * 100) / 100,
+        median: prices.length % 2 === 0
+          ? Math.round(((prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2) * 100) / 100
+          : prices[Math.floor(prices.length / 2)],
+      } : null;
+
+      return res.status(200).json({
+        total: data.total || 0,
+        categoryId,
+        items: [...enrichedItems, ...remaining],
+        priceStats,
+        aspectDistributions: data.refinement?.aspectDistributions || [],
+      });
+    }
+
+    // GET ?action=top_categories — Get top-level eBay categories for browsing
+    if (req.method === 'GET' && action === 'top_categories') {
+      const appToken = await getApplicationToken();
+      const categoryTreeId = (req.query.category_tree_id as string) || '0';
+
+      const data = await callEbayAPI(
+        `/commerce/taxonomy/v1/category_tree/${categoryTreeId}`,
+        appToken
+      );
+
+      // Return flattened top-level categories (1 level deep)
+      const rootCategory = data.rootCategoryNode;
+      const categories = (rootCategory?.childCategoryTreeNodes || []).map((node: any) => ({
+        categoryId: node.category?.categoryId,
+        categoryName: node.category?.categoryName,
+        childCount: node.childCategoryTreeNodes?.length || 0,
+        children: (node.childCategoryTreeNodes || []).slice(0, 20).map((child: any) => ({
+          categoryId: child.category?.categoryId,
+          categoryName: child.category?.categoryName,
+          childCount: child.childCategoryTreeNodes?.length || 0,
+        })),
+      }));
+
+      return res.status(200).json({
+        categoryTreeId: data.categoryTreeId,
+        categoryTreeVersion: data.categoryTreeVersion,
+        categories,
+      });
+    }
+
+    // GET ?action=analytics — Get user's own listing analytics/traffic
+    if (req.method === 'GET' && action === 'analytics') {
+      const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
+      const days = parseInt(req.query.days as string) || 30;
+
+      const yesterday = new Date(Date.now() - 86400000);
+      const startDay = new Date(Date.now() - days * 86400000);
+      const endDate = yesterday.toISOString().split('T')[0].replace(/-/g, '');
+      const startDate = startDay.toISOString().split('T')[0].replace(/-/g, '');
+
+      const data = await callEbayAPI(
+        `/sell/analytics/v1/traffic_report?dimension=LISTING&metric=LISTING_IMPRESSION_TOTAL,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE&filter=date_range:[${startDate}..${endDate}]`,
+        accessToken,
+        {},
+        marketplace
+      );
+
+      // Parse records into a readable format
+      const records = (data.records || []).map((record: any) => {
+        const listingId = record.dimensionValues?.[0]?.value;
+        const metrics: Record<string, any> = {};
+        (record.metricValues || []).forEach((mv: any, idx: number) => {
+          const key = data.header?.metrics?.[idx]?.key;
+          if (key) metrics[key] = mv.value;
+        });
+        return { listingId, ...metrics };
+      });
+
+      return res.status(200).json({
+        total: records.length,
+        dateRange: { start: startDate, end: endDate },
+        records,
+      });
+    }
+
     // -----------------------------------------------------------------
     // No matching action
     // -----------------------------------------------------------------
@@ -1271,6 +1635,13 @@ export default async function handler(
         // Research
         'search_market',
         'analyze_seo',
+        // Browse & Research
+        'my_legacy_listings',
+        'get_item_details',
+        'search_seller',
+        'category_bestsellers',
+        'top_categories',
+        'analytics',
         // Orders
         'orders',
         'order',

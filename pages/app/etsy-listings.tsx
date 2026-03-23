@@ -24,6 +24,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   DataGrid,
@@ -57,6 +59,7 @@ import BulkOperationsBar from '@/components/etsy/BulkOperationsBar';
 import SmartPricing from '@/components/etsy/SmartPricing';
 import DuplicateDetector from '@/components/etsy/DuplicateDetector';
 import BackupManager from '@/components/etsy/BackupManager';
+import EtsyMarketResearch from '@/components/etsy/MarketResearch';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -236,6 +239,7 @@ function EtsyListingsPage() {
   const [smartPricingOpen, setSmartPricingOpen] = useState(false);
   const [duplicateDetectorOpen, setDuplicateDetectorOpen] = useState(false);
   const [backupManagerOpen, setBackupManagerOpen] = useState(false);
+  const [pageTab, setPageTab] = useState(0);
 
   const [shops, setShops] = useState<ShopInfo[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string>('');
@@ -924,6 +928,21 @@ function EtsyListingsPage() {
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
       <Toaster position="top-right" />
 
+      {/* Page Tabs */}
+      <Tabs value={pageTab} onChange={(_, v) => setPageTab(v)} sx={{ mb: 2 }}>
+        <Tab label="Listelemeler" />
+        <Tab label="Pazar Arastirmasi" />
+      </Tabs>
+
+      {pageTab === 1 && (
+        <EtsyMarketResearch
+          userId={(user as any)?.id || ''}
+          shopId={selectedShopId}
+          userListings={listings}
+        />
+      )}
+
+      {pageTab === 0 && (<>
       {/* Statistics Bar */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' }, gap: 1, mb: 2 }}>
         <Paper sx={{ p: 1.5 }}>
@@ -1239,6 +1258,8 @@ function EtsyListingsPage() {
           </Paper>
         </Box>
       )}
+
+      </>)}
 
       {/* Editor Drawer */}
       <ListingEditorDrawer

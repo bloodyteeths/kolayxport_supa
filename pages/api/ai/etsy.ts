@@ -204,6 +204,50 @@ Image URL: ${image_url || 'N/A'}`;
   return { status: 200, data: { alt_text: parsed.alt_text } };
 }
 
+async function handleMarketAnalysis(body: any) {
+  const { query, totalResults, priceStats, topTags, topKeywords, shopCount,
+          avgFavorites, avgViews, topShops } = body;
+
+  if (!query) {
+    return { status: 400, data: { error: 'query alanı zorunludur.' } };
+  }
+
+  const model = getGeminiModel();
+  const prompt = `Sen Etsy pazar araştırma ve strateji uzmanısın. Mart 2026 itibarıyla Etsy'nin arama algoritması, trendleri ve satıcı stratejileri hakkında derin bilgiye sahipsin.
+
+Bir satıcı "${query}" anahtar kelimesi ile pazar araştırması yaptı. İşte toplanan veriler:
+
+PAZAR VERİLERİ:
+- Toplam sonuç: ${totalResults || 'N/A'}
+- Benzersiz mağaza sayısı: ${shopCount || 'N/A'}
+- Fiyat istatistikleri: Min: $${priceStats?.min || 'N/A'}, Ort: $${priceStats?.avg || 'N/A'}, Medyan: $${priceStats?.median || 'N/A'}, Max: $${priceStats?.max || 'N/A'}
+- Ortalama favori: ${avgFavorites || 'N/A'}
+- Ortalama görüntülenme: ${avgViews || 'N/A'}
+- En çok kullanılan etiketler: ${Array.isArray(topTags) ? topTags.slice(0, 20).map((t: any) => `${t.tag} (%${t.pct})`).join(', ') : 'N/A'}
+- En çok kullanılan başlık kelimeleri: ${Array.isArray(topKeywords) ? topKeywords.slice(0, 15).map((k: any) => `${k.keyword} (%${k.pct})`).join(', ') : 'N/A'}
+- En iyi mağazalar: ${Array.isArray(topShops) ? topShops.slice(0, 5).map((s: any) => `${s.shop_name} (${s.num_sales} satış, ${s.review_average}★)`).join(', ') : 'N/A'}
+
+Lütfen aşağıdaki analizi Türkçe olarak yap ve JSON formatında döndür:
+{
+  "opportunity_score": 0-100 arası puan,
+  "opportunity_level": "Yüksek" | "Orta" | "Düşük",
+  "market_summary": "2-3 cümlelik pazar özeti",
+  "pricing_strategy": "Önerilen fiyatlandırma stratejisi (3-4 cümle)",
+  "tag_recommendations": ["öneri1", "öneri2", ...] (en fazla 10),
+  "title_recommendations": "Başlık optimizasyonu önerileri (3-4 cümle)",
+  "niche_positioning": "Niş pozisyonlama stratejisi (3-4 cümle)",
+  "seasonal_advice": "Mevsimsel tavsiyeler (2-3 cümle)",
+  "competition_analysis": "Rekabet analizi (3-4 cümle)",
+  "action_items": ["yapılacak1", "yapılacak2", ...] (en fazla 7 madde)
+}`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  const parsed = JSON.parse(text);
+
+  return { status: 200, data: { analysis: parsed } };
+}
+
 async function handleBulkOptimize(body: any) {
   const { listings } = body;
 
@@ -311,9 +355,12 @@ export default async function handler(
       case 'bulk_optimize':
         result = await handleBulkOptimize(body);
         break;
+      case 'market_analysis':
+        result = await handleMarketAnalysis(body);
+        break;
       default:
         return res.status(400).json({
-          error: `Geçersiz action: "${action}". Desteklenen eylemler: suggest_tags, optimize_title, generate_description, generate_alt_text, bulk_optimize`,
+          error: `Geçersiz action: "${action}". Desteklenen eylemler: suggest_tags, optimize_title, generate_description, generate_alt_text, bulk_optimize, market_analysis`,
         });
     }
 

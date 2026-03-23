@@ -263,6 +263,254 @@ async function callEtsyAPI(endpoint: string, accessToken: string, options: Reque
     return response.json();
 }
 
+// ---------------------------------------------------------------------------
+// Public Etsy API (no OAuth needed — uses only x-api-key)
+// ---------------------------------------------------------------------------
+
+async function callEtsyPublicAPI(endpoint: string) {
+    const url = `${ETSY_API_BASE}${endpoint}`;
+    const apiKey = (process.env.ETSY_API_KEY || '').trim().replace(/^"|"$/g, '');
+    const apiSecret = (process.env.ETSY_API_SECRET || '').trim().replace(/^"|"$/g, '');
+    const response = await fetch(url, {
+        headers: {
+            'x-api-key': `${apiKey}:${apiSecret}`,
+        },
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Etsy Public API error: ${response.status} - ${errorText}`);
+    }
+    if (response.status === 204) return { success: true };
+    return response.json();
+}
+
+// Rate limiter for public API (max ~8 concurrent, 120ms delay)
+async function rateLimitedPublicCall(endpoint: string): Promise<any> {
+    await new Promise(resolve => setTimeout(resolve, 120));
+    return callEtsyPublicAPI(endpoint);
+}
+
+// Helper: extract keywords from titles
+function extractTitleKeywords(titles: string[]): { keyword: string; count: number; pct: number }[] {
+    const STOP = new Set([
+        'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+        'of', 'with', 'by', 'from', 'is', 'it', 'as', 'be', 'are', 'was',
+        'has', 'have', 'do', 'does', 'not', 'no', 'set', '&', '-', '/', '|', '+', 'x',
+        'her', 'him', 'his', 'she', 'he', 'they', 'this', 'that', 'these', 'those',
+        'will', 'would', 'could', 'should', 'can', 'may', 'might',
+    ]);
+    const freq: Record<string, number> = {};
+    titles.forEach(t => {
+        t.toLowerCase().split(/[\s,;:!?()[\]{}""''|\/\-]+/).filter(
+            w => w.length > 1 && !STOP.has(w) && !/^\d+$/.test(w)
+        ).forEach(w => { freq[w] = (freq[w] || 0) + 1; });
+    });
+    const total = Math.max(titles.length, 1);
+    return Object.entries(freq)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 80)
+        .map(([keyword, count]) => ({ keyword, count, pct: Math.round((count / total) * 100) }));
+}
+
+async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, action: string) {
+    // --- search_market: Search all Etsy listings ---
+    if (action === 'search_market' && req.method === 'GET') {
+        const keywords = req.query.keywords as string;
+        if (!keywords) return res.status(400).json({ error: 'keywords is required' });
+
+        const minPrice = req.query.min_price as string;
+        const maxPrice = req.query.max_price as string;
+        const sortOn = (req.query.sort_on as string) || 'score';
+        const sortOrder = (req.query.sort_order as string) || 'desc';
+        const taxonomyId = req.query.taxonomy_id as string;
+        const requestedLimit = Math.min(parseInt((req.query.limit as string) || '100'), 300);
+
+        // Paginate up to 3 pages of 100
+        const pages = Math.ceil(requestedLimit / 100);
+        const allResults: any[] = [];
+        let totalCount = 0;
+
+        for (let page = 0; page < pages; page++) {
+            const params = new URLSearchParams({
+                keywords,
+                limit: '100',
+                offset: String(page * 100),
+                sort_on: sortOn,
+                sort_order: sortOrder,
+            });
+            if (minPrice) params.set('min_price', minPrice);
+            if (maxPrice) params.set('max_price', maxPrice);
+            if (taxonomyId) params.set('taxonomy_id', taxonomyId);
+
+            const data = page === 0
+                ? await callEtsyPublicAPI(`/listings/active?${params}`)
+                : await rateLimitedPublicCall(`/listings/active?${params}`);
+
+            totalCount = data.count || 0;
+            const results = data.results || [];
+            allResults.push(...results);
+
+            if (results.length < 100) break; // no more pages
+        }
+
+        // Process items
+        const items = allResults.map((l: any) => ({
+            listing_id: l.listing_id,
+            title: l.title || '',
+            description: (l.description || '').slice(0, 300),
+            price: l.price ? l.price.amount / l.price.divisor : 0,
+            currency_code: l.price?.currency_code || 'USD',
+            views: l.views || 0,
+            num_favorers: l.num_favorers || 0,
+            tags: l.tags || [],
+            shop_id: l.shop_id,
+            taxonomy_id: l.taxonomy_id,
+            url: l.url || '',
+            quantity: l.quantity || 0,
+            image_url: l.images?.[0]?.url_170x135 || '',
+            created_timestamp: l.created_timestamp || 0,
+            state: l.state || 'active',
+        }));
+
+        // Compute price stats
+        const prices = items.map((i: any) => i.price).filter((p: number) => p > 0).sort((a: number, b: number) => a - b);
+        let priceStats: any = null;
+        if (prices.length > 0) {
+            const sum = prices.reduce((a: number, b: number) => a + b, 0);
+            const mid = Math.floor(prices.length / 2);
+            priceStats = {
+                min: prices[0],
+                max: prices[prices.length - 1],
+                avg: Math.round((sum / prices.length) * 100) / 100,
+                median: prices.length % 2 === 0 ? Math.round(((prices[mid - 1] + prices[mid]) / 2) * 100) / 100 : prices[mid],
+                count: prices.length,
+            };
+        }
+
+        // Aggregate tag frequency
+        const tagMap: Record<string, number> = {};
+        items.forEach((item: any) => {
+            (item.tags || []).forEach((tag: string) => {
+                const t = tag.toLowerCase().trim();
+                if (t) tagMap[t] = (tagMap[t] || 0) + 1;
+            });
+        });
+        const tagFrequency = Object.entries(tagMap)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 100)
+            .map(([tag, count]) => ({ tag, count, pct: Math.round((count / Math.max(items.length, 1)) * 100) }));
+
+        // Extract title keywords
+        const titleKeywords = extractTitleKeywords(items.map((i: any) => i.title));
+
+        // Unique shop IDs
+        const shopIds = [...new Set(items.map((i: any) => i.shop_id).filter(Boolean))];
+
+        return res.status(200).json({
+            total: totalCount,
+            items,
+            priceStats,
+            tagFrequency,
+            titleKeywords,
+            shopIds: shopIds.slice(0, 30),
+        });
+    }
+
+    // --- get_public_shop: Get shop details (public) ---
+    if (action === 'get_public_shop' && req.method === 'GET') {
+        const shopId = req.query.target_shop_id as string;
+        if (!shopId) return res.status(400).json({ error: 'target_shop_id is required' });
+
+        const data = await callEtsyPublicAPI(`/shops/${shopId}`);
+        return res.status(200).json({
+            shop_id: data.shop_id,
+            shop_name: data.shop_name || '',
+            num_sales: data.transaction_sold_count || 0,
+            review_count: data.review_count || 0,
+            review_average: data.review_average || 0,
+            listing_active_count: data.listing_active_count || 0,
+            currency_code: data.currency_code || 'USD',
+            url: data.url || '',
+            icon_url: data.icon_url_fullxfull || '',
+            created_timestamp: data.create_date || 0,
+        });
+    }
+
+    // --- get_public_shop_listings: Get listings from a shop (public) ---
+    if (action === 'get_public_shop_listings' && req.method === 'GET') {
+        const shopId = req.query.target_shop_id as string;
+        if (!shopId) return res.status(400).json({ error: 'target_shop_id is required' });
+
+        const requestedLimit = Math.min(parseInt((req.query.limit as string) || '100'), 500);
+        const pages = Math.ceil(requestedLimit / 100);
+        const allListings: any[] = [];
+
+        for (let page = 0; page < pages; page++) {
+            const data = page === 0
+                ? await callEtsyPublicAPI(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}`)
+                : await rateLimitedPublicCall(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}`);
+
+            const results = data.results || [];
+            allListings.push(...results.map((l: any) => ({
+                listing_id: l.listing_id,
+                title: l.title || '',
+                price: l.price ? l.price.amount / l.price.divisor : 0,
+                currency_code: l.price?.currency_code || 'USD',
+                views: l.views || 0,
+                num_favorers: l.num_favorers || 0,
+                tags: l.tags || [],
+                quantity: l.quantity || 0,
+                url: l.url || '',
+                created_timestamp: l.created_timestamp || 0,
+            })));
+
+            if (results.length < 100) break;
+        }
+
+        return res.status(200).json({
+            total: allListings.length,
+            listings: allListings,
+        });
+    }
+
+    // --- batch_shops: Get multiple shop details in parallel ---
+    if (action === 'batch_shops' && req.method === 'GET') {
+        const shopIdsStr = req.query.shop_ids as string;
+        if (!shopIdsStr) return res.status(400).json({ error: 'shop_ids is required' });
+
+        const shopIds = shopIdsStr.split(',').slice(0, 20);
+        const results = await Promise.allSettled(
+            shopIds.map((id, i) =>
+                new Promise<any>(resolve => setTimeout(async () => {
+                    try {
+                        const data = await callEtsyPublicAPI(`/shops/${id}`);
+                        resolve({
+                            shop_id: data.shop_id,
+                            shop_name: data.shop_name || '',
+                            num_sales: data.transaction_sold_count || 0,
+                            review_count: data.review_count || 0,
+                            review_average: data.review_average || 0,
+                            listing_active_count: data.listing_active_count || 0,
+                            url: data.url || '',
+                            icon_url: data.icon_url_fullxfull || '',
+                        });
+                    } catch {
+                        resolve(null);
+                    }
+                }, i * 120))
+            )
+        );
+
+        const shops = results
+            .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value !== null)
+            .map(r => r.value);
+
+        return res.status(200).json({ shops });
+    }
+
+    return res.status(400).json({ error: 'Invalid public action' });
+}
+
 export default async function handler(
     req: NextApiRequest,
     res: NextApiResponse
@@ -292,6 +540,17 @@ export default async function handler(
 
     if (!authenticated) {
         return res.status(401).json({ error: 'Unauthorized: Invalid or missing authentication' });
+    }
+
+    // --- Public Etsy API actions (no OAuth needed, just x-api-key) ---
+    const publicAction = req.query.action as string;
+    if (publicAction && ['search_market', 'get_public_shop', 'get_public_shop_listings', 'batch_shops'].includes(publicAction)) {
+        try {
+            return await handlePublicAction(req, res, publicAction);
+        } catch (error: any) {
+            logger.error('Etsy public API error:', error);
+            return res.status(500).json({ error: error.message || 'Public API error' });
+        }
     }
 
     // Get shop ID from query parameter (required)

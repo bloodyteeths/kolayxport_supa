@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Box, Typography, TextField, Button, Paper, Chip, Divider,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
   LinearProgress, Alert, Tabs, Tab, Tooltip, IconButton,
   CircularProgress, InputAdornment, Switch, FormControlLabel,
   Autocomplete, Avatar,
@@ -89,6 +89,41 @@ interface SeasonalData {
   monthlyTrends: { month: string; value: number }[];
   wikiPageviews: { month: string; views: number }[];
   peakMonth: string; lowMonth: string; hasData: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Reusable table sort hook
+// ---------------------------------------------------------------------------
+
+type SortDir = 'asc' | 'desc';
+
+function useTableSort<T>(items: T[], defaultKey: string = '', defaultDir: SortDir = 'desc') {
+  const [sortKey, setSortKey] = useState(defaultKey);
+  const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
+
+  const handleSort = useCallback((key: string) => {
+    if (sortKey === key) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  }, [sortKey]);
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return items;
+    return [...items].sort((a: any, b: any) => {
+      let va = a[sortKey] ?? 0;
+      let vb = b[sortKey] ?? 0;
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [items, sortKey, sortDir]);
+
+  return { sorted, sortKey, sortDir, handleSort };
 }
 
 // ---------------------------------------------------------------------------
@@ -428,6 +463,16 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
   // --- saved ---
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+
+  // --- Table sort states ---
+  const [kwSortKey, setKwSortKey] = useState('score');
+  const [kwSortDir, setKwSortDir] = useState<SortDir>('desc');
+  const [shopSortKey, setShopSortKey] = useState('num_sales');
+  const [shopSortDir, setShopSortDir] = useState<SortDir>('desc');
+  const [tagComboSortKey, setTagComboSortKey] = useState('count');
+  const [tagComboSortDir, setTagComboSortDir] = useState<SortDir>('desc');
+  const [bestListingSortKey, setBestListingSortKey] = useState('num_favorers');
+  const [bestListingSortDir, setBestListingSortDir] = useState<SortDir>('desc');
 
   // --- NEW: Keyword Explorer ---
   const [kwExplorerQuery, setKwExplorerQuery] = useState('');
@@ -837,6 +882,28 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   // Computed: Deep Dive
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // Table sort helpers
+  // ---------------------------------------------------------------------------
+
+  const toggleSort = useCallback((key: string, currentKey: string, currentDir: SortDir, setKey: (k: string) => void, setDir: (d: SortDir) => void) => {
+    if (currentKey === key) setDir(currentDir === 'asc' ? 'desc' : 'asc');
+    else { setKey(key); setDir('desc'); }
+  }, []);
+
+  const sortArray = useCallback(<T,>(arr: T[], key: string, dir: SortDir): T[] => {
+    if (!key) return arr;
+    return [...arr].sort((a: any, b: any) => {
+      let va = a[key] ?? 0, vb = b[key] ?? 0;
+      if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb as string).toLowerCase(); }
+      return dir === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0) : (va > vb ? -1 : va < vb ? 1 : 0);
+    });
+  }, []);
+
+  const sortedKwSuggestions = useMemo(() => sortArray(kwSuggestions, kwSortKey, kwSortDir), [kwSuggestions, kwSortKey, kwSortDir, sortArray]);
+  const sortedShops = useMemo(() => shopStats ? sortArray(shopStats.shops, shopSortKey, shopSortDir) : [], [shopStats, shopSortKey, shopSortDir, sortArray]);
+  const sortedTagCombos = useMemo(() => sortArray(tagCombos, tagComboSortKey, tagComboSortDir), [tagCombos, tagComboSortKey, tagComboSortDir, sortArray]);
+
   const deepDiveStats = useMemo(() => {
     if (deepDiveListings.length === 0) return null;
     const ddPrices = deepDiveListings.map(l => l.price).filter(p => p > 0).sort((a, b) => a - b);
@@ -861,6 +928,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       bestListings: [...deepDiveListings].sort((a, b) => b.num_favorers - a.num_favorers).slice(0, 10),
     };
   }, [deepDiveListings]);
+
+  const sortedBestListings = useMemo(() => deepDiveStats ? sortArray(deepDiveStats.bestListings, bestListingSortKey, bestListingSortDir) : [], [deepDiveStats, bestListingSortKey, bestListingSortDir, sortArray]);
 
   // ---------------------------------------------------------------------------
   // Computed: Demand Score
@@ -945,12 +1014,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       currency: '$',
       listingFee: 0.20,
       transactionRate: 0.065,     // 6.5%
-      paymentProcessingRate: 0.04, // 4% + fixed (higher for non-US)
-      paymentProcessingFixed: 0.25,
+      paymentProcessingRate: 0.065, // 6.5% + 3 TL fixed (Turkey-specific)
+      paymentProcessingFixed: 0.17, // ~3 TL ≈ $0.17
       offsiteAdsRate: 0.15,       // 15%
-      regulatoryFee: 0.005,       // 0.5% regulatory operating fee for non-US
+      regulatoryFee: 0.0227,      // 2.27% regulatory operating fee (Turkey-specific)
       vatRate: 0,                 // VAT handled separately by seller
-      notes: 'İşlem ücreti %6.5, ödeme işleme %4 + $0.25, düzenleyici ücret %0.5',
+      notes: 'İşlem ücreti %6.5, ödeme işleme %6.5 + 3₺, düzenleyici işletim ücreti %2.27',
     },
   }), []);
 
@@ -1381,13 +1450,21 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                       <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                         <TableCell>#</TableCell>
                         <TableCell>Anahtar Kelime</TableCell>
-                        <TableCell align="center">Kaynaklar</TableCell>
-                        <TableCell align="center">Skor</TableCell>
+                        <TableCell align="center">
+                          <TableSortLabel active={kwSortKey === 'sourceCount'} direction={kwSortKey === 'sourceCount' ? kwSortDir : 'desc'} onClick={() => toggleSort('sourceCount', kwSortKey, kwSortDir, setKwSortKey, setKwSortDir)}>
+                            Kaynaklar
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell align="center">
+                          <TableSortLabel active={kwSortKey === 'score'} direction={kwSortKey === 'score' ? kwSortDir : 'desc'} onClick={() => toggleSort('score', kwSortKey, kwSortDir, setKwSortKey, setKwSortDir)}>
+                            Skor
+                          </TableSortLabel>
+                        </TableCell>
                         <TableCell align="center">Aksiyon</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {kwSuggestions.slice(0, 50).map((s, i) => (
+                      {sortedKwSuggestions.slice(0, 50).map((s, i) => (
                         <TableRow key={s.keyword} hover sx={{
                           '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
                           borderLeft: i < 3 ? '3px solid #667eea' : 'none',
@@ -1757,9 +1834,21 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                       <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                         <TableCell sx={{ width: 50 }} />
                         <TableCell>Başlık</TableCell>
-                        <TableCell align="right">Fiyat</TableCell>
-                        <TableCell align="center"><Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}><Heart size={12} /> Fav</Box></TableCell>
-                        <TableCell align="center">Etkl.</TableCell>
+                        <TableCell align="right">
+                          <TableSortLabel active={compSort === 'price_asc' || compSort === 'price_desc'} direction={compSort === 'price_asc' ? 'asc' : 'desc'} onClick={() => setCompSort(compSort === 'price_desc' ? 'price_asc' : 'price_desc')}>
+                            Fiyat
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell align="center">
+                          <TableSortLabel active={compSort === 'favorites'} direction="desc" onClick={() => setCompSort('favorites')}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Heart size={12} /> Fav</Box>
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell align="center">
+                          <TableSortLabel active={compSort === 'engagement'} direction="desc" onClick={() => setCompSort('engagement')}>
+                            Etkl.
+                          </TableSortLabel>
+                        </TableCell>
                         <TableCell sx={{ width: 40 }} />
                       </TableRow>
                     </TableHead>
@@ -1897,13 +1986,13 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                       <TableHead>
                         <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                           <TableCell>Tag Cifti</TableCell>
-                          <TableCell align="center">Kullanim</TableCell>
-                          <TableCell align="center">Ort. Favori</TableCell>
+                          <TableCell align="center"><TableSortLabel active={tagComboSortKey==='count'} direction={tagComboSortKey==='count'?tagComboSortDir:'desc'} onClick={()=>toggleSort('count',tagComboSortKey,tagComboSortDir,setTagComboSortKey,setTagComboSortDir)}>Kullanim</TableSortLabel></TableCell>
+                          <TableCell align="center"><TableSortLabel active={tagComboSortKey==='avgFav'} direction={tagComboSortKey==='avgFav'?tagComboSortDir:'desc'} onClick={()=>toggleSort('avgFav',tagComboSortKey,tagComboSortDir,setTagComboSortKey,setTagComboSortDir)}>Ort. Favori</TableSortLabel></TableCell>
                           <TableCell align="center">Kopyala</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {tagCombos.map(c => (
+                        {sortedTagCombos.map(c => (
                           <TableRow key={c.pair} hover sx={{ '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' } }}>
                             <TableCell><Typography variant="body2" sx={{ fontWeight: 600 }}>{c.pair}</Typography></TableCell>
                             <TableCell align="center">{c.count}</TableCell>
@@ -2344,9 +2433,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        Ödeme İşleme ({shopRegion === 'tr' ? '%4' : '%3'} + $0.25)
+                        Ödeme İşleme ({shopRegion === 'tr' ? '%6.5 + 3₺' : '%3 + $0.25'})
                         <Tooltip title={shopRegion === 'tr'
-                          ? 'ABD dışı mağazalar için %4 + $0.25'
+                          ? 'Türkiye mağazaları için %6.5 + 3₺ sabit ücret'
                           : 'ABD mağazaları için %3 + $0.25'
                         }><Info size={14} color="#999" /></Tooltip>
                       </Box>
@@ -2357,8 +2446,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <TableRow>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          Düzenleyici İşletim Ücreti (%0.5)
-                          <Tooltip title="ABD dışı mağazalar için düzenleyici ücret"><Info size={14} color="#999" /></Tooltip>
+                          Düzenleyici İşletim Ücreti (%2.27)
+                          <Tooltip title="Türkiye'ye özel düzenleyici işletim ücreti — Dijital Hizmet Vergisi kapsamında"><Info size={14} color="#999" /></Tooltip>
                         </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.regulatoryFee)}</TableCell>

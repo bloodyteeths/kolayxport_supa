@@ -204,6 +204,42 @@ const DIMENSION_UNITS = [
 const DRAWER_WIDTH = 550;
 
 // ---------------------------------------------------------------------------
+// Draft persistence (localStorage)
+// ---------------------------------------------------------------------------
+
+const DRAFT_KEY_PREFIX = 'listing_draft_';
+
+function getDraftKey(listingId: string): string {
+  return `${DRAFT_KEY_PREFIX}${listingId}`;
+}
+
+function saveDraft(listingId: string, fields: EditableFields): void {
+  try {
+    localStorage.setItem(getDraftKey(listingId), JSON.stringify(fields));
+  } catch {
+    // Storage full or unavailable — silently ignore
+  }
+}
+
+function loadDraft(listingId: string): EditableFields | null {
+  try {
+    const raw = localStorage.getItem(getDraftKey(listingId));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft(listingId: string): void {
+  try {
+    localStorage.removeItem(getDraftKey(listingId));
+  } catch {
+    // Silently ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -283,6 +319,7 @@ export default function ListingEditorDrawer({
 
   // Editable fields
   const [fields, setFields] = useState<EditableFields | null>(null);
+  const fieldsRef = useRef<EditableFields | null>(null);
   const originalFieldsRef = useRef<EditableFields | null>(null);
 
   // Videos (fetched separately)
@@ -320,6 +357,9 @@ export default function ListingEditorDrawer({
   // Scheduled updates
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [pendingScheduleCount, setPendingScheduleCount] = useState(0);
+
+  // Keep fieldsRef in sync for use in cleanup effects
+  useEffect(() => { fieldsRef.current = fields; }, [fields]);
 
   // Execute scheduled updates (polls every 30s)
   useScheduledUpdateExecutor();
@@ -551,12 +591,29 @@ export default function ListingEditorDrawer({
   // --------------------------------------------------
   useEffect(() => {
     if (open && listingId) {
-      fetchListing();
+      fetchListing().then(() => {
+        // After fetching from Etsy, check for a localStorage draft
+        const draft = loadDraft(listingId);
+        if (draft && originalFieldsRef.current) {
+          const draftChanges = getChangedFields(originalFieldsRef.current, draft);
+          if (Object.keys(draftChanges).length > 0) {
+            setFields(draft);
+            setAutoSaveStatus('saved');
+            toast('Kaydedilmemis taslak yuklendi', { icon: '\u270F\uFE0F' });
+          }
+        }
+      });
       fetchVideos();
     }
 
-    // Reset state when drawer closes
+    // Reset state when drawer closes — save draft if there are unsaved changes
     if (!open) {
+      if (listingId && fieldsRef.current && originalFieldsRef.current) {
+        const changed = getChangedFields(originalFieldsRef.current, fieldsRef.current);
+        if (Object.keys(changed).length > 0) {
+          saveDraft(listingId, fieldsRef.current);
+        }
+      }
       setListing(null);
       setFields(null);
       originalFieldsRef.current = null;
@@ -676,7 +733,8 @@ export default function ListingEditorDrawer({
   }, [fields]);
 
   // --------------------------------------------------
-  // Auto-save effect — runs when status transitions to 'saving'
+  // Auto-save effect — saves draft to localStorage (NOT to Etsy)
+  // Manual "Kaydet" button pushes to Etsy API.
   // --------------------------------------------------
   useEffect(() => {
     if (autoSaveStatus !== 'saving') return;
@@ -691,81 +749,12 @@ export default function ListingEditorDrawer({
       return;
     }
 
-    const doSave = async () => {
-      try {
-        const payload: Record<string, any> = {};
-
-        if (changed.title !== undefined) payload.title = changed.title;
-        if (changed.description !== undefined) payload.description = changed.description;
-        if (changed.tags !== undefined) payload.tags = changed.tags;
-        if (changed.materials !== undefined) payload.materials = changed.materials;
-        if (changed.price !== undefined) payload.price = changed.price;
-        if (changed.quantity !== undefined) payload.quantity = changed.quantity;
-        if (changed.who_made !== undefined) payload.who_made = changed.who_made;
-        if (changed.when_made !== undefined) payload.when_made = changed.when_made;
-        if (changed.is_supply !== undefined) payload.is_supply = changed.is_supply;
-        if (changed.shop_section_id !== undefined && changed.shop_section_id !== '') {
-          payload.shop_section_id = changed.shop_section_id;
-        }
-        if (changed.shipping_profile_id !== undefined && changed.shipping_profile_id !== '') {
-          payload.shipping_profile_id = changed.shipping_profile_id;
-        }
-        if (changed.return_policy_id !== undefined && changed.return_policy_id !== '') {
-          payload.return_policy_id = changed.return_policy_id;
-        }
-        if (changed.processing_min !== undefined && changed.processing_min !== '') {
-          payload.processing_min = Number(changed.processing_min);
-        }
-        if (changed.processing_max !== undefined && changed.processing_max !== '') {
-          payload.processing_max = Number(changed.processing_max);
-        }
-        if (changed.item_weight !== undefined && changed.item_weight !== '') {
-          payload.item_weight = Number(changed.item_weight);
-        }
-        if (changed.item_weight_unit !== undefined) payload.item_weight_unit = changed.item_weight_unit;
-        if (changed.item_length !== undefined && changed.item_length !== '') {
-          payload.item_length = Number(changed.item_length);
-        }
-        if (changed.item_width !== undefined && changed.item_width !== '') {
-          payload.item_width = Number(changed.item_width);
-        }
-        if (changed.item_height !== undefined && changed.item_height !== '') {
-          payload.item_height = Number(changed.item_height);
-        }
-        if (changed.item_dimensions_unit !== undefined) payload.item_dimensions_unit = changed.item_dimensions_unit;
-
-        if (Object.keys(payload).length === 0) {
-          setAutoSaveStatus('idle');
-          return;
-        }
-
-        const res = await fetch(
-          `/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${shopId}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          },
-        );
-
-        if (!res.ok) {
-          throw new Error('Auto-save failed');
-        }
-
-        // Update original ref so further dirty checks are correct
-        if (fields) {
-          originalFieldsRef.current = { ...fields, tags: [...fields.tags], materials: [...fields.materials] };
-        }
-        setLastSavedAt(new Date());
-        setAutoSaveStatus('saved');
-        setHistory([]);
-        onSaved();
-      } catch {
-        setAutoSaveStatus('error');
-      }
-    };
-
-    doSave();
+    // Save draft to localStorage — does NOT touch Etsy API
+    saveDraft(listingId, fields);
+    setLastSavedAt(new Date());
+    setAutoSaveStatus('saved');
+    // Note: originalFieldsRef is NOT updated here — it tracks Etsy state,
+    // so hasChanges() stays true and the "Kaydet" button remains enabled.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSaveStatus]);
 
@@ -857,6 +846,9 @@ export default function ListingEditorDrawer({
       }
 
       toast.success('Liste guncellendi');
+
+      // Clear the localStorage draft — changes are now on Etsy
+      if (listingId) clearDraft(listingId);
 
       // Reset auto-save state and history
       if (autoSaveTimerRef.current) {
@@ -1182,11 +1174,11 @@ export default function ListingEditorDrawer({
                 }}
               />
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                {autoSaveStatus === 'unsaved' && 'Kaydedilmedi'}
-                {autoSaveStatus === 'saving' && 'Kaydediliyor...'}
+                {autoSaveStatus === 'unsaved' && 'Degisiklik var'}
+                {autoSaveStatus === 'saving' && 'Taslak kaydediliyor...'}
                 {autoSaveStatus === 'saved' &&
-                  `Kaydedildi${lastSavedAt ? ` ${lastSavedAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
-                {autoSaveStatus === 'error' && 'Hata'}
+                  `Taslak kaydedildi${lastSavedAt ? ` ${lastSavedAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
+                {autoSaveStatus === 'error' && 'Taslak kayit hatasi'}
                 {autoSaveStatus === 'idle' && ''}
               </Typography>
             </Box>
@@ -2001,7 +1993,7 @@ export default function ListingEditorDrawer({
                 onClick={handleSave}
                 disabled={saving || !hasChanges()}
               >
-                {saving ? 'Kaydediliyor...' : 'Kaydet'}
+                {saving ? 'Kaydediliyor...' : 'Etsy\'e Kaydet'}
               </Button>
               <Button
                 variant="outlined"

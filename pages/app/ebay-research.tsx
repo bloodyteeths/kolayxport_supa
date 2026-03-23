@@ -67,19 +67,19 @@ interface PriceStats {
 
 interface TrackedProduct {
   id: string;
-  itemId: string;
+  legacyItemId: string;
+  itemId?: string;
   title: string;
   imageUrl: string;
   currentPrice: number;
-  initialPrice: number;
   currency: string;
-  priceChange: number;
-  soldQuantity: number;
-  soldChange: number;
-  lastChecked: string;
+  totalSold: number;
+  itemWebUrl?: string;
   notes: string;
   tags: string[];
-  snapshots: { price: number; timestamp: string; sold: number }[];
+  lastCheckedAt: string;
+  createdAt: string;
+  snapshots: { price: number; currency: string; quantity?: number; soldQuantity?: number; timestamp: string }[];
 }
 
 interface NicheReport {
@@ -103,12 +103,11 @@ interface NicheReport {
 
 interface TrackedSeller {
   id: string;
-  username: string;
+  sellerUsername: string;
   feedbackScore: number;
-  positivePct: number;
-  lastChecked: string;
+  feedbackPct: string;
+  lastCheckedAt: string;
   notes: string;
-  totalListings: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -315,6 +314,27 @@ function mapEbayItem(item: any): ProductResult {
     listingDate: item.itemCreationDate || item.listingDate || '',
     itemUrl: item.itemWebUrl || item.itemUrl || '',
     location: item.itemLocation?.postalCode || item.location || '',
+  };
+}
+
+function mapNicheProduct(p: any): ProductResult {
+  return {
+    itemId: p.legacyItemId || p.itemId || '',
+    legacyItemId: p.legacyItemId,
+    title: p.title || '',
+    price: typeof p.price === 'number' ? p.price : parseFloat(p.price?.value || '0'),
+    currency: p.currency || 'USD',
+    imageUrl: p.imageUrl || p.image?.imageUrl || '',
+    condition: p.condition || '',
+    seller: typeof p.seller === 'string' ? p.seller : p.seller?.username || '',
+    sellerFeedback: p.sellerFeedback || 0,
+    shippingCost: null,
+    freeShipping: false,
+    topRated: false,
+    estimatedSold: p.soldQuantity ?? p.estimatedSoldQuantity ?? p.estimatedSold ?? 0,
+    listingDate: '',
+    itemUrl: p.itemUrl || p.itemWebUrl || (p.legacyItemId ? `https://www.ebay.com/itm/${p.legacyItemId}` : ''),
+    location: '',
   };
 }
 
@@ -998,25 +1018,29 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
                       {product.title}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" display="block">
-                      ID: {product.itemId}
+                      ID: {product.legacyItemId}
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" fontWeight={700}>${product.currentPrice.toFixed(2)}</Typography>
-                    {product.initialPrice !== product.currentPrice && (
-                      <Typography variant="caption" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
-                        ${product.initialPrice.toFixed(2)}
-                      </Typography>
-                    )}
+                    <Typography variant="body2" fontWeight={700}>${(product.currentPrice || 0).toFixed(2)}</Typography>
+                    {product.snapshots?.length > 1 && (() => {
+                      const oldest = product.snapshots[product.snapshots.length - 1];
+                      return oldest.price !== product.currentPrice ? (
+                        <Typography variant="caption" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
+                          ${oldest.price.toFixed(2)}
+                        </Typography>
+                      ) : null;
+                    })()}
                   </TableCell>
                   <TableCell align="center">
-                    <PriceChangeChip change={product.priceChange} />
+                    {product.snapshots?.length > 1 ? (() => {
+                      const oldest = product.snapshots[product.snapshots.length - 1];
+                      const change = oldest.price > 0 ? ((product.currentPrice - oldest.price) / oldest.price) * 100 : 0;
+                      return <PriceChangeChip change={change} />;
+                    })() : <Typography variant="caption" color="text.secondary">-</Typography>}
                   </TableCell>
                   <TableCell align="center">
-                    <Typography variant="body2">{product.soldQuantity}</Typography>
-                    {product.soldChange > 0 && (
-                      <Typography variant="caption" color="success.main">+{product.soldChange}</Typography>
-                    )}
+                    <Typography variant="body2">{product.totalSold ?? 0}</Typography>
                   </TableCell>
                   <TableCell>
                     <MiniPriceChart snapshots={product.snapshots} />
@@ -1061,13 +1085,20 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
                   </TableCell>
                   <TableCell align="center">
                     <Typography variant="caption" color="text.secondary">
-                      {product.lastChecked ? new Date(product.lastChecked).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                      {product.lastCheckedAt ? new Date(product.lastCheckedAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
-                    <IconButton size="small" color="error" onClick={() => handleRemove(product.id)}>
-                      <Trash2 size={16} />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      {product.itemWebUrl || product.legacyItemId ? (
+                        <IconButton size="small" component="a" href={product.itemWebUrl || `https://www.ebay.com/itm/${product.legacyItemId}`} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink size={16} />
+                        </IconButton>
+                      ) : null}
+                      <IconButton size="small" color="error" onClick={() => handleRemove(product.id)}>
+                        <Trash2 size={16} />
+                      </IconButton>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -1183,8 +1214,12 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags }
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="body2" fontWeight={500} noWrap>{product.title}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-            <Typography variant="subtitle2" fontWeight={700}>${product.currentPrice.toFixed(2)}</Typography>
-            <PriceChangeChip change={product.priceChange} />
+            <Typography variant="subtitle2" fontWeight={700}>${(product.currentPrice || 0).toFixed(2)}</Typography>
+            {product.snapshots?.length > 1 ? (() => {
+              const oldest = product.snapshots[product.snapshots.length - 1];
+              const change = oldest.price > 0 ? ((product.currentPrice - oldest.price) / oldest.price) * 100 : 0;
+              return <PriceChangeChip change={change} />;
+            })() : null}
           </Box>
           <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
             {(product.tags || []).slice(0, 2).map(tag => (
@@ -1197,22 +1232,29 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags }
       <Collapse in={expanded}>
         <Divider />
         <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" color="text.secondary">Ilk Fiyat:</Typography>
-            <Typography variant="caption">${product.initialPrice.toFixed(2)}</Typography>
-          </Box>
+          {product.snapshots?.length > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="caption" color="text.secondary">İlk Fiyat:</Typography>
+              <Typography variant="caption">${product.snapshots[product.snapshots.length - 1].price.toFixed(2)}</Typography>
+            </Box>
+          )}
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
             <Typography variant="caption" color="text.secondary">Satış:</Typography>
-            <Typography variant="caption">
-              {product.soldQuantity} {product.soldChange > 0 && <span style={{ color: '#2e7d32' }}>+{product.soldChange}</span>}
-            </Typography>
+            <Typography variant="caption">{product.totalSold ?? 0}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="caption" color="text.secondary">Son Kontrol:</Typography>
             <Typography variant="caption">
-              {product.lastChecked ? new Date(product.lastChecked).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+              {product.lastCheckedAt ? new Date(product.lastCheckedAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
             </Typography>
           </Box>
+          {(product.itemWebUrl || product.legacyItemId) && (
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button size="small" variant="text" component="a" href={product.itemWebUrl || `https://www.ebay.com/itm/${product.legacyItemId}`} target="_blank" rel="noopener noreferrer" startIcon={<ExternalLink size={12} />}>
+                eBay'de Gör
+              </Button>
+            </Box>
+          )}
           {/* Price Chart */}
           <Box>
             <Typography variant="caption" color="text.secondary">Fiyat Geçmişi:</Typography>
@@ -1295,7 +1337,7 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
         priceMax: data.priceSpread?.max || 0,
         freeShippingPct: data.freeShippingPct || 0,
         sellerConcentration: data.sellerConcentration || 0,
-        topProducts: (data.topProducts || []).filter(Boolean),
+        topProducts: (data.topProducts || []).filter(Boolean).map(mapNicheProduct),
         aspects: [],
         priceDistribution: [],
       };
@@ -1326,7 +1368,7 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
         priceMax: data.priceSpread?.max || 0,
         freeShippingPct: data.freeShippingPct || 0,
         sellerConcentration: data.sellerConcentration || 0,
-        topProducts: (data.topProducts || []).filter(Boolean),
+        topProducts: (data.topProducts || []).filter(Boolean).map(mapNicheProduct),
         aspects: [],
         priceDistribution: [],
       };
@@ -1387,7 +1429,7 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
       priceMax: niche.priceMax || niche.priceSpread?.max || 0,
       freeShippingPct: niche.freeShippingPct || 0,
       sellerConcentration: niche.sellerConcentration || 0,
-      topProducts: niche.topProducts || [],
+      topProducts: (niche.topProducts || []).map(mapNicheProduct),
       aspects: niche.aspects || [],
       priceDistribution: niche.priceDistribution || [],
       savedAt: niche.savedAt || niche.createdAt,
@@ -1791,27 +1833,24 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
             <Paper key={seller.id} variant="outlined" sx={{ p: 1.5 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                 <Box>
-                  <Typography variant="subtitle2" fontWeight={700}>{seller.username}</Typography>
+                  <Typography variant="subtitle2" fontWeight={700}>{seller.sellerUsername}</Typography>
                   <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                     <Chip
                       icon={<Star size={12} />}
-                      label={seller.feedbackScore.toLocaleString('tr-TR')}
+                      label={(seller.feedbackScore || 0).toLocaleString('tr-TR')}
                       size="small"
                       variant="outlined"
                       sx={{ height: 22 }}
                     />
                     <Chip
-                      label={`%${seller.positivePct.toFixed(1)} olumlu`}
+                      label={`%${seller.feedbackPct || '0'} olumlu`}
                       size="small"
                       sx={{
                         height: 22,
-                        bgcolor: seller.positivePct >= 98 ? '#e8f5e9' : seller.positivePct >= 95 ? '#fff3e0' : '#ffebee',
-                        color: seller.positivePct >= 98 ? '#2e7d32' : seller.positivePct >= 95 ? '#ed6c02' : '#c62828',
+                        bgcolor: parseFloat(seller.feedbackPct || '0') >= 98 ? '#e8f5e9' : parseFloat(seller.feedbackPct || '0') >= 95 ? '#fff3e0' : '#ffebee',
+                        color: parseFloat(seller.feedbackPct || '0') >= 98 ? '#2e7d32' : parseFloat(seller.feedbackPct || '0') >= 95 ? '#ed6c02' : '#c62828',
                       }}
                     />
-                    {seller.totalListings > 0 && (
-                      <Chip label={`${seller.totalListings.toLocaleString('tr-TR')} ürün`} size="small" variant="outlined" sx={{ height: 22 }} />
-                    )}
                   </Box>
                 </Box>
                 <IconButton size="small" color="error" onClick={() => handleRemoveSeller(seller.id)}>
@@ -1855,14 +1894,14 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
                   variant="outlined"
                   fullWidth
                   startIcon={<Eye size={14} />}
-                  onClick={() => handleViewProducts(seller.username)}
+                  onClick={() => handleViewProducts(seller.sellerUsername)}
                 >
                   Ürünleri Gör
                 </Button>
               </Box>
 
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, textAlign: 'right' }}>
-                Son kontrol: {seller.lastChecked ? new Date(seller.lastChecked).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                Son kontrol: {seller.lastCheckedAt ? new Date(seller.lastCheckedAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
               </Typography>
             </Paper>
           ))}
@@ -1876,7 +1915,6 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
                 <TableCell>Kullanıcı Adı</TableCell>
                 <TableCell align="center">Puan</TableCell>
                 <TableCell align="center">Olumlu %</TableCell>
-                <TableCell align="center">Ürün Sayısı</TableCell>
                 <TableCell>Notlar</TableCell>
                 <TableCell align="center">Son Kontrol</TableCell>
                 <TableCell align="center">Aksiyonlar</TableCell>
@@ -1886,12 +1924,12 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
               {sellers.map(seller => (
                 <TableRow key={seller.id} hover>
                   <TableCell>
-                    <Typography variant="body2" fontWeight={600}>{seller.username}</Typography>
+                    <Typography variant="body2" fontWeight={600}>{seller.sellerUsername}</Typography>
                   </TableCell>
                   <TableCell align="center">
                     <Chip
                       icon={<Star size={12} />}
-                      label={seller.feedbackScore.toLocaleString('tr-TR')}
+                      label={(seller.feedbackScore || 0).toLocaleString('tr-TR')}
                       size="small"
                       variant="outlined"
                     />
@@ -1901,14 +1939,11 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
                       variant="body2"
                       sx={{
                         fontWeight: 600,
-                        color: seller.positivePct >= 98 ? '#2e7d32' : seller.positivePct >= 95 ? '#ed6c02' : '#c62828',
+                        color: parseFloat(seller.feedbackPct || '0') >= 98 ? '#2e7d32' : parseFloat(seller.feedbackPct || '0') >= 95 ? '#ed6c02' : '#c62828',
                       }}
                     >
-                      %{seller.positivePct.toFixed(1)}
+                      %{seller.feedbackPct || '0'}
                     </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    <Typography variant="body2">{seller.totalListings.toLocaleString('tr-TR')}</Typography>
                   </TableCell>
                   <TableCell sx={{ maxWidth: 200 }}>
                     {editingNotes === seller.id ? (
@@ -1940,13 +1975,13 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
                   </TableCell>
                   <TableCell align="center">
                     <Typography variant="caption" color="text.secondary">
-                      {seller.lastChecked ? new Date(seller.lastChecked).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                      {seller.lastCheckedAt ? new Date(seller.lastCheckedAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                       <Tooltip title="Ürünleri Gör">
-                        <IconButton size="small" onClick={() => handleViewProducts(seller.username)}>
+                        <IconButton size="small" onClick={() => handleViewProducts(seller.sellerUsername)}>
                           <Eye size={16} />
                         </IconButton>
                       </Tooltip>

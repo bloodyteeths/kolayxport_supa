@@ -1,48 +1,45 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '../../../lib/logger';
 import { getSupabaseServerClient } from '../../../lib/supabase';
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export const config = { maxDuration: 30 };
 
 // ---------------------------------------------------------------------------
-// Anthropic client
+// Gemini client
 // ---------------------------------------------------------------------------
 
-function getAnthropicClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+function getGeminiClient(): GoogleGenerativeAI {
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY environment variable is not configured');
+    throw new Error('GEMINI_API_KEY environment variable is not configured');
   }
-  return new Anthropic({ apiKey });
+  return new GoogleGenerativeAI(apiKey);
 }
 
 // ---------------------------------------------------------------------------
-// Claude helper – returns parsed JSON from Claude
+// AI helper – returns parsed JSON from Gemini
 // ---------------------------------------------------------------------------
 
 async function askClaude<T>(
   systemPrompt: string,
   userMessage: string,
-  maxTokens: number = 1024
+  _maxTokens: number = 1024
 ): Promise<T> {
-  const client = getAnthropicClient();
-
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: maxTokens,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userMessage }],
+  const genAI = getGeminiClient();
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: systemPrompt,
+    generationConfig: {
+      responseMimeType: 'application/json',
+    },
   });
 
-  // Extract text from the response
-  const textBlock = response.content.find((block) => block.type === 'text');
-  if (!textBlock || textBlock.type !== 'text') {
-    throw new Error('No text response from Claude');
-  }
+  const result = await model.generateContent(userMessage);
+  const response = result.response;
+  let raw = response.text().trim();
 
-  // Parse JSON from response – strip markdown code fences if present
-  let raw = textBlock.text.trim();
+  // Strip markdown code fences if present
   if (raw.startsWith('```')) {
     raw = raw.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '').trim();
   }
@@ -50,7 +47,7 @@ async function askClaude<T>(
   try {
     return JSON.parse(raw) as T;
   } catch {
-    logger.error('Failed to parse Claude JSON response', new Error('JSON parse error'), {
+    logger.error('Failed to parse Gemini JSON response', new Error('JSON parse error'), {
       raw: raw.substring(0, 500),
     });
     throw new Error('Failed to parse AI response as JSON');
@@ -478,10 +475,14 @@ export default async function handler(
     });
 
     // Don't expose internal errors to client
-    if (errMsg.includes('ANTHROPIC_API_KEY')) {
-      return res.status(500).json({ error: 'AI service is not configured' });
+    if (errMsg.includes('GEMINI_API_KEY') || errMsg.includes('ANTHROPIC_API_KEY')) {
+      return res.status(500).json({ error: 'AI servisi yapilandirilmamis. GEMINI_API_KEY gerekli.' });
     }
 
-    return res.status(500).json({ error: 'AI processing failed. Please try again.' });
+    if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('Too Many Requests')) {
+      return res.status(429).json({ error: 'Gunluk AI kullanim limiti doldu. Lutfen yarin tekrar deneyin veya Gemini planınızı yukseltin.' });
+    }
+
+    return res.status(500).json({ error: 'AI islemi basarisiz oldu. Lutfen tekrar deneyin.' });
   }
 }

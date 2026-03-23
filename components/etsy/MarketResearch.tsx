@@ -1168,7 +1168,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     handleSectionChange(1);
                     setTimeout(() => {
                       setTab(101);
-                    }, 100);
+                      searchMarket();
+                    }, 200);
                   }}
                   sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
                 >

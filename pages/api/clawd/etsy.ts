@@ -82,21 +82,37 @@ async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<s
     }
 
     const data = await response.json();
+    const newExpiresAt = new Date(Date.now() + data.expires_in * 1000);
+    const newAccessToken = data.access_token;
+    const newRefreshToken = data.refresh_token || refreshToken;
 
-    // Update the token in database
-    await prisma.etsyShop.updateMany({
+    // Try updating EtsyShop table first
+    const etsyShopUpdate = await prisma.etsyShop.updateMany({
         where: { shopId },
         data: {
-            accessToken: data.access_token,
-            refreshToken: data.refresh_token || refreshToken,
-            tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+            accessToken: newAccessToken,
+            refreshToken: newRefreshToken,
+            tokenExpiresAt: newExpiresAt,
         },
     });
 
-    return data.access_token;
+    // If no rows updated in EtsyShop, update legacy Credential table instead
+    if (etsyShopUpdate.count === 0) {
+        await prisma.credential.updateMany({
+            where: { etsyShopId: shopId },
+            data: {
+                etsyAccessToken: newAccessToken,
+                etsyRefreshToken: newRefreshToken,
+                etsyTokenExpiresAt: newExpiresAt,
+            },
+        });
+    }
+
+    return newAccessToken;
 }
 
 async function getEtsyAccessToken(shopId: string): Promise<string> {
+    // Try EtsyShop table first
     const etsyShop = await prisma.etsyShop.findFirst({
         where: {
             shopId,
@@ -109,23 +125,43 @@ async function getEtsyAccessToken(shopId: string): Promise<string> {
         },
     });
 
-    if (!etsyShop) {
+    if (etsyShop) {
+        // Check if token is expired or about to expire (within 5 minutes)
+        const now = new Date();
+        const expiresAt = etsyShop.tokenExpiresAt;
+
+        if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
+            // Token expired or about to expire, refresh it
+            if (!etsyShop.refreshToken) {
+                throw new Error('No refresh token available');
+            }
+            return await refreshEtsyToken(shopId, etsyShop.refreshToken);
+        }
+
+        return etsyShop.accessToken;
+    }
+
+    // Fallback: check legacy Credential table
+    const credential = await prisma.credential.findFirst({
+        where: { etsyShopId: shopId },
+        select: { etsyAccessToken: true, etsyRefreshToken: true, etsyTokenExpiresAt: true },
+    });
+
+    if (!credential?.etsyAccessToken) {
         throw new Error('Etsy shop not found or not connected');
     }
 
-    // Check if token is expired or about to expire (within 5 minutes)
+    // Check if legacy token needs refresh
     const now = new Date();
-    const expiresAt = etsyShop.tokenExpiresAt;
-
+    const expiresAt = credential.etsyTokenExpiresAt;
     if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-        // Token expired or about to expire, refresh it
-        if (!etsyShop.refreshToken) {
+        if (!credential.etsyRefreshToken) {
             throw new Error('No refresh token available');
         }
-        return await refreshEtsyToken(shopId, etsyShop.refreshToken);
+        return await refreshEtsyToken(shopId, credential.etsyRefreshToken);
     }
 
-    return etsyShop.accessToken;
+    return credential.etsyAccessToken;
 }
 
 function validatePersonalizationQuestions(questions: PersonalizationQuestion[]): string | null {
@@ -258,8 +294,11 @@ export default async function handler(
         return res.status(401).json({ error: 'Unauthorized: Invalid or missing authentication' });
     }
 
-    // Get shop ID from query parameter (default to user's shop)
-    const shopId = (req.query.shop_id as string) || '54844618';
+    // Get shop ID from query parameter (required)
+    const shopId = req.query.shop_id as string;
+    if (!shopId) {
+        return res.status(400).json({ error: 'shop_id is required' });
+    }
 
     try {
         // Get and refresh Etsy access token if needed

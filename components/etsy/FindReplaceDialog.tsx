@@ -90,7 +90,7 @@ function replaceInArray(arr: string[], search: string, replace: string, caseSens
 
 function hasMatch(text: string, search: string, caseSensitive: boolean): boolean {
   if (!search) return false;
-  const flags = caseSensitive ? 'gi' : 'gi';
+  const flags = caseSensitive ? 'g' : 'gi';
   const regex = new RegExp(escapeRegExp(search), caseSensitive ? 'g' : 'gi');
   return regex.test(text);
 }

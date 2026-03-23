@@ -70,6 +70,7 @@ interface ImageInfo {
   url_570xN: string;
   url_fullxfull?: string;
   rank: number;
+  alt_text?: string;
 }
 
 interface VideoInfo {

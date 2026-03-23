@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { Box, Typography, Button, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Typography, Button, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import AddLinkIcon from '@mui/icons-material/AddLink';
 import { toast } from 'react-hot-toast';
 
 interface VideoInfo {
@@ -21,24 +21,14 @@ interface VideoUploaderProps {
 
 export default function VideoUploader({ listingId, shopId, videos, onVideoChanged }: VideoUploaderProps) {
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<VideoInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('video/')) {
-      toast.error('Lütfen bir video dosyası seçin');
-      return;
-    }
-
-    // Validate file size (100MB max)
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error('Video dosyası maksimum 100MB olabilir');
+  const handleUploadByUrl = async () => {
+    if (!videoUrl.trim()) {
+      toast.error('Lütfen bir video URL\'si girin');
       return;
     }
 
@@ -49,27 +39,16 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
     }
 
     setUploading(true);
-    setUploadProgress(0);
 
     try {
-      const formData = new FormData();
-      formData.append('video', file);
-
-      // Simulate progress since fetch doesn't support progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => Math.min(prev + 5, 90));
-      }, 500);
-
       const res = await fetch(
         `/api/clawd/etsy?action=upload_video&listing_id=${listingId}&shop_id=${shopId}`,
         {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ video_url: videoUrl.trim() }),
         }
       );
-
-      clearInterval(progressInterval);
-      setUploadProgress(100);
 
       if (!res.ok) {
         const err = await res.json();
@@ -77,13 +56,13 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
       }
 
       toast.success('Video yüklendi! İşlenmesi birkaç dakika sürebilir.');
+      setUrlDialogOpen(false);
+      setVideoUrl('');
       onVideoChanged();
     } catch (err: any) {
       toast.error(err.message || 'Video yüklenirken hata oluştu');
     } finally {
       setUploading(false);
-      setUploadProgress(0);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -140,7 +119,7 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
         </Box>
       ) : (
         <Box
-          onClick={() => !uploading && fileInputRef.current?.click()}
+          onClick={() => !uploading && setUrlDialogOpen(true)}
           sx={{
             p: 3,
             border: '2px dashed #cbd5e1',
@@ -151,34 +130,45 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
             transition: 'all 0.2s',
           }}
         >
-          {uploading ? (
-            <Box>
-              <CircularProgress size={32} variant="determinate" value={uploadProgress} />
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Yükleniyor... %{uploadProgress}
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <CloudUploadIcon sx={{ fontSize: 36, color: '#94a3b8' }} />
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Video yükle
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                MP4/MOV, maks. 100MB, 5-60 saniye
-              </Typography>
-            </>
-          )}
+          <AddLinkIcon sx={{ fontSize: 36, color: '#94a3b8' }} />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Video URL ile ekle
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            MP4/MOV, maks. 100MB, 5-60 saniye
+          </Typography>
         </Box>
       )}
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="video/mp4,video/quicktime,video/mov"
-        style={{ display: 'none' }}
-        onChange={handleUpload}
-      />
+      {/* URL input dialog */}
+      <Dialog open={urlDialogOpen} onClose={() => !uploading && setUrlDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Video URL ile Ekle</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Video URL"
+            placeholder="https://example.com/video.mp4"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            disabled={uploading}
+            sx={{ mt: 1 }}
+            helperText="MP4 veya MOV formatında, maksimum 100MB, 5-60 saniye uzunluğunda"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setUrlDialogOpen(false); setVideoUrl(''); }} disabled={uploading}>
+            İptal
+          </Button>
+          <Button
+            onClick={handleUploadByUrl}
+            variant="contained"
+            disabled={uploading || !videoUrl.trim()}
+          >
+            {uploading ? <CircularProgress size={20} /> : 'Ekle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete confirmation */}
       <Dialog open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} maxWidth="xs">

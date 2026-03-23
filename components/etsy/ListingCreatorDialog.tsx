@@ -303,13 +303,28 @@ export default function ListingCreatorDialog({
         setUploadTotal(selectedFiles.length);
         for (let i = 0; i < selectedFiles.length; i++) {
           setUploadProgress(i + 1);
-          const formData = new FormData();
-          formData.append('image', selectedFiles[i]);
-          formData.append('rank', String(i + 1));
+          const file = selectedFiles[i];
+
+          // Convert to base64
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve((reader.result as string).split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
 
           const uploadRes = await fetch(
             `/api/clawd/etsy?action=upload_image&listing_id=${newId}&shop_id=${shopId}`,
-            { method: 'POST', body: formData }
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                image_base64: base64,
+                image_content_type: file.type,
+                image_filename: file.name,
+                rank: i + 1,
+              }),
+            }
           );
 
           if (!uploadRes.ok) {

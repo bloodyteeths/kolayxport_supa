@@ -163,6 +163,8 @@ export async function callEbayAPI(
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Accept-Language': 'en-US',
+      'Content-Language': 'en-US',
       ...options.headers,
     },
   });

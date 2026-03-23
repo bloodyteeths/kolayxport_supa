@@ -49,16 +49,21 @@ function getGeminiModel() {
 
 function buildMarketContextPrompt(mc: any): string {
   if (!mc) return '';
-  const tags = Array.isArray(mc.topTags) ? mc.topTags.slice(0, 15).map((t: any) => `${t.tag} (${t.pct}%)`).join(', ') : 'N/A';
-  const keywords = Array.isArray(mc.topKeywords) ? mc.topKeywords.slice(0, 10).map((k: any) => `${k.keyword} (${k.pct}%)`).join(', ') : 'N/A';
+  const tags = Array.isArray(mc.topTags) ? mc.topTags.slice(0, 20).map((t: any) => `${t.tag} (${t.pct}%)`).join(', ') : 'N/A';
+  const keywords = Array.isArray(mc.topKeywords) ? mc.topKeywords.slice(0, 15).map((k: any) => `${k.keyword} (${k.pct}%)`).join(', ') : 'N/A';
   const priceRange = mc.priceStats ? `$${mc.priceStats.min} - $${mc.priceStats.max} (avg: $${mc.priceStats.avg})` : 'N/A';
   return `
 
-MARKET RESEARCH CONTEXT (from competitor analysis of "${mc.query || 'N/A'}"):
+MARKET RESEARCH DATA (real competitor analysis for "${mc.query || 'N/A'}"):
 - Top competitor tags by frequency: ${tags}
 - Top title keywords by frequency: ${keywords}
 - Market price range: ${priceRange}
-Prioritize tags/keywords that align with proven competitor patterns while finding underused opportunities.`;
+
+YOU MUST USE THIS DATA. Your keyword choices MUST be informed by this research:
+- Pick keywords that appear in competitor titles (proven demand) but combine them in UNIQUE phrases
+- Identify gaps — keywords competitors use that the current listing is missing
+- Don't just copy the top keywords — find the sweet spot between high-demand and less competitive terms
+- Use research to understand buyer language and search patterns for this niche`;
 }
 
 async function handleSuggestTags(body: any) {
@@ -69,20 +74,33 @@ async function handleSuggestTags(body: any) {
   }
 
   const model = getGeminiModel();
-  const prompt = `You are a top Etsy SEO specialist with deep knowledge of Etsy's search algorithm as of March 2026.
+  const prompt = `You are a top Etsy SEO specialist. Your job is to suggest research-backed, high-converting Etsy tags.
 
-ETSY SEO BEST PRACTICES (2026):
-- Etsy uses a hybrid AI + keyword matching search (XWalk system). Tags are still critically important.
-- Each tag can be up to 20 characters. Use all 13 tag slots.
-- Multi-word long-tail tags perform better than single-word tags (e.g., "personalized gift mom" > "gift").
-- Tags should match what BUYERS type in the Etsy search bar, not what sellers think.
-- Include a mix of: specific product terms, occasion/use-case tags, style/aesthetic tags, and recipient tags.
-- Avoid repeating words already in the title — Etsy indexes title and tags together.
-- Regional spelling matters: include both "jewelry" and "jewellery" variations if relevant.
-- Trending seasonal tags get boosted in search during relevant periods.
-- Etsy now weighs listing quality score (conversion rate, reviews) alongside keyword relevance.
+ETSY TAG STRATEGY (2026 — XWalk system):
+- Tags are indexed TOGETHER with the title. Tags should EXPAND search reach, not repeat title words.
+- Each tag can be up to 20 characters. Use all 13 slots — every empty slot is a missed search opportunity.
+- Multi-word long-tail tags outperform single words (e.g., "gift for new mom" > "gift").
+- Tags should match what BUYERS actually type in search, not seller jargon.
 
-Suggest exactly 13 Etsy search tags for this listing. Do NOT repeat any current tags.
+KEYWORD SELECTION (CRITICAL):
+- Use market research data (below) to pick PROVEN keywords from competitor analysis.
+- NEVER repeat words that are already in the title — title and tags work as a combined keyword set.
+- Include a strategic mix of:
+  * Product-specific terms (what it IS)
+  * Occasion/use-case tags (when/why buyers need it)
+  * Style/aesthetic tags (how it looks/feels)
+  * Recipient tags (who it's for)
+  * Seasonal/trending terms relevant to current period
+- Find underused competitor tags that have demand but low competition.
+- Regional spelling variations if relevant (jewelry/jewellery, color/colour).
+
+WHAT NOT TO DO:
+- NO single-word tags (waste of a slot)
+- NO repeating ANY word from the title
+- NO generic tags like "gift" or "handmade" alone — always combine into long-tail phrases
+- NO duplicate meaning across tags (e.g., "mom gift" and "gift for mom" cover the same search)
+
+Suggest exactly 13 tags. Do NOT repeat any current tags.
 Return JSON: { "suggestions": ["tag1", "tag2", ...] }
 
 Title: ${title}
@@ -105,32 +123,42 @@ async function handleOptimizeTitle(body: any) {
   }
 
   const model = getGeminiModel();
-  const prompt = `You are a top Etsy SEO specialist with deep knowledge of Etsy's search algorithm as of March 2026.
+  const prompt = `You are a top Etsy SEO specialist. Your job is to craft a research-backed, high-converting Etsy listing title.
 
-ETSY TITLE OPTIMIZATION BEST PRACTICES (2026):
-- Etsy uses a hybrid AI + keyword matching search (XWalk system). Titles are the MOST important ranking factor.
-- Keep under 140 characters but aim for AT LEAST 100 characters — longer, keyword-rich titles rank significantly better.
-- Front-load the most important, high-search-volume keywords in the first 40 characters (shown in search results).
-- Use natural, readable phrasing — Etsy's AI penalizes keyword stuffing and unnatural word salads.
-- Include long-tail keyword phrases that match buyer search intent (e.g., "personalized gift for mom" not just "gift").
+ETSY SEARCH ALGORITHM (2026 — XWalk system):
+- Titles are the #1 ranking factor. Etsy's AI matches buyer queries against listing titles.
+- First 40 characters are shown in search results — this MUST contain the primary product identity.
+- Etsy indexes title + tags TOGETHER. Words in the title should NOT be repeated in tags and vice versa.
+- Listing quality score (CTR, conversion, reviews) is a major ranking factor — titles must appeal to BUYERS, not just search engines.
 
-CRITICAL FORMATTING RULES:
-- CAPITALIZATION: Use Title Case — capitalize the first letter of each significant word. Small words like "for", "of", "the", "and", "with", "to", "in", "on", "a", "an" stay lowercase (unless they start the title). Example: "Personalized Baby Name Sign, Nursery Wall Decor, Custom Wood Sign for Newborn".
-- SEPARATORS: Use ONLY commas (,) to separate keyword phrases. Do NOT use dashes (-), pipes (|), slashes (/), colons (:), or other special characters — they waste character count and hurt readability.
-- Every character counts. Maximize keyword space by avoiding unnecessary punctuation or symbols.
+KEYWORD STRATEGY (CRITICAL):
+- Keywords MUST come from market research data (provided below), NOT from generic guessing.
+- Analyze competitor keywords to find PROVEN high-demand terms.
+- Combine researched keywords into UNIQUE natural phrases — don't just stack individual keywords.
+- Each comma-separated phrase should be a natural long-tail search term a buyer would actually type.
+  GOOD: "Personalized Baby Name Sign, Nursery Wall Decor, New Mom Gift"
+  BAD: "Personalized Baby Name Sign Nursery Wall Decor Gift Custom Wood" (keyword stacking)
+- NO word should appear more than ONCE in the entire title (exception: very common words like "for").
+- Find the balance: use high-demand keywords from research BUT also include less competitive terms for differentiation.
+- Include relevant: product type, material, style/aesthetic, occasion, recipient.
 
-- Include: product type, material, style/aesthetic, occasion/use-case, and recipient where relevant.
-- Do NOT repeat words already covered by tags — Etsy indexes title and tags together.
-- Regional spelling matters: prefer the marketplace's primary language/spelling.
-- Etsy now weighs listing quality score (conversion, reviews) so titles must also be buyer-appealing, not just keyword-dense.
+FORMATTING RULES:
+- Title Case: Capitalize First Letter of Each Word, except small words (for, of, the, and, with, to, in, on, a, an).
+- Use ONLY commas to separate phrases. No dashes, pipes, slashes, colons, or other special characters.
+- Length: 100-140 characters. Every character counts — no wasted space.
 
-Optimize the following Etsy listing title for maximum search visibility and click-through rate.
-The optimized title MUST be at least 100 characters and under 140 characters.
-Return a JSON object: { "optimized_title": "...", "explanation": "..." }
+WHAT NOT TO DO:
+- NO keyword stuffing or stacking random words without forming readable phrases.
+- NO repeating the same word multiple times.
+- NO generic filler words that don't help search (e.g., "Beautiful", "Amazing", "Best").
+- NO duplicating words that are already in the listing's tags.
+
+Optimize this title. Use the market research data to select proven keywords.
+Return JSON: { "optimized_title": "...", "explanation": "Brief explanation of keyword choices and strategy" }
 
 Current title: ${title}
 Description: ${description || 'N/A'}
-Tags: ${Array.isArray(tags) ? tags.join(', ') : tags || 'N/A'}
+Current tags (DO NOT repeat these words in title): ${Array.isArray(tags) ? tags.join(', ') : tags || 'None'}
 Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
 
   const result = await model.generateContent(prompt);
@@ -142,24 +170,41 @@ Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
   if (optimizedTitle) {
     // Replace dashes, pipes, slashes, colons used as separators with commas
     optimizedTitle = optimizedTitle.replace(/\s*[|/:\\-–—]\s*/g, ', ');
-    // Clean up double commas
-    optimizedTitle = optimizedTitle.replace(/,\s*,/g, ',');
-    // Enforce Title Case: capitalize first letter of each significant word
+    // Clean up double commas and trailing commas
+    optimizedTitle = optimizedTitle.replace(/,\s*,/g, ',').replace(/,\s*$/, '');
+
+    // Remove duplicate words (keep first occurrence, skip small words)
     const smallWords = new Set(['for', 'of', 'the', 'and', 'with', 'to', 'in', 'on', 'a', 'an', 'by', 'or', 'at']);
+    const seenWords = new Set<string>();
+    optimizedTitle = optimizedTitle
+      .split(' ')
+      .filter((word) => {
+        const clean = word.toLowerCase().replace(/[,]/g, '');
+        if (!clean || smallWords.has(clean)) return true; // always keep small words
+        if (seenWords.has(clean)) return false; // remove duplicate
+        seenWords.add(clean);
+        return true;
+      })
+      .join(' ');
+
+    // Clean up any double spaces or orphaned commas from dedup
+    optimizedTitle = optimizedTitle.replace(/\s+/g, ' ').replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim();
+
+    // Enforce Title Case
     optimizedTitle = optimizedTitle
       .split(' ')
       .map((word, i) => {
         const lower = word.toLowerCase();
-        // Always capitalize first word; capitalize others unless they're small words
         if (i === 0 || !smallWords.has(lower.replace(/,/g, ''))) {
           return lower.charAt(0).toUpperCase() + lower.slice(1).toLowerCase();
         }
         return lower;
       })
       .join(' ');
+
     // Trim to 140 chars
     if (optimizedTitle.length > 140) {
-      optimizedTitle = optimizedTitle.substring(0, 140).replace(/,\s*$/, '');
+      optimizedTitle = optimizedTitle.substring(0, 140).replace(/,\s*$/, '').trim();
     }
   }
 
@@ -316,26 +361,30 @@ async function handleBulkOptimize(body: any) {
   Category: ${l.category || 'N/A'}`;
   }).join('\n\n');
 
-  const prompt = `You are a top Etsy SEO specialist with deep knowledge of Etsy's search algorithm as of March 2026.
+  const prompt = `You are a top Etsy SEO specialist. Optimize listings using research-backed keyword strategy.
 
-ETSY SEO BEST PRACTICES (2026):
-- Etsy uses a hybrid AI + keyword matching search (XWalk system). Tags, titles, and descriptions all contribute to ranking.
-- TITLES: Front-load high-volume keywords in first 40 chars. Aim for 100-140 chars. Natural, readable phrasing — no keyword stuffing.
-  - CAPITALIZATION: Use Title Case — capitalize first letter of each significant word. Example: "Personalized Baby Name Sign, Nursery Wall Decor, Custom Wood Sign for Newborn"
-  - SEPARATORS: Use ONLY commas to separate phrases. No dashes, pipes, slashes, or colons — they waste characters.
-- TAGS: Each tag up to 20 characters, use all 13 slots. Multi-word long-tail tags outperform single words. Don't repeat title words in tags.
-- DESCRIPTIONS: First 160 chars = meta preview. Include keywords naturally in first 2 paragraphs. Short paragraphs, mobile-friendly.
-- Include a mix of: product type, material, style, occasion, recipient, and trending seasonal terms.
-- Etsy now weighs listing quality score (conversion rate, reviews) alongside keyword relevance.
-- Regional spelling variations matter (jewelry/jewellery).
-- Write for BUYERS, not search engines — natural language that converts.
+ETSY SEO RULES (2026 — XWalk system):
+TITLES:
+- 100-140 chars. Front-load primary product identity in first 40 chars.
+- Title Case (Capitalize Each Word, except: for, of, the, and, with, to, in, on, a, an).
+- Commas ONLY as separators. No dashes, pipes, slashes, colons.
+- Each comma-separated phrase must be a natural long-tail search term buyers would type.
+- NO keyword stacking (random words without forming readable phrases).
+- NO word repetition — each word appears at most once.
+- NO generic filler ("Beautiful", "Amazing", "Best Quality").
 
-Optimize the following listings for maximum search visibility and conversion.
-For each listing provide:
-- An improved title (100-140 chars, front-loaded keywords, only first letter capitalized, commas as separators)
-- 13 SEO tags (multi-word long-tail, no title word repetition)
-- An improved description (first 160 chars compelling, keyword-rich)
-Return a JSON object: { "optimizations": [ { "listing_id": ..., "title": "...", "tags": ["..."], "description": "..." }, ... ] }
+TAGS:
+- All 13 slots used. Each tag up to 20 chars. Multi-word long-tail only.
+- Tags MUST NOT repeat any word from the title — title + tags form one combined keyword set.
+- NO duplicate-meaning tags covering the same search intent.
+
+DESCRIPTIONS:
+- First 160 chars = meta preview (Google + Etsy). Make it compelling and keyword-rich.
+- Natural buyer-friendly language. Short paragraphs for mobile.
+
+For each listing, title words and tag words should have ZERO overlap.
+
+Return JSON: { "optimizations": [ { "listing_id": ..., "title": "...", "tags": ["..."], "description": "..." }, ... ] }
 
 ${listingSummaries}`;
 

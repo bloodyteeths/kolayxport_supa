@@ -10,8 +10,8 @@ export const config = {
   },
 };
 
-// Gemini image generation model — 2.5 Flash with native image generation
-const MODEL = 'gemini-2.5-flash-preview-image-generation';
+// Gemini image generation model — Nano Banana 2 (best quality-to-speed, up to 4K)
+const MODEL = 'gemini-3.1-flash-image-preview';
 
 // Crop bottom pixels to remove AI watermark/branding
 const WATERMARK_CROP_PX = 20;

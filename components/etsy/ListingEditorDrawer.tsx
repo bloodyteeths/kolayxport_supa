@@ -1378,8 +1378,10 @@ export default function ListingEditorDrawer({
                         const expanded = newValue.flatMap((v) =>
                           typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : [v]
                         );
-                        // Deduplicate and limit to 13
-                        const unique = [...new Set(expanded)].slice(0, 13);
+                        // Deduplicate, enforce 20-char limit, limit to 13
+                        const unique = [...new Set(expanded)]
+                          .map((t) => t.substring(0, 20))
+                          .slice(0, 13);
                         updateField('tags', unique);
                       }}
                       renderTags={(value, getTagProps) =>
@@ -1389,6 +1391,7 @@ export default function ListingEditorDrawer({
                             key={tag}
                             label={tag}
                             size="small"
+                            color={tag.length > 20 ? 'error' : undefined}
                             sx={{ maxWidth: 180 }}
                           />
                         ))
@@ -1398,12 +1401,30 @@ export default function ListingEditorDrawer({
                           {...params}
                           size="small"
                           placeholder={fields.tags.length < 13 ? 'Virgülle ayırarak toplu ekleyin...' : ''}
-                          helperText={`${fields.tags.length}/13 etiket — virgülle ayırarak toplu ekleyebilirsiniz`}
+                          helperText={`${fields.tags.length}/13 etiket — virgül veya Enter ile ekleyin`}
+                          onKeyDown={(e) => {
+                            if (e.key === ',') {
+                              e.preventDefault();
+                              const input = (e.target as HTMLInputElement).value.trim();
+                              if (input && fields.tags.length < 13) {
+                                const newTags = input.split(',').map((s) => s.trim()).filter(Boolean).map((t) => t.substring(0, 20));
+                                const merged = [...new Set([...fields.tags, ...newTags])].slice(0, 13);
+                                updateField('tags', merged);
+                                // Clear the input
+                                const autocompleteInput = (e.target as HTMLInputElement);
+                                autocompleteInput.value = '';
+                                // Trigger a change event to reset MUI's internal state
+                                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                                nativeInputValueSetter?.call(autocompleteInput, '');
+                                autocompleteInput.dispatchEvent(new Event('input', { bubbles: true }));
+                              }
+                            }
+                          }}
                           onPaste={(e) => {
                             const pasted = e.clipboardData.getData('text');
                             if (pasted.includes(',')) {
                               e.preventDefault();
-                              const newTags = pasted.split(',').map((s) => s.trim()).filter(Boolean);
+                              const newTags = pasted.split(',').map((s) => s.trim()).filter(Boolean).map((t) => t.substring(0, 20));
                               const merged = [...new Set([...fields.tags, ...newTags])].slice(0, 13);
                               updateField('tags', merged);
                             }

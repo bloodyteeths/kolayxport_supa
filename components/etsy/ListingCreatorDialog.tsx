@@ -826,7 +826,7 @@ export default function ListingCreatorDialog({
             const expanded = newVal.flatMap((v) =>
               typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : [v]
             );
-            const unique = [...new Set(expanded)].slice(0, 13);
+            const unique = [...new Set(expanded)].map((t) => t.substring(0, 20)).slice(0, 13);
             setTags(unique);
             if (expanded.length > 13) toast.error('Maksimum 13 etiket — fazlası kesildi');
           }}
@@ -837,6 +837,7 @@ export default function ListingCreatorDialog({
                 key={option}
                 label={option}
                 size="small"
+                color={option.length > 20 ? 'error' : undefined}
               />
             ))
           }
@@ -844,12 +845,28 @@ export default function ListingCreatorDialog({
             <TextField
               {...params}
               label="Etiketler"
-              helperText={`${tags.length}/13 etiket — virgülle ayırarak toplu ekleyebilirsiniz`}
+              helperText={`${tags.length}/13 etiket — virgül veya Enter ile ekleyin (maks 20 karakter/etiket)`}
+              onKeyDown={(e) => {
+                if (e.key === ',') {
+                  e.preventDefault();
+                  const input = (e.target as HTMLInputElement).value.trim();
+                  if (input && tags.length < 13) {
+                    const newTags = input.split(',').map((s) => s.trim()).filter(Boolean).map((t) => t.substring(0, 20));
+                    const merged = [...new Set([...tags, ...newTags])].slice(0, 13);
+                    setTags(merged);
+                    const autocompleteInput = (e.target as HTMLInputElement);
+                    autocompleteInput.value = '';
+                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+                    nativeInputValueSetter?.call(autocompleteInput, '');
+                    autocompleteInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  }
+                }
+              }}
               onPaste={(e) => {
                 const pasted = e.clipboardData.getData('text');
                 if (pasted.includes(',')) {
                   e.preventDefault();
-                  const newTags = pasted.split(',').map((s) => s.trim()).filter(Boolean);
+                  const newTags = pasted.split(',').map((s) => s.trim()).filter(Boolean).map((t) => t.substring(0, 20));
                   const merged = [...new Set([...tags, ...newTags])].slice(0, 13);
                   setTags(merged);
                 }

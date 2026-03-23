@@ -26,6 +26,7 @@
     "@date-io/dayjs": "^3.2.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+    "@google/generative-ai": "^0.24.1",
     "@headlessui/react": "^2.2.2",
     "@mui/icons-material": "^5.17.1",
     "@mui/x-data-grid": "^8.3.1",

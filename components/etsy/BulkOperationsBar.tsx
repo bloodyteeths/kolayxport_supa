@@ -25,6 +25,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   DeleteOutline,
@@ -33,6 +35,12 @@ import {
   DriveFileMoveOutlined,
   PublishOutlined,
   RemoveCircleOutline,
+  AutoFixHigh,
+  ContentCopy as ContentCopyIcon,
+  ImageOutlined,
+  RefreshOutlined,
+  Celebration as CelebrationIcon,
+  TuneOutlined,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 
@@ -56,15 +64,40 @@ interface ShopSection {
   title: string;
 }
 
+interface ShopInfo {
+  shopId: string;
+  shopName: string;
+}
+
 interface BulkOperationsBarProps {
   selectedCount: number;
   selectedListings: SelectedListing[];
   shopSections: ShopSection[];
   shopId: string;
+  allShops?: ShopInfo[];
   onCompleted: () => void;
 }
 
 type PriceMode = 'percent_increase' | 'percent_decrease' | 'fixed_add' | 'fixed_subtract';
+
+type SeasonTagMode = 'add' | 'replace';
+
+interface SeasonPreset {
+  label: string;
+  tags: string[];
+}
+
+const SEASON_PRESETS: SeasonPreset[] = [
+  { label: 'Yilbasi', tags: ['christmas gift', 'holiday gift', 'stocking stuffer', 'xmas present', 'holiday decor'] },
+  { label: 'Sevgililer Gunu', tags: ['valentines gift', 'valentine day', 'romantic gift', 'gift for her', 'love gift'] },
+  { label: 'Anneler Gunu', tags: ['mothers day gift', 'gift for mom', 'mom birthday', 'mama gift'] },
+  { label: 'Babalar Gunu', tags: ['fathers day gift', 'gift for dad', 'dad birthday', 'papa gift'] },
+  { label: 'Cadilar Bayrami', tags: ['halloween decor', 'spooky gift', 'trick or treat', 'halloween costume'] },
+  { label: 'Yaz', tags: ['summer decor', 'beach gift', 'outdoor', 'summer vibes'] },
+  { label: 'Kis', tags: ['winter decor', 'cozy gift', 'holiday season', 'winter vibes'] },
+];
+
+type VariationPriceMode = 'percent_increase' | 'percent_decrease' | 'fixed_add' | 'fixed_subtract';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -102,6 +135,7 @@ export default function BulkOperationsBar({
   selectedListings,
   shopSections,
   shopId,
+  allShops,
   onCompleted,
 }: BulkOperationsBarProps) {
   // Dialog states
@@ -110,6 +144,42 @@ export default function BulkOperationsBar({
   const [removeTagDialogOpen, setRemoveTagDialogOpen] = useState(false);
   const [sectionDialogOpen, setSectionDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [aiOptimizeDialogOpen, setAiOptimizeDialogOpen] = useState(false);
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+
+  // Copy state
+  const [targetShopId, setTargetShopId] = useState<string>('');
+  const [copyProcessing, setCopyProcessing] = useState(false);
+  const [copyProgress, setCopyProgress] = useState(0);
+
+  // Alt Text state
+  const [altTextDialogOpen, setAltTextDialogOpen] = useState(false);
+  const [altTextProcessing, setAltTextProcessing] = useState(false);
+  const [altTextProgress, setAltTextProgress] = useState(0);
+
+  // Renew state
+  const [renewDialogOpen, setRenewDialogOpen] = useState(false);
+  const [renewProcessing, setRenewProcessing] = useState(false);
+  const [renewProgress, setRenewProgress] = useState(0);
+
+  // Season Tags state
+  const [seasonDialogOpen, setSeasonDialogOpen] = useState(false);
+  const [selectedSeason, setSelectedSeason] = useState<SeasonPreset | null>(null);
+  const [seasonTagMode, setSeasonTagMode] = useState<SeasonTagMode>('add');
+
+  // Variation Price state
+  const [variationPriceDialogOpen, setVariationPriceDialogOpen] = useState(false);
+  const [variationPropertyName, setVariationPropertyName] = useState('');
+  const [variationPropertyValue, setVariationPropertyValue] = useState('');
+  const [variationPriceMode, setVariationPriceMode] = useState<VariationPriceMode>('percent_increase');
+  const [variationPriceAmount, setVariationPriceAmount] = useState('');
+  const [variationProcessing, setVariationProcessing] = useState(false);
+  const [variationProgress, setVariationProgress] = useState(0);
+
+  // AI Optimize state
+  const [aiProcessing, setAiProcessing] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
+  const [aiResult, setAiResult] = useState<{ success: number; failed: number } | null>(null);
 
   // Progress
   const [processing, setProcessing] = useState(false);
@@ -342,6 +412,271 @@ export default function BulkOperationsBar({
     );
   };
 
+  // --- AI Optimize ---
+  const handleAiOptimizeSubmit = async () => {
+    setAiOptimizeDialogOpen(false);
+    setAiProcessing(true);
+    setAiProgress(0);
+    setAiResult(null);
+
+    try {
+      // Step 1: Call AI bulk optimize endpoint
+      const payload = selectedListings.map((l) => ({
+        listing_id: l.listing_id,
+        title: l.title,
+        tags: l.tags,
+      }));
+
+      const aiRes = await fetch('/api/ai/etsy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bulk_optimize', listings: payload }),
+      });
+
+      if (!aiRes.ok) {
+        const errData = await aiRes.json().catch(() => ({}));
+        toast.error(errData.error || 'AI optimizasyon basarisiz oldu');
+        setAiProcessing(false);
+        return;
+      }
+
+      const { optimized } = await aiRes.json() as {
+        optimized: Array<{
+          listing_id: number;
+          title?: string;
+          tags?: string[];
+          description?: string;
+        }>;
+      };
+
+      // Step 2: Apply each optimized listing via update_listing
+      let success = 0;
+      let failed = 0;
+
+      for (let i = 0; i < optimized.length; i++) {
+        const item = optimized[i];
+        const updateBody: Record<string, any> = {};
+        if (item.title) updateBody.title = item.title;
+        if (item.tags) updateBody.tags = item.tags;
+        if (item.description) updateBody.description = item.description;
+
+        try {
+          const res = await callUpdateListing(shopId, item.listing_id, updateBody);
+          if (res.ok) {
+            success++;
+          } else {
+            failed++;
+          }
+        } catch {
+          failed++;
+        }
+
+        setAiProgress(((i + 1) / optimized.length) * 100);
+        if (i < optimized.length - 1) await delay(100);
+      }
+
+      setAiResult({ success, failed });
+
+      if (failed === 0) {
+        toast.success(`AI Optimizasyon: ${success} listeleme basariyla guncellendi`);
+      } else {
+        toast.error(`AI Optimizasyon: ${success} basarili, ${failed} basarisiz`);
+      }
+
+      onCompleted();
+    } catch (err) {
+      toast.error('AI optimizasyon sirasinda bir hata olustu');
+    } finally {
+      setAiProcessing(false);
+      setAiProgress(0);
+    }
+  };
+
+  // --- Copy to another shop ---
+  const otherShops = useMemo(
+    () => (allShops || []).filter((s) => s.shopId !== shopId),
+    [allShops, shopId]
+  );
+
+  const handleCopySubmit = async () => {
+    if (!targetShopId) {
+      toast.error('Hedef magaza seciniz');
+      return;
+    }
+
+    setCopyDialogOpen(false);
+    setCopyProcessing(true);
+    setCopyProgress(0);
+
+    let success = 0;
+    let failed = 0;
+
+    for (let i = 0; i < selectedListings.length; i++) {
+      const listing = selectedListings[i];
+      try {
+        const res = await fetch(
+          `/api/clawd/etsy?action=copy_listing&listing_id=${listing.listing_id}&shop_id=${shopId}&target_shop_id=${targetShopId}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+        if (res.ok) success++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+
+      setCopyProgress(((i + 1) / selectedListings.length) * 100);
+      if (i < selectedListings.length - 1) await delay(100);
+    }
+
+    setCopyProcessing(false);
+    setCopyProgress(0);
+    setTargetShopId('');
+
+    if (failed === 0) {
+      toast.success(`Kopyalama: ${success} listeleme basariyla kopyalandi`);
+    } else {
+      toast.error(`Kopyalama: ${success} basarili, ${failed} basarisiz`);
+    }
+
+    onCompleted();
+  };
+
+  // --- Bulk Alt Text ---
+  const handleAltTextSubmit = async () => {
+    setAltTextDialogOpen(false);
+    setAltTextProcessing(true);
+    setAltTextProgress(0);
+
+    let success = 0;
+    let failed = 0;
+
+    for (let i = 0; i < selectedListings.length; i++) {
+      const listing = selectedListings[i];
+      try {
+        // Step 1: Generate alt text via AI
+        const aiRes = await fetch('/api/ai/etsy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'generate_alt_text',
+            title: listing.title,
+          }),
+        });
+
+        if (!aiRes.ok) {
+          failed++;
+          setAltTextProgress(((i + 1) / selectedListings.length) * 100);
+          if (i < selectedListings.length - 1) await delay(100);
+          continue;
+        }
+
+        const aiData = await aiRes.json();
+        const generatedAltText: string = aiData.alt_text || '';
+
+        if (!generatedAltText) {
+          failed++;
+          setAltTextProgress(((i + 1) / selectedListings.length) * 100);
+          if (i < selectedListings.length - 1) await delay(100);
+          continue;
+        }
+
+        // Step 2: Fetch listing images from Etsy
+        const imagesRes = await fetch(
+          `/api/clawd/etsy?action=get_listing_images&listing_id=${listing.listing_id}&shop_id=${shopId}`
+        );
+
+        if (!imagesRes.ok) {
+          failed++;
+          setAltTextProgress(((i + 1) / selectedListings.length) * 100);
+          if (i < selectedListings.length - 1) await delay(100);
+          continue;
+        }
+
+        const imagesData = await imagesRes.json();
+        const images: Array<{ listing_image_id: number }> = imagesData.images || imagesData.results || [];
+
+        // Step 3: Update each image's alt text with the AI-generated text
+        let listingSuccess = true;
+        for (let j = 0; j < images.length; j++) {
+          try {
+            const updateRes = await fetch(
+              `/api/clawd/etsy?action=update_listing_image&listing_id=${listing.listing_id}&image_id=${images[j].listing_image_id}&shop_id=${shopId}`,
+              {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ alt_text: generatedAltText }),
+              }
+            );
+            if (!updateRes.ok) listingSuccess = false;
+          } catch {
+            listingSuccess = false;
+          }
+          if (j < images.length - 1) await delay(50);
+        }
+
+        if (listingSuccess) success++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+
+      setAltTextProgress(((i + 1) / selectedListings.length) * 100);
+      if (i < selectedListings.length - 1) await delay(100);
+    }
+
+    setAltTextProcessing(false);
+    setAltTextProgress(0);
+
+    if (failed === 0) {
+      toast.success(`Alt Metin: ${success} listelemenin gorselleri basariyla guncellendi`);
+    } else {
+      toast.error(`Alt Metin: ${success} basarili, ${failed} basarisiz`);
+    }
+
+    onCompleted();
+  };
+
+  // --- Bulk Renew ---
+  const handleRenewSubmit = async () => {
+    setRenewDialogOpen(false);
+    setRenewProcessing(true);
+    setRenewProgress(0);
+
+    let success = 0;
+    let failed = 0;
+
+    for (let i = 0; i < selectedListings.length; i++) {
+      const listing = selectedListings[i];
+      try {
+        const res = await fetch(
+          `/api/clawd/etsy?action=renew_listing&listing_id=${listing.listing_id}&shop_id=${shopId}`,
+          { method: 'POST' }
+        );
+        if (res.ok) success++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+
+      setRenewProgress(((i + 1) / selectedListings.length) * 100);
+      if (i < selectedListings.length - 1) await delay(100);
+    }
+
+    setRenewProcessing(false);
+    setRenewProgress(0);
+
+    if (failed === 0) {
+      toast.success(`Yenileme: ${success} listeleme basariyla yenilendi`);
+    } else {
+      toast.error(`Yenileme: ${success} basarili, ${failed} basarisiz`);
+    }
+
+    onCompleted();
+  };
+
   const toggleTagToRemove = (tag: string) => {
     setTagsToRemove((prev) => {
       const next = new Set(prev);
@@ -352,6 +687,179 @@ export default function BulkOperationsBar({
       }
       return next;
     });
+  };
+
+  // --- Season Tags ---
+  const handleSeasonTagsSubmit = async () => {
+    if (!selectedSeason) {
+      toast.error('Bir sezon secin');
+      return;
+    }
+
+    const seasonTags = selectedSeason.tags;
+
+    if (seasonTagMode === 'add') {
+      // Check 13-tag limit
+      const violations = selectedListings.filter(
+        (l) => l.tags.length + seasonTags.length > 13
+      );
+      if (violations.length > 0) {
+        toast.error(
+          `${violations.length} listelemede etiket siniri (maks 13) asilacak. Daha az etiketli bir sezon secin veya "Degistir" modunu kullanin.`
+        );
+        return;
+      }
+    }
+
+    setSeasonDialogOpen(false);
+
+    await executeBulk(
+      selectedListings,
+      (listing) => {
+        let finalTags: string[];
+        if (seasonTagMode === 'replace') {
+          finalTags = [...seasonTags].slice(0, 13);
+        } else {
+          finalTags = Array.from(new Set([...listing.tags, ...seasonTags])).slice(0, 13);
+        }
+        return callUpdateListing(shopId, listing.listing_id, { tags: finalTags });
+      },
+      'Sezon etiketi'
+    );
+
+    setSelectedSeason(null);
+    setSeasonTagMode('add');
+  };
+
+  // --- Variation Price ---
+  const handleVariationPriceSubmit = async () => {
+    const propName = variationPropertyName.trim();
+    const propValue = variationPropertyValue.trim();
+    const amt = parseFloat(variationPriceAmount);
+
+    if (!propName || !propValue) {
+      toast.error('Varyasyon ozellik adi ve degeri giriniz');
+      return;
+    }
+    if (isNaN(amt) || amt <= 0) {
+      toast.error('Gecerli bir tutar giriniz');
+      return;
+    }
+
+    setVariationPriceDialogOpen(false);
+    setVariationProcessing(true);
+    setVariationProgress(0);
+
+    let success = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    for (let i = 0; i < selectedListings.length; i++) {
+      const listing = selectedListings[i];
+      try {
+        // Step 1: Fetch listing inventory
+        const invRes = await fetch(
+          `/api/clawd/etsy?action=get_listing_inventory&listing_id=${listing.listing_id}&shop_id=${shopId}`
+        );
+
+        if (!invRes.ok) {
+          failed++;
+          setVariationProgress(((i + 1) / selectedListings.length) * 100);
+          if (i < selectedListings.length - 1) await delay(100);
+          continue;
+        }
+
+        const invData = await invRes.json();
+        const products = invData.products || [];
+
+        let hasMatch = false;
+        const updatedProducts = products.map((product: any) => {
+          const propertyValues = product.property_values || [];
+          const matches = propertyValues.some(
+            (pv: any) =>
+              pv.property_name?.toLowerCase() === propName.toLowerCase() &&
+              (pv.values || []).some(
+                (v: string) => v.toLowerCase() === propValue.toLowerCase()
+              )
+          );
+
+          if (!matches) return product;
+
+          hasMatch = true;
+          const updatedOfferings = (product.offerings || []).map((offering: any) => {
+            const currentPrice = offering.price?.amount / (offering.price?.divisor || 100);
+            let newPrice: number;
+
+            switch (variationPriceMode) {
+              case 'percent_increase':
+                newPrice = currentPrice * (1 + amt / 100);
+                break;
+              case 'percent_decrease':
+                newPrice = currentPrice * (1 - amt / 100);
+                break;
+              case 'fixed_add':
+                newPrice = currentPrice + amt;
+                break;
+              case 'fixed_subtract':
+                newPrice = currentPrice - amt;
+                break;
+            }
+            newPrice = Math.max(0.01, Math.round(newPrice * 100) / 100);
+
+            return {
+              ...offering,
+              price: {
+                ...offering.price,
+                amount: Math.round(newPrice * (offering.price?.divisor || 100)),
+              },
+            };
+          });
+
+          return { ...product, offerings: updatedOfferings };
+        });
+
+        if (!hasMatch) {
+          skipped++;
+          setVariationProgress(((i + 1) / selectedListings.length) * 100);
+          if (i < selectedListings.length - 1) await delay(100);
+          continue;
+        }
+
+        // Step 2: Update inventory
+        const updateRes = await fetch(
+          `/api/clawd/etsy?action=update_listing_inventory&listing_id=${listing.listing_id}&shop_id=${shopId}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ products: updatedProducts }),
+          }
+        );
+
+        if (updateRes.ok) success++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+
+      setVariationProgress(((i + 1) / selectedListings.length) * 100);
+      if (i < selectedListings.length - 1) await delay(100);
+    }
+
+    setVariationProcessing(false);
+    setVariationProgress(0);
+
+    const msg = `Varyasyon fiyat: ${success} basarili${failed > 0 ? `, ${failed} basarisiz` : ''}${skipped > 0 ? `, ${skipped} eslesme yok` : ''}`;
+    if (failed === 0) {
+      toast.success(msg);
+    } else {
+      toast.error(msg);
+    }
+
+    setVariationPropertyName('');
+    setVariationPropertyValue('');
+    setVariationPriceAmount('');
+    setVariationPriceMode('percent_increase');
+    onCompleted();
   };
 
   return (
@@ -459,6 +967,82 @@ export default function BulkOperationsBar({
             onClick={() => handleToggleState('inactive')}
           >
             Deaktif Et
+          </Button>
+
+          <Button
+            size="small"
+            variant="outlined"
+            color="secondary"
+            startIcon={<AutoFixHigh />}
+            onClick={() => {
+              setAiResult(null);
+              setAiOptimizeDialogOpen(true);
+            }}
+          >
+            AI Optimize
+          </Button>
+
+          <Button
+            size="small"
+            variant="outlined"
+            color="info"
+            startIcon={<ImageOutlined />}
+            onClick={() => setAltTextDialogOpen(true)}
+          >
+            Toplu Alt Metin
+          </Button>
+
+          <Button
+            size="small"
+            variant="outlined"
+            color="success"
+            startIcon={<RefreshOutlined />}
+            onClick={() => setRenewDialogOpen(true)}
+          >
+            Toplu Yenile
+          </Button>
+
+          {otherShops.length > 0 && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<ContentCopyIcon />}
+              onClick={() => {
+                setTargetShopId('');
+                setCopyDialogOpen(true);
+              }}
+            >
+              Kopyala
+            </Button>
+          )}
+
+          <Button
+            size="small"
+            variant="outlined"
+            color="secondary"
+            startIcon={<CelebrationIcon />}
+            onClick={() => {
+              setSelectedSeason(null);
+              setSeasonTagMode('add');
+              setSeasonDialogOpen(true);
+            }}
+          >
+            Sezon Etiketi
+          </Button>
+
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<TuneOutlined />}
+            onClick={() => {
+              setVariationPropertyName('');
+              setVariationPropertyValue('');
+              setVariationPriceAmount('');
+              setVariationPriceMode('percent_increase');
+              setVariationPriceDialogOpen(true);
+            }}
+          >
+            Varyasyon Fiyat
           </Button>
 
           <Button
@@ -704,6 +1288,438 @@ export default function BulkOperationsBar({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ---- AI Optimize Dialog ---- */}
+      <Dialog
+        open={aiOptimizeDialogOpen}
+        onClose={() => setAiOptimizeDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AutoFixHigh color="secondary" />
+          AI ile Toplu Optimize Et
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            <strong>{selectedCount}</strong> listeleme secildi. AI tum baslik, etiket ve aciklamalari SEO icin optimize edecek.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Optimize edilecekler:
+          </Typography>
+          <Box sx={{ pl: 2, mb: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              - Basliklar (SEO uyumlu yeniden yapilandirilacak)
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              - Etiketler (arama hacmine gore optimize edilecek)
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              - Aciklamalar (AI tarafindan olusturulacak)
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="warning.main">
+            Bu islem mevcut baslik, etiket ve aciklamalarin uzerine yazacaktir.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAiOptimizeDialogOpen(false)}>Iptal</Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={<AutoFixHigh />}
+            onClick={handleAiOptimizeSubmit}
+          >
+            Optimize Et
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ---- Copy to Shop Dialog ---- */}
+      <Dialog
+        open={copyDialogOpen}
+        onClose={() => setCopyDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ContentCopyIcon />
+          Baska Magazaya Kopyala
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <strong>{selectedCount}</strong> listeleme secili. Kopyalanacak hedef magazayi secin.
+          </Typography>
+          <FormControl fullWidth sx={{ mt: 1 }}>
+            <InputLabel>Hedef Magaza</InputLabel>
+            <Select
+              value={targetShopId}
+              label="Hedef Magaza"
+              onChange={(e) => setTargetShopId(e.target.value as string)}
+            >
+              {otherShops.map((s) => (
+                <MenuItem key={s.shopId} value={s.shopId}>
+                  {s.shopName}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCopyDialogOpen(false)}>Iptal</Button>
+          <Button
+            variant="contained"
+            onClick={handleCopySubmit}
+            disabled={!targetShopId}
+            startIcon={<ContentCopyIcon />}
+          >
+            Kopyala
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ---- Alt Text Confirmation Dialog ---- */}
+      <Dialog
+        open={altTextDialogOpen}
+        onClose={() => setAltTextDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ImageOutlined color="info" />
+          Toplu Alt Metin Olustur
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Secili <strong>{selectedCount}</strong> listing icin tum gorsellere AI ile alt metin olusturulsun mu?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Her listeleme icin:
+          </Typography>
+          <Box sx={{ pl: 2, mb: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              - Baslik bilgisinden AI ile alt metin uretilecek
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              - Tum gorsel alt metinleri guncellenecek
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="warning.main">
+            Bu islem mevcut alt metinlerin uzerine yazacaktir.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAltTextDialogOpen(false)}>Iptal</Button>
+          <Button
+            variant="contained"
+            color="info"
+            startIcon={<ImageOutlined />}
+            onClick={handleAltTextSubmit}
+          >
+            Alt Metin Olustur
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ---- Renew Confirmation Dialog ---- */}
+      <Dialog
+        open={renewDialogOpen}
+        onClose={() => setRenewDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <RefreshOutlined color="success" />
+          Toplu Yenile
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            Secili <strong>{selectedCount}</strong> listelemeyi yenilemek istediginize emin misiniz?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Suresi dolmus listelemeleri yeniden aktif hale getirir.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRenewDialogOpen(false)}>Iptal</Button>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<RefreshOutlined />}
+            onClick={handleRenewSubmit}
+          >
+            Yenile
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ---- Season Tags Dialog ---- */}
+      <Dialog
+        open={seasonDialogOpen}
+        onClose={() => setSeasonDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CelebrationIcon color="secondary" />
+          Sezon Etiketi
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Bir sezon secin ve etiketleri secili <strong>{selectedCount}</strong> listelemeye uygulayin.
+          </Typography>
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Mod
+            </Typography>
+            <ToggleButtonGroup
+              value={seasonTagMode}
+              exclusive
+              onChange={(_, val) => { if (val) setSeasonTagMode(val); }}
+              size="small"
+              fullWidth
+            >
+              <ToggleButton value="add">Ekle (mevcut etiketlere ekler)</ToggleButton>
+              <ToggleButton value="replace">Degistir (tum etiketleri degistirir)</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Sezon Secin
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {SEASON_PRESETS.map((preset) => (
+              <Paper
+                key={preset.label}
+                variant="outlined"
+                onClick={() => setSelectedSeason(preset)}
+                sx={{
+                  p: 1.5,
+                  cursor: 'pointer',
+                  borderColor: selectedSeason?.label === preset.label ? 'primary.main' : 'divider',
+                  borderWidth: selectedSeason?.label === preset.label ? 2 : 1,
+                  bgcolor: selectedSeason?.label === preset.label ? 'action.selected' : 'transparent',
+                  '&:hover': { bgcolor: 'action.hover' },
+                }}
+              >
+                <Typography variant="subtitle2">{preset.label}</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                  {preset.tags.map((tag) => (
+                    <Chip key={tag} label={tag} size="small" variant="outlined" />
+                  ))}
+                </Box>
+              </Paper>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSeasonDialogOpen(false)}>Iptal</Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={handleSeasonTagsSubmit}
+            disabled={!selectedSeason}
+            startIcon={<CelebrationIcon />}
+          >
+            {seasonTagMode === 'add' ? 'Ekle' : 'Degistir'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ---- Variation Price Dialog ---- */}
+      <Dialog
+        open={variationPriceDialogOpen}
+        onClose={() => setVariationPriceDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <TuneOutlined />
+          Varyasyon Fiyat Degistir
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Belirli bir varyasyon degerine sahip urunlerin fiyatini toplu olarak degistirin. Ornegin sadece "Small" beden urunlerin fiyatini artirin.
+          </Typography>
+
+          <TextField
+            label="Varyasyon Ozellik Adi"
+            placeholder="Orn: Size, Color, Material"
+            value={variationPropertyName}
+            onChange={(e) => setVariationPropertyName(e.target.value)}
+            fullWidth
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            label="Varyasyon Degeri"
+            placeholder="Orn: Small, Red, Cotton"
+            value={variationPropertyValue}
+            onChange={(e) => setVariationPropertyValue(e.target.value)}
+            fullWidth
+            sx={{ mb: 2 }}
+          />
+
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Fiyat Ayarlamasi
+          </Typography>
+          <RadioGroup
+            value={variationPriceMode}
+            onChange={(e) => setVariationPriceMode(e.target.value as VariationPriceMode)}
+          >
+            <FormControlLabel value="percent_increase" control={<Radio />} label="% Artir" />
+            <FormControlLabel value="percent_decrease" control={<Radio />} label="% Azalt" />
+            <FormControlLabel value="fixed_add" control={<Radio />} label="Sabit tutar ekle" />
+            <FormControlLabel value="fixed_subtract" control={<Radio />} label="Sabit tutar cikar" />
+          </RadioGroup>
+
+          <TextField
+            label={variationPriceMode.startsWith('percent') ? 'Yuzde (%)' : 'Tutar'}
+            type="number"
+            value={variationPriceAmount}
+            onChange={(e) => setVariationPriceAmount(e.target.value)}
+            fullWidth
+            sx={{ mt: 1 }}
+            inputProps={{ min: 0, step: 0.01 }}
+          />
+
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
+            Eslesmeyen listelemelerde degisiklik yapilmayacaktir.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setVariationPriceDialogOpen(false)}>Iptal</Button>
+          <Button
+            variant="contained"
+            onClick={handleVariationPriceSubmit}
+            disabled={
+              !variationPropertyName.trim() ||
+              !variationPropertyValue.trim() ||
+              !variationPriceAmount ||
+              parseFloat(variationPriceAmount) <= 0
+            }
+            startIcon={<TuneOutlined />}
+          >
+            Uygula
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Variation Price Processing overlay */}
+      {variationProcessing && (
+        <Paper
+          elevation={8}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1400,
+            p: 2,
+          }}
+        >
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Varyasyon fiyatlari guncelleniyor...
+          </Typography>
+          <LinearProgress variant="determinate" value={variationProgress} />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            %{Math.round(variationProgress)} tamamlandi
+          </Typography>
+        </Paper>
+      )}
+
+      {/* Alt Text Processing overlay */}
+      {altTextProcessing && (
+        <Paper
+          elevation={8}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1400,
+            p: 2,
+          }}
+        >
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            AI ile alt metinler olusturuluyor...
+          </Typography>
+          <LinearProgress variant="determinate" value={altTextProgress} />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            %{Math.round(altTextProgress)} tamamlandi
+          </Typography>
+        </Paper>
+      )}
+
+      {/* Renew Processing overlay */}
+      {renewProcessing && (
+        <Paper
+          elevation={8}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1400,
+            p: 2,
+          }}
+        >
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Listeler yenileniyor...
+          </Typography>
+          <LinearProgress variant="determinate" value={renewProgress} />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            %{Math.round(renewProgress)} tamamlandi
+          </Typography>
+        </Paper>
+      )}
+
+      {/* Copy Processing overlay */}
+      {copyProcessing && (
+        <Paper
+          elevation={8}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1400,
+            p: 2,
+          }}
+        >
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Listeler kopyalaniyor...
+          </Typography>
+          <LinearProgress variant="determinate" value={copyProgress} />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            %{Math.round(copyProgress)} tamamlandi
+          </Typography>
+        </Paper>
+      )}
+
+      {/* AI Processing overlay */}
+      {aiProcessing && (
+        <Paper
+          elevation={8}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1400,
+            p: 2,
+          }}
+        >
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            AI optimizasyonu uygulanıyor...
+          </Typography>
+          <LinearProgress variant="determinate" value={aiProgress} />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+            %{Math.round(aiProgress)} tamamlandi
+          </Typography>
+        </Paper>
+      )}
     </>
   );
 }

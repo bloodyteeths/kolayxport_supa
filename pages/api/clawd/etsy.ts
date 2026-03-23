@@ -1915,6 +1915,60 @@ export default async function handler(
             });
         }
 
+        // GET /api/clawd/etsy?action=get_listing_images&listing_id=xxx
+        if (req.method === 'GET' && action === 'get_listing_images' && listing_id) {
+            const data = await callEtsyAPI(
+                `/listings/${listing_id}/images`,
+                accessToken
+            );
+            return res.status(200).json({
+                count: data.count || (data.results || []).length,
+                images: (data.results || []).map((img: any) => ({
+                    listing_image_id: img.listing_image_id,
+                    listing_id: img.listing_id,
+                    url_75x75: img.url_75x75,
+                    url_170x135: img.url_170x135,
+                    url_570xN: img.url_570xN,
+                    url_fullxfull: img.url_fullxfull,
+                    rank: img.rank,
+                    alt_text: img.alt_text || '',
+                })),
+            });
+        }
+
+        // PATCH /api/clawd/etsy?action=update_listing_image&listing_id=xxx&image_id=xxx
+        if (req.method === 'PATCH' && action === 'update_listing_image' && listing_id && image_id) {
+            const { alt_text, rank } = req.body || {};
+            const updateBody: Record<string, any> = {};
+            if (alt_text !== undefined) updateBody.alt_text = alt_text;
+            if (rank !== undefined) updateBody.rank = rank;
+
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}/images/${image_id}`,
+                accessToken,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify(updateBody),
+                    headers: { 'Content-Type': 'application/json' },
+                }
+            );
+            return res.status(200).json({ success: true, image: data });
+        }
+
+        // POST /api/clawd/etsy?action=renew_listing&listing_id=xxx
+        if (req.method === 'POST' && action === 'renew_listing' && listing_id) {
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}`,
+                accessToken,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({ state: 'active' }),
+                    headers: { 'Content-Type': 'application/json' },
+                }
+            );
+            return res.status(200).json({ success: true, listing: data });
+        }
+
         // Invalid request
         return res.status(400).json({ error: 'Invalid request parameters' });
 

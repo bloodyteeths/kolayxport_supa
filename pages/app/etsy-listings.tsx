@@ -13,6 +13,17 @@ import {
   Paper,
   Chip,
   InputAdornment,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  LinearProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import {
   DataGrid,
@@ -28,6 +39,10 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   FavoriteBorder as FavoriteBorderIcon,
+  UploadFile as UploadFileIcon,
+  Warning as WarningIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  RemoveCircleOutline as RemoveCircleOutlineIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -39,6 +54,9 @@ import ListingEditorDrawer from '@/components/etsy/ListingEditorDrawer';
 import ListingCreatorDialog from '@/components/etsy/ListingCreatorDialog';
 import FindReplaceDialog from '@/components/etsy/FindReplaceDialog';
 import BulkOperationsBar from '@/components/etsy/BulkOperationsBar';
+import SmartPricing from '@/components/etsy/SmartPricing';
+import DuplicateDetector from '@/components/etsy/DuplicateDetector';
+import BackupManager from '@/components/etsy/BackupManager';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,6 +89,7 @@ interface EtsyListingRow {
     url_570xN: string;
   } | null;
   image_count: number;
+  has_video: boolean;
 }
 
 interface ShopInfo {
@@ -141,6 +160,57 @@ const STATE_LABELS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Health Score
+// ---------------------------------------------------------------------------
+
+interface HealthBreakdown {
+  tags: { score: number; color: string; label: string };
+  images: { score: number; color: string; label: string };
+  title: { score: number; color: string; label: string };
+  description: { score: number; color: string; label: string };
+  overall: number;
+  color: string;
+}
+
+function calculateHealth(listing: EtsyListingRow): HealthBreakdown {
+  // Tags: 13/13 = green(25), 10-12 = yellow(15), <10 = red(5)
+  const tagCount = listing.tags?.length || 0;
+  const tagsScore = tagCount >= 13 ? 25 : tagCount >= 10 ? 15 : 5;
+  const tagsColor = tagCount >= 13 ? '#4caf50' : tagCount >= 10 ? '#ff9800' : '#f44336';
+  const tagsLabel = `${tagCount}/13 etiket`;
+
+  // Images: 10+ = green(25), 5-9 = yellow(15), <5 = red(5)
+  const imgCount = listing.image_count || 0;
+  const imagesScore = imgCount >= 10 ? 25 : imgCount >= 5 ? 15 : 5;
+  const imagesColor = imgCount >= 10 ? '#4caf50' : imgCount >= 5 ? '#ff9800' : '#f44336';
+  const imagesLabel = `${imgCount} resim`;
+
+  // Title: 100+ = green(25), 60-99 = yellow(15), <60 = red(5)
+  const titleLen = listing.title?.length || 0;
+  const titleScore = titleLen >= 100 ? 25 : titleLen >= 60 ? 15 : 5;
+  const titleColor = titleLen >= 100 ? '#4caf50' : titleLen >= 60 ? '#ff9800' : '#f44336';
+  const titleLabel = `${titleLen} karakter başlık`;
+
+  // Description: 500+ = green(25), 200-499 = yellow(15), <200 = red(5)
+  const descLen = listing.description?.length || 0;
+  const descScore = descLen >= 500 ? 25 : descLen >= 200 ? 15 : 5;
+  const descColor = descLen >= 500 ? '#4caf50' : descLen >= 200 ? '#ff9800' : '#f44336';
+  const descLabel = `${descLen} karakter açıklama`;
+
+  const overall = tagsScore + imagesScore + titleScore + descScore;
+  const color = overall >= 80 ? '#4caf50' : overall >= 60 ? '#ff9800' : '#f44336';
+
+  return {
+    tags: { score: tagsScore, color: tagsColor, label: tagsLabel },
+    images: { score: imagesScore, color: imagesColor, label: imagesLabel },
+    title: { score: titleScore, color: titleColor, label: titleLabel },
+    description: { score: descScore, color: descColor, label: descLabel },
+    overall,
+    color,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Page Component
 // ---------------------------------------------------------------------------
 
@@ -156,11 +226,16 @@ function EtsyListingsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'active' | 'draft' | 'inactive' | 'expired'>('active');
   const [sectionFilter, setSectionFilter] = useState<string>('');
+  const [healthFilter, setHealthFilter] = useState<string>('');
+  const [excludeTerm, setExcludeTerm] = useState('');
 
   const [drawerListingId, setDrawerListingId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
+  const [smartPricingOpen, setSmartPricingOpen] = useState(false);
+  const [duplicateDetectorOpen, setDuplicateDetectorOpen] = useState(false);
+  const [backupManagerOpen, setBackupManagerOpen] = useState(false);
 
   const [shops, setShops] = useState<ShopInfo[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string>('');
@@ -174,6 +249,12 @@ function EtsyListingsPage() {
   });
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+  // CSV Import state
+  const [csvImportDialogOpen, setCsvImportDialogOpen] = useState(false);
+  const [csvImportRows, setCsvImportRows] = useState<Record<string, string>[]>([]);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvImportProgress, setCsvImportProgress] = useState(0);
 
   // --- Fetch shops via API ---
   useEffect(() => {
@@ -232,6 +313,7 @@ function EtsyListingsPage() {
       updated_timestamp: l.updated_timestamp || 0,
       thumbnail: thumb,
       image_count: l.image_count || (l.images ? l.images.length : 0),
+      has_video: l.has_video || false,
     };
   };
 
@@ -275,25 +357,22 @@ function EtsyListingsPage() {
     if (!selectedShopId) return;
     try {
       const [sectionsRes, shippingRes, returnRes] = await Promise.all([
-        fetch(`/api/clawd/etsy?action=shop_sections&shop_id=${selectedShopId}`, {
-                  }),
-        fetch(`/api/clawd/etsy?action=shipping_profiles&shop_id=${selectedShopId}`, {
-                  }),
-        fetch(`/api/clawd/etsy?action=return_policies&shop_id=${selectedShopId}`, {
-                  }),
+        fetch(`/api/clawd/etsy?action=get_shop_sections&shop_id=${selectedShopId}`),
+        fetch(`/api/clawd/etsy?action=get_shipping_profiles&shop_id=${selectedShopId}`),
+        fetch(`/api/clawd/etsy?action=get_return_policies&shop_id=${selectedShopId}`),
       ]);
 
       if (sectionsRes.ok) {
         const d = await sectionsRes.json();
-        setShopSections(d.results || []);
+        setShopSections(d.shop_sections || d.results || []);
       }
       if (shippingRes.ok) {
         const d = await shippingRes.json();
-        setShippingProfiles(d.results || []);
+        setShippingProfiles(d.shipping_profiles || d.results || []);
       }
       if (returnRes.ok) {
         const d = await returnRes.json();
-        setReturnPolicies(d.results || []);
+        setReturnPolicies(d.return_policies || d.results || []);
       }
     } catch (err) {
       console.error('Failed to fetch shop metadata:', err);
@@ -318,8 +397,32 @@ function EtsyListingsPage() {
       const secId = Number(sectionFilter);
       result = result.filter((l) => l.shop_section_id === secId);
     }
+    if (excludeTerm.trim()) {
+      const exc = excludeTerm.toLowerCase();
+      result = result.filter((l) => {
+        const title = (l.title || '').toLowerCase();
+        const desc = (l.description || '').toLowerCase();
+        const tags = (l.tags || []).join(' ').toLowerCase();
+        return !title.includes(exc) && !desc.includes(exc) && !tags.includes(exc);
+      });
+    }
+    if (healthFilter) {
+      result = result.filter((l) => {
+        const h = calculateHealth(l);
+        switch (healthFilter) {
+          case 'issues': return h.overall < 70;
+          case 'missing_images': return l.image_count < 10;
+          case 'missing_tags': return (l.tags?.length || 0) < 13;
+          case 'short_title': return (l.title?.length || 0) < 60;
+          case 'no_description': return (l.description?.length || 0) < 200;
+          case 'no_video': return !l.has_video;
+          case 'no_stock': return l.quantity === 0;
+          default: return true;
+        }
+      });
+    }
     return result;
-  }, [listings, searchTerm, sectionFilter]);
+  }, [listings, searchTerm, sectionFilter, excludeTerm, healthFilter]);
 
   // --- Delete listing ---
   const handleDeleteListing = useCallback(
@@ -377,6 +480,151 @@ function EtsyListingsPage() {
     a.download = `etsy-listings-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // --- CSV Import ---
+  const parseCSV = (text: string): Record<string, string>[] => {
+    const lines = text.split('\n').filter((line) => line.trim().length > 0);
+    if (lines.length < 2) return [];
+
+    // Parse header
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"' && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else if (ch === '"') {
+            inQuotes = false;
+          } else {
+            current += ch;
+          }
+        } else {
+          if (ch === '"') {
+            inQuotes = true;
+          } else if (ch === ',') {
+            result.push(current);
+            current = '';
+          } else {
+            current += ch;
+          }
+        }
+      }
+      result.push(current);
+      return result;
+    };
+
+    const headers = parseCSVLine(lines[0]);
+    const rows: Record<string, string>[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]);
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => {
+        row[h.trim()] = (values[idx] || '').trim();
+      });
+      rows.push(row);
+    }
+    return rows;
+  };
+
+  const handleCSVFileSelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string;
+        const rows = parseCSV(text);
+        if (rows.length === 0) {
+          toast.error('CSV dosyasi bos veya gecersiz format');
+          return;
+        }
+        // Only keep rows that have a listing_id
+        const validRows = rows.filter((r) => r.listing_id && r.listing_id.trim() !== '');
+        if (validRows.length === 0) {
+          toast.error('CSV dosyasinda listing_id sutunu bulunamadi');
+          return;
+        }
+        setCsvImportRows(validRows);
+        setCsvImportDialogOpen(true);
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  const handleCSVImportConfirm = async () => {
+    setCsvImporting(true);
+    setCsvImportProgress(0);
+
+    let succeeded = 0;
+    let failed = 0;
+
+    for (let i = 0; i < csvImportRows.length; i++) {
+      const row = csvImportRows[i];
+      const listingId = parseInt(row.listing_id, 10);
+      if (isNaN(listingId)) {
+        failed++;
+        continue;
+      }
+
+      const body: Record<string, any> = {};
+      if (row.title !== undefined && row.title !== '') body.title = row.title;
+      if (row.description !== undefined && row.description !== '') body.description = row.description;
+      if (row.tags !== undefined && row.tags !== '') body.tags = row.tags.split('|').map((t: string) => t.trim()).filter(Boolean);
+      if (row.materials !== undefined && row.materials !== '') body.materials = row.materials.split('|').map((m: string) => m.trim()).filter(Boolean);
+      if (row.price !== undefined && row.price !== '') body.price = parseFloat(row.price);
+      if (row.quantity !== undefined && row.quantity !== '') body.quantity = parseInt(row.quantity, 10);
+      if (row.state !== undefined && row.state !== '') body.state = row.state;
+
+      if (Object.keys(body).length === 0) {
+        failed++;
+        setCsvImportProgress(((i + 1) / csvImportRows.length) * 100);
+        continue;
+      }
+
+      try {
+        const res = await fetch(
+          `/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${selectedShopId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }
+        );
+        if (res.ok) succeeded++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+
+      setCsvImportProgress(((i + 1) / csvImportRows.length) * 100);
+
+      // Rate limit: 1 update per 100ms
+      if (i < csvImportRows.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+
+    setCsvImporting(false);
+    setCsvImportProgress(0);
+    setCsvImportDialogOpen(false);
+    setCsvImportRows([]);
+
+    if (failed === 0) {
+      toast.success(`CSV import tamamlandi: ${succeeded} listing guncellendi`);
+    } else {
+      toast.error(`CSV import: ${succeeded} basarili, ${failed} basarisiz`);
+    }
+
+    fetchListings();
   };
 
   // --- Open editor drawer ---
@@ -516,6 +764,64 @@ function EtsyListingsPage() {
         ),
       },
       {
+        field: 'health',
+        headerName: 'Sağlık',
+        width: 70,
+        sortable: true,
+        filterable: false,
+        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
+          const h = calculateHealth(params.row);
+          return (
+            <Tooltip
+              arrow
+              title={
+                <Box sx={{ fontSize: 12 }}>
+                  <Box sx={{ fontWeight: 700, mb: 0.5 }}>Sağlık Skoru: {h.overall}/100</Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.tags.color }} />
+                    {h.tags.label}
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.images.color }} />
+                    {h.images.label}
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.title.color }} />
+                    {h.title.label}
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.description.color }} />
+                    {h.description.label}
+                  </Box>
+                </Box>
+              }
+            >
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  border: `3px solid ${h.color}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Typography variant="caption" sx={{ fontWeight: 700, fontSize: 11, color: h.color }}>
+                  {h.overall}
+                </Typography>
+              </Box>
+            </Tooltip>
+          );
+        },
+        sortComparator: (v1: any, v2: any, p1: any, p2: any) => {
+          const a = calculateHealth(p1.api.getRow(p1.id) as EtsyListingRow);
+          const b = calculateHealth(p2.api.getRow(p2.id) as EtsyListingRow);
+          return a.overall - b.overall;
+        },
+      },
+      {
         field: 'views',
         headerName: 'Görüntü',
         width: 80,
@@ -594,6 +900,7 @@ function EtsyListingsPage() {
           ? {
               tags: false,
               seo: false,
+              health: false,
               views: false,
               num_favorers: false,
               updated_timestamp: false,
@@ -611,6 +918,7 @@ function EtsyListingsPage() {
   const totalViews = useMemo(() => listings.reduce((s, l) => s + l.views, 0), [listings]);
   const totalFavorites = useMemo(() => listings.reduce((s, l) => s + l.num_favorers, 0), [listings]);
   const outOfStock = useMemo(() => listings.filter((l) => l.quantity === 0).length, [listings]);
+  const needsAttention = useMemo(() => listings.filter((l) => calculateHealth(l).overall < 70).length, [listings]);
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
@@ -650,92 +958,183 @@ function EtsyListingsPage() {
             {outOfStock}
           </Typography>
         </Paper>
+        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120, borderLeft: '3px solid #ff9800' }}>
+          <Typography variant="caption" color="text.secondary">
+            Sorunlu
+          </Typography>
+          <Typography variant="h6" fontWeight={700} sx={{ color: '#ff9800' }}>
+            {needsAttention}
+          </Typography>
+        </Paper>
       </Box>
 
-      {/* Toolbar */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, alignItems: 'center' }}>
-        {/* Shop selector */}
-        <FormControl size="small" sx={{ minWidth: 150 }}>
-          <Select
-            value={selectedShopId}
-            onChange={(e) => setSelectedShopId(e.target.value)}
-            displayEmpty
-          >
-            {shops.length === 0 && (
-              <MenuItem value="" disabled>
-                Bağlı mağaza yok
+      {/* Toolbar Row 1: Search & Filters */}
+      <Paper sx={{ p: 1.5, mb: 1 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+          {/* Shop selector */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <Select
+              value={selectedShopId}
+              onChange={(e) => setSelectedShopId(e.target.value)}
+              displayEmpty
+            >
+              {shops.length === 0 && (
+                <MenuItem value="" disabled>
+                  Bağlı mağaza yok
+                </MenuItem>
+              )}
+              {shops.map((s) => (
+                <MenuItem key={s.shopId} value={s.shopId}>
+                  {s.shopName}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Search */}
+          <TextField
+            size="small"
+            placeholder="Listing ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            sx={{ minWidth: 200, flex: 1 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {/* Exclude (İçermez) filter */}
+          <TextField
+            size="small"
+            placeholder="İçermez..."
+            value={excludeTerm}
+            onChange={(e) => setExcludeTerm(e.target.value)}
+            sx={{ minWidth: 140 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <RemoveCircleOutlineIcon sx={{ fontSize: 18, color: 'error.main' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          {/* Status filter */}
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as 'active' | 'draft' | 'inactive' | 'expired')
+              }
+            >
+              <MenuItem value="active">Aktif</MenuItem>
+              <MenuItem value="draft">Taslak</MenuItem>
+              <MenuItem value="inactive">Deaktif</MenuItem>
+              <MenuItem value="expired">Süresi Dolmuş</MenuItem>
+            </Select>
+          </FormControl>
+
+          {/* Section filter */}
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Select
+              value={sectionFilter}
+              onChange={(e) => setSectionFilter(e.target.value)}
+              displayEmpty
+            >
+              <MenuItem value="">Tüm Bölümler</MenuItem>
+              {shopSections.map((s) => (
+                <MenuItem key={s.shop_section_id} value={String(s.shop_section_id)}>
+                  {s.title}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {/* Health filter */}
+          <FormControl size="small" sx={{ minWidth: 130 }}>
+            <Select
+              value={healthFilter}
+              onChange={(e) => setHealthFilter(e.target.value)}
+              displayEmpty
+            >
+              <MenuItem value="">Tüm Sağlık</MenuItem>
+              <MenuItem value="issues">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <ErrorOutlineIcon sx={{ fontSize: 16, color: '#ff9800' }} />
+                  Sorunlu
+                </Box>
               </MenuItem>
-            )}
-            {shops.map((s) => (
-              <MenuItem key={s.shopId} value={s.shopId}>
-                {s.shopName}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+              <MenuItem value="missing_images">Resim Eksik (&lt;10)</MenuItem>
+              <MenuItem value="missing_tags">Etiket Eksik (&lt;13)</MenuItem>
+              <MenuItem value="short_title">Kısa Başlık (&lt;60)</MenuItem>
+              <MenuItem value="no_description">Açıklama Yok</MenuItem>
+              <MenuItem value="no_video">Video Yok</MenuItem>
+              <MenuItem value="no_stock">Stok Yok</MenuItem>
+            </Select>
+          </FormControl>
 
-        {/* Search */}
-        <TextField
-          size="small"
-          placeholder="Listing ara..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{ minWidth: 200 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-        />
+          <IconButton size="small" onClick={fetchListings} disabled={loading}>
+            <RefreshIcon />
+          </IconButton>
+        </Box>
+      </Paper>
 
-        {/* Status filter */}
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <Select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as 'active' | 'draft' | 'inactive' | 'expired')
-            }
-          >
-            <MenuItem value="active">Aktif</MenuItem>
-            <MenuItem value="draft">Taslak</MenuItem>
-            <MenuItem value="inactive">Deaktif</MenuItem>
-            <MenuItem value="expired">Süresi Dolmuş</MenuItem>
-          </Select>
-        </FormControl>
-
-        {/* Section filter */}
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <Select
-            value={sectionFilter}
-            onChange={(e) => setSectionFilter(e.target.value)}
-            displayEmpty
-          >
-            <MenuItem value="">Tüm Bölümler</MenuItem>
-            {shopSections.map((s) => (
-              <MenuItem key={s.shop_section_id} value={String(s.shop_section_id)}>
-                {s.title}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <Box sx={{ flex: 1 }} />
-
-        {/* Action buttons */}
-        <Button variant="outlined" size="small" onClick={() => setFindReplaceOpen(true)}>
-          Bul ve Değiştir
-        </Button>
-        <Button variant="outlined" size="small" onClick={handleExportCSV}>
-          CSV İndir
-        </Button>
+      {/* Toolbar Row 2: Actions — grouped by category */}
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2, alignItems: 'center' }}>
+        {/* Primary action */}
         <Button variant="contained" size="small" onClick={() => setCreateDialogOpen(true)}>
           + Yeni Listing
         </Button>
-        <IconButton size="small" onClick={fetchListings} disabled={loading}>
-          <RefreshIcon />
-        </IconButton>
+
+        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
+
+        {/* Editing tools */}
+        <Tooltip title="Başlık, açıklama, etiketlerde ara ve değiştir" arrow>
+          <Button variant="outlined" size="small" onClick={() => setFindReplaceOpen(true)}>
+            Bul &amp; Değiştir
+          </Button>
+        </Tooltip>
+        <Tooltip title="Benzer/tekrarlanan listingleri bul" arrow>
+          <Button variant="outlined" size="small" color="warning" onClick={() => setDuplicateDetectorOpen(true)}>
+            Tekrar Tespit
+          </Button>
+        </Tooltip>
+
+        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
+
+        {/* Smart features */}
+        <Tooltip title="Satışa göre otomatik fiyat ayarla, stok yenile" arrow>
+          <Button variant="outlined" size="small" onClick={() => setSmartPricingOpen(true)}>
+            Akıllı Fiyat
+          </Button>
+        </Tooltip>
+
+        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
+
+        {/* Data import/export */}
+        <Tooltip title="Listing verilerini CSV olarak dışa aktar" arrow>
+          <Button variant="outlined" size="small" onClick={handleExportCSV}>
+            CSV İndir
+          </Button>
+        </Tooltip>
+        <Tooltip title="CSV dosyasından toplu güncelleme yap" arrow>
+          <Button variant="outlined" size="small" startIcon={<UploadFileIcon />} onClick={handleCSVFileSelect}>
+            CSV Yükle
+          </Button>
+        </Tooltip>
+
+        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
+
+        {/* Safety */}
+        <Tooltip title="Toplu işlem yedeklerini görüntüle ve geri yükle" arrow>
+          <Button variant="outlined" size="small" color="info" onClick={() => setBackupManagerOpen(true)}>
+            Yedekler
+          </Button>
+        </Tooltip>
       </Box>
 
       {/* No shops message */}
@@ -764,7 +1163,7 @@ function EtsyListingsPage() {
           selectedListings={selectedListings}
           shopSections={shopSections}
           shopId={selectedShopId}
-
+          allShops={shops}
           onCompleted={() => {
             setSelectedIds({ type: 'include' as const, ids: new Set<GridRowId>() });
             fetchListings();
@@ -922,6 +1321,130 @@ function EtsyListingsPage() {
           fetchListings();
         }}
       />
+
+      {/* Smart Pricing Dialog */}
+      <SmartPricing
+        open={smartPricingOpen}
+        onClose={() => setSmartPricingOpen(false)}
+        listings={filteredListings.map((l) => ({
+          listing_id: l.listing_id,
+          title: l.title,
+          price: l.price,
+          views: l.views,
+          quantity: l.quantity,
+        }))}
+      />
+
+      {/* Duplicate Detector Dialog */}
+      <DuplicateDetector
+        open={duplicateDetectorOpen}
+        onClose={() => setDuplicateDetectorOpen(false)}
+        listings={filteredListings.map((l) => ({
+          listing_id: l.listing_id,
+          title: l.title,
+          description: l.description,
+          tags: l.tags,
+          price: l.price,
+          quantity: l.quantity,
+          views: l.views,
+          num_favorers: l.num_favorers,
+          state: l.state,
+        }))}
+        shopId={selectedShopId}
+        onEdit={(listingId) => handleOpenEditor(listingId)}
+        onCompleted={() => {
+          setDuplicateDetectorOpen(false);
+          fetchListings();
+        }}
+      />
+
+      {/* Backup Manager Dialog */}
+      <BackupManager
+        open={backupManagerOpen}
+        onClose={() => setBackupManagerOpen(false)}
+        shopId={selectedShopId}
+        onRestored={() => {
+          setBackupManagerOpen(false);
+          fetchListings();
+        }}
+      />
+
+      {/* CSV Import Preview Dialog */}
+      <Dialog
+        open={csvImportDialogOpen}
+        onClose={() => {
+          if (!csvImporting) {
+            setCsvImportDialogOpen(false);
+            setCsvImportRows([]);
+          }
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>CSV Import Onizleme</DialogTitle>
+        <DialogContent>
+          {csvImporting ? (
+            <Box sx={{ py: 3 }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                Import devam ediyor...
+              </Typography>
+              <LinearProgress variant="determinate" value={csvImportProgress} />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                %{Math.round(csvImportProgress)} tamamlandi
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                {csvImportRows.length} listing guncellenecek. Asagida degisiklikler listelenmistir.
+              </Typography>
+              <TableContainer sx={{ maxHeight: 400 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Listing ID</TableCell>
+                      <TableCell>Baslik</TableCell>
+                      <TableCell>Fiyat</TableCell>
+                      <TableCell>Stok</TableCell>
+                      <TableCell>Etiketler</TableCell>
+                      <TableCell>Durum</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {csvImportRows.slice(0, 50).map((row, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{row.listing_id}</TableCell>
+                        <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {row.title || '—'}
+                        </TableCell>
+                        <TableCell>{row.price || '—'}</TableCell>
+                        <TableCell>{row.quantity || '—'}</TableCell>
+                        <TableCell sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {row.tags || '—'}
+                        </TableCell>
+                        <TableCell>{row.state || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              {csvImportRows.length > 50 && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  ... ve {csvImportRows.length - 50} satir daha
+                </Typography>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setCsvImportDialogOpen(false); setCsvImportRows([]); }} disabled={csvImporting}>
+            Iptal
+          </Button>
+          <Button variant="contained" onClick={handleCSVImportConfirm} disabled={csvImporting || csvImportRows.length === 0}>
+            {csvImporting ? 'Import ediliyor...' : `${csvImportRows.length} Listing Guncelle`}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

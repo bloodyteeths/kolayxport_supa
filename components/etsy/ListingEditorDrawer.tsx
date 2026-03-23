@@ -34,6 +34,10 @@ import SaveIcon from '@mui/icons-material/Save';
 import PublishIcon from '@mui/icons-material/Publish';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BlockIcon from '@mui/icons-material/Block';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import UndoIcon from '@mui/icons-material/Undo';
+import HistoryIcon from '@mui/icons-material/History';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import { toast } from 'react-hot-toast';
 
 import SEOIndicator from './SEOIndicator';
@@ -41,6 +45,15 @@ import ImageManager from './ImageManager';
 import VideoUploader from './VideoUploader';
 import PersonalizationEditor, { type PersonalizationQuestion } from './PersonalizationEditor';
 import VariationEditor from './VariationEditor';
+import { SaveTemplateDialog, LoadTemplateDialog, TagProfileMenu } from './ListingTemplates';
+import type { ListingTemplate } from './ListingTemplates';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import ScheduledUpdateDialog, {
+  getScheduledUpdatesForListing,
+  useScheduledUpdateExecutor,
+  type ScheduledChanges,
+} from './ScheduledUpdateDialog';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -274,8 +287,32 @@ export default function ListingEditorDrawer({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Template / profile state
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [loadTemplateOpen, setLoadTemplateOpen] = useState(false);
+
+  // AI state
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+  const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
+
   // Accordion expanded state
   const [expanded, setExpanded] = useState<string | false>('basics');
+
+  // Auto-save state
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'unsaved' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Change history for undo (stores up to 10 snapshots)
+  const [history, setHistory] = useState<EditableFields[]>([]);
+  const MAX_HISTORY = 10;
+
+  // Scheduled updates
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [pendingScheduleCount, setPendingScheduleCount] = useState(0);
+
+  // Execute scheduled updates (polls every 30s)
+  useScheduledUpdateExecutor();
 
   // --------------------------------------------------
   // Fetch listing details
@@ -333,6 +370,69 @@ export default function ListingEditorDrawer({
   }, [listingId, shopId]);
 
   // --------------------------------------------------
+  // AI helper
+  // --------------------------------------------------
+  const callAI = useCallback(async (action: string): Promise<any> => {
+    if (!fields) return null;
+
+    setAiLoading((prev) => ({ ...prev, [action]: true }));
+    try {
+      const res = await fetch('/api/ai/etsy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          title: fields.title,
+          description: fields.description,
+          tags: fields.tags,
+          materials: fields.materials,
+          price: fields.price,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `AI istegi basarisiz (HTTP ${res.status})`);
+      }
+
+      return await res.json();
+    } catch (err: any) {
+      toast.error(err.message || 'AI istegi basarisiz');
+      return null;
+    } finally {
+      setAiLoading((prev) => ({ ...prev, [action]: false }));
+    }
+  }, [fields]);
+
+  const handleAIOptimizeTitle = useCallback(async () => {
+    const result = await callAI('optimize_title');
+    if (result?.title) {
+      updateField('title', result.title);
+      if (result.explanation) {
+        toast.success(result.explanation);
+      } else {
+        toast.success('Baslik optimize edildi');
+      }
+    }
+  }, [callAI]);
+
+  const handleAIGenerateDescription = useCallback(async () => {
+    const result = await callAI('generate_description');
+    if (result?.description) {
+      updateField('description', result.description);
+      toast.success('Aciklama olusturuldu');
+    }
+  }, [callAI]);
+
+  const handleAISuggestTags = useCallback(async () => {
+    const result = await callAI('suggest_tags');
+    if (result?.tags && Array.isArray(result.tags)) {
+      setAiTagSuggestions(result.tags);
+      toast.success(`${result.tags.length} etiket onerisi alindi`);
+    }
+  }, [callAI]);
+
+  // --------------------------------------------------
   // Trigger fetch on open / listingId change
   // --------------------------------------------------
   useEffect(() => {
@@ -349,14 +449,54 @@ export default function ListingEditorDrawer({
       setFetchError(null);
       setVideos([]);
       setExpanded('basics');
+      setAiTagSuggestions([]);
+      setAutoSaveStatus('idle');
+      setLastSavedAt(null);
+      setHistory([]);
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
     }
   }, [open, listingId, fetchListing, fetchVideos]);
+
+  // --------------------------------------------------
+  // Track pending scheduled updates count
+  // --------------------------------------------------
+  useEffect(() => {
+    if (open && listingId) {
+      setPendingScheduleCount(getScheduledUpdatesForListing(listingId).length);
+    }
+  }, [open, listingId, scheduleDialogOpen]);
 
   // --------------------------------------------------
   // Field updaters
   // --------------------------------------------------
   const updateField = <K extends keyof EditableFields>(key: K, value: EditableFields[K]) => {
-    setFields((prev) => (prev ? { ...prev, [key]: value } : prev));
+    // Push current state to history before making the change
+    setFields((prev) => {
+      if (!prev) return prev;
+
+      // Save snapshot to history
+      setHistory((h) => {
+        const snapshot = { ...prev, tags: [...prev.tags], materials: [...prev.materials] };
+        const next = [...h, snapshot];
+        if (next.length > MAX_HISTORY) next.shift();
+        return next;
+      });
+
+      return { ...prev, [key]: value };
+    });
+
+    // Mark as unsaved and trigger debounced auto-save
+    setAutoSaveStatus('unsaved');
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      // Transition to 'saving' which triggers the auto-save effect
+      setAutoSaveStatus('saving');
+    }, 3000);
   };
 
   const handleAccordionChange = (panel: string) => (_: React.SyntheticEvent, isExpanded: boolean) => {
@@ -370,6 +510,159 @@ export default function ListingEditorDrawer({
     if (!fields || !originalFieldsRef.current) return false;
     return Object.keys(getChangedFields(originalFieldsRef.current, fields)).length > 0;
   };
+
+  // --------------------------------------------------
+  // Undo — revert to previous state from history
+  // --------------------------------------------------
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    const prev = history[history.length - 1];
+    setHistory((h) => h.slice(0, -1));
+    setFields({ ...prev, tags: [...prev.tags], materials: [...prev.materials] });
+
+    // Re-evaluate auto-save status after undo
+    if (originalFieldsRef.current) {
+      const changed = getChangedFields(originalFieldsRef.current, prev);
+      if (Object.keys(changed).length === 0) {
+        setAutoSaveStatus('idle');
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+          autoSaveTimerRef.current = null;
+        }
+      } else {
+        setAutoSaveStatus('unsaved');
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
+        autoSaveTimerRef.current = setTimeout(() => {
+          setAutoSaveStatus('saving');
+        }, 3000);
+      }
+    }
+  };
+
+  // --------------------------------------------------
+  // Apply listing template
+  // --------------------------------------------------
+  const handleApplyTemplate = useCallback((template: ListingTemplate) => {
+    if (!fields) return;
+
+    const f = template.fields;
+    if (f.title !== undefined) updateField('title', f.title);
+    if (f.description !== undefined) updateField('description', f.description);
+    if (f.tags !== undefined) updateField('tags', [...f.tags]);
+    if (f.materials !== undefined) updateField('materials', [...f.materials]);
+    if (f.who_made !== undefined) updateField('who_made', f.who_made);
+    if (f.when_made !== undefined) updateField('when_made', f.when_made);
+    if (f.is_supply !== undefined) updateField('is_supply', f.is_supply);
+    if (f.shipping_profile_id !== undefined) updateField('shipping_profile_id', f.shipping_profile_id);
+    if (f.return_policy_id !== undefined) updateField('return_policy_id', f.return_policy_id);
+
+    toast.success(`"${template.name}" profili uygulandi`);
+  }, [fields]);
+
+  // --------------------------------------------------
+  // Auto-save effect — runs when status transitions to 'saving'
+  // --------------------------------------------------
+  useEffect(() => {
+    if (autoSaveStatus !== 'saving') return;
+    if (!listingId || !fields || !originalFieldsRef.current) {
+      setAutoSaveStatus('idle');
+      return;
+    }
+
+    const changed = getChangedFields(originalFieldsRef.current, fields);
+    if (Object.keys(changed).length === 0) {
+      setAutoSaveStatus('idle');
+      return;
+    }
+
+    const doSave = async () => {
+      try {
+        const payload: Record<string, any> = {};
+
+        if (changed.title !== undefined) payload.title = changed.title;
+        if (changed.description !== undefined) payload.description = changed.description;
+        if (changed.tags !== undefined) payload.tags = changed.tags;
+        if (changed.materials !== undefined) payload.materials = changed.materials;
+        if (changed.price !== undefined) payload.price = changed.price;
+        if (changed.quantity !== undefined) payload.quantity = changed.quantity;
+        if (changed.who_made !== undefined) payload.who_made = changed.who_made;
+        if (changed.when_made !== undefined) payload.when_made = changed.when_made;
+        if (changed.is_supply !== undefined) payload.is_supply = changed.is_supply;
+        if (changed.shop_section_id !== undefined && changed.shop_section_id !== '') {
+          payload.shop_section_id = changed.shop_section_id;
+        }
+        if (changed.shipping_profile_id !== undefined && changed.shipping_profile_id !== '') {
+          payload.shipping_profile_id = changed.shipping_profile_id;
+        }
+        if (changed.return_policy_id !== undefined && changed.return_policy_id !== '') {
+          payload.return_policy_id = changed.return_policy_id;
+        }
+        if (changed.processing_min !== undefined && changed.processing_min !== '') {
+          payload.processing_min = Number(changed.processing_min);
+        }
+        if (changed.processing_max !== undefined && changed.processing_max !== '') {
+          payload.processing_max = Number(changed.processing_max);
+        }
+        if (changed.item_weight !== undefined && changed.item_weight !== '') {
+          payload.item_weight = Number(changed.item_weight);
+        }
+        if (changed.item_weight_unit !== undefined) payload.item_weight_unit = changed.item_weight_unit;
+        if (changed.item_length !== undefined && changed.item_length !== '') {
+          payload.item_length = Number(changed.item_length);
+        }
+        if (changed.item_width !== undefined && changed.item_width !== '') {
+          payload.item_width = Number(changed.item_width);
+        }
+        if (changed.item_height !== undefined && changed.item_height !== '') {
+          payload.item_height = Number(changed.item_height);
+        }
+        if (changed.item_dimensions_unit !== undefined) payload.item_dimensions_unit = changed.item_dimensions_unit;
+
+        if (Object.keys(payload).length === 0) {
+          setAutoSaveStatus('idle');
+          return;
+        }
+
+        const res = await fetch(
+          `/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${shopId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          },
+        );
+
+        if (!res.ok) {
+          throw new Error('Auto-save failed');
+        }
+
+        // Update original ref so further dirty checks are correct
+        if (fields) {
+          originalFieldsRef.current = { ...fields, tags: [...fields.tags], materials: [...fields.materials] };
+        }
+        setLastSavedAt(new Date());
+        setAutoSaveStatus('saved');
+        setHistory([]);
+        onSaved();
+      } catch {
+        setAutoSaveStatus('error');
+      }
+    };
+
+    doSave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSaveStatus]);
+
+  // Cleanup auto-save timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   // --------------------------------------------------
   // Save (update listing)
@@ -450,6 +743,15 @@ export default function ListingEditorDrawer({
       }
 
       toast.success('Liste guncellendi');
+
+      // Reset auto-save state and history
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      setAutoSaveStatus('saved');
+      setLastSavedAt(new Date());
+      setHistory([]);
 
       // Refresh listing data to reset dirty state
       await fetchListing();
@@ -650,6 +952,20 @@ export default function ListingEditorDrawer({
         </Box>
 
         <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+          {fields && (
+            <>
+              <Tooltip title="Profil Kaydet">
+                <IconButton size="small" onClick={() => setSaveTemplateOpen(true)}>
+                  <BookmarkBorderIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Profil Uygula">
+                <IconButton size="small" onClick={() => setLoadTemplateOpen(true)}>
+                  <FolderOpenIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
           {listing?.url && (
             <Tooltip title="Etsy'de Goruntule">
               <IconButton
@@ -716,6 +1032,74 @@ export default function ListingEditorDrawer({
         {/* Header — always shown */}
         {renderHeader()}
 
+        {/* Auto-save status & Undo bar */}
+        {fields && listing && !loading && !fetchError && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              py: 0.75,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'grey.50',
+              minHeight: 36,
+            }}
+          >
+            {/* Auto-save status */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  bgcolor:
+                    autoSaveStatus === 'unsaved'
+                      ? 'warning.main'
+                      : autoSaveStatus === 'saving'
+                      ? 'info.main'
+                      : autoSaveStatus === 'saved'
+                      ? 'success.main'
+                      : autoSaveStatus === 'error'
+                      ? 'error.main'
+                      : 'grey.400',
+                  flexShrink: 0,
+                }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                {autoSaveStatus === 'unsaved' && 'Kaydedilmedi'}
+                {autoSaveStatus === 'saving' && 'Kaydediliyor...'}
+                {autoSaveStatus === 'saved' &&
+                  `Kaydedildi${lastSavedAt ? ` ${lastSavedAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
+                {autoSaveStatus === 'error' && 'Hata'}
+                {autoSaveStatus === 'idle' && ''}
+              </Typography>
+            </Box>
+
+            {/* Undo button */}
+            <Tooltip title={history.length > 0 ? `Geri Al (${history.length} adim)` : 'Gecmis yok'}>
+              <span>
+                <Button
+                  size="small"
+                  startIcon={<UndoIcon sx={{ fontSize: 16 }} />}
+                  onClick={handleUndo}
+                  disabled={history.length === 0}
+                  sx={{
+                    textTransform: 'none',
+                    fontSize: '0.7rem',
+                    minWidth: 0,
+                    py: 0.25,
+                    px: 1,
+                  }}
+                >
+                  Geri Al{history.length > 0 ? ` (${history.length})` : ''}
+                </Button>
+              </span>
+            </Tooltip>
+          </Box>
+        )}
+
         {/* Content */}
         {loading ? (
           renderLoadingState()
@@ -739,64 +1123,100 @@ export default function ListingEditorDrawer({
               <AccordionDetails>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {/* Title */}
-                  <TextField
-                    label="Baslik"
-                    value={fields.title}
-                    onChange={(e) => {
-                      if (e.target.value.length <= 140) {
-                        updateField('title', e.target.value);
-                      }
-                    }}
-                    fullWidth
-                    size="small"
-                    helperText={`${fields.title.length}/140 karakter`}
-                    inputProps={{ maxLength: 140 }}
-                  />
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>Baslik</Typography>
+                      <Button
+                        size="small"
+                        startIcon={aiLoading.optimize_title ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
+                        onClick={handleAIOptimizeTitle}
+                        disabled={!!aiLoading.optimize_title || !fields.title}
+                        sx={{ textTransform: 'none', fontSize: '0.75rem', minWidth: 0, py: 0.25, px: 1 }}
+                      >
+                        AI ile Optimize Et
+                      </Button>
+                    </Box>
+                    <TextField
+                      value={fields.title}
+                      onChange={(e) => {
+                        if (e.target.value.length <= 140) {
+                          updateField('title', e.target.value);
+                        }
+                      }}
+                      fullWidth
+                      size="small"
+                      helperText={`${fields.title.length}/140 karakter`}
+                      inputProps={{ maxLength: 140 }}
+                    />
+                  </Box>
 
                   {/* Description */}
-                  <TextField
-                    label="Aciklama"
-                    value={fields.description}
-                    onChange={(e) => updateField('description', e.target.value)}
-                    fullWidth
-                    multiline
-                    rows={6}
-                    size="small"
-                    helperText={`${fields.description.length} karakter`}
-                  />
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>Aciklama</Typography>
+                      <Button
+                        size="small"
+                        startIcon={aiLoading.generate_description ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
+                        onClick={handleAIGenerateDescription}
+                        disabled={!!aiLoading.generate_description || !fields.title}
+                        sx={{ textTransform: 'none', fontSize: '0.75rem', minWidth: 0, py: 0.25, px: 1 }}
+                      >
+                        AI ile Olustur
+                      </Button>
+                    </Box>
+                    <TextField
+                      value={fields.description}
+                      onChange={(e) => updateField('description', e.target.value)}
+                      fullWidth
+                      multiline
+                      rows={6}
+                      size="small"
+                      helperText={`${fields.description.length} karakter`}
+                    />
+                  </Box>
 
                   {/* Tags */}
-                  <Autocomplete
-                    multiple
-                    freeSolo
-                    options={[]}
-                    value={fields.tags}
-                    onChange={(_, newValue) => {
-                      if (newValue.length <= 13) {
-                        updateField('tags', newValue as string[]);
-                      }
-                    }}
-                    renderTags={(value, getTagProps) =>
-                      value.map((tag, index) => (
-                        <Chip
-                          {...getTagProps({ index })}
-                          key={tag}
-                          label={tag}
-                          size="small"
-                          sx={{ maxWidth: 180 }}
-                        />
-                      ))
-                    }
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Etiketler"
-                        size="small"
-                        placeholder={fields.tags.length < 13 ? 'Etiket ekle...' : ''}
-                        helperText={`${fields.tags.length}/13 etiket`}
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Etiketler
+                      </Typography>
+                      <TagProfileMenu
+                        currentTags={fields.tags}
+                        onApplyTags={(tags) => updateField('tags', tags)}
                       />
-                    )}
-                  />
+                    </Box>
+                    <Autocomplete
+                      multiple
+                      freeSolo
+                      options={[]}
+                      value={fields.tags}
+                      onChange={(_, newValue) => {
+                        if (newValue.length <= 13) {
+                          updateField('tags', newValue as string[]);
+                        }
+                      }}
+                      renderTags={(value, getTagProps) =>
+                        value.map((tag, index) => (
+                          <Chip
+                            {...getTagProps({ index })}
+                            key={tag}
+                            label={tag}
+                            size="small"
+                            sx={{ maxWidth: 180 }}
+                          />
+                        ))
+                      }
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          size="small"
+                          placeholder={fields.tags.length < 13 ? 'Etiket ekle...' : ''}
+                          helperText={`${fields.tags.length}/13 etiket`}
+                        />
+                      )}
+                    />
+                  </Box>
 
                   {/* Materials */}
                   <Autocomplete
@@ -854,6 +1274,76 @@ export default function ListingEditorDrawer({
                   description={fields.description}
                   compact={false}
                 />
+
+                {/* AI Tag Suggestions */}
+                <Box sx={{ mt: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
+                      onClick={handleAISuggestTags}
+                      disabled={!!aiLoading.suggest_tags || !fields.title}
+                      sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                    >
+                      AI Etiket Oner
+                    </Button>
+                  </Box>
+
+                  {aiTagSuggestions.length > 0 && (
+                    <Box sx={{ mt: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Onerilen etiketler:
+                        </Typography>
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            const newTags = aiTagSuggestions.filter(
+                              (t) => !fields.tags.includes(t),
+                            );
+                            const merged = [...fields.tags, ...newTags].slice(0, 13);
+                            updateField('tags', merged);
+                            setAiTagSuggestions([]);
+                            toast.success(`${merged.length - fields.tags.length} etiket eklendi`);
+                          }}
+                          disabled={aiTagSuggestions.every((t) => fields.tags.includes(t))}
+                          sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
+                        >
+                          Tumunu Ekle
+                        </Button>
+                      </Box>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {aiTagSuggestions.map((tag) => {
+                          const alreadyExists = fields.tags.includes(tag);
+                          const isFull = fields.tags.length >= 13;
+                          return (
+                            <Chip
+                              key={tag}
+                              label={tag}
+                              size="small"
+                              variant={alreadyExists ? 'filled' : 'outlined'}
+                              color={alreadyExists ? 'default' : 'primary'}
+                              disabled={alreadyExists}
+                              onClick={
+                                alreadyExists || isFull
+                                  ? undefined
+                                  : () => {
+                                      updateField('tags', [...fields.tags, tag]);
+                                    }
+                              }
+                              sx={{
+                                cursor: alreadyExists || isFull ? 'default' : 'pointer',
+                                opacity: alreadyExists ? 0.5 : 1,
+                                maxWidth: 180,
+                              }}
+                            />
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
               </AccordionDetails>
             </Accordion>
 
@@ -1359,16 +1849,48 @@ export default function ListingEditorDrawer({
               zIndex: 10,
             }}
           >
-            <Button
-              variant="contained"
-              fullWidth
-              size="large"
-              startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-              onClick={handleSave}
-              disabled={saving || !hasChanges()}
-            >
-              {saving ? 'Kaydediliyor...' : 'Kaydet'}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="contained"
+                size="large"
+                sx={{ flex: 1 }}
+                startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                onClick={handleSave}
+                disabled={saving || !hasChanges()}
+              >
+                {saving ? 'Kaydediliyor...' : 'Kaydet'}
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<ScheduleIcon />}
+                onClick={() => setScheduleDialogOpen(true)}
+                disabled={saving}
+                sx={{ position: 'relative', minWidth: 'auto', px: 2 }}
+              >
+                Zamanla
+                {pendingScheduleCount > 0 && (
+                  <Chip
+                    label={pendingScheduleCount}
+                    size="small"
+                    color="warning"
+                    sx={{
+                      position: 'absolute',
+                      top: -8,
+                      right: -8,
+                      height: 20,
+                      minWidth: 20,
+                      fontSize: '0.7rem',
+                    }}
+                  />
+                )}
+              </Button>
+            </Box>
+            {pendingScheduleCount > 0 && (
+              <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: 'block', textAlign: 'right' }}>
+                {pendingScheduleCount} bekleyen guncelleme
+              </Typography>
+            )}
           </Box>
         )}
       </Drawer>
@@ -1403,6 +1925,60 @@ export default function ListingEditorDrawer({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* ================================================================ */}
+      {/* Scheduled Update Dialog */}
+      {/* ================================================================ */}
+      {listing && fields && originalFieldsRef.current && (
+        <ScheduledUpdateDialog
+          open={scheduleDialogOpen}
+          onClose={() => setScheduleDialogOpen(false)}
+          listingId={String(listing.listing_id)}
+          shopId={shopId}
+          listingTitle={listing.title}
+          changes={(() => {
+            const changed = getChangedFields(originalFieldsRef.current!, fields);
+            const sc: ScheduledChanges = {};
+            if (changed.title !== undefined) sc.title = changed.title;
+            if (changed.description !== undefined) sc.description = changed.description;
+            if (changed.tags !== undefined) sc.tags = changed.tags;
+            if (changed.price !== undefined) sc.price = changed.price;
+            if (changed.quantity !== undefined) sc.quantity = changed.quantity;
+            return sc;
+          })()}
+          onScheduled={() => {
+            setPendingScheduleCount(getScheduledUpdatesForListing(String(listing.listing_id)).length);
+          }}
+        />
+      )}
+
+      {/* ================================================================ */}
+      {/* Listing Template Dialogs */}
+      {/* ================================================================ */}
+      {fields && (
+        <>
+          <SaveTemplateDialog
+            open={saveTemplateOpen}
+            onClose={() => setSaveTemplateOpen(false)}
+            currentFields={{
+              title: fields.title,
+              description: fields.description,
+              tags: fields.tags,
+              materials: fields.materials,
+              who_made: fields.who_made,
+              when_made: fields.when_made,
+              is_supply: fields.is_supply,
+              shipping_profile_id: fields.shipping_profile_id,
+              return_policy_id: fields.return_policy_id,
+            }}
+          />
+          <LoadTemplateDialog
+            open={loadTemplateOpen}
+            onClose={() => setLoadTemplateOpen(false)}
+            onApply={handleApplyTemplate}
+          />
+        </>
+      )}
     </>
   );
 }

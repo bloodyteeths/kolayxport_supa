@@ -11,12 +11,14 @@ import {
   Button,
   TextField,
   Tooltip,
+  Divider,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import StarIcon from '@mui/icons-material/Star';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { toast } from 'react-hot-toast';
 
 interface ImageInfo {
@@ -41,7 +43,6 @@ function fileToBase64(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Strip the data:image/...;base64, prefix
       const base64 = result.split(',')[1];
       resolve(base64);
     };
@@ -54,7 +55,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const [uploading, setUploading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<ImageInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [swapping, setSwapping] = useState<number | null>(null); // rank being swapped
+  const [swapping, setSwapping] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Upload dialog state
@@ -62,6 +63,16 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [uploadAltText, setUploadAltText] = useState('');
+
+  // AI Image generation state
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiRefFile, setAiRefFile] = useState<File | null>(null);
+  const [aiRefPreview, setAiRefPreview] = useState<string | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiResult, setAiResult] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [aiUploading, setAiUploading] = useState(false);
+  const aiRefInputRef = useRef<HTMLInputElement>(null);
 
   const sortedImages = [...(images || [])].sort((a, b) => a.rank - b.rank);
 
@@ -95,7 +106,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     if (!uploadFile) return;
 
     if (sortedImages.length >= 10) {
-      toast.error('Maksimum 10 görsel yüklenebilir');
+      toast.error('Maksimum 10 gorsel yuklenebilir');
       return;
     }
 
@@ -123,14 +134,14 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Görsel yüklenemedi');
+        throw new Error(err.error || 'Gorsel yuklenemedi');
       }
 
-      toast.success('Görsel yüklendi');
+      toast.success('Gorsel yuklendi');
       setUploadDialogOpen(false);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Görsel yüklenirken hata oluştu');
+      toast.error(err.message || 'Gorsel yuklenirken hata olustu');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -150,14 +161,14 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Görsel silinemedi');
+        throw new Error(err.error || 'Gorsel silinemedi');
       }
 
-      toast.success('Görsel silindi');
+      toast.success('Gorsel silindi');
       setDeleteConfirm(null);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Görsel silinirken hata oluştu');
+      toast.error(err.message || 'Gorsel silinirken hata olustu');
     } finally {
       setDeleting(false);
     }
@@ -176,7 +187,6 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
     setSwapping(img.rank);
     try {
-      // Step 1: Upload image A's URL to rank B (overwrite)
       const uploadA = await fetch(uploadEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -188,10 +198,9 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       });
       if (!uploadA.ok) {
         const err = await uploadA.json();
-        throw new Error(err.error || 'Sıralama değiştirilemedi (adım 1)');
+        throw new Error(err.error || 'Siralama degistirilemedi (adim 1)');
       }
 
-      // Step 2: Upload image B's URL to rank A (overwrite)
       const uploadB = await fetch(uploadEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,24 +212,125 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       });
       if (!uploadB.ok) {
         const err = await uploadB.json();
-        throw new Error(err.error || 'Sıralama değiştirilemedi (adım 2)');
+        throw new Error(err.error || 'Siralama degistirilemedi (adim 2)');
       }
 
-      toast.success('Sıralama güncellendi');
+      toast.success('Siralama guncellendi');
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Sıralama değiştirilirken hata oluştu');
+      toast.error(err.message || 'Siralama degistirilirken hata olustu');
     } finally {
       setSwapping(null);
     }
   }, [sortedImages, uploadEndpoint, onImagesChanged]);
+
+  // --- AI Image Generation ---
+
+  const openAiDialog = () => {
+    setAiPrompt('');
+    setAiRefFile(null);
+    setAiRefPreview(null);
+    setAiResult(null);
+    setAiDialogOpen(true);
+  };
+
+  const handleAiRefSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAiRefFile(file);
+    setAiRefPreview(URL.createObjectURL(file));
+  };
+
+  const handleAiGenerate = async () => {
+    if (!aiPrompt.trim()) {
+      toast.error('Bir prompt girin');
+      return;
+    }
+
+    setAiGenerating(true);
+    setAiResult(null);
+    try {
+      const payload: Record<string, any> = {
+        prompt: aiPrompt.trim(),
+      };
+
+      // Add reference image if provided
+      if (aiRefFile) {
+        const base64 = await fileToBase64(aiRefFile);
+        payload.reference_image = base64;
+        payload.reference_mime_type = aiRefFile.type;
+      }
+
+      const res = await fetch('/api/ai/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Gorsel olusturulamadi');
+      }
+
+      const data = await res.json();
+      if (data.image_base64) {
+        setAiResult({ base64: data.image_base64, mimeType: data.mime_type || 'image/png' });
+        toast.success('Gorsel olusturuldu!');
+      } else {
+        throw new Error(data.text || 'Gorsel olusturulamadi');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'AI gorsel olusturma hatasi');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  const handleAiAcceptAndUpload = async () => {
+    if (!aiResult) return;
+
+    if (sortedImages.length >= 10) {
+      toast.error('Maksimum 10 gorsel yuklenebilir');
+      return;
+    }
+
+    setAiUploading(true);
+    try {
+      const nextRank = sortedImages.length > 0
+        ? Math.max(...sortedImages.map((i) => i.rank)) + 1
+        : 1;
+
+      const res = await fetch(uploadEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_base64: aiResult.base64,
+          image_content_type: aiResult.mimeType,
+          rank: nextRank,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Gorsel yuklenemedi');
+      }
+
+      toast.success('AI gorseli listinge yuklendi!');
+      setAiDialogOpen(false);
+      onImagesChanged();
+    } catch (err: any) {
+      toast.error(err.message || 'Gorsel yuklenirken hata olustu');
+    } finally {
+      setAiUploading(false);
+    }
+  };
 
   // --- Render ---
 
   return (
     <Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Görseller ({sortedImages.length}/10)
+        Gorseller ({sortedImages.length}/10)
       </Typography>
 
       <Box
@@ -250,11 +360,10 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             >
               <img
                 src={img.url_570xN}
-                alt={img.alt_text || `Görsel ${img.rank}`}
+                alt={img.alt_text || `Gorsel ${img.rank}`}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
 
-              {/* Loading overlay during swap */}
               {isSwapping && (
                 <Box
                   sx={{
@@ -282,7 +391,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 }}
               >
                 {isPrimary && (
-                  <Tooltip title="Ana görsel">
+                  <Tooltip title="Ana gorsel">
                     <StarIcon sx={{ fontSize: 18, color: '#f59e0b', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
                   </Tooltip>
                 )}
@@ -328,7 +437,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 </Tooltip>
               )}
 
-              {/* Controls overlay (delete + reorder) */}
+              {/* Controls overlay */}
               <Box
                 className="img-controls"
                 sx={{
@@ -342,7 +451,6 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   transition: 'opacity 0.2s',
                 }}
               >
-                {/* Delete button */}
                 <IconButton
                   size="small"
                   onClick={() => setDeleteConfirm(img)}
@@ -358,9 +466,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   <CloseIcon sx={{ fontSize: 14 }} />
                 </IconButton>
 
-                {/* Move up */}
                 {idx > 0 && (
-                  <Tooltip title="Yukarı taşı" placement="left">
+                  <Tooltip title="Yukari tasi" placement="left">
                     <IconButton
                       size="small"
                       onClick={() => handleSwap('up', img)}
@@ -378,9 +485,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   </Tooltip>
                 )}
 
-                {/* Move down */}
                 {idx < sortedImages.length - 1 && (
-                  <Tooltip title="Aşağı taşı" placement="left">
+                  <Tooltip title="Asagi tasi" placement="left">
                     <IconButton
                       size="small"
                       onClick={() => handleSwap('down', img)}
@@ -426,9 +532,34 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             </Typography>
           </Box>
         )}
+
+        {/* AI generate image button */}
+        {sortedImages.length < 10 && (
+          <Box
+            onClick={() => !aiGenerating && openAiDialog()}
+            sx={{
+              aspectRatio: '1',
+              borderRadius: 1,
+              border: '2px dashed #c084fc',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: aiGenerating ? 'wait' : 'pointer',
+              '&:hover': { borderColor: '#a855f7', backgroundColor: '#faf5ff' },
+              transition: 'all 0.2s',
+              minHeight: 120,
+            }}
+          >
+            <AutoFixHighIcon sx={{ fontSize: 32, color: '#a855f7' }} />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+              AI Gorsel
+            </Typography>
+          </Box>
+        )}
       </Box>
 
-      {/* Hidden file input for upload dialog */}
+      {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -444,9 +575,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Görsel Yükle</DialogTitle>
+        <DialogTitle>Gorsel Yukle</DialogTitle>
         <DialogContent>
-          {/* File picker area */}
           {!uploadPreview ? (
             <Box
               onClick={() => fileInputRef.current?.click()}
@@ -462,7 +592,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             >
               <AddPhotoAlternateIcon sx={{ fontSize: 48, color: '#94a3b8' }} />
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Görsel seçmek için tıklayın
+                Gorsel secmek icin tiklayin
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 JPEG, PNG, GIF, WebP
@@ -472,7 +602,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             <Box sx={{ textAlign: 'center', mb: 2 }}>
               <img
                 src={uploadPreview}
-                alt="Önizleme"
+                alt="Onizleme"
                 style={{
                   maxWidth: '100%',
                   maxHeight: 200,
@@ -486,47 +616,181 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 sx={{ display: 'block', mt: 1, cursor: 'pointer' }}
                 onClick={() => fileInputRef.current?.click()}
               >
-                Farklı görsel seç
+                Farkli gorsel sec
               </Typography>
             </Box>
           )}
 
-          {/* Alt text input */}
           <TextField
             label="Alt Metin (SEO)"
-            placeholder="Ör: el yapımı ahşap bileklik, doğal taş"
+            placeholder="Or: el yapimi ahsap bileklik, dogal tas"
             fullWidth
             size="small"
             value={uploadAltText}
             onChange={(e) => setUploadAltText(e.target.value)}
             sx={{ mt: 2 }}
-            helperText="Arama motorları için açıklayıcı metin"
+            helperText="Arama motorlari icin aciklayici metin"
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
-            İptal
+            Iptal
           </Button>
           <Button
             onClick={handleUploadSubmit}
             variant="contained"
             disabled={!uploadFile || uploading}
           >
-            {uploading ? <CircularProgress size={20} /> : 'Yükle'}
+            {uploading ? <CircularProgress size={20} /> : 'Yukle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* AI Image Generation Dialog */}
+      <Dialog
+        open={aiDialogOpen}
+        onClose={() => !aiGenerating && !aiUploading && setAiDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AutoFixHighIcon sx={{ color: '#a855f7' }} />
+          AI ile Gorsel Olustur
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Urun gorselinizi AI ile olusturun. Referans gorsel ekleyerek benzer stil/urun gorseli uretebilirsiniz.
+          </Typography>
+
+          <TextField
+            label="Prompt"
+            placeholder="ornek: Professional product photo of a handmade wooden phone stand on white background, studio lighting"
+            fullWidth
+            multiline
+            minRows={3}
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            disabled={aiGenerating}
+            sx={{ mb: 2 }}
+            helperText="Ingilizce prompt daha iyi sonuc verir"
+          />
+
+          {/* Reference image (optional) */}
+          <input
+            ref={aiRefInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            style={{ display: 'none' }}
+            onChange={handleAiRefSelect}
+          />
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+              Referans Gorsel (opsiyonel)
+            </Typography>
+            {!aiRefPreview ? (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => aiRefInputRef.current?.click()}
+                disabled={aiGenerating}
+                startIcon={<AddPhotoAlternateIcon />}
+              >
+                Referans Gorsel Sec
+              </Button>
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <img
+                  src={aiRefPreview}
+                  alt="Referans"
+                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                />
+                <Button
+                  size="small"
+                  color="error"
+                  onClick={() => {
+                    setAiRefFile(null);
+                    setAiRefPreview(null);
+                    if (aiRefInputRef.current) aiRefInputRef.current.value = '';
+                  }}
+                >
+                  Kaldir
+                </Button>
+              </Box>
+            )}
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Generate button */}
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={handleAiGenerate}
+            disabled={aiGenerating || !aiPrompt.trim()}
+            startIcon={aiGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
+            sx={{
+              bgcolor: '#a855f7',
+              '&:hover': { bgcolor: '#9333ea' },
+            }}
+          >
+            {aiGenerating ? 'Olusturuluyor...' : 'Gorsel Olustur'}
+          </Button>
+
+          {/* Result preview */}
+          {aiResult && (
+            <Box sx={{ mt: 2, textAlign: 'center' }}>
+              <Typography variant="subtitle2" gutterBottom>Olusturulan Gorsel:</Typography>
+              <img
+                src={`data:${aiResult.mimeType};base64,${aiResult.base64}`}
+                alt="AI gorsel"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: 300,
+                  borderRadius: 8,
+                  border: '2px solid #a855f7',
+                }}
+              />
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1.5 }}>
+                <Button
+                  variant="outlined"
+                  onClick={handleAiGenerate}
+                  disabled={aiGenerating}
+                  size="small"
+                >
+                  Tekrar Olustur
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleAiAcceptAndUpload}
+                  disabled={aiUploading}
+                  startIcon={aiUploading ? <CircularProgress size={16} color="inherit" /> : null}
+                  color="success"
+                  size="small"
+                >
+                  {aiUploading ? 'Yukleniyor...' : 'Kabul Et ve Yukle'}
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAiDialogOpen(false)} disabled={aiGenerating || aiUploading}>
+            Kapat
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteConfirm} onClose={() => !deleting && setDeleteConfirm(null)} maxWidth="xs">
-        <DialogTitle>Görseli Sil</DialogTitle>
+        <DialogTitle>Gorseli Sil</DialogTitle>
         <DialogContent>
-          <Typography>Bu görseli silmek istediğinize emin misiniz?</Typography>
+          <Typography>Bu gorseli silmek istediginize emin misiniz?</Typography>
           {deleteConfirm && (
             <Box sx={{ mt: 2, textAlign: 'center' }}>
               <img
                 src={deleteConfirm.url_570xN}
-                alt="Silinecek görsel"
+                alt="Silinecek gorsel"
                 style={{ maxWidth: 160, borderRadius: 8 }}
               />
             </Box>
@@ -534,7 +798,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirm(null)} disabled={deleting}>
-            İptal
+            Iptal
           </Button>
           <Button onClick={handleDelete} color="error" variant="contained" disabled={deleting}>
             {deleting ? <CircularProgress size={20} /> : 'Sil'}

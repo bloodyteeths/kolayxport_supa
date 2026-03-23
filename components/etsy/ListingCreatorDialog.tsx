@@ -31,6 +31,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import { toast } from 'react-hot-toast';
 import SEOIndicator from './SEOIndicator';
 import type { MarketResearchData } from './MarketResearch';
@@ -172,6 +173,14 @@ export default function ListingCreatorDialog({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // AI image generation
+  const [aiImagePrompt, setAiImagePrompt] = useState('');
+  const [aiImageRefFile, setAiImageRefFile] = useState<File | null>(null);
+  const [aiImageRefPreview, setAiImageRefPreview] = useState<string | null>(null);
+  const [aiImageGenerating, setAiImageGenerating] = useState(false);
+  const [aiImageResult, setAiImageResult] = useState<{ base64: string; mimeType: string } | null>(null);
+  const aiImageRefInputRef = useRef<HTMLInputElement>(null);
 
   // AI state
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
@@ -342,6 +351,10 @@ export default function ListingCreatorDialog({
     setUploadTotal(0);
     setAiTagSuggestions([]);
     setQuickStartKeyword('');
+    setAiImagePrompt('');
+    setAiImageRefFile(null);
+    setAiImageRefPreview(null);
+    setAiImageResult(null);
   }, []);
 
   const handleClose = () => {
@@ -415,6 +428,74 @@ export default function ListingCreatorDialog({
   // --------------------------------------------------
   // File handling
   // --------------------------------------------------
+  // --------------------------------------------------
+  // AI Image Generation (for new listings)
+  // --------------------------------------------------
+  const handleAiImageGenerate = async () => {
+    if (!aiImagePrompt.trim()) {
+      toast.error('Bir prompt girin');
+      return;
+    }
+
+    setAiImageGenerating(true);
+    setAiImageResult(null);
+    try {
+      const payload: Record<string, any> = {
+        prompt: aiImagePrompt.trim(),
+      };
+
+      if (aiImageRefFile) {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(aiImageRefFile);
+        });
+        payload.reference_image = base64;
+        payload.reference_mime_type = aiImageRefFile.type;
+      }
+
+      const res = await fetch('/api/ai/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Gorsel olusturulamadi');
+      }
+
+      const data = await res.json();
+      if (data.image_base64) {
+        setAiImageResult({ base64: data.image_base64, mimeType: data.mime_type || 'image/png' });
+        toast.success('Gorsel olusturuldu!');
+      } else {
+        throw new Error(data.text || 'Gorsel olusturulamadi');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'AI gorsel olusturma hatasi');
+    } finally {
+      setAiImageGenerating(false);
+    }
+  };
+
+  const handleAiImageAccept = () => {
+    if (!aiImageResult || selectedFiles.length >= 10) return;
+
+    // Convert base64 to File
+    const byteStr = atob(aiImageResult.base64);
+    const arr = new Uint8Array(byteStr.length);
+    for (let i = 0; i < byteStr.length; i++) arr[i] = byteStr.charCodeAt(i);
+    const blob = new Blob([arr], { type: aiImageResult.mimeType });
+    const file = new File([blob], `ai-generated-${Date.now()}.png`, { type: aiImageResult.mimeType });
+
+    setSelectedFiles((prev) => [...prev, file]);
+    setAiImageResult(null);
+    setAiImagePrompt('');
+    toast.success('AI gorseli eklendi');
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -1030,8 +1111,10 @@ export default function ListingCreatorDialog({
   const renderStep3 = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="body2" color="text.secondary">
-        Listing olusturulduktan sonra gorseller yuklenecektir. Ilk gorsel kapak gorseli olarak kullanilir.
+        Ilk gorsel kapak gorseli olarak kullanilir. Etsy icin 2000x2000px oneriliyor.
       </Typography>
+
+      {/* File upload + AI generate buttons */}
       <input
         ref={fileInputRef}
         type="file"
@@ -1040,28 +1123,43 @@ export default function ListingCreatorDialog({
         hidden
         onChange={handleFileSelect}
       />
-      <Button
-        variant="outlined"
-        startIcon={<CloudUploadIcon />}
-        onClick={() => fileInputRef.current?.click()}
-        disabled={selectedFiles.length >= 10}
-      >
-        Gorsel Sec ({selectedFiles.length}/10)
-      </Button>
+      <input
+        ref={aiImageRefInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          setAiImageRefFile(file);
+          setAiImageRefPreview(URL.createObjectURL(file));
+        }}
+      />
 
-      {selectedFiles.length === 0 && (
-        <Alert severity="warning" sx={{ mt: 1 }}>
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Button
+          variant="outlined"
+          startIcon={<CloudUploadIcon />}
+          onClick={() => fileInputRef.current?.click()}
+          disabled={selectedFiles.length >= 10}
+        >
+          Gorsel Sec ({selectedFiles.length}/10)
+        </Button>
+      </Box>
+
+      {selectedFiles.length === 0 && !aiImageResult && (
+        <Alert severity="warning">
           Etsy listingi yayinlamak icin en az 1 gorsel gereklidir. Gorselsiz sadece taslak olusturulabilir.
         </Alert>
       )}
 
+      {/* Uploaded file previews */}
       {previews.length > 0 && (
         <Box
           sx={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
             gap: 1.5,
-            mt: 1,
           }}
         >
           {previews.map((src, i) => (
@@ -1078,12 +1176,7 @@ export default function ListingCreatorDialog({
               <img
                 src={src}
                 alt={`Gorsel ${i + 1}`}
-                style={{
-                  width: '100%',
-                  height: 120,
-                  objectFit: 'cover',
-                  display: 'block',
-                }}
+                style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
               />
               <IconButton
                 size="small"
@@ -1118,6 +1211,119 @@ export default function ListingCreatorDialog({
           ))}
         </Box>
       )}
+
+      <Divider />
+
+      {/* AI Image Generation Section */}
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 2,
+          borderColor: '#c084fc',
+          background: 'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+          <AutoFixHighIcon sx={{ color: '#a855f7', fontSize: 20 }} />
+          <Typography variant="subtitle2" color="#7c3aed">
+            AI ile Gorsel Olustur
+          </Typography>
+        </Box>
+
+        <TextField
+          label="Prompt"
+          placeholder="ornek: Professional product photo of a handmade knitted baby blanket on white background"
+          fullWidth
+          multiline
+          minRows={2}
+          size="small"
+          value={aiImagePrompt}
+          onChange={(e) => setAiImagePrompt(e.target.value)}
+          disabled={aiImageGenerating}
+          sx={{ mb: 1.5 }}
+          helperText="Ingilizce prompt daha iyi sonuc verir. Gorsel 2000x2000px JPEG olarak olusturulur."
+        />
+
+        {/* Reference image */}
+        <Box sx={{ mb: 1.5 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+            Referans Gorsel (opsiyonel — benzer stil/urun icin)
+          </Typography>
+          {!aiImageRefPreview ? (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => aiImageRefInputRef.current?.click()}
+              disabled={aiImageGenerating}
+              startIcon={<AddPhotoAlternateIcon />}
+              sx={{ borderColor: '#c084fc', color: '#7c3aed' }}
+            >
+              Referans Sec
+            </Button>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <img
+                src={aiImageRefPreview}
+                alt="Referans"
+                style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
+              />
+              <Button
+                size="small"
+                color="error"
+                onClick={() => {
+                  setAiImageRefFile(null);
+                  setAiImageRefPreview(null);
+                  if (aiImageRefInputRef.current) aiImageRefInputRef.current.value = '';
+                }}
+              >
+                Kaldir
+              </Button>
+            </Box>
+          )}
+        </Box>
+
+        <Button
+          variant="contained"
+          fullWidth
+          onClick={handleAiImageGenerate}
+          disabled={aiImageGenerating || !aiImagePrompt.trim() || selectedFiles.length >= 10}
+          startIcon={aiImageGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
+          sx={{ bgcolor: '#a855f7', '&:hover': { bgcolor: '#9333ea' } }}
+        >
+          {aiImageGenerating ? 'Olusturuluyor...' : 'Gorsel Olustur'}
+        </Button>
+
+        {/* AI result preview */}
+        {aiImageResult && (
+          <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Typography variant="subtitle2" gutterBottom>Olusturulan Gorsel:</Typography>
+            <img
+              src={`data:${aiImageResult.mimeType};base64,${aiImageResult.base64}`}
+              alt="AI gorsel"
+              style={{
+                maxWidth: '100%',
+                maxHeight: 250,
+                borderRadius: 8,
+                border: '2px solid #a855f7',
+              }}
+            />
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1.5 }}>
+              <Button variant="outlined" onClick={handleAiImageGenerate} disabled={aiImageGenerating} size="small">
+                Tekrar Olustur
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleAiImageAccept}
+                disabled={selectedFiles.length >= 10}
+                color="success"
+                size="small"
+              >
+                Kabul Et ve Ekle
+              </Button>
+            </Box>
+          </Box>
+        )}
+      </Paper>
     </Box>
   );
 

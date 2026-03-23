@@ -390,6 +390,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
   const [shippingCost, setShippingCost] = useState('');
   const [includeOffsiteAds, setIncludeOffsiteAds] = useState(false);
   const [shopRegion, setShopRegion] = useState<'us' | 'tr'>('tr'); // US vs Turkey fee structure
+  const [etsyAdsRoas, setEtsyAdsRoas] = useState(''); // Etsy Ads ROAS (e.g. 3 = $3 revenue per $1 spent)
+  const [shopDiscoveryFailed, setShopDiscoveryFailed] = useState(false);
 
   // --- selected listing from user's shop ---
   const [selectedListingId, setSelectedListingId] = useState<number | null>(null);
@@ -526,7 +528,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
       if (!res.ok) throw new Error('Magaza bilgileri alinamadi');
       const data = await res.json();
       setDiscoveredShops(data.shops || []);
-    } catch (err: any) { console.error('Shop discovery error:', err); }
+      setShopDiscoveryFailed(false);
+    } catch (err: any) { console.error('Shop discovery error:', err); toast.error('Mağaza bilgileri alınamadı — tekrar deneyin'); setShopDiscoveryFailed(true); }
     finally { setShopsLoading(false); }
   }, []);
 
@@ -551,6 +554,15 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
     } catch (err: any) { toast.error(err.message); }
     finally { setDeepDiveLoading(false); }
   }, [deepDiveShopId]);
+
+  // Auto-trigger deep dive when shop ID is set from shop table click
+  const prevDeepDiveRef = useRef(deepDiveShopId);
+  useEffect(() => {
+    if (deepDiveShopId && deepDiveShopId !== prevDeepDiveRef.current && tab === 102) {
+      searchShopDeepDive();
+    }
+    prevDeepDiveRef.current = deepDiveShopId;
+  }, [deepDiveShopId, tab, searchShopDeepDive]);
 
   const generateAiInsights = useCallback(async () => {
     if (items.length === 0) { toast.error('Oncelikle bir arama yapin'); return; }
@@ -608,8 +620,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
 
   // --- NEW: Trend Analysis ---
   const fetchTrends = useCallback(async () => {
-    const kw = query.trim();
-    if (!kw) { toast.error('Oncelikle ana aramada bir kelime girin'); return; }
+    const kw = query.trim() || kwExplorerQuery.trim();
+    if (!kw) { toast.error('Önce bir anahtar kelime girin'); return; }
     setTrendLoading(true);
     setSeasonalLoading(true);
     try {
@@ -629,7 +641,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
       toast.success('Trend verileri yuklendi');
     } catch (err: any) { toast.error(err.message); }
     finally { setTrendLoading(false); setSeasonalLoading(false); }
-  }, [query]);
+  }, [query, kwExplorerQuery]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') searchMarket();
@@ -782,9 +794,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
 
     const totalSales = shops.reduce((s, sh) => s + sh.num_sales, 0);
     const avgRating = shops.reduce((s, sh) => s + sh.review_average, 0) / shops.length;
-    const top5Sales = shops.slice(0, 5).reduce((s, sh) => s + sh.listingCount, 0);
+    const totalActiveListings = shops.reduce((s, sh) => s + (sh.listing_active_count || 0), 0);
+    const top5ActiveListings = shops.slice(0, 5).reduce((s, sh) => s + (sh.listing_active_count || 0), 0);
 
-    return { shops, totalSales, avgRating: Math.round(avgRating * 100) / 100, top5Sales, totalListings: items.length };
+    return { shops, totalSales, avgRating: Math.round(avgRating * 100) / 100, top5Sales: top5ActiveListings, totalListings: totalActiveListings };
   }, [discoveredShops, items]);
 
   // ---------------------------------------------------------------------------
@@ -913,13 +926,16 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
     const cost = parseFloat(purchaseCost) || 0;
     const sell = parseFloat(sellingPrice) || (priceStats?.avg || 0);
     const ship = parseFloat(shippingCost) || 0;
+    const roas = parseFloat(etsyAdsRoas) || 0;
     const listingFee = fees.listingFee;
     const transactionFee = sell * fees.transactionRate;
     const paymentProcessing = sell * fees.paymentProcessingRate + fees.paymentProcessingFixed;
     const regulatoryFee = sell * fees.regulatoryFee;
     const offsiteAdsFee = includeOffsiteAds ? sell * fees.offsiteAdsRate : 0;
+    // Etsy Ads: ROAS = revenue / ad spend → ad spend per sale = sell / ROAS
+    const etsyAdsCost = roas > 0 ? sell / roas : 0;
     const totalFees = listingFee + transactionFee + paymentProcessing + regulatoryFee + offsiteAdsFee;
-    const profit = sell - cost - ship - totalFees;
+    const profit = sell - cost - ship - totalFees - etsyAdsCost;
     const margin = sell > 0 ? (profit / sell) * 100 : 0;
     const compare = [-20, 0, 20].map(delta => {
       const p = sell * (1 + delta / 100);
@@ -927,14 +943,15 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
       const pp = p * fees.paymentProcessingRate + fees.paymentProcessingFixed;
       const rf = p * fees.regulatoryFee;
       const oa = includeOffsiteAds ? p * fees.offsiteAdsRate : 0;
-      const pr = p - cost - ship - fees.listingFee - tf - pp - rf - oa;
+      const adCost = roas > 0 ? p / roas : 0;
+      const pr = p - cost - ship - fees.listingFee - tf - pp - rf - oa - adCost;
       return {
         label: delta === 0 ? 'Ortalama' : delta < 0 ? `${delta}%` : `+${delta}%`,
         price: p, profit: pr, margin: p > 0 ? (pr / p) * 100 : 0,
       };
     });
-    return { cost, sell, ship, listingFee, transactionFee, paymentProcessing, regulatoryFee, offsiteAdsFee, totalFees, profit, margin, compare, fees };
-  }, [purchaseCost, sellingPrice, shippingCost, priceStats, includeOffsiteAds, shopRegion, FEE_PROFILES]);
+    return { cost, sell, ship, listingFee, transactionFee, paymentProcessing, regulatoryFee, offsiteAdsFee, etsyAdsCost, roas, totalFees, profit, margin, compare, fees };
+  }, [purchaseCost, sellingPrice, shippingCost, priceStats, includeOffsiteAds, shopRegion, FEE_PROFILES, etsyAdsRoas]);
 
   useEffect(() => {
     if (priceStats && !sellingPrice) setSellingPrice(priceStats.avg.toFixed(2));
@@ -1088,15 +1105,48 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
             sx={{ mb: 1 }}
           />
           {selectedListing && (
-            <Alert severity="success" sx={{ borderRadius: '10px', py: 0.5 }}>
-              <Typography variant="caption">
-                Fiyat, başlık ve taglar otomatik dolduruldu. Aşağıdaki araçları kullanarak analiz edin.
-              </Typography>
-            </Alert>
+            <Box sx={{ mt: 1.5 }}>
+              <Alert severity="success" sx={{ borderRadius: '10px', py: 0.5, mb: 1.5 }}>
+                <Typography variant="caption">
+                  Fiyat ({fmt(profitCalc.sell)}), başlık ve {(selectedListing.tags || []).length} tag otomatik dolduruldu.
+                </Typography>
+              </Alert>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<Search size={14} />}
+                  onClick={() => {
+                    handleSectionChange(1);
+                    setTimeout(() => searchMarket(), 200);
+                  }}
+                  sx={{ background: GRADIENTS.primary, borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
+                >
+                  Rakiplerimi Araştır
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<TrendingUp size={14} />}
+                  onClick={() => {
+                    if (!query.trim() && selectedListing?.tags?.length) {
+                      setQuery(selectedListing.tags[0]);
+                    }
+                    handleSectionChange(1);
+                    setTimeout(() => {
+                      setTab(101);
+                    }, 100);
+                  }}
+                  sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
+                >
+                  Tag & Kelime Analizi
+                </Button>
+              </Box>
+            </Box>
           )}
           {!selectedListing && (
             <Typography variant="caption" color="text.secondary">
-              Bir listeleme seçin — fiyat, başlık ve taglar otomatik olarak doldurulur.
+              Bir listeleme seçin — fiyat, başlık ve taglar otomatik olarak doldurulur, rakip araştırması başlatabilirsiniz.
             </Typography>
           )}
         </Paper>
@@ -1330,8 +1380,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                               <Tooltip title="Ana aramaya gonder">
                                 <IconButton size="small" onClick={() => {
-                                  setQuery(s.keyword); setTab(2);
-                                  setTimeout(() => searchMarket(), 100);
+                                  setQuery(s.keyword);
+                                  setSection(1); setTab(100);
+                                  setTimeout(() => searchMarket(), 200);
                                 }}>
                                   <ArrowRight size={14} />
                                 </IconButton>
@@ -1385,15 +1436,15 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
               Google Trends + Wikipedia verileri ile arama trendleri ve mevsimsel analiz
             </Typography>
             <Button variant="contained" onClick={fetchTrends}
-              disabled={trendLoading || !query.trim()} size="large"
+              disabled={trendLoading || (!query.trim() && !kwExplorerQuery.trim())} size="large"
               startIcon={trendLoading ? <CircularProgress size={16} /> : <TrendingUp size={16} />}
               sx={{ background: GRADIENTS.success, borderRadius: '12px', px: 4, boxShadow: '0 4px 12px rgba(17,153,142,0.3)' }}
             >
               {trendLoading ? 'Analiz ediliyor...' : 'Trend Analizi Baslat'}
             </Button>
-            {!query.trim() && (
+            {!query.trim() && !kwExplorerQuery.trim() && (
               <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-                Oncelikle ana arama alanina bir kelime girin
+                Önce "Kelime Keşif" sekmesinde bir anahtar kelime arayın
               </Typography>
             )}
           </Paper>
@@ -1841,10 +1892,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                 </Paper>
               )}
             </>
-          ) : !loading && <PremiumEmptyState icon={<Hash size={48} />} title="Kelime & Tag Analizi"
-              desc="Rakiplerin kullandığı tagları ve anahtar kelimeleri keşfedin."
-              steps={['Önce bir anahtar kelime araması yapın', 'Rakiplerin en çok kullandığı taglar ve kelimeler listelenir', 'Eksiklerinizi görün — tıklayarak kopyalayın']}
-            />}
+          ) : !loading && (
+            hasData
+              ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Aramanızda tag verisi bulunamadı. Farklı bir anahtar kelime deneyin.</Alert>
+              : <PremiumEmptyState icon={<Hash size={48} />} title="Kelime & Tag Analizi"
+                  desc="Rakiplerin kullandığı tagları ve anahtar kelimeleri keşfedin."
+                  steps={['Önce bir anahtar kelime araması yapın', 'Rakiplerin en çok kullandığı taglar ve kelimeler listelenir', 'Eksiklerinizi görün — tıklayarak kopyalayın']}
+                />
+          )}
 
           {/* --- Keywords (merged from tab 4) --- */}
           {hasData && (
@@ -1989,7 +2044,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                             <Typography variant="body2" sx={{
                               fontWeight: 600, cursor: 'pointer',
                               '&:hover': { textDecoration: 'underline', color: 'primary.main' },
-                            }} onClick={() => { setDeepDiveShopId(String(s.shop_id)); setTab(7); }}>
+                            }} onClick={() => { setDeepDiveShopId(String(s.shop_id)); }}>
                               {s.shop_name}
                             </Typography>
                           </TableCell>
@@ -2015,12 +2070,18 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
               </Paper>
             </>
           ) : !shopsLoading && (
-            hasData
-              ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Magaza bilgileri yukleniyor...</Alert>
-              : <PremiumEmptyState icon={<Users size={48} />} title="Mağaza Analizi"
-                  desc="Aynı nişte satan mağazaları keşfedin."
-                  steps={['Bir anahtar kelime araması yapın', 'Aramanızla ilgili mağazalar otomatik bulunur', 'Satış sayısı, puan ve ortalama fiyatlarını karşılaştırın']}
-                />
+            shopDiscoveryFailed && serverShopIds.length > 0
+              ? <Alert severity="error" sx={{ borderRadius: '12px', mb: 2 }}
+                  action={<Button color="inherit" size="small" onClick={() => discoverShops(serverShopIds)}>Tekrar Dene</Button>}
+                >
+                  Mağaza bilgileri alınamadı. Tekrar deneyin.
+                </Alert>
+              : hasData
+                ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Mağaza bilgileri yükleniyor...</Alert>
+                : <PremiumEmptyState icon={<Users size={48} />} title="Mağaza Analizi"
+                    desc="Aynı nişte satan mağazaları keşfedin."
+                    steps={['Bir anahtar kelime araması yapın', 'Aramanızla ilgili mağazalar otomatik bulunur', 'Satış sayısı, puan ve ortalama fiyatlarını karşılaştırın']}
+                  />
           )}
           {/* --- Shop Deep Dive (merged from tab 7) --- */}
           <Divider sx={{ my: 3 }} />
@@ -2145,7 +2206,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
         <Box>
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Etsy Kâr Hesaplayıcı</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                Etsy Kâr Hesaplayıcı
+                {selectedListing && (
+                  <Typography component="span" variant="caption" color="primary" sx={{ ml: 1, fontWeight: 500 }}>
+                    — {selectedListing.title?.slice(0, 40)}...
+                  </Typography>
+                )}
+              </Typography>
               {/* Region selector */}
               <Box sx={{ display: 'flex', gap: 0.5 }}>
                 <Button
@@ -2185,12 +2253,23 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                 onChange={e => setSellingPrice(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-                helperText={priceStats ? `Pazar ortalaması: ${fmt(priceStats.avg)}` : 'Fiyat girin veya pazar araştırması yapın'}
+                helperText={selectedListing ? 'Listelemedeki fiyat' : priceStats ? `Pazar ortalaması: ${fmt(priceStats.avg)}` : 'Fiyat girin veya üstten listeleme seçin'}
               />
               <TextField label="Kargo Maliyeti ($)" value={shippingCost}
                 onChange={e => setShippingCost(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1 }}>
+              <TextField label="Etsy Ads ROAS" value={etsyAdsRoas}
+                onChange={e => setEtsyAdsRoas(e.target.value)}
+                size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
+                placeholder="ör: 3"
+                helperText={etsyAdsRoas && parseFloat(etsyAdsRoas) > 0
+                  ? `Her $1 reklam harcamasına $${etsyAdsRoas} gelir → satış başı reklam maliyeti: ${fmt(profitCalc.etsyAdsCost)}`
+                  : 'ROAS girin (ör: 3 = $3 gelir / $1 harcama). Boş bırakırsanız reklam maliyeti hesaplanmaz.'
+                }
               />
             </Box>
             <FormControlLabel
@@ -2260,6 +2339,17 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
                         </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.offsiteAdsFee)}</TableCell>
+                    </TableRow>
+                  )}
+                  {profitCalc.roas > 0 && (
+                    <TableRow>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          Etsy Ads Maliyeti (ROAS: {profitCalc.roas}x)
+                          <Tooltip title={`ROAS ${profitCalc.roas}x = her $1 reklam harcamasına $${profitCalc.roas} gelir. Satış başı reklam maliyeti: ${fmt(profitCalc.sell)} / ${profitCalc.roas} = ${fmt(profitCalc.etsyAdsCost)}`}><Info size={14} color="#999" /></Tooltip>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.etsyAdsCost)}</TableCell>
                     </TableRow>
                   )}
                   <TableRow><TableCell>Alış Maliyeti</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.cost)}</TableCell></TableRow>

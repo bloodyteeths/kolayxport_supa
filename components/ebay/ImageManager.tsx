@@ -43,6 +43,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
   // AI Image Generation state
   const [aiOpen, setAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiFollowUp, setAiFollowUp] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiPreview, setAiPreview] = useState<{ base64: string; mimeType: string } | null>(null);
   const [aiRefImage, setAiRefImage] = useState<{ base64: string; mimeType: string } | null>(null);
@@ -566,7 +567,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                   alt="AI Generated"
                   style={{ width: '100%', display: 'block' }}
                 />
-                <Box sx={{ display: 'flex', gap: 1, p: 1.5, bgcolor: '#f9fafb' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 1.5, bgcolor: '#f9fafb' }}>
                   <Button
                     variant="contained"
                     color="success"
@@ -577,14 +578,43 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                   >
                     {aiUploading ? 'Ekleniyor...' : 'Listeye Ekle'}
                   </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={handleAIGenerate}
-                    disabled={aiGenerating}
+
+                  {/* Follow-up prompt for regeneration */}
+                  <TextField
+                    value={aiFollowUp}
+                    onChange={(e) => setAiFollowUp(e.target.value)}
+                    size="small"
                     fullWidth
-                  >
-                    Yeniden Olustur
-                  </Button>
+                    placeholder="Degisiklik istegi yazin... (bos birakirsaniz ayni prompt kullanilir)"
+                    disabled={aiGenerating}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (aiFollowUp.trim()) {
+                          setAiPrompt(aiFollowUp.trim());
+                          setAiFollowUp('');
+                        }
+                        handleAIGenerate();
+                      }
+                    }}
+                  />
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        if (aiFollowUp.trim()) {
+                          setAiPrompt(aiFollowUp.trim());
+                          setAiFollowUp('');
+                        }
+                        handleAIGenerate();
+                      }}
+                      disabled={aiGenerating}
+                      startIcon={aiGenerating ? <CircularProgress size={14} /> : undefined}
+                      fullWidth
+                    >
+                      {aiFollowUp.trim() ? 'Degisiklikle Olustur' : 'Ayni Promptla Yeniden'}
+                    </Button>
+                  </Box>
                 </Box>
               </Box>
             )}

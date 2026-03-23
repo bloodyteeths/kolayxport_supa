@@ -11,12 +11,12 @@ import { FAQPageJsonLd } from 'next-seo';
 // Placeholder data - replace with your actual data or fetch from an API
 const trustLogos = [
   { name: 'Amazon', src: '/logos/amazon.svg', width: 120, height: 40 },
-  { name: 'Trendyol', src: '/logos/trendyol.png', width: 140, height: 40 },
-  { name: 'Hepsiburada', src: '/logos/hepsiburada.png', width: 160, height: 40 },
-  { name: 'n11', src: '/logos/n11.svg', width: 80, height: 40 },
-  { name: 'Shopify', src: '/logos/shopify.svg', width: 130, height: 40 },
-  { name: 'WooCommerce', src: '/logos/woocommerce.svg', width: 180, height: 40 },
-  { name: 'Etsy', src: '/logos/etsy.svg', width: 100, height: 40 },
+  { name: 'Trendyol', src: '/logos/trendyol.png', width: 120, height: 40 },
+  { name: 'Hepsiburada', src: '/logos/hepsiburada.png', width: 120, height: 40 },
+  { name: 'n11', src: '/logos/n11.png', width: 120, height: 40 },
+  { name: 'Shopify', src: '/logos/shopify.jpg', width: 120, height: 40 },
+  { name: 'WooCommerce', src: '/logos/woocommerce.svg', width: 140, height: 40 },
+  { name: 'Etsy', src: '/logos/etsy.svg', width: 80, height: 40 },
 ];
 
 const features = [
@@ -185,12 +185,12 @@ export default function HomePage() {
           <div className="flex flex-wrap justify-center items-center gap-x-8 gap-y-6 md:gap-x-12 lg:gap-x-16">
             {trustLogos.map((logo) => (
               <motion.div key={logo.name} whileHover={{ scale: 1.05 }}>
-                <Image 
-                  src={logo.src} 
-                  alt={`${logo.name} marketplace entegrasyonu`} 
-                  width={logo.width} 
-                  height={logo.height} 
-                  className="h-8 md:h-10 object-contain filter grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-300 ease-in-out"
+                <Image
+                  src={logo.src}
+                  alt={`${logo.name} marketplace entegrasyonu`}
+                  width={logo.width}
+                  height={logo.height}
+                  className="h-8 md:h-10 w-auto max-w-[120px] md:max-w-[140px] object-contain filter grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-300 ease-in-out"
                   loading="lazy"
                 />
               </motion.div>

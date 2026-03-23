@@ -180,6 +180,7 @@ export default function ListingCreatorDialog({
   const [aiImageRefPreview, setAiImageRefPreview] = useState<string | null>(null);
   const [aiImageGenerating, setAiImageGenerating] = useState(false);
   const [aiImageResult, setAiImageResult] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [aiImageFollowUp, setAiImageFollowUp] = useState('');
   const aiImageRefInputRef = useRef<HTMLInputElement>(null);
 
   // AI state
@@ -355,6 +356,7 @@ export default function ListingCreatorDialog({
     setAiImageRefFile(null);
     setAiImageRefPreview(null);
     setAiImageResult(null);
+    setAiImageFollowUp('');
   }, []);
 
   const handleClose = () => {
@@ -1295,21 +1297,56 @@ export default function ListingCreatorDialog({
 
         {/* AI result preview */}
         {aiImageResult && (
-          <Box sx={{ mt: 2, textAlign: 'center' }}>
-            <Typography variant="subtitle2" gutterBottom>Olusturulan Gorsel:</Typography>
-            <img
-              src={`data:${aiImageResult.mimeType};base64,${aiImageResult.base64}`}
-              alt="AI gorsel"
-              style={{
-                maxWidth: '100%',
-                maxHeight: 250,
-                borderRadius: 8,
-                border: '2px solid #a855f7',
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" gutterBottom sx={{ textAlign: 'center' }}>Olusturulan Gorsel:</Typography>
+            <Box sx={{ textAlign: 'center' }}>
+              <img
+                src={`data:${aiImageResult.mimeType};base64,${aiImageResult.base64}`}
+                alt="AI gorsel"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: 250,
+                  borderRadius: 8,
+                  border: '2px solid #a855f7',
+                }}
+              />
+            </Box>
+
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Degisiklik istegi: ornek: make background white, add soft shadow..."
+              value={aiImageFollowUp}
+              onChange={(e) => setAiImageFollowUp(e.target.value)}
+              disabled={aiImageGenerating}
+              sx={{ mt: 1.5 }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !aiImageGenerating) {
+                  e.preventDefault();
+                  if (aiImageFollowUp.trim()) {
+                    setAiImagePrompt(`${aiImagePrompt}. Additional changes: ${aiImageFollowUp.trim()}`);
+                    setAiImageFollowUp('');
+                  }
+                  handleAiImageGenerate();
+                }
               }}
             />
-            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1.5 }}>
-              <Button variant="outlined" onClick={handleAiImageGenerate} disabled={aiImageGenerating} size="small">
-                Tekrar Olustur
+
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1, flexWrap: 'wrap' }}>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  if (aiImageFollowUp.trim()) {
+                    setAiImagePrompt(`${aiImagePrompt}. Additional changes: ${aiImageFollowUp.trim()}`);
+                    setAiImageFollowUp('');
+                  }
+                  handleAiImageGenerate();
+                }}
+                disabled={aiImageGenerating}
+                size="small"
+                startIcon={aiImageGenerating ? <CircularProgress size={14} /> : null}
+              >
+                {aiImageFollowUp.trim() ? 'Degisiklikle Olustur' : 'Ayni Promptla Olustur'}
               </Button>
               <Button
                 variant="contained"

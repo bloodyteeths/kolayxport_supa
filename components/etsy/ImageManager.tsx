@@ -72,6 +72,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiResult, setAiResult] = useState<{ base64: string; mimeType: string } | null>(null);
   const [aiUploading, setAiUploading] = useState(false);
+  const [aiFollowUp, setAiFollowUp] = useState('');
   const aiRefInputRef = useRef<HTMLInputElement>(null);
 
   const sortedImages = [...(images || [])].sort((a, b) => a.rank - b.rank);
@@ -231,6 +232,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     setAiRefFile(null);
     setAiRefPreview(null);
     setAiResult(null);
+    setAiFollowUp('');
     setAiDialogOpen(true);
   };
 
@@ -739,26 +741,59 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
           {/* Result preview */}
           {aiResult && (
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
-              <Typography variant="subtitle2" gutterBottom>Olusturulan Gorsel:</Typography>
-              <img
-                src={`data:${aiResult.mimeType};base64,${aiResult.base64}`}
-                alt="AI gorsel"
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: 300,
-                  borderRadius: 8,
-                  border: '2px solid #a855f7',
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ textAlign: 'center' }}>Olusturulan Gorsel:</Typography>
+              <Box sx={{ textAlign: 'center' }}>
+                <img
+                  src={`data:${aiResult.mimeType};base64,${aiResult.base64}`}
+                  alt="AI gorsel"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: 300,
+                    borderRadius: 8,
+                    border: '2px solid #a855f7',
+                  }}
+                />
+              </Box>
+
+              {/* Follow-up prompt for regeneration */}
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Degisiklik istegi: ornek: make the background darker, add more contrast..."
+                value={aiFollowUp}
+                onChange={(e) => setAiFollowUp(e.target.value)}
+                disabled={aiGenerating}
+                sx={{ mt: 1.5 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !aiGenerating) {
+                    e.preventDefault();
+                    // Use follow-up as new prompt with reference to current result
+                    const followUpPrompt = aiFollowUp.trim()
+                      ? `${aiPrompt}. Additional changes: ${aiFollowUp.trim()}`
+                      : aiPrompt;
+                    setAiPrompt(followUpPrompt);
+                    setAiFollowUp('');
+                    handleAiGenerate();
+                  }
                 }}
               />
-              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1.5 }}>
+
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1, flexWrap: 'wrap' }}>
                 <Button
                   variant="outlined"
-                  onClick={handleAiGenerate}
+                  onClick={() => {
+                    if (aiFollowUp.trim()) {
+                      setAiPrompt(`${aiPrompt}. Additional changes: ${aiFollowUp.trim()}`);
+                      setAiFollowUp('');
+                    }
+                    handleAiGenerate();
+                  }}
                   disabled={aiGenerating}
                   size="small"
+                  startIcon={aiGenerating ? <CircularProgress size={14} /> : null}
                 >
-                  Tekrar Olustur
+                  {aiFollowUp.trim() ? 'Degisiklikle Olustur' : 'Ayni Promptla Olustur'}
                 </Button>
                 <Button
                   variant="contained"

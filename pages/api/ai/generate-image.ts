@@ -62,7 +62,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       contents: [{ role: 'user', parts }],
       config: {
         responseModalities: ['IMAGE', 'TEXT'],
-        responseMimeType: 'image/png',
       },
     });
 

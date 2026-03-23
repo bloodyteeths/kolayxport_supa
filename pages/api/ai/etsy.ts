@@ -115,7 +115,7 @@ ETSY TITLE OPTIMIZATION BEST PRACTICES (2026):
 - Include long-tail keyword phrases that match buyer search intent (e.g., "personalized gift for mom" not just "gift").
 
 CRITICAL FORMATTING RULES:
-- CAPITALIZATION: Only capitalize the FIRST letter of the title. The rest must be lowercase. Example: "Personalized baby name sign, nursery wall decor, custom wood sign for newborn" — NOT "Personalized Baby Name Sign".
+- CAPITALIZATION: Use Title Case — capitalize the first letter of each significant word. Small words like "for", "of", "the", "and", "with", "to", "in", "on", "a", "an" stay lowercase (unless they start the title). Example: "Personalized Baby Name Sign, Nursery Wall Decor, Custom Wood Sign for Newborn".
 - SEPARATORS: Use ONLY commas (,) to separate keyword phrases. Do NOT use dashes (-), pipes (|), slashes (/), colons (:), or other special characters — they waste character count and hurt readability.
 - Every character counts. Maximize keyword space by avoiding unnecessary punctuation or symbols.
 
@@ -144,8 +144,19 @@ Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
     optimizedTitle = optimizedTitle.replace(/\s*[|/:\\-–—]\s*/g, ', ');
     // Clean up double commas
     optimizedTitle = optimizedTitle.replace(/,\s*,/g, ',');
-    // Enforce lowercase except first letter
-    optimizedTitle = optimizedTitle.charAt(0).toUpperCase() + optimizedTitle.slice(1).toLowerCase();
+    // Enforce Title Case: capitalize first letter of each significant word
+    const smallWords = new Set(['for', 'of', 'the', 'and', 'with', 'to', 'in', 'on', 'a', 'an', 'by', 'or', 'at']);
+    optimizedTitle = optimizedTitle
+      .split(' ')
+      .map((word, i) => {
+        const lower = word.toLowerCase();
+        // Always capitalize first word; capitalize others unless they're small words
+        if (i === 0 || !smallWords.has(lower.replace(/,/g, ''))) {
+          return lower.charAt(0).toUpperCase() + lower.slice(1).toLowerCase();
+        }
+        return lower;
+      })
+      .join(' ');
     // Trim to 140 chars
     if (optimizedTitle.length > 140) {
       optimizedTitle = optimizedTitle.substring(0, 140).replace(/,\s*$/, '');
@@ -310,7 +321,7 @@ async function handleBulkOptimize(body: any) {
 ETSY SEO BEST PRACTICES (2026):
 - Etsy uses a hybrid AI + keyword matching search (XWalk system). Tags, titles, and descriptions all contribute to ranking.
 - TITLES: Front-load high-volume keywords in first 40 chars. Aim for 100-140 chars. Natural, readable phrasing — no keyword stuffing.
-  - CAPITALIZATION: Only capitalize the FIRST letter. Rest lowercase. Example: "Personalized baby name sign, nursery wall decor, custom wood sign"
+  - CAPITALIZATION: Use Title Case — capitalize first letter of each significant word. Example: "Personalized Baby Name Sign, Nursery Wall Decor, Custom Wood Sign for Newborn"
   - SEPARATORS: Use ONLY commas to separate phrases. No dashes, pipes, slashes, or colons — they waste characters.
 - TAGS: Each tag up to 20 characters, use all 13 slots. Multi-word long-tail tags outperform single words. Don't repeat title words in tags.
 - DESCRIPTIONS: First 160 chars = meta preview. Include keywords naturally in first 2 paragraphs. Short paragraphs, mobile-friendly.

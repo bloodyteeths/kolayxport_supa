@@ -1492,63 +1492,59 @@ function EbayListingsPage() {
         onCompleted={() => { setFindReplaceOpen(false); fetchListings(); }}
       />
 
-      {/* Smart Pricing Dialog */}
-      <SmartPricing
-        open={smartPricingOpen}
-        onClose={() => setSmartPricingOpen(false)}
-        listings={filteredListings.map((l) => ({
-          sku: l.sku,
-          offerId: l.offerId,
-          title: l.title,
-          price: l.price,
-          quantity: l.quantity,
-        }))}
-        userId={userId}
-      />
+      {/* Smart Pricing */}
+      {smartPricingOpen && (
+        <SmartPricing
+          listings={filteredListings.map((l) => ({
+            sku: l.sku,
+            offerId: l.offerId,
+            title: l.title,
+            price: l.price,
+            quantity: l.quantity,
+          }))}
+          userId={userId}
+          onPriceUpdate={() => { setSmartPricingOpen(false); fetchListings(); }}
+        />
+      )}
 
-      {/* Duplicate Detector Dialog */}
-      <DuplicateDetector
-        open={duplicateDetectorOpen}
-        onClose={() => setDuplicateDetectorOpen(false)}
-        listings={filteredListings.map((l) => ({
-          sku: l.sku,
-          offerId: l.offerId,
-          title: l.title,
-          description: l.description,
-          price: l.price,
-          quantity: l.quantity,
-          status: l.status,
-          condition: l.condition,
-        }))}
-        userId={userId}
-        onEdit={(sku) => handleOpenEditor(sku)}
-        onCompleted={() => {
-          setDuplicateDetectorOpen(false);
-          fetchListings();
-        }}
-      />
+      {/* Duplicate Detector */}
+      {duplicateDetectorOpen && (
+        <DuplicateDetector
+          listings={filteredListings.map((l) => ({
+            sku: l.sku,
+            offerId: l.offerId,
+            title: l.title,
+            description: l.description,
+            price: l.price,
+            quantity: l.quantity,
+            status: l.status,
+            condition: l.condition,
+          }))}
+          onSelect={(sku) => handleOpenEditor(sku)}
+        />
+      )}
 
-      {/* Backup Manager Dialog */}
-      <BackupManager
-        open={backupManagerOpen}
-        onClose={() => setBackupManagerOpen(false)}
-        userId={userId}
-        onRestored={() => {
-          setBackupManagerOpen(false);
-          fetchListings();
-        }}
-      />
+      {/* Backup Manager */}
+      {backupManagerOpen && (
+        <BackupManager
+          listings={filteredListings}
+          userId={userId}
+        />
+      )}
 
-      {/* Listing Templates Dialog */}
-      <ListingTemplates
-        open={templatesOpen}
-        onClose={() => setTemplatesOpen(false)}
-        userId={userId}
-        onApplied={() => {
-          setTemplatesOpen(false);
-          fetchListings();
-        }}
-      />
+      {/* Listing Templates */}
+      {templatesOpen && (
+        <ListingTemplates
+          listings={filteredListings.map(l => ({
+            ...l,
+            price: parseFloat(l.price?.value || '0'),
+          }))}
+          onApply={() => {
+            setTemplatesOpen(false);
+            fetchListings();
+          }}
+        />
+      )}
 
       {/* Scheduled Updates Dialog */}
       <ScheduledUpdateDialog
@@ -1556,9 +1552,9 @@ function EbayListingsPage() {
         onClose={() => setScheduledOpen(false)}
         userId={userId}
         listings={filteredListings}
-        onScheduled={(count) => {
-          setScheduledCount(count);
+        onExecuted={() => {
           setScheduledOpen(false);
+          fetchListings();
         }}
       />
 

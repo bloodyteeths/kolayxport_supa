@@ -49,6 +49,7 @@
     "dayjs": "^1.11.13",
     "framer-motion": "^12.10.0",
     "google-auth-library": "^9.15.1",
+    "google-trends-api": "^4.9.2",
     "googleapis": "^148.0.0",
     "iyzipay": "^2.0.64",
     "lucide-react": "^0.507.0",

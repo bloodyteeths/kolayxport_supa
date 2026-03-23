@@ -47,6 +47,9 @@ model User {
   trackingSubmissions TrackingSubmission[] @relation("UserTrackingSubmissions")
   senkronOrderData    SenkronOrderData[] @relation("UserSenkronData")
   etsyShops           EtsyShop[] @relation("UserEtsyShops")
+  ebayTrackedProducts EbayTrackedProduct[]
+  ebayTrackedSellers  EbayTrackedSeller[]
+  ebayNicheResearch   EbayNicheResearch[]
 }
 
 model Account {
@@ -468,4 +471,91 @@ model EtsyShop {
 model WebhookEvent {
   id        String   @id
   createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// eBay Product Intelligence
+// ---------------------------------------------------------------------------
+
+model EbayTrackedProduct {
+  id                String   @id @default(cuid())
+  userId            String
+  legacyItemId      String
+  itemId            String?
+  title             String
+  imageUrl          String?
+  categoryId        String?
+  categoryPath      String?
+  seller            String?
+  condition         String?
+  currentPrice      Float?
+  currency          String   @default("USD")
+  currentQuantity   Int?
+  totalSold         Int?
+  itemWebUrl        String?
+  notes             String?
+  tags              String[]
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastCheckedAt     DateTime?
+  snapshots         EbayPriceSnapshot[]
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, legacyItemId])
+  @@index([userId])
+  @@index([userId, isActive])
+}
+
+model EbayPriceSnapshot {
+  id               String   @id @default(cuid())
+  trackedProductId String
+  price            Float
+  currency         String   @default("USD")
+  quantity         Int?
+  soldQuantity     Int?
+  timestamp        DateTime @default(now())
+  trackedProduct   EbayTrackedProduct @relation(fields: [trackedProductId], references: [id], onDelete: Cascade)
+
+  @@index([trackedProductId])
+  @@index([trackedProductId, timestamp])
+}
+
+model EbayTrackedSeller {
+  id             String   @id @default(cuid())
+  userId         String
+  sellerUsername String
+  feedbackScore  Int?
+  feedbackPct    String?
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastCheckedAt  DateTime?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sellerUsername])
+  @@index([userId])
+}
+
+model EbayNicheResearch {
+  id             String   @id @default(cuid())
+  userId         String
+  query          String
+  categoryId     String?
+  categoryName   String?
+  marketplace    String   @default("EBAY_US")
+  totalResults   Int?
+  avgPrice       Float?
+  medianPrice    Float?
+  uniqueSellers  Int?
+  demandScore    Int?
+  competitionScore Int?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
 }

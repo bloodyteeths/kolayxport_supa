@@ -1430,8 +1430,8 @@ export default async function handler(
       const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
 
       // Browse API filter by seller
-      let url = `/buy/browse/v1/item_summary/search?limit=${limit}&fieldgroups=MATCHING_ITEMS,ASPECT_REFINEMENTS&filter=sellers:{${encodeURIComponent(sellerName)}}`;
-      if (q) url += `&q=${encodeURIComponent(q)}`;
+      // q is required by eBay Browse API; when not provided, use seller name as search term
+      let url = `/buy/browse/v1/item_summary/search?limit=${limit}&fieldgroups=MATCHING_ITEMS,ASPECT_REFINEMENTS&filter=sellers:{${encodeURIComponent(sellerName)}}&q=${encodeURIComponent(q || sellerName)}`;
 
       const response = await fetch(`${EBAY_API_BASE}${url}`, {
         headers: {

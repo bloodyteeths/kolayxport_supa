@@ -76,27 +76,32 @@ async function handleSuggestTags(body: any) {
   const model = getGeminiModel();
   const prompt = `You are a top Etsy SEO specialist. Your job is to suggest research-backed, high-converting Etsy tags.
 
+PRODUCT RELEVANCE (MOST IMPORTANT RULE):
+- Every single tag MUST be directly relevant to THIS SPECIFIC PRODUCT described in the title and description.
+- Read the title carefully — if it says "baby girl dress", every tag must relate to baby/toddler girl dresses/clothing.
+- NEVER suggest tags for unrelated product categories, themes, or niches.
+- If market research data mentions unrelated competitor keywords, IGNORE THEM — only use keywords relevant to this product.
+- Ask yourself for EACH tag: "Would a buyer searching this tag expect to find THIS exact product?" If no, discard it.
+
 ETSY TAG STRATEGY (2026 — XWalk system):
 - Tags are indexed TOGETHER with the title. Tags should EXPAND search reach, not repeat title words.
 - Each tag can be up to 20 characters. Use all 13 slots — every empty slot is a missed search opportunity.
 - Multi-word long-tail tags outperform single words (e.g., "gift for new mom" > "gift").
 - Tags should match what BUYERS actually type in search, not seller jargon.
 
-KEYWORD SELECTION (CRITICAL):
-- Use market research data (below) to pick PROVEN keywords from competitor analysis.
+KEYWORD SELECTION:
 - NEVER repeat words that are already in the title — title and tags work as a combined keyword set.
-- Include a strategic mix of:
-  * Product-specific terms (what it IS)
-  * Occasion/use-case tags (when/why buyers need it)
-  * Style/aesthetic tags (how it looks/feels)
-  * Recipient tags (who it's for)
-  * Seasonal/trending terms relevant to current period
-- Find underused competitor tags that have demand but low competition.
+- Include a strategic mix of tags DIRECTLY RELATED to this product:
+  * Product-specific terms (what it IS — material, style, type)
+  * Occasion/use-case tags (when/why buyers need it — birthday, holiday, photo shoot)
+  * Recipient tags (who it's for — baby, toddler, infant, newborn)
+  * Style/aesthetic tags (how it looks — boho, vintage, rustic, modern)
+- Use market research data to pick PROVEN keywords, but ONLY ones relevant to this product.
 - Regional spelling variations if relevant (jewelry/jewellery, color/colour).
 
 HARD LIMITS:
-- MAXIMUM 20 CHARACTERS per tag. This is an Etsy API limit — tags over 20 chars will be REJECTED.
-- Count characters carefully. If a phrase is too long, shorten it (e.g., "personalized wooden sign" → "custom wooden sign").
+- MAXIMUM 20 CHARACTERS per tag. Tags over 20 chars will be REJECTED.
+- Count characters carefully. Shorten if needed (e.g., "personalized wooden sign" → "custom wooden sign").
 
 WHAT NOT TO DO:
 - NO single-word tags (waste of a slot)
@@ -104,6 +109,7 @@ WHAT NOT TO DO:
 - NO generic tags like "gift" or "handmade" alone — always combine into long-tail phrases
 - NO duplicate meaning across tags (e.g., "mom gift" and "gift for mom" cover the same search)
 - NO tags longer than 20 characters
+- NO tags for unrelated products, themes, or niches — STAY ON TOPIC
 
 Suggest exactly 13 tags, each MAXIMUM 20 characters. Do NOT repeat any current tags.
 Return JSON: { "suggestions": ["tag1", "tag2", ...] }
@@ -185,7 +191,7 @@ Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
   let optimizedTitle = (parsed.optimized_title || '').trim();
   if (optimizedTitle) {
     // Replace dashes, pipes, slashes, colons used as separators with commas
-    optimizedTitle = optimizedTitle.replace(/\s*[|/:\\-–—]\s*/g, ', ');
+    optimizedTitle = optimizedTitle.replace(/\s*[|/:\\–—-]\s*/g, ', ');
     // Clean up double commas and trailing commas
     optimizedTitle = optimizedTitle.replace(/,\s*,/g, ',').replace(/,\s*$/, '');
 
@@ -224,6 +230,10 @@ Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
     }
   }
 
+  if (!optimizedTitle) {
+    return { status: 400, data: { error: 'AI baslik olusturamadi — tekrar deneyin.' } };
+  }
+
   return {
     status: 200,
     data: {
@@ -247,21 +257,35 @@ async function handleGenerateDescription(body: any) {
 
   const prompt = `You are a top Etsy copywriting and SEO specialist with deep knowledge of Etsy's search algorithm as of March 2026.
 
-ETSY DESCRIPTION BEST PRACTICES (2026):
-- Etsy's XWalk AI system now indexes descriptions for search ranking — keyword placement matters.
-- The first 160 characters appear as the meta description in Google results and Etsy's listing preview. Make them compelling and keyword-rich.
-- Use natural, conversational language — Etsy's AI rewards authentic seller voice over generic copy.
-- Structure with short paragraphs (2-3 sentences), use line breaks for scannability on mobile.
-- Include relevant keywords naturally in the first 2 paragraphs — this is where search weight is highest.
-- Mention: materials, dimensions/sizing, care instructions, what makes it unique, and who it's for.
-- Address common buyer questions preemptively (shipping time, customization options, gift wrapping).
-- Include occasion/use-case keywords (birthday gift, wedding favor, home decor, nursery) for discovery.
-- If the product is personalized/customizable, clearly explain HOW to provide customization details.
-- Etsy now factors listing quality score (conversion rate) — descriptions that reduce buyer uncertainty improve rankings.
-- Do NOT use ALL CAPS, excessive punctuation, or spammy formatting.
+CRITICAL: PRODUCT RELEVANCE
+- Read the title carefully and write a description ONLY about THIS SPECIFIC PRODUCT.
+- Every sentence must describe, sell, or provide information about this exact product.
+- Do NOT add generic filler paragraphs that could apply to any product.
+- Do NOT invent product features, materials, or dimensions not mentioned in the title/tags/materials.
+
+STRUCTURE (follow this order):
+1. **Hook paragraph** (first 160 chars): Compelling, keyword-rich opening that describes what the product IS and who it's for. This appears in Google and Etsy previews.
+2. **Product details**: What it's made of, how it looks, size/dimensions if known. Only mention details you can infer from the title and materials provided.
+3. **Why buy this**: What makes it special — unique selling points, quality, handmade aspects.
+4. **Perfect for**: Occasions and recipients (gift ideas, use cases) relevant to this product type.
+5. **Customization/ordering info**: Only if the title suggests personalization. Otherwise skip this section.
+
+WRITING STYLE:
+- Write in English. Use natural, warm, conversational language — like a skilled seller talking to a buyer.
+- Short paragraphs (2-3 sentences max). Use \\n\\n between paragraphs for mobile readability.
+- Include relevant keywords from the title and tags naturally — not forced.
+- Be specific and honest — don't oversell or make claims you can't support from the product info given.
+- Total length: 600-1200 characters. Concise but complete.
+
+WHAT NOT TO DO:
+- NO ALL CAPS, excessive exclamation marks, or spammy formatting.
+- NO generic filler like "This is the perfect gift for anyone!" without context.
+- NO inventing specific measurements, materials, or features not in the provided info.
+- NO repeating the same selling point multiple times.
+- NO emoji unless the product is clearly targeting a casual/fun audience.
 
 Write an SEO-optimized, buyer-friendly Etsy listing description.
-If an existing description is given, improve it while keeping the seller's voice.
+If an existing description is given, improve it while keeping the seller's voice and any specific product details they've included.
 Return a JSON object: { "description": "..." }
 
 Title: ${title}
@@ -273,7 +297,12 @@ Category: ${category || 'N/A'}${improvePart}${buildMarketContextPrompt(body.mark
   const text = result.response.text();
   const parsed = JSON.parse(text);
 
-  return { status: 200, data: { description: parsed.description } };
+  const description = (parsed.description || '').trim();
+  if (!description) {
+    return { status: 400, data: { error: 'AI aciklama olusturamadi — tekrar deneyin.' } };
+  }
+
+  return { status: 200, data: { description } };
 }
 
 async function handleGenerateAltText(body: any) {

@@ -1,36 +1,16 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
-  Switch,
-  Button,
-  CircularProgress,
-  Paper,
-  Typography,
-  Box,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Chip,
-  Tooltip,
-  Collapse,
-  InputAdornment,
+  TextField, Switch, Button, CircularProgress, Paper, Typography, Box,
+  IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
+  Chip, Tooltip, InputAdornment, Checkbox, FormControlLabel,
+  Select, MenuItem, Tabs, Tab, Alert, Divider,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Add as AddIcon,
-  Warning as WarningIcon,
+  ContentCopy as DuplicateIcon,
+  KeyboardArrowUp as UpIcon,
+  KeyboardArrowDown as DownIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 
@@ -69,35 +49,54 @@ interface VariationEditorProps {
   onSaved: () => void;
 }
 
+// --- Etsy known property types ---
+const ETSY_PROPERTIES = [
+  { id: 200, name: 'Color', label: 'Renk' },
+  { id: 100, name: 'Size', label: 'Beden' },
+  { id: 504, name: 'Length', label: 'Uzunluk' },
+  { id: 501, name: 'Width', label: 'Genislik' },
+  { id: 502, name: 'Height', label: 'Yükseklik' },
+  { id: 503, name: 'Weight', label: 'Agirlik' },
+  { id: 505, name: 'Diameter', label: 'Cap' },
+  { id: 506, name: 'Dimensions', label: 'Boyutlar' },
+  { id: 507, name: 'Fabric', label: 'Kumas' },
+  { id: 508, name: 'Style', label: 'Stil' },
+  { id: 509, name: 'Material', label: 'Malzeme' },
+  { id: 510, name: 'Pattern', label: 'Desen' },
+];
+
 // --- Currency helpers ---
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$',
-  EUR: '\u20AC',
-  GBP: '\u00A3',
-  TRY: '\u20BA',
-  CAD: 'CA$',
-  AUD: 'A$',
-  JPY: '\u00A5',
-  SEK: 'kr',
-  NOK: 'kr',
-  DKK: 'kr',
-  CHF: 'CHF',
-  PLN: 'z\u0142',
-  CZK: 'K\u010D',
-  HUF: 'Ft',
-  ILS: '\u20AA',
-  SGD: 'S$',
-  HKD: 'HK$',
-  NZD: 'NZ$',
-  MXN: 'MX$',
-  BRL: 'R$',
-  INR: '\u20B9',
+  USD: '$', EUR: '\u20AC', GBP: '\u00A3', TRY: '\u20BA',
+  CAD: 'CA$', AUD: 'A$', JPY: '\u00A5', SEK: 'kr', NOK: 'kr',
+  DKK: 'kr', CHF: 'CHF', PLN: 'z\u0142', CZK: 'K\u010D',
+  HUF: 'Ft', ILS: '\u20AA', SGD: 'S$', HKD: 'HK$', NZD: 'NZ$',
+  MXN: 'MX$', BRL: 'R$', INR: '\u20B9',
 };
 
 function getCurrencySymbol(code: string): string {
   return CURRENCY_SYMBOLS[code] || code;
 }
+
+// --- Variation row styles ---
+const rowSx = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1,
+  py: 1.2,
+  px: 1.5,
+  borderBottom: '1px solid rgba(0,0,0,0.06)',
+  '&:hover': { bgcolor: 'rgba(102,126,234,0.03)' },
+  transition: 'background-color 0.15s',
+};
+
+const sectionHeaderSx = {
+  px: 1.5,
+  py: 0.8,
+  bgcolor: 'rgba(0,0,0,0.03)',
+  borderBottom: '1px solid rgba(0,0,0,0.08)',
+};
 
 // --- Component ---
 
@@ -107,62 +106,85 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Add variation dialog
+  // Tab: 0=Variations, 1=Price, 2=Quantity, 3=SKU, 4=Visibility
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Price tab controls
+  const [individualPrice, setIndividualPrice] = useState(false);
+  const [priceAction, setPriceAction] = useState<'set' | 'increase' | 'decrease'>('set');
+  const [priceValue, setPriceValue] = useState('');
+
+  // Quantity tab controls
+  const [individualQuantity, setIndividualQuantity] = useState(false);
+  const [quantityAction, setQuantityAction] = useState<'set' | 'increase' | 'decrease'>('set');
+  const [quantityValue, setQuantityValue] = useState('');
+
+  // Add dialog
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [newPropertyId, setNewPropertyId] = useState<number | ''>('');
-  const [newPropertyName, setNewPropertyName] = useState('');
-  const [newValue, setNewValue] = useState('');
-  const [newPrice, setNewPrice] = useState('');
-  const [newQuantity, setNewQuantity] = useState('1');
-  const [newSku, setNewSku] = useState('');
+  const [addPropertyId, setAddPropertyId] = useState<number>(200);
+  const [addValues, setAddValues] = useState('');
+  const [addPrice, setAddPrice] = useState('');
+  const [addQuantity, setAddQuantity] = useState('1');
 
   // Delete confirmation
   const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
 
-  // Bulk actions
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkPrice, setBulkPrice] = useState('');
-  const [bulkQuantity, setBulkQuantity] = useState('');
-
-  // Detect currency from first product
+  // Detect currency
   const currencyCode = useMemo(() => {
     for (const p of products) {
-      if (p.offerings?.[0]?.price?.currency_code) {
-        return p.offerings[0].price.currency_code;
-      }
+      if (p.offerings?.[0]?.price?.currency_code) return p.offerings[0].price.currency_code;
     }
     return 'USD';
   }, [products]);
+  const sym = getCurrencySymbol(currencyCode);
 
-  const currencySymbol = getCurrencySymbol(currencyCode);
-
-  // Detect default divisor
   const defaultDivisor = useMemo(() => {
     for (const p of products) {
-      if (p.offerings?.[0]?.price?.divisor) {
-        return p.offerings[0].price.divisor;
-      }
+      if (p.offerings?.[0]?.price?.divisor) return p.offerings[0].price.divisor;
     }
     return 100;
   }, [products]);
 
-  // Unsaved changes detection
-  const hasChanges = useMemo(() => {
-    return JSON.stringify(products) !== JSON.stringify(originalProducts);
-  }, [products, originalProducts]);
+  const hasChanges = useMemo(
+    () => JSON.stringify(products) !== JSON.stringify(originalProducts),
+    [products, originalProducts],
+  );
 
-  // Existing properties in the listing (for the "add" dialog)
+  // Existing properties
   const existingProperties = useMemo(() => {
     const map = new Map<number, string>();
     for (const p of originalProducts) {
       for (const pv of p.property_values) {
-        if (!map.has(pv.property_id)) {
-          map.set(pv.property_id, pv.property_name);
-        }
+        if (!map.has(pv.property_id)) map.set(pv.property_id, pv.property_name);
       }
     }
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [originalProducts]);
+
+  // Detect individual pricing/quantity on load
+  useEffect(() => {
+    if (products.length < 2) return;
+    const prices = products.map(p => p.offerings[0]?.price?.amount).filter(Boolean);
+    const quantities = products.map(p => p.offerings[0]?.quantity).filter(q => q !== undefined);
+    setIndividualPrice(!prices.every(p => p === prices[0]));
+    setIndividualQuantity(!quantities.every(q => q === quantities[0]));
+  }, [products.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Grouped by first property ---
+  const grouped = useMemo(() => {
+    const groups: { propName: string; items: { product: Product; globalIdx: number }[] }[] = [];
+    const map = new Map<string, { product: Product; globalIdx: number }[]>();
+
+    products.forEach((p, idx) => {
+      const firstProp = p.property_values[0];
+      const key = firstProp?.property_name || '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ product: p, globalIdx: idx });
+    });
+
+    map.forEach((items, propName) => groups.push({ propName, items }));
+    return groups;
+  }, [products]);
 
   // --- Fetch ---
 
@@ -178,194 +200,146 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       setProducts(fetched);
       setOriginalProducts(JSON.parse(JSON.stringify(fetched)));
     } catch (err: any) {
-      toast.error(err.message || 'Envanter yuklenirken hata olustu');
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
   }, [listingId, shopId]);
 
-  useEffect(() => {
-    fetchInventory();
-  }, [fetchInventory]);
+  useEffect(() => { fetchInventory(); }, [fetchInventory]);
 
   // --- Helpers ---
 
-  const getVariationLabel = (product: Product): string => {
-    if (!product.property_values || product.property_values.length === 0) return '-';
-    return product.property_values
-      .map((pv) => `${pv.property_name}: ${pv.values.join(', ')}`)
-      .join(' / ');
-  };
+  const getLabel = (p: Product) =>
+    p.property_values?.map(pv => pv.values.join(', ')).join(' / ') || '-';
 
-  const getDisplayPrice = (offering: Offering): string => {
-    return (offering.price.amount / offering.price.divisor).toFixed(2);
-  };
+  const getPrice = (o: Offering) => (o.price.amount / o.price.divisor).toFixed(2);
 
   // --- Mutations ---
 
-  const updateProduct = (productIndex: number, field: string, value: any) => {
-    setProducts((prev) => {
-      const updated = [...prev];
-      const product = { ...updated[productIndex] };
-
+  const updateField = (idx: number, field: string, value: any) => {
+    setProducts(prev => {
+      const arr = [...prev];
+      const p = { ...arr[idx] };
       if (field === 'sku') {
-        product.sku = value;
-      } else if (field === 'price' && product.offerings.length > 0) {
-        const offerings = [...product.offerings];
-        const offering = { ...offerings[0] };
-        const priceNum = parseFloat(value);
-        if (!isNaN(priceNum)) {
-          offering.price = {
-            ...offering.price,
-            amount: Math.round(priceNum * offering.price.divisor),
-          };
-        }
-        offerings[0] = offering;
-        product.offerings = offerings;
-      } else if (field === 'quantity' && product.offerings.length > 0) {
-        const offerings = [...product.offerings];
-        const offering = { ...offerings[0] };
-        const qty = parseInt(value, 10);
-        if (!isNaN(qty) && qty >= 0) {
-          offering.quantity = qty;
-        }
-        offerings[0] = offering;
-        product.offerings = offerings;
-      } else if (field === 'is_enabled' && product.offerings.length > 0) {
-        const offerings = [...product.offerings];
-        const offering = { ...offerings[0] };
-        offering.is_enabled = value;
-        offerings[0] = offering;
-        product.offerings = offerings;
+        p.sku = value;
+      } else if (field === 'price' && p.offerings.length > 0) {
+        const o = { ...p.offerings[0] };
+        const n = parseFloat(value);
+        if (!isNaN(n)) o.price = { ...o.price, amount: Math.round(n * o.price.divisor) };
+        p.offerings = [o, ...p.offerings.slice(1)];
+      } else if (field === 'quantity' && p.offerings.length > 0) {
+        const o = { ...p.offerings[0] };
+        const n = parseInt(value, 10);
+        if (!isNaN(n) && n >= 0) o.quantity = n;
+        p.offerings = [o, ...p.offerings.slice(1)];
+      } else if (field === 'is_enabled' && p.offerings.length > 0) {
+        p.offerings = [{ ...p.offerings[0], is_enabled: value }, ...p.offerings.slice(1)];
       }
-
-      updated[productIndex] = product;
-      return updated;
+      arr[idx] = p;
+      return arr;
     });
   };
 
-  const removeProduct = (index: number) => {
-    setProducts((prev) => prev.filter((_, i) => i !== index));
+  const removeProduct = (idx: number) => {
+    setProducts(prev => prev.filter((_, i) => i !== idx));
     setDeleteIndex(null);
-    toast.success('Varyasyon silindi (kaydetmeyi unutmayin)');
+    toast.success('Varyasyon silindi');
   };
 
-  const addVariation = () => {
-    if (!newValue.trim()) {
-      toast.error('Deger giriniz');
-      return;
-    }
-
-    const priceNum = parseFloat(newPrice);
-    const qtyNum = parseInt(newQuantity, 10);
-
-    if (isNaN(priceNum) || priceNum < 0) {
-      toast.error('Gecerli bir fiyat giriniz');
-      return;
-    }
-    if (isNaN(qtyNum) || qtyNum < 0) {
-      toast.error('Gecerli bir stok giriniz');
-      return;
-    }
-
-    const propertyId = typeof newPropertyId === 'number' ? newPropertyId : 0;
-    const propertyName = newPropertyName.trim();
-
-    if (!propertyId && !propertyName) {
-      toast.error('Ozellik seciniz veya yeni ozellik adi giriniz');
-      return;
-    }
-
-    // Resolve property name from existing if selected
-    let resolvedName = propertyName;
-    if (propertyId && !resolvedName) {
-      const found = existingProperties.find((p) => p.id === propertyId);
-      resolvedName = found?.name || 'Variation';
-    }
-
-    const newProduct: Product = {
-      product_id: 0, // new product, Etsy assigns ID
-      sku: newSku.trim(),
-      property_values: [
-        {
-          property_id: propertyId,
-          property_name: resolvedName,
-          values: [newValue.trim()],
-          scale_id: null,
-        },
-      ],
-      offerings: [
-        {
-          offering_id: 0,
-          price: {
-            amount: Math.round(priceNum * defaultDivisor),
-            divisor: defaultDivisor,
-            currency_code: currencyCode,
-          },
-          quantity: qtyNum,
-          is_enabled: true,
-        },
-      ],
-    };
-
-    setProducts((prev) => [...prev, newProduct]);
-    resetAddDialog();
-    toast.success('Varyasyon eklendi (kaydetmeyi unutmayin)');
+  const duplicateProduct = (idx: number) => {
+    setProducts(prev => {
+      const clone: Product = JSON.parse(JSON.stringify(prev[idx]));
+      clone.product_id = 0;
+      clone.sku = '';
+      if (clone.property_values[0]?.values[0]) {
+        clone.property_values[0].values[0] += ' (kopya)';
+      }
+      const arr = [...prev];
+      arr.splice(idx + 1, 0, clone);
+      return arr;
+    });
   };
 
-  const resetAddDialog = () => {
-    setAddDialogOpen(false);
-    setNewPropertyId('');
-    setNewPropertyName('');
-    setNewValue('');
-    setNewPrice('');
-    setNewQuantity('1');
-    setNewSku('');
+  const moveProduct = (idx: number, dir: 'up' | 'down') => {
+    setProducts(prev => {
+      const arr = [...prev];
+      const t = dir === 'up' ? idx - 1 : idx + 1;
+      if (t < 0 || t >= arr.length) return prev;
+      [arr[idx], arr[t]] = [arr[t], arr[idx]];
+      return arr;
+    });
   };
 
-  // --- Bulk actions ---
-
+  // Bulk price/quantity apply
   const applyBulkPrice = () => {
-    const priceNum = parseFloat(bulkPrice);
-    if (isNaN(priceNum) || priceNum < 0) {
-      toast.error('Gecerli bir fiyat giriniz');
-      return;
-    }
-    setProducts((prev) =>
-      prev.map((product) => {
-        if (product.offerings.length === 0) return product;
-        const offerings = [...product.offerings];
-        const offering = { ...offerings[0] };
-        offering.price = {
-          ...offering.price,
-          amount: Math.round(priceNum * offering.price.divisor),
-        };
-        offerings[0] = offering;
-        return { ...product, offerings };
-      })
-    );
-    setBulkPrice('');
-    toast.success('Tum fiyatlar guncellendi');
+    const v = parseFloat(priceValue);
+    if (isNaN(v)) return;
+    setProducts(prev => prev.map(p => {
+      if (!p.offerings.length) return p;
+      const o = { ...p.offerings[0] };
+      const cur = o.price.amount / o.price.divisor;
+      let newPrice = cur;
+      if (priceAction === 'set') newPrice = v;
+      else if (priceAction === 'increase') newPrice = cur + v;
+      else if (priceAction === 'decrease') newPrice = Math.max(0, cur - v);
+      o.price = { ...o.price, amount: Math.round(newPrice * o.price.divisor) };
+      return { ...p, offerings: [o, ...p.offerings.slice(1)] };
+    }));
+    toast.success('Fiyatlar güncellendi');
   };
 
   const applyBulkQuantity = () => {
-    const qtyNum = parseInt(bulkQuantity, 10);
-    if (isNaN(qtyNum) || qtyNum < 0) {
-      toast.error('Gecerli bir stok giriniz');
-      return;
-    }
-    setProducts((prev) =>
-      prev.map((product) => {
-        if (product.offerings.length === 0) return product;
-        const offerings = [...product.offerings];
-        const offering = { ...offerings[0] };
-        offering.quantity = qtyNum;
-        offerings[0] = offering;
-        return { ...product, offerings };
-      })
-    );
-    setBulkQuantity('');
-    toast.success('Tum stoklar guncellendi');
+    const v = parseInt(quantityValue, 10);
+    if (isNaN(v)) return;
+    setProducts(prev => prev.map(p => {
+      if (!p.offerings.length) return p;
+      const o = { ...p.offerings[0] };
+      let newQty = o.quantity;
+      if (quantityAction === 'set') newQty = v;
+      else if (quantityAction === 'increase') newQty = o.quantity + v;
+      else if (quantityAction === 'decrease') newQty = Math.max(0, o.quantity - v);
+      o.quantity = newQty;
+      return { ...p, offerings: [o, ...p.offerings.slice(1)] };
+    }));
+    toast.success('Stoklar güncellendi');
+  };
+
+  // Batch add variations
+  const addVariations = () => {
+    const values = addValues.split(',').map(v => v.trim()).filter(v => v.length > 0);
+    if (!values.length) { toast.error('En az bir deger girin'); return; }
+    const priceNum = parseFloat(addPrice);
+    const qtyNum = parseInt(addQuantity, 10);
+    if (isNaN(priceNum) || priceNum < 0) { toast.error('Gecerli fiyat girin'); return; }
+    if (isNaN(qtyNum) || qtyNum < 0) { toast.error('Gecerli stok girin'); return; }
+
+    const propName = existingProperties.find(p => p.id === addPropertyId)?.name
+      || ETSY_PROPERTIES.find(p => p.id === addPropertyId)?.name || 'Variation';
+
+    const newProducts: Product[] = values.map(value => ({
+      product_id: 0,
+      sku: '',
+      property_values: [{
+        property_id: addPropertyId,
+        property_name: propName,
+        values: [value],
+        scale_id: null,
+      }],
+      offerings: [{
+        offering_id: 0,
+        price: { amount: Math.round(priceNum * defaultDivisor), divisor: defaultDivisor, currency_code: currencyCode },
+        quantity: qtyNum,
+        is_enabled: true,
+      }],
+    }));
+
+    setProducts(prev => [...prev, ...newProducts]);
+    setAddDialogOpen(false);
+    setAddValues('');
+    setAddPrice('');
+    setAddQuantity('1');
+    toast.success(`${values.length} varyasyon eklendi`);
   };
 
   // --- Save ---
@@ -375,21 +349,17 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
     try {
       const res = await fetch(
         `/api/clawd/etsy?action=update_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ products }),
-        }
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products }) }
       );
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Envanter guncellenemedi');
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Envanter güncellenemedi');
       }
-      toast.success('Varyasyonlar basariyla guncellendi');
+      toast.success('Varyasyonlar Etsy\'ye kaydedildi');
       setOriginalProducts(JSON.parse(JSON.stringify(products)));
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Kaydetme sirasinda hata olustu');
+      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -408,327 +378,499 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
     );
   }
 
+  const totalStock = products.reduce((sum, p) => sum + (p.offerings[0]?.quantity || 0), 0);
+
   return (
     <Box>
-      {/* Unsaved changes indicator */}
-      {hasChanges && (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            mb: 1.5,
-            px: 1.5,
-            py: 0.75,
-            bgcolor: 'warning.light',
-            borderRadius: 1,
-          }}
-        >
-          <WarningIcon fontSize="small" sx={{ color: 'warning.dark' }} />
-          <Typography variant="body2" sx={{ color: 'warning.dark', fontWeight: 500 }}>
-            Degisiklik var - kaydetmeyi unutmayin
-          </Typography>
+      {/* Tabs — Getvela style */}
+      <Tabs
+        value={activeTab}
+        onChange={(_, v) => setActiveTab(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{
+          borderBottom: '2px solid #eee',
+          mb: 0,
+          minHeight: 36,
+          '& .MuiTab-root': {
+            minHeight: 36, py: 0.5, textTransform: 'none', fontWeight: 600,
+            fontSize: '0.82rem', color: '#888',
+          },
+          '& .Mui-selected': { color: '#667eea' },
+          '& .MuiTabs-indicator': { bgcolor: '#667eea', height: 2.5 },
+        }}
+      >
+        <Tab label="Varyasyonlar" />
+        <Tab label="Fiyat" />
+        <Tab label="Stok" />
+        <Tab label="SKU" />
+        <Tab label="Görünürlük" />
+      </Tabs>
+
+      {/* Summary chips */}
+      {products.length > 0 && (
+        <Box sx={{ display: 'flex', gap: 1, py: 1, px: 0.5, flexWrap: 'wrap' }}>
+          <Chip label={`${products.length} varyasyon`} size="small" variant="outlined" />
+          <Chip label={`Toplam stok: ${totalStock}`} size="small" variant="outlined" />
+          {existingProperties.map(p => (
+            <Chip key={p.id} label={p.name} size="small"
+              sx={{ bgcolor: 'rgba(102,126,234,0.1)', fontWeight: 600 }} />
+          ))}
         </Box>
       )}
 
-      {/* Toolbar: Add + Bulk */}
-      <Box display="flex" flexWrap="wrap" gap={1} mb={1.5} alignItems="center">
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={() => setAddDialogOpen(true)}
-        >
-          Varyasyon Ekle
-        </Button>
-        <Button
-          variant="text"
-          size="small"
-          onClick={() => setBulkOpen((o) => !o)}
-        >
-          Toplu Islemler
-        </Button>
-        {products.length > 0 && (
-          <Chip
-            label={`${products.length} varyasyon`}
-            size="small"
-            variant="outlined"
-            sx={{ ml: 'auto' }}
-          />
-        )}
-      </Box>
-
-      {/* Bulk actions panel */}
-      <Collapse in={bulkOpen}>
-        <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'flex-end' }}>
-          <Box display="flex" gap={1} alignItems="flex-end">
-            <TextField
-              label="Tum fiyatlar"
-              size="small"
-              type="number"
-              value={bulkPrice}
-              onChange={(e) => setBulkPrice(e.target.value)}
-              inputProps={{ min: 0, step: '0.01' }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">{currencySymbol}</InputAdornment>
-                ),
-              }}
-              sx={{ width: 140 }}
-            />
-            <Button variant="outlined" size="small" onClick={applyBulkPrice} disabled={!bulkPrice}>
-              Tumunun fiyatini guncelle
-            </Button>
-          </Box>
-          <Box display="flex" gap={1} alignItems="flex-end">
-            <TextField
-              label="Tum stoklar"
-              size="small"
-              type="number"
-              value={bulkQuantity}
-              onChange={(e) => setBulkQuantity(e.target.value)}
-              inputProps={{ min: 0 }}
-              sx={{ width: 100 }}
-            />
-            <Button variant="outlined" size="small" onClick={applyBulkQuantity} disabled={!bulkQuantity}>
-              Tumunun stokunu guncelle
-            </Button>
-          </Box>
-        </Paper>
-      </Collapse>
-
-      {/* Table */}
-      {products.length === 0 ? (
-        <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-          Bu urunun varyasyonu yok. Eklemek icin yukardaki butonu kullanin.
-        </Typography>
-      ) : (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Varyasyon</TableCell>
-                <TableCell>Fiyat ({currencySymbol})</TableCell>
-                <TableCell>Stok</TableCell>
-                <TableCell>SKU</TableCell>
-                <TableCell align="center">Aktif</TableCell>
-                <TableCell align="center" sx={{ width: 48 }}></TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {products.map((product, idx) => {
-                const offering = product.offerings[0];
-                if (!offering) return null;
-                const isDisabled = !offering.is_enabled;
-                return (
-                  <TableRow
-                    key={product.product_id || `new-${idx}`}
-                    sx={{
-                      opacity: isDisabled ? 0.5 : 1,
-                      bgcolor: isDisabled ? 'action.hover' : 'inherit',
-                      '&:hover': { bgcolor: isDisabled ? 'action.hover' : 'action.selected' },
-                    }}
-                  >
-                    <TableCell>
-                      <Typography variant="body2">{getVariationLabel(product)}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        type="number"
-                        value={getDisplayPrice(offering)}
-                        onChange={(e) => updateProduct(idx, 'price', e.target.value)}
-                        inputProps={{ min: 0, step: '0.01' }}
-                        InputProps={{
-                          startAdornment: (
-                            <InputAdornment position="start">{currencySymbol}</InputAdornment>
-                          ),
-                        }}
-                        sx={{ width: 120 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        type="number"
-                        value={offering.quantity}
-                        onChange={(e) => updateProduct(idx, 'quantity', e.target.value)}
-                        inputProps={{ min: 0 }}
-                        sx={{ width: 80 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        value={product.sku}
-                        onChange={(e) => updateProduct(idx, 'sku', e.target.value)}
-                        sx={{ width: 120 }}
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Switch
-                        checked={offering.is_enabled}
-                        onChange={(e) => updateProduct(idx, 'is_enabled', e.target.checked)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell align="center">
-                      <Tooltip title="Varyasyonu sil">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => setDeleteIndex(idx)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+      {/* Unsaved warning */}
+      {hasChanges && (
+        <Alert severity="warning" sx={{ py: 0.3, my: 0.5, borderRadius: '8px', fontSize: '0.8rem' }}>
+          Kaydedilmemis degisiklikler var
+        </Alert>
       )}
 
-      {/* Save button */}
-      <Box display="flex" justifyContent="flex-end" mt={2} gap={1}>
+      {/* ============================================================ */}
+      {/* TAB 0: Variations — list with reorder, duplicate, delete     */}
+      {/* ============================================================ */}
+      {activeTab === 0 && (
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1 }}>
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setAddDialogOpen(true)}
+              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}
+            >
+              Varyasyon Ekle
+            </Button>
+            <Typography variant="caption" color="text.secondary">
+              İlk varyasyon = varsayılan
+            </Typography>
+          </Box>
+
+          {products.length === 0 ? (
+            <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#fafafa', borderRadius: '10px' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                Henüz varyasyon yok
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Virgülle ayirarak toplu ekleyebilirsiniz: <strong>S, M, L, XL</strong>
+              </Typography>
+            </Paper>
+          ) : (
+            <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+              {grouped.map(group => (
+                <Box key={group.propName}>
+                  {group.propName && (
+                    <Box sx={sectionHeaderSx}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {group.propName}
+                      </Typography>
+                    </Box>
+                  )}
+                  {group.items.map(({ product, globalIdx }) => {
+                    const o = product.offerings[0];
+                    if (!o) return null;
+                    return (
+                      <Box key={product.product_id || `new-${globalIdx}`} sx={{
+                        ...rowSx,
+                        opacity: o.is_enabled ? 1 : 0.45,
+                      }}>
+                        {/* Reorder arrows */}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', mr: 0.5 }}>
+                          <IconButton size="small" disabled={globalIdx === 0} onClick={() => moveProduct(globalIdx, 'up')} sx={{ p: 0.15 }}>
+                            <UpIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                          <IconButton size="small" disabled={globalIdx === products.length - 1} onClick={() => moveProduct(globalIdx, 'down')} sx={{ p: 0.15 }}>
+                            <DownIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Box>
+
+                        {/* Label */}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" fontWeight={600} noWrap>
+                            {getLabel(product)}
+                          </Typography>
+                          {product.sku && (
+                            <Typography variant="caption" color="text.secondary">SKU: {product.sku}</Typography>
+                          )}
+                        </Box>
+
+                        {/* Quick info */}
+                        <Typography variant="body2" color="text.secondary" sx={{ minWidth: 55, textAlign: 'right' }}>
+                          {sym}{getPrice(o)}
+                        </Typography>
+                        <Chip
+                          label={o.quantity === 0 ? 'Stok yok' : `${o.quantity} adet`}
+                          size="small"
+                          color={o.quantity === 0 ? 'error' : 'default'}
+                          variant="outlined"
+                          sx={{ fontSize: '0.7rem', height: 22, minWidth: 60 }}
+                        />
+
+                        {/* Actions */}
+                        <Box sx={{ display: 'flex', gap: 0 }}>
+                          <Tooltip title="Kopyala">
+                            <IconButton size="small" onClick={() => duplicateProduct(globalIdx)}><DuplicateIcon sx={{ fontSize: 16 }} /></IconButton>
+                          </Tooltip>
+                          <Tooltip title="Sil">
+                            <IconButton size="small" color="error" onClick={() => setDeleteIndex(globalIdx)}><DeleteIcon sx={{ fontSize: 16 }} /></IconButton>
+                          </Tooltip>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              ))}
+            </Paper>
+          )}
+        </Box>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB 1: Price                                                  */}
+      {/* ============================================================ */}
+      {activeTab === 1 && products.length > 0 && (
+        <Box sx={{ pt: 1 }}>
+          {/* Getvela-style controls */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+            <FormControlLabel
+              control={<Checkbox checked={individualPrice} onChange={(e) => setIndividualPrice(e.target.checked)} size="small" sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' } }} />}
+              label={<Typography variant="body2" fontWeight={600}>Bireysel fiyat</Typography>}
+            />
+            {!individualPrice && (
+              <>
+                <Select size="small" value={priceAction} onChange={(e) => setPriceAction(e.target.value as any)}
+                  sx={{ minWidth: 130, height: 36 }}>
+                  <MenuItem value="set">Ayarla</MenuItem>
+                  <MenuItem value="increase">Artır</MenuItem>
+                  <MenuItem value="decrease">Azalt</MenuItem>
+                </Select>
+                <TextField
+                  size="small" type="number" value={priceValue}
+                  onChange={(e) => setPriceValue(e.target.value)}
+                  InputProps={{ startAdornment: <InputAdornment position="start">{sym}</InputAdornment> }}
+                  inputProps={{ min: 0, step: '0.01' }}
+                  sx={{ width: 120 }}
+                  placeholder="0.00"
+                />
+                <Button size="small" variant="contained" onClick={applyBulkPrice} disabled={!priceValue}
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36 }}>
+                  Uygula
+                </Button>
+              </>
+            )}
+          </Box>
+
+          {/* Price rows */}
+          <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+            {grouped.map(group => (
+              <Box key={group.propName}>
+                {group.propName && (
+                  <Box sx={sectionHeaderSx}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {group.propName}
+                    </Typography>
+                  </Box>
+                )}
+                {group.items.map(({ product, globalIdx }) => {
+                  const o = product.offerings[0];
+                  if (!o) return null;
+                  return (
+                    <Box key={globalIdx} sx={rowSx}>
+                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{getLabel(product)}</Typography>
+                      {individualPrice ? (
+                        <TextField
+                          size="small" type="number"
+                          value={getPrice(o)}
+                          onChange={(e) => updateField(globalIdx, 'price', e.target.value)}
+                          InputProps={{ startAdornment: <InputAdornment position="start">{sym}</InputAdornment> }}
+                          inputProps={{ min: 0, step: '0.01' }}
+                          sx={{ width: 120 }}
+                        />
+                      ) : (
+                        <Typography variant="body2" fontWeight={600} sx={{ minWidth: 70, textAlign: 'right' }}>
+                          {sym}{getPrice(o)}
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
+            ))}
+          </Paper>
+        </Box>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB 2: Quantity                                               */}
+      {/* ============================================================ */}
+      {activeTab === 2 && products.length > 0 && (
+        <Box sx={{ pt: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+            <FormControlLabel
+              control={<Checkbox checked={individualQuantity} onChange={(e) => setIndividualQuantity(e.target.checked)} size="small" sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' } }} />}
+              label={<Typography variant="body2" fontWeight={600}>Bireysel stok</Typography>}
+            />
+            {!individualQuantity && (
+              <>
+                <Select size="small" value={quantityAction} onChange={(e) => setQuantityAction(e.target.value as any)}
+                  sx={{ minWidth: 130, height: 36 }}>
+                  <MenuItem value="set">Ayarla</MenuItem>
+                  <MenuItem value="increase">Artır</MenuItem>
+                  <MenuItem value="decrease">Azalt</MenuItem>
+                </Select>
+                <TextField
+                  size="small" type="number" value={quantityValue}
+                  onChange={(e) => setQuantityValue(e.target.value)}
+                  inputProps={{ min: 0 }}
+                  sx={{ width: 100 }}
+                  placeholder="0"
+                />
+                <Button size="small" variant="contained" onClick={applyBulkQuantity} disabled={!quantityValue}
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36 }}>
+                  Uygula
+                </Button>
+              </>
+            )}
+          </Box>
+
+          <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+            {grouped.map(group => (
+              <Box key={group.propName}>
+                {group.propName && (
+                  <Box sx={sectionHeaderSx}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {group.propName}
+                    </Typography>
+                  </Box>
+                )}
+                {group.items.map(({ product, globalIdx }) => {
+                  const o = product.offerings[0];
+                  if (!o) return null;
+                  return (
+                    <Box key={globalIdx} sx={rowSx}>
+                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{getLabel(product)}</Typography>
+                      {individualQuantity ? (
+                        <TextField
+                          size="small" type="number"
+                          value={o.quantity}
+                          onChange={(e) => updateField(globalIdx, 'quantity', e.target.value)}
+                          inputProps={{ min: 0 }}
+                          sx={{ width: 90 }}
+                        />
+                      ) : (
+                        <Chip
+                          label={o.quantity === 0 ? 'Stok yok' : o.quantity}
+                          size="small"
+                          color={o.quantity === 0 ? 'error' : 'default'}
+                          variant="outlined"
+                          sx={{ minWidth: 60 }}
+                        />
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
+            ))}
+          </Paper>
+        </Box>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB 3: SKU                                                    */}
+      {/* ============================================================ */}
+      {activeTab === 3 && products.length > 0 && (
+        <Box sx={{ pt: 1 }}>
+          <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+            {grouped.map(group => (
+              <Box key={group.propName}>
+                {group.propName && (
+                  <Box sx={sectionHeaderSx}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {group.propName}
+                    </Typography>
+                  </Box>
+                )}
+                {group.items.map(({ product, globalIdx }) => (
+                  <Box key={globalIdx} sx={rowSx}>
+                    <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{getLabel(product)}</Typography>
+                    <TextField
+                      size="small"
+                      value={product.sku}
+                      onChange={(e) => updateField(globalIdx, 'sku', e.target.value)}
+                      placeholder="SKU girin"
+                      sx={{ width: 150 }}
+                    />
+                  </Box>
+                ))}
+              </Box>
+            ))}
+          </Paper>
+        </Box>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB 4: Visibility (active/inactive toggle)                    */}
+      {/* ============================================================ */}
+      {activeTab === 4 && products.length > 0 && (
+        <Box sx={{ pt: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+            <Button size="small" variant="outlined" onClick={() => {
+              setProducts(prev => prev.map(p => {
+                if (!p.offerings.length) return p;
+                return { ...p, offerings: [{ ...p.offerings[0], is_enabled: true }, ...p.offerings.slice(1)] };
+              }));
+            }} sx={{ textTransform: 'none', borderRadius: '6px' }}>
+              Tümünü Aktif Yap
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => {
+              setProducts(prev => prev.map(p => {
+                if (!p.offerings.length) return p;
+                return { ...p, offerings: [{ ...p.offerings[0], is_enabled: false }, ...p.offerings.slice(1)] };
+              }));
+            }} sx={{ textTransform: 'none', borderRadius: '6px' }}>
+              Tümünü Pasif Yap
+            </Button>
+          </Box>
+          <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+            {grouped.map(group => (
+              <Box key={group.propName}>
+                {group.propName && (
+                  <Box sx={sectionHeaderSx}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {group.propName}
+                    </Typography>
+                  </Box>
+                )}
+                {group.items.map(({ product, globalIdx }) => {
+                  const o = product.offerings[0];
+                  if (!o) return null;
+                  return (
+                    <Box key={globalIdx} sx={{ ...rowSx, opacity: o.is_enabled ? 1 : 0.45 }}>
+                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{getLabel(product)}</Typography>
+                      <Switch
+                        checked={o.is_enabled}
+                        onChange={(e) => updateField(globalIdx, 'is_enabled', e.target.checked)}
+                        size="small"
+                        sx={{ '& .Mui-checked': { color: '#667eea' }, '& .Mui-checked + .MuiSwitch-track': { bgcolor: '#667eea' } }}
+                      />
+                    </Box>
+                  );
+                })}
+              </Box>
+            ))}
+          </Paper>
+        </Box>
+      )}
+
+      {/* Empty state for non-variation tabs */}
+      {activeTab > 0 && products.length === 0 && (
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary">Önce varyasyon ekleyin</Typography>
+        </Box>
+      )}
+
+      {/* Save / Cancel */}
+      <Box display="flex" justifyContent="flex-end" mt={2} gap={1} alignItems="center">
         {hasChanges && (
-          <Button
-            variant="text"
-            onClick={() => {
-              setProducts(JSON.parse(JSON.stringify(originalProducts)));
-            }}
-            disabled={saving}
-          >
-            Vazgec
-          </Button>
+          <>
+            <Typography variant="caption" color="text.secondary" sx={{ mr: 'auto' }}>
+              Degisiklikler henüz Etsy&apos;ye gönderilmedi
+            </Typography>
+            <Button variant="text" onClick={() => setProducts(JSON.parse(JSON.stringify(originalProducts)))}
+              disabled={saving} sx={{ textTransform: 'none' }}>
+              Vazgec
+            </Button>
+          </>
         )}
         <Button
           variant="contained"
           onClick={handleSave}
           disabled={saving || !hasChanges}
           startIcon={saving ? <CircularProgress size={16} /> : undefined}
+          sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}
         >
-          {saving ? 'Kaydediliyor...' : 'Kaydet'}
+          {saving ? 'Kaydediliyor...' : 'Etsy\'ye Kaydet'}
         </Button>
       </Box>
 
-      {/* --- Add Variation Dialog --- */}
-      <Dialog open={addDialogOpen} onClose={resetAddDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Yeni Varyasyon Ekle</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
-          {/* Property selection: existing or custom */}
-          {existingProperties.length > 0 ? (
-            <FormControl size="small" fullWidth>
-              <InputLabel>Ozellik Sec</InputLabel>
-              <Select
-                value={newPropertyId}
-                label="Ozellik Sec"
-                onChange={(e) => {
-                  const val = e.target.value as number;
-                  setNewPropertyId(val);
-                  const found = existingProperties.find((p) => p.id === val);
-                  setNewPropertyName(found?.name || '');
-                }}
-              >
-                {existingProperties.map((prop) => (
-                  <MenuItem key={prop.id} value={prop.id}>
-                    {prop.name} (ID: {prop.id})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          ) : (
-            <>
-              <TextField
-                label="Ozellik Adi (orn: Renk, Beden)"
-                size="small"
-                fullWidth
-                value={newPropertyName}
-                onChange={(e) => setNewPropertyName(e.target.value)}
-              />
-              <TextField
-                label="Ozellik ID (Etsy property_id)"
-                size="small"
-                fullWidth
-                type="number"
-                value={newPropertyId}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  setNewPropertyId(isNaN(v) ? '' : v);
-                }}
-                helperText="Ornek: 200 = Color, 100 = Size"
-              />
-            </>
-          )}
+      {/* --- Add Variations Dialog --- */}
+      <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} maxWidth="sm" fullWidth sx={{ zIndex: 1600 }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Varyasyon Ekle</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: '16px !important' }}>
+          <Alert severity="info" sx={{ py: 0.5, borderRadius: '8px' }}>
+            Birden fazla deger icin virgülle ayirin: <strong>S, M, L, XL, XXL</strong>
+          </Alert>
 
-          <TextField
-            label="Deger (orn: XXL, Kirmizi)"
-            size="small"
-            fullWidth
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-            autoFocus
+          {/* Property type chips */}
+          <Box>
+            <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block', color: 'text.secondary', textTransform: 'uppercase' }}>
+              Özellik Tipi
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+              {existingProperties.map(prop => (
+                <Chip key={prop.id}
+                  label={`${ETSY_PROPERTIES.find(p => p.id === prop.id)?.label || prop.name} (mevcut)`}
+                  onClick={() => setAddPropertyId(prop.id)}
+                  color={addPropertyId === prop.id ? 'primary' : 'default'}
+                  variant={addPropertyId === prop.id ? 'filled' : 'outlined'}
+                  size="small" sx={{ fontWeight: addPropertyId === prop.id ? 700 : 400 }}
+                />
+              ))}
+              {ETSY_PROPERTIES.filter(p => !existingProperties.some(ep => ep.id === p.id)).slice(0, 8).map(prop => (
+                <Chip key={prop.id} label={prop.label}
+                  onClick={() => setAddPropertyId(prop.id)}
+                  color={addPropertyId === prop.id ? 'primary' : 'default'}
+                  variant={addPropertyId === prop.id ? 'filled' : 'outlined'}
+                  size="small" sx={{ fontWeight: addPropertyId === prop.id ? 700 : 400 }}
+                />
+              ))}
+            </Box>
+          </Box>
+
+          <TextField label="Degerler (virgülle ayirin)" size="small" fullWidth multiline minRows={2}
+            value={addValues} onChange={(e) => setAddValues(e.target.value)}
+            placeholder="Kirmizi, Mavi, Yesil, Sari, Beyaz" autoFocus
+            helperText={addValues ? `${addValues.split(',').filter(v => v.trim()).length} varyasyon eklenecek` : 'Her deger bir varyasyon olusturur'}
           />
 
           <Box display="flex" gap={2}>
-            <TextField
-              label={`Fiyat (${currencySymbol})`}
-              size="small"
-              type="number"
-              value={newPrice}
-              onChange={(e) => setNewPrice(e.target.value)}
-              inputProps={{ min: 0, step: '0.01' }}
-              sx={{ flex: 1 }}
+            <TextField label={`Fiyat (${sym})`} size="small" type="number"
+              value={addPrice} onChange={(e) => setAddPrice(e.target.value)}
+              inputProps={{ min: 0, step: '0.01' }} sx={{ flex: 1 }}
+              helperText="Tümüne uygulanır"
             />
-            <TextField
-              label="Stok"
-              size="small"
-              type="number"
-              value={newQuantity}
-              onChange={(e) => setNewQuantity(e.target.value)}
-              inputProps={{ min: 0 }}
-              sx={{ flex: 1 }}
+            <TextField label="Stok" size="small" type="number"
+              value={addQuantity} onChange={(e) => setAddQuantity(e.target.value)}
+              inputProps={{ min: 0 }} sx={{ flex: 1 }}
             />
           </Box>
-
-          <TextField
-            label="SKU (opsiyonel)"
-            size="small"
-            fullWidth
-            value={newSku}
-            onChange={(e) => setNewSku(e.target.value)}
-          />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={resetAddDialog}>Iptal</Button>
-          <Button variant="contained" onClick={addVariation}>
-            Ekle
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAddDialogOpen(false)} sx={{ textTransform: 'none' }}>İptal</Button>
+          <Button variant="contained" onClick={addVariations} disabled={!addValues.trim() || !addPrice}
+            sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}>
+            {addValues.split(',').filter(v => v.trim()).length || 0} Varyasyon Ekle
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* --- Delete Confirmation Dialog --- */}
-      <Dialog open={deleteIndex !== null} onClose={() => setDeleteIndex(null)} maxWidth="xs">
-        <DialogTitle>Varyasyonu Sil</DialogTitle>
+      {/* --- Delete Confirmation --- */}
+      <Dialog open={deleteIndex !== null} onClose={() => setDeleteIndex(null)} maxWidth="xs" sx={{ zIndex: 1600 }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Varyasyonu Sil</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
             {deleteIndex !== null && products[deleteIndex]
-              ? `"${getVariationLabel(products[deleteIndex])}" varyasyonunu silmek istediginize emin misiniz?`
+              ? `"${getLabel(products[deleteIndex])}" silinsin mi?`
               : 'Bu varyasyonu silmek istediginize emin misiniz?'}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Degisiklik kaydedilene kadar Etsy&apos;de silinmez.
+            &quot;Etsy&apos;ye Kaydet&quot; butonuna basana kadar Etsy&apos;de silinmez.
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteIndex(null)}>Vazgec</Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={() => deleteIndex !== null && removeProduct(deleteIndex)}
-          >
+          <Button onClick={() => setDeleteIndex(null)} sx={{ textTransform: 'none' }}>Vazgec</Button>
+          <Button variant="contained" color="error" onClick={() => deleteIndex !== null && removeProduct(deleteIndex)}
+            sx={{ textTransform: 'none' }}>
             Sil
           </Button>
         </DialogActions>

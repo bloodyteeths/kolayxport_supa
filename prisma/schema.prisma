@@ -50,6 +50,7 @@ model User {
   ebayTrackedProducts EbayTrackedProduct[]
   ebayTrackedSellers  EbayTrackedSeller[]
   ebayNicheResearch   EbayNicheResearch[]
+  rankTrackedKeywords RankTrackedKeyword[]
 }
 
 model Account {
@@ -558,4 +559,38 @@ model EbayNicheResearch {
 
   @@index([userId])
   @@index([userId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Etsy Keyword Rank Tracking
+// ---------------------------------------------------------------------------
+
+model RankTrackedKeyword {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  etsyShopId      String
+  etsyListingId   String
+  listingTitle    String   @default("")
+  keyword         String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  snapshots       RankSnapshot[]
+
+  @@unique([userId, etsyListingId, keyword])
+  @@index([userId, isActive])
+  @@index([etsyListingId])
+}
+
+model RankSnapshot {
+  id           String   @id @default(cuid())
+  keywordId    String
+  keyword      RankTrackedKeyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  rank         Int?
+  page         Int?
+  totalResults Int      @default(0)
+  checkedAt    DateTime @default(now())
+
+  @@index([keywordId, checkedAt])
 }

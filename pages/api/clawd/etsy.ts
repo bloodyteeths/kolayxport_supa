@@ -2135,6 +2135,7 @@ export default async function handler(
                 };
             });
 
+            res.setHeader('Cache-Control', 'private, max-age=300');
             return res.status(200).json({
                 count: data.count || listings.length,
                 listings,
@@ -2338,6 +2339,191 @@ export default async function handler(
                 { method: 'DELETE' }
             );
             return res.status(200).json({ success: true });
+        }
+
+        // ===================================================================
+        // Keyword Rank Tracking
+        // ===================================================================
+
+        // GET /api/clawd/etsy?action=check_keyword_rank&keyword=X&listing_id=Y
+        if (req.method === 'GET' && action === 'check_keyword_rank') {
+            const keyword = req.query.keyword as string;
+            const listingId = req.query.listing_id as string;
+            if (!keyword || !listingId) {
+                return res.status(400).json({ error: 'keyword and listing_id are required' });
+            }
+
+            let rank: number | null = null;
+            let page: number | null = null;
+            let totalResults = 0;
+            const maxPages = 5; // Check up to 500 results
+
+            for (let p = 0; p < maxPages; p++) {
+                const params = new URLSearchParams({
+                    keywords: keyword,
+                    limit: '100',
+                    offset: String(p * 100),
+                    sort_on: 'score',
+                    sort_order: 'desc',
+                });
+
+                const data = p === 0
+                    ? await callEtsyPublicAPI(`/listings/active?${params}`)
+                    : await rateLimitedPublicCall(`/listings/active?${params}`);
+
+                if (p === 0) totalResults = data.count || 0;
+                const results: any[] = data.results || [];
+
+                const idx = results.findIndex((r: any) => String(r.listing_id) === String(listingId));
+                if (idx !== -1) {
+                    rank = p * 100 + idx + 1;
+                    page = p + 1;
+                    break;
+                }
+
+                // Stop if we've exhausted results
+                if (results.length < 100) break;
+            }
+
+            return res.status(200).json({ rank, page, totalResults });
+        }
+
+        // POST /api/clawd/etsy?action=add_tracked_keyword
+        if (req.method === 'POST' && action === 'add_tracked_keyword') {
+            const { keyword, listing_id, listing_title } = req.body;
+            if (!keyword || !listing_id) {
+                return res.status(400).json({ error: 'keyword and listing_id are required' });
+            }
+
+            // Get userId from shop
+            const shop = await prisma.etsyShop.findFirst({ where: { shopId, isActive: true }, select: { userId: true } });
+            if (!shop) return res.status(404).json({ error: 'Shop not found' });
+            const userId = shop.userId;
+
+            // Upsert the tracked keyword
+            const tracked = await prisma.rankTrackedKeyword.upsert({
+                where: {
+                    userId_etsyListingId_keyword: {
+                        userId,
+                        etsyListingId: String(listing_id),
+                        keyword: keyword.toLowerCase().trim(),
+                    },
+                },
+                update: { isActive: true, listingTitle: listing_title || '' },
+                create: {
+                    userId,
+                    etsyShopId: shopId,
+                    etsyListingId: String(listing_id),
+                    listingTitle: listing_title || '',
+                    keyword: keyword.toLowerCase().trim(),
+                },
+            });
+
+            // Immediately check rank
+            let rank: number | null = null;
+            let page: number | null = null;
+            let totalResults = 0;
+
+            try {
+                for (let p = 0; p < 5; p++) {
+                    const params = new URLSearchParams({
+                        keywords: keyword,
+                        limit: '100',
+                        offset: String(p * 100),
+                        sort_on: 'score',
+                        sort_order: 'desc',
+                    });
+                    const data = p === 0
+                        ? await callEtsyPublicAPI(`/listings/active?${params}`)
+                        : await rateLimitedPublicCall(`/listings/active?${params}`);
+                    if (p === 0) totalResults = data.count || 0;
+                    const results: any[] = data.results || [];
+                    const idx = results.findIndex((r: any) => String(r.listing_id) === String(listing_id));
+                    if (idx !== -1) {
+                        rank = p * 100 + idx + 1;
+                        page = p + 1;
+                        break;
+                    }
+                    if (results.length < 100) break;
+                }
+
+                await prisma.rankSnapshot.create({
+                    data: {
+                        keywordId: tracked.id,
+                        rank,
+                        page,
+                        totalResults,
+                    },
+                });
+            } catch (rankErr: any) {
+                logger.error('Rank check failed on add:', rankErr);
+            }
+
+            return res.status(200).json({ tracked, rank, page, totalResults });
+        }
+
+        // DELETE /api/clawd/etsy?action=remove_tracked_keyword&keyword_id=X
+        if (req.method === 'DELETE' && action === 'remove_tracked_keyword') {
+            const keywordId = req.query.keyword_id as string;
+            if (!keywordId) return res.status(400).json({ error: 'keyword_id is required' });
+
+            await prisma.rankTrackedKeyword.update({
+                where: { id: keywordId },
+                data: { isActive: false },
+            });
+            return res.status(200).json({ success: true });
+        }
+
+        // GET /api/clawd/etsy?action=get_tracked_keywords
+        if (req.method === 'GET' && action === 'get_tracked_keywords') {
+            const shop = await prisma.etsyShop.findFirst({ where: { shopId, isActive: true }, select: { userId: true } });
+            if (!shop) return res.status(404).json({ error: 'Shop not found' });
+            const userId = shop.userId;
+            const keywords = await prisma.rankTrackedKeyword.findMany({
+                where: { userId, isActive: true },
+                include: {
+                    snapshots: {
+                        orderBy: { checkedAt: 'desc' },
+                        take: 2, // latest + previous for change calculation
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+            });
+
+            const result = keywords.map((kw) => {
+                const latest = kw.snapshots[0] || null;
+                const previous = kw.snapshots[1] || null;
+                const change = latest?.rank != null && previous?.rank != null
+                    ? previous.rank - latest.rank // positive = improved
+                    : null;
+                return {
+                    id: kw.id,
+                    keyword: kw.keyword,
+                    etsyListingId: kw.etsyListingId,
+                    listingTitle: kw.listingTitle,
+                    rank: latest?.rank ?? null,
+                    page: latest?.page ?? null,
+                    totalResults: latest?.totalResults ?? 0,
+                    change,
+                    checkedAt: latest?.checkedAt ?? null,
+                };
+            });
+
+            return res.status(200).json({ keywords: result });
+        }
+
+        // GET /api/clawd/etsy?action=get_rank_history&keyword_id=X
+        if (req.method === 'GET' && action === 'get_rank_history') {
+            const keywordId = req.query.keyword_id as string;
+            if (!keywordId) return res.status(400).json({ error: 'keyword_id is required' });
+
+            const snapshots = await prisma.rankSnapshot.findMany({
+                where: { keywordId },
+                orderBy: { checkedAt: 'asc' },
+                take: 60, // ~30 days at 2x/day
+            });
+
+            return res.status(200).json({ snapshots });
         }
 
         // Invalid request

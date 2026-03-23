@@ -486,6 +486,15 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   const [seasonalData, setSeasonalData] = useState<SeasonalData | null>(null);
   const [seasonalLoading, setSeasonalLoading] = useState(false);
 
+  // --- NEW: Rank Tracker ---
+  const [trackedKeywords, setTrackedKeywords] = useState<any[]>([]);
+  const [rankLoading, setRankLoading] = useState(false);
+  const [rankKeywordInput, setRankKeywordInput] = useState('');
+  const [rankListingId, setRankListingId] = useState<number | null>(null);
+  const [rankAddLoading, setRankAddLoading] = useState(false);
+  const [expandedRankId, setExpandedRankId] = useState<string | null>(null);
+  const [rankHistory, setRankHistory] = useState<any[]>([]);
+
   useEffect(() => { setSavedSearches(loadSavedSearches()); }, []);
 
   // --- Section/Tab navigation ---
@@ -497,6 +506,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       tabs: [
         { idx: 9, label: 'Kâr Hesaplama', icon: <Calculator size={14} />, tip: 'Etsy komisyonları dahil net kârınızı hesaplayın' },
         { idx: 10, label: 'SEO Karşılaştırma', icon: <TrendingUp size={14} />, tip: 'Başlık ve taglarınızı rakiplerle kıyaslayın' },
+        { idx: 11, label: 'Sıralama Takibi', icon: <Target size={14} />, tip: 'Listelerinizin Etsy aramada kaçıncı sırada olduğunu takip edin' },
       ],
     },
     {
@@ -540,6 +550,91 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       .slice(0, 8)
       .map(([tag]) => tag);
   }, [userListings]);
+
+  // ---------------------------------------------------------------------------
+  // Rank Tracker functions
+  // ---------------------------------------------------------------------------
+
+  const fetchTrackedKeywords = useCallback(async () => {
+    if (!shopId) return;
+    setRankLoading(true);
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=get_tracked_keywords&shop_id=${shopId}`);
+      if (!res.ok) throw new Error('Takip edilen kelimeler alinamadi');
+      const data = await res.json();
+      setTrackedKeywords(data.keywords || []);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setRankLoading(false);
+    }
+  }, [shopId]);
+
+  const addTrackedKeyword = useCallback(async () => {
+    if (!rankKeywordInput.trim() || !rankListingId || !shopId) return;
+    setRankAddLoading(true);
+    try {
+      const listing = userListings?.find((l: any) => (l.listing_id || l.id) === rankListingId);
+      const res = await fetch(`/api/clawd/etsy?action=add_tracked_keyword&shop_id=${shopId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword: rankKeywordInput.trim(),
+          listing_id: rankListingId,
+          listing_title: listing?.title || '',
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Eklenemedi');
+      }
+      const data = await res.json();
+      toast.success(
+        data.rank != null
+          ? `"${rankKeywordInput}" icin #${data.rank} sirada (Sayfa ${data.page})`
+          : `"${rankKeywordInput}" icin ilk 500'de bulunamadi`
+      );
+      setRankKeywordInput('');
+      fetchTrackedKeywords();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setRankAddLoading(false);
+    }
+  }, [rankKeywordInput, rankListingId, shopId, userListings, fetchTrackedKeywords]);
+
+  const removeTrackedKeyword = useCallback(async (keywordId: string) => {
+    try {
+      await fetch(`/api/clawd/etsy?action=remove_tracked_keyword&keyword_id=${keywordId}&shop_id=${shopId}`, {
+        method: 'DELETE',
+      });
+      setTrackedKeywords((prev) => prev.filter((k) => k.id !== keywordId));
+      toast.success('Takipten kaldirildi');
+    } catch {
+      toast.error('Silinemedi');
+    }
+  }, [shopId]);
+
+  const fetchRankHistory = useCallback(async (keywordId: string) => {
+    if (expandedRankId === keywordId) {
+      setExpandedRankId(null);
+      return;
+    }
+    setExpandedRankId(keywordId);
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=get_rank_history&keyword_id=${keywordId}&shop_id=${shopId}`);
+      if (!res.ok) throw new Error('Gecmis alinamadi');
+      const data = await res.json();
+      setRankHistory(data.snapshots || []);
+    } catch {
+      setRankHistory([]);
+    }
+  }, [expandedRankId, shopId]);
+
+  // Load tracked keywords when rank tab is selected
+  useEffect(() => {
+    if (tab === 11 && shopId) fetchTrackedKeywords();
+  }, [tab, shopId, fetchTrackedKeywords]);
 
   // ---------------------------------------------------------------------------
   // Emit market research data to parent
@@ -2667,6 +2762,221 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               }
             />
           )}
+        </Box>
+      )}
+
+      {/* ================================================================ */}
+      {/* TAB 11: RANK TRACKER                                              */}
+      {/* ================================================================ */}
+      {tab === 11 && (
+        <Box>
+          {/* Add keyword form */}
+          <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Target size={16} color="#667eea" /> Anahtar Kelime Takibe Al
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <Autocomplete
+                options={userListings || []}
+                getOptionLabel={(opt: any) => opt.title || `Listing #${opt.listing_id || opt.id}`}
+                value={userListings?.find((l: any) => (l.listing_id || l.id) === rankListingId) || null}
+                onChange={(_, val: any) => setRankListingId(val ? (val.listing_id || val.id) : null)}
+                renderOption={(props, opt: any) => (
+                  <li {...props} key={opt.listing_id || opt.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Avatar
+                        src={opt.thumbnail?.url_75x75 || ''}
+                        variant="rounded"
+                        sx={{ width: 32, height: 32, bgcolor: '#f5f5f5' }}
+                      >
+                        <ShoppingBag size={14} />
+                      </Avatar>
+                      <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }}>
+                        {opt.title || `#${opt.listing_id || opt.id}`}
+                      </Typography>
+                    </Box>
+                  </li>
+                )}
+                renderInput={(params) => (
+                  <TextField {...params} size="small" label="Listeleme Seçin" placeholder="Listeleme ara..." />
+                )}
+                isOptionEqualToValue={(opt: any, val: any) => (opt.listing_id || opt.id) === (val.listing_id || val.id)}
+                sx={{ flex: 2, minWidth: 200 }}
+              />
+              <TextField
+                size="small"
+                label="Anahtar Kelime"
+                placeholder="baby blanket, crochet dress..."
+                value={rankKeywordInput}
+                onChange={(e) => setRankKeywordInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addTrackedKeyword(); }}
+                sx={{ flex: 1, minWidth: 150 }}
+              />
+              <Button
+                variant="contained"
+                onClick={addTrackedKeyword}
+                disabled={rankAddLoading || !rankKeywordInput.trim() || !rankListingId}
+                startIcon={rankAddLoading ? <CircularProgress size={14} /> : <Target size={14} />}
+                sx={{
+                  background: GRADIENTS.primary, borderRadius: '10px', textTransform: 'none',
+                  fontWeight: 600, whiteSpace: 'nowrap',
+                }}
+              >
+                Takip Et
+              </Button>
+            </Box>
+          </Paper>
+
+          {/* Tracked keywords table */}
+          {rankLoading ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}><CircularProgress size={32} /></Box>
+          ) : trackedKeywords.length === 0 ? (
+            <PremiumEmptyState
+              icon={<Target size={64} />}
+              title="Sıralama Takibi"
+              desc="Listelerinizin Etsy aramada kaçıncı sırada olduğunu takip edin"
+              steps={[
+                'Yukarıdan bir listeleme seçin',
+                'Takip etmek istediğiniz anahtar kelimeyi girin',
+                '"Takip Et" butonuna basın — anında sıralama sonucunu görün',
+                'Her 12 saatte otomatik güncellenir',
+              ]}
+            />
+          ) : (
+            <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: 'rgba(102,126,234,0.06)' }}>
+                      <TableCell sx={{ fontWeight: 700 }}>Anahtar Kelime</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>Listeleme</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">Sıra</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">Sayfa</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">Değişim</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">Son Kontrol</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center" />
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {trackedKeywords.map((kw) => {
+                      const rankColor = kw.rank == null ? '#eb3349'
+                        : kw.rank <= 10 ? '#11998e'
+                        : kw.rank <= 48 ? '#F2994A'
+                        : kw.rank <= 96 ? '#e67e22'
+                        : '#eb3349';
+                      const changeIcon = kw.change == null ? ''
+                        : kw.change > 0 ? `↑${kw.change}`
+                        : kw.change < 0 ? `↓${Math.abs(kw.change)}`
+                        : '—';
+                      const changeColor = kw.change > 0 ? '#11998e' : kw.change < 0 ? '#eb3349' : '#999';
+
+                      return (
+                        <React.Fragment key={kw.id}>
+                          <TableRow
+                            hover
+                            onClick={() => fetchRankHistory(kw.id)}
+                            sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' } }}
+                          >
+                            <TableCell>
+                              <Chip label={kw.keyword} size="small" sx={{ fontWeight: 600 }} />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="caption" sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                                {kw.listingTitle || `#${kw.etsyListingId}`}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Chip
+                                label={kw.rank != null ? `#${kw.rank}` : 'Yok'}
+                                size="small"
+                                sx={{
+                                  bgcolor: rankColor, color: '#fff', fontWeight: 700,
+                                  fontSize: '0.75rem', minWidth: 48,
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell align="center">
+                              <Typography variant="body2" fontWeight={600}>
+                                {kw.page != null ? kw.page : '—'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Typography variant="body2" sx={{ color: changeColor, fontWeight: 700 }}>
+                                {changeIcon || '—'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Typography variant="caption" color="text.secondary">
+                                {kw.checkedAt ? new Date(kw.checkedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <IconButton size="small" onClick={(e) => { e.stopPropagation(); removeTrackedKeyword(kw.id); }}>
+                                <Trash2 size={14} color="#e53935" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                          {/* Expanded rank history */}
+                          {expandedRankId === kw.id && (
+                            <TableRow>
+                              <TableCell colSpan={7} sx={{ bgcolor: 'rgba(102,126,234,0.03)', py: 2 }}>
+                                {rankHistory.length > 1 ? (
+                                  <Box>
+                                    <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block' }}>
+                                      Son 30 gün sıralama geçmişi (düşük = daha iyi)
+                                    </Typography>
+                                    <Box sx={{ height: 120 }}>
+                                      <TrendChart
+                                        data={rankHistory.map((s: any) => ({
+                                          date: new Date(s.checkedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }),
+                                          value: s.rank != null ? Math.max(1, 500 - s.rank) : 0,
+                                        }))}
+                                        height={120}
+                                        color={rankColor}
+                                      />
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                                      {rankHistory.slice(-5).reverse().map((s: any, i: number) => (
+                                        <Chip
+                                          key={i}
+                                          size="small"
+                                          variant="outlined"
+                                          label={`${new Date(s.checkedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}: ${s.rank != null ? `#${s.rank}` : 'Yok'}`}
+                                          sx={{ fontSize: '0.7rem' }}
+                                        />
+                                      ))}
+                                    </Box>
+                                  </Box>
+                                ) : (
+                                  <Typography variant="caption" color="text.secondary">
+                                    Henüz yeterli veri yok — 12 saat sonra ilk güncelleme gelecek
+                                  </Typography>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          )}
+
+          {/* Rank legend */}
+          <Box sx={{ display: 'flex', gap: 1.5, mt: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+            {[
+              { label: 'Sayfa 1 (1-48)', color: '#11998e' },
+              { label: 'Sayfa 2 (49-96)', color: '#e67e22' },
+              { label: '96+', color: '#eb3349' },
+            ].map((item) => (
+              <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: item.color }} />
+                <Typography variant="caption" color="text.secondary">{item.label}</Typography>
+              </Box>
+            ))}
+          </Box>
         </Box>
       )}
 

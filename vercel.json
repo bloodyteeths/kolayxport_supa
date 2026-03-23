@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/reset-usage",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/track-ranks",
+      "schedule": "0 */12 * * *"
     }
   ],
   "build": {

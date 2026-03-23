@@ -200,7 +200,7 @@ const DIMENSION_UNITS = [
   { value: 'cm', label: 'cm' },
 ];
 
-const DRAWER_WIDTH = 550;
+const DRAWER_WIDTH = 800;
 
 // ---------------------------------------------------------------------------
 // Draft persistence (localStorage)
@@ -343,8 +343,14 @@ export default function ListingEditorDrawer({
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
 
-  // Accordion expanded state
-  const [expanded, setExpanded] = useState<string | false>('basics');
+  // Rank check state
+  const [rankCheckOpen, setRankCheckOpen] = useState(false);
+  const [rankKeyword, setRankKeyword] = useState('');
+  const [rankResult, setRankResult] = useState<{ rank: number | null; page: number | null; totalResults: number } | null>(null);
+  const [rankLoading, setRankLoading] = useState(false);
+
+  // Accordion expanded state — default to SEO
+  const [expanded, setExpanded] = useState<string | false>('seo');
 
   // Auto-save state
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'unsaved' | 'saving' | 'saved' | 'error'>('idle');
@@ -612,13 +618,15 @@ export default function ListingEditorDrawer({
   const handleAIOptimizeTitle = useCallback(async () => {
     const result = await callAI('optimize_title');
     const newTitle = result?.optimized_title || result?.title;
-    if (newTitle) {
-      updateField('title', newTitle);
-      if (result.explanation) {
-        toast.success(result.explanation);
-      } else {
-        toast.success('Baslik optimize edildi');
-      }
+    if (!newTitle) {
+      toast.error('AI baslik olusturamadi — tekrar deneyin');
+      return;
+    }
+    updateField('title', newTitle);
+    if (result.explanation) {
+      toast.success(result.explanation);
+    } else {
+      toast.success('Baslik optimize edildi');
     }
   }, [callAI]);
 
@@ -638,6 +646,43 @@ export default function ListingEditorDrawer({
       toast.success(`${tags.length} etiket onerisi alindi`);
     }
   }, [callAI]);
+
+  const handleRankCheck = useCallback(async () => {
+    if (!rankKeyword.trim() || !listingId) return;
+    setRankLoading(true);
+    setRankResult(null);
+    try {
+      const res = await fetch(
+        `/api/clawd/etsy?action=check_keyword_rank&keyword=${encodeURIComponent(rankKeyword.trim())}&listing_id=${listingId}&shop_id=${shopId}`
+      );
+      if (!res.ok) throw new Error('Sıralama kontrol edilemedi');
+      const data = await res.json();
+      setRankResult(data);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setRankLoading(false);
+    }
+  }, [rankKeyword, listingId, shopId]);
+
+  const handleAddToTracking = useCallback(async () => {
+    if (!rankKeyword.trim() || !listingId) return;
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=add_tracked_keyword&shop_id=${shopId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword: rankKeyword.trim(),
+          listing_id: listingId,
+          listing_title: fields?.title || '',
+        }),
+      });
+      if (!res.ok) throw new Error('Takibe alinamadi');
+      toast.success('Takibe alindi — Pazar Araştırma > Sıralama Takibi sekmesinden takip edin');
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  }, [rankKeyword, listingId, shopId, fields?.title]);
 
   // --------------------------------------------------
   // Trigger fetch on open / listingId change
@@ -1248,11 +1293,11 @@ export default function ListingEditorDrawer({
                 }}
               />
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                {autoSaveStatus === 'unsaved' && 'Degisiklik var'}
-                {autoSaveStatus === 'saving' && 'Taslak kaydediliyor...'}
+                {autoSaveStatus === 'unsaved' && 'Degisiklik var (henuz Etsy\'ye gonderilmedi)'}
+                {autoSaveStatus === 'saving' && 'Yerel taslak kaydediliyor...'}
                 {autoSaveStatus === 'saved' &&
-                  `Taslak kaydedildi${lastSavedAt ? ` ${lastSavedAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
-                {autoSaveStatus === 'error' && 'Taslak kayit hatasi'}
+                  `Yerel taslak kaydedildi (Etsy'ye gondermek icin "Etsy'ye Kaydet" basin)${lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
+                {autoSaveStatus === 'error' && 'Yerel taslak kayit hatasi'}
                 {autoSaveStatus === 'idle' && ''}
               </Typography>
             </Box>
@@ -1287,6 +1332,96 @@ export default function ListingEditorDrawer({
           renderErrorState()
         ) : fields && listing ? (
           <Box sx={{ overflow: 'auto', flex: 1, pb: 10 }}>
+            {/* ============================================================ */}
+            {/* SEO Analizi (top priority) */}
+            {/* ============================================================ */}
+            <Accordion
+              expanded={expanded === 'seo'}
+              onChange={handleAccordionChange('seo')}
+              disableGutters
+              elevation={0}
+              sx={{ '&:before': { display: 'none' } }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography fontWeight={600}>SEO Analizi</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <SEOIndicator
+                  tags={fields.tags}
+                  title={fields.title}
+                  description={fields.description}
+                  compact={false}
+                />
+
+                {/* Quick Rank Check */}
+                <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #eee' }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setRankCheckOpen(true)}
+                    sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
+                  >
+                    Sıralama Kontrol
+                  </Button>
+                </Box>
+
+                <Dialog open={rankCheckOpen} onClose={() => setRankCheckOpen(false)} maxWidth="xs" fullWidth
+                  sx={{ zIndex: 1600 }}
+                >
+                  <DialogTitle sx={{ fontWeight: 700 }}>Sıralama Kontrol</DialogTitle>
+                  <DialogContent>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Anahtar Kelime"
+                      placeholder="baby blanket, crochet dress..."
+                      value={rankKeyword}
+                      onChange={(e) => setRankKeyword(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleRankCheck(); }}
+                      sx={{ mt: 1, mb: 2 }}
+                    />
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      onClick={handleRankCheck}
+                      disabled={rankLoading || !rankKeyword.trim()}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', mb: 2 }}
+                    >
+                      {rankLoading ? <CircularProgress size={18} /> : 'Kontrol Et'}
+                    </Button>
+                    {rankResult && (
+                      <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f8f9fa', borderRadius: '8px' }}>
+                        {rankResult.rank != null ? (
+                          <>
+                            <Typography variant="h4" sx={{ fontWeight: 800, color: rankResult.rank <= 10 ? '#11998e' : rankResult.rank <= 48 ? '#F2994A' : '#eb3349' }}>
+                              #{rankResult.rank}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Sayfa {rankResult.page} · {rankResult.totalResults.toLocaleString()} sonuç içinde
+                            </Typography>
+                          </>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            İlk 500 sonuçta bulunamadı ({rankResult.totalResults.toLocaleString()} toplam)
+                          </Typography>
+                        )}
+                        <Button
+                          size="small"
+                          onClick={handleAddToTracking}
+                          sx={{ mt: 1, textTransform: 'none' }}
+                        >
+                          Takibe Al
+                        </Button>
+                      </Box>
+                    )}
+                  </DialogContent>
+                  <DialogActions>
+                    <Button onClick={() => setRankCheckOpen(false)}>Kapat</Button>
+                  </DialogActions>
+                </Dialog>
+              </AccordionDetails>
+            </Accordion>
+
             {/* ============================================================ */}
             {/* 1. Temel Bilgiler */}
             {/* ============================================================ */}
@@ -1582,30 +1717,6 @@ export default function ListingEditorDrawer({
                     )}
                   />
                 </Box>
-              </AccordionDetails>
-            </Accordion>
-
-            {/* ============================================================ */}
-            {/* 2. SEO Analizi */}
-            {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'seo'}
-              onChange={handleAccordionChange('seo')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>SEO Analizi</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <SEOIndicator
-                  tags={fields.tags}
-                  title={fields.title}
-                  description={fields.description}
-                  compact={false}
-                />
-
               </AccordionDetails>
             </Accordion>
 
@@ -2164,7 +2275,7 @@ export default function ListingEditorDrawer({
                 onClick={handleSave}
                 disabled={saving || !hasChanges()}
               >
-                {saving ? 'Kaydediliyor...' : listing?.state === 'active' ? 'Degisiklikleri Kaydet' : 'Draft Olarak Kaydet'}
+                {saving ? 'Etsy\'ye kaydediliyor...' : listing?.state === 'active' ? 'Etsy\'ye Kaydet' : 'Etsy\'ye Draft Kaydet'}
               </Button>
               <Button
                 variant="outlined"

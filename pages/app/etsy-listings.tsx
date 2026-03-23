@@ -327,26 +327,34 @@ function EtsyListingsPage() {
     if (!selectedShopId) return;
     setLoading(true);
     try {
-      const allRows: EtsyListingRow[] = [];
-      let offset = 0;
       const limit = 100;
-      let total = 0;
+      const buildUrl = (offset: number) =>
+        `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&limit=${limit}&offset=${offset}&state=${statusFilter}`;
 
-      // Paginate through all listings (Etsy max 100 per request)
-      do {
-        const res = await fetch(
-          `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&limit=${limit}&offset=${offset}&state=${statusFilter}`
+      // First page to get total count
+      const firstRes = await fetch(buildUrl(0));
+      if (!firstRes.ok) {
+        const errData = await firstRes.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${firstRes.status}`);
+      }
+      const firstData = await firstRes.json();
+      const total = firstData.count || 0;
+      const firstResults: any[] = firstData.listings || firstData.results || [];
+      const allRows: EtsyListingRow[] = firstResults.map(mapListing);
+
+      // Fetch remaining pages in parallel
+      if (total > limit) {
+        const remainingPages = Math.ceil((total - limit) / limit);
+        const fetches = Array.from({ length: remainingPages }, (_, i) =>
+          fetch(buildUrl((i + 1) * limit)).then(async (res) => {
+            if (!res.ok) return [];
+            const data = await res.json();
+            return (data.listings || data.results || []).map(mapListing);
+          })
         );
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `HTTP ${res.status}`);
-        }
-        const data = await res.json();
-        const results: any[] = data.listings || data.results || [];
-        total = data.count || 0;
-        allRows.push(...results.map(mapListing));
-        offset += limit;
-      } while (offset < total);
+        const pages = await Promise.all(fetches);
+        pages.forEach((rows) => allRows.push(...rows));
+      }
 
       setListings(allRows);
       setTotalCount(total || allRows.length);
@@ -397,6 +405,13 @@ function EtsyListingsPage() {
     setPaginationModel((prev) => (prev.page !== 0 ? { ...prev, page: 0 } : prev));
   }, [searchTerm, sectionFilter, excludeTerm, healthFilter]);
 
+  // Pre-compute health scores to avoid recalculating per filter toggle
+  const healthMap = useMemo(() => {
+    const map = new Map<number, ReturnType<typeof calculateHealth>>();
+    listings.forEach((l) => map.set(l.listing_id, calculateHealth(l)));
+    return map;
+  }, [listings]);
+
   // --- Client-side filtering ---
   const filteredListings = useMemo(() => {
     let result = listings;
@@ -419,7 +434,7 @@ function EtsyListingsPage() {
     }
     if (healthFilter) {
       result = result.filter((l) => {
-        const h = calculateHealth(l);
+        const h = healthMap.get(l.listing_id) || calculateHealth(l);
         switch (healthFilter) {
           case 'issues': return h.overall < 70;
           case 'missing_images': return l.image_count < 10;
@@ -433,7 +448,7 @@ function EtsyListingsPage() {
       });
     }
     return result;
-  }, [listings, searchTerm, sectionFilter, excludeTerm, healthFilter]);
+  }, [listings, searchTerm, sectionFilter, excludeTerm, healthFilter, healthMap]);
 
   // --- Delete listing ---
   const handleDeleteListing = useCallback(
@@ -700,6 +715,7 @@ function EtsyListingsPage() {
               component="img"
               src={thumb.url_170x135}
               alt=""
+              loading="lazy"
               sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1 }}
             />
           ) : (

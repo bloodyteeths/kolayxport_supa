@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
-import { ChevronDown, Star, Truck, BarChart3, Box } from 'lucide-react';
+import { ChevronDown, Star, Truck, BarChart3, Box, Search, Sparkles, TrendingUp, ShoppingBag, Globe, Layers, Brain, Target, Zap } from 'lucide-react';
 import { Disclosure, Transition } from '@headlessui/react';
 import { supabase } from '@/lib/supabase';
 import { FAQPageJsonLd } from 'next-seo';
@@ -21,31 +21,50 @@ const trustLogos = [
 
 const features = [
   {
+    icon: Brain,
+    title: 'AI Listeleme Asistanı',
+    description: 'Yapay zeka ile başlık optimizasyonu, açıklama oluşturma, fiyat önerileri ve listeleme analizi. Satışlarınızı AI ile katlamaya başlayın.',
+  },
+  {
+    icon: Search,
+    title: 'Pazar Araştırması',
+    description: 'Rakip analizi, niş keşfi, anahtar kelime istihbaratı ve trend takibi. Veri odaklı kararlarla satışlarınızı büyütün.',
+  },
+  {
+    icon: ShoppingBag,
+    title: 'Listeleme Yönetimi',
+    description: 'Etsy ve eBay listelerinizi tek panelden oluşturun, düzenleyin, kopyalayın ve toplu işlem yapın. Varyant, görsel ve kargo profili dahil.',
+  },
+  {
     icon: Truck,
     title: 'Otomatik Kargo Etiketi',
-    description: 'FedEx, Yurtiçi, Aras… algoritmamız en ucuz ve zamanında opsiyonu seçer, etiketlerinizi otomatik oluşturur.',
+    description: 'FedEx, UPS, Yurtiçi, Aras… algoritmamız en ucuz opsiyonu seçer, etiketlerinizi otomatik oluşturur.',
   },
   {
-    icon: Box,
-    title: 'Gerçek Zamanlı Envanter',
-    description: 'Tüm satış kanallarınızdaki stoklarınızı tek merkezden yönetin, fazla satışı ve stok eksikliğini önleyin.',
+    icon: TrendingUp,
+    title: 'Finansal İstihbarat',
+    description: 'Kar marjı hesaplama, komisyon analizi, gelir raporları ve satıcı performans takibi ile finansal sağlığınızı izleyin.',
   },
   {
-    icon: BarChart3,
-    title: 'Finans Analizi',
-    description: 'Gelir-gider takibi, karlılık raporları ve pazar yeri komisyon hesaplamaları ile finansal sağlığınızı izleyin.',
+    icon: Layers,
+    title: 'Çoklu Kanal Senkronizasyonu',
+    description: 'Sipariş, envanter ve takip bilgilerini tüm pazaryerlerinde anlık senkronize edin. Fazla satış ve stok hatalarını önleyin.',
   },
 ];
 
 const includedFeatures = [
-  'Sınırsız Sipariş Yönetimi',
-  'Tüm Pazaryeri Entegrasyonları',
-  'Otomatik Kargo Etiketi',
-  'Gerçek Zamanlı Envanter Senkronizasyonu',
+  'AI Başlık & Açıklama Optimizasyonu',
+  'Rakip Analizi & Satıcı Takibi',
+  'Niş Keşfi & Trend Analizi',
+  'Anahtar Kelime İstihbaratı',
+  'Toplu Listeleme Yönetimi',
+  'Kar Marjı & Komisyon Hesaplayıcı',
+  'Otomatik Kargo Etiketi (FedEx, UPS)',
+  'Çoklu Pazaryeri Senkronizasyonu',
+  'Gerçek Zamanlı Envanter Takibi',
+  'Sipariş & Takip Yönetimi',
   'Türkçe Arayüz & Destek',
   'SSL ile Şifreli Bağlantı',
-  'Çoklu Kargo Firması Desteği',
-  'Detaylı Raporlama',
 ];
 
 const testimonials = [
@@ -79,11 +98,19 @@ const faqItems = [
   },
   {
     question: 'Hangi pazar yerleri ve kargo firmaları destekleniyor?',
-    answer: 'Etsy, Trendyol, Hepsiburada, Amazon, n11, Shopify, WooCommerce gibi popüler pazar yerlerini ve FedEx, UPS, Yurtiçi Kargo, Aras Kargo gibi önde gelen kargo firmalarını destekliyoruz. Entegrasyon listemiz sürekli genişlemektedir.',
+    answer: 'Etsy, eBay, Trendyol, Hepsiburada, Amazon, n11, Shopify, WooCommerce gibi popüler pazar yerlerini ve FedEx, UPS, Yurtiçi Kargo, Aras Kargo gibi önde gelen kargo firmalarını destekliyoruz. Entegrasyon listemiz sürekli genişlemektedir.',
+  },
+  {
+    question: 'AI araçları nasıl çalışıyor?',
+    answer: 'KolayXport\'un AI asistanı, Etsy ve eBay listeleriniz için başlık optimizasyonu, açıklama oluşturma, fiyat önerileri ve listeleme analizi yapabilir. Pazar verilerini analiz ederek satışlarınızı artıracak öneriler sunar.',
+  },
+  {
+    question: 'Pazar araştırması araçları neler sunuyor?',
+    answer: 'Rakip analizi, satıcı takibi, niş keşfi, anahtar kelime istihbaratı, trend analizi ve kar marjı hesaplama gibi araçlarla veri odaklı satış kararları almanızı sağlar. eRank ve Terapeak gibi ücretli araçlara alternatiftir.',
   },
   {
     question: 'Veri güvenliğim nasıl sağlanıyor?',
-    answer: 'Veri güvenliğiniz bizim için en üst düzey önceliktir. Tüm bağlantılar SSL ile şifrelenir, hassas verileriniz (API anahtarları vb.) veritabanımızda şifreli olarak saklanır ve Google Cloud Platformunun güvenlik altyapısını kullanırız.',
+    answer: 'Veri güvenliğiniz bizim için en üst düzey önceliktir. Tüm bağlantılar SSL ile şifrelenir, hassas verileriniz (API anahtarları vb.) veritabanımızda şifreli olarak saklanır.',
   },
   {
     question: 'Ücretsiz deneme sürümü mevcut mu?',
@@ -119,10 +146,10 @@ const HeroSection = () => (
     <div aria-hidden className="absolute inset-0 -z-10 bg-[url('/noise.png')] opacity-10" />
     <div className="mx-auto max-w-7xl px-6 pt-28 pb-20 sm:pt-36 sm:pb-24 text-center">
       <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900">
-        Bütün Marketplacelere <span className="text-primary">Tek Panelden</span> Hükmedin.
+        AI Destekli <span className="text-primary">E-Ticaret Komuta Merkezi</span>
       </h1>
       <p className="mt-6 mx-auto max-w-2xl text-lg text-slate-600">
-        Sipariş yönetimi, kargo, envanter senkronizasyonu—%100 Türkçe, hepsi tek tıkla.
+        Pazar araştırması, AI listeleme, rakip analizi, sipariş yönetimi ve kargo—Etsy & eBay için ihtiyacınız olan her şey, %100 Türkçe.
       </p>
 
       <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-x-6">
@@ -147,8 +174,8 @@ const HeroSection = () => (
 export default function HomePage() {
   return (
     <PublicLayout 
-      title="KolayXport – E-commerce Automation Platform" 
-      description="Automate orders, shipping, inventory and invoicing from one dashboard." 
+      title="KolayXport – AI Destekli E-Ticaret Komuta Merkezi | Etsy & eBay Araçları"
+      description="AI listeleme, pazar araştırması, rakip analizi, sipariş yönetimi ve kargo—Etsy & eBay satıcıları için hepsi tek panelde." 
       seo={{
         openGraph: {
           images: [
@@ -209,12 +236,12 @@ export default function HomePage() {
       >
         <div className="container max-w-7xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">İşinizi Otomatik Pilotta Yönetin</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Satış Araçlarınızın Tamamı Tek Yerde</h2>
             <p className="max-w-2xl mx-auto text-lg text-slate-600">
-              KolayXport, karmaşık e-ticaret süreçlerini basitleştirerek size zaman ve maliyet avantajı sağlar. <Link href="/entegrasyonlar" className="text-blue-600 hover:underline">Desteklenen entegrasyonları</Link> keşfedin.
+              Araştırma, listeleme, optimizasyon, sipariş ve kargo—KolayXport, e-ticaretin tüm aşamalarını kapsar. <Link href="/entegrasyonlar" className="text-blue-600 hover:underline">Desteklenen entegrasyonları</Link> keşfedin.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature) => (
               <motion.div
                 key={feature.title}
@@ -233,6 +260,80 @@ export default function HomePage() {
         </div>
       </motion.section>
 
+      {/* Section: MARKETPLACE POWER TOOLS */}
+      <motion.section
+        className="py-20 md:py-28 bg-white"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+        variants={sectionVariants}
+      >
+        <div className="container max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Etsy & eBay İçin Güçlü Araçlar</h2>
+            <p className="max-w-2xl mx-auto text-lg text-slate-600">
+              Sadece sipariş yönetimi değil—araştırmadan satışa kadar tüm süreci yönetin
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-10">
+            {/* Etsy Tools */}
+            <motion.div
+              className="relative bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 rounded-3xl p-8 md:p-10"
+              whileHover={{ scale: 1.01 }}
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <Image src="/logos/etsy.svg" alt="Etsy" width={60} height={24} className="h-6 w-auto" />
+                <span className="text-xs font-semibold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase tracking-wider">Tam Entegrasyon</span>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  'Pazar araştırması & trend analizi',
+                  'AI ile başlık ve açıklama optimizasyonu',
+                  'Listeleme oluşturma, düzenleme, kopyalama',
+                  'Varyant & envanter yönetimi',
+                  'Görsel ve video yükleme',
+                  'Kargo profili & iade politikaları',
+                  'Sipariş takibi & müşteri mesajları',
+                  'Kişiselleştirme ayarları',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                    <Zap size={16} className="text-orange-500 mt-0.5 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+            {/* eBay Tools */}
+            <motion.div
+              className="relative bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-3xl p-8 md:p-10"
+              whileHover={{ scale: 1.01 }}
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <span className="text-2xl font-bold text-blue-600 tracking-tight">eBay</span>
+                <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2.5 py-1 rounded-full uppercase tracking-wider">Tam Entegrasyon</span>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  'Rakip analizi & satıcı takibi',
+                  'AI başlık optimizasyonu & fiyat önerileri',
+                  'Niş analizi & ürün veritabanı',
+                  'Anahtar kelime istihbaratı',
+                  'Listeleme oluşturma & toplu düzenleme',
+                  'Kategori & item specifics rehberi',
+                  'Finansal istihbarat & kar analizi',
+                  'Sipariş yönetimi & kargo takibi',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                    <Zap size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          </div>
+        </div>
+      </motion.section>
+
       {/* Section 4: WHAT'S INCLUDED */}
       <motion.section
         className="py-20 md:py-28 bg-white"
@@ -243,12 +344,12 @@ export default function HomePage() {
       >
         <div className="container max-w-5xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Neler Dahil?</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Her Plana Dahil</h2>
             <p className="max-w-xl mx-auto text-lg text-slate-600">
-              Tüm planlarda standart olarak sunulan özellikler
+              Araştırmadan satışa, tüm araçlar elinizin altında
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {includedFeatures.map((feature) => (
               <div key={feature} className="flex items-center gap-3 bg-slate-50 rounded-xl px-5 py-4">
                 <svg className="w-6 h-6 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -308,10 +409,10 @@ export default function HomePage() {
       >
         <div className="container max-w-4xl mx-auto px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Hazır mısınız? Bugün entegrasyona başlayın.
+            Araştırma, Listeleme, Satış—Hepsini Tek Yerden Yönetin.
           </h2>
           <p className="max-w-xl mx-auto text-lg text-blue-100 mb-10">
-            KolayXport\'un gücünü keşfedin ve e-ticaret operasyonlarınızı bir üst seviyeye taşıyın. <Link href="/fiyatlandirma" className="text-blue-100 hover:text-white underline">Fiyatlandırma planlarını</Link> inceleyin.
+            AI destekli araçlarla Etsy ve eBay satışlarınızı büyütün. <Link href="/fiyatlandirma" className="text-blue-100 hover:text-white underline">Fiyatlandırma planlarını</Link> inceleyin.
           </p>
           <div className="mt-8">
             <Link href="/login" className="inline-block px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">

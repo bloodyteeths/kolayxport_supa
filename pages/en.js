@@ -3,51 +3,65 @@ import Link from 'next/link';
 import Image from 'next/image';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
-import { ChevronDown, Star, Truck, BarChart3, Box, ShoppingBag, Search, Tag } from 'lucide-react';
+import { ChevronDown, Star, Truck, BarChart3, Box, ShoppingBag, Search, Tag, Brain, TrendingUp, Layers, Zap } from 'lucide-react';
 import { Disclosure, Transition } from '@headlessui/react';
 
 const trustLogos = [
-  { name: 'Etsy', src: '/logos/etsy.svg', width: 100, height: 40 },
+  { name: 'Etsy', src: '/logos/etsy.svg', width: 80, height: 40 },
   { name: 'Amazon', src: '/logos/amazon.svg', width: 120, height: 40 },
-  { name: 'Trendyol', src: '/logos/trendyol.png', width: 140, height: 40 },
-  { name: 'Hepsiburada', src: '/logos/hepsiburada.png', width: 160, height: 40 },
-  { name: 'n11', src: '/logos/n11.svg', width: 80, height: 40 },
-  { name: 'Shopify', src: '/logos/shopify.svg', width: 130, height: 40 },
-  { name: 'WooCommerce', src: '/logos/woocommerce.svg', width: 180, height: 40 },
+  { name: 'Trendyol', src: '/logos/trendyol.png', width: 120, height: 40 },
+  { name: 'Hepsiburada', src: '/logos/hepsiburada.png', width: 120, height: 40 },
+  { name: 'n11', src: '/logos/n11.png', width: 120, height: 40 },
+  { name: 'Shopify', src: '/logos/shopify.jpg', width: 120, height: 40 },
+  { name: 'WooCommerce', src: '/logos/woocommerce.svg', width: 140, height: 40 },
 ];
 
 const features = [
   {
-    icon: Truck,
-    title: 'Automatic Shipping Labels',
-    description: 'FedEx, UPS, and more — our system selects the cheapest and fastest option and generates your labels automatically.',
-  },
-  {
-    icon: Box,
-    title: 'Real-Time Inventory',
-    description: 'Manage stock across all your sales channels from one central dashboard. Prevent overselling and stockouts.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Financial Analytics',
-    description: 'Revenue tracking, profitability reports, and marketplace commission calculations to monitor your financial health.',
+    icon: Brain,
+    title: 'AI Listing Assistant',
+    description: 'AI-powered title optimization, description generation, pricing suggestions, and listing analysis. Multiply your sales with AI.',
   },
   {
     icon: Search,
-    title: 'Market Research & SEO',
-    description: 'Analyze pricing trends, discover competitors, optimize your listing titles and tags with AI-powered insights.',
+    title: 'Market Research',
+    description: 'Competitor analysis, niche discovery, keyword intelligence, and trend tracking. Make data-driven decisions to grow sales.',
+  },
+  {
+    icon: ShoppingBag,
+    title: 'Listing Management',
+    description: 'Create, edit, copy, and bulk-manage your Etsy and eBay listings from one dashboard. Variants, images, and shipping profiles included.',
+  },
+  {
+    icon: Truck,
+    title: 'Automatic Shipping Labels',
+    description: 'FedEx, UPS, and more — our system selects the cheapest option and generates your labels automatically.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Financial Intelligence',
+    description: 'Profit margin calculator, commission analysis, revenue reports, and seller performance tracking.',
+  },
+  {
+    icon: Layers,
+    title: 'Multi-Channel Sync',
+    description: 'Orders, inventory, and tracking synced in real-time across all marketplaces. Prevent overselling and stock errors.',
   },
 ];
 
 const includedFeatures = [
-  'Unlimited Order Management',
-  'All Marketplace Integrations',
-  'Automatic Shipping Labels',
-  'Real-Time Inventory Sync',
-  'Market Research & SEO Tools',
+  'AI Title & Description Optimization',
+  'Competitor Analysis & Seller Tracking',
+  'Niche Discovery & Trend Analysis',
+  'Keyword Intelligence',
+  'Bulk Listing Management',
+  'Profit Margin & Commission Calculator',
+  'Automatic Shipping Labels (FedEx, UPS)',
+  'Multi-Marketplace Sync',
+  'Real-Time Inventory Tracking',
+  'Order & Tracking Management',
   'SSL Encrypted Connections',
   'Multi-Carrier Support',
-  'Detailed Reporting & Analytics',
 ];
 
 const testimonials = [
@@ -78,7 +92,15 @@ const faqItems = [
   },
   {
     question: 'Which marketplaces and carriers are supported?',
-    answer: 'We support Etsy, Amazon, Trendyol, Hepsiburada, n11, Shopify, WooCommerce, and other popular marketplaces, along with FedEx, UPS, and other leading shipping carriers. Our integration list is constantly expanding.',
+    answer: 'We support Etsy, eBay, Trendyol, Hepsiburada, Amazon, n11, Shopify, WooCommerce, and other popular marketplaces, along with FedEx, UPS, and other leading shipping carriers. Our integration list is constantly expanding.',
+  },
+  {
+    question: 'How do the AI tools work?',
+    answer: 'KolayXport\'s AI assistant can optimize titles, generate descriptions, suggest pricing, and analyze your Etsy and eBay listings. It analyzes market data to provide actionable recommendations that increase your sales.',
+  },
+  {
+    question: 'What do the market research tools offer?',
+    answer: 'Competitor analysis, seller tracking, niche discovery, keyword intelligence, trend analysis, and profit margin calculators help you make data-driven selling decisions. It\'s a built-in alternative to paid tools like eRank and Terapeak.',
   },
   {
     question: 'How is my data secured?',
@@ -122,10 +144,10 @@ const HeroSection = () => (
     <div aria-hidden className="absolute inset-0 -z-10 bg-[url('/noise.png')] opacity-10" />
     <div className="mx-auto max-w-7xl px-6 pt-28 pb-20 sm:pt-36 sm:pb-24 text-center">
       <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900">
-        Manage <span className="text-primary">All Marketplaces</span> From One Dashboard.
+        AI-Powered <span className="text-primary">E-Commerce Command Center</span>
       </h1>
       <p className="mt-6 mx-auto max-w-2xl text-lg text-slate-600">
-        Order management, shipping, inventory sync — everything in one click. Built for Etsy, Amazon, Shopify and more.
+        Market research, AI listing optimization, competitor analysis, order management & shipping — everything you need for Etsy & eBay, in one dashboard.
       </p>
 
       <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-x-6">
@@ -150,8 +172,8 @@ const HeroSection = () => (
 export default function HomePageEN() {
   return (
     <PublicLayout
-      title="KolayXport – E-commerce Automation Platform for Etsy, Amazon & More"
-      description="Manage orders, shipping labels, inventory and analytics across Etsy, Amazon, Shopify and more marketplaces from one unified dashboard."
+      title="KolayXport – AI-Powered E-Commerce Command Center | Etsy & eBay Tools"
+      description="AI listing optimization, market research, competitor analysis, order management & shipping — everything Etsy & eBay sellers need in one dashboard."
       seo={{
         openGraph: {
           images: [
@@ -187,7 +209,7 @@ export default function HomePageEN() {
                   alt={`${logo.name} marketplace integration`}
                   width={logo.width}
                   height={logo.height}
-                  className="h-8 md:h-10 object-contain filter grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-300 ease-in-out"
+                  className="h-8 md:h-10 w-auto max-w-[120px] md:max-w-[140px] object-contain filter grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-300 ease-in-out"
                   loading="lazy"
                 />
               </motion.div>
@@ -206,12 +228,12 @@ export default function HomePageEN() {
       >
         <div className="container max-w-7xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Run Your Business on Autopilot</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">All Your Selling Tools in One Place</h2>
             <p className="max-w-2xl mx-auto text-lg text-slate-600">
-              KolayXport simplifies complex e-commerce processes, saving you time and money across all your sales channels.
+              Research, listing, optimization, orders & shipping — KolayXport covers every stage of e-commerce.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature) => (
               <motion.div
                 key={feature.title}
@@ -230,6 +252,78 @@ export default function HomePageEN() {
         </div>
       </motion.section>
 
+      {/* MARKETPLACE POWER TOOLS */}
+      <motion.section
+        className="py-20 md:py-28 bg-white"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+        variants={sectionVariants}
+      >
+        <div className="container max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Powerful Tools for Etsy & eBay</h2>
+            <p className="max-w-2xl mx-auto text-lg text-slate-600">
+              Not just order management — manage the entire journey from research to sale
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-10">
+            <motion.div
+              className="relative bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 rounded-3xl p-8 md:p-10"
+              whileHover={{ scale: 1.01 }}
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <Image src="/logos/etsy.svg" alt="Etsy" width={60} height={24} className="h-6 w-auto" />
+                <span className="text-xs font-semibold text-orange-600 bg-orange-100 px-2.5 py-1 rounded-full uppercase tracking-wider">Full Integration</span>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  'Market research & trend analysis',
+                  'AI title and description optimization',
+                  'Create, edit, copy & bulk-manage listings',
+                  'Variant & inventory management',
+                  'Image and video uploads',
+                  'Shipping profiles & return policies',
+                  'Order tracking & customer messaging',
+                  'Personalization settings',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                    <Zap size={16} className="text-orange-500 mt-0.5 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+            <motion.div
+              className="relative bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-3xl p-8 md:p-10"
+              whileHover={{ scale: 1.01 }}
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <span className="text-2xl font-bold text-blue-600 tracking-tight">eBay</span>
+                <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2.5 py-1 rounded-full uppercase tracking-wider">Full Integration</span>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  'Competitor analysis & seller tracking',
+                  'AI title optimization & pricing suggestions',
+                  'Niche analysis & product database',
+                  'Keyword intelligence',
+                  'Create listings & bulk editing',
+                  'Category & item specifics guidance',
+                  'Financial intelligence & profit analysis',
+                  'Order management & shipping tracking',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                    <Zap size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          </div>
+        </div>
+      </motion.section>
+
       {/* WHAT'S INCLUDED */}
       <motion.section
         className="py-20 md:py-28 bg-white"
@@ -240,12 +334,12 @@ export default function HomePageEN() {
       >
         <div className="container max-w-5xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">What&apos;s Included?</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Included in Every Plan</h2>
             <p className="max-w-xl mx-auto text-lg text-slate-600">
-              Standard features included in all plans
+              From research to sales, all tools at your fingertips
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {includedFeatures.map((feature) => (
               <div key={feature} className="flex items-center gap-3 bg-slate-50 rounded-xl px-5 py-4">
                 <svg className="w-6 h-6 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -307,10 +401,10 @@ export default function HomePageEN() {
       >
         <div className="container max-w-4xl mx-auto px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Ready? Start Your Integration Today.
+            Research, List, Sell — All From One Place.
           </h2>
           <p className="max-w-xl mx-auto text-lg text-blue-100 mb-10">
-            Discover the power of KolayXport and take your e-commerce operations to the next level.
+            Grow your Etsy and eBay sales with AI-powered tools. Start your free trial today.
           </p>
           <div className="mt-8">
             <Link href="/login" className="inline-block px-12 py-4 text-xl font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">

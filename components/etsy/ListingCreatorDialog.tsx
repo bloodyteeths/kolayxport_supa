@@ -788,8 +788,12 @@ export default function ListingCreatorDialog({
           options={[]}
           value={tags}
           onChange={(_, newVal) => {
-            if (newVal.length <= 13) setTags(newVal as string[]);
-            else toast.error('Maksimum 13 etiket eklenebilir');
+            const expanded = newVal.flatMap((v) =>
+              typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : [v]
+            );
+            const unique = [...new Set(expanded)].slice(0, 13);
+            setTags(unique);
+            if (expanded.length > 13) toast.error('Maksimum 13 etiket — fazlası kesildi');
           }}
           renderTags={(value, getTagProps) =>
             value.map((option, index) => (
@@ -805,7 +809,16 @@ export default function ListingCreatorDialog({
             <TextField
               {...params}
               label="Etiketler"
-              helperText={`${tags.length}/13 etiket — Enter ile ekleyin`}
+              helperText={`${tags.length}/13 etiket — virgülle ayırarak toplu ekleyebilirsiniz`}
+              onPaste={(e) => {
+                const pasted = e.clipboardData.getData('text');
+                if (pasted.includes(',')) {
+                  e.preventDefault();
+                  const newTags = pasted.split(',').map((s) => s.trim()).filter(Boolean);
+                  const merged = [...new Set([...tags, ...newTags])].slice(0, 13);
+                  setTags(merged);
+                }
+              }}
             />
           )}
         />

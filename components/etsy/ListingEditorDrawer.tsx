@@ -1339,9 +1339,13 @@ export default function ListingEditorDrawer({
                       options={[]}
                       value={fields.tags}
                       onChange={(_, newValue) => {
-                        if (newValue.length <= 13) {
-                          updateField('tags', newValue as string[]);
-                        }
+                        // Split any comma-separated entries and flatten
+                        const expanded = newValue.flatMap((v) =>
+                          typeof v === 'string' ? v.split(',').map((s) => s.trim()).filter(Boolean) : [v]
+                        );
+                        // Deduplicate and limit to 13
+                        const unique = [...new Set(expanded)].slice(0, 13);
+                        updateField('tags', unique);
                       }}
                       renderTags={(value, getTagProps) =>
                         value.map((tag, index) => (
@@ -1358,8 +1362,17 @@ export default function ListingEditorDrawer({
                         <TextField
                           {...params}
                           size="small"
-                          placeholder={fields.tags.length < 13 ? 'Etiket ekle...' : ''}
-                          helperText={`${fields.tags.length}/13 etiket`}
+                          placeholder={fields.tags.length < 13 ? 'Virgülle ayırarak toplu ekleyin...' : ''}
+                          helperText={`${fields.tags.length}/13 etiket — virgülle ayırarak toplu ekleyebilirsiniz`}
+                          onPaste={(e) => {
+                            const pasted = e.clipboardData.getData('text');
+                            if (pasted.includes(',')) {
+                              e.preventDefault();
+                              const newTags = pasted.split(',').map((s) => s.trim()).filter(Boolean);
+                              const merged = [...new Set([...fields.tags, ...newTags])].slice(0, 13);
+                              updateField('tags', merged);
+                            }
+                          }}
                         />
                       )}
                     />

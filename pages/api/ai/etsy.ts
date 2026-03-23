@@ -47,6 +47,20 @@ function getGeminiModel() {
 // Action handlers
 // ---------------------------------------------------------------------------
 
+function buildMarketContextPrompt(mc: any): string {
+  if (!mc) return '';
+  const tags = Array.isArray(mc.topTags) ? mc.topTags.slice(0, 15).map((t: any) => `${t.tag} (${t.pct}%)`).join(', ') : 'N/A';
+  const keywords = Array.isArray(mc.topKeywords) ? mc.topKeywords.slice(0, 10).map((k: any) => `${k.keyword} (${k.pct}%)`).join(', ') : 'N/A';
+  const priceRange = mc.priceStats ? `$${mc.priceStats.min} - $${mc.priceStats.max} (avg: $${mc.priceStats.avg})` : 'N/A';
+  return `
+
+MARKET RESEARCH CONTEXT (from competitor analysis of "${mc.query || 'N/A'}"):
+- Top competitor tags by frequency: ${tags}
+- Top title keywords by frequency: ${keywords}
+- Market price range: ${priceRange}
+Prioritize tags/keywords that align with proven competitor patterns while finding underused opportunities.`;
+}
+
 async function handleSuggestTags(body: any) {
   const { title, description, tags_current, category } = body;
 
@@ -74,7 +88,7 @@ Return JSON: { "suggestions": ["tag1", "tag2", ...] }
 Title: ${title}
 Description: ${description || 'N/A'}
 Current tags: ${Array.isArray(tags_current) ? tags_current.join(', ') : tags_current || 'None'}
-Category: ${category || 'N/A'}`;
+Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();
@@ -111,7 +125,7 @@ Return a JSON object: { "optimized_title": "...", "explanation": "..." }
 Current title: ${title}
 Description: ${description || 'N/A'}
 Tags: ${Array.isArray(tags) ? tags.join(', ') : tags || 'N/A'}
-Category: ${category || 'N/A'}`;
+Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();
@@ -160,7 +174,7 @@ Return a JSON object: { "description": "..." }
 Title: ${title}
 Tags: ${Array.isArray(tags) ? tags.join(', ') : tags || 'N/A'}
 Materials: ${Array.isArray(materials) ? materials.join(', ') : materials || 'N/A'}
-Category: ${category || 'N/A'}${improvePart}`;
+Category: ${category || 'N/A'}${improvePart}${buildMarketContextPrompt(body.market_context)}`;
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();
@@ -215,6 +229,8 @@ async function handleMarketAnalysis(body: any) {
   const model = getGeminiModel();
   const prompt = `Sen Etsy pazar araştırma ve strateji uzmanısın. Mart 2026 itibarıyla Etsy'nin arama algoritması, trendleri ve satıcı stratejileri hakkında derin bilgiye sahipsin.
 
+ÖNEMLİ DİL KURALI: Etsy alıcıları İngilizce arama yaptığı için tüm Etsy anahtar kelimeleri, tagleri, arama terimleri, niş terimleri ve başlık önerileri MUTLAKA İNGİLİZCE olmalıdır. Sadece analiz metni, açıklamalar ve yorumlar Türkçe olmalıdır. tag_recommendations dizisi tamamen İngilizce Etsy tagleri içermelidir. niche_positioning ve title_recommendations içindeki anahtar kelimeler/örnekler İngilizce olmalıdır.
+
 Bir satıcı "${query}" anahtar kelimesi ile pazar araştırması yaptı. İşte toplanan veriler:
 
 PAZAR VERİLERİ:
@@ -227,18 +243,18 @@ PAZAR VERİLERİ:
 - En çok kullanılan başlık kelimeleri: ${Array.isArray(topKeywords) ? topKeywords.slice(0, 15).map((k: any) => `${k.keyword} (%${k.pct})`).join(', ') : 'N/A'}
 - En iyi mağazalar: ${Array.isArray(topShops) ? topShops.slice(0, 5).map((s: any) => `${s.shop_name} (${s.num_sales} satış, ${s.review_average}★)`).join(', ') : 'N/A'}
 
-Lütfen aşağıdaki analizi Türkçe olarak yap ve JSON formatında döndür:
+Analiz metnini Türkçe, tüm anahtar kelime/tag/başlık önerilerini İngilizce olarak JSON formatında döndür:
 {
   "opportunity_score": 0-100 arası puan,
   "opportunity_level": "Yüksek" | "Orta" | "Düşük",
-  "market_summary": "2-3 cümlelik pazar özeti",
-  "pricing_strategy": "Önerilen fiyatlandırma stratejisi (3-4 cümle)",
-  "tag_recommendations": ["öneri1", "öneri2", ...] (en fazla 10),
-  "title_recommendations": "Başlık optimizasyonu önerileri (3-4 cümle)",
-  "niche_positioning": "Niş pozisyonlama stratejisi (3-4 cümle)",
-  "seasonal_advice": "Mevsimsel tavsiyeler (2-3 cümle)",
-  "competition_analysis": "Rekabet analizi (3-4 cümle)",
-  "action_items": ["yapılacak1", "yapılacak2", ...] (en fazla 7 madde)
+  "market_summary": "2-3 cümlelik pazar özeti (Türkçe)",
+  "pricing_strategy": "Önerilen fiyatlandırma stratejisi (Türkçe, 3-4 cümle)",
+  "tag_recommendations": ["english tag 1", "english tag 2", ...] (en fazla 10, MUTLAKA İNGİLİZCE Etsy tagleri),
+  "title_recommendations": "Başlık optimizasyonu önerileri (Türkçe açıklama, İngilizce keyword örnekleri)",
+  "niche_positioning": "Niş pozisyonlama stratejisi (Türkçe açıklama, İngilizce niş terimleri, ör: 'boho flower girl dresses')",
+  "seasonal_advice": "Mevsimsel tavsiyeler (Türkçe, 2-3 cümle)",
+  "competition_analysis": "Rekabet analizi (Türkçe, 3-4 cümle)",
+  "action_items": ["yapılacak1", "yapılacak2", ...] (en fazla 7 madde, Türkçe ama keyword örnekleri İngilizce)
 }`;
 
   const result = await model.generateContent(prompt);
@@ -293,7 +309,7 @@ ${listingSummaries}`;
   const text = result.response.text();
   const parsed = JSON.parse(text);
 
-  return { status: 200, data: { optimizations: parsed.optimizations } };
+  return { status: 200, data: { optimized: parsed.optimizations || parsed.optimized } };
 }
 
 // ---------------------------------------------------------------------------

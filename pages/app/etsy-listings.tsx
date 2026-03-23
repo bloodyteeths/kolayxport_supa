@@ -59,7 +59,7 @@ import BulkOperationsBar from '@/components/etsy/BulkOperationsBar';
 import SmartPricing from '@/components/etsy/SmartPricing';
 import DuplicateDetector from '@/components/etsy/DuplicateDetector';
 import BackupManager from '@/components/etsy/BackupManager';
-import EtsyMarketResearch from '@/components/etsy/MarketResearch';
+import EtsyMarketResearch, { MarketResearchData } from '@/components/etsy/MarketResearch';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -240,6 +240,7 @@ function EtsyListingsPage() {
   const [duplicateDetectorOpen, setDuplicateDetectorOpen] = useState(false);
   const [backupManagerOpen, setBackupManagerOpen] = useState(false);
   const [pageTab, setPageTab] = useState(0);
+  const [marketResearchData, setMarketResearchData] = useState<MarketResearchData | null>(null);
 
   const [shops, setShops] = useState<ShopInfo[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string>('');
@@ -939,6 +940,7 @@ function EtsyListingsPage() {
           userId={(user as any)?.id || ''}
           shopId={selectedShopId}
           userListings={listings}
+          onMarketDataChange={setMarketResearchData}
         />
       )}
 
@@ -1276,6 +1278,7 @@ function EtsyListingsPage() {
         onSaved={() => {
           fetchListings();
         }}
+        marketResearchData={marketResearchData}
       />
 
       {/* Creator Dialog */}

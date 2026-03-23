@@ -19,10 +19,18 @@ import { toast } from 'react-hot-toast';
 // Types
 // ---------------------------------------------------------------------------
 
+export interface MarketResearchData {
+  query: string;
+  topTags: Array<{ tag: string; count: number; pct: number }>;
+  topKeywords: Array<{ keyword: string; count: number; pct: number }>;
+  priceStats: { min: number; avg: number; median: number; max: number } | null;
+}
+
 interface EtsyMarketResearchProps {
   userId: string;
   shopId?: string;
   userListings?: any[];
+  onMarketDataChange?: (data: MarketResearchData | null) => void;
 }
 
 interface EtsyMarketItem {
@@ -346,7 +354,7 @@ function TrendChart({ data, height = 200, color = '#667eea' }: {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function EtsyMarketResearch({ userId, shopId, userListings }: EtsyMarketResearchProps) {
+export default function EtsyMarketResearch({ userId, shopId, userListings, onMarketDataChange }: EtsyMarketResearchProps) {
   // --- controls ---
   const [tab, setTab] = useState(9); // Default to Kâr Hesaplama (My Shop)
   const [section, setSection] = useState(0); // 0=Mağazam, 1=Pazar Araştırma, 2=Keşif
@@ -487,6 +495,31 @@ export default function EtsyMarketResearch({ userId, shopId, userListings }: Ets
       .slice(0, 8)
       .map(([tag]) => tag);
   }, [userListings]);
+
+  // ---------------------------------------------------------------------------
+  // Emit market research data to parent
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!onMarketDataChange) return;
+    if (serverTagFreq.length === 0 && serverKeywords.length === 0) {
+      onMarketDataChange(null);
+      return;
+    }
+    const prices = items.map(i => i.price).filter(p => p > 0).sort((a, b) => a - b);
+    const mid = Math.floor(prices.length / 2);
+    onMarketDataChange({
+      query,
+      topTags: serverTagFreq.slice(0, 30),
+      topKeywords: serverKeywords.slice(0, 20),
+      priceStats: prices.length > 0 ? {
+        min: prices[0],
+        max: prices[prices.length - 1],
+        avg: Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100,
+        median: prices.length % 2 === 0 ? (prices[mid - 1] + prices[mid]) / 2 : prices[mid],
+      } : null,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverTagFreq, serverKeywords, items.length]);
 
   // ---------------------------------------------------------------------------
   // Search

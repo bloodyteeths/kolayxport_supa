@@ -60,6 +60,13 @@ import ScheduledUpdateDialog, {
 // Types
 // ---------------------------------------------------------------------------
 
+interface MarketContext {
+  query: string;
+  topTags: Array<{ tag: string; count: number; pct: number }>;
+  topKeywords: Array<{ keyword: string; count: number; pct: number }>;
+  priceStats: { min: number; avg: number; median: number; max: number } | null;
+}
+
 interface ListingEditorDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -69,6 +76,7 @@ interface ListingEditorDrawerProps {
   shippingProfiles: Array<{ shipping_profile_id: number; title: string }>;
   returnPolicies: Array<{ return_policy_id: number; description?: string; accepts_returns?: boolean; accepts_exchanges?: boolean }>;
   onSaved: () => void;
+  marketResearchData?: MarketContext | null;
 }
 
 interface PriceInfo {
@@ -266,6 +274,7 @@ export default function ListingEditorDrawer({
   shippingProfiles,
   returnPolicies,
   onSaved,
+  marketResearchData,
 }: ListingEditorDrawerProps) {
   // Loading / data state
   const [loading, setLoading] = useState(false);
@@ -469,17 +478,28 @@ export default function ListingEditorDrawer({
 
     setAiLoading((prev) => ({ ...prev, [action]: true }));
     try {
+      const payload: Record<string, any> = {
+        action,
+        title: fields.title,
+        description: fields.description,
+        tags: fields.tags,
+        tags_current: fields.tags,
+        materials: fields.materials,
+        price: fields.price,
+      };
+      if (marketResearchData) {
+        payload.market_context = {
+          query: marketResearchData.query,
+          topTags: marketResearchData.topTags.slice(0, 20),
+          topKeywords: marketResearchData.topKeywords.slice(0, 15),
+          priceStats: marketResearchData.priceStats,
+        };
+      }
+
       const res = await fetch('/api/ai/etsy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action,
-          title: fields.title,
-          description: fields.description,
-          tags: fields.tags,
-          materials: fields.materials,
-          price: fields.price,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -494,12 +514,13 @@ export default function ListingEditorDrawer({
     } finally {
       setAiLoading((prev) => ({ ...prev, [action]: false }));
     }
-  }, [fields]);
+  }, [fields, marketResearchData]);
 
   const handleAIOptimizeTitle = useCallback(async () => {
     const result = await callAI('optimize_title');
-    if (result?.title) {
-      updateField('title', result.title);
+    const newTitle = result?.optimized_title || result?.title;
+    if (newTitle) {
+      updateField('title', newTitle);
       if (result.explanation) {
         toast.success(result.explanation);
       } else {
@@ -518,9 +539,10 @@ export default function ListingEditorDrawer({
 
   const handleAISuggestTags = useCallback(async () => {
     const result = await callAI('suggest_tags');
-    if (result?.tags && Array.isArray(result.tags)) {
-      setAiTagSuggestions(result.tags);
-      toast.success(`${result.tags.length} etiket onerisi alindi`);
+    const tags = result?.suggestions || result?.tags;
+    if (tags && Array.isArray(tags)) {
+      setAiTagSuggestions(tags);
+      toast.success(`${tags.length} etiket onerisi alindi`);
     }
   }, [callAI]);
 

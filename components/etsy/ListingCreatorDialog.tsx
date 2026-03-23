@@ -21,13 +21,23 @@ import {
   useMediaQuery,
   useTheme,
   IconButton,
-  Grid,
+  Alert,
+  CircularProgress,
+  Tooltip,
+  Divider,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import { toast } from 'react-hot-toast';
 import SEOIndicator from './SEOIndicator';
+import type { MarketResearchData } from './MarketResearch';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface ListingCreatorDialogProps {
   open: boolean;
@@ -37,6 +47,7 @@ interface ListingCreatorDialogProps {
   shippingProfiles: Array<{ shipping_profile_id: number; title: string }>;
   returnPolicies: Array<{ return_policy_id: number; description?: string }>;
   onCreated: (listingId: number) => void;
+  marketResearchData?: MarketResearchData | null;
 }
 
 interface TaxonomyNode {
@@ -52,32 +63,49 @@ interface FlatTaxonomy {
   label: string;
 }
 
-const STEPS = ['Temel Bilgiler', 'Kategori ve Fiyat', 'Görseller', 'Önizleme ve Oluştur'];
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const STEPS = ['Icerik & AI', 'Kategori & Fiyat', 'Gorseller', 'Onizleme'];
 
 const WHO_MADE_OPTIONS = [
-  { value: 'i_did', label: 'Ben yaptım' },
-  { value: 'collective', label: 'Kolektif / Atölye' },
-  { value: 'someone_else', label: 'Başka biri' },
+  { value: 'i_did', label: 'Ben yaptim' },
+  { value: 'collective', label: 'Kolektif / Atolye' },
+  { value: 'someone_else', label: 'Baskasi yapti' },
 ];
 
 const WHEN_MADE_OPTIONS = [
-  { value: 'made_to_order', label: 'Siparişe göre yapılıyor' },
+  { value: 'made_to_order', label: 'Siparise gore yapiliyor' },
   { value: '2020_2025', label: '2020-2025' },
   { value: '2010_2019', label: '2010-2019' },
   { value: '2004_2009', label: '2004-2009' },
-  { value: 'before_2004', label: '2004 öncesi' },
+  { value: 'before_2004', label: '2004 oncesi' },
   { value: '2000_2003', label: '2000-2003' },
   { value: '1990s', label: '1990\'lar' },
   { value: '1980s', label: '1980\'ler' },
   { value: '1970s', label: '1970\'ler' },
   { value: '1960s', label: '1960\'lar' },
-  { value: '1950s', label: '1950\'ler' },
-  { value: '1940s', label: '1940\'lar' },
-  { value: '1930s', label: '1930\'lar' },
-  { value: '1920s', label: '1920\'ler' },
-  { value: '1910s', label: '1910\'lar' },
-  { value: '1900s', label: '1900\'ler' },
 ];
+
+const WEIGHT_UNITS = [
+  { value: 'oz', label: 'oz' },
+  { value: 'lb', label: 'lb' },
+  { value: 'g', label: 'g' },
+  { value: 'kg', label: 'kg' },
+];
+
+const DIMENSION_UNITS = [
+  { value: 'in', label: 'in' },
+  { value: 'ft', label: 'ft' },
+  { value: 'mm', label: 'mm' },
+  { value: 'cm', label: 'cm' },
+  { value: 'm', label: 'm' },
+];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function flattenTaxonomy(nodes: TaxonomyNode[], prefix = ''): FlatTaxonomy[] {
   const result: FlatTaxonomy[] = [];
@@ -91,6 +119,10 @@ function flattenTaxonomy(nodes: TaxonomyNode[], prefix = ''): FlatTaxonomy[] {
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export default function ListingCreatorDialog({
   open,
   onClose,
@@ -99,6 +131,7 @@ export default function ListingCreatorDialog({
   shippingProfiles,
   returnPolicies,
   onCreated,
+  marketResearchData,
 }: ListingCreatorDialogProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -108,7 +141,7 @@ export default function ListingCreatorDialog({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadTotal, setUploadTotal] = useState(0);
 
-  // Step 1
+  // Step 1 — Content
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -117,7 +150,7 @@ export default function ListingCreatorDialog({
   const [whenMade, setWhenMade] = useState('made_to_order');
   const [isSupply, setIsSupply] = useState(false);
 
-  // Step 2
+  // Step 2 — Category & Price
   const [taxonomyOptions, setTaxonomyOptions] = useState<FlatTaxonomy[]>([]);
   const [taxonomyLoading, setTaxonomyLoading] = useState(false);
   const [selectedTaxonomy, setSelectedTaxonomy] = useState<FlatTaxonomy | null>(null);
@@ -126,13 +159,30 @@ export default function ListingCreatorDialog({
   const [shopSectionId, setShopSectionId] = useState<number | ''>('');
   const [shippingProfileId, setShippingProfileId] = useState<number | ''>('');
   const [returnPolicyId, setReturnPolicyId] = useState<number | ''>('');
+  const [processingMin, setProcessingMin] = useState('');
+  const [processingMax, setProcessingMax] = useState('');
+  const [itemWeight, setItemWeight] = useState('');
+  const [itemWeightUnit, setItemWeightUnit] = useState('g');
+  const [itemLength, setItemLength] = useState('');
+  const [itemWidth, setItemWidth] = useState('');
+  const [itemHeight, setItemHeight] = useState('');
+  const [itemDimensionsUnit, setItemDimensionsUnit] = useState('cm');
 
-  // Step 3
+  // Step 3 — Images
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // AI state
+  const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
+  const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
+
+  // Quick-start
+  const [quickStartKeyword, setQuickStartKeyword] = useState('');
+
+  // --------------------------------------------------
   // Fetch taxonomy on open
+  // --------------------------------------------------
   useEffect(() => {
     if (open && taxonomyOptions.length === 0) {
       setTaxonomyLoading(true);
@@ -144,7 +194,7 @@ export default function ListingCreatorDialog({
           setTaxonomyOptions(flat);
         })
         .catch(() => {
-          toast.error('Kategoriler yüklenemedi');
+          toast.error('Kategoriler yuklenemedi');
         })
         .finally(() => setTaxonomyLoading(false));
     }
@@ -157,6 +207,112 @@ export default function ListingCreatorDialog({
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [selectedFiles]);
 
+  // --------------------------------------------------
+  // AI helper
+  // --------------------------------------------------
+  const callAI = useCallback(async (action: string, overrides?: Record<string, any>): Promise<any> => {
+    setAiLoading((prev) => ({ ...prev, [action]: true }));
+    try {
+      const payload: Record<string, any> = {
+        action,
+        title: overrides?.title ?? title,
+        description: overrides?.description ?? description,
+        tags: overrides?.tags ?? tags,
+        tags_current: overrides?.tags_current ?? tags,
+        materials,
+        price,
+      };
+      if (marketResearchData) {
+        payload.market_context = {
+          query: marketResearchData.query,
+          topTags: marketResearchData.topTags.slice(0, 20),
+          topKeywords: marketResearchData.topKeywords.slice(0, 15),
+          priceStats: marketResearchData.priceStats,
+        };
+      }
+      const res = await fetch('/api/ai/etsy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `AI istegi basarisiz (HTTP ${res.status})`);
+      }
+      return await res.json();
+    } catch (err: any) {
+      toast.error(err.message || 'AI istegi basarisiz');
+      return null;
+    } finally {
+      setAiLoading((prev) => ({ ...prev, [action]: false }));
+    }
+  }, [title, description, tags, materials, price, marketResearchData]);
+
+  const handleAIOptimizeTitle = useCallback(async () => {
+    const result = await callAI('optimize_title');
+    const newTitle = result?.optimized_title || result?.title;
+    if (newTitle) {
+      setTitle(newTitle);
+      if (result.explanation) toast.success(result.explanation);
+      else toast.success('Baslik optimize edildi');
+    }
+  }, [callAI]);
+
+  const handleAIGenerateDescription = useCallback(async () => {
+    const result = await callAI('generate_description');
+    if (result?.description) {
+      setDescription(result.description);
+      toast.success('Aciklama olusturuldu');
+    }
+  }, [callAI]);
+
+  const handleAISuggestTags = useCallback(async () => {
+    const result = await callAI('suggest_tags');
+    const suggested = result?.suggestions || result?.tags;
+    if (suggested && Array.isArray(suggested)) {
+      setAiTagSuggestions(suggested);
+      toast.success(`${suggested.length} etiket onerisi alindi`);
+    }
+  }, [callAI]);
+
+  // --------------------------------------------------
+  // Quick-start: AI generates title + description + tags from a keyword
+  // --------------------------------------------------
+  const handleQuickStart = useCallback(async () => {
+    const keyword = quickStartKeyword.trim();
+    if (!keyword) {
+      toast.error('Bir urun fikri veya anahtar kelime girin');
+      return;
+    }
+    setAiLoading((prev) => ({ ...prev, quick_start: true }));
+    try {
+      // 1. Generate optimized title from keyword
+      const titleResult = await callAI('optimize_title', { title: keyword });
+      const newTitle = titleResult?.optimized_title || keyword;
+      setTitle(newTitle);
+
+      // 2. Generate description
+      const descResult = await callAI('generate_description', { title: newTitle });
+      if (descResult?.description) setDescription(descResult.description);
+
+      // 3. Suggest tags
+      const tagResult = await callAI('suggest_tags', { title: newTitle, tags_current: [] });
+      const suggested = tagResult?.suggestions || tagResult?.tags;
+      if (suggested && Array.isArray(suggested)) {
+        setTags(suggested.slice(0, 13));
+      }
+
+      toast.success('AI ile icerik olusturuldu! Kontrol edin ve duzenleyin.');
+    } catch {
+      toast.error('AI icerik olusturma basarisiz');
+    } finally {
+      setAiLoading((prev) => ({ ...prev, quick_start: false }));
+    }
+  }, [quickStartKeyword, callAI]);
+
+  // --------------------------------------------------
+  // Reset
+  // --------------------------------------------------
   const resetForm = useCallback(() => {
     setActiveStep(0);
     setTitle('');
@@ -172,10 +328,20 @@ export default function ListingCreatorDialog({
     setShopSectionId('');
     setShippingProfileId('');
     setReturnPolicyId('');
+    setProcessingMin('');
+    setProcessingMax('');
+    setItemWeight('');
+    setItemWeightUnit('g');
+    setItemLength('');
+    setItemWidth('');
+    setItemHeight('');
+    setItemDimensionsUnit('cm');
     setSelectedFiles([]);
     setCreating(false);
     setUploadProgress(0);
     setUploadTotal(0);
+    setAiTagSuggestions([]);
+    setQuickStartKeyword('');
   }, []);
 
   const handleClose = () => {
@@ -184,33 +350,48 @@ export default function ListingCreatorDialog({
     onClose();
   };
 
+  // --------------------------------------------------
+  // Validation
+  // --------------------------------------------------
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 0:
         if (!title.trim()) {
-          toast.error('Başlık zorunludur');
+          toast.error('Baslik zorunludur');
+          return false;
+        }
+        if (title.trim().length < 3) {
+          toast.error('Baslik en az 3 karakter olmalidir');
           return false;
         }
         if (!description.trim()) {
-          toast.error('Açıklama zorunludur');
+          toast.error('Aciklama zorunludur');
+          return false;
+        }
+        if (description.trim().length < 10) {
+          toast.error('Aciklama en az 10 karakter olmalidir');
           return false;
         }
         return true;
       case 1:
         if (!selectedTaxonomy) {
-          toast.error('Kategori seçimi zorunludur');
+          toast.error('Kategori secimi zorunludur');
           return false;
         }
         if (!price || parseFloat(price) <= 0) {
-          toast.error('Geçerli bir fiyat giriniz');
+          toast.error('Gecerli bir fiyat giriniz');
           return false;
         }
         if (!shippingProfileId) {
-          toast.error('Kargo profili seçimi zorunludur');
+          toast.error('Kargo profili secimi zorunludur');
           return false;
         }
         if (!returnPolicyId) {
-          toast.error('İade politikası seçimi zorunludur');
+          toast.error('Iade politikasi secimi zorunludur');
+          return false;
+        }
+        if (processingMin && processingMax && Number(processingMin) > Number(processingMax)) {
+          toast.error('Min hazirlama suresi max\'tan buyuk olamaz');
           return false;
         }
         return true;
@@ -231,6 +412,9 @@ export default function ListingCreatorDialog({
     setActiveStep((prev) => prev - 1);
   };
 
+  // --------------------------------------------------
+  // File handling
+  // --------------------------------------------------
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -238,7 +422,7 @@ export default function ListingCreatorDialog({
     const newFiles = Array.from(files);
     const total = selectedFiles.length + newFiles.length;
     if (total > 10) {
-      toast.error('Maksimum 10 görsel seçilebilir');
+      toast.error('Maksimum 10 gorsel secilebilir');
       return;
     }
 
@@ -259,10 +443,12 @@ export default function ListingCreatorDialog({
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // --------------------------------------------------
+  // Create listing
+  // --------------------------------------------------
   const handleCreate = async (publish: boolean) => {
     setCreating(true);
     try {
-      // 1. Create listing
       const body: Record<string, unknown> = {
         title: title.trim(),
         description: description.trim(),
@@ -277,9 +463,9 @@ export default function ListingCreatorDialog({
         shipping_profile_id: shippingProfileId,
         return_policy_id: returnPolicyId,
       };
-      if (shopSectionId) {
-        body.shop_section_id = shopSectionId;
-      }
+      if (shopSectionId) body.shop_section_id = shopSectionId;
+      if (processingMin) body.processing_min = Number(processingMin);
+      if (processingMax) body.processing_max = Number(processingMax);
 
       const createRes = await fetch(
         `/api/clawd/etsy?action=create_listing&shop_id=${shopId}`,
@@ -292,20 +478,19 @@ export default function ListingCreatorDialog({
 
       if (!createRes.ok) {
         const err = await createRes.json().catch(() => ({}));
-        throw new Error(err.error || 'Listing oluşturulamadı');
+        throw new Error(err.error || 'Listing olusturulamadi');
       }
 
       const created = await createRes.json();
       const newId = created.listing_id;
 
-      // 2. Upload images
+      // Upload images
       if (selectedFiles.length > 0) {
         setUploadTotal(selectedFiles.length);
         for (let i = 0; i < selectedFiles.length; i++) {
           setUploadProgress(i + 1);
           const file = selectedFiles[i];
 
-          // Convert to base64
           const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve((reader.result as string).split(',')[1]);
@@ -328,87 +513,272 @@ export default function ListingCreatorDialog({
           );
 
           if (!uploadRes.ok) {
-            toast.error(`Görsel ${i + 1} yüklenemedi`);
+            toast.error(`Gorsel ${i + 1} yuklenemedi`);
           }
         }
       }
 
-      // 3. Publish if requested
+      // Publish if requested
       if (publish) {
         const pubRes = await fetch(
           `/api/clawd/etsy?action=publish&listing_id=${newId}&shop_id=${shopId}`,
           { method: 'POST' }
         );
         if (!pubRes.ok) {
-          toast.error('Listing yayınlanamadı, taslak olarak kaydedildi');
+          toast.error('Listing yayinlanamadi, taslak olarak kaydedildi');
         } else {
-          toast.success('Listing oluşturuldu ve yayınlandı!');
+          toast.success('Listing olusturuldu ve yayinlandi!');
         }
       } else {
-        toast.success('Listing taslak olarak oluşturuldu!');
+        toast.success('Listing taslak olarak olusturuldu!');
       }
 
       onCreated(newId);
       resetForm();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || 'Bir hata oluştu');
+      toast.error(err.message || 'Bir hata olustu');
     } finally {
       setCreating(false);
     }
   };
 
+  // --------------------------------------------------
+  // Render helpers
+  // --------------------------------------------------
+  const isAnyAILoading = Object.values(aiLoading).some(Boolean);
+
   const whoMadeLabel = WHO_MADE_OPTIONS.find((o) => o.value === whoMade)?.label || whoMade;
   const whenMadeLabel = WHEN_MADE_OPTIONS.find((o) => o.value === whenMade)?.label || whenMade;
 
+  // ================================================================
+  // Step 1: Content & AI
+  // ================================================================
   const renderStep1 = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-      <TextField
-        label="Başlık"
-        value={title}
-        onChange={(e) => setTitle(e.target.value.slice(0, 140))}
-        required
-        fullWidth
-        helperText={`${title.length}/140 karakter`}
-        inputProps={{ maxLength: 140 }}
-      />
-      <TextField
-        label="Açıklama"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        required
-        fullWidth
-        multiline
-        minRows={4}
-        helperText={`${description.length} karakter`}
-      />
-      <Autocomplete
-        multiple
-        freeSolo
-        options={[]}
-        value={tags}
-        onChange={(_, newVal) => {
-          if (newVal.length <= 13) setTags(newVal as string[]);
-          else toast.error('Maksimum 13 etiket eklenebilir');
+      {/* ---- Quick Start with AI ---- */}
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 2,
+          bgcolor: 'primary.50',
+          borderColor: 'primary.200',
+          background: 'linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%)',
         }}
-        renderTags={(value, getTagProps) =>
-          value.map((option, index) => (
-            <Chip
-              {...getTagProps({ index })}
-              key={option}
-              label={option}
-              size="small"
-            />
-          ))
-        }
-        renderInput={(params) => (
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+          <RocketLaunchIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+          <Typography variant="subtitle2" color="primary.main">
+            AI ile Hizli Baslangic
+          </Typography>
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+          Urun fikrinizi yazin, AI baslik, aciklama ve etiketleri otomatik olustursun.
+          {marketResearchData ? ' Pazar arastirma verileri de kullanilacak.' : ''}
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <TextField
-            {...params}
-            label="Etiketler"
-            helperText={`${tags.length}/13 etiket — Enter ile ekleyin`}
+            size="small"
+            fullWidth
+            placeholder="ornek: boho flower girl dress, wooden phone stand..."
+            value={quickStartKeyword}
+            onChange={(e) => setQuickStartKeyword(e.target.value)}
+            disabled={!!aiLoading.quick_start}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !aiLoading.quick_start) {
+                e.preventDefault();
+                handleQuickStart();
+              }
+            }}
           />
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleQuickStart}
+            disabled={!!aiLoading.quick_start || !quickStartKeyword.trim()}
+            startIcon={aiLoading.quick_start ? <CircularProgress size={16} color="inherit" /> : <AutoFixHighIcon />}
+            sx={{ whiteSpace: 'nowrap', minWidth: 120 }}
+          >
+            {aiLoading.quick_start ? 'Olusturuluyor...' : 'AI ile Doldur'}
+          </Button>
+        </Box>
+      </Paper>
+
+      {/* ---- Market Research Context Banner ---- */}
+      {marketResearchData && (
+        <Alert severity="info" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
+          <Typography variant="caption" fontWeight={600}>
+            Pazar Verileri: &quot;{marketResearchData.query}&quot;
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+            {marketResearchData.topTags.slice(0, 8).map((t) => (
+              <Chip
+                key={t.tag}
+                label={`${t.tag} (${t.pct}%)`}
+                size="small"
+                variant="outlined"
+                sx={{ fontSize: '0.65rem', height: 22, cursor: 'pointer' }}
+                onClick={() => {
+                  if (tags.length < 13 && !tags.includes(t.tag)) {
+                    setTags((prev) => [...prev, t.tag]);
+                    toast.success(`"${t.tag}" eklendi`);
+                  }
+                }}
+              />
+            ))}
+          </Box>
+          {marketResearchData.priceStats && (
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+              Fiyat araligi: ${marketResearchData.priceStats.min} - ${marketResearchData.priceStats.max} (ort: ${marketResearchData.priceStats.avg})
+            </Typography>
+          )}
+        </Alert>
+      )}
+
+      <Divider />
+
+      {/* ---- Title ---- */}
+      <Box>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+          <TextField
+            label="Baslik"
+            value={title}
+            onChange={(e) => setTitle(e.target.value.slice(0, 140))}
+            required
+            fullWidth
+            helperText={`${title.length}/140 karakter`}
+            inputProps={{ maxLength: 140 }}
+          />
+          <Tooltip title="AI ile baslik optimize et">
+            <span>
+              <IconButton
+                onClick={handleAIOptimizeTitle}
+                disabled={!!aiLoading.optimize_title || !title.trim()}
+                color="primary"
+                sx={{ mt: 1 }}
+              >
+                {aiLoading.optimize_title ? <CircularProgress size={20} /> : <AutoFixHighIcon />}
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
+      </Box>
+
+      {/* ---- Description ---- */}
+      <Box>
+        <TextField
+          label="Aciklama"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          required
+          fullWidth
+          multiline
+          minRows={4}
+          helperText={`${description.length} karakter`}
+        />
+        <Button
+          size="small"
+          startIcon={aiLoading.generate_description ? <CircularProgress size={14} /> : <AutoFixHighIcon />}
+          onClick={handleAIGenerateDescription}
+          disabled={!!aiLoading.generate_description || !title.trim()}
+          sx={{ mt: 0.5, textTransform: 'none' }}
+        >
+          AI ile Aciklama Olustur
+        </Button>
+      </Box>
+
+      {/* ---- Tags ---- */}
+      <Box>
+        <Autocomplete
+          multiple
+          freeSolo
+          options={[]}
+          value={tags}
+          onChange={(_, newVal) => {
+            if (newVal.length <= 13) setTags(newVal as string[]);
+            else toast.error('Maksimum 13 etiket eklenebilir');
+          }}
+          renderTags={(value, getTagProps) =>
+            value.map((option, index) => (
+              <Chip
+                {...getTagProps({ index })}
+                key={option}
+                label={option}
+                size="small"
+              />
+            ))
+          }
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Etiketler"
+              helperText={`${tags.length}/13 etiket — Enter ile ekleyin`}
+            />
+          )}
+        />
+        <Button
+          size="small"
+          startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon />}
+          onClick={handleAISuggestTags}
+          disabled={!!aiLoading.suggest_tags || !title.trim()}
+          sx={{ mt: 0.5, textTransform: 'none' }}
+        >
+          AI Etiket Oner
+        </Button>
+
+        {/* AI Tag Suggestions */}
+        {aiTagSuggestions.length > 0 && (
+          <Box sx={{ mt: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="caption" color="text.secondary">
+                Onerilen etiketler:
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => {
+                  const newTags = aiTagSuggestions.filter((t) => !tags.includes(t));
+                  const merged = [...tags, ...newTags].slice(0, 13);
+                  setTags(merged);
+                  setAiTagSuggestions([]);
+                  toast.success(`${merged.length - tags.length} etiket eklendi`);
+                }}
+                disabled={aiTagSuggestions.every((t) => tags.includes(t))}
+                sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
+              >
+                Tumunu Ekle
+              </Button>
+            </Box>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {aiTagSuggestions.map((tag) => {
+                const alreadyExists = tags.includes(tag);
+                const isFull = tags.length >= 13;
+                return (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    size="small"
+                    variant={alreadyExists ? 'filled' : 'outlined'}
+                    color={alreadyExists ? 'default' : 'primary'}
+                    disabled={alreadyExists}
+                    onClick={
+                      alreadyExists || isFull
+                        ? undefined
+                        : () => setTags((prev) => [...prev, tag])
+                    }
+                    sx={{
+                      cursor: alreadyExists || isFull ? 'default' : 'pointer',
+                      opacity: alreadyExists ? 0.5 : 1,
+                      maxWidth: 180,
+                    }}
+                  />
+                );
+              })}
+            </Box>
+          </Box>
         )}
-      />
+      </Box>
+
+      {/* ---- Materials ---- */}
       <Autocomplete
         multiple
         freeSolo
@@ -436,11 +806,13 @@ export default function ListingCreatorDialog({
           />
         )}
       />
+
+      {/* ---- Who/When/Supply ---- */}
       <FormControl fullWidth required>
-        <InputLabel>Kim yaptı?</InputLabel>
+        <InputLabel>Kim yapti?</InputLabel>
         <Select
           value={whoMade}
-          label="Kim yaptı?"
+          label="Kim yapti?"
           onChange={(e) => setWhoMade(e.target.value)}
         >
           {WHO_MADE_OPTIONS.map((opt) => (
@@ -451,10 +823,10 @@ export default function ListingCreatorDialog({
         </Select>
       </FormControl>
       <FormControl fullWidth required>
-        <InputLabel>Ne zaman yapıldı?</InputLabel>
+        <InputLabel>Ne zaman yapildi?</InputLabel>
         <Select
           value={whenMade}
-          label="Ne zaman yapıldı?"
+          label="Ne zaman yapildi?"
           onChange={(e) => setWhenMade(e.target.value)}
         >
           {WHEN_MADE_OPTIONS.map((opt) => (
@@ -471,11 +843,21 @@ export default function ListingCreatorDialog({
             onChange={(e) => setIsSupply(e.target.checked)}
           />
         }
-        label="Bu bir malzeme/araçtır (supply)"
+        label="Bu bir malzeme/aractir (supply)"
       />
+
+      {/* ---- Live SEO Indicator ---- */}
+      {(title || tags.length > 0) && (
+        <Paper variant="outlined" sx={{ p: 1.5 }}>
+          <SEOIndicator tags={tags} title={title} description={description} />
+        </Paper>
+      )}
     </Box>
   );
 
+  // ================================================================
+  // Step 2: Category & Price
+  // ================================================================
   const renderStep2 = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
       <Autocomplete
@@ -489,22 +871,32 @@ export default function ListingCreatorDialog({
             {...params}
             label="Kategori"
             required
-            helperText="Kategori ağacından arayarak seçin"
+            helperText="Kategori agacindan arayarak secin"
           />
         )}
         isOptionEqualToValue={(opt, val) => opt.id === val.id}
-        noOptionsText="Kategori bulunamadı"
-        loadingText="Yükleniyor..."
+        noOptionsText="Kategori bulunamadi"
+        loadingText="Yukleniyor..."
       />
-      <TextField
-        label="Fiyat"
-        type="number"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-        required
-        fullWidth
-        inputProps={{ min: 0, step: '0.01' }}
-      />
+
+      {/* Price with market hint */}
+      <Box>
+        <TextField
+          label="Fiyat (USD)"
+          type="number"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          required
+          fullWidth
+          inputProps={{ min: 0, step: '0.01' }}
+        />
+        {marketResearchData?.priceStats && !price && (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+            Pazar ortalamasi: ${marketResearchData.priceStats.avg} (${marketResearchData.priceStats.min} - ${marketResearchData.priceStats.max})
+          </Typography>
+        )}
+      </Box>
+
       <TextField
         label="Miktar"
         type="number"
@@ -513,15 +905,16 @@ export default function ListingCreatorDialog({
         fullWidth
         inputProps={{ min: 1 }}
       />
+
       <FormControl fullWidth>
-        <InputLabel>Mağaza Bölümü</InputLabel>
+        <InputLabel>Magaza Bolumu</InputLabel>
         <Select
           value={shopSectionId}
-          label="Mağaza Bölümü"
+          label="Magaza Bolumu"
           onChange={(e) => setShopSectionId(e.target.value as number | '')}
         >
           <MenuItem value="">
-            <em>Seçim yok</em>
+            <em>Secim yok</em>
           </MenuItem>
           {shopSections.map((s) => (
             <MenuItem key={s.shop_section_id} value={s.shop_section_id}>
@@ -530,6 +923,7 @@ export default function ListingCreatorDialog({
           ))}
         </Select>
       </FormControl>
+
       <FormControl fullWidth required>
         <InputLabel>Kargo Profili</InputLabel>
         <Select
@@ -544,11 +938,12 @@ export default function ListingCreatorDialog({
           ))}
         </Select>
       </FormControl>
+
       <FormControl fullWidth required>
-        <InputLabel>İade Politikası</InputLabel>
+        <InputLabel>Iade Politikasi</InputLabel>
         <Select
           value={returnPolicyId}
-          label="İade Politikası"
+          label="Iade Politikasi"
           onChange={(e) => setReturnPolicyId(e.target.value as number)}
         >
           {returnPolicies.map((r) => (
@@ -558,13 +953,84 @@ export default function ListingCreatorDialog({
           ))}
         </Select>
       </FormControl>
+
+      <Divider sx={{ my: 0.5 }} />
+
+      {/* Processing time */}
+      <Typography variant="subtitle2" color="text.secondary">Hazirlama Suresi (is gunu)</Typography>
+      <Box sx={{ display: 'flex', gap: 2 }}>
+        <TextField
+          label="Min"
+          type="number"
+          value={processingMin}
+          onChange={(e) => setProcessingMin(e.target.value)}
+          fullWidth
+          inputProps={{ min: 1 }}
+          size="small"
+        />
+        <TextField
+          label="Max"
+          type="number"
+          value={processingMax}
+          onChange={(e) => setProcessingMax(e.target.value)}
+          fullWidth
+          inputProps={{ min: 1 }}
+          size="small"
+        />
+      </Box>
+
+      {/* Weight & Dimensions */}
+      <Typography variant="subtitle2" color="text.secondary">Agirlik & Boyutlar</Typography>
+      <Box sx={{ display: 'flex', gap: 2 }}>
+        <TextField
+          label="Agirlik"
+          type="number"
+          value={itemWeight}
+          onChange={(e) => setItemWeight(e.target.value)}
+          sx={{ flex: 2 }}
+          inputProps={{ min: 0, step: '0.1' }}
+          size="small"
+        />
+        <FormControl sx={{ flex: 1, minWidth: 80 }} size="small">
+          <InputLabel>Birim</InputLabel>
+          <Select
+            value={itemWeightUnit}
+            label="Birim"
+            onChange={(e) => setItemWeightUnit(e.target.value)}
+          >
+            {WEIGHT_UNITS.map((u) => (
+              <MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <TextField label="Uzunluk" type="number" value={itemLength} onChange={(e) => setItemLength(e.target.value)} size="small" inputProps={{ min: 0 }} sx={{ flex: 1 }} />
+        <TextField label="Genislik" type="number" value={itemWidth} onChange={(e) => setItemWidth(e.target.value)} size="small" inputProps={{ min: 0 }} sx={{ flex: 1 }} />
+        <TextField label="Yukseklik" type="number" value={itemHeight} onChange={(e) => setItemHeight(e.target.value)} size="small" inputProps={{ min: 0 }} sx={{ flex: 1 }} />
+        <FormControl sx={{ minWidth: 70 }} size="small">
+          <InputLabel>Birim</InputLabel>
+          <Select
+            value={itemDimensionsUnit}
+            label="Birim"
+            onChange={(e) => setItemDimensionsUnit(e.target.value)}
+          >
+            {DIMENSION_UNITS.map((u) => (
+              <MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
     </Box>
   );
 
+  // ================================================================
+  // Step 3: Images
+  // ================================================================
   const renderStep3 = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Listing oluşturulduktan sonra görseller yüklenecektir
+      <Typography variant="body2" color="text.secondary">
+        Listing olusturulduktan sonra gorseller yuklenecektir. Ilk gorsel kapak gorseli olarak kullanilir.
       </Typography>
       <input
         ref={fileInputRef}
@@ -580,8 +1046,15 @@ export default function ListingCreatorDialog({
         onClick={() => fileInputRef.current?.click()}
         disabled={selectedFiles.length >= 10}
       >
-        Görsel Seç ({selectedFiles.length}/10)
+        Gorsel Sec ({selectedFiles.length}/10)
       </Button>
+
+      {selectedFiles.length === 0 && (
+        <Alert severity="warning" sx={{ mt: 1 }}>
+          Etsy listingi yayinlamak icin en az 1 gorsel gereklidir. Gorselsiz sadece taslak olusturulabilir.
+        </Alert>
+      )}
+
       {previews.length > 0 && (
         <Box
           sx={{
@@ -598,13 +1071,13 @@ export default function ListingCreatorDialog({
                 position: 'relative',
                 borderRadius: 1,
                 overflow: 'hidden',
-                border: '1px solid',
-                borderColor: 'divider',
+                border: i === 0 ? '2px solid' : '1px solid',
+                borderColor: i === 0 ? 'primary.main' : 'divider',
               }}
             >
               <img
                 src={src}
-                alt={`Görsel ${i + 1}`}
+                alt={`Gorsel ${i + 1}`}
                 style={{
                   width: '100%',
                   height: 120,
@@ -639,7 +1112,7 @@ export default function ListingCreatorDialog({
                   py: 0.25,
                 }}
               >
-                {i + 1}
+                {i === 0 ? 'Kapak' : i + 1}
               </Typography>
             </Box>
           ))}
@@ -648,6 +1121,9 @@ export default function ListingCreatorDialog({
     </Box>
   );
 
+  // ================================================================
+  // Step 4: Preview & Create
+  // ================================================================
   const renderStep4 = () => {
     const sectionLabel = shopSections.find((s) => s.shop_section_id === shopSectionId)?.title;
     const shippingLabel = shippingProfiles.find((s) => s.shipping_profile_id === shippingProfileId)?.title;
@@ -656,29 +1132,32 @@ export default function ListingCreatorDialog({
       (returnPolicyId ? `Politika #${returnPolicyId}` : '');
 
     const summaryFields: Array<{ label: string; value: string | number }> = [
-      { label: 'Başlık', value: title },
-      { label: 'Açıklama', value: description.length > 200 ? description.slice(0, 200) + '...' : description },
+      { label: 'Baslik', value: title },
+      { label: 'Aciklama', value: description.length > 200 ? description.slice(0, 200) + '...' : description },
       { label: 'Etiketler', value: tags.join(', ') || '-' },
       { label: 'Malzemeler', value: materials.join(', ') || '-' },
-      { label: 'Kim yaptı', value: whoMadeLabel },
-      { label: 'Ne zaman yapıldı', value: whenMadeLabel },
-      { label: 'Malzeme/Araç', value: isSupply ? 'Evet' : 'Hayır' },
+      { label: 'Kim yapti', value: whoMadeLabel },
+      { label: 'Ne zaman yapildi', value: whenMadeLabel },
+      { label: 'Malzeme/Arac', value: isSupply ? 'Evet' : 'Hayir' },
       { label: 'Kategori', value: selectedTaxonomy?.label || '-' },
-      { label: 'Fiyat', value: price },
+      { label: 'Fiyat', value: `$${price}` },
       { label: 'Miktar', value: quantity },
-      { label: 'Mağaza Bölümü', value: sectionLabel || '-' },
+      { label: 'Magaza Bolumu', value: sectionLabel || '-' },
       { label: 'Kargo Profili', value: shippingLabel || '-' },
-      { label: 'İade Politikası', value: returnLabel || '-' },
-      { label: 'Görseller', value: `${selectedFiles.length} adet` },
+      { label: 'Iade Politikasi', value: returnLabel || '-' },
+      { label: 'Hazirlama', value: processingMin && processingMax ? `${processingMin}-${processingMax} is gunu` : '-' },
+      { label: 'Agirlik', value: itemWeight ? `${itemWeight} ${itemWeightUnit}` : '-' },
+      { label: 'Boyutlar', value: itemLength ? `${itemLength}x${itemWidth}x${itemHeight} ${itemDimensionsUnit}` : '-' },
+      { label: 'Gorseller', value: `${selectedFiles.length} adet` },
     ];
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="subtitle2" gutterBottom>
-            Listing Özeti
+            Listing Ozeti
           </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             {summaryFields.map((field) => (
               <Box
                 key={field.label}
@@ -691,7 +1170,7 @@ export default function ListingCreatorDialog({
                   borderColor: 'divider',
                 }}
               >
-                <Typography variant="body2" color="text.secondary" sx={{ minWidth: 140, flexShrink: 0 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ minWidth: 120, flexShrink: 0 }}>
                   {field.label}
                 </Typography>
                 <Typography variant="body2" sx={{ textAlign: 'right', wordBreak: 'break-word' }}>
@@ -709,7 +1188,7 @@ export default function ListingCreatorDialog({
         {creating && uploadTotal > 0 && (
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              Görseller yükleniyor: {uploadProgress}/{uploadTotal}
+              Gorseller yukleniyor: {uploadProgress}/{uploadTotal}
             </Typography>
             <LinearProgress
               variant="determinate"
@@ -719,30 +1198,39 @@ export default function ListingCreatorDialog({
           </Box>
         )}
 
-        <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 2, mt: 1, flexDirection: isMobile ? 'column' : 'row' }}>
           <Button
             variant="contained"
             onClick={() => handleCreate(false)}
             disabled={creating}
             sx={{ flex: 1, minWidth: 180 }}
           >
-            {creating ? 'Oluşturuluyor...' : 'Taslak Olarak Oluştur'}
+            {creating ? 'Olusturuluyor...' : 'Draft Olarak Kaydet'}
           </Button>
           <Button
             variant="outlined"
+            color="success"
             onClick={() => handleCreate(true)}
-            disabled={creating}
+            disabled={creating || selectedFiles.length === 0}
             sx={{ flex: 1, minWidth: 180 }}
           >
-            {creating ? 'Oluşturuluyor...' : 'Oluştur ve Yayınla'}
+            {creating ? 'Olusturuluyor...' : 'Olustur ve Yayinla'}
           </Button>
         </Box>
+        {selectedFiles.length === 0 && (
+          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+            Yayinlamak icin en az 1 gorsel gereklidir
+          </Typography>
+        )}
       </Box>
     );
   };
 
   const stepContent = [renderStep1, renderStep2, renderStep3, renderStep4];
 
+  // ================================================================
+  // Dialog
+  // ================================================================
   return (
     <Dialog
       open={open}
@@ -765,19 +1253,19 @@ export default function ListingCreatorDialog({
           borderColor: 'divider',
         }}
       >
-        <Typography variant="h6">Yeni Listing Oluştur</Typography>
+        <Typography variant="h6">Yeni Listing Olustur</Typography>
         <IconButton onClick={handleClose} disabled={creating}>
           <CloseIcon />
         </IconButton>
       </Box>
 
-      {creating && <LinearProgress />}
+      {(creating || isAnyAILoading) && <LinearProgress />}
 
       <Box sx={{ px: 3, pt: 3 }}>
         <Stepper activeStep={activeStep} alternativeLabel={!isMobile}>
-          {STEPS.map((label) => (
+          {STEPS.map((label, idx) => (
             <Step key={label}>
-              <StepLabel>{isMobile && activeStep !== STEPS.indexOf(label) ? '' : label}</StepLabel>
+              <StepLabel>{isMobile && activeStep !== idx ? '' : label}</StepLabel>
             </Step>
           ))}
         </Stepper>
@@ -802,7 +1290,7 @@ export default function ListingCreatorDialog({
             Geri
           </Button>
           <Button variant="contained" onClick={handleNext}>
-            İleri
+            Ileri
           </Button>
         </Box>
       )}

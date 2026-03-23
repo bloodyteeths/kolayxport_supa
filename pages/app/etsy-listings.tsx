@@ -1289,6 +1289,7 @@ function EtsyListingsPage() {
         shopSections={shopSections}
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}
+        marketResearchData={marketResearchData}
         onCreated={(listingId) => {
           setCreateDialogOpen(false);
           toast.success(`Listing #${listingId} olusturuldu`);

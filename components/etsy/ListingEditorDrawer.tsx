@@ -374,6 +374,7 @@ export default function ListingEditorDrawer({
   const [newShipping, setNewShipping] = useState({
     title: '', origin_country_iso: 'TR', primary_cost: '0', secondary_cost: '0',
     min_processing_days: '1', max_processing_days: '3',
+    destination_country_iso: '',
   });
 
   // Return policy creation form
@@ -385,25 +386,41 @@ export default function ListingEditorDrawer({
   const [newSectionTitle, setNewSectionTitle] = useState('');
 
   const handleCreateShippingProfile = async () => {
+    if (!newShipping.title.trim()) {
+      toast.error('Profil adi zorunludur');
+      return;
+    }
+    if (Number(newShipping.min_processing_days) > Number(newShipping.max_processing_days)) {
+      toast.error('Min hazirlama suresi max\'tan buyuk olamaz');
+      return;
+    }
     setCreateLoading(true);
     try {
+      const payload: Record<string, any> = {
+        title: newShipping.title.trim(),
+        origin_country_iso: newShipping.origin_country_iso,
+        primary_cost: parseFloat(newShipping.primary_cost) || 0,
+        secondary_cost: parseFloat(newShipping.secondary_cost) || 0,
+        min_processing_days: parseInt(newShipping.min_processing_days) || 1,
+        max_processing_days: parseInt(newShipping.max_processing_days) || 3,
+      };
+      if (newShipping.destination_country_iso) {
+        payload.destination_country_iso = newShipping.destination_country_iso;
+      }
+
       const res = await fetch(`/api/clawd/etsy?shop_id=${shopId}&action=create_shipping_profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newShipping.title,
-          origin_country_iso: newShipping.origin_country_iso,
-          primary_cost: parseFloat(newShipping.primary_cost),
-          secondary_cost: parseFloat(newShipping.secondary_cost),
-          min_processing_days: parseInt(newShipping.min_processing_days),
-          max_processing_days: parseInt(newShipping.max_processing_days),
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('Kargo profili olusturulamadi');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Kargo profili olusturulamadi');
+      }
       toast.success('Kargo profili olusturuldu');
       setCreateShippingOpen(false);
-      setNewShipping({ title: '', origin_country_iso: 'TR', primary_cost: '0', secondary_cost: '0', min_processing_days: '1', max_processing_days: '3' });
-      onSaved(); // refresh parent data
+      setNewShipping({ title: '', origin_country_iso: 'TR', primary_cost: '0', secondary_cost: '0', min_processing_days: '1', max_processing_days: '3', destination_country_iso: '' });
+      onSaved();
     } catch (e: any) {
       toast.error(e.message || 'Hata olustu');
     } finally {
@@ -1993,7 +2010,7 @@ export default function ListingEditorDrawer({
                 onClick={handleSave}
                 disabled={saving || !hasChanges()}
               >
-                {saving ? 'Kaydediliyor...' : 'Etsy\'e Kaydet'}
+                {saving ? 'Kaydediliyor...' : listing?.state === 'active' ? 'Degisiklikleri Kaydet' : 'Draft Olarak Kaydet'}
               </Button>
               <Button
                 variant="outlined"
@@ -2116,24 +2133,128 @@ export default function ListingEditorDrawer({
       )}
 
       {/* Create Shipping Profile Dialog */}
-      <Dialog open={createShippingOpen} onClose={() => setCreateShippingOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Yeni Kargo Profili</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
-          <TextField label="Baslik" size="small" fullWidth value={newShipping.title} onChange={(e) => setNewShipping(s => ({ ...s, title: e.target.value }))} />
-          <TextField label="Mensei ulke (ISO)" size="small" fullWidth value={newShipping.origin_country_iso} onChange={(e) => setNewShipping(s => ({ ...s, origin_country_iso: e.target.value }))} />
+      <Dialog open={createShippingOpen} onClose={() => setCreateShippingOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Yeni Kargo Profili Olustur</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: '12px !important' }}>
+          <TextField
+            label="Profil Adi"
+            placeholder="ornek: Turkiye'den ABD'ye Standart Kargo"
+            size="small"
+            fullWidth
+            required
+            value={newShipping.title}
+            onChange={(e) => setNewShipping(s => ({ ...s, title: e.target.value }))}
+            helperText="Bu isim listing duzenlerken kargo profili secerken gorunecek"
+          />
+
+          <Divider />
+
+          {/* Origin & Destination */}
+          <Typography variant="subtitle2" color="text.secondary">Gonderim Rotasi</Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField label="Birincil ucret" type="number" size="small" fullWidth value={newShipping.primary_cost} onChange={(e) => setNewShipping(s => ({ ...s, primary_cost: e.target.value }))} />
-            <TextField label="Ikincil ucret" type="number" size="small" fullWidth value={newShipping.secondary_cost} onChange={(e) => setNewShipping(s => ({ ...s, secondary_cost: e.target.value }))} />
+            <FormControl fullWidth size="small" required>
+              <InputLabel>Gonderim Ulkesi</InputLabel>
+              <Select
+                value={newShipping.origin_country_iso}
+                label="Gonderim Ulkesi"
+                onChange={(e) => setNewShipping(s => ({ ...s, origin_country_iso: e.target.value }))}
+              >
+                <MenuItem value="TR">Turkiye</MenuItem>
+                <MenuItem value="US">ABD</MenuItem>
+                <MenuItem value="GB">Ingiltere</MenuItem>
+                <MenuItem value="DE">Almanya</MenuItem>
+                <MenuItem value="FR">Fransa</MenuItem>
+                <MenuItem value="CA">Kanada</MenuItem>
+                <MenuItem value="AU">Avustralya</MenuItem>
+                <MenuItem value="NL">Hollanda</MenuItem>
+                <MenuItem value="IT">Italya</MenuItem>
+                <MenuItem value="ES">Ispanya</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Hedef Ulke</InputLabel>
+              <Select
+                value={newShipping.destination_country_iso}
+                label="Hedef Ulke"
+                onChange={(e) => setNewShipping(s => ({ ...s, destination_country_iso: e.target.value }))}
+              >
+                <MenuItem value=""><em>Tum Dunya (varsayilan)</em></MenuItem>
+                <MenuItem value="US">ABD</MenuItem>
+                <MenuItem value="GB">Ingiltere</MenuItem>
+                <MenuItem value="DE">Almanya</MenuItem>
+                <MenuItem value="FR">Fransa</MenuItem>
+                <MenuItem value="CA">Kanada</MenuItem>
+                <MenuItem value="AU">Avustralya</MenuItem>
+                <MenuItem value="TR">Turkiye</MenuItem>
+                <MenuItem value="NL">Hollanda</MenuItem>
+                <MenuItem value="IT">Italya</MenuItem>
+                <MenuItem value="ES">Ispanya</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
+
+          <Divider />
+
+          {/* Shipping costs */}
+          <Typography variant="subtitle2" color="text.secondary">Kargo Ucretleri (USD)</Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField label="Min gun" type="number" size="small" fullWidth value={newShipping.min_processing_days} onChange={(e) => setNewShipping(s => ({ ...s, min_processing_days: e.target.value }))} inputProps={{ min: 1 }} />
-            <TextField label="Max gun" type="number" size="small" fullWidth value={newShipping.max_processing_days} onChange={(e) => setNewShipping(s => ({ ...s, max_processing_days: e.target.value }))} inputProps={{ min: 1 }} />
+            <TextField
+              label="Ilk Urun Kargo Ucreti"
+              type="number"
+              size="small"
+              fullWidth
+              value={newShipping.primary_cost}
+              onChange={(e) => setNewShipping(s => ({ ...s, primary_cost: e.target.value }))}
+              inputProps={{ min: 0, step: '0.01' }}
+              helperText="Siparisin ilk urunu icin"
+            />
+            <TextField
+              label="Ek Urun Kargo Ucreti"
+              type="number"
+              size="small"
+              fullWidth
+              value={newShipping.secondary_cost}
+              onChange={(e) => setNewShipping(s => ({ ...s, secondary_cost: e.target.value }))}
+              inputProps={{ min: 0, step: '0.01' }}
+              helperText="Her ek urun icin"
+            />
+          </Box>
+
+          <Divider />
+
+          {/* Processing time */}
+          <Typography variant="subtitle2" color="text.secondary">Hazirlama Suresi (is gunu)</Typography>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField
+              label="Minimum"
+              type="number"
+              size="small"
+              fullWidth
+              value={newShipping.min_processing_days}
+              onChange={(e) => setNewShipping(s => ({ ...s, min_processing_days: e.target.value }))}
+              inputProps={{ min: 1, max: 45 }}
+              helperText="Siparis sonrasi min hazirlama"
+            />
+            <TextField
+              label="Maksimum"
+              type="number"
+              size="small"
+              fullWidth
+              value={newShipping.max_processing_days}
+              onChange={(e) => setNewShipping(s => ({ ...s, max_processing_days: e.target.value }))}
+              inputProps={{ min: 1, max: 45 }}
+              helperText="Siparis sonrasi max hazirlama"
+            />
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCreateShippingOpen(false)}>Iptal</Button>
-          <Button variant="contained" onClick={handleCreateShippingProfile} disabled={createLoading || !newShipping.title}>
-            {createLoading ? <CircularProgress size={20} /> : 'Olustur'}
+          <Button
+            variant="contained"
+            onClick={handleCreateShippingProfile}
+            disabled={createLoading || !newShipping.title.trim()}
+          >
+            {createLoading ? <CircularProgress size={20} /> : 'Kargo Profili Olustur'}
           </Button>
         </DialogActions>
       </Dialog>

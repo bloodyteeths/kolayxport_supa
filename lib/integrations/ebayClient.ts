@@ -68,7 +68,7 @@ export async function getApplicationToken(): Promise<string> {
  * Exchange an authorization code for user tokens (Authorization Code grant).
  */
 export async function getUserToken(authCode: string): Promise<EbayTokenResponse> {
-  const redirectUri = 'https://kolayxport.com/api/integrations/ebay/callback';
+  const redirectUri = process.env.EBAY_RU_NAME || 'Tamsar__Inc.-TamsarIn-kolayx-fejubx';
 
   logger.info('Exchanging eBay authorization code for user token');
 
@@ -80,7 +80,7 @@ export async function getUserToken(authCode: string): Promise<EbayTokenResponse>
     },
     body: new URLSearchParams({
       grant_type: 'authorization_code',
-      code: authCode,
+      code: decodeURIComponent(authCode),
       redirect_uri: redirectUri,
     }).toString(),
   });

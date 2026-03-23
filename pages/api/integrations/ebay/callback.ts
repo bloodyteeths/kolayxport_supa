@@ -74,7 +74,7 @@ export default async function handler(
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        code: code as string,
+        code: decodeURIComponent(code as string),
         redirect_uri: redirectUri,
       }).toString(),
     });

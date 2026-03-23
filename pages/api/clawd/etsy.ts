@@ -1969,6 +1969,108 @@ export default async function handler(
             return res.status(200).json({ success: true, listing: data });
         }
 
+        // --- Shipping Profile CRUD ---
+
+        // POST /api/clawd/etsy?action=create_shipping_profile
+        if (req.method === 'POST' && action === 'create_shipping_profile') {
+            const { title, origin_country_iso, primary_cost, secondary_cost, min_processing_days, max_processing_days, destination_country_iso, mail_class } = req.body || {};
+            const payload: Record<string, any> = {
+                title, origin_country_iso, primary_cost, secondary_cost,
+                min_processing_days, max_processing_days,
+            };
+            if (destination_country_iso) payload.destination_country_iso = destination_country_iso;
+            if (mail_class) payload.mail_class = mail_class;
+
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/shipping-profiles`,
+                accessToken,
+                { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } }
+            );
+            return res.status(200).json({ success: true, shipping_profile: data });
+        }
+
+        // PATCH /api/clawd/etsy?action=update_shipping_profile&shipping_profile_id=xxx
+        if (req.method === 'PATCH' && action === 'update_shipping_profile') {
+            const spId = req.query.shipping_profile_id as string;
+            if (!spId) return res.status(400).json({ error: 'shipping_profile_id is required' });
+
+            const { title, min_processing_days, max_processing_days, primary_cost, secondary_cost } = req.body || {};
+            const payload: Record<string, any> = {};
+            if (title !== undefined) payload.title = title;
+            if (min_processing_days !== undefined) payload.min_processing_days = min_processing_days;
+            if (max_processing_days !== undefined) payload.max_processing_days = max_processing_days;
+            if (primary_cost !== undefined) payload.primary_cost = primary_cost;
+            if (secondary_cost !== undefined) payload.secondary_cost = secondary_cost;
+
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/shipping-profiles/${spId}`,
+                accessToken,
+                { method: 'PUT', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } }
+            );
+            return res.status(200).json({ success: true, shipping_profile: data });
+        }
+
+        // DELETE /api/clawd/etsy?action=delete_shipping_profile&shipping_profile_id=xxx
+        if (req.method === 'DELETE' && action === 'delete_shipping_profile') {
+            const spId = req.query.shipping_profile_id as string;
+            if (!spId) return res.status(400).json({ error: 'shipping_profile_id is required' });
+
+            await callEtsyAPI(
+                `/shops/${shopId}/shipping-profiles/${spId}`,
+                accessToken,
+                { method: 'DELETE' }
+            );
+            return res.status(200).json({ success: true });
+        }
+
+        // --- Return Policy CRUD ---
+
+        // POST /api/clawd/etsy?action=create_return_policy
+        if (req.method === 'POST' && action === 'create_return_policy') {
+            const { accepts_returns, accepts_exchanges, return_deadline } = req.body || {};
+            const payload: Record<string, any> = { accepts_returns, accepts_exchanges };
+            if (return_deadline !== undefined) payload.return_deadline = return_deadline;
+
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/policies/return`,
+                accessToken,
+                { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } }
+            );
+            return res.status(200).json({ success: true, return_policy: data });
+        }
+
+        // PUT /api/clawd/etsy?action=update_return_policy&return_policy_id=xxx
+        if (req.method === 'PUT' && action === 'update_return_policy') {
+            const rpId = req.query.return_policy_id as string;
+            if (!rpId) return res.status(400).json({ error: 'return_policy_id is required' });
+
+            const { accepts_returns, accepts_exchanges, return_deadline } = req.body || {};
+            const payload: Record<string, any> = {};
+            if (accepts_returns !== undefined) payload.accepts_returns = accepts_returns;
+            if (accepts_exchanges !== undefined) payload.accepts_exchanges = accepts_exchanges;
+            if (return_deadline !== undefined) payload.return_deadline = return_deadline;
+
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/policies/return/${rpId}`,
+                accessToken,
+                { method: 'PUT', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } }
+            );
+            return res.status(200).json({ success: true, return_policy: data });
+        }
+
+        // DELETE /api/clawd/etsy?action=delete_return_policy&return_policy_id=xxx
+        if (req.method === 'DELETE' && action === 'delete_return_policy') {
+            const rpId = req.query.return_policy_id as string;
+            if (!rpId) return res.status(400).json({ error: 'return_policy_id is required' });
+
+            await callEtsyAPI(
+                `/shops/${shopId}/policies/return/${rpId}`,
+                accessToken,
+                { method: 'DELETE' }
+            );
+            return res.status(200).json({ success: true });
+        }
+
         // Invalid request
         return res.status(400).json({ error: 'Invalid request parameters' });
 

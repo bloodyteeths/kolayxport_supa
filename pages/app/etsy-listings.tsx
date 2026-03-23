@@ -925,54 +925,34 @@ function EtsyListingsPage() {
       <Toaster position="top-right" />
 
       {/* Statistics Bar */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-          <Typography variant="caption" color="text.secondary">
-            Toplam Listing
-          </Typography>
-          <Typography variant="h6" fontWeight={700}>
-            {totalCount}
-          </Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' }, gap: 1, mb: 2 }}>
+        <Paper sx={{ p: 1.5 }}>
+          <Typography variant="caption" color="text.secondary">Toplam Listing</Typography>
+          <Typography variant="h6" fontWeight={700}>{totalCount}</Typography>
         </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-          <Typography variant="caption" color="text.secondary">
-            Toplam Görüntülenme
-          </Typography>
-          <Typography variant="h6" fontWeight={700}>
-            {totalViews.toLocaleString()}
-          </Typography>
+        <Paper sx={{ p: 1.5 }}>
+          <Typography variant="caption" color="text.secondary">Görüntülenme</Typography>
+          <Typography variant="h6" fontWeight={700}>{totalViews.toLocaleString()}</Typography>
         </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-          <Typography variant="caption" color="text.secondary">
-            Toplam Favori
-          </Typography>
-          <Typography variant="h6" fontWeight={700}>
-            {totalFavorites.toLocaleString()}
-          </Typography>
+        <Paper sx={{ p: 1.5 }}>
+          <Typography variant="caption" color="text.secondary">Favori</Typography>
+          <Typography variant="h6" fontWeight={700}>{totalFavorites.toLocaleString()}</Typography>
         </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-          <Typography variant="caption" color="text.secondary">
-            Stoksuz
-          </Typography>
-          <Typography variant="h6" fontWeight={700} color="error">
-            {outOfStock}
-          </Typography>
+        <Paper sx={{ p: 1.5 }}>
+          <Typography variant="caption" color="text.secondary">Stoksuz</Typography>
+          <Typography variant="h6" fontWeight={700} color="error">{outOfStock}</Typography>
         </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120, borderLeft: '3px solid #ff9800' }}>
-          <Typography variant="caption" color="text.secondary">
-            Sorunlu
-          </Typography>
-          <Typography variant="h6" fontWeight={700} sx={{ color: '#ff9800' }}>
-            {needsAttention}
-          </Typography>
+        <Paper sx={{ p: 1.5, borderLeft: '3px solid #ff9800' }}>
+          <Typography variant="caption" color="text.secondary">Sorunlu</Typography>
+          <Typography variant="h6" fontWeight={700} sx={{ color: '#ff9800' }}>{needsAttention}</Typography>
         </Paper>
       </Box>
 
       {/* Toolbar Row 1: Search & Filters */}
       <Paper sx={{ p: 1.5, mb: 1 }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-          {/* Shop selector */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
+        {/* Search row — full width on mobile */}
+        <Box sx={{ display: 'flex', gap: 1, mb: { xs: 1, md: 0 }, flexWrap: 'wrap', alignItems: 'center' }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 150 } }}>
             <Select
               value={selectedShopId}
               onChange={(e) => setSelectedShopId(e.target.value)}
@@ -991,13 +971,12 @@ function EtsyListingsPage() {
             </Select>
           </FormControl>
 
-          {/* Search */}
           <TextField
             size="small"
             placeholder="Listing ara..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ minWidth: 200, flex: 1 }}
+            sx={{ flex: 1, minWidth: { xs: '100%', sm: 200 } }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -1007,13 +986,12 @@ function EtsyListingsPage() {
             }}
           />
 
-          {/* Exclude (İçermez) filter */}
           <TextField
             size="small"
             placeholder="İçermez..."
             value={excludeTerm}
             onChange={(e) => setExcludeTerm(e.target.value)}
-            sx={{ minWidth: 140 }}
+            sx={{ minWidth: { xs: '48%', sm: 140 } }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -1023,8 +1001,8 @@ function EtsyListingsPage() {
             }}
           />
 
-          {/* Status filter */}
-          <FormControl size="small" sx={{ minWidth: 120 }}>
+          {/* Filters — on mobile these wrap to a second line */}
+          <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 100 } }}>
             <Select
               value={statusFilter}
               onChange={(e) =>
@@ -1038,8 +1016,7 @@ function EtsyListingsPage() {
             </Select>
           </FormControl>
 
-          {/* Section filter */}
-          <FormControl size="small" sx={{ minWidth: 120 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 110 }, display: { xs: 'none', sm: 'flex' } }}>
             <Select
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
@@ -1054,8 +1031,7 @@ function EtsyListingsPage() {
             </Select>
           </FormControl>
 
-          {/* Health filter */}
-          <FormControl size="small" sx={{ minWidth: 130 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 120 } }}>
             <Select
               value={healthFilter}
               onChange={(e) => setHealthFilter(e.target.value)}
@@ -1083,55 +1059,47 @@ function EtsyListingsPage() {
         </Box>
       </Paper>
 
-      {/* Toolbar Row 2: Actions — grouped by category */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2, alignItems: 'center' }}>
-        {/* Primary action */}
-        <Button variant="contained" size="small" onClick={() => setCreateDialogOpen(true)}>
+      {/* Toolbar Row 2: Actions — horizontally scrollable on mobile */}
+      <Box sx={{
+        display: 'flex',
+        gap: 1,
+        mb: 2,
+        alignItems: 'center',
+        overflowX: 'auto',
+        pb: 0.5,
+        '&::-webkit-scrollbar': { height: 4 },
+        '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 2 },
+      }}>
+        <Button variant="contained" size="small" sx={{ whiteSpace: 'nowrap' }} onClick={() => setCreateDialogOpen(true)}>
           + Yeni Listing
         </Button>
-
-        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
-
-        {/* Editing tools */}
         <Tooltip title="Başlık, açıklama, etiketlerde ara ve değiştir" arrow>
-          <Button variant="outlined" size="small" onClick={() => setFindReplaceOpen(true)}>
+          <Button variant="outlined" size="small" sx={{ whiteSpace: 'nowrap' }} onClick={() => setFindReplaceOpen(true)}>
             Bul &amp; Değiştir
           </Button>
         </Tooltip>
         <Tooltip title="Benzer/tekrarlanan listingleri bul" arrow>
-          <Button variant="outlined" size="small" color="warning" onClick={() => setDuplicateDetectorOpen(true)}>
+          <Button variant="outlined" size="small" color="warning" sx={{ whiteSpace: 'nowrap' }} onClick={() => setDuplicateDetectorOpen(true)}>
             Tekrar Tespit
           </Button>
         </Tooltip>
-
-        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
-
-        {/* Smart features */}
         <Tooltip title="Satışa göre otomatik fiyat ayarla, stok yenile" arrow>
-          <Button variant="outlined" size="small" onClick={() => setSmartPricingOpen(true)}>
+          <Button variant="outlined" size="small" sx={{ whiteSpace: 'nowrap' }} onClick={() => setSmartPricingOpen(true)}>
             Akıllı Fiyat
           </Button>
         </Tooltip>
-
-        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
-
-        {/* Data import/export */}
         <Tooltip title="Listing verilerini CSV olarak dışa aktar" arrow>
-          <Button variant="outlined" size="small" onClick={handleExportCSV}>
+          <Button variant="outlined" size="small" sx={{ whiteSpace: 'nowrap' }} onClick={handleExportCSV}>
             CSV İndir
           </Button>
         </Tooltip>
         <Tooltip title="CSV dosyasından toplu güncelleme yap" arrow>
-          <Button variant="outlined" size="small" startIcon={<UploadFileIcon />} onClick={handleCSVFileSelect}>
+          <Button variant="outlined" size="small" sx={{ whiteSpace: 'nowrap' }} startIcon={<UploadFileIcon />} onClick={handleCSVFileSelect}>
             CSV Yükle
           </Button>
         </Tooltip>
-
-        <Box sx={{ width: 1, height: 24, borderLeft: '1px solid', borderColor: 'divider', mx: 0.5 }} />
-
-        {/* Safety */}
         <Tooltip title="Toplu işlem yedeklerini görüntüle ve geri yükle" arrow>
-          <Button variant="outlined" size="small" color="info" onClick={() => setBackupManagerOpen(true)}>
+          <Button variant="outlined" size="small" color="info" sx={{ whiteSpace: 'nowrap' }} onClick={() => setBackupManagerOpen(true)}>
             Yedekler
           </Button>
         </Tooltip>

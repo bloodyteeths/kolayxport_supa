@@ -36,6 +36,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import BlockIcon from '@mui/icons-material/Block';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import UndoIcon from '@mui/icons-material/Undo';
+import AddIcon from '@mui/icons-material/Add';
 import HistoryIcon from '@mui/icons-material/History';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import { toast } from 'react-hot-toast';
@@ -66,7 +67,7 @@ interface ListingEditorDrawerProps {
   shopId: string;
   shopSections: Array<{ shop_section_id: number; title: string }>;
   shippingProfiles: Array<{ shipping_profile_id: number; title: string }>;
-  returnPolicies: Array<{ return_policy_id: number; description?: string }>;
+  returnPolicies: Array<{ return_policy_id: number; description?: string; accepts_returns?: boolean; accepts_exchanges?: boolean }>;
   onSaved: () => void;
 }
 
@@ -313,6 +314,97 @@ export default function ListingEditorDrawer({
 
   // Execute scheduled updates (polls every 30s)
   useScheduledUpdateExecutor();
+
+  // Creation dialog states
+  const [createShippingOpen, setCreateShippingOpen] = useState(false);
+  const [createReturnOpen, setCreateReturnOpen] = useState(false);
+  const [createSectionOpen, setCreateSectionOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+
+  // Shipping profile creation form
+  const [newShipping, setNewShipping] = useState({
+    title: '', origin_country_iso: 'TR', primary_cost: '0', secondary_cost: '0',
+    min_processing_days: '1', max_processing_days: '3',
+  });
+
+  // Return policy creation form
+  const [newReturn, setNewReturn] = useState({
+    accepts_returns: true, accepts_exchanges: true, return_deadline: '30',
+  });
+
+  // Section creation form
+  const [newSectionTitle, setNewSectionTitle] = useState('');
+
+  const handleCreateShippingProfile = async () => {
+    setCreateLoading(true);
+    try {
+      const res = await fetch(`/api/clawd/etsy?shop_id=${shopId}&action=create_shipping_profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newShipping.title,
+          origin_country_iso: newShipping.origin_country_iso,
+          primary_cost: parseFloat(newShipping.primary_cost),
+          secondary_cost: parseFloat(newShipping.secondary_cost),
+          min_processing_days: parseInt(newShipping.min_processing_days),
+          max_processing_days: parseInt(newShipping.max_processing_days),
+        }),
+      });
+      if (!res.ok) throw new Error('Kargo profili olusturulamadi');
+      toast.success('Kargo profili olusturuldu');
+      setCreateShippingOpen(false);
+      setNewShipping({ title: '', origin_country_iso: 'TR', primary_cost: '0', secondary_cost: '0', min_processing_days: '1', max_processing_days: '3' });
+      onSaved(); // refresh parent data
+    } catch (e: any) {
+      toast.error(e.message || 'Hata olustu');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleCreateReturnPolicy = async () => {
+    setCreateLoading(true);
+    try {
+      const res = await fetch(`/api/clawd/etsy?shop_id=${shopId}&action=create_return_policy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accepts_returns: newReturn.accepts_returns,
+          accepts_exchanges: newReturn.accepts_exchanges,
+          return_deadline: newReturn.return_deadline ? parseInt(newReturn.return_deadline) : undefined,
+        }),
+      });
+      if (!res.ok) throw new Error('Iade politikasi olusturulamadi');
+      toast.success('Iade politikasi olusturuldu');
+      setCreateReturnOpen(false);
+      setNewReturn({ accepts_returns: true, accepts_exchanges: true, return_deadline: '30' });
+      onSaved();
+    } catch (e: any) {
+      toast.error(e.message || 'Hata olustu');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleCreateSection = async () => {
+    setCreateLoading(true);
+    try {
+      const res = await fetch(`/api/clawd/etsy?shop_id=${shopId}&action=create_shop_section`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newSectionTitle }),
+      });
+      if (!res.ok) throw new Error('Bolum olusturulamadi');
+      toast.success('Magaza bolumu olusturuldu');
+      setCreateSectionOpen(false);
+      setNewSectionTitle('');
+      onSaved();
+    } catch (e: any) {
+      toast.error(e.message || 'Hata olustu');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
 
   // --------------------------------------------------
   // Fetch listing details
@@ -1576,67 +1668,96 @@ export default function ListingEditorDrawer({
                   <Divider sx={{ my: 0.5 }} />
 
                   {/* Shop section */}
-                  <FormControl size="small" fullWidth>
-                    <InputLabel>Magaza bolumu</InputLabel>
-                    <Select
-                      value={String(fields.shop_section_id)}
-                      label="Magaza bolumu"
-                      onChange={(e: SelectChangeEvent) =>
-                        updateField('shop_section_id', e.target.value ? Number(e.target.value) : '')
-                      }
-                    >
-                      <MenuItem value="">
-                        <em>Secilmedi</em>
-                      </MenuItem>
-                      {shopSections.map((sec) => (
-                        <MenuItem key={sec.shop_section_id} value={String(sec.shop_section_id)}>
-                          {sec.title}
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Magaza bolumu</InputLabel>
+                      <Select
+                        value={String(fields.shop_section_id)}
+                        label="Magaza bolumu"
+                        onChange={(e: SelectChangeEvent) =>
+                          updateField('shop_section_id', e.target.value ? Number(e.target.value) : '')
+                        }
+                      >
+                        <MenuItem value="">
+                          <em>Secilmedi</em>
                         </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                        {shopSections.map((sec) => (
+                          <MenuItem key={sec.shop_section_id} value={String(sec.shop_section_id)}>
+                            {sec.title}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <Tooltip title="Yeni bolum ekle">
+                      <IconButton size="small" onClick={() => setCreateSectionOpen(true)} sx={{ mt: 0.5 }}>
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
 
                   {/* Shipping profile */}
-                  <FormControl size="small" fullWidth>
-                    <InputLabel>Kargo profili</InputLabel>
-                    <Select
-                      value={String(fields.shipping_profile_id)}
-                      label="Kargo profili"
-                      onChange={(e: SelectChangeEvent) =>
-                        updateField('shipping_profile_id', e.target.value ? Number(e.target.value) : '')
-                      }
-                    >
-                      <MenuItem value="">
-                        <em>Secilmedi</em>
-                      </MenuItem>
-                      {shippingProfiles.map((sp) => (
-                        <MenuItem key={sp.shipping_profile_id} value={String(sp.shipping_profile_id)}>
-                          {sp.title}
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Kargo profili</InputLabel>
+                      <Select
+                        value={String(fields.shipping_profile_id)}
+                        label="Kargo profili"
+                        onChange={(e: SelectChangeEvent) =>
+                          updateField('shipping_profile_id', e.target.value ? Number(e.target.value) : '')
+                        }
+                      >
+                        <MenuItem value="">
+                          <em>Secilmedi</em>
                         </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                        {shippingProfiles.map((sp) => (
+                          <MenuItem key={sp.shipping_profile_id} value={String(sp.shipping_profile_id)}>
+                            {sp.title}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <Tooltip title="Yeni kargo profili ekle">
+                      <IconButton size="small" onClick={() => setCreateShippingOpen(true)} sx={{ mt: 0.5 }}>
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
 
                   {/* Return policy */}
-                  <FormControl size="small" fullWidth>
-                    <InputLabel>Iade politikasi</InputLabel>
-                    <Select
-                      value={String(fields.return_policy_id)}
-                      label="Iade politikasi"
-                      onChange={(e: SelectChangeEvent) =>
-                        updateField('return_policy_id', e.target.value ? Number(e.target.value) : '')
-                      }
-                    >
-                      <MenuItem value="">
-                        <em>Secilmedi</em>
-                      </MenuItem>
-                      {returnPolicies.map((rp) => (
-                        <MenuItem key={rp.return_policy_id} value={String(rp.return_policy_id)}>
-                          {rp.description || `Politika #${rp.return_policy_id}`}
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel>Iade politikasi</InputLabel>
+                      <Select
+                        value={String(fields.return_policy_id)}
+                        label="Iade politikasi"
+                        onChange={(e: SelectChangeEvent) =>
+                          updateField('return_policy_id', e.target.value ? Number(e.target.value) : '')
+                        }
+                      >
+                        <MenuItem value="">
+                          <em>Secilmedi</em>
                         </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                        {returnPolicies.map((rp) => {
+                          const label = rp.description
+                            ? rp.description
+                            : [
+                                rp.accepts_returns ? 'Iade Var' : 'Iade Yok',
+                                rp.accepts_exchanges ? 'Degisim Var' : 'Degisim Yok',
+                              ].join(', ');
+                          return (
+                            <MenuItem key={rp.return_policy_id} value={String(rp.return_policy_id)}>
+                              {label}
+                            </MenuItem>
+                          );
+                        })}
+                      </Select>
+                    </FormControl>
+                    <Tooltip title="Yeni iade politikasi ekle">
+                      <IconButton size="small" onClick={() => setCreateReturnOpen(true)} sx={{ mt: 0.5 }}>
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
 
                   <Divider sx={{ my: 0.5 }} />
 
@@ -1979,6 +2100,67 @@ export default function ListingEditorDrawer({
           />
         </>
       )}
+
+      {/* Create Shipping Profile Dialog */}
+      <Dialog open={createShippingOpen} onClose={() => setCreateShippingOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Yeni Kargo Profili</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
+          <TextField label="Baslik" size="small" fullWidth value={newShipping.title} onChange={(e) => setNewShipping(s => ({ ...s, title: e.target.value }))} />
+          <TextField label="Mensei ulke (ISO)" size="small" fullWidth value={newShipping.origin_country_iso} onChange={(e) => setNewShipping(s => ({ ...s, origin_country_iso: e.target.value }))} />
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField label="Birincil ucret" type="number" size="small" fullWidth value={newShipping.primary_cost} onChange={(e) => setNewShipping(s => ({ ...s, primary_cost: e.target.value }))} />
+            <TextField label="Ikincil ucret" type="number" size="small" fullWidth value={newShipping.secondary_cost} onChange={(e) => setNewShipping(s => ({ ...s, secondary_cost: e.target.value }))} />
+          </Box>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField label="Min gun" type="number" size="small" fullWidth value={newShipping.min_processing_days} onChange={(e) => setNewShipping(s => ({ ...s, min_processing_days: e.target.value }))} inputProps={{ min: 1 }} />
+            <TextField label="Max gun" type="number" size="small" fullWidth value={newShipping.max_processing_days} onChange={(e) => setNewShipping(s => ({ ...s, max_processing_days: e.target.value }))} inputProps={{ min: 1 }} />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateShippingOpen(false)}>Iptal</Button>
+          <Button variant="contained" onClick={handleCreateShippingProfile} disabled={createLoading || !newShipping.title}>
+            {createLoading ? <CircularProgress size={20} /> : 'Olustur'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Return Policy Dialog */}
+      <Dialog open={createReturnOpen} onClose={() => setCreateReturnOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Yeni Iade Politikasi</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
+          <FormControlLabel
+            control={<Switch checked={newReturn.accepts_returns} onChange={(e) => setNewReturn(s => ({ ...s, accepts_returns: e.target.checked }))} />}
+            label="Iade kabul ediliyor"
+          />
+          <FormControlLabel
+            control={<Switch checked={newReturn.accepts_exchanges} onChange={(e) => setNewReturn(s => ({ ...s, accepts_exchanges: e.target.checked }))} />}
+            label="Degisim kabul ediliyor"
+          />
+          {newReturn.accepts_returns && (
+            <TextField label="Iade suresi (gun)" type="number" size="small" fullWidth value={newReturn.return_deadline} onChange={(e) => setNewReturn(s => ({ ...s, return_deadline: e.target.value }))} inputProps={{ min: 1 }} />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateReturnOpen(false)}>Iptal</Button>
+          <Button variant="contained" onClick={handleCreateReturnPolicy} disabled={createLoading}>
+            {createLoading ? <CircularProgress size={20} /> : 'Olustur'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Shop Section Dialog */}
+      <Dialog open={createSectionOpen} onClose={() => setCreateSectionOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Yeni Magaza Bolumu</DialogTitle>
+        <DialogContent sx={{ pt: '8px !important' }}>
+          <TextField label="Bolum adi" size="small" fullWidth value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateSectionOpen(false)}>Iptal</Button>
+          <Button variant="contained" onClick={handleCreateSection} disabled={createLoading || !newSectionTitle}>
+            {createLoading ? <CircularProgress size={20} /> : 'Olustur'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

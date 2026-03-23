@@ -9,11 +9,13 @@ import {
   Button,
   Divider,
   Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 
 interface AspectMetadata {
   localizedAspectName: string;
@@ -29,6 +31,9 @@ interface ItemSpecificsEditorProps {
   requiredAspects: AspectMetadata[];
   recommendedAspects: AspectMetadata[];
   onChange: (aspects: Record<string, string[]>) => void;
+  /** If provided, enables AI auto-fill button */
+  onAIFill?: (aspectNames: string[], currentAspects: Record<string, string[]>) => Promise<Record<string, string[]> | null>;
+  aiLoading?: boolean;
 }
 
 export default function ItemSpecificsEditor({
@@ -36,6 +41,8 @@ export default function ItemSpecificsEditor({
   requiredAspects,
   recommendedAspects,
   onChange,
+  onAIFill,
+  aiLoading,
 }: ItemSpecificsEditorProps) {
   const [customKey, setCustomKey] = useState('');
   const [customValue, setCustomValue] = useState('');
@@ -121,6 +128,7 @@ export default function ItemSpecificsEditor({
                 />
               )}
               size="small"
+              slotProps={{ popper: { style: { zIndex: 1600 } } }}
             />
           </Box>
           {isFilled ? (
@@ -162,6 +170,7 @@ export default function ItemSpecificsEditor({
                 />
               )}
               size="small"
+              slotProps={{ popper: { style: { zIndex: 1600 } } }}
             />
           </Box>
           {isFilled ? (
@@ -199,17 +208,40 @@ export default function ItemSpecificsEditor({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* Count display */}
+      {/* Count display + AI fill */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="body2" fontWeight={600}>
           Ürün Özellikleri
         </Typography>
-        <Chip
-          label={`${filledAspects}/${totalAspects} dolduruldu`}
-          size="small"
-          color={filledAspects === totalAspects ? 'success' : filledAspects > 0 ? 'warning' : 'default'}
-          sx={{ height: 22, fontSize: '0.75rem' }}
-        />
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          {onAIFill && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={aiLoading ? <CircularProgress size={14} /> : <AutoFixHighIcon />}
+              disabled={aiLoading || (requiredAspects.length === 0 && recommendedAspects.length === 0)}
+              onClick={async () => {
+                const allNames = [
+                  ...requiredAspects.map(a => a.localizedAspectName),
+                  ...recommendedAspects.map(a => a.localizedAspectName),
+                ];
+                const result = await onAIFill(allNames, aspects);
+                if (result) {
+                  onChange({ ...aspects, ...result });
+                }
+              }}
+              sx={{ fontSize: '0.7rem', py: 0.25 }}
+            >
+              AI Doldur
+            </Button>
+          )}
+          <Chip
+            label={`${filledAspects}/${totalAspects} dolduruldu`}
+            size="small"
+            color={filledAspects === totalAspects ? 'success' : filledAspects > 0 ? 'warning' : 'default'}
+            sx={{ height: 22, fontSize: '0.75rem' }}
+          />
+        </Box>
       </Box>
 
       {/* Required aspects */}

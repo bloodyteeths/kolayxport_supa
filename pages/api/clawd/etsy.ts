@@ -1103,6 +1103,7 @@ export default async function handler(
                 processing_max,
                 item_weight, item_weight_unit,
                 item_length, item_width, item_height, item_dimensions_unit,
+                currency_code,
                 // New Sept 2025 requirement for processing profiles
                 readiness_state_id,
             } = req.body;
@@ -1135,6 +1136,7 @@ export default async function handler(
             };
 
             // Add optional fields if provided
+            if (currency_code) listingPayload.currency_code = currency_code;
             if (tags && tags.length > 0) listingPayload.tags = tags.slice(0, 13); // Etsy max 13 tags
             if (materials && materials.length > 0) listingPayload.materials = materials.slice(0, 13);
             if (shipping_profile_id) listingPayload.shipping_profile_id = shipping_profile_id;

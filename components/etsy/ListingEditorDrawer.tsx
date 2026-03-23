@@ -332,6 +332,8 @@ export default function ListingEditorDrawer({
   const [copying, setCopying] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false);
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
 
   // Template / profile state
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
@@ -744,6 +746,17 @@ export default function ListingEditorDrawer({
     if (f.is_supply !== undefined) updateField('is_supply', f.is_supply);
     if (f.shipping_profile_id !== undefined) updateField('shipping_profile_id', f.shipping_profile_id);
     if (f.return_policy_id !== undefined) updateField('return_policy_id', f.return_policy_id);
+    if (f.processing_min !== undefined) updateField('processing_min', f.processing_min);
+    if (f.processing_max !== undefined) updateField('processing_max', f.processing_max);
+    if (f.item_weight !== undefined) updateField('item_weight', f.item_weight);
+    if (f.item_weight_unit !== undefined) updateField('item_weight_unit', f.item_weight_unit);
+    if (f.item_length !== undefined) updateField('item_length', f.item_length);
+    if (f.item_width !== undefined) updateField('item_width', f.item_width);
+    if (f.item_height !== undefined) updateField('item_height', f.item_height);
+    if (f.item_dimensions_unit !== undefined) updateField('item_dimensions_unit', f.item_dimensions_unit);
+    if (f.shop_section_id !== undefined) updateField('shop_section_id', f.shop_section_id);
+    if (f.price !== undefined) updateField('price', f.price);
+    if (f.quantity !== undefined) updateField('quantity', f.quantity);
 
     toast.success(`"${template.name}" profili uygulandi`);
   }, [fields]);
@@ -1782,6 +1795,11 @@ export default function ListingEditorDrawer({
                       </IconButton>
                     </Tooltip>
                   </Box>
+                  {shopSections.length === 0 && (
+                    <Typography variant="caption" color="warning.main">
+                      Yuklenemedi — sayfayi yenileyin
+                    </Typography>
+                  )}
 
                   {/* Shipping profile */}
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
@@ -1810,6 +1828,11 @@ export default function ListingEditorDrawer({
                       </IconButton>
                     </Tooltip>
                   </Box>
+                  {shippingProfiles.length === 0 && (
+                    <Typography variant="caption" color="warning.main">
+                      Yuklenemedi — sayfayi yenileyin
+                    </Typography>
+                  )}
 
                   {/* Return policy */}
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
@@ -1846,6 +1869,11 @@ export default function ListingEditorDrawer({
                       </IconButton>
                     </Tooltip>
                   </Box>
+                  {returnPolicies.length === 0 && (
+                    <Typography variant="caption" color="warning.main">
+                      Yuklenemedi — sayfayi yenileyin
+                    </Typography>
+                  )}
 
                   <Divider sx={{ my: 0.5 }} />
 
@@ -1992,7 +2020,7 @@ export default function ListingEditorDrawer({
                       variant="contained"
                       color="success"
                       startIcon={publishing ? <CircularProgress size={18} color="inherit" /> : <PublishIcon />}
-                      onClick={handlePublish}
+                      onClick={() => setPublishDialogOpen(true)}
                       disabled={publishing}
                       fullWidth
                     >
@@ -2008,7 +2036,7 @@ export default function ListingEditorDrawer({
                       startIcon={
                         deactivating ? <CircularProgress size={18} color="inherit" /> : <BlockIcon />
                       }
-                      onClick={handleDeactivate}
+                      onClick={() => setDeactivateDialogOpen(true)}
                       disabled={deactivating}
                       fullWidth
                     >
@@ -2136,6 +2164,64 @@ export default function ListingEditorDrawer({
       </Dialog>
 
       {/* ================================================================ */}
+      {/* Publish Confirmation Dialog */}
+      {/* ================================================================ */}
+      <Dialog open={publishDialogOpen} onClose={() => setPublishDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Listingi Yayinla</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Bu listingi yayinlamak istediginize emin misiniz?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPublishDialogOpen(false)} disabled={publishing}>
+            Iptal
+          </Button>
+          <Button
+            onClick={() => {
+              setPublishDialogOpen(false);
+              handlePublish();
+            }}
+            color="success"
+            variant="contained"
+            disabled={publishing}
+            startIcon={publishing ? <CircularProgress size={18} color="inherit" /> : <PublishIcon />}
+          >
+            Yayinla
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ================================================================ */}
+      {/* Deactivate Confirmation Dialog */}
+      {/* ================================================================ */}
+      <Dialog open={deactivateDialogOpen} onClose={() => setDeactivateDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Listingi Deaktif Et</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Bu listingi deaktif etmek istediginize emin misiniz? Listing Etsy&apos;de gorunmez olacak.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeactivateDialogOpen(false)} disabled={deactivating}>
+            Iptal
+          </Button>
+          <Button
+            onClick={() => {
+              setDeactivateDialogOpen(false);
+              handleDeactivate();
+            }}
+            color="error"
+            variant="contained"
+            disabled={deactivating}
+            startIcon={deactivating ? <CircularProgress size={18} color="inherit" /> : <BlockIcon />}
+          >
+            Deaktif Et
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ================================================================ */}
       {/* Scheduled Update Dialog */}
       {/* ================================================================ */}
       {listing && fields && originalFieldsRef.current && (
@@ -2179,6 +2265,17 @@ export default function ListingEditorDrawer({
               is_supply: fields.is_supply,
               shipping_profile_id: fields.shipping_profile_id,
               return_policy_id: fields.return_policy_id,
+              processing_min: fields.processing_min,
+              processing_max: fields.processing_max,
+              item_weight: fields.item_weight,
+              item_weight_unit: fields.item_weight_unit,
+              item_length: fields.item_length,
+              item_width: fields.item_width,
+              item_height: fields.item_height,
+              item_dimensions_unit: fields.item_dimensions_unit,
+              shop_section_id: fields.shop_section_id,
+              price: fields.price,
+              quantity: fields.quantity,
             }}
           />
           <LoadTemplateDialog

@@ -930,6 +930,7 @@ export default function ListingCreatorDialog({
         )}
         size="small"
         isOptionEqualToValue={(opt, val) => opt.id === val.id}
+        slotProps={{ popper: { style: { zIndex: 1600 } } }}
       />
 
       {selectedCategory && (
@@ -980,6 +981,7 @@ export default function ListingCreatorDialog({
             value={currency}
             label="Para Birimi"
             onChange={(e: SelectChangeEvent) => setCurrency(e.target.value)}
+            MenuProps={{ sx: { zIndex: 1600 } }}
           >
             {CURRENCY_OPTIONS.map((c) => (
               <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>
@@ -1009,6 +1011,30 @@ export default function ListingCreatorDialog({
               requiredAspects={requiredAspects}
               recommendedAspects={recommendedAspects}
               onChange={setAspects}
+              aiLoading={aiLoading === 'aspects'}
+              onAIFill={async (aspectNames, currentAspects) => {
+                setAiLoading('aspects');
+                try {
+                  const research = marketResearch || await fetchMarketResearch(title);
+                  const data = await callAI('suggest_aspects', {
+                    title: title.trim(),
+                    aspectNames,
+                    currentAspects,
+                    categoryName: selectedCategory?.name,
+                    marketResearch: research,
+                  });
+                  if (data.aspects) {
+                    toast.success('Özellikler AI ile dolduruldu');
+                    return data.aspects;
+                  }
+                  return null;
+                } catch (err: any) {
+                  toast.error(err.message || 'AI özellik önerisi başarısız');
+                  return null;
+                } finally {
+                  setAiLoading(null);
+                }
+              }}
             />
           )}
         </>
@@ -1187,6 +1213,7 @@ export default function ListingCreatorDialog({
           value={fulfillmentPolicyId}
           label="Teslimat Politikası"
           onChange={(e: SelectChangeEvent) => setFulfillmentPolicyId(e.target.value)}
+          MenuProps={{ sx: { zIndex: 1600 } }}
         >
           {fulfillmentPolicies.map((p) => (
             <MenuItem key={p.policyId} value={p.policyId}>{p.name}</MenuItem>
@@ -1200,6 +1227,7 @@ export default function ListingCreatorDialog({
           value={returnPolicyId}
           label="İade Politikası"
           onChange={(e: SelectChangeEvent) => setReturnPolicyId(e.target.value)}
+          MenuProps={{ sx: { zIndex: 1600 } }}
         >
           {returnPolicies.map((p) => (
             <MenuItem key={p.policyId} value={p.policyId}>{p.name}</MenuItem>
@@ -1213,6 +1241,7 @@ export default function ListingCreatorDialog({
           value={paymentPolicyId}
           label="Ödeme Politikası"
           onChange={(e: SelectChangeEvent) => setPaymentPolicyId(e.target.value)}
+          MenuProps={{ sx: { zIndex: 1600 } }}
         >
           {paymentPolicies.map((p) => (
             <MenuItem key={p.policyId} value={p.policyId}>{p.name}</MenuItem>
@@ -1231,6 +1260,7 @@ export default function ListingCreatorDialog({
               value={selectedStoreCategory}
               label="Birincil Mağaza Kategorisi"
               onChange={(e: SelectChangeEvent) => setSelectedStoreCategory(e.target.value)}
+              MenuProps={{ sx: { zIndex: 1600 } }}
             >
               <MenuItem value=""><em>Seçilmedi</em></MenuItem>
               {storeCategories.map((c) => (
@@ -1244,6 +1274,7 @@ export default function ListingCreatorDialog({
               value={selectedStoreCategory2}
               label="İkincil Mağaza Kategorisi"
               onChange={(e: SelectChangeEvent) => setSelectedStoreCategory2(e.target.value)}
+              MenuProps={{ sx: { zIndex: 1600 } }}
             >
               <MenuItem value=""><em>Seçilmedi</em></MenuItem>
               {storeCategories.map((c) => (

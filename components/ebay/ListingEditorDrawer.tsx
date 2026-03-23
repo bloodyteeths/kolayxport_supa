@@ -1171,6 +1171,29 @@ export default function ListingEditorDrawer({
                   requiredAspects={requiredAspects}
                   recommendedAspects={recommendedAspects}
                   onChange={(newAspects) => updateField('aspects', newAspects)}
+                  aiLoading={aiLoading === 'aspects'}
+                  onAIFill={async (aspectNames, currentAspects) => {
+                    setAiLoading('aspects');
+                    try {
+                      const research = marketResearch || await fetchMarketResearch(fields.title);
+                      const data = await callAI('suggest_aspects', {
+                        title: fields.title.trim(),
+                        aspectNames,
+                        currentAspects,
+                        marketResearch: research,
+                      });
+                      if (data.aspects) {
+                        toast.success('Özellikler AI ile dolduruldu');
+                        return data.aspects;
+                      }
+                      return null;
+                    } catch (err: any) {
+                      toast.error(err.message || 'AI özellik önerisi başarısız');
+                      return null;
+                    } finally {
+                      setAiLoading(null);
+                    }
+                  }}
                 />
               </AccordionDetails>
             </Accordion>

@@ -48,6 +48,17 @@ export interface ListingTemplate {
     is_supply?: boolean;
     shipping_profile_id?: number | '';
     return_policy_id?: number | '';
+    processing_min?: number | '';
+    processing_max?: number | '';
+    item_weight?: number | '';
+    item_weight_unit?: string;
+    item_length?: number | '';
+    item_width?: number | '';
+    item_height?: number | '';
+    item_dimensions_unit?: string;
+    shop_section_id?: number | '';
+    price?: string;
+    quantity?: number;
   };
 }
 
@@ -68,6 +79,17 @@ interface CurrentFields {
   is_supply: boolean;
   shipping_profile_id: number | '';
   return_policy_id: number | '';
+  processing_min: number | '';
+  processing_max: number | '';
+  item_weight: number | '';
+  item_weight_unit: string;
+  item_length: number | '';
+  item_width: number | '';
+  item_height: number | '';
+  item_dimensions_unit: string;
+  shop_section_id: number | '';
+  price: string;
+  quantity: number;
 }
 
 // ---------------------------------------------------------------------------

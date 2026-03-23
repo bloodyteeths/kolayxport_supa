@@ -427,6 +427,51 @@ Return one result per input listing, in the same order.`;
 }
 
 // ---------------------------------------------------------------------------
+// 6. Suggest Item Specifics / Aspects
+// ---------------------------------------------------------------------------
+
+interface SuggestAspectsInput {
+  title: string;
+  aspectNames: string[];
+  currentAspects?: Record<string, string[]>;
+  categoryName?: string;
+  marketResearch?: Record<string, unknown>;
+}
+
+interface SuggestAspectsOutput {
+  aspects: Record<string, string[]>;
+}
+
+async function handleSuggestAspects(body: SuggestAspectsInput): Promise<SuggestAspectsOutput> {
+  const { title, aspectNames, currentAspects, categoryName, marketResearch } = body;
+  if (!title) throw new InputError('title is required');
+  if (!aspectNames || aspectNames.length === 0) throw new InputError('aspectNames is required');
+
+  const marketContext = marketResearch ? formatMarketContext(marketResearch) : '';
+
+  const systemPrompt = `You are an eBay product data specialist. Given a product title and a list of item specific field names, suggest the most accurate and appropriate values for each field.
+
+Rules:
+- For "Country/Region of Manufacture" or similar: use the most likely country (e.g., "China", "United States", "Turkey")
+- For "Brand": if identifiable from the title, use it. Otherwise use "Unbranded"
+- For "Type", "Style", "Material", "Color", "Size": deduce from the title context
+- Each value should be a single string in an array (e.g., ["Blue"])
+- Only fill aspects where you can make a reasonable guess — skip ones you're unsure about
+- Values must be in English (eBay standard)
+- If current values already exist, keep them unless you have a better suggestion
+
+${marketContext}
+
+Respond with ONLY valid JSON: { "aspects": { "AspectName": ["value"], ... } }`;
+
+  const userMsg = `Product: "${title}"${categoryName ? ` | Category: ${categoryName}` : ''}
+Aspects to fill: ${aspectNames.join(', ')}
+${currentAspects && Object.keys(currentAspects).length > 0 ? `Current values: ${JSON.stringify(currentAspects)}` : ''}`;
+
+  return askClaude<SuggestAspectsOutput>(systemPrompt, userMsg, 1024);
+}
+
+// ---------------------------------------------------------------------------
 // Custom error for input validation
 // ---------------------------------------------------------------------------
 
@@ -490,6 +535,7 @@ export default async function handler(
         'analyze_listing',
         'suggest_price',
         'bulk_optimize_titles',
+        'suggest_aspects',
       ],
     });
   }
@@ -518,6 +564,10 @@ export default async function handler(
         result = await handleBulkOptimizeTitles(req.body);
         break;
 
+      case 'suggest_aspects':
+        result = await handleSuggestAspects(req.body);
+        break;
+
       default:
         return res.status(400).json({
           error: `Unknown action: ${action}`,
@@ -527,6 +577,7 @@ export default async function handler(
             'analyze_listing',
             'suggest_price',
             'bulk_optimize_titles',
+            'suggest_aspects',
           ],
         });
     }

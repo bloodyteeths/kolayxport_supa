@@ -541,6 +541,7 @@ export default function ListingCreatorDialog({
         is_supply: isSupply,
         taxonomy_id: selectedTaxonomy!.id,
         price: parseFloat(price),
+        currency_code: 'USD',
         quantity: parseInt(quantity) || 1,
         shipping_profile_id: shippingProfileId,
         return_policy_id: returnPolicyId,
@@ -1030,6 +1031,11 @@ export default function ListingCreatorDialog({
           ))}
         </Select>
       </FormControl>
+      {shippingProfiles.length === 0 && (
+        <Typography variant="caption" color="warning.main">
+          Yuklenemedi — sayfayi yenileyin
+        </Typography>
+      )}
 
       <FormControl fullWidth required>
         <InputLabel>Iade Politikasi</InputLabel>
@@ -1045,6 +1051,11 @@ export default function ListingCreatorDialog({
           ))}
         </Select>
       </FormControl>
+      {returnPolicies.length === 0 && (
+        <Typography variant="caption" color="warning.main">
+          Yuklenemedi — sayfayi yenileyin
+        </Typography>
+      )}
 
       <Divider sx={{ my: 0.5 }} />
 

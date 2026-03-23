@@ -47,6 +47,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiPreview, setAiPreview] = useState<{ base64: string; mimeType: string } | null>(null);
   const [aiRefImage, setAiRefImage] = useState<{ base64: string; mimeType: string } | null>(null);
+  const [aiRefUrl, setAiRefUrl] = useState<string | null>(null); // URL-based reference (from existing images)
   const [aiUploading, setAiUploading] = useState(false);
 
   const sortedImages = images || [];
@@ -181,6 +182,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
     setAiOpen(true);
     setAiPreview(null);
     setAiRefImage(null);
+    setAiRefUrl(null);
     // Auto-fill prompt from product title if available
     if (productTitle && !aiPrompt) {
       setAiPrompt(productTitle);
@@ -224,6 +226,8 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
       if (aiRefImage) {
         body.reference_image = aiRefImage.base64;
         body.reference_mime_type = aiRefImage.mimeType;
+      } else if (aiRefUrl) {
+        body.reference_image_url = aiRefUrl;
       }
 
       const res = await fetch('/api/ai/generate-image', {
@@ -459,7 +463,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
       />
 
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteConfirmIndex !== null} onClose={() => setDeleteConfirmIndex(null)} maxWidth="xs">
+      <Dialog open={deleteConfirmIndex !== null} onClose={() => setDeleteConfirmIndex(null)} maxWidth="xs" sx={{ zIndex: 1500 }}>
         <DialogTitle>Gorseli Sil</DialogTitle>
         <DialogContent>
           <Typography>Bu gorseli silmek istediginize emin misiniz?</Typography>
@@ -481,12 +485,13 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
         </DialogActions>
       </Dialog>
 
-      {/* AI Image Generation Dialog */}
+      {/* AI Image Generation Dialog — high z-index for nesting inside other dialogs */}
       <Dialog
         open={aiOpen}
         onClose={() => !aiGenerating && !aiUploading && setAiOpen(false)}
         maxWidth="sm"
         fullWidth
+        sx={{ zIndex: 1500 }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -517,7 +522,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
               <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
                 Referans Gorsel (istege bagli)
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Button
                   variant="outlined"
                   size="small"
@@ -525,19 +530,20 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                   onClick={() => refImageInputRef.current?.click()}
                   disabled={aiGenerating}
                 >
-                  {aiRefImage ? 'Degistir' : 'Referans Ekle'}
+                  Dosyadan Yukle
                 </Button>
-                {aiRefImage && (
+                {/* Show current reference */}
+                {(aiRefImage || aiRefUrl) && (
                   <>
                     <img
-                      src={`data:${aiRefImage.mimeType};base64,${aiRefImage.base64}`}
+                      src={aiRefImage ? `data:${aiRefImage.mimeType};base64,${aiRefImage.base64}` : aiRefUrl!}
                       alt="Referans"
-                      style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
+                      style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4, border: '2px solid #1976d2' }}
                     />
                     <Button
                       size="small"
                       color="error"
-                      onClick={() => setAiRefImage(null)}
+                      onClick={() => { setAiRefImage(null); setAiRefUrl(null); }}
                       disabled={aiGenerating}
                       sx={{ minWidth: 0, px: 1 }}
                     >
@@ -546,6 +552,43 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                   </>
                 )}
               </Box>
+              {/* Pick from existing listing images */}
+              {sortedImages.length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                    Veya mevcut gorsellerden sec:
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {sortedImages.map((imgUrl, idx) => (
+                      <Box
+                        key={idx}
+                        onClick={() => {
+                          if (aiGenerating) return;
+                          setAiRefImage(null);
+                          setAiRefUrl(imgUrl);
+                        }}
+                        sx={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          cursor: aiGenerating ? 'default' : 'pointer',
+                          border: aiRefUrl === imgUrl ? '2px solid #1976d2' : '1px solid #ddd',
+                          opacity: aiGenerating ? 0.5 : 1,
+                          transition: 'border 0.15s',
+                          '&:hover': aiGenerating ? {} : { borderColor: '#1976d2' },
+                        }}
+                      >
+                        <img
+                          src={imgUrl}
+                          alt={`Ref ${idx + 1}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              )}
             </Box>
 
             {/* Generate button */}

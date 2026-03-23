@@ -968,9 +968,14 @@ export default async function handler(
         marketplaceId
       );
 
+      // Normalize policy IDs to common `policyId` field for frontend consistency
+      const policies = (data.fulfillmentPolicies || []).map((p: any) => ({
+        ...p,
+        policyId: p.fulfillmentPolicyId || p.policyId,
+      }));
       return res.status(200).json({
         total: data.total || 0,
-        fulfillmentPolicies: data.fulfillmentPolicies || [],
+        fulfillmentPolicies: policies,
       });
     }
 
@@ -983,9 +988,13 @@ export default async function handler(
         marketplaceId
       );
 
+      const policies = (data.returnPolicies || []).map((p: any) => ({
+        ...p,
+        policyId: p.returnPolicyId || p.policyId,
+      }));
       return res.status(200).json({
         total: data.total || 0,
-        returnPolicies: data.returnPolicies || [],
+        returnPolicies: policies,
       });
     }
 
@@ -998,9 +1007,13 @@ export default async function handler(
         marketplaceId
       );
 
+      const policies = (data.paymentPolicies || []).map((p: any) => ({
+        ...p,
+        policyId: p.paymentPolicyId || p.policyId,
+      }));
       return res.status(200).json({
         total: data.total || 0,
-        paymentPolicies: data.paymentPolicies || [],
+        paymentPolicies: policies,
       });
     }
 

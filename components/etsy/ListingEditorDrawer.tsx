@@ -1102,7 +1102,7 @@ export default function ListingEditorDrawer({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Silme basarisiz');
+        throw new Error(err.error || err.details || 'Silme basarisiz');
       }
 
       toast.success('Liste silindi');

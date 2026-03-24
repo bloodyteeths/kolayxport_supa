@@ -344,7 +344,6 @@ export default function ListingEditorDrawer({
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
 
   // Rank check state
-  const [rankCheckOpen, setRankCheckOpen] = useState(false);
   const [rankKeyword, setRankKeyword] = useState('');
   const [rankResult, setRankResult] = useState<{ rank: number | null; page: number | null; totalResults: number } | null>(null);
   const [rankLoading, setRankLoading] = useState(false);
@@ -673,29 +672,6 @@ export default function ListingEditorDrawer({
     }
   }, [rankKeyword, listingId, shopId]);
 
-  const handleAddToTracking = useCallback(async () => {
-    if (!rankKeyword.trim() || !listingId) return;
-    try {
-      const res = await fetch(`/api/clawd/etsy?action=add_tracked_keyword&shop_id=${shopId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          keyword: rankKeyword.trim(),
-          listing_id: listingId,
-          listing_title: fields?.title || '',
-        }),
-      });
-      if (!res.ok) throw new Error('Takibe alinamadi');
-      toast.success('Takibe alindi');
-      setRankCheckOpen(false);
-      setRankKeyword('');
-      setRankResult(null);
-      fetchTrackedKeywords(); // refresh inline list
-    } catch (err: any) {
-      toast.error(err.message);
-    }
-  }, [rankKeyword, listingId, shopId, fields?.title, fetchTrackedKeywords]);
-
   // Fetch tracked keywords for this listing
   const fetchTrackedKeywords = useCallback(async () => {
     if (!listingId || !shopId) return;
@@ -704,7 +680,6 @@ export default function ListingEditorDrawer({
       const res = await fetch(`/api/clawd/etsy?action=get_tracked_keywords&shop_id=${shopId}`);
       if (!res.ok) return;
       const data = await res.json();
-      // Filter to only this listing's keywords
       const forListing = (data.keywords || []).filter(
         (kw: any) => String(kw.etsyListingId) === String(listingId)
       );
@@ -720,6 +695,28 @@ export default function ListingEditorDrawer({
   useEffect(() => {
     if (open && listingId) fetchTrackedKeywords();
   }, [open, listingId, fetchTrackedKeywords]);
+
+  const handleAddToTracking = useCallback(async () => {
+    if (!rankKeyword.trim() || !listingId) return;
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=add_tracked_keyword&shop_id=${shopId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyword: rankKeyword.trim(),
+          listing_id: listingId,
+          listing_title: fields?.title || '',
+        }),
+      });
+      if (!res.ok) throw new Error('Takibe alinamadi');
+      toast.success('Takibe alindi');
+      setRankKeyword('');
+      setRankResult(null);
+      fetchTrackedKeywords();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  }, [rankKeyword, listingId, shopId, fields?.title, fetchTrackedKeywords]);
 
   // --------------------------------------------------
   // Trigger fetch on open / listingId change
@@ -1390,72 +1387,134 @@ export default function ListingEditorDrawer({
                   compact={false}
                 />
 
-                {/* Quick Rank Check */}
+                {/* Organic Rank Tracking — inline */}
                 <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #eee' }}>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => setRankCheckOpen(true)}
-                    sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                  >
-                    Sıralama Kontrol
-                  </Button>
-                </Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
+                    Organik Arama Sıralaması
+                  </Typography>
 
-                <Dialog open={rankCheckOpen} onClose={() => setRankCheckOpen(false)} maxWidth="xs" fullWidth
-                  sx={{ zIndex: 1600 }}
-                >
-                  <DialogTitle sx={{ fontWeight: 700 }}>Sıralama Kontrol</DialogTitle>
-                  <DialogContent>
+                  {/* Tracked keywords table */}
+                  {trackedLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                      <CircularProgress size={20} />
+                    </Box>
+                  ) : trackedKeywords.length > 0 ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+                      {trackedKeywords.map((kw) => (
+                        <Box
+                          key={kw.id}
+                          sx={{
+                            display: 'flex', alignItems: 'center', gap: 1.5,
+                            p: 1.5, bgcolor: '#f8f9fa', borderRadius: '8px',
+                            border: '1px solid #eee',
+                          }}
+                        >
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {kw.keyword}
+                            </Typography>
+                            {kw.checkedAt && (
+                              <Typography variant="caption" color="text.secondary">
+                                {new Date(kw.checkedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </Typography>
+                            )}
+                          </Box>
+                          <Box sx={{ textAlign: 'right', minWidth: 60 }}>
+                            {kw.rank != null ? (
+                              <>
+                                <Typography
+                                  variant="body1"
+                                  sx={{
+                                    fontWeight: 800,
+                                    color: kw.rank <= 10 ? '#11998e' : kw.rank <= 48 ? '#F2994A' : '#eb3349',
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  #{kw.rank}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Sayfa {kw.page}
+                                  {kw.change != null && kw.change !== 0 && (
+                                    <span style={{ color: kw.change > 0 ? '#11998e' : '#eb3349', fontWeight: 700, marginLeft: 4 }}>
+                                      {kw.change > 0 ? `+${kw.change}` : kw.change}
+                                    </span>
+                                  )}
+                                </Typography>
+                              </>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">500+</Typography>
+                            )}
+                          </Box>
+                          <IconButton
+                            size="small"
+                            onClick={async () => {
+                              try {
+                                await fetch(`/api/clawd/etsy?action=remove_tracked_keyword&keyword_id=${kw.id}&shop_id=${shopId}`, { method: 'DELETE' });
+                                setTrackedKeywords(prev => prev.filter(k => k.id !== kw.id));
+                              } catch { /* silent */ }
+                            }}
+                            sx={{ color: '#999', '&:hover': { color: '#eb3349' } }}
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Henüz takip edilen anahtar kelime yok
+                    </Typography>
+                  )}
+
+                  {/* Inline rank check */}
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                     <TextField
-                      fullWidth
                       size="small"
-                      label="Anahtar Kelime"
-                      placeholder="baby blanket, crochet dress..."
+                      placeholder="Anahtar kelime girin..."
                       value={rankKeyword}
                       onChange={(e) => setRankKeyword(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleRankCheck(); }}
-                      sx={{ mt: 1, mb: 2 }}
+                      sx={{ flex: 1 }}
                     />
                     <Button
-                      fullWidth
                       variant="contained"
+                      size="small"
                       onClick={handleRankCheck}
                       disabled={rankLoading || !rankKeyword.trim()}
-                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', mb: 2 }}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', minWidth: 80, height: 40 }}
                     >
-                      {rankLoading ? <CircularProgress size={18} /> : 'Kontrol Et'}
+                      {rankLoading ? <CircularProgress size={16} /> : 'Kontrol'}
                     </Button>
-                    {rankResult && (
-                      <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#f8f9fa', borderRadius: '8px' }}>
+                  </Box>
+
+                  {/* Rank check result */}
+                  {rankResult && (
+                    <Box sx={{ mt: 1.5, p: 1.5, bgcolor: '#f0f7ff', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{ flex: 1 }}>
                         {rankResult.rank != null ? (
-                          <>
-                            <Typography variant="h4" sx={{ fontWeight: 800, color: rankResult.rank <= 10 ? '#11998e' : rankResult.rank <= 48 ? '#F2994A' : '#eb3349' }}>
+                          <Typography variant="body2">
+                            <strong style={{ color: rankResult.rank <= 10 ? '#11998e' : rankResult.rank <= 48 ? '#F2994A' : '#eb3349', fontSize: '1.1rem' }}>
                               #{rankResult.rank}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              Sayfa {rankResult.page} · {rankResult.totalResults.toLocaleString()} sonuç içinde
-                            </Typography>
-                          </>
+                            </strong>
+                            {' '}· Sayfa {rankResult.page} · {rankResult.totalResults.toLocaleString()} sonuç
+                          </Typography>
                         ) : (
                           <Typography variant="body2" color="text.secondary">
                             İlk 500 sonuçta bulunamadı ({rankResult.totalResults.toLocaleString()} toplam)
                           </Typography>
                         )}
-                        <Button
-                          size="small"
-                          onClick={handleAddToTracking}
-                          sx={{ mt: 1, textTransform: 'none' }}
-                        >
-                          Takibe Al
-                        </Button>
                       </Box>
-                    )}
-                  </DialogContent>
-                  <DialogActions>
-                    <Button onClick={() => setRankCheckOpen(false)}>Kapat</Button>
-                  </DialogActions>
-                </Dialog>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={handleAddToTracking}
+                        sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', whiteSpace: 'nowrap' }}
+                      >
+                        Takibe Al
+                      </Button>
+                    </Box>
+                  )}
+                </Box>
               </AccordionDetails>
             </Accordion>
 

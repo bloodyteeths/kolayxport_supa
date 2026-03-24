@@ -188,10 +188,22 @@ Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
   const parsed = JSON.parse(text);
 
   // Post-process: enforce formatting rules
-  let optimizedTitle = (parsed.optimized_title || '').trim();
+  // Gemini sometimes returns title as array of words instead of string
+  const rawTitle = parsed.optimized_title;
+  let optimizedTitle = '';
+  if (typeof rawTitle === 'string') {
+    optimizedTitle = rawTitle.trim();
+  } else if (Array.isArray(rawTitle)) {
+    // Join with spaces — String(array) would join with commas producing garbage
+    optimizedTitle = rawTitle.filter((w: any) => typeof w === 'string' && w.trim().length > 1).join(' ').trim();
+  } else if (rawTitle && typeof rawTitle === 'object' && rawTitle.text) {
+    optimizedTitle = String(rawTitle.text).trim();
+  }
+
   if (optimizedTitle) {
-    // Replace dashes, pipes, slashes, colons used as separators with commas
-    optimizedTitle = optimizedTitle.replace(/\s*[|/:\\–—-]\s*/g, ', ');
+    // Replace standalone dashes, pipes, slashes, colons used as separators with commas
+    // Use explicit unicode escapes to avoid charset issues in production builds
+    optimizedTitle = optimizedTitle.replace(/\s+[-\u2013\u2014|/:\\]\s+/g, ', ');
     // Clean up double commas and trailing commas
     optimizedTitle = optimizedTitle.replace(/,\s*,/g, ',').replace(/,\s*$/, '');
 
@@ -224,14 +236,23 @@ Category: ${category || 'N/A'}${buildMarketContextPrompt(body.market_context)}`;
       })
       .join(' ');
 
-    // Trim to 140 chars
+    // Trim to 140 chars at last comma boundary
     if (optimizedTitle.length > 140) {
-      optimizedTitle = optimizedTitle.substring(0, 140).replace(/,\s*$/, '').trim();
+      const cut = optimizedTitle.substring(0, 140).lastIndexOf(',');
+      optimizedTitle = (cut > 60 ? optimizedTitle.substring(0, cut) : optimizedTitle.substring(0, 140)).replace(/,\s*$/, '').trim();
+    }
+
+    // Sanity check: reject garbled output (mostly single-character words)
+    const words = optimizedTitle.split(/[\s,]+/).filter(Boolean);
+    const singleCharWords = words.filter((w) => w.length <= 1 && !smallWords.has(w.toLowerCase()));
+    if (words.length > 3 && singleCharWords.length > words.length * 0.4) {
+      console.error('[AI Etsy] Title sanity check failed — garbled output:', optimizedTitle, '| raw:', rawTitle);
+      optimizedTitle = '';
     }
   }
 
   if (!optimizedTitle) {
-    return { status: 400, data: { error: 'AI baslik olusturamadi — tekrar deneyin.' } };
+    return { status: 400, data: { error: 'AI bozuk baslik uretti — lutfen tekrar deneyin.' } };
   }
 
   return {

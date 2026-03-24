@@ -295,10 +295,14 @@ export default function ListingCreatorDialog({
   const handleAIOptimizeTitle = useCallback(async () => {
     const result = await callAI('optimize_title');
     const newTitle = result?.optimized_title || result?.title;
-    if (newTitle) {
+    if (newTitle && typeof newTitle === 'string') {
+      // Sanity check: reject garbled single-character output
+      if (newTitle.split(/[\s,]+/).filter(Boolean).every((w: string) => w.length <= 1)) {
+        toast.error('AI bozuk baslik uretti — tekrar deneyin');
+        return;
+      }
       setTitle(newTitle);
-      if (result.explanation) toast.success(result.explanation);
-      else toast.success('Baslik optimize edildi');
+      toast.success('Baslik optimize edildi');
     }
   }, [callAI]);
 

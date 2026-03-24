@@ -200,7 +200,7 @@ const DIMENSION_UNITS = [
   { value: 'cm', label: 'cm' },
 ];
 
-const DRAWER_WIDTH = 800;
+const DRAWER_WIDTH = 1100;
 
 // ---------------------------------------------------------------------------
 // Draft persistence (localStorage)
@@ -348,6 +348,13 @@ export default function ListingEditorDrawer({
   const [rankKeyword, setRankKeyword] = useState('');
   const [rankResult, setRankResult] = useState<{ rank: number | null; page: number | null; totalResults: number } | null>(null);
   const [rankLoading, setRankLoading] = useState(false);
+
+  // Tracked keywords for this listing
+  const [trackedKeywords, setTrackedKeywords] = useState<Array<{
+    id: string; keyword: string; rank: number | null; page: number | null;
+    totalResults: number; change: number | null; checkedAt: string | null;
+  }>>([]);
+  const [trackedLoading, setTrackedLoading] = useState(false);
 
   // Accordion expanded state — default to SEO
   const [expanded, setExpanded] = useState<string | false>('seo');
@@ -622,12 +629,13 @@ export default function ListingEditorDrawer({
       toast.error('AI baslik olusturamadi — tekrar deneyin');
       return;
     }
-    updateField('title', newTitle);
-    if (result.explanation) {
-      toast.success(result.explanation);
-    } else {
-      toast.success('Baslik optimize edildi');
+    // Reject garbled single-character output
+    if (typeof newTitle !== 'string' || newTitle.split(/[\s,]+/).filter(Boolean).every((w: string) => w.length <= 1)) {
+      toast.error('AI bozuk baslik uretti — tekrar deneyin');
+      return;
     }
+    updateField('title', newTitle);
+    toast.success('Baslik optimize edildi');
   }, [callAI]);
 
   const handleAIGenerateDescription = useCallback(async () => {
@@ -678,11 +686,40 @@ export default function ListingEditorDrawer({
         }),
       });
       if (!res.ok) throw new Error('Takibe alinamadi');
-      toast.success('Takibe alindi — Pazar Araştırma > Sıralama Takibi sekmesinden takip edin');
+      toast.success('Takibe alindi');
+      setRankCheckOpen(false);
+      setRankKeyword('');
+      setRankResult(null);
+      fetchTrackedKeywords(); // refresh inline list
     } catch (err: any) {
       toast.error(err.message);
     }
-  }, [rankKeyword, listingId, shopId, fields?.title]);
+  }, [rankKeyword, listingId, shopId, fields?.title, fetchTrackedKeywords]);
+
+  // Fetch tracked keywords for this listing
+  const fetchTrackedKeywords = useCallback(async () => {
+    if (!listingId || !shopId) return;
+    setTrackedLoading(true);
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=get_tracked_keywords&shop_id=${shopId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      // Filter to only this listing's keywords
+      const forListing = (data.keywords || []).filter(
+        (kw: any) => String(kw.etsyListingId) === String(listingId)
+      );
+      setTrackedKeywords(forListing);
+    } catch {
+      // silent
+    } finally {
+      setTrackedLoading(false);
+    }
+  }, [listingId, shopId]);
+
+  // Auto-fetch tracked keywords when drawer opens
+  useEffect(() => {
+    if (open && listingId) fetchTrackedKeywords();
+  }, [open, listingId, fetchTrackedKeywords]);
 
   // --------------------------------------------------
   // Trigger fetch on open / listingId change

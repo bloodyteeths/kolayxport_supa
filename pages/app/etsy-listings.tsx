@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Button,
@@ -224,7 +224,11 @@ function EtsyListingsPage() {
   // --- State ---
   const [listings, setListings] = useState<EtsyListingRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+
+  // In-memory cache: avoid re-fetching when switching back to same shop+status
+  const listingsCacheRef = useRef<Record<string, { listings: EtsyListingRow[]; total: number; ts: number }>>({});
 
   const [selectedIds, setSelectedIds] = useState<GridRowSelectionModel>({ type: 'include' as const, ids: new Set<GridRowId>() });
   const [searchTerm, setSearchTerm] = useState('');
@@ -325,13 +329,23 @@ function EtsyListingsPage() {
 
   const fetchListings = useCallback(async () => {
     if (!selectedShopId) return;
+
+    // Check in-memory cache (5 min TTL)
+    const cacheKey = `${selectedShopId}:${statusFilter}`;
+    const cached = listingsCacheRef.current[cacheKey];
+    if (cached && Date.now() - cached.ts < 300_000) {
+      setListings(cached.listings);
+      setTotalCount(cached.total);
+      return;
+    }
+
     setLoading(true);
     try {
       const limit = 100;
       const buildUrl = (offset: number) =>
         `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&limit=${limit}&offset=${offset}&state=${statusFilter}`;
 
-      // First page to get total count
+      // First page — show immediately
       const firstRes = await fetch(buildUrl(0));
       if (!firstRes.ok) {
         const errData = await firstRes.json().catch(() => ({}));
@@ -340,29 +354,46 @@ function EtsyListingsPage() {
       const firstData = await firstRes.json();
       const total = firstData.count || 0;
       const firstResults: any[] = firstData.listings || firstData.results || [];
-      const allRows: EtsyListingRow[] = firstResults.map(mapListing);
+      const firstRows: EtsyListingRow[] = firstResults.map(mapListing);
 
-      // Fetch remaining pages in parallel
+      // Show first page immediately so user sees data fast
+      setListings(firstRows);
+      setTotalCount(total || firstRows.length);
+      setLoading(false);
+
+      // Fetch remaining pages in background
       if (total > limit) {
+        setLoadingMore(true);
         const remainingPages = Math.ceil((total - limit) / limit);
-        const fetches = Array.from({ length: remainingPages }, (_, i) =>
-          fetch(buildUrl((i + 1) * limit)).then(async (res) => {
-            if (!res.ok) return [];
-            const data = await res.json();
-            return (data.listings || data.results || []).map(mapListing);
-          })
-        );
-        const pages = await Promise.all(fetches);
-        pages.forEach((rows) => allRows.push(...rows));
-      }
+        // Batch in groups of 5 to avoid overwhelming Etsy rate limits
+        const allRows = [...firstRows];
+        for (let batch = 0; batch < remainingPages; batch += 5) {
+          const batchSize = Math.min(5, remainingPages - batch);
+          const fetches = Array.from({ length: batchSize }, (_, i) =>
+            fetch(buildUrl((batch + i + 1) * limit)).then(async (res) => {
+              if (!res.ok) return [];
+              const data = await res.json();
+              return (data.listings || data.results || []).map(mapListing);
+            })
+          );
+          const pages = await Promise.all(fetches);
+          pages.forEach((rows) => allRows.push(...rows));
+          // Update UI progressively after each batch
+          setListings([...allRows]);
+        }
+        setLoadingMore(false);
 
-      setListings(allRows);
-      setTotalCount(total || allRows.length);
+        // Cache the full result
+        listingsCacheRef.current[cacheKey] = { listings: allRows, total, ts: Date.now() };
+      } else {
+        // Cache single-page result
+        listingsCacheRef.current[cacheKey] = { listings: firstRows, total, ts: Date.now() };
+      }
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
       toast.error(`Listing'lar yüklenemedi: ${err.message}`);
-    } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [selectedShopId, statusFilter]);
 
@@ -1141,7 +1172,12 @@ function EtsyListingsPage() {
             </Select>
           </FormControl>
 
-          <IconButton size="small" onClick={fetchListings} disabled={loading}>
+          <IconButton size="small" onClick={() => {
+            // Invalidate cache on manual refresh
+            const cacheKey = `${selectedShopId}:${statusFilter}`;
+            delete listingsCacheRef.current[cacheKey];
+            fetchListings();
+          }} disabled={loading}>
             <RefreshIcon />
           </IconButton>
         </Box>
@@ -1225,6 +1261,16 @@ function EtsyListingsPage() {
             fetchListings();
           }}
         />
+      )}
+
+      {/* Loading more indicator */}
+      {loadingMore && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, px: 1 }}>
+          <LinearProgress sx={{ flex: 1, height: 4, borderRadius: 2 }} />
+          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+            {listings.length}/{totalCount} yükleniyor...
+          </Typography>
+        </Box>
       )}
 
       {/* DataGrid */}

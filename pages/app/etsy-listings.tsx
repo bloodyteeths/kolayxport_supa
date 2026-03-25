@@ -1295,6 +1295,9 @@ function EtsyListingsPage() {
           allShops={shops}
           onCompleted={() => {
             setSelectedIds({ type: 'include' as const, ids: new Set<GridRowId>() });
+            // Invalidate cache so we re-fetch from Etsy
+            const cacheKey = `${selectedShopId}:${statusFilter}`;
+            delete listingsCacheRef.current[cacheKey];
             fetchListings();
           }}
         />

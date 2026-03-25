@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
-const MAX_KEYWORDS_PER_RUN = 50;
+const MAX_KEYWORDS_PER_RUN = 50; // Vercel Hobby: 10s function timeout, keep batch small
 const RATE_LIMIT_MS = 120;
 
 async function callEtsyPublicAPI(endpoint: string) {

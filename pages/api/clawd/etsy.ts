@@ -2471,6 +2471,50 @@ export default async function handler(
             return res.status(200).json({ tracked, rank, page, totalResults });
         }
 
+        // POST /api/clawd/etsy?action=auto_track_listing_tags
+        // Bulk-register listing tags as tracked keywords (no immediate rank check — cron handles it)
+        if (req.method === 'POST' && action === 'auto_track_listing_tags') {
+            const { listing_id, listing_title, tags } = req.body;
+            if (!listing_id || !Array.isArray(tags) || tags.length === 0) {
+                return res.status(400).json({ error: 'listing_id and tags[] are required' });
+            }
+
+            const shop = await prisma.etsyShop.findFirst({ where: { shopId, isActive: true }, select: { userId: true } });
+            if (!shop) return res.status(404).json({ error: 'Shop not found' });
+            const userId = shop.userId;
+
+            // Bulk upsert all tags — skip rank check to avoid rate limits
+            let added = 0;
+            for (const tag of tags.slice(0, 13)) {
+                const kw = tag.toLowerCase().trim();
+                if (!kw || kw.length < 2) continue;
+                try {
+                    await prisma.rankTrackedKeyword.upsert({
+                        where: {
+                            userId_etsyListingId_keyword: {
+                                userId,
+                                etsyListingId: String(listing_id),
+                                keyword: kw,
+                            },
+                        },
+                        update: { isActive: true, listingTitle: listing_title || '' },
+                        create: {
+                            userId,
+                            etsyShopId: shopId,
+                            etsyListingId: String(listing_id),
+                            listingTitle: listing_title || '',
+                            keyword: kw,
+                        },
+                    });
+                    added++;
+                } catch {
+                    // Skip duplicates or errors
+                }
+            }
+
+            return res.status(200).json({ added, total: tags.length });
+        }
+
         // DELETE /api/clawd/etsy?action=remove_tracked_keyword&keyword_id=X
         if (req.method === 'DELETE' && action === 'remove_tracked_keyword') {
             const keywordId = req.query.keyword_id as string;
@@ -2488,22 +2532,28 @@ export default async function handler(
             const shop = await prisma.etsyShop.findFirst({ where: { shopId, isActive: true }, select: { userId: true } });
             if (!shop) return res.status(404).json({ error: 'Shop not found' });
             const userId = shop.userId;
+            // Optional: filter by listing_id
+            const listingIdFilter = req.query.listing_id as string | undefined;
+            const where: any = { userId, isActive: true };
+            if (listingIdFilter) where.etsyListingId = String(listingIdFilter);
+
             const keywords = await prisma.rankTrackedKeyword.findMany({
-                where: { userId, isActive: true },
+                where,
                 include: {
                     snapshots: {
-                        orderBy: { checkedAt: 'desc' },
-                        take: 2, // latest + previous for change calculation
+                        orderBy: { checkedAt: 'asc' },
+                        // Get first + last snapshots for "since added" change
                     },
                 },
                 orderBy: { createdAt: 'desc' },
             });
 
             const result = keywords.map((kw) => {
-                const latest = kw.snapshots[0] || null;
-                const previous = kw.snapshots[1] || null;
-                const change = latest?.rank != null && previous?.rank != null
-                    ? previous.rank - latest.rank // positive = improved
+                const first = kw.snapshots[0] || null; // oldest (first tracked)
+                const latest = kw.snapshots[kw.snapshots.length - 1] || null;
+                // Change since first tracked: positive = improved (rank went down = better)
+                const change = latest?.rank != null && first?.rank != null && kw.snapshots.length > 1
+                    ? first.rank - latest.rank
                     : null;
                 return {
                     id: kw.id,
@@ -2515,6 +2565,8 @@ export default async function handler(
                     totalResults: latest?.totalResults ?? 0,
                     change,
                     checkedAt: latest?.checkedAt ?? null,
+                    firstCheckedAt: first?.checkedAt ?? null,
+                    snapshotCount: kw.snapshots.length,
                 };
             });
 

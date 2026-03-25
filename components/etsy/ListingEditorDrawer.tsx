@@ -352,6 +352,7 @@ export default function ListingEditorDrawer({
   const [trackedKeywords, setTrackedKeywords] = useState<Array<{
     id: string; keyword: string; rank: number | null; page: number | null;
     totalResults: number; change: number | null; checkedAt: string | null;
+    firstCheckedAt?: string | null; snapshotCount?: number;
   }>>([]);
   const [trackedLoading, setTrackedLoading] = useState(false);
 
@@ -672,18 +673,15 @@ export default function ListingEditorDrawer({
     }
   }, [rankKeyword, listingId, shopId]);
 
-  // Fetch tracked keywords for this listing
+  // Fetch tracked keywords for this listing (filter server-side)
   const fetchTrackedKeywords = useCallback(async () => {
     if (!listingId || !shopId) return;
     setTrackedLoading(true);
     try {
-      const res = await fetch(`/api/clawd/etsy?action=get_tracked_keywords&shop_id=${shopId}`);
+      const res = await fetch(`/api/clawd/etsy?action=get_tracked_keywords&shop_id=${shopId}&listing_id=${listingId}`);
       if (!res.ok) return;
       const data = await res.json();
-      const forListing = (data.keywords || []).filter(
-        (kw: any) => String(kw.etsyListingId) === String(listingId)
-      );
-      setTrackedKeywords(forListing);
+      setTrackedKeywords(data.keywords || []);
     } catch {
       // silent
     } finally {
@@ -691,10 +689,32 @@ export default function ListingEditorDrawer({
     }
   }, [listingId, shopId]);
 
-  // Auto-fetch tracked keywords when drawer opens
+  // Auto-track listing tags as keywords when drawer opens
+  const autoTrackRef = useRef<string>('');
   useEffect(() => {
-    if (open && listingId) fetchTrackedKeywords();
-  }, [open, listingId, fetchTrackedKeywords]);
+    if (!open || !listingId || !shopId || !fields?.tags?.length) return;
+    // Only auto-track once per listing open (avoid re-triggering on tag edits)
+    const key = `${listingId}:${fields.tags.length}`;
+    if (autoTrackRef.current === key) return;
+    autoTrackRef.current = key;
+
+    (async () => {
+      try {
+        await fetch(`/api/clawd/etsy?action=auto_track_listing_tags&shop_id=${shopId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            listing_id: listingId,
+            listing_title: fields.title || '',
+            tags: fields.tags,
+          }),
+        });
+      } catch {
+        // silent — auto-track is best-effort
+      }
+      fetchTrackedKeywords();
+    })();
+  }, [open, listingId, shopId, fields?.tags, fields?.title, fetchTrackedKeywords]);
 
   const handleAddToTracking = useCallback(async () => {
     if (!rankKeyword.trim() || !listingId) return;
@@ -1413,9 +1433,15 @@ export default function ListingEditorDrawer({
                             <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {kw.keyword}
                             </Typography>
-                            {kw.checkedAt && (
+                            {kw.checkedAt ? (
                               <Typography variant="caption" color="text.secondary">
                                 {new Date(kw.checkedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                {(kw.snapshotCount ?? 0) > 1 && ' · '}
+                                {(kw.snapshotCount ?? 0) > 1 && `${kw.snapshotCount} kontrol`}
+                              </Typography>
+                            ) : (
+                              <Typography variant="caption" sx={{ color: '#999', fontStyle: 'italic' }}>
+                                Sıra kontrol bekliyor...
                               </Typography>
                             )}
                           </Box>
@@ -1436,13 +1462,15 @@ export default function ListingEditorDrawer({
                                   Sayfa {kw.page}
                                   {kw.change != null && kw.change !== 0 && (
                                     <span style={{ color: kw.change > 0 ? '#11998e' : '#eb3349', fontWeight: 700, marginLeft: 4 }}>
-                                      {kw.change > 0 ? `+${kw.change}` : kw.change}
+                                      {kw.change > 0 ? `↑${kw.change}` : `↓${Math.abs(kw.change)}`}
                                     </span>
                                   )}
                                 </Typography>
                               </>
-                            ) : (
+                            ) : kw.checkedAt ? (
                               <Typography variant="caption" color="text.secondary">500+</Typography>
+                            ) : (
+                              <Typography variant="caption" sx={{ color: '#bbb' }}>—</Typography>
                             )}
                           </Box>
                           <IconButton

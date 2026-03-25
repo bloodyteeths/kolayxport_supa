@@ -1397,6 +1397,11 @@ function EtsyListingsPage() {
         onSaved={() => {
           fetchListings();
         }}
+        onOpenListing={(newId) => {
+          setStatusFilter('draft');
+          setDrawerListingId(newId);
+          // drawer stays open, just switches to new listing
+        }}
         marketResearchData={marketResearchData}
       />
 

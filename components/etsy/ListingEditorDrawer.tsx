@@ -76,6 +76,7 @@ interface ListingEditorDrawerProps {
   shippingProfiles: Array<{ shipping_profile_id: number; title: string }>;
   returnPolicies: Array<{ return_policy_id: number; description?: string; accepts_returns?: boolean; accepts_exchanges?: boolean }>;
   onSaved: () => void;
+  onOpenListing?: (listingId: string) => void;
   marketResearchData?: MarketContext | null;
 }
 
@@ -309,6 +310,7 @@ export default function ListingEditorDrawer({
   shippingProfiles,
   returnPolicies,
   onSaved,
+  onOpenListing,
   marketResearchData,
 }: ListingEditorDrawerProps) {
   // Loading / data state
@@ -355,6 +357,11 @@ export default function ListingEditorDrawer({
     firstCheckedAt?: string | null; snapshotCount?: number;
   }>>([]);
   const [trackedLoading, setTrackedLoading] = useState(false);
+
+  // Ranking analysis state
+  const [rankAnalysis, setRankAnalysis] = useState<any>(null);
+  const [rankAnalysisLoading, setRankAnalysisLoading] = useState<string | null>(null); // keyword being analyzed
+  const [rankAnalysisOpen, setRankAnalysisOpen] = useState(false);
 
   // Accordion expanded state — default to SEO
   const [expanded, setExpanded] = useState<string | false>('seo');
@@ -737,6 +744,29 @@ export default function ListingEditorDrawer({
       toast.error(err.message);
     }
   }, [rankKeyword, listingId, shopId, fields?.title, fetchTrackedKeywords]);
+
+  const handleAnalyzeRanking = useCallback(async (keyword: string) => {
+    if (!listingId || !shopId) return;
+    setRankAnalysisLoading(keyword);
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=analyze_keyword_ranking&shop_id=${shopId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword, listing_id: listingId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setRankAnalysis(data);
+      setRankAnalysisOpen(true);
+    } catch (err: any) {
+      toast.error(err.message || 'Analiz yapilamadi');
+    } finally {
+      setRankAnalysisLoading(null);
+    }
+  }, [listingId, shopId]);
 
   // --------------------------------------------------
   // Trigger fetch on open / listingId change
@@ -1125,13 +1155,18 @@ export default function ListingEditorDrawer({
         },
       );
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Kopyalama basarisiz');
+        throw new Error(data.error || `Kopyalama basarisiz (HTTP ${res.status})`);
       }
 
-      toast.success('Liste kopyalandi (taslak olarak)');
-      onSaved();
+      toast.success('Liste kopyalandi — taslak açılıyor');
+      onSaved(); // refresh parent listing list
+
+      // Open the copied listing in the editor
+      if (data.new_listing_id && onOpenListing) {
+        onOpenListing(String(data.new_listing_id));
+      }
     } catch (err: any) {
       toast.error(err.message || 'Kopyalama basarisiz');
     } finally {
@@ -1473,6 +1508,16 @@ export default function ListingEditorDrawer({
                               <Typography variant="caption" sx={{ color: '#bbb' }}>—</Typography>
                             )}
                           </Box>
+                          <Tooltip title="Sıralama analizi">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleAnalyzeRanking(kw.keyword)}
+                              disabled={rankAnalysisLoading === kw.keyword}
+                              sx={{ color: '#666', '&:hover': { color: '#1976d2' } }}
+                            >
+                              {rankAnalysisLoading === kw.keyword ? <CircularProgress size={16} /> : <AutoFixHighIcon fontSize="small" />}
+                            </IconButton>
+                          </Tooltip>
                           <IconButton
                             size="small"
                             onClick={async () => {
@@ -2753,6 +2798,103 @@ export default function ListingEditorDrawer({
             {createLoading ? <CircularProgress size={20} /> : 'Olustur'}
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Ranking Analysis Dialog */}
+      <Dialog open={rankAnalysisOpen} onClose={() => setRankAnalysisOpen(false)} maxWidth="md" fullWidth sx={{ zIndex: 1500 }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Sıralama Analizi</Typography>
+            {rankAnalysis?.market && (
+              <Typography variant="caption" color="text.secondary">
+                Sıra: #{rankAnalysis.market.userRank ?? '500+'} · {rankAnalysis.market.totalResults?.toLocaleString()} sonuç
+              </Typography>
+            )}
+          </Box>
+          <IconButton onClick={() => setRankAnalysisOpen(false)}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {rankAnalysis?.analysis && (() => {
+            const a = rankAnalysis.analysis;
+            return (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 2 }}>
+                  <Box sx={{
+                    width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    bgcolor: a.overall_score >= 70 ? '#e8f5e9' : a.overall_score >= 40 ? '#fff3e0' : '#fce4ec',
+                    color: a.overall_score >= 70 ? '#2e7d32' : a.overall_score >= 40 ? '#e65100' : '#c62828',
+                    fontWeight: 800, fontSize: '1.2rem',
+                  }}>
+                    {a.overall_score}
+                  </Box>
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Zorluk: {a.estimated_page1_difficulty}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Rakip ort: {rankAnalysis.market.avgViews} görüntülenme · {rankAnalysis.market.avgFavorites} favori · ${rankAnalysis.market.avgPrice}
+                    </Typography>
+                  </Box>
+                </Box>
+                {a.priority_actions?.length > 0 && (
+                  <Box sx={{ p: 2, bgcolor: '#e3f2fd', borderRadius: 2, border: '1px solid #bbdefb' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#1565c0' }}>Öncelikli Aksiyonlar</Typography>
+                    {a.priority_actions.map((action: string, i: number) => (
+                      <Box key={i} sx={{ display: 'flex', gap: 1, mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#1565c0', minWidth: 20 }}>{i + 1}.</Typography>
+                        <Typography variant="body2">{action}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+                {a.factors?.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Faktör Analizi</Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {a.factors.map((f: any, i: number) => (
+                        <Box key={i} sx={{ p: 1.5, borderRadius: 1, border: '1px solid #eee', bgcolor: '#fafafa' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>{f.name}</Typography>
+                            <Chip label={`${f.score}/10`} size="small" sx={{
+                              fontWeight: 700, height: 22,
+                              bgcolor: f.status === 'iyi' ? '#e8f5e9' : f.status === 'orta' ? '#fff3e0' : '#fce4ec',
+                              color: f.status === 'iyi' ? '#2e7d32' : f.status === 'orta' ? '#e65100' : '#c62828',
+                            }} />
+                          </Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>{f.finding}</Typography>
+                          <Typography variant="caption" sx={{ color: '#1565c0', fontWeight: 500 }}>→ {f.action}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+                {(a.missing_keywords?.length > 0 || rankAnalysis.market?.missingTags?.length > 0) && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Eksik Anahtar Kelimeler</Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {(a.missing_keywords || []).map((kw: string, i: number) => (
+                        <Chip key={i} label={kw} size="small" variant="outlined" sx={{ fontSize: '0.75rem' }} />
+                      ))}
+                      {(rankAnalysis.market?.missingTags || []).map((tag: string, i: number) => (
+                        <Chip key={`t${i}`} label={tag} size="small" color="primary" variant="outlined" sx={{ fontSize: '0.75rem' }} />
+                      ))}
+                    </Box>
+                  </Box>
+                )}
+                {a.suggested_title && (
+                  <Box sx={{ p: 2, bgcolor: '#f3e5f5', borderRadius: 2, border: '1px solid #ce93d8' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, color: '#6a1b9a' }}>Önerilen Başlık</Typography>
+                    <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-word' }}>{a.suggested_title}</Typography>
+                    <Button size="small" sx={{ mt: 1, textTransform: 'none' }} onClick={() => {
+                      updateField('title', a.suggested_title);
+                      toast.success('Baslik uygulandi');
+                    }}>
+                      Başlığı Uygula
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            );
+          })()}
+        </DialogContent>
       </Dialog>
     </>
   );

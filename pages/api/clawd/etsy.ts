@@ -1234,22 +1234,7 @@ export default async function handler(
                 });
             }
 
-            // Step 2: Get a valid readiness_state_id from shop's processing profiles
-            let readinessStateId = null;
-            try {
-                const readinessStates = await callEtsyAPI(
-                    `/shops/${shopId}/readiness-state-definitions`,
-                    accessToken
-                );
-                if (readinessStates.results && readinessStates.results.length > 0) {
-                    // Use the first available readiness state
-                    readinessStateId = readinessStates.results[0].readiness_state_id;
-                }
-            } catch (readinessError) {
-                logger.warn('Could not fetch readiness states', { error: readinessError });
-            }
-
-            // Step 3: Build the new listing payload
+            // Step 2: Build the new listing payload
             const newTitle = `${title_prefix}${sourceListing.title}`;
 
             // Calculate price from Etsy's amount/divisor format
@@ -1280,21 +1265,7 @@ export default async function handler(
             if (sourceListing.shipping_profile_id) {
                 copyPayload.shipping_profile_id = sourceListing.shipping_profile_id;
             }
-            if (sourceListing.shop_section_id) {
-                // Validate section still exists before copying
-                try {
-                    const sections = await callEtsyAPI(`/shops/${shopId}/sections`, accessToken);
-                    const validIds = new Set((sections.results || []).map((s: any) => s.shop_section_id));
-                    if (validIds.has(sourceListing.shop_section_id)) {
-                        copyPayload.shop_section_id = sourceListing.shop_section_id;
-                    }
-                } catch {
-                    // Skip section if we can't validate
-                }
-            }
-            if (readinessStateId) {
-                copyPayload.readiness_state_id = readinessStateId;
-            }
+            // Skip shop_section_id — often invalid and causes 400 errors
 
             // Step 4: Create the new draft listing (personalization handled separately via new endpoint)
             const newListing = await callEtsyAPI(
@@ -1306,53 +1277,15 @@ export default async function handler(
                 }
             );
 
-            // Step 5: Copy personalization from source listing using new dedicated endpoint
-            let copiedPersonalization: any[] = [];
-            try {
-                // GET uses /listings/{id}/personalization (no shop_id)
-                const sourcePersonalization = await callEtsyAPI(
-                    `/listings/${source_listing_id}/personalization?supports_multiple_personalization_questions=true`,
-                    accessToken
-                );
-
-                if (sourcePersonalization.personalization_questions && sourcePersonalization.personalization_questions.length > 0) {
-                    // Strip question_ids from source (Etsy assigns new ones)
-                    const questionsForCopy = sourcePersonalization.personalization_questions.map((q: any) => {
-                        const { question_id, ...rest } = q;
-                        return rest;
-                    });
-
-                    const personalizationResult = await callEtsyAPI(
-                        `/shops/${shopId}/listings/${newListing.listing_id}/personalization?supports_multiple_personalization_questions=true`,
-                        accessToken,
-                        {
-                            method: 'POST',
-                            body: JSON.stringify({ personalization_questions: questionsForCopy }),
-                        }
-                    );
-                    copiedPersonalization = personalizationResult.personalization_questions || [];
-                    logger.info('Personalization copied to new listing', {
-                        source_listing_id,
-                        new_listing_id: newListing.listing_id,
-                        questions_copied: copiedPersonalization.length,
-                    });
-                }
-            } catch (personalizationError) {
-                logger.warn('Could not copy personalization to new listing', {
-                    source_listing_id,
-                    new_listing_id: newListing.listing_id,
-                    error: personalizationError,
-                });
-            }
-
-            // Gather image URLs from source for reference
+            // Return immediately — personalization copy happens after response
             const sourceImages = (sourceListing.images || []).map((img: any) => ({
                 listing_image_id: img.listing_image_id,
                 url_fullxfull: img.url_fullxfull,
                 rank: img.rank,
             }));
 
-            return res.status(201).json({
+            // Send response first so UI opens instantly
+            res.status(201).json({
                 success: true,
                 source_listing_id: parseInt(source_listing_id),
                 new_listing_id: newListing.listing_id,
@@ -1360,10 +1293,29 @@ export default async function handler(
                 state: newListing.state,
                 url: newListing.url,
                 source_images: sourceImages,
-                personalization_copied: copiedPersonalization.length > 0,
-                personalization_questions: copiedPersonalization,
-                message: 'Listing copied as draft. Edit title/description/price, upload images (not copied automatically), then publish.',
             });
+
+            // Best-effort: copy personalization after response is sent
+            try {
+                const sourcePersonalization = await callEtsyAPI(
+                    `/listings/${source_listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                    accessToken
+                );
+                if (sourcePersonalization.personalization_questions?.length > 0) {
+                    const questionsForCopy = sourcePersonalization.personalization_questions.map((q: any) => {
+                        const { question_id, ...rest } = q;
+                        return rest;
+                    });
+                    await callEtsyAPI(
+                        `/shops/${shopId}/listings/${newListing.listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                        accessToken,
+                        { method: 'POST', body: JSON.stringify({ personalization_questions: questionsForCopy }) }
+                    );
+                }
+            } catch {
+                // Non-critical — personalization copy is best-effort
+            }
+            return;
         }
 
         // POST /api/clawd/etsy?action=upload_image&listing_id=XXXXX - Upload image to listing

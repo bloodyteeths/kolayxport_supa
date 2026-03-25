@@ -1228,16 +1228,18 @@ export default async function handler(
                 accessToken
             );
 
-            // Fetch images separately (includes param unreliable for single listing)
+            // Fetch images and inventory in parallel
             let sourceImageList: any[] = [];
-            try {
-                const imagesData = await callEtsyAPI(
-                    `/listings/${source_listing_id}/images`,
-                    accessToken
-                );
-                sourceImageList = imagesData.results || imagesData || [];
-            } catch {
-                logger.warn('Failed to fetch source listing images', { source_listing_id });
+            let sourceInventory: any[] = [];
+            const [imagesResult, inventoryResult] = await Promise.allSettled([
+                callEtsyAPI(`/listings/${source_listing_id}/images`, accessToken),
+                callEtsyAPI(`/listings/${source_listing_id}/inventory`, accessToken),
+            ]);
+            if (imagesResult.status === 'fulfilled') {
+                sourceImageList = imagesResult.value.results || imagesResult.value || [];
+            }
+            if (inventoryResult.status === 'fulfilled') {
+                sourceInventory = inventoryResult.value.products || [];
             }
 
             if (!sourceListing || !sourceListing.listing_id) {
@@ -1317,6 +1319,47 @@ export default async function handler(
                 }
             );
 
+            // Copy variations/inventory to the new listing
+            let inventoryCopied = false;
+            if (sourceInventory.length > 0) {
+                try {
+                    // Strip source-specific IDs, convert price from amount/divisor to decimal
+                    const productsForCopy = sourceInventory.map((product: any) => ({
+                        sku: product.sku || '',
+                        property_values: (product.property_values || []).map((pv: any) => ({
+                            property_id: pv.property_id,
+                            property_name: pv.property_name,
+                            values: pv.values,
+                            ...(pv.scale_id ? { scale_id: pv.scale_id } : {}),
+                        })),
+                        offerings: (product.offerings || []).map((off: any) => ({
+                            price: off.price ? off.price.amount / (off.price.divisor || 100) : 0,
+                            quantity: off.quantity || 0,
+                            is_enabled: off.is_enabled ?? true,
+                        })),
+                    }));
+
+                    await callEtsyAPI(
+                        `/listings/${newListing.listing_id}/inventory`,
+                        accessToken,
+                        {
+                            method: 'PUT',
+                            body: JSON.stringify({ products: productsForCopy }),
+                        }
+                    );
+                    inventoryCopied = true;
+                    logger.info('Inventory copied successfully', {
+                        new_listing_id: newListing.listing_id,
+                        product_count: productsForCopy.length,
+                    });
+                } catch (invErr: any) {
+                    logger.warn('Failed to copy inventory', {
+                        new_listing_id: newListing.listing_id,
+                        error: invErr.message,
+                    });
+                }
+            }
+
             // Return source images so frontend can copy them (avoids Vercel timeout)
             const sourceImages = sourceImageList.map((img: any) => ({
                 listing_image_id: img.listing_image_id,
@@ -1333,6 +1376,8 @@ export default async function handler(
                 state: newListing.state,
                 url: newListing.url,
                 source_images: sourceImages,
+                inventory_copied: inventoryCopied,
+                variation_count: sourceInventory.length,
             });
 
             // Best-effort: copy personalization (images are copied by frontend to avoid Vercel timeout)

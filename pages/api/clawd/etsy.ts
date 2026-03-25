@@ -1339,7 +1339,16 @@ export default async function handler(
                         })),
                     }));
 
-                    await callEtsyAPI(
+                    logger.info('Copying inventory to new listing', {
+                        source_listing_id: source_listing_id,
+                        new_listing_id: newListing.listing_id,
+                        source_product_count: sourceInventory.length,
+                        products_to_copy: productsForCopy.length,
+                        sample_source: JSON.stringify(sourceInventory[0]).substring(0, 500),
+                        sample_copy: JSON.stringify(productsForCopy[0]).substring(0, 500),
+                    });
+
+                    const inventoryResult = await callEtsyAPI(
                         `/listings/${newListing.listing_id}/inventory`,
                         accessToken,
                         {
@@ -1348,14 +1357,15 @@ export default async function handler(
                         }
                     );
                     inventoryCopied = true;
-                    logger.info('Inventory copied successfully', {
+                    logger.info('Inventory copy result', {
                         new_listing_id: newListing.listing_id,
-                        product_count: productsForCopy.length,
+                        copied_product_count: (inventoryResult.products || []).length,
+                        source_product_count: productsForCopy.length,
                     });
                 } catch (invErr: any) {
-                    logger.warn('Failed to copy inventory', {
+                    logger.error('Failed to copy inventory', invErr, {
                         new_listing_id: newListing.listing_id,
-                        error: invErr.message,
+                        source_product_count: sourceInventory.length,
                     });
                 }
             }

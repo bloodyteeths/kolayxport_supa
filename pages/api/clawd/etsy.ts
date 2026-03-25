@@ -1251,9 +1251,38 @@ export default async function handler(
                 taxonomy_id: sourceListing.taxonomy_id,
                 who_made: sourceListing.who_made || 'i_did',
                 when_made: sourceListing.when_made || 'made_to_order',
-                is_supply: sourceListing.is_supply || false,
+                is_supply: sourceListing.is_supply ?? false,
                 state: 'draft',
+                type: sourceListing.type || 'physical',
             };
+
+            // Physical listings require readiness_state_id
+            if (sourceListing.readiness_state_id) {
+                copyPayload.readiness_state_id = sourceListing.readiness_state_id;
+            } else if (copyPayload.type === 'physical' || !sourceListing.is_digital) {
+                // Fetch shop's readiness states and use first one as fallback
+                try {
+                    const rsData = await callEtsyAPI(`/shops/${shopId}/readiness-states`, accessToken);
+                    const states = rsData.results || rsData.readiness_states || rsData;
+                    if (Array.isArray(states) && states.length > 0) {
+                        copyPayload.readiness_state_id = states[0].readiness_state_id;
+                    }
+                } catch { /* will fail at create if truly missing */ }
+            }
+
+            // Physical listings require shipping_profile_id
+            if (sourceListing.shipping_profile_id) {
+                copyPayload.shipping_profile_id = sourceListing.shipping_profile_id;
+            } else if ((copyPayload.type === 'physical' || copyPayload.type === 'both') && !sourceListing.is_digital) {
+                // Fetch shop's first shipping profile as fallback
+                try {
+                    const profiles = await callEtsyAPI(`/shops/${shopId}/shipping-profiles`, accessToken);
+                    const profileList = profiles.results || profiles;
+                    if (Array.isArray(profileList) && profileList.length > 0) {
+                        copyPayload.shipping_profile_id = profileList[0].shipping_profile_id;
+                    }
+                } catch { /* will fail at create if truly missing */ }
+            }
 
             // Add optional fields if present in source
             if (sourceListing.tags && sourceListing.tags.length > 0) {
@@ -1262,10 +1291,9 @@ export default async function handler(
             if (sourceListing.materials && sourceListing.materials.length > 0) {
                 copyPayload.materials = sourceListing.materials.slice(0, 13);
             }
-            if (sourceListing.shipping_profile_id) {
-                copyPayload.shipping_profile_id = sourceListing.shipping_profile_id;
+            if (sourceListing.return_policy_id) {
+                copyPayload.return_policy_id = sourceListing.return_policy_id;
             }
-            // Skip shop_section_id — often invalid and causes 400 errors
 
             // Step 4: Create the new draft listing (personalization handled separately via new endpoint)
             const newListing = await callEtsyAPI(

@@ -1323,7 +1323,7 @@ export default async function handler(
                 source_images: sourceImages,
             });
 
-            // Best-effort: copy personalization after response is sent
+            // Best-effort: copy personalization (images are copied by frontend to avoid Vercel timeout)
             try {
                 const sourcePersonalization = await callEtsyAPI(
                     `/listings/${source_listing_id}/personalization?supports_multiple_personalization_questions=true`,
@@ -1341,7 +1341,7 @@ export default async function handler(
                     );
                 }
             } catch {
-                // Non-critical — personalization copy is best-effort
+                // Non-critical
             }
             return;
         }

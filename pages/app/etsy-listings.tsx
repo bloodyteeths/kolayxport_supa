@@ -708,13 +708,37 @@ function EtsyListingsPage() {
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success('Kopya oluşturuldu — düzenleme açılıyor', { id: toastId });
       // Invalidate cache so draft view shows the new listing
       const draftCacheKey = `${shopId}:draft`;
       delete listingsCacheRef.current[draftCacheKey];
       // Open the new listing in Editor Drawer (same as edit)
       setDrawerListingId(String(data.new_listing_id));
       setDrawerOpen(true);
+
+      // Copy images in background from frontend (Vercel kills serverless after response)
+      const sourceImages: Array<{ url_fullxfull: string; rank: number }> = data.source_images || [];
+      if (sourceImages.length > 0) {
+        toast.loading(`Görseller kopyalanıyor (0/${sourceImages.length})...`, { id: toastId });
+        let copied = 0;
+        for (const img of sourceImages.sort((a, b) => (a.rank || 1) - (b.rank || 1))) {
+          if (!img.url_fullxfull) continue;
+          try {
+            await fetch(
+              `/api/clawd/etsy?action=upload_image&listing_id=${data.new_listing_id}&shop_id=${shopId}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image_url: img.url_fullxfull, rank: img.rank || 1, overwrite: false }),
+              }
+            );
+            copied++;
+            toast.loading(`Görseller kopyalanıyor (${copied}/${sourceImages.length})...`, { id: toastId });
+          } catch { /* skip failed image */ }
+        }
+        toast.success(`Kopya tamamlandı — ${copied} görsel kopyalandı`, { id: toastId });
+      } else {
+        toast.success('Kopya oluşturuldu', { id: toastId });
+      }
     } catch (err: any) {
       toast.error(err.message || 'Kopyalama başarısız', { id: toastId });
     }

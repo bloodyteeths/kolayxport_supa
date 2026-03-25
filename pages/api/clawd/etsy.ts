@@ -2018,11 +2018,19 @@ export default async function handler(
         // DELETE /api/clawd/etsy?action=delete_listing&listing_id=XXXXX
         if (req.method === 'DELETE' && action === 'delete_listing' && listing_id) {
             logger.info('Deleting Etsy listing', { listing_id, shopId });
-            await callEtsyAPI(
-                `/shops/${shopId}/listings/${listing_id}`,
-                accessToken,
-                { method: 'DELETE' }
-            );
+            try {
+                await callEtsyAPI(
+                    `/shops/${shopId}/listings/${listing_id}`,
+                    accessToken,
+                    { method: 'DELETE' }
+                );
+            } catch (err: any) {
+                // 404 = already deleted, treat as success
+                if (err.message?.includes('404')) {
+                    return res.status(200).json({ success: true, listing_id, message: 'Listing already deleted' });
+                }
+                throw err;
+            }
             return res.status(200).json({ success: true, listing_id, message: 'Listing deleted' });
         }
 

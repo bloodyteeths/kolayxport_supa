@@ -40,6 +40,22 @@ import type { MarketResearchData } from './MarketResearch';
 // Types
 // ---------------------------------------------------------------------------
 
+export interface CopySourceData {
+  title: string;
+  description: string;
+  tags: string[];
+  materials?: string[];
+  price?: number;
+  quantity?: number;
+  who_made?: string;
+  when_made?: string;
+  is_supply?: boolean;
+  shipping_profile_id?: number;
+  return_policy_id?: number;
+  shop_section_id?: number;
+  taxonomy_id?: number;
+}
+
 interface ListingCreatorDialogProps {
   open: boolean;
   onClose: () => void;
@@ -49,6 +65,7 @@ interface ListingCreatorDialogProps {
   returnPolicies: Array<{ return_policy_id: number; description?: string }>;
   onCreated: (listingId: number) => void;
   marketResearchData?: MarketResearchData | null;
+  copySource?: CopySourceData | null;
 }
 
 interface TaxonomyNode {
@@ -132,6 +149,7 @@ export default function ListingCreatorDialog({
   returnPolicies,
   onCreated,
   marketResearchData,
+  copySource,
 }: ListingCreatorDialogProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -188,6 +206,26 @@ export default function ListingCreatorDialog({
 
   // Quick-start
   const [quickStartKeyword, setQuickStartKeyword] = useState('');
+
+  // --------------------------------------------------
+  // Pre-fill from copy source when dialog opens
+  // --------------------------------------------------
+  useEffect(() => {
+    if (!open || !copySource) return;
+    setTitle(copySource.title ? `COPY - ${copySource.title}`.substring(0, 140) : '');
+    setDescription(copySource.description || '');
+    setTags(copySource.tags?.slice(0, 13) || []);
+    setMaterials(copySource.materials || []);
+    if (copySource.price) setPrice(String(copySource.price));
+    if (copySource.quantity) setQuantity(String(copySource.quantity));
+    if (copySource.who_made) setWhoMade(copySource.who_made);
+    if (copySource.when_made) setWhenMade(copySource.when_made);
+    if (copySource.is_supply !== undefined) setIsSupply(copySource.is_supply);
+    if (copySource.shipping_profile_id) setShippingProfileId(copySource.shipping_profile_id);
+    if (copySource.return_policy_id) setReturnPolicyId(copySource.return_policy_id);
+    if (copySource.shop_section_id) setShopSectionId(copySource.shop_section_id);
+    setActiveStep(0); // Start from step 1 so user can review
+  }, [open, copySource]);
 
   // --------------------------------------------------
   // Fetch taxonomy on open

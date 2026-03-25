@@ -54,7 +54,7 @@ import { useAuth } from '@/lib/auth-context';
 
 import SEOIndicator from '@/components/etsy/SEOIndicator';
 import ListingEditorDrawer from '@/components/etsy/ListingEditorDrawer';
-import ListingCreatorDialog from '@/components/etsy/ListingCreatorDialog';
+import ListingCreatorDialog, { CopySourceData } from '@/components/etsy/ListingCreatorDialog';
 import FindReplaceDialog from '@/components/etsy/FindReplaceDialog';
 import BulkOperationsBar from '@/components/etsy/BulkOperationsBar';
 import SmartPricing from '@/components/etsy/SmartPricing';
@@ -240,6 +240,7 @@ function EtsyListingsPage() {
   const [drawerListingId, setDrawerListingId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [copySource, setCopySource] = useState<CopySourceData | null>(null);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [smartPricingOpen, setSmartPricingOpen] = useState(false);
   const [duplicateDetectorOpen, setDuplicateDetectorOpen] = useState(false);
@@ -690,36 +691,28 @@ function EtsyListingsPage() {
     setDrawerOpen(true);
   };
 
-  // --- Copy listing ---
-  const [copyingId, setCopyingId] = useState<number | null>(null);
-  const handleCopyListing = async (listingId: number) => {
-    if (!selectedShopId) return;
-    setCopyingId(listingId);
-    try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=copy_listing&shop_id=${selectedShopId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source_listing_id: listingId }),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      toast.success('Liste kopyalandı — taslak olarak açılıyor');
-      // Invalidate cache so draft view shows the new listing
-      const draftCacheKey = `${selectedShopId}:draft`;
-      delete listingsCacheRef.current[draftCacheKey];
-      // Open the new listing immediately (drawer fetches its own data from Etsy API)
-      setDrawerListingId(String(data.new_listing_id));
-      setDrawerOpen(true);
-      // Switch to draft view so the copy appears in the grid
-      setStatusFilter('draft');
-    } catch (err: any) {
-      toast.error(err.message || 'Kopyalama başarısız');
-    } finally {
-      setCopyingId(null);
+  // --- Copy listing (local-first: instant UI, no API call) ---
+  const handleCopyListing = (listingId: number) => {
+    const source = listings.find((l) => l.listing_id === listingId);
+    if (!source) {
+      toast.error('Listing bulunamadı');
+      return;
     }
+    const priceValue = source.price ? source.price.amount / source.price.divisor : undefined;
+    setCopySource({
+      title: source.title,
+      description: source.description,
+      tags: source.tags || [],
+      materials: source.materials || [],
+      price: priceValue,
+      quantity: source.quantity,
+      who_made: source.who_made,
+      when_made: source.when_made,
+      is_supply: source.is_supply,
+      shop_section_id: source.shop_section_id ?? undefined,
+      taxonomy_id: source.taxonomy_id ?? undefined,
+    });
+    setCreateDialogOpen(true);
   };
 
   // --- Selected listing objects for bulk operations ---
@@ -973,13 +966,8 @@ function EtsyListingsPage() {
                   size="small"
                   color="primary"
                   onClick={() => handleCopyListing(params.row.listing_id)}
-                  disabled={copyingId === params.row.listing_id}
                 >
-                  {copyingId === params.row.listing_id ? (
-                    <CircularProgress size={16} />
-                  ) : (
-                    <ContentCopyIcon fontSize="small" />
-                  )}
+                  <ContentCopyIcon fontSize="small" />
                 </IconButton>
               </span>
             </Tooltip>
@@ -1409,14 +1397,16 @@ function EtsyListingsPage() {
       {/* Creator Dialog */}
       <ListingCreatorDialog
         open={createDialogOpen}
-        onClose={() => setCreateDialogOpen(false)}
+        onClose={() => { setCreateDialogOpen(false); setCopySource(null); }}
         shopId={selectedShopId}
         shopSections={shopSections}
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}
         marketResearchData={marketResearchData}
+        copySource={copySource}
         onCreated={(listingId) => {
           setCreateDialogOpen(false);
+          setCopySource(null);
           toast.success(`Listing #${listingId} olusturuldu`);
           fetchListings();
         }}

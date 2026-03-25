@@ -78,6 +78,7 @@ interface ListingEditorDrawerProps {
   onSaved: () => void;
   onOpenListing?: (listingId: string) => void;
   marketResearchData?: MarketContext | null;
+  refreshKey?: number;
 }
 
 interface PriceInfo {
@@ -312,6 +313,7 @@ export default function ListingEditorDrawer({
   onSaved,
   onOpenListing,
   marketResearchData,
+  refreshKey,
 }: ListingEditorDrawerProps) {
   // Loading / data state
   const [loading, setLoading] = useState(false);
@@ -811,7 +813,7 @@ export default function ListingEditorDrawer({
         autoSaveTimerRef.current = null;
       }
     }
-  }, [open, listingId, fetchListing, fetchVideos]);
+  }, [open, listingId, fetchListing, fetchVideos, refreshKey]);
 
   // --------------------------------------------------
   // Track pending scheduled updates count

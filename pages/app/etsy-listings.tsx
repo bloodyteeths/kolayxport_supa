@@ -239,6 +239,7 @@ function EtsyListingsPage() {
 
   const [drawerListingId, setDrawerListingId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
   const [smartPricingOpen, setSmartPricingOpen] = useState(false);
@@ -712,7 +713,11 @@ function EtsyListingsPage() {
       const draftCacheKey = `${shopId}:draft`;
       delete listingsCacheRef.current[draftCacheKey];
 
-      // Copy images first, then open drawer so images are visible
+      // Open drawer immediately so user sees the listing
+      setDrawerListingId(String(data.new_listing_id));
+      setDrawerOpen(true);
+
+      // Copy images in background, then refresh drawer
       const sourceImages: Array<{ url_fullxfull: string; rank: number }> = data.source_images || [];
       if (sourceImages.length > 0) {
         toast.loading(`Görseller kopyalanıyor (0/${sourceImages.length})...`, { id: toastId });
@@ -737,14 +742,12 @@ function EtsyListingsPage() {
             toast.loading(`Görseller kopyalanıyor (${copied}/${sourceImages.length})...`, { id: toastId });
           } catch { /* skip failed image */ }
         }
+        // Refresh drawer to show newly uploaded images
+        setDrawerRefreshKey((k) => k + 1);
         toast.success(`Kopya tamamlandı — ${copied} görsel kopyalandı`, { id: toastId });
       } else {
         toast.success('Kopya oluşturuldu', { id: toastId });
       }
-
-      // Open drawer AFTER images are copied so they show up
-      setDrawerListingId(String(data.new_listing_id));
-      setDrawerOpen(true);
     } catch (err: any) {
       toast.error(err.message || 'Kopyalama başarısız', { id: toastId });
     }
@@ -1415,6 +1418,7 @@ function EtsyListingsPage() {
         }}
         listingId={drawerListingId}
         shopId={selectedShopId}
+        refreshKey={drawerRefreshKey}
         shopSections={shopSections}
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}

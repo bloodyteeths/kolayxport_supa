@@ -1281,7 +1281,16 @@ export default async function handler(
                 copyPayload.shipping_profile_id = sourceListing.shipping_profile_id;
             }
             if (sourceListing.shop_section_id) {
-                copyPayload.shop_section_id = sourceListing.shop_section_id;
+                // Validate section still exists before copying
+                try {
+                    const sections = await callEtsyAPI(`/shops/${shopId}/sections`, accessToken);
+                    const validIds = new Set((sections.results || []).map((s: any) => s.shop_section_id));
+                    if (validIds.has(sourceListing.shop_section_id)) {
+                        copyPayload.shop_section_id = sourceListing.shop_section_id;
+                    }
+                } catch {
+                    // Skip section if we can't validate
+                }
             }
             if (readinessStateId) {
                 copyPayload.readiness_state_id = readinessStateId;

@@ -3,8 +3,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
-// On Hetzner: no timeout limit, process all keywords. On Vercel Hobby: 50 max (10s timeout).
-const MAX_KEYWORDS_PER_RUN = parseInt(process.env.RANK_BATCH_SIZE || '0') || 0; // 0 = unlimited
+const MAX_KEYWORDS_PER_RUN = 50; // Vercel Hobby: 10s function timeout, keep batch small
 const RATE_LIMIT_MS = 120;
 
 async function callEtsyPublicAPI(endpoint: string) {
@@ -74,7 +73,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const keywords = await prisma.rankTrackedKeyword.findMany({
       where: { isActive: true },
       orderBy: { updatedAt: 'asc' }, // Oldest checked first
-      ...(MAX_KEYWORDS_PER_RUN > 0 ? { take: MAX_KEYWORDS_PER_RUN } : {}),
+      take: MAX_KEYWORDS_PER_RUN,
     });
 
     logger.info(`Rank tracker cron: checking ${keywords.length} keywords`);

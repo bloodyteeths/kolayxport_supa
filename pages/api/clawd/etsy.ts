@@ -1230,7 +1230,7 @@ export default async function handler(
 
             // Fetch images and inventory in parallel
             let sourceImageList: any[] = [];
-            let sourceInventory: any[] = [];
+            let sourceInventoryData: any = {};
             const [imagesResult, inventoryResult] = await Promise.allSettled([
                 callEtsyAPI(`/listings/${source_listing_id}/images`, accessToken),
                 callEtsyAPI(`/listings/${source_listing_id}/inventory`, accessToken),
@@ -1239,8 +1239,9 @@ export default async function handler(
                 sourceImageList = imagesResult.value.results || imagesResult.value || [];
             }
             if (inventoryResult.status === 'fulfilled') {
-                sourceInventory = inventoryResult.value.products || [];
+                sourceInventoryData = inventoryResult.value || {};
             }
+            const sourceInventory = sourceInventoryData.products || [];
 
             if (!sourceListing || !sourceListing.listing_id) {
                 return res.status(404).json({
@@ -1339,27 +1340,43 @@ export default async function handler(
                         })),
                     }));
 
+                    // Build inventory payload with *_on_property fields from source
+                    const inventoryPayload: Record<string, any> = {
+                        products: productsForCopy,
+                    };
+                    // These tell Etsy which properties control price/quantity/sku variations
+                    if (sourceInventoryData.price_on_property) {
+                        inventoryPayload.price_on_property = sourceInventoryData.price_on_property;
+                    }
+                    if (sourceInventoryData.quantity_on_property) {
+                        inventoryPayload.quantity_on_property = sourceInventoryData.quantity_on_property;
+                    }
+                    if (sourceInventoryData.sku_on_property) {
+                        inventoryPayload.sku_on_property = sourceInventoryData.sku_on_property;
+                    }
+
                     logger.info('Copying inventory to new listing', {
                         source_listing_id: source_listing_id,
                         new_listing_id: newListing.listing_id,
                         source_product_count: sourceInventory.length,
                         products_to_copy: productsForCopy.length,
-                        sample_source: JSON.stringify(sourceInventory[0]).substring(0, 500),
-                        sample_copy: JSON.stringify(productsForCopy[0]).substring(0, 500),
+                        price_on_property: inventoryPayload.price_on_property,
+                        quantity_on_property: inventoryPayload.quantity_on_property,
+                        sku_on_property: inventoryPayload.sku_on_property,
                     });
 
-                    const inventoryResult = await callEtsyAPI(
+                    const inventoryCopyResult = await callEtsyAPI(
                         `/listings/${newListing.listing_id}/inventory`,
                         accessToken,
                         {
                             method: 'PUT',
-                            body: JSON.stringify({ products: productsForCopy }),
+                            body: JSON.stringify(inventoryPayload),
                         }
                     );
                     inventoryCopied = true;
                     logger.info('Inventory copy result', {
                         new_listing_id: newListing.listing_id,
-                        copied_product_count: (inventoryResult.products || []).length,
+                        copied_product_count: (inventoryCopyResult.products || []).length,
                         source_product_count: productsForCopy.length,
                     });
                 } catch (invErr: any) {
@@ -2040,7 +2057,7 @@ export default async function handler(
 
         // PUT /api/clawd/etsy?action=update_listing_inventory&listing_id=XXXXX - Update listing inventory
         if (req.method === 'PUT' && action === 'update_listing_inventory' && listing_id) {
-            const { products } = req.body;
+            const { products, price_on_property, quantity_on_property, sku_on_property } = req.body;
 
             if (!products || !Array.isArray(products)) {
                 return res.status(400).json({
@@ -2053,12 +2070,17 @@ export default async function handler(
                 product_count: products.length,
             });
 
+            const payload: Record<string, any> = { products };
+            if (price_on_property) payload.price_on_property = price_on_property;
+            if (quantity_on_property) payload.quantity_on_property = quantity_on_property;
+            if (sku_on_property) payload.sku_on_property = sku_on_property;
+
             const result = await callEtsyAPI(
                 `/listings/${listing_id}/inventory`,
                 accessToken,
                 {
                     method: 'PUT',
-                    body: JSON.stringify({ products }),
+                    body: JSON.stringify(payload),
                 }
             );
 

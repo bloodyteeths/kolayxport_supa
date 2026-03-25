@@ -937,7 +937,7 @@ export default async function handler(
             };
 
             const result = await callEtsyAPI(
-                `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
                     method: 'POST',
@@ -958,7 +958,7 @@ export default async function handler(
             logger.info('Removing personalization from listing', { listing_id, shopId });
 
             const result = await callEtsyAPI(
-                `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
                     method: 'DELETE',
@@ -996,7 +996,7 @@ export default async function handler(
             logger.info('Setting simple personalization for listing', { listing_id, shopId, question_text });
 
             const result = await callEtsyAPI(
-                `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
                     method: 'POST',
@@ -1402,7 +1402,7 @@ export default async function handler(
                         return rest;
                     });
                     await callEtsyAPI(
-                        `/shops/${shopId}/listings/${newListing.listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                        `/listings/${newListing.listing_id}/personalization?supports_multiple_personalization_questions=true`,
                         accessToken,
                         { method: 'POST', body: JSON.stringify({ personalization_questions: questionsForCopy }) }
                     );

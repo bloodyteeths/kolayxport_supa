@@ -711,11 +711,8 @@ function EtsyListingsPage() {
       // Invalidate cache so draft view shows the new listing
       const draftCacheKey = `${shopId}:draft`;
       delete listingsCacheRef.current[draftCacheKey];
-      // Open the new listing in Editor Drawer (same as edit)
-      setDrawerListingId(String(data.new_listing_id));
-      setDrawerOpen(true);
 
-      // Copy images in background from frontend (Vercel kills serverless after response)
+      // Copy images first, then open drawer so images are visible
       const sourceImages: Array<{ url_fullxfull: string; rank: number }> = data.source_images || [];
       if (sourceImages.length > 0) {
         toast.loading(`Görseller kopyalanıyor (0/${sourceImages.length})...`, { id: toastId });
@@ -744,6 +741,10 @@ function EtsyListingsPage() {
       } else {
         toast.success('Kopya oluşturuldu', { id: toastId });
       }
+
+      // Open drawer AFTER images are copied so they show up
+      setDrawerListingId(String(data.new_listing_id));
+      setDrawerOpen(true);
     } catch (err: any) {
       toast.error(err.message || 'Kopyalama başarısız', { id: toastId });
     }

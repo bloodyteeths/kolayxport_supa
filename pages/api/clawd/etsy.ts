@@ -2587,6 +2587,161 @@ export default async function handler(
             return res.status(200).json({ snapshots });
         }
 
+        // POST /api/clawd/etsy?action=analyze_keyword_ranking
+        // Fetches top competitors for a keyword, compares with user's listing, returns AI recommendations
+        if (req.method === 'POST' && action === 'analyze_keyword_ranking') {
+            const { keyword, listing_id } = req.body;
+            if (!keyword || !listing_id) {
+                return res.status(400).json({ error: 'keyword and listing_id are required' });
+            }
+
+            // 1. Fetch user's listing details
+            const userListing = await callEtsyAPI(`/listings/${listing_id}?includes=Images`, accessToken);
+
+            // 2. Fetch top 48 competitors for this keyword (first page of Etsy search)
+            const searchParams = new URLSearchParams({
+                keywords: keyword,
+                limit: '48',
+                offset: '0',
+                sort_on: 'score',
+                sort_order: 'desc',
+            });
+            const searchData = await callEtsyPublicAPI(`/listings/active?${searchParams}`);
+            const competitors = (searchData.results || []).map((c: any) => ({
+                listing_id: c.listing_id,
+                title: c.title,
+                tags: c.tags || [],
+                views: c.views || 0,
+                favorites: c.num_favorers || 0,
+                price: c.price ? (c.price.amount / (c.price.divisor || 100)) : 0,
+                quantity: c.quantity || 0,
+                shop_id: c.shop_id,
+            }));
+
+            // 3. Find user's rank in these results
+            const userIdx = competitors.findIndex((c: any) => String(c.listing_id) === String(listing_id));
+            const userRank = userIdx >= 0 ? userIdx + 1 : null;
+
+            // 4. Extract market patterns from top competitors
+            const top10 = competitors.slice(0, 10);
+            const allTags = competitors.flatMap((c: any) => c.tags);
+            const tagCounts: Record<string, number> = {};
+            allTags.forEach((t: string) => { tagCounts[t] = (tagCounts[t] || 0) + 1; });
+            const topTags = Object.entries(tagCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20)
+                .map(([tag, count]) => ({ tag, pct: Math.round(count / competitors.length * 100) }));
+
+            const allTitleWords = competitors.flatMap((c: any) =>
+                c.title.toLowerCase().split(/[\s,]+/).filter((w: string) => w.length > 3)
+            );
+            const wordCounts: Record<string, number> = {};
+            allTitleWords.forEach((w: string) => { wordCounts[w] = (wordCounts[w] || 0) + 1; });
+            const topKeywords = Object.entries(wordCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 15)
+                .map(([word, count]) => ({ keyword: word, pct: Math.round(count / competitors.length * 100) }));
+
+            const avgViews = Math.round(top10.reduce((s: number, c: any) => s + c.views, 0) / (top10.length || 1));
+            const avgFavorites = Math.round(top10.reduce((s: number, c: any) => s + c.favorites, 0) / (top10.length || 1));
+            const avgPrice = +(top10.reduce((s: number, c: any) => s + c.price, 0) / (top10.length || 1)).toFixed(2);
+
+            // 5. Build user listing summary
+            const userPrice = userListing.price ? (userListing.price.amount / (userListing.price.divisor || 100)) : 0;
+            const userViews = userListing.views || 0;
+            const userFavorites = userListing.num_favorers || 0;
+            const favoriteRate = userViews > 0 ? ((userFavorites / userViews) * 100).toFixed(1) : '0';
+
+            // 6. Find missing keywords — in top competitor titles/tags but NOT in user's listing
+            const userTitleWords = new Set((userListing.title || '').toLowerCase().split(/[\s,]+/).filter((w: string) => w.length > 3));
+            const userTags = new Set((userListing.tags || []).map((t: string) => t.toLowerCase()));
+            const missingKeywords = topKeywords.filter(k => !userTitleWords.has(k.keyword) && !userTags.has(k.keyword));
+            const missingTags = topTags.filter(t => !userTags.has(t.tag.toLowerCase()) && !userTitleWords.has(t.tag.toLowerCase()));
+
+            // 7. Call Gemini AI for analysis
+            const { GoogleGenerativeAI } = await import('@google/generative-ai');
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+            const model = genAI.getGenerativeModel({
+                model: 'gemini-2.5-flash',
+                generationConfig: { responseMimeType: 'application/json' } as any,
+            });
+
+            const aiPrompt = `You are an Etsy search ranking expert. Analyze why this listing ranks #${userRank ?? '500+'} for "${keyword}" and give SPECIFIC, ACTIONABLE steps to reach page 1 (top 48).
+
+YOUR LISTING:
+- Title: ${userListing.title}
+- Tags: ${(userListing.tags || []).join(', ')}
+- Price: $${userPrice}
+- Views: ${userViews} | Favorites: ${userFavorites} | Favorite rate: ${favoriteRate}%
+- Description length: ${(userListing.description || '').length} chars
+- Images: ${userListing.images?.length || 0}
+
+TOP 10 COMPETITORS (page 1 for "${keyword}"):
+${top10.map((c: any, i: number) => `#${i + 1}: "${c.title}" | $${c.price} | ${c.views} views | ${c.favorites} favs`).join('\n')}
+
+MARKET DATA:
+- Avg views (top 10): ${avgViews} | Avg favorites (top 10): ${avgFavorites}
+- Avg price (top 10): $${avgPrice}
+- Total results: ${searchData.count || 0}
+- Top tags: ${topTags.slice(0, 10).map(t => `${t.tag} (${t.pct}%)`).join(', ')}
+- Top title keywords: ${topKeywords.slice(0, 10).map(k => `${k.keyword} (${k.pct}%)`).join(', ')}
+
+MISSING FROM YOUR LISTING:
+- Keywords in top titles you're missing: ${missingKeywords.slice(0, 8).map(k => k.keyword).join(', ') || 'None'}
+- Tags used by competitors you're missing: ${missingTags.slice(0, 8).map(t => t.tag).join(', ') || 'None'}
+
+ETSY RANKING FACTORS (2026):
+1. Keyword relevance (title + tags match to search query)
+2. Listing quality score (CTR from search → conversion)
+3. Recency (recently updated/renewed listings get a boost)
+4. Shop score (reviews, response time, star seller status)
+5. Price competitiveness vs market
+6. Engagement rate (favorites/views ratio, typically 2-5% for good listings)
+7. Complete listings (all 13 tags, 10 images, detailed description)
+
+Analyze each factor comparing this listing to competitors. Be SPECIFIC — reference actual competitor titles, keywords, and numbers.
+
+Return JSON in Turkish (but keep all keywords/tags/titles in English):
+{
+  "overall_score": 0-100,
+  "current_rank": ${userRank ?? 'null'},
+  "estimated_page1_difficulty": "Kolay" | "Orta" | "Zor",
+  "factors": [
+    {
+      "name": "factor name in Turkish",
+      "score": 0-10,
+      "status": "iyi" | "orta" | "zayif",
+      "finding": "specific finding in Turkish — reference real data/numbers",
+      "action": "specific action to take in Turkish, with English keywords where relevant"
+    }
+  ],
+  "priority_actions": [
+    "Top 3 highest-impact actions in Turkish, ordered by importance. Be very specific."
+  ],
+  "missing_keywords": ["keyword1", "keyword2"],
+  "suggested_title": "Optimized title suggestion using research data, in English, Title Case, commas only"
+}`;
+
+            const aiResult = await model.generateContent(aiPrompt);
+            const aiText = aiResult.response.text();
+            const analysis = JSON.parse(aiText);
+
+            return res.status(200).json({
+                analysis,
+                market: {
+                    totalResults: searchData.count || 0,
+                    userRank,
+                    avgViews,
+                    avgFavorites,
+                    avgPrice,
+                    topTags: topTags.slice(0, 10),
+                    topKeywords: topKeywords.slice(0, 10),
+                    missingKeywords: missingKeywords.slice(0, 8).map(k => k.keyword),
+                    missingTags: missingTags.slice(0, 8).map(t => t.tag),
+                },
+            });
+        }
+
         // Invalid request
         return res.status(400).json({ error: 'Invalid request parameters' });
 

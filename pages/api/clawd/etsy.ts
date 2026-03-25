@@ -1222,11 +1222,23 @@ export default async function handler(
                 source_listing_id,
             });
 
-            // Step 1: Fetch the source listing with images
+            // Step 1: Fetch the source listing
             const sourceListing = await callEtsyAPI(
-                `/listings/${source_listing_id}?includes=Images`,
+                `/listings/${source_listing_id}`,
                 accessToken
             );
+
+            // Fetch images separately (includes param unreliable for single listing)
+            let sourceImageList: any[] = [];
+            try {
+                const imagesData = await callEtsyAPI(
+                    `/listings/${source_listing_id}/images`,
+                    accessToken
+                );
+                sourceImageList = imagesData.results || imagesData || [];
+            } catch {
+                logger.warn('Failed to fetch source listing images', { source_listing_id });
+            }
 
             if (!sourceListing || !sourceListing.listing_id) {
                 return res.status(404).json({
@@ -1305,8 +1317,8 @@ export default async function handler(
                 }
             );
 
-            // Return immediately — personalization copy happens after response
-            const sourceImages = (sourceListing.images || []).map((img: any) => ({
+            // Return source images so frontend can copy them (avoids Vercel timeout)
+            const sourceImages = sourceImageList.map((img: any) => ({
                 listing_image_id: img.listing_image_id,
                 url_fullxfull: img.url_fullxfull,
                 rank: img.rank,

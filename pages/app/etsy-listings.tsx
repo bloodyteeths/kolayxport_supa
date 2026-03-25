@@ -723,7 +723,7 @@ function EtsyListingsPage() {
         for (const img of sourceImages.sort((a, b) => (a.rank || 1) - (b.rank || 1))) {
           if (!img.url_fullxfull) continue;
           try {
-            await fetch(
+            const uploadRes = await fetch(
               `/api/clawd/etsy?action=upload_image&listing_id=${data.new_listing_id}&shop_id=${shopId}`,
               {
                 method: 'POST',
@@ -731,6 +731,11 @@ function EtsyListingsPage() {
                 body: JSON.stringify({ image_url: img.url_fullxfull, rank: img.rank || 1, overwrite: false }),
               }
             );
+            if (!uploadRes.ok) {
+              const errData = await uploadRes.json().catch(() => ({}));
+              console.warn(`Image copy rank ${img.rank} failed:`, errData);
+              continue;
+            }
             copied++;
             toast.loading(`Görseller kopyalanıyor (${copied}/${sourceImages.length})...`, { id: toastId });
           } catch { /* skip failed image */ }

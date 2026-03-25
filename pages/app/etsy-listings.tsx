@@ -707,13 +707,14 @@ function EtsyListingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       toast.success('Liste kopyalandı — taslak olarak açılıyor');
-      // Switch to draft filter so user can see the copy, then open it
+      // Invalidate cache so draft view shows the new listing
+      const draftCacheKey = `${selectedShopId}:draft`;
+      delete listingsCacheRef.current[draftCacheKey];
+      // Open the new listing immediately (drawer fetches its own data from Etsy API)
+      setDrawerListingId(String(data.new_listing_id));
+      setDrawerOpen(true);
+      // Switch to draft view so the copy appears in the grid
       setStatusFilter('draft');
-      // Small delay to let filter change trigger fetchListings, then open editor
-      setTimeout(() => {
-        setDrawerListingId(String(data.new_listing_id));
-        setDrawerOpen(true);
-      }, 500);
     } catch (err: any) {
       toast.error(err.message || 'Kopyalama başarısız');
     } finally {

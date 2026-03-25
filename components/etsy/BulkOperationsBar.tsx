@@ -259,6 +259,20 @@ export default function BulkOperationsBar({
     const succeeded = results.filter((r) => r.status === 'fulfilled' && (r.value as Response).ok).length;
     const failed = results.length - succeeded;
 
+    // Log failed operations for debugging
+    if (failed > 0) {
+      for (const r of results) {
+        if (r.status === 'rejected') {
+          console.error(`${actionLabel} failed (rejected):`, r.reason);
+        } else if (r.status === 'fulfilled' && !(r.value as Response).ok) {
+          try {
+            const errBody = await (r.value as Response).clone().json();
+            console.error(`${actionLabel} failed (${(r.value as Response).status}):`, errBody);
+          } catch { console.error(`${actionLabel} failed (${(r.value as Response).status})`); }
+        }
+      }
+    }
+
     if (failed === 0) {
       toast.success(`${actionLabel}: ${succeeded} listeleme basariyla guncellendi`);
     } else {

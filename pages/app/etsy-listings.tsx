@@ -1157,9 +1157,13 @@ function EtsyListingsPage() {
           <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 100 } }}>
             <Select
               value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as 'active' | 'draft' | 'inactive' | 'expired')
-              }
+              onChange={(e) => {
+                const val = e.target.value as 'active' | 'draft' | 'inactive' | 'expired';
+                setStatusFilter(val);
+                // Clear old listings immediately so loading state is visible
+                setListings([]);
+                setTotalCount(0);
+              }}
             >
               <MenuItem value="active">Aktif</MenuItem>
               <MenuItem value="draft">Taslak</MenuItem>

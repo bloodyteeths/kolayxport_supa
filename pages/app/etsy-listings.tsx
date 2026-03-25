@@ -223,6 +223,8 @@ function EtsyListingsPage() {
 
   // --- State ---
   const [listings, setListings] = useState<EtsyListingRow[]>([]);
+  const listingsRef = useRef<EtsyListingRow[]>([]);
+  listingsRef.current = listings;
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -693,7 +695,7 @@ function EtsyListingsPage() {
 
   // --- Copy listing (local-first: instant UI, no API call) ---
   const handleCopyListing = (listingId: number) => {
-    const source = listings.find((l) => l.listing_id === listingId);
+    const source = listingsRef.current.find((l) => l.listing_id === listingId);
     if (!source) {
       toast.error('Listing bulunamadı');
       return;

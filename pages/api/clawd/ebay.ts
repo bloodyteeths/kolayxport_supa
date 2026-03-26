@@ -1187,20 +1187,42 @@ export default async function handler(
         }),
       };
 
-      const result = await callEbayAPI(
-        '/sell/inventory/v1/bulk_update_price_quantity',
-        accessToken,
-        {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        },
-        marketplaceId
-      );
+      // Bulk API may return 400 with per-item results — handle gracefully
+      let result: any;
+      try {
+        result = await callEbayAPI(
+          '/sell/inventory/v1/bulk_update_price_quantity',
+          accessToken,
+          {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          },
+          marketplaceId
+        );
+      } catch (err: any) {
+        // eBay returns 400 but body has per-item results — try to parse
+        const errMsg = err.message || '';
+        const jsonMatch = errMsg.match(/\{.*\}/s);
+        if (jsonMatch) {
+          try {
+            result = JSON.parse(jsonMatch[0]);
+          } catch {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
+
+      const responses = result?.responses || [];
+      const failedCount = responses.filter((r: any) => r.statusCode >= 400).length;
 
       return res.status(200).json({
-        success: true,
-        responses: result.responses || [],
-        message: `Bulk update completed for ${requests.length} item(s).`,
+        success: failedCount === 0,
+        responses,
+        message: failedCount > 0
+          ? `Bulk update: ${responses.length - failedCount} succeeded, ${failedCount} failed.`
+          : `Bulk update completed for ${requests.length} item(s).`,
       });
     }
 

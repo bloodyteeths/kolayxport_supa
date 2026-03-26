@@ -121,7 +121,7 @@ async function testCreateListing() {
     method: 'POST',
     body: {
       sku: TEST_SKU,
-      title: 'E2E Test Product — Do Not Buy — Automated Test',
+      title: 'E2E Test Product — Automated Test Item — Automated Test',
       description: '<p>This is an automated E2E test listing. Please ignore.</p>',
       condition: 'NEW',
       quantity: 1,
@@ -193,7 +193,7 @@ async function testGetListing() {
 async function testUpdateInventoryItem() {
   console.log('\n✏️  Testing: Update Inventory Item (Save — title, description, aspects)');
 
-  const newTitle = 'E2E Test Product UPDATED — Do Not Buy';
+  const newTitle = 'E2E Test Product UPDATED — Automated Test Item';
   const { status, json } = await api(`/api/clawd/ebay?action=update_inventory_item&sku=${encodeURIComponent(TEST_SKU)}`, {
     method: 'PUT',
     body: {
@@ -369,7 +369,7 @@ async function testCopyListing() {
     method: 'PUT',
     body: {
       product: {
-        title: 'E2E Test Product COPY — Do Not Buy',
+        title: 'E2E Test Product COPY — Automated Test Item',
         description: '<p>Copied from E2E test.</p>',
         aspects: {
           'Brand': ['Unbranded'],
@@ -554,7 +554,7 @@ async function testCreateAndPublish() {
     method: 'POST',
     body: {
       sku: publishSku,
-      title: 'E2E Test PUBLISH — Do Not Buy — Automated',
+      title: 'E2E Test PUBLISH — Automated Test Item — Automated',
       description: '<p>Auto-publish test.</p>',
       condition: 'NEW',
       quantity: 1,
@@ -581,7 +581,11 @@ async function testCreateAndPublish() {
 
   if (status === 201 || status === 200) {
     log('PASS', 'create_listing (publish=true)', `offerId: ${json?.offerId}, listingId: ${json?.listingId}`);
-    log(json?.published === true ? 'PASS' : 'FAIL', 'Listing auto-published', `published: ${json?.published}`);
+    if (json?.published === true) {
+      log('PASS', 'Listing auto-published');
+    } else {
+      log('FAIL', 'Listing auto-published', `published: ${json?.published}, publishError: ${json?.publishError?.substring(0, 200)}`);
+    }
 
     // Clean up: withdraw + delete
     if (json?.offerId) {
@@ -814,11 +818,11 @@ async function main() {
   await testGetListing();              // Fetch single listing
   await testUpdateInventoryItem();     // Edit title/desc/aspects/qty
   await testUpdateOffer();             // Edit price/policies
+  await testBulkUpdatePrice();         // Bulk price/qty (before publish/withdraw)
   await testPublish();                 // Publish
   await testWithdraw();                // Withdraw
   await testEndListing();              // End (alias)
   await testCopyListing();             // Copy
-  await testBulkUpdatePrice();         // Bulk price/qty
 
   // ── Data Endpoints ──
   console.log(`\n${'─'.repeat(65)}`);

@@ -2094,13 +2094,10 @@ export default async function handler(
                 if (rest.offerings && Array.isArray(rest.offerings)) {
                     rest.offerings = rest.offerings.map((o: any) => {
                         const { offering_id, is_deleted: od, readiness_state_id, ...offeringRest } = o;
-                        // Price must only contain amount+divisor+currency_code
+                        // Etsy PUT expects price as a flat float, not the {amount,divisor,currency_code} object from GET
                         if (offeringRest.price && typeof offeringRest.price === 'object') {
-                            offeringRest.price = {
-                                amount: offeringRest.price.amount,
-                                divisor: offeringRest.price.divisor,
-                                currency_code: offeringRest.price.currency_code,
-                            };
+                            const { amount, divisor } = offeringRest.price;
+                            offeringRest.price = amount / (divisor || 100);
                         }
                         return offeringRest;
                     });

@@ -102,6 +102,28 @@ async function callEbayAPI(endpoint: string, accessToken: string, options: Reque
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Fetch the first inventory location key for the user (needed for publishing). */
+async function getDefaultMerchantLocationKey(
+  accessToken: string,
+  marketplaceId?: string
+): Promise<string | null> {
+  try {
+    const data = await callEbayAPI(
+      '/sell/inventory/v1/location?limit=1',
+      accessToken,
+      {},
+      marketplaceId
+    );
+    return data.locations?.[0]?.merchantLocationKey || null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
 
@@ -209,12 +231,23 @@ export default async function handler(
       const categoryTreeId = (req.query.category_tree_id as string) || '0';
       const appToken = await getApplicationToken();
 
-      const data = await callEbayAPI(
-        `/commerce/taxonomy/v1/category_tree/${categoryTreeId}/get_item_aspects_for_category?category_id=${categoryId}`,
-        appToken
-      );
-
-      return res.status(200).json(data);
+      try {
+        const data = await callEbayAPI(
+          `/commerce/taxonomy/v1/category_tree/${categoryTreeId}/get_item_aspects_for_category?category_id=${categoryId}`,
+          appToken
+        );
+        return res.status(200).json(data);
+      } catch (err: any) {
+        // Non-leaf category — return empty aspects instead of crashing
+        if (err.message?.includes('62009')) {
+          return res.status(200).json({
+            categoryId,
+            aspects: [],
+            error: 'Category is not a leaf category. Please select a more specific subcategory.',
+          });
+        }
+        throw err;
+      }
     }
 
     // =====================================================================
@@ -545,7 +578,10 @@ export default async function handler(
       }
 
       if (categoryId) offerPayload.categoryId = categoryId;
-      if (merchantLocationKey) offerPayload.merchantLocationKey = merchantLocationKey;
+
+      // Auto-fetch merchant location if not provided (required for publishing)
+      const locationKey = merchantLocationKey || await getDefaultMerchantLocationKey(accessToken, marketplaceId);
+      if (locationKey) offerPayload.merchantLocationKey = locationKey;
 
       const offerResult = await callEbayAPI(
         '/sell/inventory/v1/offer',
@@ -896,10 +932,18 @@ export default async function handler(
 
     // POST ?action=create_offer — Create offer only (body contains offer payload)
     if (req.method === 'POST' && action === 'create_offer') {
+      const offerBody = { ...req.body };
+
+      // Auto-inject merchantLocationKey if not provided
+      if (!offerBody.merchantLocationKey) {
+        const locationKey = await getDefaultMerchantLocationKey(accessToken, marketplaceId);
+        if (locationKey) offerBody.merchantLocationKey = locationKey;
+      }
+
       const result = await callEbayAPI(
         '/sell/inventory/v1/offer',
         accessToken,
-        { method: 'POST', body: JSON.stringify(req.body) },
+        { method: 'POST', body: JSON.stringify(offerBody) },
         marketplaceId
       );
 
@@ -953,6 +997,28 @@ export default async function handler(
       );
 
       return res.status(200).json(data);
+    }
+
+    // -----------------------------------------------------------------
+    // INVENTORY LOCATIONS
+    // -----------------------------------------------------------------
+
+    // GET ?action=locations — Get merchant locations
+    if (req.method === 'GET' && action === 'locations') {
+      try {
+        const data = await callEbayAPI(
+          '/sell/inventory/v1/location?limit=100',
+          accessToken,
+          {},
+          marketplaceId
+        );
+        return res.status(200).json({
+          total: data.total || 0,
+          locations: data.locations || [],
+        });
+      } catch {
+        return res.status(200).json({ total: 0, locations: [] });
+      }
     }
 
     // -----------------------------------------------------------------

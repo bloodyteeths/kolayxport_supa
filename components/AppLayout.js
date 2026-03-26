@@ -93,13 +93,21 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const touchStartY = useRef(0);
   const isPulling = useRef(false);
+  const pullDistanceRef = useRef(0);
   const PULL_THRESHOLD = 80;
+
+  // Keep ref in sync with state
+  useEffect(() => { pullDistanceRef.current = pullDistance; }, [pullDistance]);
 
   useEffect(() => {
     if (!isMobile) return;
 
+    const getScrollTop = () => {
+      return window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+    };
+
     const handleTouchStart = (e) => {
-      if (window.scrollY === 0 && !isRefreshing) {
+      if (getScrollTop() <= 1 && !isRefreshing) {
         touchStartY.current = e.touches[0].clientY;
         isPulling.current = true;
       }
@@ -109,19 +117,21 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
       if (!isPulling.current || isRefreshing) return;
       const currentY = e.touches[0].clientY;
       const diff = currentY - touchStartY.current;
-      if (diff > 0 && window.scrollY === 0) {
-        // Dampen the pull distance
-        setPullDistance(Math.min(diff * 0.5, 120));
-      } else {
+      if (diff > 10 && getScrollTop() <= 1) {
+        const dampened = Math.min((diff - 10) * 0.4, 120);
+        setPullDistance(dampened);
+        pullDistanceRef.current = dampened;
+      } else if (diff < 0) {
         isPulling.current = false;
         setPullDistance(0);
+        pullDistanceRef.current = 0;
       }
     };
 
     const handleTouchEnd = () => {
       if (!isPulling.current) return;
       isPulling.current = false;
-      if (pullDistance >= PULL_THRESHOLD) {
+      if (pullDistanceRef.current >= PULL_THRESHOLD) {
         setIsRefreshing(true);
         setPullDistance(PULL_THRESHOLD * 0.5);
         setTimeout(() => {
@@ -129,11 +139,12 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
         }, 300);
       } else {
         setPullDistance(0);
+        pullDistanceRef.current = 0;
       }
     };
 
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     return () => {
@@ -141,7 +152,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isMobile, isRefreshing, pullDistance]);
+  }, [isMobile, isRefreshing]);
 
   const handleSignOut = async () => {
     await supabaseSignOut();

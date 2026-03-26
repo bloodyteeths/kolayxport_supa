@@ -19,6 +19,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   overflow-x: hidden;
   max-width: 100vw;
+  overscroll-behavior-y: contain;
 }
 
 /* Brand color */

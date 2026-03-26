@@ -9,6 +9,7 @@ import {
   Select,
   MenuItem,
   FormControl,
+  InputLabel,
   IconButton,
   Typography,
   Paper,
@@ -29,6 +30,14 @@ import {
   Tab,
   useMediaQuery,
   useTheme,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  SwipeableDrawer,
+  Badge,
+  Checkbox,
+  Divider,
+  InputLabel,
 } from '@mui/material';
 import {
   DataGrid,
@@ -52,6 +61,18 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   Visibility as VisibilityIcon,
+  Add as AddIcon,
+  MoreVert as MoreVertIcon,
+  FindReplace as FindReplaceIcon,
+  ContentPasteSearch as ContentPasteSearchIcon,
+  PriceChange as PriceChangeIcon,
+  FileDownload as FileDownloadIcon,
+  FileUpload as FileUploadIcon,
+  Inventory as InventoryIcon,
+  FilterList as FilterListIcon,
+  Close as CloseIcon,
+  CheckBox as CheckBoxIcon,
+  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -229,23 +250,26 @@ function MobileEtsyListingCard({
   onEdit,
   onCopy,
   onDelete,
+  selected,
+  onToggleSelect,
 }: {
   listing: EtsyListingRow;
   onEdit: (listingId: number) => void;
   onCopy: (listingId: number) => void;
   onDelete: (listingId: number) => void;
+  selected?: boolean;
+  onToggleSelect?: (listingId: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const health = calculateHealth(listing);
-  const isActive = listing.state === 'active';
 
   return (
-    <Paper sx={{ mb: 1.5, overflow: 'hidden', borderRadius: 2, maxWidth: '100%', width: '100%' }}>
-      {/* Always-visible header: thumbnail + title + price row */}
+    <Paper sx={{ mb: 1, overflow: 'hidden', borderRadius: 2, maxWidth: '100%', width: '100%', border: selected ? '2px solid' : '1px solid', borderColor: selected ? 'primary.main' : 'divider' }}>
+      {/* Always-visible header: checkbox + thumbnail + title + price row */}
       <Box
         sx={{
           display: 'flex',
-          gap: 1.5,
+          gap: 1,
           p: 1.5,
           cursor: 'pointer',
           alignItems: 'center',
@@ -255,19 +279,30 @@ function MobileEtsyListingCard({
         }}
         onClick={() => setExpanded(!expanded)}
       >
+        {/* Checkbox for bulk select */}
+        {onToggleSelect && (
+          <Checkbox
+            checked={!!selected}
+            onChange={(e) => { e.stopPropagation(); onToggleSelect(listing.listing_id); }}
+            onClick={(e) => e.stopPropagation()}
+            size="small"
+            sx={{ p: 0.5, flexShrink: 0 }}
+          />
+        )}
+
         {/* Thumbnail */}
         {listing.thumbnail ? (
           <Box
             component="img"
             src={listing.thumbnail.url_170x135}
             alt=""
-            sx={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
+            sx={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
           />
         ) : (
           <Box
             sx={{
-              width: 56,
-              height: 56,
+              width: 52,
+              height: 52,
               borderRadius: 1,
               backgroundColor: '#e0e0e0',
               display: 'flex',
@@ -294,15 +329,16 @@ function MobileEtsyListingCard({
               lineHeight: 1.3,
               wordBreak: 'break-word',
               maxWidth: '100%',
+              fontSize: '0.82rem',
             }}
           >
             {listing.title}
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5, flexWrap: 'wrap' }}>
-            <Typography variant="body2" fontWeight={600}>
+          <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
+            <Typography variant="body2" fontWeight={600} fontSize="0.82rem">
               {formatPrice(listing.price)}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" fontSize="0.72rem">
               Stok: {listing.quantity}
             </Typography>
             <Chip
@@ -310,13 +346,13 @@ function MobileEtsyListingCard({
               size="small"
               color={STATE_COLORS[listing.state] || 'default'}
               variant="outlined"
-              sx={{ height: 20, fontSize: 11 }}
+              sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.5 } }}
             />
             {/* Health badge */}
             <Box
               sx={{
-                width: 22,
-                height: 22,
+                width: 20,
+                height: 20,
                 borderRadius: '50%',
                 border: `2px solid ${health.color}`,
                 display: 'flex',
@@ -333,8 +369,8 @@ function MobileEtsyListingCard({
         </Box>
 
         {/* Expand icon */}
-        <IconButton size="small" sx={{ flexShrink: 0, minWidth: 44, minHeight: 44 }}>
-          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        <IconButton size="small" sx={{ flexShrink: 0, minWidth: 40, minHeight: 40 }}>
+          {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
         </IconButton>
       </Box>
 
@@ -501,6 +537,31 @@ function EtsyListingsPage() {
   });
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+  // Mobile card pagination
+  const [mobileVisibleCount, setMobileVisibleCount] = useState(25);
+
+  // Toolbar menus
+  const [toolsMenuAnchor, setToolsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+
+  // Mobile selection state (for mobile cards)
+  const mobileSelectedIds = useMemo(() => {
+    if ('ids' in selectedIds) return selectedIds.ids;
+    return new Set<GridRowId>();
+  }, [selectedIds]);
+
+  const handleMobileToggleSelect = useCallback((listingId: number) => {
+    setSelectedIds((prev) => {
+      const ids = new Set('ids' in prev ? prev.ids : []);
+      if (ids.has(listingId)) {
+        ids.delete(listingId);
+      } else {
+        ids.add(listingId);
+      }
+      return { type: 'include' as const, ids };
+    });
+  }, []);
 
   // CSV Import state
   const [csvImportDialogOpen, setCsvImportDialogOpen] = useState(false);
@@ -677,6 +738,7 @@ function EtsyListingsPage() {
   // Reset pagination to page 0 when filters change
   useEffect(() => {
     setPaginationModel((prev) => (prev.page !== 0 ? { ...prev, page: 0 } : prev));
+    setMobileVisibleCount(25);
   }, [searchTerm, sectionFilter, excludeTerm, healthFilter]);
 
   // Pre-compute health scores to avoid recalculating per filter toggle
@@ -1025,7 +1087,7 @@ function EtsyListingsPage() {
       {
         field: 'thumbnail',
         headerName: '',
-        width: 90,
+        width: 68,
         sortable: false,
         filterable: false,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
@@ -1036,13 +1098,13 @@ function EtsyListingsPage() {
               src={thumb.url_170x135}
               alt=""
               loading="lazy"
-              sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1 }}
+              sx={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 1 }}
             />
           ) : (
             <Box
               sx={{
-                width: 72,
-                height: 72,
+                width: 52,
+                height: 52,
                 borderRadius: 1,
                 backgroundColor: '#f5f5f5',
                 display: 'flex',
@@ -1121,24 +1183,9 @@ function EtsyListingsPage() {
         },
       },
       {
-        field: 'seo',
-        headerName: 'SEO',
-        width: 60,
-        sortable: false,
-        filterable: false,
-        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
-          <SEOIndicator
-            tags={params.row.tags || []}
-            title={params.row.title || ''}
-            description={params.row.description || ''}
-            compact
-          />
-        ),
-      },
-      {
-        field: 'health',
-        headerName: 'Sağlık',
-        width: 70,
+        field: 'skor',
+        headerName: 'Skor',
+        width: 80,
         sortable: true,
         filterable: false,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
@@ -1148,7 +1195,7 @@ function EtsyListingsPage() {
               arrow
               title={
                 <Box sx={{ fontSize: 12 }}>
-                  <Box sx={{ fontWeight: 700, mb: 0.5 }}>Sağlık Skoru: {h.overall}/100</Box>
+                  <Box sx={{ fontWeight: 700, mb: 0.5 }}>Skor: {h.overall}/100</Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.tags.color }} />
                     {h.tags.label}
@@ -1168,21 +1215,29 @@ function EtsyListingsPage() {
                 </Box>
               }
             >
-              <Box
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  border: `3px solid ${h.color}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                <Typography variant="caption" sx={{ fontWeight: 700, fontSize: 11, color: h.color }}>
-                  {h.overall}
-                </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    border: `2.5px solid ${h.color}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Typography variant="caption" sx={{ fontWeight: 700, fontSize: 10, color: h.color }}>
+                    {h.overall}
+                  </Typography>
+                </Box>
+                <SEOIndicator
+                  tags={params.row.tags || []}
+                  title={params.row.title || ''}
+                  description={params.row.description || ''}
+                  compact
+                />
               </Box>
             </Tooltip>
           );
@@ -1281,20 +1336,15 @@ function EtsyListingsPage() {
 
   useEffect(() => {
     const handleResize = () => {
-      const isSmall = window.innerWidth < 768;
-      setColumnVisibilityModel(
-        isSmall
-          ? {
-              tags: false,
-              seo: false,
-              health: false,
-              views: false,
-              num_favorers: false,
-              updated_timestamp: false,
-              state: false,
-            }
-          : {}
-      );
+      const w = window.innerWidth;
+      if (w < 768) {
+        setColumnVisibilityModel({ tags: false, skor: false, views: false, num_favorers: false, updated_timestamp: false, state: false });
+      } else if (w < 1440) {
+        // Compact preset: hide less important columns
+        setColumnVisibilityModel({ tags: false, views: false, num_favorers: false, updated_timestamp: false });
+      } else {
+        setColumnVisibilityModel({});
+      }
     };
     handleResize();
     window.addEventListener('resize', handleResize);
@@ -1306,6 +1356,15 @@ function EtsyListingsPage() {
   const totalFavorites = useMemo(() => listings.reduce((s, l) => s + l.num_favorers, 0), [listings]);
   const outOfStock = useMemo(() => listings.filter((l) => l.quantity === 0).length, [listings]);
   const needsAttention = useMemo(() => listings.filter((l) => calculateHealth(l).overall < 70).length, [listings]);
+
+  // Active filter count for badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (sectionFilter) count++;
+    if (healthFilter) count++;
+    if (excludeTerm.trim()) count++;
+    return count;
+  }, [sectionFilter, healthFilter, excludeTerm]);
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1600, mx: 'auto', overflowX: 'hidden' }}>
@@ -1327,91 +1386,73 @@ function EtsyListingsPage() {
       )}
 
       {pageTab === 0 && (<>
-      {/* Statistics Bar */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)', md: 'repeat(5, 1fr)' }, gap: 1, mb: 2, overflow: 'hidden', width: '100%' }}>
-        <Paper sx={{ p: 1.5, minWidth: 0, overflow: 'hidden' }}>
-          <Typography variant="caption" color="text.secondary" noWrap>Toplam Listing</Typography>
-          <Typography variant="h6" fontWeight={700} noWrap>{totalCount}</Typography>
-        </Paper>
-        <Paper sx={{ p: 1.5, minWidth: 0, overflow: 'hidden' }}>
-          <Typography variant="caption" color="text.secondary" noWrap>Görüntülenme</Typography>
-          <Typography variant="h6" fontWeight={700} noWrap>{totalViews.toLocaleString()}</Typography>
-        </Paper>
-        <Paper sx={{ p: 1.5, minWidth: 0, overflow: 'hidden' }}>
-          <Typography variant="caption" color="text.secondary" noWrap>Favori</Typography>
-          <Typography variant="h6" fontWeight={700} noWrap>{totalFavorites.toLocaleString()}</Typography>
-        </Paper>
-        <Paper sx={{ p: 1.5, minWidth: 0, overflow: 'hidden' }}>
-          <Typography variant="caption" color="text.secondary" noWrap>Stoksuz</Typography>
-          <Typography variant="h6" fontWeight={700} color="error" noWrap>{outOfStock}</Typography>
-        </Paper>
-        <Paper sx={{ p: 1.5, borderLeft: '3px solid #ff9800', minWidth: 0, overflow: 'hidden' }}>
-          <Typography variant="caption" color="text.secondary" noWrap>Sorunlu</Typography>
-          <Typography variant="h6" fontWeight={700} sx={{ color: '#ff9800' }} noWrap>{needsAttention}</Typography>
-        </Paper>
-      </Box>
+      {/* Compact Stats Row */}
+      <Paper sx={{ px: 2, py: 1, mb: 1.5, display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 }, flexWrap: 'wrap', minHeight: 40 }}>
+        <Typography variant="body2" fontWeight={700} noWrap>
+          {totalCount} <Typography component="span" variant="caption" color="text.secondary">listing</Typography>
+        </Typography>
+        <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }} noWrap>
+          {totalViews.toLocaleString()} <Typography component="span" variant="caption" color="text.secondary">görüntülenme</Typography>
+        </Typography>
+        <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }} noWrap>
+          {totalFavorites.toLocaleString()} <Typography component="span" variant="caption" color="text.secondary">favori</Typography>
+        </Typography>
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          sx={{ color: outOfStock > 0 ? 'error.main' : 'text.secondary', cursor: outOfStock > 0 ? 'pointer' : 'default' }}
+          onClick={() => outOfStock > 0 && setHealthFilter('no_stock')}
+          noWrap
+        >
+          {outOfStock} <Typography component="span" variant="caption" sx={{ color: 'inherit' }}>stoksuz</Typography>
+        </Typography>
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          sx={{ color: needsAttention > 0 ? '#ff9800' : 'text.secondary', cursor: needsAttention > 0 ? 'pointer' : 'default' }}
+          onClick={() => needsAttention > 0 && setHealthFilter('issues')}
+          noWrap
+        >
+          {needsAttention} <Typography component="span" variant="caption" sx={{ color: 'inherit' }}>sorunlu</Typography>
+        </Typography>
+      </Paper>
 
-      {/* Toolbar Row 1: Search & Filters */}
-      <Paper sx={{ p: 1.5, mb: 1, overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
-        {/* Search row — full width on mobile */}
-        <Box sx={{ display: 'flex', gap: 1, mb: { xs: 1, md: 0 }, flexWrap: 'wrap', alignItems: 'center', width: '100%', maxWidth: '100%' }}>
-          <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 150 }, width: { xs: '100%' }, maxWidth: '100%' }}>
+      {/* Unified Toolbar */}
+      <Paper sx={{ px: 1.5, py: 1, mb: 1.5, overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Shop selector — hidden on mobile if only 1 shop */}
+          <FormControl size="small" sx={{ minWidth: 130, display: { xs: shops.length > 1 ? 'flex' : 'none', sm: 'flex' } }}>
             <Select
               value={selectedShopId}
               onChange={(e) => setSelectedShopId(e.target.value)}
               displayEmpty
             >
-              {shops.length === 0 && (
-                <MenuItem value="" disabled>
-                  Bağlı mağaza yok
-                </MenuItem>
-              )}
+              {shops.length === 0 && <MenuItem value="" disabled>Bağlı mağaza yok</MenuItem>}
               {shops.map((s) => (
-                <MenuItem key={s.shopId} value={s.shopId}>
-                  {s.shopName}
-                </MenuItem>
+                <MenuItem key={s.shopId} value={s.shopId}>{s.shopName}</MenuItem>
               ))}
             </Select>
           </FormControl>
 
+          {/* Search */}
           <TextField
             size="small"
-            placeholder="Listing ara..."
+            placeholder="Ara..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ flex: 1, minWidth: { xs: 0, sm: 200 }, width: { xs: '100%' }, maxWidth: '100%', boxSizing: 'border-box' }}
+            sx={{ flex: 1, minWidth: { xs: 80, sm: 160 } }}
             InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
+              startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18 }} /></InputAdornment>,
             }}
           />
 
-          <TextField
-            size="small"
-            placeholder="İçermez..."
-            value={excludeTerm}
-            onChange={(e) => setExcludeTerm(e.target.value)}
-            sx={{ minWidth: { xs: 0, sm: 140 }, flex: { xs: '1 1 calc(50% - 4px)', sm: '0 0 auto' }, maxWidth: '100%', boxSizing: 'border-box' }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <RemoveCircleOutlineIcon sx={{ fontSize: 18, color: 'error.main' }} />
-                </InputAdornment>
-              ),
-            }}
-          />
-
-          {/* Filters — on mobile these wrap to a second line */}
-          <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 100 }, flex: { xs: '1 1 calc(50% - 4px)', sm: '0 0 auto' }, maxWidth: '100%' }}>
+          {/* Status filter — always visible (triggers API fetch) */}
+          <FormControl size="small" sx={{ minWidth: { xs: 85, sm: 110 } }}>
             <Select
               value={statusFilter}
               onChange={(e) => {
                 const val = e.target.value as 'active' | 'draft' | 'inactive' | 'expired';
                 setStatusFilter(val);
-                // Clear old listings immediately so loading state is visible
                 setListings([]);
                 setTotalCount(0);
               }}
@@ -1419,38 +1460,160 @@ function EtsyListingsPage() {
               <MenuItem value="active">Aktif</MenuItem>
               <MenuItem value="draft">Taslak</MenuItem>
               <MenuItem value="inactive">Deaktif</MenuItem>
-              <MenuItem value="expired">Süresi Dolmuş</MenuItem>
+              <MenuItem value="expired">Sür. Dolmuş</MenuItem>
             </Select>
           </FormControl>
 
-          <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 110 }, display: { xs: 'none', sm: 'flex' } }}>
-            <Select
-              value={sectionFilter}
-              onChange={(e) => setSectionFilter(e.target.value)}
-              displayEmpty
+          {/* Filters button with badge */}
+          <Badge badgeContent={activeFilterCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10, minWidth: 16, height: 16 } }}>
+            <Button
+              size="small"
+              variant={activeFilterCount > 0 ? 'contained' : 'outlined'}
+              startIcon={<FilterListIcon />}
+              onClick={(e) => isMobile ? setFilterDrawerOpen(true) : setFilterDrawerOpen(!filterDrawerOpen)}
+              sx={{ minHeight: 36, whiteSpace: 'nowrap', minWidth: 0 }}
             >
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Filtreler</Box>
+            </Button>
+          </Badge>
+
+          {/* Spacer on desktop */}
+          <Box sx={{ flex: '1 0 0', display: { xs: 'none', md: 'block' } }} />
+
+          {/* + New Listing */}
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => setCreateDialogOpen(true)}
+            sx={{ minHeight: 36, whiteSpace: 'nowrap' }}
+          >
+            <AddIcon sx={{ mr: { xs: 0, sm: 0.5 }, fontSize: 18 }} />
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Yeni Listing</Box>
+          </Button>
+
+          {/* Tools menu */}
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={(e) => setToolsMenuAnchor(e.currentTarget)}
+            sx={{ minHeight: 36, whiteSpace: 'nowrap', minWidth: 0 }}
+          >
+            <MoreVertIcon sx={{ mr: { xs: 0, sm: 0.5 }, fontSize: 18 }} />
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Araçlar</Box>
+          </Button>
+
+          {/* Refresh */}
+          <IconButton
+            size="small"
+            onClick={() => {
+              const cacheKey = `${selectedShopId}:${statusFilter}`;
+              delete listingsCacheRef.current[cacheKey];
+              fetchListings();
+            }}
+            disabled={loading}
+            sx={{ minWidth: 36, minHeight: 36 }}
+          >
+            <RefreshIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      </Paper>
+
+      {/* Tools Menu */}
+      <Menu
+        anchorEl={toolsMenuAnchor}
+        open={Boolean(toolsMenuAnchor)}
+        onClose={() => setToolsMenuAnchor(null)}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem onClick={() => { setToolsMenuAnchor(null); setFindReplaceOpen(true); }}>
+          <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Bul &amp; Değiştir</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { setToolsMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
+          <ListItemIcon><ContentPasteSearchIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Tekrar Tespit</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { setToolsMenuAnchor(null); setSmartPricingOpen(true); }}>
+          <ListItemIcon><PriceChangeIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Akıllı Fiyat</ListItemText>
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={() => { setToolsMenuAnchor(null); handleExportCSV(); }}>
+          <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>CSV İndir</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { setToolsMenuAnchor(null); handleCSVFileSelect(); }}>
+          <ListItemIcon><FileUploadIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>CSV Yükle</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { setToolsMenuAnchor(null); setBackupManagerOpen(true); }}>
+          <ListItemIcon><InventoryIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Yedekler</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* Filter Panel — Popover on desktop, bottom drawer on mobile */}
+      {isMobile ? (
+        <SwipeableDrawer
+          anchor="bottom"
+          open={filterDrawerOpen}
+          onClose={() => setFilterDrawerOpen(false)}
+          onOpen={() => setFilterDrawerOpen(true)}
+          PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, px: 2, pb: 3, pt: 1 } }}
+        >
+          <Box sx={{ width: 40, height: 4, bgcolor: 'divider', borderRadius: 2, mx: 'auto', mb: 2 }} />
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Filtreler</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Bölüm</InputLabel>
+              <Select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)} label="Bölüm">
+                <MenuItem value="">Tüm Bölümler</MenuItem>
+                {shopSections.map((s) => <MenuItem key={s.shop_section_id} value={String(s.shop_section_id)}>{s.title}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Sağlık</InputLabel>
+              <Select value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)} label="Sağlık">
+                <MenuItem value="">Tüm Sağlık</MenuItem>
+                <MenuItem value="issues">Sorunlu</MenuItem>
+                <MenuItem value="missing_images">Resim Eksik (&lt;10)</MenuItem>
+                <MenuItem value="missing_tags">Etiket Eksik (&lt;13)</MenuItem>
+                <MenuItem value="short_title">Kısa Başlık (&lt;100)</MenuItem>
+                <MenuItem value="no_description">Açıklama Yok</MenuItem>
+                <MenuItem value="no_video">Video Yok</MenuItem>
+                <MenuItem value="no_stock">Stok Yok</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              size="small"
+              fullWidth
+              label="İçermez"
+              placeholder="Hariç tutulacak kelime..."
+              value={excludeTerm}
+              onChange={(e) => setExcludeTerm(e.target.value)}
+            />
+            {activeFilterCount > 0 && (
+              <Button size="small" color="error" onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); }}>
+                Filtreleri Temizle
+              </Button>
+            )}
+          </Box>
+        </SwipeableDrawer>
+      ) : filterDrawerOpen && (
+        <Paper sx={{ p: 2, mb: 1.5, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Bölüm</InputLabel>
+            <Select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)} label="Bölüm">
               <MenuItem value="">Tüm Bölümler</MenuItem>
-              {shopSections.map((s) => (
-                <MenuItem key={s.shop_section_id} value={String(s.shop_section_id)}>
-                  {s.title}
-                </MenuItem>
-              ))}
+              {shopSections.map((s) => <MenuItem key={s.shop_section_id} value={String(s.shop_section_id)}>{s.title}</MenuItem>)}
             </Select>
           </FormControl>
-
-          <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 120 }, flex: { xs: '1 1 calc(50% - 4px)', sm: '0 0 auto' }, maxWidth: '100%' }}>
-            <Select
-              value={healthFilter}
-              onChange={(e) => setHealthFilter(e.target.value)}
-              displayEmpty
-            >
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Sağlık</InputLabel>
+            <Select value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)} label="Sağlık">
               <MenuItem value="">Tüm Sağlık</MenuItem>
-              <MenuItem value="issues">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <ErrorOutlineIcon sx={{ fontSize: 16, color: '#ff9800' }} />
-                  Sorunlu
-                </Box>
-              </MenuItem>
+              <MenuItem value="issues">Sorunlu</MenuItem>
               <MenuItem value="missing_images">Resim Eksik (&lt;10)</MenuItem>
               <MenuItem value="missing_tags">Etiket Eksik (&lt;13)</MenuItem>
               <MenuItem value="short_title">Kısa Başlık (&lt;100)</MenuItem>
@@ -1459,62 +1622,66 @@ function EtsyListingsPage() {
               <MenuItem value="no_stock">Stok Yok</MenuItem>
             </Select>
           </FormControl>
-
-          <IconButton size="small" onClick={() => {
-            // Invalidate cache on manual refresh
-            const cacheKey = `${selectedShopId}:${statusFilter}`;
-            delete listingsCacheRef.current[cacheKey];
-            fetchListings();
-          }} disabled={loading}>
-            <RefreshIcon />
+          <TextField
+            size="small"
+            placeholder="İçermez..."
+            value={excludeTerm}
+            onChange={(e) => setExcludeTerm(e.target.value)}
+            sx={{ minWidth: 160 }}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"><RemoveCircleOutlineIcon sx={{ fontSize: 18, color: 'error.main' }} /></InputAdornment>,
+            }}
+          />
+          {activeFilterCount > 0 && (
+            <Button size="small" color="error" variant="text" onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); }}>
+              Temizle
+            </Button>
+          )}
+          <IconButton size="small" onClick={() => setFilterDrawerOpen(false)} sx={{ ml: 'auto' }}>
+            <CloseIcon fontSize="small" />
           </IconButton>
-        </Box>
-      </Paper>
+        </Paper>
+      )}
 
-      {/* Toolbar Row 2: Actions — 2-col grid on mobile, flex row on desktop */}
-      <Box sx={{
-        display: { xs: 'grid', md: 'flex' },
-        gridTemplateColumns: { xs: 'repeat(2, 1fr)' },
-        gap: 1,
-        mb: 2,
-        alignItems: 'center',
-        overflow: 'hidden',
-        width: '100%',
-      }}>
-        <Button variant="contained" size="small" sx={{ whiteSpace: 'nowrap', minWidth: 0 }} onClick={() => setCreateDialogOpen(true)}>
-          + Yeni Listing
-        </Button>
-        <Tooltip title="Başlık, açıklama, etiketlerde ara ve değiştir" arrow>
-          <Button variant="outlined" size="small" sx={{ whiteSpace: 'nowrap', minWidth: 0 }} onClick={() => setFindReplaceOpen(true)}>
-            Bul &amp; Değiştir
-          </Button>
-        </Tooltip>
-        <Tooltip title="Benzer/tekrarlanan listingleri bul" arrow>
-          <Button variant="outlined" size="small" color="warning" sx={{ whiteSpace: 'nowrap', minWidth: 0 }} onClick={() => setDuplicateDetectorOpen(true)}>
-            Tekrar Tespit
-          </Button>
-        </Tooltip>
-        <Tooltip title="Satışa göre otomatik fiyat ayarla, stok yenile" arrow>
-          <Button variant="outlined" size="small" sx={{ whiteSpace: 'nowrap', minWidth: 0 }} onClick={() => setSmartPricingOpen(true)}>
-            Akıllı Fiyat
-          </Button>
-        </Tooltip>
-        <Tooltip title="Listing verilerini CSV olarak dışa aktar" arrow>
-          <Button variant="outlined" size="small" sx={{ whiteSpace: 'nowrap', minWidth: 0 }} onClick={handleExportCSV}>
-            CSV İndir
-          </Button>
-        </Tooltip>
-        <Tooltip title="CSV dosyasından toplu güncelleme yap" arrow>
-          <Button variant="outlined" size="small" sx={{ whiteSpace: 'nowrap', minWidth: 0 }} startIcon={<UploadFileIcon />} onClick={handleCSVFileSelect}>
-            CSV Yükle
-          </Button>
-        </Tooltip>
-        <Tooltip title="Toplu işlem yedeklerini görüntüle ve geri yükle" arrow>
-          <Button variant="outlined" size="small" color="info" sx={{ whiteSpace: 'nowrap', minWidth: 0 }} onClick={() => setBackupManagerOpen(true)}>
-            Yedekler
-          </Button>
-        </Tooltip>
-      </Box>
+      {/* Active Filter Chips */}
+      {activeFilterCount > 0 && (
+        <Box sx={{ display: 'flex', gap: 0.5, mb: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+          {sectionFilter && (
+            <Chip
+              label={`Bölüm: ${shopSections.find(s => String(s.shop_section_id) === sectionFilter)?.title || sectionFilter}`}
+              size="small"
+              onDelete={() => setSectionFilter('')}
+              sx={{ height: 28 }}
+            />
+          )}
+          {healthFilter && (
+            <Chip
+              label={`Sağlık: ${healthFilter === 'issues' ? 'Sorunlu' : healthFilter === 'missing_images' ? 'Resim Eksik' : healthFilter === 'missing_tags' ? 'Etiket Eksik' : healthFilter === 'short_title' ? 'Kısa Başlık' : healthFilter === 'no_description' ? 'Açıklama Yok' : healthFilter === 'no_video' ? 'Video Yok' : 'Stok Yok'}`}
+              size="small"
+              onDelete={() => setHealthFilter('')}
+              color="warning"
+              sx={{ height: 28 }}
+            />
+          )}
+          {excludeTerm.trim() && (
+            <Chip
+              label={`Hariç: ${excludeTerm}`}
+              size="small"
+              onDelete={() => setExcludeTerm('')}
+              color="error"
+              variant="outlined"
+              sx={{ height: 28 }}
+            />
+          )}
+          <Chip
+            label="Tümünü Temizle"
+            size="small"
+            variant="outlined"
+            onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); }}
+            sx={{ height: 28, cursor: 'pointer' }}
+          />
+        </Box>
+      )}
 
       {/* No shops message */}
       {shops.length === 0 && !(loading) && (
@@ -1572,19 +1739,37 @@ function EtsyListingsPage() {
         ) : filteredListings.length === 0 ? (
           <Paper sx={{ p: 3, textAlign: 'center' }}>
             <Typography color="text.secondary">
-              {selectedShopId ? 'Listing bulunamadi' : 'Lutfen bir magaza secin'}
+              {selectedShopId ? 'Listing bulunamadı' : 'Lütfen bir mağaza seçin'}
             </Typography>
           </Paper>
         ) : (
-          filteredListings.map((listing) => (
-            <MobileEtsyListingCard
-              key={listing.listing_id}
-              listing={listing}
-              onEdit={handleOpenEditor}
-              onCopy={handleCopyListing}
-              onDelete={(id) => setDeleteConfirmId(id)}
-            />
-          ))
+          <>
+            {/* Mobile result count */}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, px: 0.5 }}>
+              {filteredListings.length} sonuç{filteredListings.length !== totalCount ? ` (toplam ${totalCount})` : ''}
+            </Typography>
+            {filteredListings.slice(0, mobileVisibleCount).map((listing) => (
+              <MobileEtsyListingCard
+                key={listing.listing_id}
+                listing={listing}
+                onEdit={handleOpenEditor}
+                onCopy={handleCopyListing}
+                onDelete={(id) => setDeleteConfirmId(id)}
+                selected={mobileSelectedIds.has(listing.listing_id)}
+                onToggleSelect={handleMobileToggleSelect}
+              />
+            ))}
+            {mobileVisibleCount < filteredListings.length && (
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={() => setMobileVisibleCount((prev) => prev + 25)}
+                sx={{ mt: 1, mb: 2, minHeight: 44 }}
+              >
+                Daha Fazla Yükle ({Math.min(25, filteredListings.length - mobileVisibleCount)} daha)
+              </Button>
+            )}
+          </>
         )}
       </Box>
 
@@ -1596,7 +1781,7 @@ function EtsyListingsPage() {
           loading={loading}
           checkboxSelection
           disableRowSelectionOnClick
-          rowHeight={82}
+          rowHeight={64}
           rowSelectionModel={selectedIds}
           onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}
           paginationModel={paginationModel}

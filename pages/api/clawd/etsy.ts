@@ -2093,7 +2093,7 @@ export default async function handler(
                 // Strip read-only keys from offerings
                 if (rest.offerings && Array.isArray(rest.offerings)) {
                     rest.offerings = rest.offerings.map((o: any) => {
-                        const { offering_id, is_deleted: od, readiness_state_id, ...offeringRest } = o;
+                        const { offering_id, is_deleted: od, ...offeringRest } = o;
                         // Etsy PUT expects price as a flat float, not the {amount,divisor,currency_code} object from GET
                         if (offeringRest.price && typeof offeringRest.price === 'object') {
                             const { amount, divisor } = offeringRest.price;

@@ -123,7 +123,8 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
             isMobile ? 'z-50' : 'z-40'
           }`}
           style={{
-            width: isMobile ? 'min(75vw, 280px)' : (isOpen ? '16rem' : '4rem')
+            width: isMobile ? 'min(75vw, 280px)' : (isOpen ? '16rem' : '4rem'),
+            paddingTop: 'env(safe-area-inset-top, 0px)',
           }}
         >
           <div className="flex items-center justify-between h-16 px-4 border-b border-slate-700">
@@ -235,7 +236,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
             />
           )}
           {/* Topbar */}
-          <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 h-16 border-b border-gray-200">
+          <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-gray-200" style={{ minHeight: '4rem', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
             <div className="flex items-center">
               {/* Mobile hamburger menu - 3 lines */}
               {isMobile && (
@@ -301,7 +302,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           {/* Page content */}
           <main className={`flex-grow bg-slate-50 ${
             isMobile ? 'p-3' : 'p-4 sm:p-6 lg:p-8'
-          }`}>
+          }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
             {/* Optional: Page header can go here if not in topbar */}
             {/* <h1 className="text-2xl font-semibold text-slate-800 mb-6">{title.replace('KolayXport Dashboard - ','')}</h1> */}
             {children}

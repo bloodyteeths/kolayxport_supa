@@ -63,6 +63,7 @@ import {
   Build as BuildIcon,
   AutoFixHigh as AutoFixHighIcon,
   Psychology as PsychologyIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -334,20 +335,27 @@ function MobileListingCard({
           <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
             <Button
               size="small"
-              variant="outlined"
-              startIcon={<EditIcon />}
+              variant="contained"
+              startIcon={<EditIcon sx={{ fontSize: '16px !important' }} />}
               onClick={(e) => { e.stopPropagation(); onEdit(listing.sku); }}
-              sx={{ flex: 1 }}
+              sx={{
+                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                '&:hover': { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
+              }}
             >
               Duzenle
             </Button>
             <Button
               size="small"
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
+              variant="contained"
+              startIcon={<DeleteIcon sx={{ fontSize: '16px !important' }} />}
               onClick={(e) => { e.stopPropagation(); onDelete(listing); }}
-              sx={{ flex: 1 }}
+              sx={{
+                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(220,38,38,0.25)',
+                '&:hover': { background: 'linear-gradient(135deg, #dc2626, #b91c1c)' },
+              }}
             >
               Sil
             </Button>
@@ -1389,28 +1397,53 @@ function EbayListingsPage() {
       {/* Toolbar Row 2: Actions */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, alignItems: 'center', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         {/* Primary action */}
-        <Button variant="contained" size="small" color="success" onClick={() => setCreatorOpen(true)} sx={{ whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0 }}>
-          + Yeni Listeleme
+        <Button
+          variant="contained"
+          size="small"
+          onClick={() => setCreatorOpen(true)}
+          startIcon={<AddIcon />}
+          sx={{
+            whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0, minHeight: 40,
+            borderRadius: '10px', textTransform: 'none', fontWeight: 600, px: 2, fontSize: '0.85rem',
+            background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
+            '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
+          }}
+        >
+          Yeni Listeleme
         </Button>
 
-        {/* CSV Download — always visible */}
-        <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={handleExportCSV} sx={{ whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0 }}>
+        {/* CSV Download */}
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<DownloadIcon />}
+          onClick={handleExportCSV}
+          sx={{
+            whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0, minHeight: 40,
+            borderRadius: '10px', textTransform: 'none', fontWeight: 600, px: 2, fontSize: '0.85rem',
+            borderColor: '#e2e8f0', color: '#475569',
+            '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
+          }}
+        >
           CSV İndir
         </Button>
 
-        {/* Tools dropdown — shared by mobile & desktop */}
-        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
-            startIcon={<BuildIcon />}
-            endIcon={<ExpandMoreIcon />}
-            sx={{ whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0 }}
-          >
-            Araçlar
-          </Button>
-        </Box>
+        {/* Tools dropdown */}
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+          startIcon={<BuildIcon />}
+          endIcon={<ExpandMoreIcon />}
+          sx={{
+            whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0, minHeight: 40,
+            borderRadius: '10px', textTransform: 'none', fontWeight: 600, px: 2, fontSize: '0.85rem',
+            borderColor: '#e2e8f0', color: '#475569',
+            '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
+          }}
+        >
+          Araçlar
+        </Button>
 
         <Menu
           anchorEl={moreMenuAnchor}

@@ -802,7 +802,7 @@ export default async function handler(
                     accessToken
                 ),
                 callEtsyAPI(
-                    `/shops/${shopId}/listings/${listing_id}/images`,
+                    `/listings/${listing_id}/images`,
                     accessToken
                 ),
             ]);
@@ -1232,7 +1232,7 @@ export default async function handler(
             let sourceImageList: any[] = [];
             let sourceInventoryData: any = {};
             const [imagesResult, inventoryResult] = await Promise.allSettled([
-                callEtsyAPI(`/shops/${shopId}/listings/${source_listing_id}/images`, accessToken),
+                callEtsyAPI(`/listings/${source_listing_id}/images`, accessToken),
                 callEtsyAPI(`/listings/${source_listing_id}/inventory`, accessToken),
             ]);
             if (imagesResult.status === 'fulfilled') {
@@ -1596,7 +1596,7 @@ export default async function handler(
             // First check if listing has at least one image
             try {
                 const images = await callEtsyAPI(
-                    `/shops/${shopId}/listings/${listing_id}/images`,
+                    `/listings/${listing_id}/images`,
                     accessToken
                 );
 
@@ -2288,9 +2288,10 @@ export default async function handler(
         }
 
         // GET /api/clawd/etsy?action=get_listing_images&listing_id=xxx
+        // Etsy v3: getListingImages is NOT shop-scoped
         if (req.method === 'GET' && action === 'get_listing_images' && listing_id) {
             const data = await callEtsyAPI(
-                `/shops/${shopId}/listings/${listing_id}/images`,
+                `/listings/${listing_id}/images`,
                 accessToken
             );
             return res.status(200).json({
@@ -2314,8 +2315,9 @@ export default async function handler(
             const { alt_text, rank } = req.body || {};
 
             // Step 1: Get the current image to find its URL
+            // Etsy v3: getListingImage is NOT shop-scoped
             const imageData = await callEtsyAPI(
-                `/shops/${shopId}/listings/${listing_id}/images/${image_id}`,
+                `/listings/${listing_id}/images/${image_id}`,
                 accessToken
             );
             const imageUrl = imageData.url_fullxfull;

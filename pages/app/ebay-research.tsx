@@ -580,7 +580,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         <Collapse in={showFilters || !isMobile}>
           <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
             {/* Marketplace */}
-            <FormControl size="small" sx={{ minWidth: 130 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 130 } }}>
               <InputLabel>Pazar Yeri</InputLabel>
               <Select value={filters.marketplace} label="Pazar Yeri" onChange={e => updateFilter('marketplace', e.target.value)}>
                 {MARKETPLACES.map(m => (
@@ -590,7 +590,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             </FormControl>
 
             {/* Condition */}
-            <FormControl size="small" sx={{ minWidth: 120 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 120 } }}>
               <InputLabel>Durum</InputLabel>
               <Select value={filters.condition} label="Durum" onChange={e => updateFilter('condition', e.target.value)}>
                 {CONDITIONS.map(c => (
@@ -600,7 +600,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             </FormControl>
 
             {/* Sort */}
-            <FormControl size="small" sx={{ minWidth: 170 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 170 } }}>
               <InputLabel>Sıralama</InputLabel>
               <Select value={filters.sortBy} label="Sıralama" onChange={e => updateFilter('sortBy', e.target.value)}>
                 {SORT_OPTIONS.map(s => (
@@ -616,7 +616,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
               type="number"
               value={filters.priceMin || ''}
               onChange={e => updateFilter('priceMin', Number(e.target.value))}
-              sx={{ width: 100 }}
+              sx={{ width: { xs: '45%', sm: 100 } }}
               InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
             />
             <TextField
@@ -625,7 +625,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
               type="number"
               value={filters.priceMax >= 10000 ? '' : filters.priceMax}
               onChange={e => updateFilter('priceMax', Number(e.target.value) || 10000)}
-              sx={{ width: 100 }}
+              sx={{ width: { xs: '45%', sm: 100 } }}
               InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
             />
           </Box>
@@ -1541,7 +1541,7 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
                 onClick={() => handleCategoryAnalyze(cat.id, cat.name)}
                 sx={{
                   p: 2, cursor: 'pointer', textAlign: 'center',
-                  minWidth: isMobile ? '43%' : 130, flex: '1 1 130px', maxWidth: 170,
+                  minWidth: isMobile ? '48%' : 130, flex: '1 1 130px', maxWidth: 170,
                   transition: 'all 0.2s',
                   '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover', transform: 'translateY(-2px)', boxShadow: 1 },
                   opacity: categoryAnalyzing === cat.id ? 0.6 : 1,
@@ -1588,10 +1588,10 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap', mb: 2 }}>
-              <Paper variant="outlined" sx={{ minWidth: 140 }}>
+              <Paper variant="outlined" sx={{ minWidth: { xs: '45%', sm: 140 } }}>
                 <ScoreDisplay label="Talep Skoru" score={report.demandScore} />
               </Paper>
-              <Paper variant="outlined" sx={{ minWidth: 140 }}>
+              <Paper variant="outlined" sx={{ minWidth: { xs: '45%', sm: 140 } }}>
                 <ScoreDisplay label="Rekabet Skoru" score={report.competitionScore} invert />
               </Paper>
             </Box>

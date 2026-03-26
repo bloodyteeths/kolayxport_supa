@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma db push --accept-data-loss && prisma generate && next build",
+    "build": "prisma db push --accept-data-loss && prisma generate && next build --webpack",
     "postbuild": "next-sitemap",
     "start": "next start",
     "test": "vitest",
@@ -25,6 +25,7 @@
     "@auth0/nextjs-auth0": "^4.5.1",
     "@date-io/date-fns": "^2.16.0",
     "@date-io/dayjs": "^3.2.0",
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@google/genai": "^1.46.0",

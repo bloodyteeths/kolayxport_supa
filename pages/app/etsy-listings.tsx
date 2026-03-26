@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  Collapse,
   Tooltip,
   TextField,
   Select,
@@ -26,6 +27,8 @@ import {
   TableRow,
   Tabs,
   Tab,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   DataGrid,
@@ -46,6 +49,9 @@ import {
   ErrorOutline as ErrorOutlineIcon,
   RemoveCircleOutline as RemoveCircleOutlineIcon,
   ContentCopy as ContentCopyIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -215,11 +221,240 @@ function calculateHealth(listing: EtsyListingRow): HealthBreakdown {
 }
 
 // ---------------------------------------------------------------------------
+// Mobile Card Component
+// ---------------------------------------------------------------------------
+
+function MobileEtsyListingCard({
+  listing,
+  onEdit,
+  onCopy,
+  onDelete,
+}: {
+  listing: EtsyListingRow;
+  onEdit: (listingId: number) => void;
+  onCopy: (listingId: number) => void;
+  onDelete: (listingId: number) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const health = calculateHealth(listing);
+  const isActive = listing.state === 'active';
+
+  return (
+    <Paper sx={{ mb: 1.5, overflow: 'hidden', borderRadius: 2 }}>
+      {/* Always-visible header: thumbnail + title + price row */}
+      <Box
+        sx={{
+          display: 'flex',
+          gap: 1.5,
+          p: 1.5,
+          cursor: 'pointer',
+          alignItems: 'center',
+          minHeight: 44,
+        }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {/* Thumbnail */}
+        {listing.thumbnail ? (
+          <Box
+            component="img"
+            src={listing.thumbnail.url_170x135}
+            alt=""
+            sx={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
+          />
+        ) : (
+          <Box
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: 1,
+              backgroundColor: '#e0e0e0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <Typography variant="caption" color="text.disabled">N/A</Typography>
+          </Box>
+        )}
+
+        {/* Main info */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              lineHeight: 1.3,
+            }}
+          >
+            {listing.title}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5, flexWrap: 'wrap' }}>
+            <Typography variant="body2" fontWeight={600}>
+              {formatPrice(listing.price)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Stok: {listing.quantity}
+            </Typography>
+            <Chip
+              label={STATE_LABELS[listing.state] || listing.state}
+              size="small"
+              color={STATE_COLORS[listing.state] || 'default'}
+              variant="outlined"
+              sx={{ height: 20, fontSize: 11 }}
+            />
+            {/* Health badge */}
+            <Box
+              sx={{
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                border: `2px solid ${health.color}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 700, fontSize: 9, color: health.color }}>
+                {health.overall}
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Expand icon */}
+        <IconButton size="small" sx={{ flexShrink: 0, minWidth: 44, minHeight: 44 }}>
+          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        </IconButton>
+      </Box>
+
+      {/* Expandable details */}
+      <Collapse in={expanded}>
+        <Box sx={{ px: 1.5, pb: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+          {/* Tags */}
+          {listing.tags && listing.tags.length > 0 && (
+            <Box sx={{ mt: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                Etiketler ({listing.tags.length}/13)
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {listing.tags.map((tag, i) => (
+                  <Chip key={i} label={tag} size="small" sx={{ height: 22, fontSize: 11 }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Stats row */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
+            <Box sx={{ flex: '1 1 45%' }}>
+              <Typography variant="caption" color="text.secondary">Goruntulenme</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <VisibilityIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="body2">{listing.views.toLocaleString()}</Typography>
+              </Box>
+            </Box>
+            <Box sx={{ flex: '1 1 45%' }}>
+              <Typography variant="caption" color="text.secondary">Favori</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <FavoriteBorderIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="body2">{listing.num_favorers.toLocaleString()}</Typography>
+              </Box>
+            </Box>
+            <Box sx={{ flex: '1 1 45%' }}>
+              <Typography variant="caption" color="text.secondary">Gorseller</Typography>
+              <Typography variant="body2">{listing.image_count} resim{listing.has_video ? ' + video' : ''}</Typography>
+            </Box>
+            <Box sx={{ flex: '1 1 45%' }}>
+              <Typography variant="caption" color="text.secondary">Son Guncelleme</Typography>
+              <Typography variant="body2">{formatTimestamp(listing.updated_timestamp)}</Typography>
+            </Box>
+          </Box>
+
+          {/* Health breakdown chips */}
+          <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {[health.tags, health.images, health.title, health.description].map((item, i) => (
+              <Chip
+                key={i}
+                label={item.label}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: 10,
+                  bgcolor: `${item.color}15`,
+                  color: item.color,
+                  borderColor: item.color,
+                }}
+                variant="outlined"
+              />
+            ))}
+          </Box>
+
+          {/* Actions */}
+          <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<EditIcon />}
+              onClick={(e) => { e.stopPropagation(); onEdit(listing.listing_id); }}
+              sx={{ flex: 1, minHeight: 44 }}
+            >
+              Duzenle
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="primary"
+              startIcon={<ContentCopyIcon />}
+              onClick={(e) => { e.stopPropagation(); onCopy(listing.listing_id); }}
+              sx={{ flex: 1, minHeight: 44 }}
+            >
+              Kopyala
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={(e) => { e.stopPropagation(); onDelete(listing.listing_id); }}
+              sx={{ flex: 1, minHeight: 44 }}
+            >
+              Sil
+            </Button>
+          </Box>
+
+          {listing.url && (
+            <Button
+              size="small"
+              variant="text"
+              href={listing.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ mt: 0.5, fontSize: 11 }}
+            >
+              Etsy&apos;de Gor
+            </Button>
+          )}
+        </Box>
+      </Collapse>
+    </Paper>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page Component
 // ---------------------------------------------------------------------------
 
 function EtsyListingsPage() {
   const { user } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // --- State ---
   const [listings, setListings] = useState<EtsyListingRow[]>([]);
@@ -1325,8 +1560,33 @@ function EtsyListingsPage() {
         </Box>
       )}
 
-      {/* DataGrid */}
-      <Paper sx={{ width: '100%' }}>
+      {/* Mobile Card List */}
+      <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : filteredListings.length === 0 ? (
+          <Paper sx={{ p: 3, textAlign: 'center' }}>
+            <Typography color="text.secondary">
+              {selectedShopId ? 'Listing bulunamadi' : 'Lutfen bir magaza secin'}
+            </Typography>
+          </Paper>
+        ) : (
+          filteredListings.map((listing) => (
+            <MobileEtsyListingCard
+              key={listing.listing_id}
+              listing={listing}
+              onEdit={handleOpenEditor}
+              onCopy={handleCopyListing}
+              onDelete={(id) => setDeleteConfirmId(id)}
+            />
+          ))
+        )}
+      </Box>
+
+      {/* DataGrid (desktop only) */}
+      <Paper sx={{ width: '100%', display: { xs: 'none', md: 'block' } }}>
         <DataGrid
           rows={filteredListings}
           columns={columns}

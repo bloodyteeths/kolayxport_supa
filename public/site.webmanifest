@@ -2,7 +2,7 @@
   "name": "KolayXport - E-ticaret Entegrasyon SaaS",
   "short_name": "KolayXport",
   "description": "Tek panelden marketplace yönetimi, otomatik kargo ve finans analitiği",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
@@ -17,6 +17,38 @@
       "src": "/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Siparisler",
+      "short_name": "Siparisler",
+      "url": "/siparisler",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Etsy Listeler",
+      "short_name": "Etsy",
+      "url": "/app/etsy-listings",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "eBay Listeler",
+      "short_name": "eBay",
+      "url": "/app/ebay-listings",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
     }
   ],
   "categories": ["business", "productivity", "utilities"],

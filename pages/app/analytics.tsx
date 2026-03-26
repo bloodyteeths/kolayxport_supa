@@ -754,63 +754,93 @@ export default function AnalyticsPage() {
         <SectionCard>
           <SectionTitle>Pazaryeri Performansi</SectionTitle>
           {mpData.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Pazaryeri
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Siparis
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Gelir (TL)
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Musteri
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ort. Siparis (TL)
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      % Oran
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {[...mpData]
-                    .sort((a, b) => b.orders - a.orders)
-                    .map((mp, idx) => {
-                      const totalOrders = mpData.reduce((s, m) => s + m.orders, 0) || 1;
-                      const pct = mp.percentage || (mp.orders / totalOrders) * 100;
-                      const avg = mp.avgOrderValue || (mp.orders > 0 ? mp.revenue / mp.orders : 0);
-                      return (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <MarketplaceBadge name={mp.marketplace} />
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                            {formatNumber(mp.orders)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                            {formatCurrency(mp.revenue)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                            {formatNumber(mp.customers)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                            {formatCurrency(avg)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                            {pct.toFixed(1)}%
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {/* Mobile cards */}
+              <div className="block md:hidden space-y-3">
+                {[...mpData]
+                  .sort((a, b) => b.orders - a.orders)
+                  .map((mp, idx) => {
+                    const totalOrders = mpData.reduce((s, m) => s + m.orders, 0) || 1;
+                    const pct = mp.percentage || (mp.orders / totalOrders) * 100;
+                    return (
+                      <div key={idx} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                        <div className="flex items-center justify-between mb-3">
+                          <MarketplaceBadge name={mp.marketplace} />
+                          <span className="text-xs text-gray-500">{pct.toFixed(1)}%</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-xs text-gray-500">Siparis</p>
+                            <p className="text-sm font-semibold text-gray-900">{formatNumber(mp.orders)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Gelir</p>
+                            <p className="text-sm font-semibold text-gray-900">{formatCurrency(mp.revenue)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Pazaryeri
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Siparis
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Gelir (TL)
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Musteri
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ort. Siparis (TL)
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        % Oran
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {[...mpData]
+                      .sort((a, b) => b.orders - a.orders)
+                      .map((mp, idx) => {
+                        const totalOrders = mpData.reduce((s, m) => s + m.orders, 0) || 1;
+                        const pct = mp.percentage || (mp.orders / totalOrders) * 100;
+                        const avg = mp.avgOrderValue || (mp.orders > 0 ? mp.revenue / mp.orders : 0);
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <MarketplaceBadge name={mp.marketplace} />
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {formatNumber(mp.orders)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {formatCurrency(mp.revenue)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {formatNumber(mp.customers)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {formatCurrency(avg)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
+                              {pct.toFixed(1)}%
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
             <EmptyState />
           )}
@@ -834,28 +864,52 @@ export default function AnalyticsPage() {
           <SectionCard>
             <SectionTitle>En Cok Satan Urunler</SectionTitle>
             {data?.topProducts && data.topProducts.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Urun</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Siparis</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Gelir (TL)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {data.topProducts.slice(0, 5).map((product, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 text-sm font-medium text-gray-500">{index + 1}</td>
-                        <td className="px-3 py-2 text-sm text-gray-900 max-w-[200px] truncate">{product.name}</td>
-                        <td className="px-3 py-2 text-sm text-gray-900 text-right">{formatNumber(product.orders)}</td>
-                        <td className="px-3 py-2 text-sm text-gray-900 text-right">{formatCurrency(product.revenue)}</td>
+              <>
+                {/* Mobile cards */}
+                <div className="block md:hidden space-y-3">
+                  {data.topProducts.slice(0, 5).map((product, index) => (
+                    <div key={index} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="text-xs font-medium text-gray-400">#{index + 1}</span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 mb-3 line-clamp-2">{product.name}</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500">Siparis</p>
+                          <p className="text-sm font-semibold text-gray-900">{formatNumber(product.orders)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500">Gelir</p>
+                          <p className="text-sm font-semibold text-gray-900">{formatCurrency(product.revenue)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Urun</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Siparis</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Gelir (TL)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {data.topProducts.slice(0, 5).map((product, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-sm font-medium text-gray-500">{index + 1}</td>
+                          <td className="px-3 py-2 text-sm text-gray-900 max-w-[200px] truncate">{product.name}</td>
+                          <td className="px-3 py-2 text-sm text-gray-900 text-right">{formatNumber(product.orders)}</td>
+                          <td className="px-3 py-2 text-sm text-gray-900 text-right">{formatCurrency(product.revenue)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             ) : (
               <EmptyState message="Urun verisi yok" />
             )}

@@ -31,6 +31,8 @@ import {
   ListItemIcon,
   ListSubheader,
   Divider,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   DataGrid,
@@ -424,14 +426,8 @@ function EbayListingsPage() {
   const [appliedTitles, setAppliedTitles] = useState<Map<string, string>>(new Map()); // id -> original title
 
   // Mobile detection
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   // Scheduled updates count (placeholder - would come from API)
   const [scheduledCount, setScheduledCount] = useState(0);
@@ -1268,8 +1264,8 @@ function EbayListingsPage() {
       <Toaster position="top-right" />
 
       {/* Statistics Bar */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
+      <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, mb: 2, flexWrap: 'wrap' }}>
+        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
           <Typography variant="caption" color="text.secondary">
             Toplam Listeleme
           </Typography>
@@ -1277,7 +1273,7 @@ function EbayListingsPage() {
             {totalCount}
           </Typography>
         </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
+        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
           <Typography variant="caption" color="text.secondary">
             Yayinda
           </Typography>
@@ -1285,7 +1281,7 @@ function EbayListingsPage() {
             {publishedCount}
           </Typography>
         </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
+        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
           <Typography variant="caption" color="text.secondary">
             Taslak
           </Typography>
@@ -1293,7 +1289,7 @@ function EbayListingsPage() {
             {unpublishedCount}
           </Typography>
         </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
+        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
           <Typography variant="caption" color="text.secondary">
             Stok Biten
           </Typography>
@@ -1301,7 +1297,7 @@ function EbayListingsPage() {
             {outOfStock}
           </Typography>
         </Paper>
-        <Paper sx={{ p: 1.5, flex: 1, minWidth: 120, borderLeft: '3px solid #ff9800' }}>
+        <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 }, borderLeft: '3px solid #ff9800' }}>
           <Typography variant="caption" color="text.secondary">
             Sorunlu
           </Typography>
@@ -1323,7 +1319,7 @@ function EbayListingsPage() {
             placeholder="Listeleme ara..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ minWidth: 200, flex: 1 }}
+            sx={{ minWidth: { xs: '100%', sm: 200 }, flex: 1 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -1334,7 +1330,7 @@ function EbayListingsPage() {
           />
 
           {/* Status filter */}
-          <FormControl size="small" sx={{ minWidth: 120 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 } }}>
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -1346,7 +1342,7 @@ function EbayListingsPage() {
           </FormControl>
 
           {/* Condition filter */}
-          <FormControl size="small" sx={{ minWidth: 120 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 } }}>
             <Select
               value={conditionFilter}
               onChange={(e) => setConditionFilter(e.target.value)}
@@ -1361,7 +1357,7 @@ function EbayListingsPage() {
           </FormControl>
 
           {/* Health filter */}
-          <FormControl size="small" sx={{ minWidth: 130 }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 130 } }}>
             <Select
               value={healthFilter}
               onChange={(e) => setHealthFilter(e.target.value)}
@@ -1382,7 +1378,7 @@ function EbayListingsPage() {
             </Select>
           </FormControl>
 
-          <IconButton size="small" onClick={fetchListings} disabled={loading}>
+          <IconButton size="small" onClick={fetchListings} disabled={loading} sx={{ minWidth: 44, minHeight: 44 }}>
             <RefreshIcon />
           </IconButton>
         </Box>

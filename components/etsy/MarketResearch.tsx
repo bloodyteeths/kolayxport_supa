@@ -452,19 +452,39 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
     if (priceVal) setSellingPrice(String(priceVal.toFixed ? priceVal.toFixed(2) : priceVal));
     setMyTitle(selectedListing.title || '');
     setMyTags((selectedListing.tags || []).join(', '));
-    // Build smart search query from title: take first comma-separated phrase, limit to ~60 chars
-    // This captures the product identity better than a single tag
-    const title = selectedListing.title || '';
-    const firstPhrase = title.split(',')[0].trim();
-    // If first phrase is too short (<10 chars), combine first two phrases
-    let smartQuery = firstPhrase;
-    if (smartQuery.length < 10 && title.includes(',')) {
-      smartQuery = title.split(',').slice(0, 2).join(' ').trim();
+
+    // Build smart search query: tags ARE buyer search terms, use the best one
+    const tags: string[] = selectedListing.tags || [];
+    const title: string = selectedListing.title || '';
+    const genericWords = new Set(['handmade', 'custom', 'personalized', 'gift', 'gifts', 'unique', 'cute', 'vintage', 'boho', 'rustic', 'modern', 'luxury', 'premium', 'sale', 'new', 'best', 'top']);
+
+    // Strategy: find the most specific multi-word tag (these are actual buyer searches)
+    const scoredTags = tags.map(tag => {
+      const words = tag.toLowerCase().split(/\s+/);
+      const meaningfulWords = words.filter(w => !genericWords.has(w) && w.length > 2);
+      // Prefer: multi-word, non-generic, product-descriptive tags
+      let score = meaningfulWords.length * 10; // more meaningful words = better
+      if (words.length >= 2 && words.length <= 4) score += 20; // 2-4 word tags are ideal search queries
+      if (words.length === 1) score -= 10; // single words too broad
+      if (words.length > 5) score -= 5; // too long = too specific
+      if (genericWords.has(words[0])) score -= 15; // starts with generic word
+      return { tag, score };
+    }).sort((a, b) => b.score - a.score);
+
+    let smartQuery = '';
+    if (scoredTags.length > 0 && scoredTags[0].score > 10) {
+      smartQuery = scoredTags[0].tag;
     }
-    // Fallback to first tag if title is empty
-    if (!smartQuery && selectedListing.tags?.length) {
-      smartQuery = selectedListing.tags[0];
+
+    // Fallback: extract core product words from title
+    if (!smartQuery && title) {
+      const titleWords = title.toLowerCase()
+        .replace(/[|,\-–—]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !genericWords.has(w) && !/^\d+$/.test(w));
+      smartQuery = titleWords.slice(0, 4).join(' ');
     }
+
     if (smartQuery) setQuery(smartQuery.substring(0, 60));
   }, [selectedListing]);
 

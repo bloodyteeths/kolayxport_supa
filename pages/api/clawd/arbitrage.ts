@@ -243,6 +243,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.json({ rate, source: 'open.er-api.com' });
       }
 
+      case 'test_trendyol': {
+        const query = req.body.query || 'havlu';
+        try {
+          const result = await searchTrendyolProducts({ query, limit: 5 });
+          return res.json({ success: true, count: result.products.length, totalCount: result.totalCount, products: result.products.slice(0, 2) });
+        } catch (err: any) {
+          return res.json({ success: false, error: err.message });
+        }
+      }
+
       default:
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }

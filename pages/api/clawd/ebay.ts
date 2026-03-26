@@ -264,20 +264,21 @@ export default async function handler(
       const limit = parseInt((req.query.limit as string) || '200');
       const offset = parseInt((req.query.offset as string) || '0');
 
-      // Step 1: Fetch offers (marketplace_id is a required query param for eBay)
+      // Step 1: Fetch offers
       let offersData: any;
       try {
         offersData = await callEbayAPI(
-          `/sell/inventory/v1/offer?marketplace_id=${marketplaceId}&limit=${limit}&offset=${offset}`,
+          `/sell/inventory/v1/offer?limit=${limit}&offset=${offset}`,
           accessToken,
           {},
           marketplaceId
         );
       } catch (err: any) {
-        // Return empty list on validation errors (no inventory)
-        if (err.message?.includes('25707') || err.message?.includes('25710')) {
+        // Return empty list on validation errors (no inventory / no offers)
+        if (err.message?.includes('25707') || err.message?.includes('25710') || err.message?.includes('25713')) {
           return res.status(200).json({ total: 0, size: 0, offset, offers: [] });
         }
+        logger.warn('Unexpected error fetching offers', { error: err.message?.substring(0, 300), userId });
         throw err;
       }
 

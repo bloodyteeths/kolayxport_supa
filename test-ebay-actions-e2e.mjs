@@ -132,6 +132,7 @@ async function testCreateListing() {
       returnPolicyId,
       paymentPolicyId,
       publish: false,
+      imageUrls: ['https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/300px-PNG_transparency_demonstration_1.png'],
       aspects: {
         'Brand': ['Unbranded'],
         'Type': ['Jacket'],
@@ -199,6 +200,7 @@ async function testUpdateInventoryItem() {
       product: {
         title: newTitle,
         description: '<p>Updated description from E2E test.</p>',
+        imageUrls: ['https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/300px-PNG_transparency_demonstration_1.png'],
         aspects: {
           'Brand': ['Unbranded'],
           'Type': ['Jacket'],
@@ -563,6 +565,7 @@ async function testCreateAndPublish() {
       returnPolicyId,
       paymentPolicyId,
       publish: true,
+      imageUrls: ['https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/300px-PNG_transparency_demonstration_1.png'],
       aspects: {
         'Brand': ['Unbranded'],
         'Type': ['Jacket'],

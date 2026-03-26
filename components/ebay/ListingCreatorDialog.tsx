@@ -629,6 +629,8 @@ export default function ListingCreatorDialog({
             sku: row.sku,
             marketplaceId: 'EBAY_US',
             format: 'FIXED_PRICE',
+            availableQuantity: parseInt(row.quantity) || 1,
+            listingDuration: 'GTC',
             listingDescription: description.trim(),
             pricingSummary: {
               price: { value: row.price || price, currency },
@@ -697,11 +699,13 @@ export default function ListingCreatorDialog({
           throw new Error(err.error || 'Envanter öğesi oluşturulamadı');
         }
 
-        // 2. Create offer
+        // 2. Create offer — include all fields required for publishing
         const offerPayload: Record<string, any> = {
           sku: baseSku,
           marketplaceId: 'EBAY_US',
           format: 'FIXED_PRICE',
+          availableQuantity: parseInt(quantity) || 1,
+          listingDuration: 'GTC',
           listingDescription: description.trim(),
           pricingSummary: {
             price: { value: price, currency },

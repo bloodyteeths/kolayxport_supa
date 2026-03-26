@@ -1752,7 +1752,7 @@ export default async function handler(
                 readiness_state,  // "ready_to_ship" or "made_to_order"
                 min_processing_time = 1,
                 max_processing_time = 3,
-                processing_time_unit = 'business_days',  // "business_days" or "weeks"
+                processing_time_unit = 'days',  // "days" or "weeks"
             } = req.body;
 
             if (!readiness_state) {

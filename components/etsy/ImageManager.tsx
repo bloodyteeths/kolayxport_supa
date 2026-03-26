@@ -19,6 +19,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import StarIcon from '@mui/icons-material/Star';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import EditIcon from '@mui/icons-material/Edit';
 import { toast } from 'react-hot-toast';
 
 interface ImageInfo {
@@ -75,6 +76,11 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const [aiFollowUp, setAiFollowUp] = useState('');
   const [aiRefUrl, setAiRefUrl] = useState<string | null>(null); // URL of existing listing image used as reference
   const aiRefInputRef = useRef<HTMLInputElement>(null);
+
+  // Alt text editing state
+  const [editAltImage, setEditAltImage] = useState<ImageInfo | null>(null);
+  const [editAltText, setEditAltText] = useState('');
+  const [savingAlt, setSavingAlt] = useState(false);
 
   const sortedImages = [...(images || [])].sort((a, b) => a.rank - b.rank);
 
@@ -331,6 +337,39 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     }
   };
 
+  // --- Alt Text Edit ---
+
+  const openAltEdit = (img: ImageInfo) => {
+    setEditAltImage(img);
+    setEditAltText(img.alt_text || '');
+  };
+
+  const handleSaveAltText = async () => {
+    if (!editAltImage) return;
+    setSavingAlt(true);
+    try {
+      const res = await fetch(
+        `/api/clawd/etsy?action=update_listing_image&listing_id=${listingId}&image_id=${editAltImage.listing_image_id}&shop_id=${shopId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alt_text: editAltText.trim() }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Alt metin guncellenemedi');
+      }
+      toast.success('Alt metin guncellendi');
+      setEditAltImage(null);
+      onImagesChanged();
+    } catch (err: any) {
+      toast.error(err.message || 'Alt metin guncellenirken hata olustu');
+    } finally {
+      setSavingAlt(false);
+    }
+  };
+
   // --- Render ---
 
   return (
@@ -419,29 +458,30 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 </Box>
               </Box>
 
-              {/* Alt text indicator */}
-              {img.alt_text && (
-                <Tooltip title={img.alt_text}>
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      backgroundColor: 'rgba(0,0,0,0.6)',
-                      color: 'white',
-                      fontSize: 10,
-                      px: 0.5,
-                      py: 0.25,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {img.alt_text}
-                  </Box>
-                </Tooltip>
-              )}
+              {/* Alt text indicator — click to edit */}
+              <Tooltip title={img.alt_text ? `${img.alt_text} (duzenlemek icin tikla)` : 'Alt metin ekle (tikla)'}>
+                <Box
+                  onClick={(e) => { e.stopPropagation(); openAltEdit(img); }}
+                  sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: img.alt_text ? 'rgba(0,0,0,0.6)' : 'rgba(245,158,11,0.7)',
+                    color: 'white',
+                    fontSize: 10,
+                    px: 0.5,
+                    py: 0.25,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    cursor: 'pointer',
+                    '&:hover': { backgroundColor: img.alt_text ? 'rgba(0,0,0,0.8)' : 'rgba(245,158,11,0.9)' },
+                  }}
+                >
+                  {img.alt_text || '+ Alt metin ekle'}
+                </Box>
+              </Tooltip>
 
               {/* Controls overlay */}
               <Box
@@ -509,6 +549,23 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                     </IconButton>
                   </Tooltip>
                 )}
+
+                <Tooltip title="Alt metin duzenle" placement="left">
+                  <IconButton
+                    size="small"
+                    onClick={() => openAltEdit(img)}
+                    disabled={!!swapping}
+                    sx={{
+                      backgroundColor: 'rgba(16,185,129,0.85)',
+                      color: 'white',
+                      width: 24,
+                      height: 24,
+                      '&:hover': { backgroundColor: 'rgba(5,150,105,1)' },
+                    }}
+                  >
+                    <EditIcon sx={{ fontSize: 14 }} />
+                  </IconButton>
+                </Tooltip>
               </Box>
             </Box>
           );
@@ -891,6 +948,56 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
           </Button>
           <Button onClick={handleDelete} color="error" variant="contained" disabled={deleting}>
             {deleting ? <CircularProgress size={20} /> : 'Sil'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Alt text edit dialog */}
+      <Dialog
+        open={!!editAltImage}
+        onClose={() => !savingAlt && setEditAltImage(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Alt Metin Duzenle</DialogTitle>
+        <DialogContent>
+          {editAltImage && (
+            <Box sx={{ textAlign: 'center', mb: 2 }}>
+              <img
+                src={editAltImage.url_570xN}
+                alt="Duzenlenecek gorsel"
+                style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8, objectFit: 'contain' }}
+              />
+            </Box>
+          )}
+          <TextField
+            label="Alt Metin (SEO)"
+            placeholder="Or: handmade wooden bracelet, natural stone beads"
+            fullWidth
+            size="small"
+            multiline
+            minRows={2}
+            value={editAltText}
+            onChange={(e) => setEditAltText(e.target.value)}
+            disabled={savingAlt}
+            helperText="Arama motorlari icin aciklayici metin (Ingilizce onerilir)"
+            inputProps={{ maxLength: 250 }}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', textAlign: 'right' }}>
+            {editAltText.length}/250
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditAltImage(null)} disabled={savingAlt}>
+            Iptal
+          </Button>
+          <Button
+            onClick={handleSaveAltText}
+            variant="contained"
+            disabled={savingAlt}
+            color="success"
+          >
+            {savingAlt ? <CircularProgress size={20} /> : 'Kaydet'}
           </Button>
         </DialogActions>
       </Dialog>

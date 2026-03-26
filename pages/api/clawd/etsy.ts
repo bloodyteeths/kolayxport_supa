@@ -2087,7 +2087,20 @@ export default async function handler(
                 product_count: products.length,
             });
 
-            const payload: Record<string, any> = { products };
+            // Strip read-only keys that Etsy returns but rejects on PUT
+            const cleanProducts = products.map((p: any) => {
+                const { product_id, is_deleted, ...rest } = p;
+                // Also strip offering_id from each offering
+                if (rest.offerings && Array.isArray(rest.offerings)) {
+                    rest.offerings = rest.offerings.map((o: any) => {
+                        const { offering_id, ...offeringRest } = o;
+                        return offeringRest;
+                    });
+                }
+                return rest;
+            });
+
+            const payload: Record<string, any> = { products: cleanProducts };
             if (price_on_property) payload.price_on_property = price_on_property;
             if (quantity_on_property) payload.quantity_on_property = quantity_on_property;
             if (sku_on_property) payload.sku_on_property = sku_on_property;

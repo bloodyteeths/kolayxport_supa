@@ -669,37 +669,48 @@ export default async function handler(
       let missingAspects: string[] = [];
 
       if (publish && offerId) {
-        // Small delay to let eBay process the offer before publishing
-        await new Promise(r => setTimeout(r, 2000));
+        // Retry publish with increasing delays — eBay needs time to index the offer
+        const delays = [3000, 5000];
+        for (let attempt = 0; attempt < delays.length; attempt++) {
+          await new Promise(r => setTimeout(r, delays[attempt]));
 
-        try {
-          const publishResult = await callEbayAPI(
-            `/sell/inventory/v1/offer/${offerId}/publish`,
-            accessToken,
-            { method: 'POST' },
-            marketplaceId
-          );
-          listingId = publishResult.listingId;
-          logger.info('eBay listing published', { sku, offerId, listingId });
-        } catch (pubErr: any) {
-          const errMsg = pubErr.message || '';
-          logger.error('Failed to auto-publish eBay listing', pubErr instanceof Error ? pubErr : new Error(String(pubErr)), {
-            sku,
-            offerId,
-          });
+          try {
+            const publishResult = await callEbayAPI(
+              `/sell/inventory/v1/offer/${offerId}/publish`,
+              accessToken,
+              { method: 'POST' },
+              marketplaceId
+            );
+            listingId = publishResult.listingId;
+            logger.info('eBay listing published', { sku, offerId, listingId, attempt });
+            break; // Success — exit retry loop
+          } catch (pubErr: any) {
+            // If transient "System error" and we have retries left, try again
+            const isTransient = pubErr.message?.includes('System error') || pubErr.message?.includes('Unable to process');
+            if (isTransient && attempt < delays.length - 1) {
+              logger.warn('Transient publish error, retrying...', { sku, offerId, attempt });
+              continue;
+            }
 
-          // Extract missing required aspects
-          const aspectRegex = /The item specific (\w[\w\s]*?) is missing/g;
-          let match;
-          while ((match = aspectRegex.exec(errMsg)) !== null) {
-            missingAspects.push(match[1].trim());
+            const errMsg = pubErr.message || '';
+            logger.error('Failed to auto-publish eBay listing', pubErr instanceof Error ? pubErr : new Error(String(pubErr)), {
+              sku,
+              offerId,
+            });
+
+            // Extract missing required aspects
+            const aspectRegex = /The item specific (\w[\w\s]*?) is missing/g;
+            let match;
+            while ((match = aspectRegex.exec(errMsg)) !== null) {
+              missingAspects.push(match[1].trim());
+            }
+
+            publishError = missingAspects.length > 0
+              ? `Şu zorunlu özellikler eksik: ${missingAspects.join(', ')}`
+              : errMsg.includes('Item.Country')
+                ? 'Konum bilgisi (ülke) eksik'
+                : errMsg.substring(0, 300);
           }
-
-          publishError = missingAspects.length > 0
-            ? `Şu zorunlu özellikler eksik: ${missingAspects.join(', ')}`
-            : errMsg.includes('Item.Country')
-              ? 'Konum bilgisi (ülke) eksik'
-              : errMsg.substring(0, 300);
         }
       }
 

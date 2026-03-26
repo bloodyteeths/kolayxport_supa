@@ -452,10 +452,20 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
     if (priceVal) setSellingPrice(String(priceVal.toFixed ? priceVal.toFixed(2) : priceVal));
     setMyTitle(selectedListing.title || '');
     setMyTags((selectedListing.tags || []).join(', '));
-    // Set first tag as search query for market research
-    if (selectedListing.tags?.length) {
-      setQuery(selectedListing.tags[0]);
+    // Build smart search query from title: take first comma-separated phrase, limit to ~60 chars
+    // This captures the product identity better than a single tag
+    const title = selectedListing.title || '';
+    const firstPhrase = title.split(',')[0].trim();
+    // If first phrase is too short (<10 chars), combine first two phrases
+    let smartQuery = firstPhrase;
+    if (smartQuery.length < 10 && title.includes(',')) {
+      smartQuery = title.split(',').slice(0, 2).join(' ').trim();
     }
+    // Fallback to first tag if title is empty
+    if (!smartQuery && selectedListing.tags?.length) {
+      smartQuery = selectedListing.tags[0];
+    }
+    if (smartQuery) setQuery(smartQuery.substring(0, 60));
   }, [selectedListing]);
 
   // --- keyword filter ---
@@ -1260,6 +1270,16 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           <Autocomplete
             options={userListings}
             getOptionLabel={(opt: any) => opt.title || `Listing #${opt.listing_id || opt.id}`}
+            filterOptions={(options, { inputValue }) => {
+              if (!inputValue) return options;
+              const q = inputValue.toLowerCase();
+              return options.filter((opt: any) => {
+                const title = (opt.title || '').toLowerCase();
+                const tags = (opt.tags || []).join(' ').toLowerCase();
+                const id = String(opt.listing_id || opt.id || '');
+                return title.includes(q) || tags.includes(q) || id.includes(q);
+              });
+            }}
             value={selectedListing}
             onChange={(_, val: any) => setSelectedListingId(val ? (val.listing_id || val.id) : null)}
             renderOption={(props, opt: any) => {
@@ -1294,7 +1314,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               <TextField
                 {...params}
                 size="small"
-                placeholder="Listeleme arayın veya seçin..."
+                placeholder="Başlık, tag veya ID ile arayın..."
                 InputProps={{
                   ...params.InputProps,
                   startAdornment: (
@@ -1313,8 +1333,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {selectedListing && (
             <Box sx={{ mt: 1.5 }}>
               <Alert severity="success" sx={{ borderRadius: '10px', py: 0.5, mb: 1.5 }}>
-                <Typography variant="caption">
-                  Fiyat ({fmt(profitCalc.sell)}), başlık ve {(selectedListing.tags || []).length} tag otomatik dolduruldu.
+                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                  Fiyat ({fmt(profitCalc.sell)}), başlık ve {(selectedListing.tags || []).length} tag dolduruldu.
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                  Arama: "<b>{query}</b>" — düzenleyebilirsiniz
                 </Typography>
               </Alert>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -1324,29 +1347,29 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   startIcon={<Search size={14} />}
                   onClick={() => {
                     handleSectionChange(1);
-                    setTimeout(() => searchMarket(), 200);
+                    pendingSearchRef.current = true;
+                    // Trigger via useEffect so searchMarket has latest query
+                    setQuery(q => q); // force re-render
+                    setTimeout(() => searchMarket(), 100);
                   }}
                   sx={{ background: GRADIENTS.primary, borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
                 >
-                  Rakiplerimi Araştır
+                  Rakip Analizi (Fiyat + Mağaza + Talep)
                 </Button>
                 <Button
                   variant="outlined"
                   size="small"
                   startIcon={<TrendingUp size={14} />}
                   onClick={() => {
-                    if (!query.trim() && selectedListing?.tags?.length) {
-                      setQuery(selectedListing.tags[0]);
-                    }
                     handleSectionChange(1);
-                    setTimeout(() => {
-                      setTab(101);
-                      searchMarket();
-                    }, 200);
+                    setTab(101);
+                    pendingSearchRef.current = true;
+                    setQuery(q => q);
+                    setTimeout(() => searchMarket(), 100);
                   }}
                   sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
                 >
-                  Tag & Kelime Analizi
+                  Tag & Kelime Boşluk Analizi
                 </Button>
               </Box>
             </Box>

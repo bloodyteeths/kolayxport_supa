@@ -1343,6 +1343,7 @@ export default async function handler(
                             price: off.price ? off.price.amount / (off.price.divisor || 100) : 0,
                             quantity: off.quantity || 0,
                             is_enabled: off.is_enabled ?? true,
+                            ...(off.readiness_state_id ? { readiness_state_id: off.readiness_state_id } : {}),
                         })),
                     }));
 

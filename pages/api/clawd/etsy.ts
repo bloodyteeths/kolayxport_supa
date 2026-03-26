@@ -802,7 +802,7 @@ export default async function handler(
                     accessToken
                 ),
                 callEtsyAPI(
-                    `/listings/${listing_id}/images`,
+                    `/shops/${shopId}/listings/${listing_id}/images`,
                     accessToken
                 ),
             ]);
@@ -937,7 +937,7 @@ export default async function handler(
             };
 
             const result = await callEtsyAPI(
-                `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
                     method: 'POST',
@@ -958,7 +958,7 @@ export default async function handler(
             logger.info('Removing personalization from listing', { listing_id, shopId });
 
             const result = await callEtsyAPI(
-                `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
                     method: 'DELETE',
@@ -996,7 +996,7 @@ export default async function handler(
             logger.info('Setting simple personalization for listing', { listing_id, shopId, question_text });
 
             const result = await callEtsyAPI(
-                `/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                `/shops/${shopId}/listings/${listing_id}/personalization?supports_multiple_personalization_questions=true`,
                 accessToken,
                 {
                     method: 'POST',
@@ -1232,7 +1232,7 @@ export default async function handler(
             let sourceImageList: any[] = [];
             let sourceInventoryData: any = {};
             const [imagesResult, inventoryResult] = await Promise.allSettled([
-                callEtsyAPI(`/listings/${source_listing_id}/images`, accessToken),
+                callEtsyAPI(`/shops/${shopId}/listings/${source_listing_id}/images`, accessToken),
                 callEtsyAPI(`/listings/${source_listing_id}/inventory`, accessToken),
             ]);
             if (imagesResult.status === 'fulfilled') {
@@ -1398,7 +1398,7 @@ export default async function handler(
                         source_product_count: sourceInventory.length,
                         error_message: invErr.message,
                     });
-                    // Pass error to response for debugging
+                    // Include error in response for debugging
                     (newListing as any)._inventoryError = invErr.message || String(invErr);
                 }
             }
@@ -1436,7 +1436,7 @@ export default async function handler(
                         return rest;
                     });
                     await callEtsyAPI(
-                        `/listings/${newListing.listing_id}/personalization?supports_multiple_personalization_questions=true`,
+                        `/shops/${shopId}/listings/${newListing.listing_id}/personalization?supports_multiple_personalization_questions=true`,
                         accessToken,
                         { method: 'POST', body: JSON.stringify({ personalization_questions: questionsForCopy }) }
                     );
@@ -1596,7 +1596,7 @@ export default async function handler(
             // First check if listing has at least one image
             try {
                 const images = await callEtsyAPI(
-                    `/listings/${listing_id}/images`,
+                    `/shops/${shopId}/listings/${listing_id}/images`,
                     accessToken
                 );
 
@@ -1610,9 +1610,9 @@ export default async function handler(
                 logger.warn('Could not verify listing images', { listing_id, error: imgError });
             }
 
-            // Activate the listing
+            // Activate the listing (updateListing is shop-scoped)
             const result = await callEtsyAPI(
-                `/listings/${listing_id}`,
+                `/shops/${shopId}/listings/${listing_id}`,
                 accessToken,
                 {
                     method: 'PATCH',
@@ -2290,7 +2290,7 @@ export default async function handler(
         // GET /api/clawd/etsy?action=get_listing_images&listing_id=xxx
         if (req.method === 'GET' && action === 'get_listing_images' && listing_id) {
             const data = await callEtsyAPI(
-                `/listings/${listing_id}/images`,
+                `/shops/${shopId}/listings/${listing_id}/images`,
                 accessToken
             );
             return res.status(200).json({
@@ -2309,21 +2309,52 @@ export default async function handler(
         }
 
         // PATCH /api/clawd/etsy?action=update_listing_image&listing_id=xxx&image_id=xxx
+        // Etsy v3 has no PATCH for images — must re-upload with overwrite to update alt_text/rank
         if (req.method === 'PATCH' && action === 'update_listing_image' && listing_id && image_id) {
             const { alt_text, rank } = req.body || {};
-            const updateBody: Record<string, any> = {};
-            if (alt_text !== undefined) updateBody.alt_text = alt_text;
-            if (rank !== undefined) updateBody.rank = rank;
 
-            const data = await callEtsyAPI(
+            // Step 1: Get the current image to find its URL
+            const imageData = await callEtsyAPI(
                 `/shops/${shopId}/listings/${listing_id}/images/${image_id}`,
-                accessToken,
+                accessToken
+            );
+            const imageUrl = imageData.url_fullxfull;
+            if (!imageUrl) {
+                return res.status(400).json({ error: 'Could not find image URL for re-upload' });
+            }
+
+            // Step 2: Download the image
+            const imageResp = await fetch(imageUrl);
+            if (!imageResp.ok) {
+                return res.status(400).json({ error: `Failed to download image: ${imageResp.status}` });
+            }
+            const imageBuffer = Buffer.from(await imageResp.arrayBuffer());
+
+            // Step 3: Re-upload with overwrite, including alt_text and rank
+            const apiKey = `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`;
+            const formData = new FormData();
+            formData.append('image', new Blob([imageBuffer]), 'image.jpg');
+            formData.append('listing_image_id', image_id);
+            formData.append('overwrite', 'true');
+            if (rank !== undefined) formData.append('rank', String(rank));
+            if (alt_text !== undefined) formData.append('alt_text', alt_text);
+
+            const uploadResp = await fetch(
+                `${ETSY_API_BASE}/shops/${shopId}/listings/${listing_id}/images`,
                 {
-                    method: 'PATCH',
-                    body: JSON.stringify(updateBody),
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'x-api-key': apiKey,
+                    },
+                    body: formData,
                 }
             );
+            if (!uploadResp.ok) {
+                const errText = await uploadResp.text();
+                throw new Error(`Etsy API error: ${uploadResp.status} - ${errText}`);
+            }
+            const data = await uploadResp.json();
             return res.status(200).json({ success: true, image: data });
         }
 

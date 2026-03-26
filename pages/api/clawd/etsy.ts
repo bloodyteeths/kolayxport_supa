@@ -2105,10 +2105,10 @@ export default async function handler(
                         return offeringRest;
                     });
                 }
-                // Strip read-only keys from property_values
+                // Strip read-only keys from property_values (property_name is required, scale_name is read-only)
                 if (rest.property_values && Array.isArray(rest.property_values)) {
                     rest.property_values = rest.property_values.map((pv: any) => {
-                        const { property_name, scale_name, ...pvRest } = pv;
+                        const { scale_name, ...pvRest } = pv;
                         return pvRest;
                     });
                 }
@@ -2406,13 +2406,22 @@ export default async function handler(
 
         // POST /api/clawd/etsy?action=create_shipping_profile
         if (req.method === 'POST' && action === 'create_shipping_profile') {
-            const { title, origin_country_iso, primary_cost, secondary_cost, min_processing_days, max_processing_days, destination_country_iso, mail_class } = req.body || {};
+            const {
+                title, origin_country_iso, primary_cost, secondary_cost,
+                min_processing_days, max_processing_days,
+                destination_country_iso, destination_region, mail_class,
+                origin_postal_code, min_delivery_days, max_delivery_days,
+            } = req.body || {};
             const payload: Record<string, any> = {
                 title, origin_country_iso, primary_cost, secondary_cost,
                 min_processing_days, max_processing_days,
             };
             if (destination_country_iso) payload.destination_country_iso = destination_country_iso;
+            if (destination_region) payload.destination_region = destination_region;
             if (mail_class) payload.mail_class = mail_class;
+            if (origin_postal_code) payload.origin_postal_code = origin_postal_code;
+            if (min_delivery_days) payload.min_delivery_days = min_delivery_days;
+            if (max_delivery_days) payload.max_delivery_days = max_delivery_days;
 
             const data = await callEtsyAPI(
                 `/shops/${shopId}/shipping-profiles`,

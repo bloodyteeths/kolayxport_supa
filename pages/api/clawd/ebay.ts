@@ -264,11 +264,11 @@ export default async function handler(
       const limit = parseInt((req.query.limit as string) || '200');
       const offset = parseInt((req.query.offset as string) || '0');
 
-      // Step 1: Fetch offers
+      // Step 1: Fetch offers (marketplace_id is a required query param for eBay)
       let offersData: any;
       try {
         offersData = await callEbayAPI(
-          `/sell/inventory/v1/offer?limit=${limit}&offset=${offset}`,
+          `/sell/inventory/v1/offer?marketplace_id=${marketplaceId}&limit=${limit}&offset=${offset}`,
           accessToken,
           {},
           marketplaceId

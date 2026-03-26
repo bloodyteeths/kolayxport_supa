@@ -23,6 +23,7 @@ import KeywordIntelligence from '@/components/ebay/research/KeywordIntelligence'
 import CompetitiveIntelligence from '@/components/ebay/research/CompetitiveIntelligence';
 import ListingOptimizer from '@/components/ebay/research/ListingOptimizer';
 import FinancialIntelligence from '@/components/ebay/research/FinancialIntelligence';
+import ArbitrageScanner from '@/components/ebay/research/ArbitrageScanner';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -99,6 +100,13 @@ interface NicheReport {
   priceDistribution: { range: string; count: number }[];
   savedAt?: string;
   id?: string;
+  opportunityScore?: number;
+  demandLabel?: string;
+  competitionLabel?: string;
+  opportunityLabel?: string;
+  avgSoldPerItem?: number;
+  sellThroughRate?: number;
+  listingsPerSeller?: number;
 }
 
 interface TrackedSeller {
@@ -1389,7 +1397,14 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
         sellerConcentration: data.sellerConcentration || 0,
         topProducts: (data.topProducts || []).filter(Boolean).map(mapNicheProduct),
         aspects: [],
-        priceDistribution: [],
+        priceDistribution: data.priceDistribution || [],
+        opportunityScore: data.opportunityScore || 0,
+        demandLabel: data.demandLabel || '',
+        competitionLabel: data.competitionLabel || '',
+        opportunityLabel: data.opportunityLabel || '',
+        avgSoldPerItem: data.avgSoldPerItem,
+        sellThroughRate: data.sellThroughRate,
+        listingsPerSeller: data.listingsPerSeller,
       };
       setReport(mapped);
     } catch (err: any) {
@@ -1420,7 +1435,14 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
         sellerConcentration: data.sellerConcentration || 0,
         topProducts: (data.topProducts || []).filter(Boolean).map(mapNicheProduct),
         aspects: [],
-        priceDistribution: [],
+        priceDistribution: data.priceDistribution || [],
+        opportunityScore: data.opportunityScore || 0,
+        demandLabel: data.demandLabel || '',
+        competitionLabel: data.competitionLabel || '',
+        opportunityLabel: data.opportunityLabel || '',
+        avgSoldPerItem: data.avgSoldPerItem,
+        sellThroughRate: data.sellThroughRate,
+        listingsPerSeller: data.listingsPerSeller,
       };
       setReport(mapped);
     } catch (err: any) {
@@ -1483,6 +1505,13 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
       aspects: niche.aspects || [],
       priceDistribution: niche.priceDistribution || [],
       savedAt: niche.savedAt || niche.createdAt,
+      opportunityScore: niche.opportunityScore || 0,
+      demandLabel: niche.demandLabel || '',
+      competitionLabel: niche.competitionLabel || '',
+      opportunityLabel: niche.opportunityLabel || '',
+      avgSoldPerItem: niche.avgSoldPerItem,
+      sellThroughRate: niche.sellThroughRate,
+      listingsPerSeller: niche.listingsPerSeller,
     };
     setReport(mapped);
     setKeyword(mapped.keyword);
@@ -1594,6 +1623,28 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
               <Paper variant="outlined" sx={{ minWidth: { xs: '45%', sm: 140 } }}>
                 <ScoreDisplay label="Rekabet Skoru" score={report.competitionScore} invert />
               </Paper>
+              <Paper variant="outlined" sx={{ minWidth: { xs: '90%', sm: 140 } }}>
+                <ScoreDisplay label="Fırsat Skoru" score={report.opportunityScore || 0} />
+              </Paper>
+            </Box>
+
+            {/* Score Explanations */}
+            <Box sx={{ mt: 2, mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {report.demandLabel && (
+                <Alert severity={report.demandScore >= 70 ? 'success' : report.demandScore >= 40 ? 'warning' : 'error'} sx={{ py: 0 }}>
+                  <Typography variant="body2"><strong>Talep:</strong> {report.demandLabel}</Typography>
+                </Alert>
+              )}
+              {report.competitionLabel && (
+                <Alert severity={report.competitionScore <= 30 ? 'success' : report.competitionScore <= 60 ? 'warning' : 'error'} sx={{ py: 0 }}>
+                  <Typography variant="body2"><strong>Rekabet:</strong> {report.competitionLabel}</Typography>
+                </Alert>
+              )}
+              {report.opportunityLabel && (
+                <Alert severity={(report.opportunityScore || 0) >= 70 ? 'success' : (report.opportunityScore || 0) >= 50 ? 'info' : (report.opportunityScore || 0) >= 30 ? 'warning' : 'error'} sx={{ py: 0 }}>
+                  <Typography variant="body2"><strong>Sonuç:</strong> {report.opportunityLabel}</Typography>
+                </Alert>
+              )}
             </Box>
 
             {/* Stats Grid */}
@@ -1605,6 +1656,15 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
               <StatCard icon={<ArrowUpDown size={16} />} label="Fiyat Aralığı" value={`$${report.priceMin.toFixed(0)} - $${report.priceMax.toFixed(0)}`} />
               <StatCard icon={<ShoppingBag size={16} />} label="Ücretsiz Kargo" value={`%${report.freeShippingPct.toFixed(0)}`} />
               <StatCard icon={<Users size={16} />} label="Satıcı Yoğunluğu" value={`%${report.sellerConcentration.toFixed(0)}`} sub="Top 10 satıcı payı" />
+              {report.avgSoldPerItem !== undefined && (
+                <StatCard icon={<TrendingUp size={16} />} label="Ort. Satış/Ürün" value={report.avgSoldPerItem || 0} sub="Top 20 ortalama" />
+              )}
+              {report.sellThroughRate !== undefined && (
+                <StatCard icon={<BarChart2 size={16} />} label="Satış Oranı" value={`%${(report.sellThroughRate || 0).toFixed(1)}`} sub="Talep/arz oranı" />
+              )}
+              {report.listingsPerSeller !== undefined && (
+                <StatCard icon={<Users size={16} />} label="Liste/Satıcı" value={(report.listingsPerSeller || 0).toFixed(1)} sub="Satıcı başı ortalama" />
+              )}
             </Box>
           </Paper>
 
@@ -1650,57 +1710,81 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
                 <Star size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
                 En Çok Satan Ürünler
               </Typography>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                      <TableCell>Başlık</TableCell>
-                      <TableCell align="right" sortDirection={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : false}>
-                        <TableSortLabel active={nicheProductSort.sortKey === 'price'} direction={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : 'desc'} onClick={() => nicheProductSort.handleSort('price')}>
-                          Fiyat
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell align="center" sortDirection={nicheProductSort.sortKey === 'estimatedSold' ? nicheProductSort.sortDir : false}>
-                        <TableSortLabel active={nicheProductSort.sortKey === 'estimatedSold'} direction={nicheProductSort.sortKey === 'estimatedSold' ? nicheProductSort.sortDir : 'desc'} onClick={() => nicheProductSort.handleSort('estimatedSold')}>
-                          Satış
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell>Satıcı</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {nicheProductSort.sorted.slice(0, isMobile ? 10 : 20).map(p => (
-                      <TableRow key={p.itemId} hover>
-                        <TableCell sx={{ maxWidth: isMobile ? 180 : 350 }}>
-                          <Typography
-                            variant="body2"
-                            component="a"
-                            href={p.itemUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            sx={{
-                              color: 'primary.main', textDecoration: 'none',
-                              '&:hover': { textDecoration: 'underline' },
-                              display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                            }}
-                          >
+              {isMobile ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {nicheProductSort.sorted.slice(0, 10).map(p => (
+                    <Paper key={p.itemId} variant="outlined" sx={{ p: 1.5 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Typography variant="body2" fontWeight={500} sx={{
+                          flex: 1, mr: 1,
+                          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                        }}>
+                          <a href={p.itemUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'none' }}>
                             {p.title}
-                          </Typography>
+                          </a>
+                        </Typography>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ flexShrink: 0 }}>${p.price.toFixed(2)}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
+                        <SoldBadge count={p.estimatedSold} />
+                        {p.seller && <Typography variant="caption" color="text.secondary">{p.seller}</Typography>}
+                      </Box>
+                    </Paper>
+                  ))}
+                </Box>
+              ) : (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                        <TableCell>Başlık</TableCell>
+                        <TableCell align="right" sortDirection={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : false}>
+                          <TableSortLabel active={nicheProductSort.sortKey === 'price'} direction={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : 'desc'} onClick={() => nicheProductSort.handleSort('price')}>
+                            Fiyat
+                          </TableSortLabel>
                         </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" fontWeight={600}>${p.price.toFixed(2)}</Typography>
+                        <TableCell align="center" sortDirection={nicheProductSort.sortKey === 'estimatedSold' ? nicheProductSort.sortDir : false}>
+                          <TableSortLabel active={nicheProductSort.sortKey === 'estimatedSold'} direction={nicheProductSort.sortKey === 'estimatedSold' ? nicheProductSort.sortDir : 'desc'} onClick={() => nicheProductSort.handleSort('estimatedSold')}>
+                            Satış
+                          </TableSortLabel>
                         </TableCell>
-                        <TableCell align="center">
-                          <SoldBadge count={p.estimatedSold} />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="caption">{p.seller}</Typography>
-                        </TableCell>
+                        <TableCell>Satıcı</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {nicheProductSort.sorted.slice(0, 20).map(p => (
+                        <TableRow key={p.itemId} hover>
+                          <TableCell sx={{ maxWidth: 350 }}>
+                            <Typography
+                              variant="body2"
+                              component="a"
+                              href={p.itemUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              sx={{
+                                color: 'primary.main', textDecoration: 'none',
+                                '&:hover': { textDecoration: 'underline' },
+                                display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                              }}
+                            >
+                              {p.title}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2" fontWeight={600}>${p.price.toFixed(2)}</Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <SoldBadge count={p.estimatedSold} />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption">{p.seller}</Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
             </Paper>
           )}
         </Box>
@@ -2079,6 +2163,7 @@ const SECTIONS = [
       { label: 'Urun Veritabani', icon: <Package size={14} /> },
       { label: 'Kategori & Nis Bulucu', icon: <Gauge size={14} /> },
       { label: 'Anahtar Kelime Analizi', icon: <Tag size={14} /> },
+      { label: 'Arbitraj Bulucu', icon: <Globe size={14} /> },
     ],
   },
   {
@@ -2334,6 +2419,7 @@ function EbayResearchPage() {
       {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} userListings={userListings} userListingsLoading={userListingsLoading} />}
       {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} userListings={userListings} />}
       {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
+      {mainTab === 0 && subTab === 3 && <ArbitrageScanner userId={userId} />}
 
       {/* Section 1: Takip */}
       {mainTab === 1 && subTab === 0 && <ProductTracker userId={userId} userListings={userListings} />}

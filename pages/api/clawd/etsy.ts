@@ -1395,7 +1395,10 @@ export default async function handler(
                     logger.error('Failed to copy inventory', invErr, {
                         new_listing_id: newListing.listing_id,
                         source_product_count: sourceInventory.length,
+                        error_message: invErr.message,
                     });
+                    // Pass error to response for debugging
+                    (newListing as any)._inventoryError = invErr.message || String(invErr);
                 }
             }
 
@@ -1417,6 +1420,7 @@ export default async function handler(
                 source_images: sourceImages,
                 inventory_copied: inventoryCopied,
                 variation_count: sourceInventory.length,
+                inventory_error: (newListing as any)._inventoryError || null,
             });
 
             // Best-effort: copy personalization (images are copied by frontend to avoid Vercel timeout)

@@ -274,12 +274,13 @@ export default async function handler(
           marketplaceId
         );
       } catch (err: any) {
-        // Return empty list on validation errors (no inventory / no offers)
+        // No offers found via bulk endpoint — fall through to inventory fallback
         if (err.message?.includes('25707') || err.message?.includes('25710') || err.message?.includes('25713')) {
-          return res.status(200).json({ total: 0, size: 0, offset, offers: [] });
+          offersData = { offers: [] };
+        } else {
+          logger.warn('Unexpected error fetching offers', { error: err.message?.substring(0, 300), userId });
+          throw err;
         }
-        logger.warn('Unexpected error fetching offers', { error: err.message?.substring(0, 300), userId });
-        throw err;
       }
 
       const offers = offersData.offers || [];

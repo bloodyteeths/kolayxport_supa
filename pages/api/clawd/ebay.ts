@@ -598,6 +598,9 @@ export default async function handler(
 
       // Step 3: Optionally publish
       let listingId = null;
+      let publishError: string | null = null;
+      let missingAspects: string[] = [];
+
       if (publish && offerId) {
         try {
           const publishResult = await callEbayAPI(
@@ -608,11 +611,25 @@ export default async function handler(
           );
           listingId = publishResult.listingId;
           logger.info('eBay listing published', { sku, offerId, listingId });
-        } catch (publishError) {
-          logger.error('Failed to auto-publish eBay listing', publishError instanceof Error ? publishError : new Error(String(publishError)), {
+        } catch (pubErr: any) {
+          const errMsg = pubErr.message || '';
+          logger.error('Failed to auto-publish eBay listing', pubErr instanceof Error ? pubErr : new Error(String(pubErr)), {
             sku,
             offerId,
           });
+
+          // Extract missing required aspects
+          const aspectRegex = /The item specific (\w[\w\s]*?) is missing/g;
+          let match;
+          while ((match = aspectRegex.exec(errMsg)) !== null) {
+            missingAspects.push(match[1].trim());
+          }
+
+          publishError = missingAspects.length > 0
+            ? `Şu zorunlu özellikler eksik: ${missingAspects.join(', ')}`
+            : errMsg.includes('Item.Country')
+              ? 'Konum bilgisi (ülke) eksik'
+              : errMsg.substring(0, 300);
         }
       }
 
@@ -622,9 +639,13 @@ export default async function handler(
         offerId,
         listingId,
         published: !!listingId,
+        publishError: publishError || undefined,
+        missingAspects: missingAspects.length > 0 ? missingAspects : undefined,
         message: listingId
           ? 'Listing created and published.'
-          : 'Listing created. Use the publish action to make it live.',
+          : publishError
+            ? `Listing created but publish failed: ${publishError}`
+            : 'Listing created. Use the publish action to make it live.',
       });
     }
 
@@ -817,19 +838,50 @@ export default async function handler(
 
       logger.info('Publishing eBay offer', { offerId, userId });
 
-      const result = await callEbayAPI(
-        `/sell/inventory/v1/offer/${offerId}/publish`,
-        accessToken,
-        { method: 'POST' },
-        marketplaceId
-      );
+      try {
+        const result = await callEbayAPI(
+          `/sell/inventory/v1/offer/${offerId}/publish`,
+          accessToken,
+          { method: 'POST' },
+          marketplaceId
+        );
 
-      return res.status(200).json({
-        success: true,
-        offerId,
-        listingId: result.listingId,
-        message: 'Offer published.',
-      });
+        return res.status(200).json({
+          success: true,
+          offerId,
+          listingId: result.listingId,
+          message: 'Offer published.',
+        });
+      } catch (err: any) {
+        // Parse eBay error to extract missing required aspects for user-friendly message
+        const errMsg = err.message || '';
+        const missingAspects: string[] = [];
+
+        // Extract aspect names from eBay error messages like "The item specific Color is missing"
+        const aspectRegex = /The item specific (\w[\w\s]*?) is missing/g;
+        let match;
+        while ((match = aspectRegex.exec(errMsg)) !== null) {
+          missingAspects.push(match[1].trim());
+        }
+
+        if (missingAspects.length > 0) {
+          return res.status(400).json({
+            error: `Yayınlamak için şu zorunlu özellikler eksik: ${missingAspects.join(', ')}`,
+            missingAspects,
+            rawError: errMsg.substring(0, 500),
+          });
+        }
+
+        // Check for location/country error
+        if (errMsg.includes('Item.Country')) {
+          return res.status(400).json({
+            error: 'Yayınlamak için konum bilgisi (ülke) gereklidir. eBay Seller Hub\'dan adres ayarlayın.',
+            rawError: errMsg.substring(0, 500),
+          });
+        }
+
+        throw err;
+      }
     }
 
     // POST ?action=withdraw&offerId=XXX — Withdraw/end a listing

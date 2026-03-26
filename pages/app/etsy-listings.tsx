@@ -37,7 +37,6 @@ import {
   Badge,
   Checkbox,
   Divider,
-  InputLabel,
 } from '@mui/material';
 import {
   DataGrid,
@@ -53,9 +52,6 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   FavoriteBorder as FavoriteBorderIcon,
-  UploadFile as UploadFileIcon,
-  Warning as WarningIcon,
-  ErrorOutline as ErrorOutlineIcon,
   RemoveCircleOutline as RemoveCircleOutlineIcon,
   ContentCopy as ContentCopyIcon,
   ExpandMore as ExpandMoreIcon,
@@ -71,8 +67,6 @@ import {
   Inventory as InventoryIcon,
   FilterList as FilterListIcon,
   Close as CloseIcon,
-  CheckBox as CheckBoxIcon,
-  CheckBoxOutlineBlank as CheckBoxOutlineBlankIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -440,30 +434,40 @@ function MobileEtsyListingCard({
           <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
             <Button
               size="small"
-              variant="outlined"
-              startIcon={<EditIcon />}
+              variant="contained"
+              startIcon={<EditIcon sx={{ fontSize: '16px !important' }} />}
               onClick={(e) => { e.stopPropagation(); onEdit(listing.listing_id); }}
-              sx={{ flex: 1, minHeight: 44 }}
+              sx={{
+                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                '&:hover': { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
+              }}
             >
               Duzenle
             </Button>
             <Button
               size="small"
-              variant="outlined"
-              color="primary"
-              startIcon={<ContentCopyIcon />}
+              variant="contained"
+              startIcon={<ContentCopyIcon sx={{ fontSize: '16px !important' }} />}
               onClick={(e) => { e.stopPropagation(); onCopy(listing.listing_id); }}
-              sx={{ flex: 1, minHeight: 44 }}
+              sx={{
+                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', boxShadow: '0 2px 8px rgba(124,58,237,0.25)',
+                '&:hover': { background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' },
+              }}
             >
               Kopyala
             </Button>
             <Button
               size="small"
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
+              variant="contained"
+              startIcon={<DeleteIcon sx={{ fontSize: '16px !important' }} />}
               onClick={(e) => { e.stopPropagation(); onDelete(listing.listing_id); }}
-              sx={{ flex: 1, minHeight: 44 }}
+              sx={{
+                flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(220,38,38,0.25)',
+                '&:hover': { background: 'linear-gradient(135deg, #dc2626, #b91c1c)' },
+              }}
             >
               Sil
             </Button>
@@ -1485,9 +1489,14 @@ function EtsyListingsPage() {
             variant="contained"
             size="small"
             onClick={() => setCreateDialogOpen(true)}
-            sx={{ minHeight: 36, whiteSpace: 'nowrap' }}
+            sx={{
+              minHeight: 40, whiteSpace: 'nowrap', borderRadius: '10px', textTransform: 'none', fontWeight: 600,
+              background: 'linear-gradient(135deg, #10b981, #059669)', boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
+              px: 2, fontSize: '0.85rem',
+              '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
+            }}
           >
-            <AddIcon sx={{ mr: { xs: 0, sm: 0.5 }, fontSize: 18 }} />
+            <AddIcon sx={{ mr: 0.5, fontSize: 18 }} />
             <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Yeni Listing</Box>
           </Button>
 
@@ -1496,7 +1505,11 @@ function EtsyListingsPage() {
             size="small"
             variant="outlined"
             onClick={(e) => setToolsMenuAnchor(e.currentTarget)}
-            sx={{ minHeight: 36, whiteSpace: 'nowrap', minWidth: 0 }}
+            sx={{
+              minHeight: 40, whiteSpace: 'nowrap', minWidth: 0, borderRadius: '10px', textTransform: 'none', fontWeight: 600,
+              borderColor: '#e2e8f0', color: '#475569', px: 2, fontSize: '0.85rem',
+              '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
+            }}
           >
             <MoreVertIcon sx={{ mr: { xs: 0, sm: 0.5 }, fontSize: 18 }} />
             <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Araçlar</Box>
@@ -1511,7 +1524,10 @@ function EtsyListingsPage() {
               fetchListings();
             }}
             disabled={loading}
-            sx={{ minWidth: 36, minHeight: 36 }}
+            sx={{
+              minWidth: 40, minHeight: 40, borderRadius: '10px', border: '1px solid #e2e8f0',
+              color: '#475569', '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
+            }}
           >
             <RefreshIcon fontSize="small" />
           </IconButton>

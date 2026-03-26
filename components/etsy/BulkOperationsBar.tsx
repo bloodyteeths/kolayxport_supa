@@ -27,6 +27,17 @@ import {
   TableRow,
   ToggleButton,
   ToggleButtonGroup,
+  Menu,
+  ListItemIcon,
+  ListItemText,
+  SwipeableDrawer,
+  List,
+  ListItem,
+  ListItemButton,
+  useMediaQuery,
+  useTheme,
+  Divider,
+  IconButton,
 } from '@mui/material';
 import {
   DeleteOutline,
@@ -41,6 +52,8 @@ import {
   RefreshOutlined,
   Celebration as CelebrationIcon,
   TuneOutlined,
+  MoreHoriz as MoreHorizIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 
@@ -197,6 +210,15 @@ export default function BulkOperationsBar({
   const [targetSectionId, setTargetSectionId] = useState<number | ''>('');
 
   const visible = selectedCount > 0 && !processing;
+
+  // Menu anchor states for grouped dropdowns
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [tagsMenuAnchor, setTagsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [priceMenuAnchor, setPriceMenuAnchor] = useState<null | HTMLElement>(null);
+  const [managementMenuAnchor, setManagementMenuAnchor] = useState<null | HTMLElement>(null);
+  const [aiMenuAnchor, setAiMenuAnchor] = useState<null | HTMLElement>(null);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   // Collect all unique tags from selected listings
   const allUniqueTags = useMemo(() => {
@@ -925,165 +947,256 @@ export default function BulkOperationsBar({
             left: 0,
             right: 0,
             zIndex: 1300,
-            px: 3,
+            px: { xs: 1.5, md: 3 },
             py: 1.5,
             display: 'flex',
             alignItems: 'center',
             gap: 1,
-            flexWrap: 'wrap',
+            overflow: 'hidden',
             borderTop: '2px solid',
             borderColor: 'primary.main',
           }}
         >
-          <Typography variant="body2" fontWeight={600} sx={{ mr: 2 }}>
-            {selectedCount} listeleme secildi
-          </Typography>
-
-          <Button
+          {/* Selected count */}
+          <Chip
+            label={isMobile ? `✓ ${selectedCount}` : `✓ ${selectedCount} seçildi`}
+            color="primary"
             size="small"
-            variant="outlined"
-            startIcon={<AttachMoneyOutlined />}
-            onClick={() => setPriceDialogOpen(true)}
-          >
-            Toplu Fiyat Degistir
-          </Button>
+            sx={{ fontWeight: 600, mr: 0.5, flexShrink: 0 }}
+          />
 
+          {/* Etiketler dropdown */}
           <Button
             size="small"
             variant="outlined"
             startIcon={<LocalOfferOutlined />}
-            onClick={() => setAddTagDialogOpen(true)}
+            endIcon={<KeyboardArrowDownIcon />}
+            onClick={(e) => setTagsMenuAnchor(e.currentTarget)}
+            sx={{ minHeight: 36, flexShrink: 0 }}
           >
-            Etiket Ekle
+            Etiketler
           </Button>
+          <Menu
+            anchorEl={tagsMenuAnchor}
+            open={Boolean(tagsMenuAnchor)}
+            onClose={() => setTagsMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          >
+            <MenuItem onClick={() => { setTagsMenuAnchor(null); setAddTagDialogOpen(true); }}>
+              <ListItemIcon><LocalOfferOutlined fontSize="small" /></ListItemIcon>
+              <ListItemText>Etiket Ekle</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setTagsMenuAnchor(null); setTagsToRemove(new Set()); setRemoveTagDialogOpen(true); }}>
+              <ListItemIcon><RemoveCircleOutline fontSize="small" /></ListItemIcon>
+              <ListItemText>Etiket Çıkar</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setTagsMenuAnchor(null); setSelectedSeason(null); setSeasonTagMode('add'); setSeasonDialogOpen(true); }}>
+              <ListItemIcon><CelebrationIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>Sezon Etiketi</ListItemText>
+            </MenuItem>
+          </Menu>
 
+          {/* Fiyat dropdown */}
           <Button
             size="small"
             variant="outlined"
-            startIcon={<RemoveCircleOutline />}
-            onClick={() => {
-              setTagsToRemove(new Set());
-              setRemoveTagDialogOpen(true);
-            }}
+            startIcon={<AttachMoneyOutlined />}
+            endIcon={<KeyboardArrowDownIcon />}
+            onClick={(e) => setPriceMenuAnchor(e.currentTarget)}
+            sx={{ minHeight: 36, flexShrink: 0 }}
           >
-            Etiket Cikar
+            Fiyat
           </Button>
-
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<DriveFileMoveOutlined />}
-            onClick={() => setSectionDialogOpen(true)}
+          <Menu
+            anchorEl={priceMenuAnchor}
+            open={Boolean(priceMenuAnchor)}
+            onClose={() => setPriceMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
           >
-            Bolum Tasi
-          </Button>
+            <MenuItem onClick={() => { setPriceMenuAnchor(null); setPriceDialogOpen(true); }}>
+              <ListItemIcon><AttachMoneyOutlined fontSize="small" /></ListItemIcon>
+              <ListItemText>Toplu Fiyat Değiştir</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { setPriceMenuAnchor(null); setVariationPropertyName(''); setVariationPropertyValue(''); setVariationPriceAmount(''); setVariationPriceMode('percent_increase'); setVariationPriceDialogOpen(true); }}>
+              <ListItemIcon><TuneOutlined fontSize="small" /></ListItemIcon>
+              <ListItemText>Varyasyon Fiyat</ListItemText>
+            </MenuItem>
+          </Menu>
 
-          <Button
-            size="small"
-            variant="outlined"
-            color="success"
-            startIcon={<PublishOutlined />}
-            onClick={() => handleToggleState('active')}
-          >
-            Yayinla
-          </Button>
+          {/* Yönetim dropdown - desktop only */}
+          {!isMobile && (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<DriveFileMoveOutlined />}
+                endIcon={<KeyboardArrowDownIcon />}
+                onClick={(e) => setManagementMenuAnchor(e.currentTarget)}
+                sx={{ minHeight: 36, flexShrink: 0 }}
+              >
+                Yönetim
+              </Button>
+              <Menu
+                anchorEl={managementMenuAnchor}
+                open={Boolean(managementMenuAnchor)}
+                onClose={() => setManagementMenuAnchor(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+              >
+                <MenuItem onClick={() => { setManagementMenuAnchor(null); handleToggleState('active'); }}>
+                  <ListItemIcon><PublishOutlined fontSize="small" color="success" /></ListItemIcon>
+                  <ListItemText>Yayınla</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => { setManagementMenuAnchor(null); handleToggleState('inactive'); }}>
+                  <ListItemIcon><RemoveCircleOutline fontSize="small" color="warning" /></ListItemIcon>
+                  <ListItemText>Deaktif Et</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => { setManagementMenuAnchor(null); setSectionDialogOpen(true); }}>
+                  <ListItemIcon><DriveFileMoveOutlined fontSize="small" /></ListItemIcon>
+                  <ListItemText>Bölüm Taşı</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => { setManagementMenuAnchor(null); setRenewDialogOpen(true); }}>
+                  <ListItemIcon><RefreshOutlined fontSize="small" /></ListItemIcon>
+                  <ListItemText>Toplu Yenile</ListItemText>
+                </MenuItem>
+                {otherShops.length > 0 && (
+                  <MenuItem onClick={() => { setManagementMenuAnchor(null); setTargetShopId(''); setCopyDialogOpen(true); }}>
+                    <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
+                    <ListItemText>Kopyala</ListItemText>
+                  </MenuItem>
+                )}
+              </Menu>
+            </>
+          )}
 
-          <Button
-            size="small"
-            variant="outlined"
-            color="warning"
-            onClick={() => handleToggleState('inactive')}
-          >
-            Deaktif Et
-          </Button>
+          {/* AI dropdown - desktop only */}
+          {!isMobile && (
+            <>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<AutoFixHigh />}
+                endIcon={<KeyboardArrowDownIcon />}
+                onClick={(e) => setAiMenuAnchor(e.currentTarget)}
+                sx={{ minHeight: 36, flexShrink: 0 }}
+              >
+                AI
+              </Button>
+              <Menu
+                anchorEl={aiMenuAnchor}
+                open={Boolean(aiMenuAnchor)}
+                onClose={() => setAiMenuAnchor(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+              >
+                <MenuItem onClick={() => { setAiMenuAnchor(null); setAiResult(null); setAiOptimizeDialogOpen(true); }}>
+                  <ListItemIcon><AutoFixHigh fontSize="small" /></ListItemIcon>
+                  <ListItemText>AI Optimize</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => { setAiMenuAnchor(null); setAltTextDialogOpen(true); }}>
+                  <ListItemIcon><ImageOutlined fontSize="small" /></ListItemIcon>
+                  <ListItemText>Toplu Alt Metin</ListItemText>
+                </MenuItem>
+              </Menu>
+            </>
+          )}
 
-          <Button
-            size="small"
-            variant="outlined"
-            color="secondary"
-            startIcon={<AutoFixHigh />}
-            onClick={() => {
-              setAiResult(null);
-              setAiOptimizeDialogOpen(true);
-            }}
-          >
-            AI Optimize
-          </Button>
+          {/* Mobile overflow button (⋯) - shows Yönetim + AI items */}
+          {isMobile && (
+            <IconButton
+              size="small"
+              onClick={() => setMobileDrawerOpen(true)}
+              sx={{ minHeight: 36, minWidth: 36, flexShrink: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
+            >
+              <MoreHorizIcon />
+            </IconButton>
+          )}
 
-          <Button
-            size="small"
-            variant="outlined"
-            color="info"
-            startIcon={<ImageOutlined />}
-            onClick={() => setAltTextDialogOpen(true)}
-          >
-            Toplu Alt Metin
-          </Button>
-
-          <Button
-            size="small"
-            variant="outlined"
-            color="success"
-            startIcon={<RefreshOutlined />}
-            onClick={() => setRenewDialogOpen(true)}
-          >
-            Toplu Yenile
-          </Button>
-
-          {otherShops.length > 0 && (
+          {/* Sil button - always visible */}
+          {isMobile ? (
+            <IconButton
+              size="small"
+              color="error"
+              onClick={() => setDeleteDialogOpen(true)}
+              sx={{ minHeight: 36, minWidth: 36, flexShrink: 0, border: '1px solid', borderColor: 'error.main', borderRadius: 1, ml: 'auto' }}
+            >
+              <DeleteOutline />
+            </IconButton>
+          ) : (
             <Button
               size="small"
               variant="outlined"
-              startIcon={<ContentCopyIcon />}
-              onClick={() => {
-                setTargetShopId('');
-                setCopyDialogOpen(true);
-              }}
+              color="error"
+              startIcon={<DeleteOutline />}
+              onClick={() => setDeleteDialogOpen(true)}
+              sx={{ minHeight: 36, flexShrink: 0, ml: 'auto' }}
             >
-              Kopyala
+              Sil
             </Button>
           )}
-
-          <Button
-            size="small"
-            variant="outlined"
-            color="secondary"
-            startIcon={<CelebrationIcon />}
-            onClick={() => {
-              setSelectedSeason(null);
-              setSeasonTagMode('add');
-              setSeasonDialogOpen(true);
-            }}
-          >
-            Sezon Etiketi
-          </Button>
-
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<TuneOutlined />}
-            onClick={() => {
-              setVariationPropertyName('');
-              setVariationPropertyValue('');
-              setVariationPriceAmount('');
-              setVariationPriceMode('percent_increase');
-              setVariationPriceDialogOpen(true);
-            }}
-          >
-            Varyasyon Fiyat
-          </Button>
-
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteOutline />}
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            Toplu Sil
-          </Button>
         </Paper>
       </Slide>
+
+      {/* Mobile overflow drawer */}
+      <SwipeableDrawer
+        anchor="bottom"
+        open={mobileDrawerOpen}
+        onClose={() => setMobileDrawerOpen(false)}
+        onOpen={() => setMobileDrawerOpen(true)}
+        sx={{ zIndex: 1400 }}
+        PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, pb: 2 } }}
+      >
+        <Box sx={{ width: 40, height: 4, bgcolor: 'grey.400', borderRadius: 2, mx: 'auto', mt: 1.5, mb: 1 }} />
+        <List>
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => { setMobileDrawerOpen(false); handleToggleState('active'); }}>
+              <ListItemIcon><PublishOutlined color="success" /></ListItemIcon>
+              <ListItemText primary="Yayınla" />
+            </ListItemButton>
+          </ListItem>
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => { setMobileDrawerOpen(false); handleToggleState('inactive'); }}>
+              <ListItemIcon><RemoveCircleOutline color="warning" /></ListItemIcon>
+              <ListItemText primary="Deaktif Et" />
+            </ListItemButton>
+          </ListItem>
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => { setMobileDrawerOpen(false); setSectionDialogOpen(true); }}>
+              <ListItemIcon><DriveFileMoveOutlined /></ListItemIcon>
+              <ListItemText primary="Bölüm Taşı" />
+            </ListItemButton>
+          </ListItem>
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => { setMobileDrawerOpen(false); setRenewDialogOpen(true); }}>
+              <ListItemIcon><RefreshOutlined /></ListItemIcon>
+              <ListItemText primary="Toplu Yenile" />
+            </ListItemButton>
+          </ListItem>
+          {otherShops.length > 0 && (
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => { setMobileDrawerOpen(false); setTargetShopId(''); setCopyDialogOpen(true); }}>
+                <ListItemIcon><ContentCopyIcon /></ListItemIcon>
+                <ListItemText primary="Kopyala" />
+              </ListItemButton>
+            </ListItem>
+          )}
+          <Divider sx={{ my: 1 }} />
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => { setMobileDrawerOpen(false); setAiResult(null); setAiOptimizeDialogOpen(true); }}>
+              <ListItemIcon><AutoFixHigh /></ListItemIcon>
+              <ListItemText primary="AI Optimize" />
+            </ListItemButton>
+          </ListItem>
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => { setMobileDrawerOpen(false); setAltTextDialogOpen(true); }}>
+              <ListItemIcon><ImageOutlined /></ListItemIcon>
+              <ListItemText primary="Toplu Alt Metin" />
+            </ListItemButton>
+          </ListItem>
+        </List>
+      </SwipeableDrawer>
 
       {/* ---- Price Dialog ---- */}
       <Dialog

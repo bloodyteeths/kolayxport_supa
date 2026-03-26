@@ -256,7 +256,19 @@ export default function BulkOperationsBar({
       if (i < items.length - 1) await delay(100);
     }
 
-    const succeeded = results.filter((r) => r.status === 'fulfilled' && (r.value as Response).ok).length;
+    // Count successes — for delete, 403 "already removed" counts as success
+    let succeeded = 0;
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        const resp = r.value as Response;
+        if (resp.ok) {
+          succeeded++;
+        } else if (actionLabel === 'Silme' && resp.status === 403) {
+          // Etsy returns 403 for already-removed listings — treat as success
+          succeeded++;
+        }
+      }
+    }
     const failed = results.length - succeeded;
 
     // Log failed operations for debugging
@@ -265,10 +277,12 @@ export default function BulkOperationsBar({
         if (r.status === 'rejected') {
           console.error(`${actionLabel} failed (rejected):`, r.reason);
         } else if (r.status === 'fulfilled' && !(r.value as Response).ok) {
+          const resp = r.value as Response;
+          if (actionLabel === 'Silme' && resp.status === 403) continue; // already counted as success
           try {
-            const errBody = await (r.value as Response).clone().json();
-            console.error(`${actionLabel} failed (${(r.value as Response).status}):`, errBody);
-          } catch { console.error(`${actionLabel} failed (${(r.value as Response).status})`); }
+            const errBody = await resp.clone().json();
+            console.error(`${actionLabel} failed (${resp.status}):`, errBody);
+          } catch { console.error(`${actionLabel} failed (${resp.status})`); }
         }
       }
     }

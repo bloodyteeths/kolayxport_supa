@@ -494,19 +494,27 @@ function EtsyListingsPage() {
         );
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `HTTP ${res.status}`);
+          const errMsg = errData.error || `HTTP ${res.status}`;
+          // If Etsy says listing is already removed, treat as success
+          if (res.status === 403 && errMsg.includes('removed')) {
+            // Already deleted on Etsy — just remove from our UI
+          } else {
+            throw new Error(errMsg);
+          }
         }
         toast.success('Listing silindi');
         setDeleteConfirmId(null);
-        // Invalidate cache so deleted listing doesn't reappear
+        // Remove from local state immediately
+        setListings((prev) => prev.filter((l) => l.listing_id !== listingId));
+        setTotalCount((prev) => Math.max(0, prev - 1));
+        // Invalidate cache so it doesn't reappear on next fetch
         const cacheKey = `${selectedShopId}:${statusFilter}`;
         delete listingsCacheRef.current[cacheKey];
-        fetchListings();
       } catch (err: any) {
         toast.error(`Silinemedi: ${err.message}`);
       }
     },
-    [selectedShopId, fetchListings]
+    [selectedShopId, statusFilter]
   );
 
   // --- CSV Export ---

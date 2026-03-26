@@ -284,6 +284,71 @@ export default async function handler(
 
       const offers = offersData.offers || [];
       if (offers.length === 0) {
+        // Fallback: build listing data from inventory items when offers list is empty
+        // This happens on accounts that create items via Inventory API but the
+        // GET /offer endpoint doesn't return them (eBay eventual consistency / API bug)
+        try {
+          const invData = await callEbayAPI(
+            `/sell/inventory/v1/inventory_item?limit=${limit}&offset=${offset}`,
+            accessToken,
+            {},
+            marketplaceId
+          );
+          const invItems = invData.inventoryItems || [];
+          if (invItems.length > 0) {
+            // Fetch offers per SKU to get pricing/status
+            const enrichedFromInv = await Promise.all(
+              invItems.map(async (item: any) => {
+                const product = item.product || {};
+                const images = product.imageUrls || [];
+                let offerData: any = null;
+
+                try {
+                  const offersForSku = await callEbayAPI(
+                    `/sell/inventory/v1/offer?sku=${encodeURIComponent(item.sku)}&limit=10`,
+                    accessToken,
+                    {},
+                    marketplaceId
+                  );
+                  offerData = offersForSku.offers?.[0];
+                } catch {
+                  // No offer for this SKU — show as draft
+                }
+
+                return {
+                  sku: item.sku,
+                  offerId: offerData?.offerId || null,
+                  listingId: offerData?.listing?.listingId || null,
+                  title: product.title || item.sku,
+                  description: product.description || '',
+                  price: offerData?.pricingSummary?.price || { value: '0', currency: 'USD' },
+                  quantity: item.availability?.shipToLocationAvailability?.quantity ?? 0,
+                  status: offerData?.status || 'DRAFT',
+                  condition: item.condition || 'NEW',
+                  categoryId: offerData?.categoryId || '',
+                  imageUrl: images[0] || null,
+                  imageCount: images.length,
+                  aspects: product.aspects || {},
+                  format: offerData?.format || 'FIXED_PRICE',
+                  marketplaceId: offerData?.marketplaceId || marketplaceId,
+                  listingUrl: offerData?.listing?.listingId
+                    ? `https://www.ebay.com/itm/${offerData.listing.listingId}`
+                    : null,
+                };
+              })
+            );
+
+            return res.status(200).json({
+              total: invData.total || enrichedFromInv.length,
+              size: enrichedFromInv.length,
+              offset,
+              offers: enrichedFromInv,
+            });
+          }
+        } catch {
+          // Fallback also failed, return empty
+        }
+
         return res.status(200).json({ total: offersData.total || 0, size: 0, offset, offers: [] });
       }
 
@@ -1202,7 +1267,7 @@ export default async function handler(
       } catch (err: any) {
         // eBay returns 400 but body has per-item results — try to parse
         const errMsg = err.message || '';
-        const jsonMatch = errMsg.match(/\{.*\}/s);
+        const jsonMatch = errMsg.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           try {
             result = JSON.parse(jsonMatch[0]);

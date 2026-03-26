@@ -86,6 +86,7 @@ const rowSx = {
   gap: 1,
   py: 1.2,
   px: 1.5,
+  flexWrap: 'wrap',
   borderBottom: '1px solid rgba(0,0,0,0.06)',
   '&:hover': { bgcolor: 'rgba(102,126,234,0.03)' },
   transition: 'background-color 0.15s',
@@ -503,7 +504,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                           size="small"
                           color={o.quantity === 0 ? 'error' : 'default'}
                           variant="outlined"
-                          sx={{ fontSize: '0.7rem', height: 22, minWidth: 60 }}
+                          sx={{ fontSize: '0.7rem', height: 22, minWidth: { xs: 'auto', sm: 60 } }}
                         />
 
                         {/* Actions */}
@@ -531,15 +532,15 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       {activeTab === 1 && products.length > 0 && (
         <Box sx={{ pt: 1 }}>
           {/* Getvela-style controls */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap', flexDirection: { xs: 'column', sm: 'row' } }}>
             <FormControlLabel
-              control={<Checkbox checked={individualPrice} onChange={(e) => setIndividualPrice(e.target.checked)} size="small" sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' } }} />}
+              control={<Checkbox checked={individualPrice} onChange={(e) => setIndividualPrice(e.target.checked)} sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' }, '& .MuiSvgIcon-root': { fontSize: 24 } }} />}
               label={<Typography variant="body2" fontWeight={600}>Bireysel fiyat</Typography>}
             />
             {!individualPrice && (
               <>
                 <Select size="small" value={priceAction} onChange={(e) => setPriceAction(e.target.value as any)}
-                  sx={{ minWidth: 130, height: 36 }}>
+                  sx={{ minWidth: { xs: '100%', sm: 130 }, height: 36 }}>
                   <MenuItem value="set">Ayarla</MenuItem>
                   <MenuItem value="increase">Artır</MenuItem>
                   <MenuItem value="decrease">Azalt</MenuItem>
@@ -549,11 +550,11 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                   onChange={(e) => setPriceValue(e.target.value)}
                   InputProps={{ startAdornment: <InputAdornment position="start">{sym}</InputAdornment> }}
                   inputProps={{ min: 0, step: '0.01' }}
-                  sx={{ width: 120 }}
+                  sx={{ width: { xs: '100%', sm: 120 } }}
                   placeholder="0.00"
                 />
                 <Button size="small" variant="contained" onClick={applyBulkPrice} disabled={!priceValue}
-                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36 }}>
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36, width: { xs: '100%', sm: 'auto' } }}>
                   Uygula
                 </Button>
               </>
@@ -584,7 +585,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                           onChange={(e) => updateField(globalIdx, 'price', e.target.value)}
                           InputProps={{ startAdornment: <InputAdornment position="start">{sym}</InputAdornment> }}
                           inputProps={{ min: 0, step: '0.01' }}
-                          sx={{ width: 120 }}
+                          sx={{ width: { xs: '100%', sm: 120 } }}
                         />
                       ) : (
                         <Typography variant="body2" fontWeight={600} sx={{ minWidth: 70, textAlign: 'right' }}>
@@ -605,15 +606,15 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       {/* ============================================================ */}
       {activeTab === 2 && products.length > 0 && (
         <Box sx={{ pt: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap', flexDirection: { xs: 'column', sm: 'row' } }}>
             <FormControlLabel
-              control={<Checkbox checked={individualQuantity} onChange={(e) => setIndividualQuantity(e.target.checked)} size="small" sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' } }} />}
+              control={<Checkbox checked={individualQuantity} onChange={(e) => setIndividualQuantity(e.target.checked)} sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' }, '& .MuiSvgIcon-root': { fontSize: 24 } }} />}
               label={<Typography variant="body2" fontWeight={600}>Bireysel stok</Typography>}
             />
             {!individualQuantity && (
               <>
                 <Select size="small" value={quantityAction} onChange={(e) => setQuantityAction(e.target.value as any)}
-                  sx={{ minWidth: 130, height: 36 }}>
+                  sx={{ minWidth: { xs: '100%', sm: 130 }, height: 36 }}>
                   <MenuItem value="set">Ayarla</MenuItem>
                   <MenuItem value="increase">Artır</MenuItem>
                   <MenuItem value="decrease">Azalt</MenuItem>
@@ -622,11 +623,11 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                   size="small" type="number" value={quantityValue}
                   onChange={(e) => setQuantityValue(e.target.value)}
                   inputProps={{ min: 0 }}
-                  sx={{ width: 100 }}
+                  sx={{ width: { xs: '100%', sm: 100 } }}
                   placeholder="0"
                 />
                 <Button size="small" variant="contained" onClick={applyBulkQuantity} disabled={!quantityValue}
-                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36 }}>
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36, width: { xs: '100%', sm: 'auto' } }}>
                   Uygula
                 </Button>
               </>
@@ -655,7 +656,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                           value={o.quantity}
                           onChange={(e) => updateField(globalIdx, 'quantity', e.target.value)}
                           inputProps={{ min: 0 }}
-                          sx={{ width: 90 }}
+                          sx={{ width: { xs: '100%', sm: 90 } }}
                         />
                       ) : (
                         <Chip
@@ -698,7 +699,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                       value={product.sku}
                       onChange={(e) => updateField(globalIdx, 'sku', e.target.value)}
                       placeholder="SKU girin"
-                      sx={{ width: 150 }}
+                      sx={{ width: { xs: '100%', sm: 150 } }}
                     />
                   </Box>
                 ))}
@@ -750,7 +751,6 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                       <Switch
                         checked={o.is_enabled}
                         onChange={(e) => updateField(globalIdx, 'is_enabled', e.target.checked)}
-                        size="small"
                         sx={{ '& .Mui-checked': { color: '#667eea' }, '& .Mui-checked + .MuiSwitch-track': { bgcolor: '#667eea' } }}
                       />
                     </Box>
@@ -770,7 +770,8 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       )}
 
       {/* Save / Cancel */}
-      <Box display="flex" justifyContent="flex-end" mt={2} gap={1} alignItems="center">
+      <Box display="flex" justifyContent="flex-end" mt={2} gap={1} alignItems="center"
+        sx={{ position: 'sticky', bottom: 0, bgcolor: 'white', py: 1.5, zIndex: 5, borderTop: '1px solid #eee' }}>
         {hasChanges && (
           <>
             <Typography variant="caption" color="text.secondary" sx={{ mr: 'auto' }}>

@@ -230,7 +230,7 @@ export default function ItemSpecificsEditor({
                   onChange({ ...aspects, ...result });
                 }
               }}
-              sx={{ fontSize: '0.7rem', py: 0.25 }}
+              sx={{ fontSize: '0.7rem', py: 0.75 }}
             >
               AI Doldur
             </Button>
@@ -304,20 +304,20 @@ export default function ItemSpecificsEditor({
       <Typography variant="caption" fontWeight={600} color="text.secondary">
         Özel Özellik Ekle
       </Typography>
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexDirection: { xs: 'column', sm: 'row' } }}>
         <TextField
           label="Özellik Adı"
           value={customKey}
           onChange={(e) => setCustomKey(e.target.value)}
           size="small"
-          sx={{ flex: 1 }}
+          sx={{ flex: 1, width: { xs: '100%', sm: 'auto' } }}
         />
         <TextField
           label="Değer"
           value={customValue}
           onChange={(e) => setCustomValue(e.target.value)}
           size="small"
-          sx={{ flex: 1 }}
+          sx={{ flex: 1, width: { xs: '100%', sm: 'auto' } }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleAddCustom();
           }}
@@ -328,7 +328,7 @@ export default function ItemSpecificsEditor({
           startIcon={<AddIcon />}
           onClick={handleAddCustom}
           disabled={!customKey.trim() || !customValue.trim()}
-          sx={{ minWidth: 80, mt: 0.25 }}
+          sx={{ minWidth: 80, mt: 0.25, width: { xs: '100%', sm: 'auto' } }}
         >
           Ekle
         </Button>

@@ -1064,7 +1064,7 @@ export default function ListingEditorDrawer({
                       onChange={(e) => updateField('description', e.target.value)}
                       fullWidth
                       multiline
-                      rows={6}
+                      rows={4}
                       size="small"
                       helperText={`${fields.description.length} karakter`}
                     />
@@ -1233,7 +1233,7 @@ export default function ListingEditorDrawer({
                 <Typography fontWeight={600}>Fiyat ve Stok</Typography>
               </AccordionSummary>
               <AccordionDetails>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-end', flexDirection: { xs: 'column', sm: 'row' } }}>
                   <TextField
                     label="Fiyat"
                     value={fields.price}
@@ -1261,7 +1261,7 @@ export default function ListingEditorDrawer({
                       </span>
                     </Tooltip>
                   )}
-                  <FormControl size="small" sx={{ minWidth: 90 }}>
+                  <FormControl size="small" sx={{ minWidth: 90, width: { xs: '100%', sm: 'auto' } }}>
                     <InputLabel>Para Birimi</InputLabel>
                     <Select
                       value={fields.currency}
@@ -1279,7 +1279,7 @@ export default function ListingEditorDrawer({
                     value={fields.quantity}
                     onChange={(e) => updateField('quantity', Math.max(0, parseInt(e.target.value) || 0))}
                     size="small"
-                    sx={{ width: 100 }}
+                    sx={{ width: { xs: '100%', sm: 100 } }}
                     inputProps={{ min: 0 }}
                   />
                 </Box>

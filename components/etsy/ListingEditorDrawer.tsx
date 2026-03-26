@@ -1617,7 +1617,7 @@ export default function ListingEditorDrawer({
                         startIcon={aiLoading.optimize_title ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                         onClick={handleAIOptimizeTitle}
                         disabled={!!aiLoading.optimize_title || !fields.title}
-                        sx={{ textTransform: 'none', fontSize: '0.75rem', minWidth: 0, py: 0.25, px: 1 }}
+                        sx={{ textTransform: 'none', fontSize: '0.8rem', minWidth: 0, py: 0.75, px: 1.5 }}
                       >
                         AI ile Optimize Et
                       </Button>
@@ -1633,6 +1633,7 @@ export default function ListingEditorDrawer({
                       size="small"
                       helperText={`${fields.title.length}/140 karakter`}
                       inputProps={{ maxLength: 140 }}
+                      sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
                     />
                   </Box>
 
@@ -1645,7 +1646,7 @@ export default function ListingEditorDrawer({
                         startIcon={aiLoading.generate_description ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                         onClick={handleAIGenerateDescription}
                         disabled={!!aiLoading.generate_description || !fields.title}
-                        sx={{ textTransform: 'none', fontSize: '0.75rem', minWidth: 0, py: 0.25, px: 1 }}
+                        sx={{ textTransform: 'none', fontSize: '0.8rem', minWidth: 0, py: 0.75, px: 1.5 }}
                       >
                         AI ile Olustur
                       </Button>
@@ -1658,6 +1659,7 @@ export default function ListingEditorDrawer({
                       rows={6}
                       size="small"
                       helperText={`${fields.description.length} karakter`}
+                      sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
                     />
                   </Box>
 
@@ -1707,6 +1709,7 @@ export default function ListingEditorDrawer({
                           {...params}
                           size="small"
                           placeholder={fields.tags.length < 13 ? 'Virgülle ayırarak toplu ekleyin...' : ''}
+                          sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
                           helperText={`${fields.tags.length}/13 etiket — virgül veya Enter ile ekleyin`}
                           onKeyDown={(e) => {
                             if (e.key === ',') {
@@ -1747,7 +1750,7 @@ export default function ListingEditorDrawer({
                         startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                         onClick={handleAISuggestTags}
                         disabled={!!aiLoading.suggest_tags || !fields.title}
-                        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                        sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75, px: 1.5 }}
                       >
                         AI Etiket Oner
                       </Button>
@@ -1766,7 +1769,7 @@ export default function ListingEditorDrawer({
                             }
                           }}
                           disabled={!!aiLoading.suggest_tags || !fields.title}
-                          sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75, px: 1.5 }}
                         >
                           AI ile Tumunu Degistir
                         </Button>
@@ -1811,7 +1814,7 @@ export default function ListingEditorDrawer({
                             </Button>
                           </Box>
                         </Box>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                           {aiTagSuggestions.map((tag) => {
                             const alreadyExists = fields.tags.includes(tag);
                             return (

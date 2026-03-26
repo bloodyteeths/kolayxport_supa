@@ -822,7 +822,7 @@ export default function ListingCreatorDialog({
       {/* Market insights bar */}
       {renderMarketInsightsBar()}
 
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+      <Box sx={{ display: 'flex', gap: 1, alignItems: { xs: 'stretch', sm: 'flex-end' }, flexDirection: { xs: 'column', sm: 'row' } }}>
         <TextField
           label="Başlık"
           value={title}
@@ -840,14 +840,14 @@ export default function ListingCreatorDialog({
           size="small"
           onClick={handleAIOptimizeTitle}
           disabled={!!aiLoading || !title.trim()}
-          sx={{ minWidth: 0, px: 1.5, mb: 2.5, flexShrink: 0 }}
+          sx={{ minWidth: 0, px: 1.5, mb: { xs: 0, sm: 2.5 }, flexShrink: 0 }}
           title="AI ile başlığı optimize et"
         >
           {aiLoading === 'title' ? <CircularProgress size={18} /> : <AutoFixHighIcon sx={{ fontSize: 18 }} />}
         </Button>
       </Box>
 
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+      <Box sx={{ display: 'flex', gap: 1, alignItems: { xs: 'stretch', sm: 'flex-start' }, flexDirection: { xs: 'column', sm: 'row' } }}>
         <TextField
           label="Açıklama"
           value={description}
@@ -863,7 +863,7 @@ export default function ListingCreatorDialog({
           size="small"
           onClick={handleAIGenerateDescription}
           disabled={!!aiLoading || !title.trim()}
-          sx={{ minWidth: 0, px: 1.5, mt: 0.5, flexShrink: 0 }}
+          sx={{ minWidth: 0, px: 1.5, mt: { xs: 0, sm: 0.5 }, flexShrink: 0 }}
           title="AI ile açıklama oluştur"
         >
           {aiLoading === 'description' ? <CircularProgress size={18} /> : <AutoFixHighIcon sx={{ fontSize: 18 }} />}
@@ -950,7 +950,7 @@ export default function ListingCreatorDialog({
       {/* Market insights on price step too */}
       {renderMarketInsightsBar()}
 
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+      <Box sx={{ display: 'flex', gap: 2, alignItems: { xs: 'stretch', sm: 'flex-end' }, flexDirection: { xs: 'column', sm: 'row' } }}>
         <TextField
           label="Fiyat"
           value={price}
@@ -970,12 +970,12 @@ export default function ListingCreatorDialog({
           size="small"
           onClick={handleAISuggestPrice}
           disabled={!!aiLoading || !title.trim()}
-          sx={{ minWidth: 0, px: 1.5, mb: marketResearch?.avgPrice ? 2.5 : 0, flexShrink: 0 }}
+          sx={{ minWidth: 0, px: 1.5, mb: { xs: 0, sm: marketResearch?.avgPrice ? 2.5 : 0 }, flexShrink: 0 }}
           title="AI fiyat önerisi"
         >
           {aiLoading === 'price' ? <CircularProgress size={18} /> : <TrendingUpIcon sx={{ fontSize: 18 }} />}
         </Button>
-        <FormControl size="small" sx={{ minWidth: 90 }}>
+        <FormControl size="small" sx={{ minWidth: 90, width: { xs: '100%', sm: 'auto' } }}>
           <InputLabel>Para Birimi</InputLabel>
           <Select
             value={currency}
@@ -994,7 +994,7 @@ export default function ListingCreatorDialog({
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
           size="small"
-          sx={{ width: 100 }}
+          sx={{ width: { xs: '100%', sm: 100 } }}
           inputProps={{ min: 1 }}
         />
       </Box>
@@ -1134,7 +1134,7 @@ export default function ListingCreatorDialog({
 
           {/* Variation rows table */}
           {variationRows.length > 0 && (
-            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'auto', maxHeight: 300 }}>
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'auto', maxHeight: 300, maxWidth: '100%', WebkitOverflowScrolling: 'touch' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ background: '#f5f5f5' }}>

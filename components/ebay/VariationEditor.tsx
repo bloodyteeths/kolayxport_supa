@@ -193,7 +193,7 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
 
   return (
     <Box>
-      <TableContainer component={Paper} variant="outlined">
+      <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto', maxWidth: '100%', WebkitOverflowScrolling: 'touch' }}>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -220,7 +220,7 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
                       value={variation.price.value}
                       onChange={(e) => updateVariation(idx, 'price', e.target.value)}
                       inputProps={{ min: 0, step: '0.01' }}
-                      sx={{ width: 100 }}
+                      sx={{ width: { xs: '100%', sm: 100 } }}
                       InputProps={{
                         endAdornment: (
                           <Typography variant="caption" color="text.secondary">
@@ -240,7 +240,7 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
                     value={variation.quantity ?? 0}
                     onChange={(e) => updateVariation(idx, 'quantity', e.target.value)}
                     inputProps={{ min: 0 }}
-                    sx={{ width: 80 }}
+                    sx={{ width: { xs: '100%', sm: 80 } }}
                   />
                 </TableCell>
                 <TableCell>
@@ -263,7 +263,7 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
           </TableBody>
         </Table>
       </TableContainer>
-      <Box display="flex" justifyContent="flex-end" mt={2}>
+      <Box display="flex" justifyContent="flex-end" mt={2} sx={{ position: 'sticky', bottom: 0, bgcolor: 'white', py: 1.5, zIndex: 5 }}>
         <Button
           variant="contained"
           onClick={handleSave}

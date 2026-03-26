@@ -453,7 +453,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 0.3,
-                  opacity: 0,
+                  opacity: { xs: 1, md: 0 },
                   transition: 'opacity 0.2s',
                 }}
               >

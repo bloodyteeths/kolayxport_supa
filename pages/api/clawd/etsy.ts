@@ -2087,14 +2087,29 @@ export default async function handler(
                 product_count: products.length,
             });
 
-            // Strip read-only keys that Etsy returns but rejects on PUT
+            // Strip read-only keys that Etsy returns in GET but rejects on PUT
             const cleanProducts = products.map((p: any) => {
                 const { product_id, is_deleted, ...rest } = p;
-                // Also strip offering_id from each offering
+                // Strip read-only keys from offerings
                 if (rest.offerings && Array.isArray(rest.offerings)) {
                     rest.offerings = rest.offerings.map((o: any) => {
-                        const { offering_id, ...offeringRest } = o;
+                        const { offering_id, is_deleted: od, readiness_state_id, ...offeringRest } = o;
+                        // Price must only contain amount+divisor+currency_code
+                        if (offeringRest.price && typeof offeringRest.price === 'object') {
+                            offeringRest.price = {
+                                amount: offeringRest.price.amount,
+                                divisor: offeringRest.price.divisor,
+                                currency_code: offeringRest.price.currency_code,
+                            };
+                        }
                         return offeringRest;
+                    });
+                }
+                // Strip read-only keys from property_values
+                if (rest.property_values && Array.isArray(rest.property_values)) {
+                    rest.property_values = rest.property_values.map((pv: any) => {
+                        const { property_name, scale_name, ...pvRest } = pv;
+                        return pvRest;
                     });
                 }
                 return rest;

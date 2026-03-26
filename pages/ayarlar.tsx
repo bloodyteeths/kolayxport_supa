@@ -447,7 +447,7 @@ const AyarlarPage = () => {
   try {
     return (
       <AppLayout title="Ayarlar">
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4, overflowX: 'hidden', maxWidth: '100%', px: { xs: 1.5, sm: 3 } }}>
           {fetchError && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {fetchError}
@@ -465,8 +465,8 @@ const AyarlarPage = () => {
           )}
 
           <form onSubmit={handleSubmit}>
-            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1 }}>
+            <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
+              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
                 API Entegrasyonları
               </Typography>
               <Grid container spacing={3}>
@@ -536,24 +536,24 @@ const AyarlarPage = () => {
               </Grid>
             </Paper>
 
-            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1 }}>
+            <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
+              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
                 Marketplace Bağlantıları
               </Typography>
               
               {/* Etsy Connection */}
               <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 2, gap: 1 }}>
+                  <Typography variant="h6" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     Etsy Shop Bağlantıları
                   </Typography>
                   <Button
                     variant="contained"
                     color="primary"
                     href="/api/integrations/etsy/connect"
-                    sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
+                    sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap', flexShrink: 0 }}
                   >
-                    🔗 Yeni Shop Bağla
+                    Yeni Shop Bağla
                   </Button>
                 </Box>
 
@@ -624,8 +624,8 @@ const AyarlarPage = () => {
 
               {/* eBay Connection */}
               <Box sx={{ mb: 3, mt: 4, pt: 3, borderTop: '1px solid #e0e0e0' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 2, gap: 1 }}>
+                  <Typography variant="h6" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     eBay Hesap Bağlantısı
                   </Typography>
                   {!ebayConnected && (
@@ -633,7 +633,7 @@ const AyarlarPage = () => {
                       variant="contained"
                       color="primary"
                       href="/api/integrations/ebay/connect"
-                      sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
+                      sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
                       eBay Hesabını Bağla
                     </Button>
@@ -646,19 +646,19 @@ const AyarlarPage = () => {
                 {ebayLoading ? (
                   <Typography>eBay bağlantı durumu kontrol ediliyor...</Typography>
                 ) : ebayConnected ? (
-                  <Paper elevation={1} sx={{ p: 2, border: '1px solid #e0e0e0' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Box>
+                  <Paper elevation={1} sx={{ p: 2, border: '1px solid #e0e0e0', overflow: 'hidden' }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5 }}>
+                      <Box sx={{ minWidth: 0 }}>
                         <Typography variant="subtitle1" fontWeight="bold" color="success.main" sx={{ mb: 0.5 }}>
                           eBay Hesabı Bağlı
                         </Typography>
                         {ebayTokenExpires && (
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             Token geçerlilik: {new Date(ebayTokenExpires).toLocaleString('tr-TR')}
                           </Typography>
                         )}
                       </Box>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
                         <Button
                           size="small"
                           variant="outlined"
@@ -694,9 +694,9 @@ const AyarlarPage = () => {
               </Box>
             </Paper>
 
-            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1 }}>
-                ETGB (E-Ticaret Gümrük Beyanı) Ayarları
+            <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
+              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+                ETGB Ayarları
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 Türkiye'ye gönderilecek siparişler için ETGB belgesi oluşturma ayarları
@@ -740,8 +740,8 @@ const AyarlarPage = () => {
               </Grid>
             </Paper>
 
-            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1 }}>
+            <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
+              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
                 Gönderici Profili
               </Typography>
               <Grid container spacing={3}>
@@ -862,17 +862,17 @@ const AyarlarPage = () => {
             </Paper>
 
             {/* --- Sync History Section --- */}
-            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+            <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', flex: 1 }}>
+                <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', flex: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   Senkron Geçmişi
                 </Typography>
                 <IconButton onClick={() => { setSyncHistoryCursor(null); setSyncHistoryEnd(false); fetchSyncHistory(); }} disabled={syncHistoryLoading}>
                   <RefreshIcon />
                 </IconButton>
               </Box>
-              <TableContainer sx={{ overflowX: 'auto' }}>
-                <Table size="small" sx={{ minWidth: 700 }}>
+              <TableContainer sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+                <Table size="small" sx={{ minWidth: { xs: 500, sm: 700 } }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Eşitleme Türü</TableCell>
@@ -955,20 +955,22 @@ const AyarlarPage = () => {
             </Paper>
 
             {/* --- Full Sync Button --- */}
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: { xs: 'stretch', sm: 'flex-end' }, mb: 2 }}>
               <Button
                 variant="contained"
                 color="secondary"
                 disabled={isFullSyncLoading}
                 onClick={handleFullSync}
                 startIcon={isFullSyncLoading ? <CircularProgress size={20} color="inherit" /> : <ReplayIcon />}
+                fullWidth
+                sx={{ maxWidth: { sm: 'fit-content' }, whiteSpace: 'nowrap', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
               >
-                {isFullSyncLoading ? 'Tam Senkronizasyon Başlatılıyor...' : 'Tam Senkronizasyon (Full Sync)'}
+                {isFullSyncLoading ? 'Senkronizasyon...' : 'Tam Senkronizasyon'}
               </Button>
             </Box>
 
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-              <Button type="submit" variant="contained" color="primary" disabled={isSubmitting || isLoading} size="large">
+            <Box sx={{ display: 'flex', justifyContent: { xs: 'stretch', sm: 'flex-end' }, mt: 3 }}>
+              <Button type="submit" variant="contained" color="primary" disabled={isSubmitting || isLoading} size="large" fullWidth sx={{ maxWidth: { sm: 'fit-content' } }}>
                 {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Ayarları Kaydet'}
               </Button>
             </Box>

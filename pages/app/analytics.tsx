@@ -167,7 +167,7 @@ const formatNumber = (value: number): string => value.toLocaleString('tr-TR');
 // ---------------------------------------------------------------------------
 
 const SectionCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-6 ${className}`}>{children}</div>
+  <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-6 overflow-hidden min-w-0 ${className}`}>{children}</div>
 );
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
@@ -226,24 +226,24 @@ const StatCard = ({
   };
 
   return (
-    <div className="bg-white p-3 sm:p-5 rounded-lg shadow-sm border border-gray-200">
+    <div className="bg-white p-2 sm:p-5 rounded-lg shadow-sm border border-gray-200 overflow-hidden min-w-0">
       <div className="flex items-center justify-between">
-        <div className={`p-2 sm:p-3 rounded-lg ${colorMap[color]?.bg ?? 'bg-blue-100'}`}>
-          <Icon className={`h-4 w-4 sm:h-6 sm:w-6 ${colorMap[color]?.text ?? 'text-blue-600'}`} />
+        <div className={`p-1.5 sm:p-3 rounded-lg ${colorMap[color]?.bg ?? 'bg-blue-100'}`}>
+          <Icon className={`h-3.5 w-3.5 sm:h-6 sm:w-6 ${colorMap[color]?.text ?? 'text-blue-600'}`} />
         </div>
         {trend !== undefined && (
           <div className={`flex items-center ${trendColor}`}>
             <TrendIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5" />
-            <span className="text-xs sm:text-sm font-medium">{Math.abs(trend).toFixed(1)}%</span>
+            <span className="text-[10px] sm:text-sm font-medium">{Math.abs(trend).toFixed(1)}%</span>
           </div>
         )}
       </div>
-      <div className="mt-2 sm:mt-4">
-        <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+      <div className="mt-1.5 sm:mt-4 min-w-0">
+        <h3 className="text-sm sm:text-lg font-semibold text-gray-900 truncate">
           {typeof value === 'number' ? formatNumber(value) : value}
         </h3>
-        <p className="text-xs sm:text-sm text-gray-600">{title}</p>
-        {trendLabel && <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">{trendLabel}</p>}
+        <p className="text-[10px] sm:text-sm text-gray-600 truncate">{title}</p>
+        {trendLabel && <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 truncate">{trendLabel}</p>}
       </div>
     </div>
   );
@@ -544,18 +544,18 @@ export default function AnalyticsPage() {
 
   return (
     <AppLayout title="Analitik - KolayXport Dashboard">
-      <div className="space-y-6">
+      <div className="space-y-6 overflow-x-hidden max-w-full">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
               {dateRange === 'day' ? 'Gunun Analizi' : 'Analitik Dashboard'}
             </h1>
-            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-600">
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-600 truncate">
               {dateRange === 'day' ? selectedDayLabel : 'Pazaryeri satis performansinizi takip edin'}
             </p>
           </div>
-          <div className="mt-2 sm:mt-0 flex items-center space-x-3">
+          <div className="mt-2 sm:mt-0 flex items-center space-x-3 flex-shrink-0">
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -570,7 +570,7 @@ export default function AnalyticsPage() {
         {/* ============================================================= */}
         {/* ROW 1: KPI Cards                                              */}
         {/* ============================================================= */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6 overflow-hidden">
           <StatCard
             title={dateRange === 'day' ? 'Siparis' : 'Toplam Siparis'}
             value={data?.totalOrders ?? 0}

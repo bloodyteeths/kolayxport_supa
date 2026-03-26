@@ -109,8 +109,8 @@ export default function SubscriptionDashboard({
     : null;
 
   return (
-    <Box sx={{ mb: 4 }}>
-      <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
+    <Box sx={{ mb: 4, overflowX: 'hidden', maxWidth: '100%' }}>
+      <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         Abonelik ve Kullanım
       </Typography>
 
@@ -159,7 +159,7 @@ export default function SubscriptionDashboard({
                 </Alert>
               )}
 
-              <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+              <Box sx={{ mt: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, overflow: 'hidden' }}>
                 {(plan === 'trial' || plan === 'starter') && (
                   <Button
                     variant="contained"
@@ -167,6 +167,7 @@ export default function SubscriptionDashboard({
                     startIcon={<UpgradeOutlined />}
                     onClick={onUpgrade}
                     fullWidth
+                    sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                   >
                     Plan Yükselt
                   </Button>
@@ -177,20 +178,22 @@ export default function SubscriptionDashboard({
                     startIcon={<CreditCard />}
                     onClick={onManageSubscription}
                     fullWidth
+                    sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                   >
                     Abonelik Yönet
                   </Button>
                 )}
               </Box>
-              
+
               {plan !== 'trial' && (
-                <Box sx={{ mt: 2 }}>
+                <Box sx={{ mt: 2, overflow: 'hidden' }}>
                   <Button
                     variant="text"
                     startIcon={<Receipt />}
                     onClick={onViewBillingHistory}
                     fullWidth
                     size="small"
+                    sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: { xs: '0.75rem', sm: '0.8rem' } }}
                   >
                     Fatura Geçmişi
                   </Button>

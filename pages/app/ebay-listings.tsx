@@ -197,7 +197,7 @@ function MobileListingCard({
   const isPublished = listing.status === 'PUBLISHED';
 
   return (
-    <Paper sx={{ mb: 1.5, overflow: 'hidden' }}>
+    <Paper sx={{ mb: 1.5, overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
       <Box
         sx={{
           display: 'flex',
@@ -205,6 +205,8 @@ function MobileListingCard({
           p: 1.5,
           cursor: 'pointer',
           alignItems: 'center',
+          overflow: 'hidden',
+          maxWidth: '100%',
         }}
         onClick={() => setExpanded(!expanded)}
       >
@@ -1260,11 +1262,11 @@ function EbayListingsPage() {
   }, [filteredListings, paginationModel]);
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1600, mx: 'auto', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
       <Toaster position="top-right" />
 
       {/* Statistics Bar */}
-      <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, mb: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, mb: 2, flexWrap: 'wrap', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
           <Typography variant="caption" color="text.secondary">
             Toplam Listeleme
@@ -1311,8 +1313,8 @@ function EbayListingsPage() {
       <>
 
       {/* Toolbar Row 1: Search & Filters */}
-      <Paper sx={{ p: 1.5, mb: 1 }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+      <Paper sx={{ p: 1.5, mb: 1, overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center', width: '100%', maxWidth: '100%' }}>
           {/* Search */}
           <TextField
             size="small"
@@ -1385,14 +1387,14 @@ function EbayListingsPage() {
       </Paper>
 
       {/* Toolbar Row 2: Actions */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2, alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, alignItems: 'center', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         {/* Primary action */}
-        <Button variant="contained" size="small" color="success" onClick={() => setCreatorOpen(true)}>
+        <Button variant="contained" size="small" color="success" onClick={() => setCreatorOpen(true)} sx={{ whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0 }}>
           + Yeni Listeleme
         </Button>
 
         {/* CSV Download — always visible */}
-        <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={handleExportCSV}>
+        <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={handleExportCSV} sx={{ whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0 }}>
           CSV İndir
         </Button>
 
@@ -1404,6 +1406,7 @@ function EbayListingsPage() {
             onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
             startIcon={<BuildIcon />}
             endIcon={<ExpandMoreIcon />}
+            sx={{ whiteSpace: 'nowrap', minWidth: 'auto', flexShrink: 0 }}
           >
             Araçlar
           </Button>
@@ -1498,7 +1501,7 @@ function EbayListingsPage() {
 
       {/* Mobile Card Layout */}
       {isMobile ? (
-        <Box>
+        <Box sx={{ overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
               <CircularProgress />

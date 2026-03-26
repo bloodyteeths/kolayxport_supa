@@ -8,16 +8,16 @@ import Link from 'next/link';
 const Section = ({ title, icon: Icon, children, id }) => (
   <motion.div
     id={id}
-    className="bg-white p-6 md:p-8 rounded-lg shadow-md mb-8"
+    className="bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-md mb-8 overflow-hidden max-w-full"
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5 }}
   >
-    <div className="flex items-center mb-6">
-      {Icon && <Icon size={32} className="mr-3 text-blue-600" />}
-      <h2 className="text-2xl font-bold text-slate-800">{title}</h2>
+    <div className="flex items-center mb-4 sm:mb-6 min-w-0">
+      {Icon && <Icon size={28} className="mr-2 sm:mr-3 text-blue-600 flex-shrink-0" />}
+      <h2 className="text-lg sm:text-2xl font-bold text-slate-800 break-words min-w-0">{title}</h2>
     </div>
-    <div className="prose prose-slate max-w-none text-slate-700 leading-relaxed">
+    <div className="prose prose-slate max-w-none text-slate-700 leading-relaxed overflow-hidden" style={{ wordBreak: 'break-word' }}>
       {children}
     </div>
   </motion.div>
@@ -25,12 +25,12 @@ const Section = ({ title, icon: Icon, children, id }) => (
 
 const Step = ({ number, title, children }) => (
   <div className="flex items-start mb-4">
-    <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold mr-4">
+    <div className="flex-shrink-0 w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold mr-3 sm:mr-4">
       {number}
     </div>
-    <div>
-      <h4 className="font-semibold text-slate-800 mb-1">{title}</h4>
-      <div className="text-sm text-slate-600">{children}</div>
+    <div className="min-w-0 flex-1 overflow-hidden">
+      <h4 className="font-semibold text-slate-800 mb-1 break-words">{title}</h4>
+      <div className="text-sm text-slate-600 overflow-hidden" style={{ wordBreak: 'break-word' }}>{children}</div>
     </div>
   </div>
 );
@@ -60,17 +60,17 @@ export default function EntegrasyonlarVeRehberlerPage() {
       <NextSeo noindex={true} nofollow={true} />
 
       <motion.div
-        className="mb-8"
+        className="mb-6 sm:mb-8 overflow-hidden max-w-full"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h1 className="text-3xl font-bold text-slate-800 flex items-center">
-            <Zap size={36} className="mr-3 text-blue-600" />
-            Entegrasyonlar ve Kurulum Rehberleri
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow overflow-hidden">
+          <h1 className="text-xl sm:text-3xl font-bold text-slate-800 flex items-center min-w-0">
+            <Zap size={28} className="mr-2 sm:mr-3 text-blue-600 flex-shrink-0" />
+            <span className="break-words min-w-0">Entegrasyonlar ve Kurulum Rehberleri</span>
           </h1>
-          <p className="mt-2 text-slate-600">
+          <p className="mt-2 text-sm sm:text-base text-slate-600" style={{ wordBreak: 'break-word' }}>
             KolayXport'u e-ticaret altyapınızla nasıl entegre edeceğinizi ve verilerinizi nasıl yöneteceğinizi öğrenin.
           </p>
         </div>

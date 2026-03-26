@@ -419,13 +419,14 @@ function SenkronPage() {
     <AppLayout title="Senkron – Siparişler">
       <NextSeo title="Senkron – KolayXport" />
       <motion.section
-        className="py-6 px-0 w-full min-h-screen bg-slate-50"
+        className="py-4 sm:py-6 px-2 sm:px-4 w-full min-h-screen bg-slate-50"
+        style={{ overflowX: 'hidden', maxWidth: '100%' }}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        <div className="w-full max-w-full px-0">
-          <div className="flex items-center justify-between mb-8">
+        <div className="w-full max-w-full overflow-x-hidden">
+          <div className="flex items-center justify-between mb-4 sm:mb-8">
             <div className="flex items-center gap-4">
               <IconButton
                 color="secondary"
@@ -474,7 +475,7 @@ function SenkronPage() {
             </div>
           </div>
           {/* Filters */}
-          <div className="flex flex-wrap gap-2 sm:gap-4 justify-between items-center mb-6 bg-white p-2 sm:p-4 rounded shadow">
+          <div className="flex flex-wrap gap-2 sm:gap-4 justify-between items-center mb-6 bg-white p-2 sm:p-4 rounded shadow overflow-hidden">
             <TextField
               label="Sipariş No / Müşteri Ara"
               value={search}
@@ -595,21 +596,21 @@ function SenkronPage() {
               Toplam: {total}
             </Typography>
           </div>
-          <div className="w-full overflow-x-auto">
-            <TableContainer component={Paper} sx={{ mt: 2, maxWidth: '100%', px: { xs: 1, sm: 2, md: 3 } }}>
-              <Table>
+          <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <TableContainer component={Paper} sx={{ mt: 2, maxWidth: '100%', px: { xs: 0.5, sm: 2, md: 3 } }}>
+              <Table sx={{ tableLayout: 'auto' }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ minWidth: 120, width: 120 }}>Görsel</TableCell>
-                    <TableCell>Müşteri Adı</TableCell>
-                    <TableCell>Sipariş Tarihi</TableCell>
-                    <TableCell>Varyant</TableCell>
-                    <TableCell>Müşteri Notu</TableCell>
-                    <TableCell sx={{ minWidth: 180 }}>Not</TableCell>
+                    <TableCell sx={{ minWidth: { xs: 56, sm: 120 }, width: { xs: 56, sm: 120 }, p: { xs: 0.5, sm: 1 } }}>Görsel</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Müşteri Adı</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Sipariş Tarihi</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Varyant</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Müşteri Notu</TableCell>
+                    <TableCell sx={{ minWidth: { xs: 120, sm: 180 } }}>Not</TableCell>
                     <TableCell>Durum</TableCell>
-                    <TableCell>Kargo Durumu</TableCell>
-                    <TableCell>Son Kargo Tarihi</TableCell>
-                    <TableCell>Mağaza</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Kargo Durumu</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Son Kargo Tarihi</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Mağaza</TableCell>
                     <TableCell>Sipariş No</TableCell>
                   </TableRow>
                 </TableHead>
@@ -638,9 +639,9 @@ function SenkronPage() {
                         
                         return (
                           <TableRow key={row.rowKey} sx={{ height: 80 }}>
-                            <TableCell sx={{ p: 1, minWidth: 120, width: 120, verticalAlign: 'middle' }}>—</TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
-                      <div style={{ 
+                            <TableCell sx={{ p: { xs: 0.5, sm: 1 }, minWidth: { xs: 56, sm: 120 }, width: { xs: 56, sm: 120 }, verticalAlign: 'middle' }}>—</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150, display: { xs: 'none', sm: 'table-cell' } }}>
+                      <div style={{
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
@@ -648,9 +649,9 @@ function SenkronPage() {
                         {order.customerName || '—'}
                       </div>
                     </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>{orderDateTR}</TableCell>
-                            <TableCell sx={{ p: 1, minWidth: 120, fontSize: 14 }}>—</TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, display: { xs: 'none', md: 'table-cell' } }}>{orderDateTR}</TableCell>
+                            <TableCell sx={{ p: 1, minWidth: 120, fontSize: 14, display: { xs: 'none', lg: 'table-cell' } }}>—</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150, display: { xs: 'none', lg: 'table-cell' } }}>
                               {customerNote ? (
                                 <div style={{ 
                                   maxHeight: 60,
@@ -733,16 +734,16 @@ function SenkronPage() {
                                 ))}
                               </Select>
                             </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, display: { xs: 'none', md: 'table-cell' } }}>
                               {(() => {
                                 const status = (order.status || order.externalStatus || 'UNKNOWN').toUpperCase();
                                 const config = statusColors[status] || { bg: '#ccc', text: '#000' };
                                 const statusOption = orderStatusOptions.find(opt => opt.value === status);
                                 const label = statusOption?.label || status.replace(/_/g, ' ');
-                                
+
                                 return (
-                                  <Chip 
-                                    label={label} 
+                                  <Chip
+                                    label={label}
                                     size="small"
                                     style={{
                                       backgroundColor: config.bg,
@@ -754,9 +755,9 @@ function SenkronPage() {
                                 );
                               })()}
                             </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>{shipByDateTR}</TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>{order.marketplace || '—'}</TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, display: { xs: 'none', lg: 'table-cell' } }}>{shipByDateTR}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14, display: { xs: 'none', sm: 'table-cell' } }}>{order.marketplace || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: { xs: 12, sm: 14 }, maxWidth: { xs: 100, sm: 'none' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {order.orderNumber
                                 ? order.orderNumber
                                 : <span style={{ color: 'red', fontWeight: 'bold' }}>
@@ -776,25 +777,25 @@ function SenkronPage() {
                       const customerNote = extractCustomerNote(order);
                       
                       return (
-                        <TableRow key={row.rowKey} sx={{ height: 120 }}>
-                            <TableCell sx={{ p: 1, minWidth: 120, width: 120, verticalAlign: 'middle' }}>
+                        <TableRow key={row.rowKey} sx={{ height: { xs: 80, sm: 120 } }}>
+                            <TableCell sx={{ p: { xs: 0.5, sm: 1 }, minWidth: { xs: 56, sm: 120 }, width: { xs: 56, sm: 120 }, verticalAlign: 'middle' }}>
                               {item.image
-                                ? <img 
-                                    src={item.image} 
-                                    style={{ 
-                                      width: '80px',
-                                      height: '80px',
-                                      objectFit: 'cover', 
-                                      borderRadius: 12, 
-                                      display: 'block', 
+                                ? <img
+                                    src={item.image}
+                                    style={{
+                                      width: 'clamp(44px, 10vw, 80px)',
+                                      height: 'clamp(44px, 10vw, 80px)',
+                                      objectFit: 'cover',
+                                      borderRadius: 8,
+                                      display: 'block',
                                       margin: '0 auto'
-                                    }} 
+                                    }}
                                     alt="Product"
                                   />
                                 : '—'}
                             </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
-                      <div style={{ 
+                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150, display: { xs: 'none', sm: 'table-cell' } }}>
+                      <div style={{
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
@@ -802,9 +803,9 @@ function SenkronPage() {
                         {order.customerName || '—'}
                       </div>
                     </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>{orderDateTR}</TableCell>
-                            <TableCell sx={{ p: 1, minWidth: 120, fontSize: 14 }}>{item.variantInfo || '—'}</TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, display: { xs: 'none', md: 'table-cell' } }}>{orderDateTR}</TableCell>
+                            <TableCell sx={{ p: 1, minWidth: 120, fontSize: 14, display: { xs: 'none', lg: 'table-cell' } }}>{item.variantInfo || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150, display: { xs: 'none', lg: 'table-cell' } }}>
                               {customerNote ? (
                                 <div style={{ 
                                   maxHeight: 60,
@@ -887,16 +888,16 @@ function SenkronPage() {
                                 ))}
                               </Select>
                             </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, display: { xs: 'none', md: 'table-cell' } }}>
                               {(() => {
                                 const status = (order.status || order.externalStatus || 'UNKNOWN').toUpperCase();
                                 const config = statusColors[status] || { bg: '#ccc', text: '#000' };
                                 const statusOption = orderStatusOptions.find(opt => opt.value === status);
                                 const label = statusOption?.label || status.replace(/_/g, ' ');
-                                
+
                                 return (
-                                  <Chip 
-                                    label={label} 
+                                  <Chip
+                                    label={label}
                                     size="small"
                                     style={{
                                       backgroundColor: config.bg,
@@ -908,9 +909,9 @@ function SenkronPage() {
                                 );
                               })()}
                             </TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>{shipByDateTR}</TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>{order.marketplace || '—'}</TableCell>
-                            <TableCell sx={{ p: 1, fontSize: 14 }}>
+                            <TableCell sx={{ p: 1, fontSize: 14, display: { xs: 'none', lg: 'table-cell' } }}>{shipByDateTR}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: 14, display: { xs: 'none', sm: 'table-cell' } }}>{order.marketplace || '—'}</TableCell>
+                            <TableCell sx={{ p: 1, fontSize: { xs: 12, sm: 14 }, maxWidth: { xs: 100, sm: 'none' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {order.orderNumber
                                 ? order.orderNumber
                                 : <span style={{ color: 'red', fontWeight: 'bold' }}>

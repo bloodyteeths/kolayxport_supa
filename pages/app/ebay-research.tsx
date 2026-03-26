@@ -2121,27 +2121,31 @@ function SectionWelcome({ section, userListings = [], sectionIndex }: { section:
     <Paper
       variant="outlined"
       sx={{
-        p: 4,
+        p: { xs: 2, sm: 4 },
         textAlign: 'center',
         borderStyle: 'dashed',
         borderColor: 'primary.light',
         bgcolor: 'action.hover',
         borderRadius: 3,
+        overflow: 'hidden',
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
       }}
     >
       <Box sx={{ color: 'primary.main', mb: 2 }}>{React.cloneElement(section.icon as React.ReactElement, { size: 40, strokeWidth: 1.5 })}</Box>
       <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
         {section.label}
       </Typography>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 480, mx: 'auto' }}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 480, mx: 'auto', wordBreak: 'break-word', px: 1 }}>
         {section.welcome}
       </Typography>
       {personalizedMessage && (
-        <Typography variant="body2" color="primary.main" fontWeight={600} sx={{ mb: 2, maxWidth: 480, mx: 'auto' }}>
+        <Typography variant="body2" color="primary.main" fontWeight={600} sx={{ mb: 2, maxWidth: 480, mx: 'auto', wordBreak: 'break-word', px: 1 }}>
           {personalizedMessage}
         </Typography>
       )}
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
         Baslamak icin yukaridaki araclardan birini secin.
       </Typography>
     </Paper>
@@ -2201,31 +2205,35 @@ function EbayResearchPage() {
   const currentSection = SECTIONS[mainTab];
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: 'auto', px: isMobile ? 1 : 3, py: 2 }}>
+    <Box sx={{ maxWidth: 1400, mx: 'auto', px: isMobile ? 1 : 3, py: 2, width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
       <Toaster position="top-right" />
 
       {/* Header */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant={isMobile ? 'h6' : 'h5'} fontWeight={800}>
+      <Box sx={{ mb: 2, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+        <Typography variant={isMobile ? 'h6' : 'h5'} fontWeight={800} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           eBay Urun Istihbarati
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
           Pazar arastirmasi, urun takibi, nis analizi ve rakip izleme
         </Typography>
       </Box>
 
       {/* Main Section Tabs */}
-      <Paper sx={{ mb: 2 }} variant="outlined">
+      <Paper sx={{ mb: 2, overflow: 'hidden', width: '100%', maxWidth: '100%' }} variant="outlined">
         <Tabs
           value={mainTab}
           onChange={handleMainTabChange}
-          variant="fullWidth"
+          variant={isMobile ? 'scrollable' : 'fullWidth'}
+          scrollButtons={isMobile ? 'auto' : false}
+          allowScrollButtonsMobile
           sx={{
             '& .MuiTab-root': {
               textTransform: 'none',
               fontWeight: 600,
-              minHeight: 64,
+              minHeight: isMobile ? 48 : 64,
               py: 1.5,
+              minWidth: isMobile ? 'auto' : undefined,
+              px: isMobile ? 1.5 : 2,
             },
           }}
         >
@@ -2236,7 +2244,7 @@ function EbayResearchPage() {
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                     {section.icon}
-                    <span style={{ fontWeight: 700, fontSize: isMobile ? '0.85rem' : '0.95rem' }}>{section.label}</span>
+                    <span style={{ fontWeight: 700, fontSize: isMobile ? '0.8rem' : '0.95rem', whiteSpace: 'nowrap' }}>{section.label}</span>
                   </Box>
                   {!isMobile && (
                     <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', lineHeight: 1.2 }}>
@@ -2251,7 +2259,7 @@ function EbayResearchPage() {
       </Paper>
 
       {/* Sub-tab pills */}
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+      <Box sx={{ display: 'flex', flexWrap: isMobile ? 'nowrap' : 'wrap', gap: 1, mb: 2, overflowX: isMobile ? 'auto' : 'visible', overflowY: 'hidden', width: '100%', maxWidth: '100%', pb: isMobile ? 0.5 : 0, WebkitOverflowScrolling: 'touch', '&::-webkit-scrollbar': { display: 'none' }, msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
         {currentSection.subTabs.map((st, i) => (
           <Chip
             key={i}
@@ -2266,6 +2274,8 @@ function EbayResearchPage() {
               fontSize: '0.8rem',
               height: 36,
               px: 0.5,
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
               '& .MuiChip-icon': { fontSize: 14 },
               transition: 'all 0.15s ease',
               ...(subTab === i
@@ -2283,23 +2293,23 @@ function EbayResearchPage() {
 
       {/* User listings status bar */}
       {userListingsLoading && (
-        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0f7ff' }}>
-          <CircularProgress size={16} />
-          <Typography variant="body2" color="text.secondary">
+        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0f7ff', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+          <CircularProgress size={16} sx={{ flexShrink: 0 }} />
+          <Typography variant="body2" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             eBay listeleriniz yukleniyor...
           </Typography>
         </Paper>
       )}
       {!userListingsLoading && userListings.length > 0 && (
-        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0fff4' }}>
-          <Typography variant="body2" color="success.main" fontWeight={600}>
+        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0fff4', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
+          <Typography variant="body2" color="success.main" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
             {userListings.length} aktif listelemeniz yuklendi — araclar otomatik olarak verilerinizi kullanacak.
           </Typography>
         </Paper>
       )}
       {!userListingsLoading && userListings.length === 0 && (
-        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#fff8f0' }}>
-          <Typography variant="body2" color="warning.main">
+        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#fff8f0', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box', flexWrap: 'wrap', gap: 1 }}>
+          <Typography variant="body2" color="warning.main" sx={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
             eBay listeleriniz yuklenemedi. Araclar manual arama ile calisir.
           </Typography>
           <Button size="small" variant="outlined" onClick={() => {

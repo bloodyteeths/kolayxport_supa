@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head'; // Using Head for simple title, can be NextSeo if more complex SEO needed per dashboard page
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -88,6 +88,61 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
     };
   }, [isOpen, isMobile, closeSidebar]);
 
+  // Pull-to-refresh (mobile only)
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const isPulling = useRef(false);
+  const PULL_THRESHOLD = 80;
+
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const handleTouchStart = (e) => {
+      if (window.scrollY === 0 && !isRefreshing) {
+        touchStartY.current = e.touches[0].clientY;
+        isPulling.current = true;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (!isPulling.current || isRefreshing) return;
+      const currentY = e.touches[0].clientY;
+      const diff = currentY - touchStartY.current;
+      if (diff > 0 && window.scrollY === 0) {
+        // Dampen the pull distance
+        setPullDistance(Math.min(diff * 0.5, 120));
+      } else {
+        isPulling.current = false;
+        setPullDistance(0);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (!isPulling.current) return;
+      isPulling.current = false;
+      if (pullDistance >= PULL_THRESHOLD) {
+        setIsRefreshing(true);
+        setPullDistance(PULL_THRESHOLD * 0.5);
+        setTimeout(() => {
+          window.location.reload();
+        }, 300);
+      } else {
+        setPullDistance(0);
+      }
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isMobile, isRefreshing, pullDistance]);
+
   const handleSignOut = async () => {
     await supabaseSignOut();
     // router.push('/') is already handled in supabaseSignOut
@@ -99,7 +154,60 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
       <Head>
         <title>{title}</title>
       </Head>
-      <div className="min-h-screen bg-slate-100 flex text-slate-800">
+      {/* Pull-to-refresh indicator */}
+      {isMobile && pullDistance > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: `${pullDistance}px`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            background: 'linear-gradient(to bottom, #f1f5f9, transparent)',
+            transition: isPulling.current ? 'none' : 'height 0.2s ease-out',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            opacity: Math.min(pullDistance / PULL_THRESHOLD, 1),
+          }}>
+            {isRefreshing ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" style={{ animation: 'spin 0.8s linear infinite' }}>
+                <circle cx="12" cy="12" r="10" stroke="#64748b" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#64748b"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  transform: pullDistance >= PULL_THRESHOLD ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease',
+                }}
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <polyline points="19 12 12 19 5 12" />
+              </svg>
+            )}
+            <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
+              {isRefreshing ? 'Yenileniyor...' : pullDistance >= PULL_THRESHOLD ? 'Bırak' : 'Yenilemek icin cek'}
+            </span>
+          </div>
+        </div>
+      )}
+      <div className="min-h-screen bg-slate-100 flex text-slate-800" style={{ overflowX: 'hidden', maxWidth: '100%' }}>
 
         {/* Sidebar - Mobile: overlay drawer, Desktop: persistent sidebar */}
         <motion.aside
@@ -227,7 +335,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
         {/* Main content area */}
         <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
           isDesktop ? (isOpen ? 'ml-64' : 'ml-16') : 'ml-0'
-        }`}>
+        }`} style={{ overflowX: 'hidden', maxWidth: '100%', width: '100%' }}>
           {/* Mobile overlay when sidebar is open */}
           {isOpen && isMobile && (
             <div 
@@ -236,7 +344,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
             />
           )}
           {/* Topbar */}
-          <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-gray-200" style={{ minHeight: '4rem', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <header className="sticky top-0 z-30 bg-white shadow-sm flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-gray-200" style={{ minHeight: '4rem', paddingTop: 'env(safe-area-inset-top, 0px)', overflow: 'hidden' }}>
             <div className="flex items-center">
               {/* Mobile hamburger menu - 3 lines */}
               {isMobile && (
@@ -302,7 +410,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           {/* Page content */}
           <main className={`flex-grow bg-slate-50 ${
             isMobile ? 'p-3' : 'p-4 sm:p-6 lg:p-8'
-          }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', overflowX: 'hidden', maxWidth: '100%' }}>
             {/* Optional: Page header can go here if not in topbar */}
             {/* <h1 className="text-2xl font-semibold text-slate-800 mb-6">{title.replace('KolayXport Dashboard - ','')}</h1> */}
             {children}

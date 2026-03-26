@@ -1324,45 +1324,57 @@ export default async function handler(
             let inventoryCopied = false;
             if (sourceInventory.length > 0) {
                 try {
-                    // Strip source-specific IDs, convert price from amount/divisor to decimal
-                    const productsForCopy = sourceInventory.map((product: any) => ({
+                    // Strip source-specific IDs (product_id, offering_id, is_deleted, scale_name)
+                    // Keep value_ids for property_values, convert price from amount/divisor to decimal
+                    const productsForCopy = sourceInventory
+                        .filter((product: any) => !product.is_deleted)
+                        .map((product: any) => ({
                         sku: product.sku || '',
                         property_values: (product.property_values || []).map((pv: any) => ({
                             property_id: pv.property_id,
                             property_name: pv.property_name,
                             values: pv.values,
+                            ...(pv.value_ids ? { value_ids: pv.value_ids } : {}),
                             ...(pv.scale_id ? { scale_id: pv.scale_id } : {}),
                         })),
-                        offerings: (product.offerings || []).map((off: any) => ({
+                        offerings: (product.offerings || [])
+                            .filter((off: any) => !off.is_deleted)
+                            .map((off: any) => ({
                             price: off.price ? off.price.amount / (off.price.divisor || 100) : 0,
                             quantity: off.quantity || 0,
                             is_enabled: off.is_enabled ?? true,
                         })),
                     }));
 
-                    // Build inventory payload with *_on_property fields from source
+                    // Derive property IDs from products for *_on_property fallback
+                    const allPropertyIds = new Set<number>();
+                    for (const p of sourceInventory) {
+                        for (const pv of (p.property_values || [])) {
+                            if (pv.property_id) allPropertyIds.add(pv.property_id);
+                        }
+                    }
+                    const propertyIdArray = Array.from(allPropertyIds);
+
+                    // Build inventory payload — *_on_property fields are REQUIRED (default to [])
+                    // If source has them, use them; otherwise derive from product property_ids
                     const inventoryPayload: Record<string, any> = {
                         products: productsForCopy,
+                        price_on_property: sourceInventoryData.price_on_property ?? propertyIdArray,
+                        quantity_on_property: sourceInventoryData.quantity_on_property ?? [],
+                        sku_on_property: sourceInventoryData.sku_on_property ?? [],
                     };
-                    // These tell Etsy which properties control price/quantity/sku variations
-                    if (sourceInventoryData.price_on_property) {
-                        inventoryPayload.price_on_property = sourceInventoryData.price_on_property;
-                    }
-                    if (sourceInventoryData.quantity_on_property) {
-                        inventoryPayload.quantity_on_property = sourceInventoryData.quantity_on_property;
-                    }
-                    if (sourceInventoryData.sku_on_property) {
-                        inventoryPayload.sku_on_property = sourceInventoryData.sku_on_property;
-                    }
 
                     logger.info('Copying inventory to new listing', {
                         source_listing_id: source_listing_id,
                         new_listing_id: newListing.listing_id,
                         source_product_count: sourceInventory.length,
                         products_to_copy: productsForCopy.length,
-                        price_on_property: inventoryPayload.price_on_property,
-                        quantity_on_property: inventoryPayload.quantity_on_property,
-                        sku_on_property: inventoryPayload.sku_on_property,
+                        raw_source_keys: Object.keys(sourceInventoryData),
+                        raw_price_on_property: sourceInventoryData.price_on_property,
+                        final_price_on_property: inventoryPayload.price_on_property,
+                        final_quantity_on_property: inventoryPayload.quantity_on_property,
+                        final_sku_on_property: inventoryPayload.sku_on_property,
+                        sample_product_property_values: productsForCopy[0]?.property_values,
                     });
 
                     const inventoryCopyResult = await callEtsyAPI(

@@ -498,6 +498,9 @@ function EtsyListingsPage() {
         }
         toast.success('Listing silindi');
         setDeleteConfirmId(null);
+        // Invalidate cache so deleted listing doesn't reappear
+        const cacheKey = `${selectedShopId}:${statusFilter}`;
+        delete listingsCacheRef.current[cacheKey];
         fetchListings();
       } catch (err: any) {
         toast.error(`Silinemedi: ${err.message}`);

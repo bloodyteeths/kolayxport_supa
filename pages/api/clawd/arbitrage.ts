@@ -4,9 +4,13 @@ import { getSupabaseServerClient } from '../../../lib/supabase';
 import { getApplicationToken } from '../../../lib/integrations/ebayClient';
 import { searchTrendyolProducts, getExchangeRate } from '../../../lib/integrations/trendyolSearch';
 import { calculateArbitrage } from '../../../lib/arbitrage/calculator';
-import type { ArbitrageScanParams, ArbitrageResult, EbayComparable, ArbitrageScanResponse } from '../../../lib/arbitrage/types';
+import type { ArbitrageResult, EbayComparable, ArbitrageScanResponse } from '../../../lib/arbitrage/types';
 
-export const config = { runtime: 'nodejs' };
+// Run from Frankfurt (EU) to avoid Trendyol geo-blocking
+export const config = {
+  runtime: 'nodejs',
+  regions: ['fra1'],
+};
 
 const EBAY_API_BASE = 'https://api.ebay.com';
 
@@ -75,7 +79,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     switch (action) {
       case 'scan': {
         const startTime = Date.now();
-        const params = req.body as ArbitrageScanParams & { action: string; highDefectRate?: boolean };
         const {
           keywords = [],
           minProfitUsd = 5,
@@ -85,14 +88,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           includeInternationalFee = true,
           maxTrendyolResults = 30,
           highDefectRate = false,
-        } = params;
+        } = req.body;
 
         if (!keywords.length) {
           return res.status(400).json({ error: 'At least one keyword is required' });
         }
 
         // Get exchange rate
-        const exchangeRate = params.exchangeRate || await getExchangeRate();
+        const exchangeRate = req.body.exchangeRate || await getExchangeRate();
 
         // Get eBay app token
         const appToken = await getApplicationToken();
@@ -108,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               limit: perKeywordLimit,
               sort: 'BEST_SELLER',
             });
-            products.forEach(p => {
+            products.forEach((p: any) => {
               if (!allTrendyolProducts.has(p.id)) {
                 allTrendyolProducts.set(p.id, p);
               }
@@ -135,32 +138,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         for (const tp of trendyolProducts) {
           try {
-            // Build a search query from product name — use first 3-4 meaningful words
+            // Build a search query from product name — use first 4-5 meaningful words
             const searchTerms = tp.name
               .replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s]/g, ' ')
               .split(/\s+/)
               .filter((w: string) => w.length > 2)
-              .slice(0, 4)
+              .slice(0, 5)
               .join(' ');
 
             if (!searchTerms) continue;
 
             // Search eBay
-            const params = new URLSearchParams();
-            params.set('q', searchTerms);
-            params.set('sort', 'newlyListed');
-            params.set('limit', '20');
+            const searchParams = new URLSearchParams();
+            searchParams.set('q', searchTerms);
+            searchParams.set('sort', 'newlyListed');
+            searchParams.set('limit', '15');
 
             const searchResult = await callEbayAPI(
-              `/buy/browse/v1/item_summary/search?${params.toString()}`,
+              `/buy/browse/v1/item_summary/search?${searchParams.toString()}`,
               appToken
             );
 
             const ebayItems = searchResult.itemSummaries || [];
             if (ebayItems.length === 0) continue;
 
-            // Enrich first 10 with sold quantity
-            const enrichLimit = Math.min(ebayItems.length, 10);
+            // Enrich first 8 with sold quantity
+            const enrichLimit = Math.min(ebayItems.length, 8);
             const enriched: EbayComparable[] = [];
 
             for (let i = 0; i < enrichLimit; i++) {
@@ -219,9 +222,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-        // Sort by score descending, then filter by thresholds
-        const sorted = results
-          .sort((a, b) => b.score - a.score);
+        // Sort by score descending
+        const sorted = results.sort((a, b) => b.score - a.score);
 
         const profitable = sorted.filter(
           r => r.financials.profitUsd >= minProfitUsd && r.financials.roiPercent >= minRoiPercent

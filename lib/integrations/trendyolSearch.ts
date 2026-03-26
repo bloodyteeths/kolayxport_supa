@@ -1,17 +1,19 @@
 /**
- * Trendyol public product search using the discovery API.
- * No authentication needed — uses the same API that powers trendyol.com search.
+ * Trendyol public product search via the discovery API.
+ * Uses the new sfint-search-service endpoint on apigw.trendyol.com.
+ * Runs from EU Vercel region to avoid geo-blocking.
  */
 import fetch from 'node-fetch';
 import type { TrendyolProduct } from '../arbitrage/types';
 
-const DISCOVERY_BASE = 'https://public.trendyol.com/discovery-web-searchgw-service/v2/api/infinite-scroll/sr';
+// New internal search API (replaced the old public.trendyol.com)
+const SEARCH_BASE = 'https://apigw.trendyol.com/discovery-sfint-search-service/v2/api/infinite-scroll/sr';
 
 interface TrendyolSearchParams {
   query: string;
   page?: number;
   limit?: number;
-  sort?: 'MOST_FAVOURITE' | 'BEST_SELLER' | 'MOST_RATED' | 'PRICE_BY_ASC' | 'PRICE_BY_DESC' | 'MOST_RECENT';
+  sort?: 'BEST_SELLER' | 'MOST_FAVOURITE' | 'MOST_RATED' | 'PRICE_BY_ASC' | 'PRICE_BY_DESC' | 'MOST_RECENT';
 }
 
 interface TrendyolSearchResult {
@@ -22,11 +24,19 @@ interface TrendyolSearchResult {
 export async function searchTrendyolProducts(params: TrendyolSearchParams): Promise<TrendyolSearchResult> {
   const { query, page = 1, limit = 24, sort = 'BEST_SELLER' } = params;
 
-  const url = new URL(DISCOVERY_BASE);
+  const sortMap: Record<string, string> = {
+    'BEST_SELLER': '2',
+    'MOST_FAVOURITE': '3',
+    'PRICE_BY_ASC': '4',
+    'PRICE_BY_DESC': '5',
+    'MOST_RECENT': '1',
+    'MOST_RATED': '6',
+  };
+
+  const url = new URL(SEARCH_BASE);
   url.searchParams.set('q', query);
   url.searchParams.set('pi', String(page));
-  url.searchParams.set('ps', String(limit)); // Not guaranteed to be respected
-  url.searchParams.set('os', sort === 'BEST_SELLER' ? '2' : sort === 'MOST_FAVOURITE' ? '3' : sort === 'PRICE_BY_ASC' ? '4' : sort === 'PRICE_BY_DESC' ? '5' : '1');
+  url.searchParams.set('os', sortMap[sort] || '2');
   url.searchParams.set('culture', 'tr-TR');
   url.searchParams.set('userGenderId', '0');
   url.searchParams.set('pId', '0');
@@ -35,17 +45,29 @@ export async function searchTrendyolProducts(params: TrendyolSearchParams): Prom
   url.searchParams.set('isLegalRequirementConfirmed', 'false');
   url.searchParams.set('searchStrategyType', 'DEFAULT');
   url.searchParams.set('productStampType', 'TypeA');
+  url.searchParams.set('storefrontId', '1');
+  url.searchParams.set('language', 'tr');
+  url.searchParams.set('channelId', '1');
 
   const res = await fetch(url.toString(), {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-      'Accept': 'application/json',
-      'Accept-Language': 'tr-TR,tr;q=0.9',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Referer': 'https://www.trendyol.com/',
+      'Origin': 'https://www.trendyol.com',
+      'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Windows"',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-site',
     },
   });
 
   if (!res.ok) {
-    throw new Error(`Trendyol search failed: ${res.status}`);
+    const text = await res.text().catch(() => '');
+    throw new Error(`Trendyol search failed: ${res.status} ${text.substring(0, 100)}`);
   }
 
   const data: any = await res.json();
@@ -82,7 +104,7 @@ export async function getExchangeRate(): Promise<number> {
     });
     if (!res.ok) throw new Error(`Exchange rate API: ${res.status}`);
     const data: any = await res.json();
-    return data?.rates?.USD || 0.028; // fallback ~1 TRY = 0.028 USD
+    return data?.rates?.USD || 0.028;
   } catch {
     return 0.028;
   }

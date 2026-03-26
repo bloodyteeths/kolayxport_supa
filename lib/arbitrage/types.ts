@@ -22,6 +22,9 @@ export interface TrendyolProduct {
   ratingCount: number;
   merchantName: string;
   freeShipping: boolean;
+  barcode?: string;
+  stockCode?: string;
+  quantity?: number;
 }
 
 export interface EbayComparable {

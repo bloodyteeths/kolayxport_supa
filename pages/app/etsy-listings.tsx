@@ -345,8 +345,9 @@ function EtsyListingsPage() {
     setLoading(true);
     try {
       const limit = 100;
+      const cacheBust = Date.now();
       const buildUrl = (offset: number) =>
-        `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&limit=${limit}&offset=${offset}&state=${statusFilter}`;
+        `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&limit=${limit}&offset=${offset}&state=${statusFilter}&_t=${cacheBust}`;
 
       // First page — show immediately
       const firstRes = await fetch(buildUrl(0));

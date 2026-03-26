@@ -2191,7 +2191,13 @@ export default async function handler(
 
             const data = await callEtsyAPI(endpoint, accessToken);
 
-            const listings = (data.results || []).map((listing: any) => {
+            // Filter out listings whose state doesn't match the requested state
+            // (Etsy sometimes returns removed/expired listings in draft/active queries)
+            const filteredResults = (data.results || []).filter(
+                (listing: any) => listing.state === state
+            );
+
+            const listings = filteredResults.map((listing: any) => {
                 const firstImage = listing.images && listing.images.length > 0 ? listing.images[0] : null;
                 return {
                     listing_id: listing.listing_id,
@@ -2226,7 +2232,7 @@ export default async function handler(
                 };
             });
 
-            res.setHeader('Cache-Control', 'private, max-age=300');
+            res.setHeader('Cache-Control', 'private, no-cache');
             return res.status(200).json({
                 count: data.count || listings.length,
                 listings,

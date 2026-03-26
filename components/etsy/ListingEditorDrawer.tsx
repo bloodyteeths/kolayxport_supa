@@ -24,6 +24,8 @@ import {
   DialogActions,
   Divider,
   Tooltip,
+  Alert,
+  Collapse,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import CloseIcon from '@mui/icons-material/Close';
@@ -346,6 +348,7 @@ export default function ListingEditorDrawer({
   // AI state
   const [aiLoading, setAiLoading] = useState<Record<string, boolean>>({});
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([]);
+  const [researchBannerOpen, setResearchBannerOpen] = useState(true);
 
   // Rank check state
   const [rankKeyword, setRankKeyword] = useState('');
@@ -1678,6 +1681,77 @@ export default function ListingEditorDrawer({
                         />
                       </Box>
                     </Box>
+
+                    {/* Market Research Data Banner */}
+                    {marketResearchData && (
+                      <Alert
+                        severity="info"
+                        sx={{
+                          mb: 1.5,
+                          py: 0.5,
+                          '& .MuiAlert-message': { width: '100%' },
+                          '& .MuiAlert-icon': { py: 0.5 },
+                        }}
+                        action={
+                          <IconButton
+                            size="small"
+                            onClick={() => setResearchBannerOpen((prev) => !prev)}
+                            sx={{ mt: -0.5 }}
+                          >
+                            <ExpandMoreIcon
+                              sx={{
+                                fontSize: 18,
+                                transform: researchBannerOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s',
+                              }}
+                            />
+                          </IconButton>
+                        }
+                      >
+                        <Typography variant="caption" fontWeight={600} sx={{ cursor: 'pointer' }} onClick={() => setResearchBannerOpen((prev) => !prev)}>
+                          Pazar Verileri: &quot;{marketResearchData.query}&quot;
+                        </Typography>
+                        <Collapse in={researchBannerOpen}>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                            {marketResearchData.topTags.slice(0, 10).map((t) => (
+                              <Chip
+                                key={t.tag}
+                                label={`${t.tag} (${t.pct}%)`}
+                                size="small"
+                                variant="outlined"
+                                sx={{
+                                  fontSize: '0.65rem',
+                                  height: 22,
+                                  cursor: 'pointer',
+                                  '&:hover': { bgcolor: 'action.hover' },
+                                }}
+                                onClick={() => {
+                                  if (fields.tags.length >= 13) {
+                                    toast.error('Maksimum 13 etiket eklenebilir');
+                                    return;
+                                  }
+                                  if (fields.tags.includes(t.tag)) {
+                                    toast('Bu etiket zaten mevcut', { icon: 'ℹ️' });
+                                    return;
+                                  }
+                                  updateField('tags', [...fields.tags, t.tag]);
+                                  toast.success(`"${t.tag}" eklendi`);
+                                }}
+                              />
+                            ))}
+                          </Box>
+                          {marketResearchData.priceStats && (
+                            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                              Fiyat araligi: ${marketResearchData.priceStats.min} - ${marketResearchData.priceStats.max} (ort: ${marketResearchData.priceStats.avg})
+                            </Typography>
+                          )}
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', fontStyle: 'italic', fontSize: '0.6rem' }}>
+                            Arastirma verileri AI onerilerinde kullaniliyor
+                          </Typography>
+                        </Collapse>
+                      </Alert>
+                    )}
+
                     <Autocomplete
                       multiple
                       freeSolo
@@ -1776,6 +1850,22 @@ export default function ListingEditorDrawer({
                           AI ile Tumunu Degistir
                         </Button>
                       )}
+                      {/* Research data availability indicator */}
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: '0.7rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          ml: 'auto',
+                          color: marketResearchData ? 'success.main' : 'warning.main',
+                        }}
+                      >
+                        {marketResearchData
+                          ? '\uD83D\uDCCA Arastirma verisi mevcut'
+                          : '\u26A0\uFE0F Arastirma verisi yok \u2014 once pazar arastirmasi yapin'}
+                      </Typography>
                     </Box>
 
                     {/* AI Tag Suggestions */}

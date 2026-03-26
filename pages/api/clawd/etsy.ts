@@ -346,7 +346,7 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
                 ? await callEtsyPublicAPI(`/listings/active?${params}`)
                 : await rateLimitedPublicCall(`/listings/active?${params}`);
 
-            totalCount = data.count || 0;
+            if (page === 0) totalCount = data.count || 0;
             const results = data.results || [];
             allResults.push(...results);
 

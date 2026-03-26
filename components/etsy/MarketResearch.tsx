@@ -693,6 +693,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
     finally { setLoading(false); }
   }, [query, sortOn, minPrice, maxPrice]);
 
+  // Auto-trigger search when pendingSearchRef is set (used by keyword explorer send-to-search)
+  useEffect(() => {
+    if (pendingSearchRef.current && query.trim()) {
+      pendingSearchRef.current = false;
+      searchMarket();
+    }
+  }, [query, searchMarket]);
+
   const discoverShops = useCallback(async (shopIds: number[]) => {
     setShopsLoading(true);
     try {
@@ -730,6 +738,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
   // Auto-trigger deep dive when shop ID is set from shop table click
   const prevDeepDiveRef = useRef(deepDiveShopId);
+  const pendingSearchRef = useRef(false);
   useEffect(() => {
     if (deepDiveShopId && deepDiveShopId !== prevDeepDiveRef.current && tab === 102) {
       searchShopDeepDive();
@@ -1586,9 +1595,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                               <Tooltip title="Ana aramaya gonder">
                                 <IconButton size="small" onClick={() => {
+                                  pendingSearchRef.current = true;
                                   setQuery(s.keyword);
                                   setSection(1); setTab(100);
-                                  setTimeout(() => searchMarket(), 200);
                                 }}>
                                   <ArrowRight size={14} />
                                 </IconButton>
@@ -1880,11 +1889,51 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               </Typography>
               <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
                 <ScoreRing score={demandScore.score} size={120} label="Firsat" />
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
                   {demandScore.score >= 70 ? 'Bu niş iyi bir fırsat! Rekabet makul ve talep yüksek.' :
                     demandScore.score >= 40 ? 'Orta seviye fırsat. Rekabet analizi yaparak stratejinizi belirleyin.' :
                       'Bu pazar çok rekabetçi veya doygun olabilir. Niş bir alt kategori bulmaya çalışın.'}
                 </Typography>
+
+                {/* Score Breakdown Bars */}
+                {(() => {
+                  const bd = demandScore.breakdown;
+                  const components = [
+                    { key: 'supply', label: 'Arz Skoru', value: bd.supplyScore, max: 25, weakness: 'Çok fazla rakip listing var — niş daraltmayı deneyin' },
+                    { key: 'competition', label: 'Rekabet Skoru', value: bd.compScore, max: 25, weakness: 'Az sayıda mağaza bu alanı domine ediyor' },
+                    { key: 'demand', label: 'Talep Skoru', value: bd.demandPts, max: 20, weakness: 'Talep düşük — farklı anahtar kelimeler deneyin' },
+                    { key: 'engagement', label: 'Etkileşim Skoru', value: bd.engScore, max: 15, weakness: 'Alıcılar ilgilenmiyor — görsel/fiyat iyileştirin' },
+                    { key: 'variety', label: 'Fiyat Çeşitliliği', value: bd.spreadScore, max: 15, weakness: 'Fiyat çeşitliliği az — fiyatlandırma fırsatı' },
+                  ];
+                  const weakest = components.reduce((min, c) => (c.value / c.max) < (min.value / min.max) ? c : min, components[0]);
+
+                  return (
+                    <Box sx={{ textAlign: 'left', mt: 1 }}>
+                      {components.map(c => {
+                        const pctVal = (c.value / c.max) * 100;
+                        const barColor = pctVal > 70 ? '#11998e' : pctVal >= 40 ? '#F2994A' : '#eb3349';
+                        return (
+                          <Box key={c.key} sx={{ mb: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.3 }}>
+                              <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>{c.label}</Typography>
+                              <Typography variant="caption" sx={{ fontWeight: 700, color: barColor }}>{c.value}/{c.max}</Typography>
+                            </Box>
+                            <Box sx={{ width: '100%', bgcolor: '#f0f0f0', borderRadius: 3, height: 8, overflow: 'hidden' }}>
+                              <Box sx={{
+                                width: `${pctVal}%`, height: 8, borderRadius: 3,
+                                bgcolor: barColor,
+                                transition: 'width 0.5s ease-out',
+                              }} />
+                            </Box>
+                          </Box>
+                        );
+                      })}
+                      <Alert severity="info" icon={<Info size={16} />} sx={{ mt: 1.5, borderRadius: '10px', py: 0.3, '& .MuiAlert-message': { fontSize: '0.78rem' } }}>
+                        <strong>En zayıf alan:</strong> {weakest.label} — {weakest.weakness}
+                      </Alert>
+                    </Box>
+                  );
+                })()}
               </Paper>
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
                 {[

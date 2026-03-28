@@ -1004,6 +1004,42 @@ function EtsyListingsPage() {
     fetchListings();
   };
 
+  // --- Inline edit handler (double-click title/price in DataGrid) ---
+  const handleProcessRowUpdate = useCallback(
+    async (newRow: EtsyListingRow, oldRow: EtsyListingRow) => {
+      const body: Record<string, any> = {};
+      if (newRow.title !== oldRow.title) body.title = newRow.title;
+      if (newRow.price !== oldRow.price) {
+        // price field was edited as a decimal string via valueGetter
+        const newPrice = parseFloat((newRow as any).price);
+        if (!isNaN(newPrice)) body.price = newPrice;
+      }
+      if (Object.keys(body).length === 0) return oldRow;
+
+      try {
+        const res = await fetch(
+          `/api/clawd/etsy?action=update_listing&listing_id=${newRow.listing_id}&shop_id=${selectedShopId}`,
+          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        toast.success('Güncellendi');
+        // Update local state
+        setListings((prev) => prev.map((l) => (l.listing_id === newRow.listing_id ? { ...l, ...body } : l)));
+        // Invalidate cache
+        const cacheKey = `${selectedShopId}:${statusFilter}`;
+        delete listingsCacheRef.current[cacheKey];
+        return newRow;
+      } catch (err: any) {
+        toast.error(`Güncelleme başarısız: ${err.message}`);
+        return oldRow;
+      }
+    },
+    [selectedShopId, statusFilter]
+  );
+
   // --- Open editor drawer ---
   const handleOpenEditor = (listingId: number) => {
     setDrawerListingId(String(listingId));
@@ -1128,8 +1164,9 @@ function EtsyListingsPage() {
         headerName: 'Başlık',
         flex: 1,
         minWidth: 200,
+        editable: true,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
-          <Tooltip title={params.row.title} arrow>
+          <Tooltip title={`${params.row.title} (düzenlemek için çift tıkla)`} arrow>
             <Typography
               variant="body2"
               sx={{
@@ -1150,8 +1187,12 @@ function EtsyListingsPage() {
         field: 'price',
         headerName: 'Fiyat',
         width: 100,
+        editable: true,
+        valueGetter: (value: any, row: EtsyListingRow) => {
+          return row.price ? (row.price.amount / row.price.divisor).toFixed(2) : '0.00';
+        },
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
-          <Typography variant="body2">{formatPrice(params.row.price)}</Typography>
+          <Typography variant="body2" sx={{ cursor: 'text' }}>{formatPrice(params.row.price)}</Typography>
         ),
         sortComparator: (v1: any, v2: any, p1: any, p2: any) => {
           const a = p1.api.getRow(p1.id)?.price;
@@ -1718,8 +1759,8 @@ function EtsyListingsPage() {
         </Paper>
       )}
 
-      {/* Bulk operations bar */}
-      {('ids' in selectedIds ? selectedIds.ids.size : 0) > 0 && (
+      {/* Bulk operations bar — always visible */}
+      {selectedShopId && (
         <BulkOperationsBar
           selectedCount={'ids' in selectedIds ? selectedIds.ids.size : 0}
           selectedListings={selectedListings}
@@ -1797,6 +1838,8 @@ function EtsyListingsPage() {
           loading={loading}
           checkboxSelection
           disableRowSelectionOnClick
+          processRowUpdate={handleProcessRowUpdate}
+          onProcessRowUpdateError={(error) => toast.error(`Güncelleme hatası: ${error.message}`)}
           rowHeight={64}
           rowSelectionModel={selectedIds}
           onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}

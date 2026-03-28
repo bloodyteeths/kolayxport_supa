@@ -10,9 +10,6 @@ import {
   FormControl,
   InputLabel,
   Button,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   CircularProgress,
   Switch,
   FormControlLabel,
@@ -29,6 +26,7 @@ import {
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -41,6 +39,17 @@ import UndoIcon from '@mui/icons-material/Undo';
 import AddIcon from '@mui/icons-material/Add';
 import HistoryIcon from '@mui/icons-material/History';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import SearchIcon from '@mui/icons-material/Search';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import ImageIcon from '@mui/icons-material/Image';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import BrushIcon from '@mui/icons-material/Brush';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import TuneIcon from '@mui/icons-material/Tune';
+import SettingsIcon from '@mui/icons-material/Settings';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-hot-toast';
 
 import SEOIndicator from './SEOIndicator';
@@ -368,8 +377,12 @@ export default function ListingEditorDrawer({
   const [rankAnalysisLoading, setRankAnalysisLoading] = useState<string | null>(null); // keyword being analyzed
   const [rankAnalysisOpen, setRankAnalysisOpen] = useState(false);
 
-  // Accordion expanded state — default to SEO
-  const [expanded, setExpanded] = useState<string | false>('seo');
+  // Tab state — replaces accordion expanded state
+  const [activeTab, setActiveTab] = useState<string>('seo');
+  // Keep expanded for backwards compat — maps to activeTab
+  const expanded = activeTab;
+  const theme = useTheme();
+  const isMobileEditor = useMediaQuery(theme.breakpoints.down('md'));
 
   // Auto-save state
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'unsaved' | 'saving' | 'saved' | 'error'>('idle');
@@ -806,7 +819,7 @@ export default function ListingEditorDrawer({
       originalFieldsRef.current = null;
       setFetchError(null);
       setVideos([]);
-      setExpanded('basics');
+      setActiveTab('basics');
       setAiTagSuggestions([]);
       setAutoSaveStatus('idle');
       setLastSavedAt(null);
@@ -858,7 +871,7 @@ export default function ListingEditorDrawer({
   };
 
   const handleAccordionChange = (panel: string) => (_: React.SyntheticEvent, isExpanded: boolean) => {
-    setExpanded(isExpanded ? panel : false);
+    setActiveTab(panel);
   };
 
   // --------------------------------------------------
@@ -1213,105 +1226,7 @@ export default function ListingEditorDrawer({
   // --------------------------------------------------
   // Render helpers
   // --------------------------------------------------
-  const renderHeader = () => {
-    const truncatedTitle = listing?.title
-      ? listing.title.length > 45
-        ? listing.title.substring(0, 45) + '...'
-        : listing.title
-      : 'Liste Duzenle';
-
-    return (
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          pt: { xs: 'calc(env(safe-area-inset-top, 0px) + 16px)', sm: 2 },
-          pb: 2,
-          px: 2,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-        }}
-      >
-        <Box sx={{ flex: 1, minWidth: 0, mr: 1 }}>
-          <Typography variant="subtitle1" fontWeight={600} noWrap title={listing?.title}>
-            {truncatedTitle}
-          </Typography>
-          {listing && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
-              <Chip
-                label={
-                  listing.state === 'active'
-                    ? 'Aktif'
-                    : listing.state === 'draft'
-                    ? 'Taslak'
-                    : listing.state === 'inactive'
-                    ? 'Deaktif'
-                    : listing.state === 'expired'
-                    ? 'Suresi Doldu'
-                    : listing.state
-                }
-                size="small"
-                color={
-                  listing.state === 'active'
-                    ? 'success'
-                    : listing.state === 'draft'
-                    ? 'warning'
-                    : 'default'
-                }
-                sx={{ height: 20, fontSize: '0.7rem' }}
-              />
-              <Typography variant="caption" color="text.secondary">
-                {listing.views} goruntulenme &middot; {listing.num_favorers} favori
-              </Typography>
-            </Box>
-          )}
-        </Box>
-
-        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-          {fields && (
-            <>
-              <Tooltip title="Profil Kaydet">
-                <IconButton size="small" onClick={() => setSaveTemplateOpen(true)}>
-                  <BookmarkBorderIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Profil Uygula">
-                <IconButton size="small" onClick={() => setLoadTemplateOpen(true)}>
-                  <FolderOpenIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </>
-          )}
-          {listing?.url && (
-            <Tooltip title="Etsy'de Goruntule">
-              <IconButton
-                size="small"
-                component="a"
-                href={listing.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <OpenInNewIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-          <Tooltip title="Kopyala">
-            <IconButton size="small" onClick={handleCopy} disabled={copying}>
-              {copying ? <CircularProgress size={18} /> : <ContentCopyIcon fontSize="small" />}
-            </IconButton>
-          </Tooltip>
-          <IconButton size="small" onClick={onClose}>
-            <CloseIcon />
-          </IconButton>
-        </Box>
-      </Box>
-    );
-  };
+  // renderHeader removed — header is now inline in the main render
 
   const renderLoadingState = () => (
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', p: 4 }}>
@@ -1337,6 +1252,19 @@ export default function ListingEditorDrawer({
     // Drawer is open but no data yet — nothing to render
   }
 
+  // Tab config for sidebar navigation
+  const editorTabs = [
+    { id: 'seo', label: 'SEO', icon: <SearchIcon fontSize="small" /> },
+    { id: 'basics', label: 'Temel', icon: <TextFieldsIcon fontSize="small" /> },
+    { id: 'pricing', label: 'Fiyat', icon: <AttachMoneyIcon fontSize="small" /> },
+    { id: 'images', label: 'Görseller', icon: <ImageIcon fontSize="small" /> },
+    { id: 'video', label: 'Video', icon: <VideocamIcon fontSize="small" /> },
+    { id: 'personalization', label: 'Kişisel', icon: <BrushIcon fontSize="small" /> },
+    { id: 'variations', label: 'Varyasyon', icon: <ViewModuleIcon fontSize="small" /> },
+    { id: 'details', label: 'Detaylar', icon: <TuneIcon fontSize="small" /> },
+    { id: 'actions', label: 'İşlemler', icon: <SettingsIcon fontSize="small" /> },
+  ];
+
   return (
     <>
       <Drawer
@@ -1345,103 +1273,225 @@ export default function ListingEditorDrawer({
         onClose={onClose}
         PaperProps={{
           sx: {
-            width: { xs: '100%', sm: DRAWER_WIDTH },
+            width: '100%',
             maxWidth: '100vw',
           },
         }}
       >
-        {/* Header — always shown */}
-        {renderHeader()}
+        {/* Header — full-width with back button */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            pt: { xs: 'calc(env(safe-area-inset-top, 0px) + 8px)', sm: 1 },
+            pb: 1,
+            px: 2,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+          }}
+        >
+          {/* Back button + Title */}
+          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, mr: 1 }}>
+            <IconButton onClick={onClose} sx={{ mr: 1 }}>
+              <ArrowBackIcon />
+            </IconButton>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle1" fontWeight={600} noWrap title={listing?.title}>
+                {listing?.title
+                  ? listing.title.length > (isMobileEditor ? 30 : 60)
+                    ? listing.title.substring(0, isMobileEditor ? 30 : 60) + '...'
+                    : listing.title
+                  : 'Liste Düzenle'}
+              </Typography>
+              {listing && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
+                  <Chip
+                    label={
+                      listing.state === 'active' ? 'Aktif'
+                        : listing.state === 'draft' ? 'Taslak'
+                        : listing.state === 'inactive' ? 'Deaktif'
+                        : listing.state === 'expired' ? 'Süresi Doldu'
+                        : listing.state
+                    }
+                    size="small"
+                    color={
+                      listing.state === 'active' ? 'success'
+                        : listing.state === 'draft' ? 'default'
+                        : listing.state === 'inactive' ? 'error'
+                        : 'warning'
+                    }
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    {listing.views} görüntülenme · {listing.num_favorers} favori
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Box>
 
-        {/* Auto-save status & Undo bar */}
-        {fields && listing && !loading && !fetchError && (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              px: 2,
-              py: 0.75,
-              borderBottom: '1px solid',
-              borderColor: 'divider',
-              bgcolor: 'grey.50',
-              minHeight: 36,
-            }}
-          >
-            {/* Auto-save status */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          {/* Action buttons */}
+          <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignItems: 'center' }}>
+            {/* Auto-save indicator */}
+            {fields && (
               <Box
                 sx={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
+                  width: 8, height: 8, borderRadius: '50%', mr: 0.5,
                   bgcolor:
-                    autoSaveStatus === 'unsaved'
-                      ? 'warning.main'
-                      : autoSaveStatus === 'saving'
-                      ? 'info.main'
-                      : autoSaveStatus === 'saved'
-                      ? 'success.main'
-                      : autoSaveStatus === 'error'
-                      ? 'error.main'
-                      : 'grey.400',
-                  flexShrink: 0,
+                    autoSaveStatus === 'unsaved' ? 'warning.main'
+                    : autoSaveStatus === 'saving' ? 'info.main'
+                    : autoSaveStatus === 'saved' ? 'success.main'
+                    : autoSaveStatus === 'error' ? 'error.main'
+                    : 'grey.400',
                 }}
               />
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                {autoSaveStatus === 'unsaved' && 'Degisiklik var (henuz Etsy\'ye gonderilmedi)'}
-                {autoSaveStatus === 'saving' && 'Yerel taslak kaydediliyor...'}
-                {autoSaveStatus === 'saved' &&
-                  `Yerel taslak kaydedildi (Etsy'ye gondermek icin "Etsy'ye Kaydet" basin)${lastSavedAt ? ` · ${lastSavedAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` : ''}`}
-                {autoSaveStatus === 'error' && 'Yerel taslak kayit hatasi'}
-                {autoSaveStatus === 'idle' && ''}
-              </Typography>
-            </Box>
-
-            {/* Undo button */}
-            <Tooltip title={history.length > 0 ? `Geri Al (${history.length} adim)` : 'Gecmis yok'}>
+            )}
+            <Tooltip title={history.length > 0 ? `Geri Al (${history.length})` : 'Geçmiş yok'}>
               <span>
-                <Button
-                  size="small"
-                  startIcon={<UndoIcon sx={{ fontSize: 16 }} />}
-                  onClick={handleUndo}
-                  disabled={history.length === 0}
-                  sx={{
-                    textTransform: 'none',
-                    fontSize: '0.7rem',
-                    minWidth: 0,
-                    py: 0.25,
-                    px: 1,
-                  }}
-                >
-                  Geri Al{history.length > 0 ? ` (${history.length})` : ''}
-                </Button>
+                <IconButton size="small" onClick={handleUndo} disabled={history.length === 0}>
+                  <UndoIcon fontSize="small" />
+                </IconButton>
               </span>
             </Tooltip>
+            {fields && (
+              <>
+                <Tooltip title="Profil Kaydet">
+                  <IconButton size="small" onClick={() => setSaveTemplateOpen(true)}>
+                    <BookmarkBorderIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Profil Uygula">
+                  <IconButton size="small" onClick={() => setLoadTemplateOpen(true)}>
+                    <FolderOpenIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
+            {listing?.url && (
+              <Tooltip title="Etsy'de Görüntüle">
+                <IconButton size="small" component="a" href={listing.url} target="_blank" rel="noopener noreferrer">
+                  <OpenInNewIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Tooltip title="Kopyala">
+              <IconButton size="small" onClick={handleCopy} disabled={copying}>
+                {copying ? <CircularProgress size={18} /> : <ContentCopyIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
           </Box>
-        )}
+        </Box>
 
-        {/* Content */}
+        {/* Content — sidebar + main area */}
         {loading ? (
           renderLoadingState()
         ) : fetchError ? (
           renderErrorState()
         ) : fields && listing ? (
-          <Box sx={{ overflow: 'auto', flex: 1, pb: 10 }}>
+          <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+            {/* Left sidebar tabs — desktop only */}
+            {!isMobileEditor && (
+              <Box
+                sx={{
+                  width: 180,
+                  minWidth: 180,
+                  borderRight: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: '#f8f9fb',
+                  overflowY: 'auto',
+                  py: 1,
+                }}
+              >
+                {editorTabs.map((tab) => (
+                  <Box
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      px: 2,
+                      py: 1.25,
+                      cursor: 'pointer',
+                      borderLeft: '3px solid',
+                      borderColor: activeTab === tab.id ? 'primary.main' : 'transparent',
+                      bgcolor: activeTab === tab.id ? 'white' : 'transparent',
+                      color: activeTab === tab.id ? 'primary.main' : 'text.secondary',
+                      fontWeight: activeTab === tab.id ? 600 : 400,
+                      transition: 'all 0.15s ease',
+                      '&:hover': {
+                        bgcolor: activeTab === tab.id ? 'white' : 'grey.100',
+                      },
+                    }}
+                  >
+                    {tab.icon}
+                    <Typography variant="body2" sx={{ fontWeight: 'inherit', fontSize: '0.85rem' }}>
+                      {tab.label}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {/* Mobile horizontal tabs */}
+            {isMobileEditor && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 'auto',
+                  left: 0,
+                  right: 0,
+                  zIndex: 5,
+                  bgcolor: 'background.paper',
+                  borderBottom: '1px solid',
+                  borderColor: 'divider',
+                  overflowX: 'auto',
+                  WebkitOverflowScrolling: 'touch',
+                  '&::-webkit-scrollbar': { display: 'none' },
+                  display: 'flex',
+                  gap: 0,
+                }}
+              >
+                {editorTabs.map((tab) => (
+                  <Box
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 0.25,
+                      px: 1.5,
+                      py: 1,
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      borderBottom: '2px solid',
+                      borderColor: activeTab === tab.id ? 'primary.main' : 'transparent',
+                      color: activeTab === tab.id ? 'primary.main' : 'text.secondary',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {tab.icon}
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: activeTab === tab.id ? 600 : 400, whiteSpace: 'nowrap' }}>
+                      {tab.label}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {/* Main content area */}
+            <Box sx={{ flex: 1, overflow: 'auto', pb: 10, pt: isMobileEditor ? '60px' : 0 }}>
             {/* ============================================================ */}
-            {/* SEO Analizi (top priority) */}
+            {/* SEO Analizi */}
             {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'seo'}
-              onChange={handleAccordionChange('seo')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>SEO Analizi</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
+            {activeTab === 'seo' && (
+              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <SEOIndicator
                   tags={fields.tags}
                   title={fields.title}
@@ -1595,23 +1645,14 @@ export default function ListingEditorDrawer({
                     </Box>
                   )}
                 </Box>
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            )}
 
             {/* ============================================================ */}
-            {/* 1. Temel Bilgiler */}
+            {/* Temel Bilgiler */}
             {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'basics'}
-              onChange={handleAccordionChange('basics')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Temel Bilgiler</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
+            {activeTab === 'basics' && (
+              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {/* Title */}
                   <Box>
@@ -1983,23 +2024,14 @@ export default function ListingEditorDrawer({
                     )}
                   />
                 </Box>
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            )}
 
             {/* ============================================================ */}
-            {/* 3. Fiyat ve Stok */}
+            {/* Fiyat ve Stok */}
             {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'pricing'}
-              onChange={handleAccordionChange('pricing')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Fiyat ve Stok</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
+            {activeTab === 'pricing' && (
+              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <TextField
                     label="Fiyat"
@@ -2031,55 +2063,38 @@ export default function ListingEditorDrawer({
                     inputProps={{ min: 0 }}
                   />
                 </Box>
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            )}
 
             {/* ============================================================ */}
-            {/* 4. Gorseller */}
+            {/* Gorseller */}
             {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'images'}
-              onChange={handleAccordionChange('images')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography fontWeight={600}>Gorseller</Typography>
+            {activeTab === 'images' && (
+              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <Typography variant="h6" fontWeight={600}>Görseller</Typography>
                   <Chip label={listing.images.length} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
                 </Box>
-              </AccordionSummary>
-              <AccordionDetails>
                 <ImageManager
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
-
                   images={listing.images}
                   onImagesChanged={fetchListing}
                 />
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            )}
 
             {/* ============================================================ */}
-            {/* 5. Video */}
+            {/* Video */}
             {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'video'}
-              onChange={handleAccordionChange('video')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography fontWeight={600}>Video</Typography>
+            {activeTab === 'video' && (
+              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <Typography variant="h6" fontWeight={600}>Video</Typography>
                   {videos.length > 0 && (
                     <Chip label={videos.length} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
                   )}
                 </Box>
-              </AccordionSummary>
-              <AccordionDetails>
                 {videosLoading ? (
                   <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
                     <CircularProgress size={24} />
@@ -2088,37 +2103,21 @@ export default function ListingEditorDrawer({
                   <VideoUploader
                     listingId={String(listing.listing_id)}
                     shopId={shopId}
-  
                     videos={videos}
                     onVideoChanged={fetchVideos}
                   />
                 )}
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            )}
 
             {/* ============================================================ */}
-            {/* 6. Kisiselleistirme */}
+            {/* Kişiselleştirme */}
             {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'personalization'}
-              onChange={handleAccordionChange('personalization')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography fontWeight={600}>Kisilestirme</Typography>
-                  {listing.is_personalizable && (
-                    <Chip label="Aktif" size="small" color="success" sx={{ height: 20, fontSize: '0.7rem' }} />
-                  )}
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails>
+            {activeTab === 'personalization' && (
+              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <PersonalizationEditor
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
-
                   questions={listing.personalization_questions}
                   legacy={{
                     is_personalizable: listing.is_personalizable || false,
@@ -2128,46 +2127,27 @@ export default function ListingEditorDrawer({
                   }}
                   onSaved={fetchListing}
                 />
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            )}
 
             {/* ============================================================ */}
-            {/* 7. Varyasyonlar ve Envanter */}
+            {/* Varyasyonlar ve Envanter */}
             {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'variations'}
-              onChange={handleAccordionChange('variations')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Varyasyonlar ve Envanter</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
+            {activeTab === 'variations' && (
+              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <VariationEditor
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
-
                   onSaved={fetchListing}
                 />
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            )}
 
             {/* ============================================================ */}
-            {/* 8. Liste Detaylari */}
+            {/* Liste Detayları */}
             {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'details'}
-              onChange={handleAccordionChange('details')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Liste Detaylari</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
+            {activeTab === 'details' && (
+              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {/* Who made */}
                   <FormControl size="small" fullWidth>
@@ -2442,23 +2422,14 @@ export default function ListingEditorDrawer({
                     </FormControl>
                   </Box>
                 </Box>
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            )}
 
             {/* ============================================================ */}
-            {/* 9. Islemler */}
+            {/* İşlemler */}
             {/* ============================================================ */}
-            <Accordion
-              expanded={expanded === 'actions'}
-              onChange={handleAccordionChange('actions')}
-              disableGutters
-              elevation={0}
-              sx={{ '&:before': { display: 'none' } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Islemler</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
+            {activeTab === 'actions' && (
+              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                   {/* Publish — only for draft/inactive */}
                   {(listing.state === 'draft' || listing.state === 'inactive') && (
@@ -2512,14 +2483,15 @@ export default function ListingEditorDrawer({
                     Sil
                   </Button>
                 </Box>
-              </AccordionDetails>
-            </Accordion>
+              </Box>
+            )}
+            </Box>
+
+            {/* ================================================================ */}
           </Box>
         ) : null}
 
-        {/* ================================================================ */}
-        {/* Footer — Save button */}
-        {/* ================================================================ */}
+        {/* Footer — Save button (sticky at bottom of drawer) */}
         {fields && listing && !loading && !fetchError && (
           <Box
             sx={{
@@ -2530,13 +2502,18 @@ export default function ListingEditorDrawer({
               borderColor: 'divider',
               bgcolor: 'background.paper',
               zIndex: 10,
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
             }}
           >
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 variant="contained"
                 size="large"
-                sx={{ flex: 1 }}
+                sx={{
+                  flex: 1,
+                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                  '&:hover': { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
+                }}
                 startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
                 onClick={handleSave}
                 disabled={saving || !hasChanges()}
@@ -2571,7 +2548,7 @@ export default function ListingEditorDrawer({
             </Box>
             {pendingScheduleCount > 0 && (
               <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: 'block', textAlign: 'right' }}>
-                {pendingScheduleCount} bekleyen guncelleme
+                {pendingScheduleCount} bekleyen güncelleme
               </Typography>
             )}
           </Box>

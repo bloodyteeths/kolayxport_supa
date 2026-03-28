@@ -16,7 +16,6 @@ import {
   LinearProgress,
   Typography,
   Box,
-  Slide,
   InputLabel,
   FormControl,
   Table,
@@ -209,7 +208,8 @@ export default function BulkOperationsBar({
   // Section dialog state
   const [targetSectionId, setTargetSectionId] = useState<number | ''>('');
 
-  const visible = selectedCount > 0 && !processing;
+  const visible = !processing; // Always show bar; buttons disabled when nothing selected
+  const hasSelection = selectedCount > 0;
 
   // Menu anchor states for grouped dropdowns
   const theme = useTheme();
@@ -937,30 +937,29 @@ export default function BulkOperationsBar({
         </Paper>
       )}
 
-      {/* Main bar */}
-      <Slide direction="up" in={visible} mountOnEnter unmountOnExit>
+      {/* Main bar — always visible inline */}
         <Paper
-          elevation={8}
+          elevation={hasSelection ? 3 : 0}
           sx={{
-            position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 1300,
-            px: { xs: 1.5, md: 3 },
-            py: 1.5,
+            px: { xs: 1.5, md: 2 },
+            py: 1,
+            mb: 1,
             display: 'flex',
             alignItems: 'center',
             gap: 1,
             overflow: 'hidden',
-            borderTop: '2px solid',
-            borderColor: 'primary.main',
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: hasSelection ? 'primary.main' : 'divider',
+            bgcolor: hasSelection ? 'primary.50' : 'background.paper',
+            transition: 'all 0.2s ease',
+            opacity: processing ? 0.6 : 1,
           }}
         >
           {/* Selected count */}
           <Chip
-            label={isMobile ? `✓ ${selectedCount}` : `✓ ${selectedCount} seçildi`}
-            color="primary"
+            label={isMobile ? (hasSelection ? `✓ ${selectedCount}` : 'Seç') : (hasSelection ? `✓ ${selectedCount} seçildi` : 'Toplu İşlemler')}
+            color={hasSelection ? 'primary' : 'default'}
             size="small"
             sx={{ fontWeight: 600, mr: 0.5, flexShrink: 0 }}
           />
@@ -969,6 +968,7 @@ export default function BulkOperationsBar({
           <Button
             size="small"
             variant="outlined"
+            disabled={!hasSelection}
             startIcon={<LocalOfferOutlined />}
             endIcon={<KeyboardArrowDownIcon />}
             onClick={(e) => setTagsMenuAnchor(e.currentTarget)}
@@ -1001,6 +1001,7 @@ export default function BulkOperationsBar({
           <Button
             size="small"
             variant="outlined"
+            disabled={!hasSelection}
             startIcon={<AttachMoneyOutlined />}
             endIcon={<KeyboardArrowDownIcon />}
             onClick={(e) => setPriceMenuAnchor(e.currentTarget)}
@@ -1031,6 +1032,7 @@ export default function BulkOperationsBar({
               <Button
                 size="small"
                 variant="outlined"
+                disabled={!hasSelection}
                 startIcon={<DriveFileMoveOutlined />}
                 endIcon={<KeyboardArrowDownIcon />}
                 onClick={(e) => setManagementMenuAnchor(e.currentTarget)}
@@ -1077,6 +1079,7 @@ export default function BulkOperationsBar({
               <Button
                 size="small"
                 variant="outlined"
+                disabled={!hasSelection}
                 startIcon={<AutoFixHigh />}
                 endIcon={<KeyboardArrowDownIcon />}
                 onClick={(e) => setAiMenuAnchor(e.currentTarget)}
@@ -1107,6 +1110,7 @@ export default function BulkOperationsBar({
           {isMobile && (
             <IconButton
               size="small"
+              disabled={!hasSelection}
               onClick={() => setMobileDrawerOpen(true)}
               sx={{ minHeight: 36, minWidth: 36, flexShrink: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
             >
@@ -1119,8 +1123,9 @@ export default function BulkOperationsBar({
             <IconButton
               size="small"
               color="error"
+              disabled={!hasSelection}
               onClick={() => setDeleteDialogOpen(true)}
-              sx={{ minHeight: 36, minWidth: 36, flexShrink: 0, border: '1px solid', borderColor: 'error.main', borderRadius: 1, ml: 'auto' }}
+              sx={{ minHeight: 36, minWidth: 36, flexShrink: 0, border: '1px solid', borderColor: hasSelection ? 'error.main' : 'divider', borderRadius: 1, ml: 'auto' }}
             >
               <DeleteOutline />
             </IconButton>
@@ -1129,6 +1134,7 @@ export default function BulkOperationsBar({
               size="small"
               variant="outlined"
               color="error"
+              disabled={!hasSelection}
               startIcon={<DeleteOutline />}
               onClick={() => setDeleteDialogOpen(true)}
               sx={{ minHeight: 36, flexShrink: 0, ml: 'auto' }}
@@ -1137,7 +1143,6 @@ export default function BulkOperationsBar({
             </Button>
           )}
         </Paper>
-      </Slide>
 
       {/* Mobile overflow drawer */}
       <SwipeableDrawer

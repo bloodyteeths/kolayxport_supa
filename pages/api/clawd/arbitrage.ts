@@ -96,70 +96,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Get eBay app token
         const appToken = await getApplicationToken();
 
-        // Fetch Trendyol products from selected categories
-        const allTrendyolProducts = new Map<number, any>();
+        // Process each category: fetch Trendyol products, search eBay with English terms,
+        // then calculate arbitrage for each Trendyol product against eBay market data.
+        const results: ArbitrageResult[] = [];
+        let totalScannedCount = 0;
         const perCategoryLimit = Math.ceil(maxTrendyolResults / categories.length);
 
         for (const slug of categories) {
           try {
-            const { products } = await fetchTrendyolCategoryProducts(slug);
-            products.slice(0, perCategoryLimit).forEach((p: any) => {
-              if (!allTrendyolProducts.has(p.id)) {
-                allTrendyolProducts.set(p.id, p);
-              }
-            });
-          } catch (err) {
-            logger.warn(`Trendyol category fetch failed for "${slug}"`, { error: String(err) });
-          }
-        }
+            // Fetch Trendyol products for this category
+            const { products: trendyolProducts } = await fetchTrendyolCategoryProducts(slug);
+            const categoryProducts = trendyolProducts.slice(0, perCategoryLimit);
+            if (categoryProducts.length === 0) continue;
+            totalScannedCount += categoryProducts.length;
 
-        const trendyolProducts = Array.from(allTrendyolProducts.values()).slice(0, maxTrendyolResults);
+            // Find the English search term for this category
+            const categoryDef = TRENDYOL_CATEGORIES.find(c => c.slug === slug);
+            const ebaySearchQuery = categoryDef?.ebaySearch || categoryDef?.label || slug.split('-x-c')[0].replace(/-/g, ' ');
 
-        if (trendyolProducts.length === 0) {
-          return res.json({
-            results: [],
-            exchangeRate,
-            totalScanned: 0,
-            profitable: 0,
-            scanDurationMs: Date.now() - startTime,
-          } as ArbitrageScanResponse);
-        }
-
-        // For each Trendyol product, search eBay and calculate arbitrage
-        const results: ArbitrageResult[] = [];
-
-        for (const tp of trendyolProducts) {
-          try {
-            // Build search query — use brand + first 3-4 words of name
-            const nameWords = tp.name
-              .replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s]/g, ' ')
-              .split(/\s+/)
-              .filter((w: string) => w.length > 2)
-              .slice(0, 4)
-              .join(' ');
-
-            const searchTerms = tp.brand
-              ? `${tp.brand} ${nameWords}`.trim()
-              : nameWords;
-
-            if (!searchTerms || searchTerms.length < 3) continue;
-
-            // Search eBay
+            // Search eBay once per category using English terms
             const searchParams = new URLSearchParams();
-            searchParams.set('q', searchTerms);
+            searchParams.set('q', ebaySearchQuery);
             searchParams.set('sort', 'newlyListed');
-            searchParams.set('limit', '15');
+            searchParams.set('limit', '30');
 
-            const searchResult = await callEbayAPI(
-              `/buy/browse/v1/item_summary/search?${searchParams.toString()}`,
-              appToken
-            );
+            let ebayItems: any[] = [];
+            try {
+              const searchResult = await callEbayAPI(
+                `/buy/browse/v1/item_summary/search?${searchParams.toString()}`,
+                appToken
+              );
+              ebayItems = searchResult.itemSummaries || [];
+            } catch (err) {
+              logger.warn(`eBay search failed for "${ebaySearchQuery}"`, { error: String(err) });
+              continue;
+            }
 
-            const ebayItems = searchResult.itemSummaries || [];
             if (ebayItems.length === 0) continue;
 
-            // Enrich first 8 with sold quantity
-            const enrichLimit = Math.min(ebayItems.length, 8);
+            // Enrich top eBay items with sold quantity
+            const enrichLimit = Math.min(ebayItems.length, 12);
             const enriched: EbayComparable[] = [];
 
             for (let i = 0; i < enrichLimit; i++) {
@@ -197,24 +173,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               }
             }
 
-            const validItems = enriched.filter(i => i.price > 0);
-            if (validItems.length === 0) continue;
+            const validEbayItems = enriched.filter(i => i.price > 0);
+            if (validEbayItems.length === 0) continue;
 
-            const result = calculateArbitrage({
-              trendyol: tp,
-              ebayItems: validItems,
-              exchangeRate,
-              shippingCostUsd,
-              feeOverridePercent,
-              includeInternationalFee,
-              highDefectRate,
-            });
+            // Calculate arbitrage for each Trendyol product against the eBay market data
+            for (const tp of categoryProducts) {
+              try {
+                const result = calculateArbitrage({
+                  trendyol: tp,
+                  ebayItems: validEbayItems,
+                  exchangeRate,
+                  shippingCostUsd,
+                  feeOverridePercent,
+                  includeInternationalFee,
+                  highDefectRate,
+                });
 
-            if (result) {
-              results.push(result);
+                if (result) {
+                  results.push(result);
+                }
+              } catch (err) {
+                logger.warn(`Arbitrage calc failed for Trendyol product ${tp.id}`, { error: String(err) });
+              }
             }
           } catch (err) {
-            logger.warn(`Arbitrage calc failed for Trendyol product ${tp.id}`, { error: String(err) });
+            logger.warn(`Category scan failed for "${slug}"`, { error: String(err) });
           }
         }
 
@@ -228,7 +211,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.json({
           results: sorted,
           exchangeRate,
-          totalScanned: trendyolProducts.length,
+          totalScanned: totalScannedCount,
           profitable: profitable.length,
           scanDurationMs: Date.now() - startTime,
         } as ArbitrageScanResponse);

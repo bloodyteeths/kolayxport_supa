@@ -2,15 +2,11 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '../../../lib/logger';
 import { getSupabaseServerClient } from '../../../lib/supabase';
 import { getApplicationToken } from '../../../lib/integrations/ebayClient';
-import { searchTrendyolProducts, getExchangeRate } from '../../../lib/integrations/trendyolSearch';
+import { fetchTrendyolCategoryProducts, getExchangeRate, TRENDYOL_CATEGORIES } from '../../../lib/integrations/trendyolSearch';
 import { calculateArbitrage } from '../../../lib/arbitrage/calculator';
 import type { ArbitrageResult, EbayComparable, ArbitrageScanResponse } from '../../../lib/arbitrage/types';
 
-// Run from Frankfurt (EU) to avoid Trendyol geo-blocking
-export const config = {
-  runtime: 'nodejs',
-  regions: ['fra1'],
-};
+export const config = { runtime: 'nodejs' };
 
 const EBAY_API_BASE = 'https://api.ebay.com';
 
@@ -80,7 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'scan': {
         const startTime = Date.now();
         const {
-          keywords = [],
+          categories = [],
           minProfitUsd = 5,
           minRoiPercent = 20,
           shippingCostUsd = 15,
@@ -90,8 +86,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           highDefectRate = false,
         } = req.body;
 
-        if (!keywords.length) {
-          return res.status(400).json({ error: 'At least one keyword is required' });
+        if (!categories.length) {
+          return res.status(400).json({ error: 'At least one category is required' });
         }
 
         // Get exchange rate
@@ -100,24 +96,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Get eBay app token
         const appToken = await getApplicationToken();
 
-        // Search Trendyol for each keyword
+        // Fetch Trendyol products from selected categories
         const allTrendyolProducts = new Map<number, any>();
-        const perKeywordLimit = Math.ceil(maxTrendyolResults / keywords.length);
+        const perCategoryLimit = Math.ceil(maxTrendyolResults / categories.length);
 
-        for (const kw of keywords) {
+        for (const slug of categories) {
           try {
-            const { products } = await searchTrendyolProducts({
-              query: kw,
-              limit: perKeywordLimit,
-              sort: 'BEST_SELLER',
-            });
-            products.forEach((p: any) => {
+            const { products } = await fetchTrendyolCategoryProducts(slug);
+            products.slice(0, perCategoryLimit).forEach((p: any) => {
               if (!allTrendyolProducts.has(p.id)) {
                 allTrendyolProducts.set(p.id, p);
               }
             });
           } catch (err) {
-            logger.warn(`Trendyol search failed for "${kw}"`, { error: String(err) });
+            logger.warn(`Trendyol category fetch failed for "${slug}"`, { error: String(err) });
           }
         }
 
@@ -138,15 +130,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         for (const tp of trendyolProducts) {
           try {
-            // Build a search query from product name — use first 4-5 meaningful words
-            const searchTerms = tp.name
+            // Build search query — use brand + first 3-4 words of name
+            const nameWords = tp.name
               .replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ0-9\s]/g, ' ')
               .split(/\s+/)
               .filter((w: string) => w.length > 2)
-              .slice(0, 5)
+              .slice(0, 4)
               .join(' ');
 
-            if (!searchTerms) continue;
+            const searchTerms = tp.brand
+              ? `${tp.brand} ${nameWords}`.trim()
+              : nameWords;
+
+            if (!searchTerms || searchTerms.length < 3) continue;
 
             // Search eBay
             const searchParams = new URLSearchParams();
@@ -238,16 +234,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } as ArbitrageScanResponse);
       }
 
+      case 'categories': {
+        return res.json({ categories: TRENDYOL_CATEGORIES });
+      }
+
       case 'exchange_rate': {
         const rate = await getExchangeRate();
         return res.json({ rate, source: 'open.er-api.com' });
       }
 
       case 'test_trendyol': {
-        const query = req.body.query || 'havlu';
+        const slug = req.body.slug || 'havlu-x-c104073';
         try {
-          const result = await searchTrendyolProducts({ query, limit: 5 });
-          return res.json({ success: true, count: result.products.length, totalCount: result.totalCount, products: result.products.slice(0, 2) });
+          const result = await fetchTrendyolCategoryProducts(slug);
+          return res.json({
+            success: true,
+            count: result.products.length,
+            products: result.products.slice(0, 3).map(p => ({
+              id: p.id, name: p.name, brand: p.brand,
+              priceTry: p.priceTry, imageUrl: p.imageUrl,
+            })),
+          });
         } catch (err: any) {
           return res.json({ success: false, error: err.message });
         }

@@ -1,5 +1,5 @@
 export interface ArbitrageScanParams {
-  keywords: string[];
+  categories: string[];
   minProfitUsd: number;
   minRoiPercent: number;
   shippingCostUsd: number;

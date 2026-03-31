@@ -259,7 +259,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const hasDiscountedPrice = html.includes('"discountedPrice"');
           const hasPriceInfos = html.includes('"priceInfos"');
           const idMatches = html.match(/"id":\d+/g) || [];
-          const sample = html.substring(html.indexOf('"products":['), html.indexOf('"products":[') + 500);
+          // Extract first full product object
+          const productsIdx = html.indexOf('"products":[');
+          let firstProduct = '';
+          if (productsIdx > -1) {
+            const arrStart = productsIdx + '"products":['.length;
+            let depth = 0;
+            let i = arrStart;
+            for (; i < html.length && i < arrStart + 5000; i++) {
+              if (html[i] === '{') depth++;
+              if (html[i] === '}') { depth--; if (depth === 0) { i++; break; } }
+            }
+            firstProduct = html.substring(arrStart, i);
+          }
 
           const result = await fetchTrendyolCategoryProducts(slug);
           return res.json({
@@ -270,7 +282,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             hasDiscountedPrice,
             hasPriceInfos,
             idCount: idMatches.length,
-            sampleJson: sample.substring(0, 300),
+            firstProduct: firstProduct.substring(0, 2000),
             parsedCount: result.products.length,
             products: result.products.slice(0, 2).map(p => ({
               id: p.id, name: p.name, brand: p.brand,

@@ -246,11 +246,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'test_trendyol': {
         const slug = req.body.slug || 'havlu-x-c104073';
         try {
+          // Raw fetch to debug HTML content
+          const rawRes = await fetch(`https://www.trendyol.com/${slug}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+              'Accept': 'text/html',
+            },
+            redirect: 'follow',
+          });
+          const html = await rawRes.text();
+          const hasProducts = html.includes('"products":[');
+          const hasDiscountedPrice = html.includes('"discountedPrice"');
+          const hasPriceInfos = html.includes('"priceInfos"');
+          const idMatches = html.match(/"id":\d+/g) || [];
+          const sample = html.substring(html.indexOf('"products":['), html.indexOf('"products":[') + 500);
+
           const result = await fetchTrendyolCategoryProducts(slug);
           return res.json({
             success: true,
-            count: result.products.length,
-            products: result.products.slice(0, 3).map(p => ({
+            httpStatus: rawRes.status,
+            htmlLength: html.length,
+            hasProducts,
+            hasDiscountedPrice,
+            hasPriceInfos,
+            idCount: idMatches.length,
+            sampleJson: sample.substring(0, 300),
+            parsedCount: result.products.length,
+            products: result.products.slice(0, 2).map(p => ({
               id: p.id, name: p.name, brand: p.brand,
               priceTry: p.priceTry, imageUrl: p.imageUrl,
             })),

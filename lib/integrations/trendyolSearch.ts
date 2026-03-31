@@ -70,49 +70,74 @@ export async function fetchTrendyolCategoryProducts(categorySlug: string, page =
 
   const html = await res.text();
 
-  // Parse embedded product JSON from the SSR HTML
-  // Products appear in the second "products":[ block (the first is a small boutique carousel)
+  // Extract the products JSON array from SSR HTML.
+  // Products are embedded as "products":[{...},{...},...] in a script/state block.
+  // We find the largest "products":[ array (the main listing, not small carousels).
   const products: TrendyolProduct[] = [];
-
-  // Find all product blocks with priceInfos (the real product listings)
-  const productRegex = /\{"brand":"([^"]*)"[^}]*"title":"([^"]*)"[^}]*"id":(\d+)[^}]*"price":"([^"]*)"[^}]*"imgUrl":"([^"]*)"[^}]*"productUrl":"([^"]*)"[^}]*?"priceInfos":\{[^}]*"discountedPrice":([\d.]+)[^}]*"sellingPrice":([\d.]+)/g;
-
-  let match;
   const seenIds = new Set<number>();
 
-  while ((match = productRegex.exec(html)) !== null) {
-    const id = parseInt(match[3]);
-    if (seenIds.has(id)) continue;
+  // Find all occurrences of "products":[ and extract the array from each
+  let searchFrom = 0;
+  let bestRaw: any[] = [];
+
+  while (true) {
+    const marker = '"products":[';
+    const idx = html.indexOf(marker, searchFrom);
+    if (idx === -1) break;
+
+    const arrStart = idx + marker.length - 1; // position of '['
+    // Walk through to find the matching ']'
+    let depth = 0;
+    let arrEnd = arrStart;
+    for (let i = arrStart; i < html.length && i < arrStart + 500000; i++) {
+      if (html[i] === '[') depth++;
+      if (html[i] === ']') {
+        depth--;
+        if (depth === 0) { arrEnd = i + 1; break; }
+      }
+    }
+
+    if (arrEnd > arrStart) {
+      try {
+        const raw = JSON.parse(html.substring(arrStart, arrEnd));
+        if (Array.isArray(raw) && raw.length > bestRaw.length) {
+          bestRaw = raw;
+        }
+      } catch {
+        // Not valid JSON, skip
+      }
+    }
+    searchFrom = idx + marker.length;
+  }
+
+  // Map raw product objects to TrendyolProduct
+  for (const p of bestRaw) {
+    const id = p.id || p.contentId;
+    if (!id || seenIds.has(id)) continue;
     seenIds.add(id);
 
-    const imgUrl = match[5].replace(/\\u002F/g, '/');
-    const productUrl = match[6].replace(/\\u002F/g, '/');
+    const discountedPrice = p.price?.discountedPrice ?? p.price?.current ?? 0;
+    const originalPrice = p.price?.originalPrice ?? p.price?.current ?? discountedPrice;
+
+    const imgUrl = (p.image || p.images?.[0] || '')
+      .replace(/\\u002F/g, '/');
+    const productUrl = (p.url || '')
+      .replace(/\\u002F/g, '/');
 
     products.push({
       id,
-      name: match[2],
-      brand: match[1],
-      priceTry: parseFloat(match[7]) || 0, // discountedPrice
-      originalPriceTry: parseFloat(match[8]) || 0, // sellingPrice
+      name: p.name || '',
+      brand: p.brand || '',
+      priceTry: discountedPrice,
+      originalPriceTry: originalPrice,
       imageUrl: imgUrl.startsWith('http') ? imgUrl : `https://cdn.dsmcdn.com${imgUrl}`,
-      url: `https://www.trendyol.com${productUrl}`,
-      categoryName: categorySlug.split('-x-c')[0].replace(/-/g, ' '),
-      ratingScore: 0,
-      ratingCount: 0,
+      url: productUrl.startsWith('http') ? productUrl : `https://www.trendyol.com${productUrl}`,
+      categoryName: p.category?.name || categorySlug.split('-x-c')[0].replace(/-/g, ' '),
+      ratingScore: p.ratingScore?.averageRating || 0,
+      ratingCount: p.ratingScore?.totalCount || 0,
       merchantName: '',
-      freeShipping: false,
+      freeShipping: p.freeCargo || false,
     });
-  }
-
-  // Try to extract rating info separately
-  const ratingRegex = /"id":(\d+)[^}]*?"ratingScore":\{"averageRating":([\d.]+),"totalCount":(\d+)\}/g;
-  while ((match = ratingRegex.exec(html)) !== null) {
-    const id = parseInt(match[1]);
-    const product = products.find(p => p.id === id);
-    if (product) {
-      product.ratingScore = parseFloat(match[2]);
-      product.ratingCount = parseInt(match[3]);
-    }
   }
 
   return {

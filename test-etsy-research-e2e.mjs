@@ -4,10 +4,6 @@
  * Tests all new Phase 2-6 endpoints: research intelligence, AI reports, extension API, telemetry
  *
  * Usage: node test-etsy-research-e2e.mjs [base_url]
- *
- * NOTE: /api/ext/* and /api/ext/telemetry are NEW endpoints.
- *       They will 404 until the code is deployed. Tests are marked (DEPLOY)
- *       and auto-skip on 404 so you can run this before and after deploy.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -83,10 +79,10 @@ async function test(num, name, fn) {
   }
 }
 
-// Wraps a POST call that may 404 if endpoint not deployed yet
+// ext endpoints use Supabase cookie auth to bypass anonymous rate limit
 async function extPost(path, body) {
   const res = await fetch(`${BASE}${path}`, {
-    method: 'POST', headers, body: JSON.stringify(body),
+    method: 'POST', headers: authedHeaders(), body: JSON.stringify(body),
   });
   if (res.status === 404) throw new Error('NOT_DEPLOYED');
   const text = await res.text();
@@ -130,11 +126,6 @@ async function apiPost(path, body, { auth = false, allow404 = false } = {}) {
 
 function assert(condition, msg) {
   if (!condition) throw new Error(msg);
-}
-
-// For endpoints not yet deployed — auto-skip on 404
-async function apiPostDeploy(path, body, opts = {}) {
-  return apiPost(path, body, { ...opts, allow404: true });
 }
 
 async function fetchRaw(path, fetchOpts = {}) {
@@ -200,51 +191,50 @@ async function run() {
 
   await test(4, 'analyze_niche — demand scoring', async () => {
     const d = await apiGet(`/api/clawd/etsy?action=analyze_niche&keywords=${encodeURIComponent(TEST_KEYWORD)}&shop_id=${SHOP_ID}`);
-    assert(d.demandScore !== undefined || d.demand_score !== undefined, 'No demand score');
     nicheData = d;
-    const score = d.demandScore ?? d.demand_score;
+    // demandScore is an object {score, breakdown, level}
+    const ds = d.demandScore;
+    assert(ds, 'No demandScore');
+    const score = typeof ds === 'object' ? ds.score : ds;
     assert(typeof score === 'number' && score >= 0 && score <= 100, `Score out of range: ${score}`);
-    return `Demand score: ${score}/100, supply: ${d.supplyMetrics?.totalResults || d.supply?.totalResults || '?'}`;
+    return `Demand score: ${score}/100 (${ds.level || '?'}), supply: ${d.totalResults || '?'}`;
   });
 
   await test(5, 'analyze_niche — competition metrics', async () => {
     assert(nicheData, 'No niche data from test #4');
-    const comp = nicheData.competitionMetrics || nicheData.competition || {};
-    assert(comp.saturationIndex !== undefined || comp.saturation !== undefined, 'No saturation index');
-    const sat = comp.saturationIndex ?? comp.saturation;
-    return `Saturation: ${sat}, concentration: ${comp.topSellerConcentration ?? comp.concentration ?? '?'}`;
+    const comp = nicheData.competition || {};
+    assert(comp.saturationIndex !== undefined, 'No saturation index');
+    return `Saturation: ${comp.saturationIndex}, concentration: ${comp.top5Concentration ?? '?'}`;
   });
 
   await test(6, 'analyze_niche — sales velocity', async () => {
     assert(nicheData, 'No niche data from test #4');
-    const vel = nicheData.salesVelocity || nicheData.velocity || {};
-    assert(vel.avgMonthlySales !== undefined || vel.avg !== undefined, 'No velocity data');
-    return `Avg monthly: ${vel.avgMonthlySales ?? vel.avg}, median: ${vel.medianMonthlySales ?? vel.median ?? '?'}`;
+    const vel = nicheData.velocity || {};
+    assert(vel.avgEstMonthlySales !== undefined, 'No velocity data');
+    return `Avg monthly: ${vel.avgEstMonthlySales}, median: ${vel.medianEstMonthlySales ?? '?'}`;
   });
 
-  await test(7, 'analyze_niche — price tiers', async () => {
+  await test(7, 'analyze_niche — price stats', async () => {
     assert(nicheData, 'No niche data from test #4');
-    const tiers = nicheData.priceTiers || nicheData.price_tiers || {};
-    const keys = Object.keys(tiers);
-    assert(keys.length > 0, 'No price tiers');
-    return `${keys.length} price tiers: ${keys.join(', ')}`;
+    const ps = nicheData.priceStats || {};
+    assert(ps.avg !== undefined, 'No price stats');
+    return `Avg: $${ps.avg}, median: $${ps.median}, range: $${ps.min}-$${ps.max}`;
   });
 
   await test(8, 'estimate_sales_velocity', async () => {
     const d = await apiGet(`/api/clawd/etsy?action=estimate_sales_velocity&keywords=${encodeURIComponent(TEST_KEYWORD)}&shop_id=${SHOP_ID}`);
-    assert(d.velocities || d.results || d.items, 'No velocity results');
-    const items = d.velocities || d.results || d.items || [];
+    const items = d.listings || d.velocities || d.results || [];
     assert(items.length > 0, 'Empty velocity results');
     const first = items[0];
-    assert(first.estMonthlySales !== undefined || first.velocity !== undefined, 'No sales estimate on item');
-    return `${items.length} items, first est: ${first.estMonthlySales ?? first.velocity}/mo`;
+    assert(first.estMonthlySales !== undefined, 'No sales estimate on item');
+    return `${items.length} items, first est: ${first.estMonthlySales}/mo, summary avg: ${d.summary?.avgEstMonthlySales ?? '?'}`;
   });
 
   await test(9, 'analyze_competition', async () => {
     const d = await apiGet(`/api/clawd/etsy?action=analyze_competition&keywords=${encodeURIComponent(TEST_KEYWORD)}&shop_id=${SHOP_ID}`);
-    assert(d.saturationIndex !== undefined || d.saturation !== undefined || d.competition, 'No competition data');
-    const sat = d.saturationIndex ?? d.saturation ?? d.competition?.saturation;
-    return `Saturation: ${sat}, new seller success: ${d.newSellerSuccess ?? d.newSellerSignal ?? d.competition?.newSellerSuccess ?? '?'}`;
+    assert(d.saturationIndex !== undefined || d.competition, 'No competition data');
+    const sat = d.saturationIndex ?? d.competition?.saturationIndex;
+    return `Saturation: ${sat}, new seller: ${d.newSellerPct ?? d.competition?.newSellerPct ?? '?'}%`;
   });
 
   // ═══════════════════════════════════════════════════════════════════
@@ -265,7 +255,7 @@ async function run() {
   await test(11, 'get_shop_reviews', async () => {
     const d = await apiGet(`/api/clawd/etsy?action=get_shop_reviews&target_shop_id=${SHOP_ID}&shop_id=${SHOP_ID}`);
     const reviews = d.reviews || d.results || [];
-    assert(reviews.length >= 0, 'Invalid reviews response'); // 0 reviews is valid
+    assert(reviews.length >= 0, 'Invalid reviews response');
     shopReviews = reviews;
     return `${reviews.length} reviews loaded`;
   });
@@ -288,55 +278,54 @@ async function run() {
 
   await test(13, 'AI niche_report', async () => {
     if (!nicheData) return 'SKIP';
+    const score = typeof nicheData.demandScore === 'object' ? nicheData.demandScore.score : nicheData.demandScore;
     const d = await apiPost('/api/ai/etsy', {
       action: 'niche_report',
       query: TEST_KEYWORD,
-      totalResults: nicheData.supplyMetrics?.totalResults || 1000,
-      avgPrice: nicheData.supplyMetrics?.avgPrice || 25,
-      avgFavorites: nicheData.supplyMetrics?.avgFavorites || 50,
+      demandScore: score ?? 50,
+      priceStats: nicheData.priceStats,
+      competition: nicheData.competition,
+      velocity: nicheData.velocity,
+      engagement: nicheData.engagement,
       topTags: ['baby', 'blanket', 'crochet', 'handmade', 'gift'],
-      demandScore: nicheData.demandScore ?? nicheData.demand_score ?? 50,
     }, { auth: true });
-    assert(d.verdict || d.report?.verdict, 'No verdict');
-    const verdict = d.verdict || d.report?.verdict;
-    return `Verdict: ${verdict}`;
+    // Response: { report: { verdict, strengths, weaknesses, opportunities, ... } }
+    const report = d.report || d;
+    assert(report.verdict, 'No verdict');
+    return `Verdict: ${report.verdict}`;
   });
 
-  await test(14, 'AI niche_report — SWOT', async () => {
+  await test(14, 'AI niche_report — strengths/weaknesses', async () => {
+    const score = nicheData ? (typeof nicheData.demandScore === 'object' ? nicheData.demandScore.score : nicheData.demandScore) : 50;
     const d = await apiPost('/api/ai/etsy', {
       action: 'niche_report',
       query: TEST_KEYWORD,
-      totalResults: 5000,
-      avgPrice: 30,
-      avgFavorites: 100,
+      demandScore: score,
+      priceStats: { min: 5, avg: 30, median: 25, max: 85 },
       topTags: ['baby', 'blanket', 'crochet'],
-      demandScore: 65,
     }, { auth: true });
-    const swot = d.swot || d.report?.swot;
-    assert(swot, 'No SWOT analysis');
-    assert(swot.strengths || swot.S, 'No strengths in SWOT');
-    assert(swot.weaknesses || swot.W, 'No weaknesses in SWOT');
-    return `SWOT: S=${(swot.strengths || swot.S)?.length || '?'}, W=${(swot.weaknesses || swot.W)?.length || '?'}`;
+    const report = d.report || d;
+    assert(report.strengths, 'No strengths');
+    assert(report.weaknesses, 'No weaknesses');
+    assert(report.opportunities, 'No opportunities');
+    return `Strengths: ${report.strengths?.length || '?'}, Weaknesses: ${report.weaknesses?.length || '?'}, Opportunities: ${report.opportunities?.length || '?'}`;
   });
 
   await test(15, 'AI shop_spy_report', async () => {
     const d = await apiPost('/api/ai/etsy', {
       action: 'shop_spy_report',
       shopName: 'TestShop',
-      totalSales: 5000,
-      rating: 4.8,
-      reviewCount: 200,
-      listingCount: 150,
-      avgPrice: 35,
+      shopData: { sales: 5000, rating: 4.8, listings: 150 },
       topListings: [
         { title: 'Handmade Baby Blanket', price: 40, favorites: 500 },
         { title: 'Crochet Toy Set', price: 25, favorites: 300 },
       ],
       topTags: ['baby', 'crochet', 'handmade'],
     }, { auth: true });
-    assert(d.grade || d.report?.grade || d.shopGrade, 'No shop grade');
-    const grade = d.grade || d.report?.grade || d.shopGrade;
-    return `Shop grade: ${grade}, revenue est: ${d.monthlyRevenue || d.report?.monthlyRevenue || '?'}`;
+    // Response: { report: { shop_grade, estimated_monthly_revenue, ... } }
+    const report = d.report || d;
+    assert(report.shop_grade, 'No shop grade');
+    return `Shop grade: ${report.shop_grade}, revenue est: $${report.estimated_monthly_revenue || '?'}`;
   });
 
   await test(16, 'AI listing_audit', async () => {
@@ -350,10 +339,11 @@ async function run() {
       favorites: 100,
       views: 2000,
     }, { auth: true });
-    assert(d.grade || d.audit?.grade || d.overallGrade, 'No audit grade');
-    const grade = d.grade || d.audit?.grade || d.overallGrade;
-    assert(d.quickWins || d.audit?.quickWins || d.improvements, 'No quick wins');
-    return `Grade: ${grade}, quick wins: ${(d.quickWins || d.audit?.quickWins || d.improvements)?.length || '?'}`;
+    // Response: { audit: { overall_grade, quick_wins, ... } }
+    const audit = d.audit || d;
+    assert(audit.overall_grade, 'No audit grade');
+    assert(audit.quick_wins, 'No quick wins');
+    return `Grade: ${audit.overall_grade}, quick wins: ${audit.quick_wins?.length || '?'}`;
   });
 
   await test(17, 'AI review_sentiment', async () => {
@@ -370,31 +360,27 @@ async function run() {
       })),
       shopName: 'TestShop',
     }, { auth: true });
-    assert(d.buyerLoves || d.sentiment?.buyerLoves || d.loves, 'No buyer loves');
-    assert(d.complaints || d.sentiment?.complaints || d.issues, 'No complaints data');
-    return `Loves: ${(d.buyerLoves || d.sentiment?.buyerLoves || d.loves)?.length || '?'}, complaints: ${(d.complaints || d.sentiment?.complaints || d.issues)?.length || '?'}`;
+    // Response: { sentiment: { buyer_loves, buyer_complaints, ... } }
+    const s = d.sentiment || d;
+    assert(s.buyer_loves, 'No buyer loves');
+    assert(s.buyer_complaints, 'No buyer complaints');
+    return `Loves: ${s.buyer_loves?.length || '?'}, complaints: ${s.buyer_complaints?.length || '?'}`;
   });
 
   await test(18, 'AI price_recommendation', async () => {
     const d = await apiPost('/api/ai/etsy', {
       action: 'price_recommendation',
-      title: 'Handmade Baby Blanket Crochet',
-      currentPrice: 35,
-      avgMarketPrice: 28,
-      minMarketPrice: 12,
-      maxMarketPrice: 85,
-      favorites: 100,
-      views: 2000,
-      materials: 'organic cotton yarn',
-      competitors: [
-        { title: 'Baby Blanket', price: 25, favorites: 200 },
-        { title: 'Luxury Baby Blanket', price: 55, favorites: 500 },
-      ],
+      query: 'Handmade Baby Blanket Crochet',
+      myPrice: 35,
+      priceStats: { min: 12, avg: 28, median: 25, max: 85 },
+      avgFavorites: 100,
     }, { auth: true });
-    assert(d.recommendedPrice || d.price || d.recommendation?.price, 'No recommended price');
-    const price = d.recommendedPrice || d.price || d.recommendation?.price;
+    // Response: { recommendation: { recommended_price, strategy, reasoning, ... } }
+    const rec = d.recommendation || d;
+    assert(rec.recommended_price, 'No recommended price');
+    const price = rec.recommended_price;
     assert(typeof price === 'number' && price > 0, `Invalid price: ${price}`);
-    return `Recommended: $${price}, reasoning: ${(d.reasoning || d.recommendation?.reasoning || '').substring(0, 80)}...`;
+    return `Recommended: $${price}, strategy: ${rec.strategy || '?'}`;
   });
 
   // ═══════════════════════════════════════════════════════════════════
@@ -573,15 +559,16 @@ async function run() {
 
   await test(32, 'niche analysis — score components consistent', async () => {
     if (!nicheData) return 'SKIP';
-    const score = nicheData.demandScore ?? nicheData.demand_score;
-    assert(score >= 0 && score <= 100, 'Score out of range');
-    // Check sub-components if available
-    const breakdown = nicheData.scoreBreakdown || nicheData.breakdown;
-    if (breakdown) {
-      const total = Object.values(breakdown).reduce((a, b) => a + Number(b), 0);
+    const ds = nicheData.demandScore;
+    const score = typeof ds === 'object' ? ds.score : ds;
+    assert(typeof score === 'number' && score >= 0 && score <= 100, 'Score out of range');
+    if (ds?.breakdown) {
+      const b = ds.breakdown;
+      const total = (b.searchVolume || 0) + (b.engagement || 0) + (b.velocity || 0) + (b.competition || 0) + (b.priceRoom || 0);
       assert(Math.abs(total - score) < 5, `Breakdown sum ${total} differs from score ${score}`);
+      return `Score: ${score}, breakdown: sv=${b.searchVolume} eng=${b.engagement} vel=${b.velocity} comp=${b.competition} pr=${b.priceRoom}`;
     }
-    return `Score: ${score}, has breakdown: ${!!breakdown}`;
+    return `Score: ${score}, no breakdown`;
   });
 
   await test(33, 'ext search_enrich — prices are sane', async () => {
@@ -615,7 +602,6 @@ async function run() {
     });
     const mainData = await apiGet(`/api/clawd/etsy?action=search_market&keywords=${encodeURIComponent(TEST_KEYWORD)}&limit=48`);
     const mainItems = mainData.items || mainData.results || [];
-    // Both should return data for the same keyword
     assert(extData.summary.totalResults > 0, 'Ext: no results');
     assert(mainItems.length > 0, 'Main: no results');
     return `Ext total: ${extData.summary.totalResults}, Main items: ${mainItems.length}`;
@@ -630,7 +616,8 @@ async function run() {
 
   await test(36, 'analyze_niche — rare keyword', async () => {
     const d = await apiGet(`/api/clawd/etsy?action=analyze_niche&keywords=${encodeURIComponent('xyzzyqwerty987')}&shop_id=${SHOP_ID}`);
-    const score = d.demandScore ?? d.demand_score ?? 0;
+    const ds = d.demandScore;
+    const score = typeof ds === 'object' ? ds.score : (ds ?? 0);
     assert(score <= 30, `High score for nonsense keyword: ${score}`);
     return `Score for nonsense: ${score} (expected low)`;
   });
@@ -725,7 +712,4 @@ async function run() {
   process.exit(failed > 0 ? 1 : 0);
 }
 
-run().catch(err => {
-  console.error('\n\x1b[31mFatal error:\x1b[0m', err);
-  process.exit(1);
-});
+run().catch(err => { console.error('Fatal:', err); process.exit(1); });

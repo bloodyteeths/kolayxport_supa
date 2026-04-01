@@ -41,19 +41,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  // Auth check — optional
+  // Auth check — optional (Bearer token OR Supabase cookie)
   let userId: string | null = null;
   let plan = 'free';
   try {
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      const supabase = getSupabaseServerClient(req, res);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        userId = user.id;
-        // Could check plan from DB here
-        plan = 'starter'; // Default for authenticated users
-      }
+    const supabase = getSupabaseServerClient(req, res);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      userId = user.id;
+      plan = 'starter';
     }
   } catch { /* anonymous access */ }
 

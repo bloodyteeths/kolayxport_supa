@@ -70,6 +70,8 @@ export interface ArbitrageResult {
   exchangeRate: number;
   score: number; // 0-100 opportunity score
   verdict: 'excellent' | 'good' | 'marginal' | 'skip';
+  matchTier?: 'gtin' | 'gemini' | 'fallback';
+  translatedQuery?: string;
 }
 
 export interface ArbitrageScanResponse {
@@ -78,4 +80,32 @@ export interface ArbitrageScanResponse {
   totalScanned: number;
   profitable: number;
   scanDurationMs: number;
+}
+
+// Background scan job
+export interface ArbitrageScanJobStatus {
+  jobId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  progress: number;
+  totalProducts: number;
+  resultsCount: number;
+  results?: ArbitrageResult[];
+  exchangeRate?: number;
+  error?: string;
+  scanDurationMs?: number;
+}
+
+// Trendyol category tree node
+export interface TrendyolCategoryNode {
+  id: number;
+  name: string;
+  slug: string;
+  parentId?: number;
+  parentPath?: string;
+  subCategories?: TrendyolCategoryNode[];
+  productCount?: number;
+  ebayCategoryId?: string;
+  ebayCategoryName?: string;
+  ebayFeeRate?: number;
+  isMapped: boolean;
 }

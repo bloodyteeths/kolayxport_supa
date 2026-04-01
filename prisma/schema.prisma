@@ -51,6 +51,8 @@ model User {
   ebayTrackedSellers  EbayTrackedSeller[]
   ebayNicheResearch   EbayNicheResearch[]
   rankTrackedKeywords RankTrackedKeyword[]
+  arbitrageScanJobs   ArbitrageScanJob[]
+  arbitrageResults    ArbitrageResultRecord[]
 }
 
 model Account {
@@ -593,4 +595,115 @@ model RankSnapshot {
   checkedAt    DateTime @default(now())
 
   @@index([keywordId, checkedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Trendyol → eBay Arbitrage
+// ---------------------------------------------------------------------------
+
+model ArbitrageCache {
+  key       String   @id
+  value     Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model ArbitrageScanJob {
+  id             String   @id @default(cuid())
+  userId         String
+  status         String   @default("pending") // pending | processing | completed | failed | cancelled
+  categorySlugs  String[]
+  params         Json     // scan parameters
+  progress       Int      @default(0)
+  totalProducts  Int      @default(0)
+  resultsCount   Int      @default(0)
+  processedSlugs String[] // tracks which categories have been processed
+  exchangeRate   Float?
+  error          String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  results        ArbitrageResultRecord[]
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+model ArbitrageResultRecord {
+  id                String   @id @default(cuid())
+  scanJobId         String?
+  userId            String
+  trendyolProductId Int
+  trendyolName      String
+  trendyolBrand     String
+  trendyolPriceTry  Float
+  trendyolImageUrl  String?
+  trendyolUrl       String?
+  trendyolCategory  String?
+  ebayMedianPrice   Float
+  ebayAvgPrice      Float
+  ebayListingCount  Int
+  ebayAvgSold       Float
+  ebayCategoryId    String?
+  ebayCategoryName  String?
+  ebayTopItems      Json
+  translatedQuery   String?
+  matchTier         String?  // gtin | gemini | fallback
+  profitUsd         Float
+  roiPercent        Float
+  marginPercent     Float
+  totalCostUsd      Float
+  score             Int
+  verdict           String   // excellent | good | marginal | skip
+  financials        Json
+  exchangeRate      Float
+  isTracked         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  scanJob           ArbitrageScanJob? @relation(fields: [scanJobId], references: [id], onDelete: SetNull)
+  priceHistory      ArbitragePricePoint[]
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trendyolProductId])
+  @@index([userId, score])
+  @@index([userId, verdict])
+  @@index([userId, isTracked])
+  @@index([scanJobId])
+}
+
+model ArbitragePricePoint {
+  id                String   @id @default(cuid())
+  arbitrageResultId String
+  trendyolPriceTry  Float
+  ebayMedianPrice   Float
+  exchangeRate      Float
+  profitUsd         Float
+  roiPercent        Float
+  score             Int
+  checkedAt         DateTime @default(now())
+  result            ArbitrageResultRecord @relation(fields: [arbitrageResultId], references: [id], onDelete: Cascade)
+
+  @@index([arbitrageResultId, checkedAt])
+}
+
+model TrendyolCategoryMap {
+  id                 String   @id @default(cuid())
+  trendyolCategoryId String   @unique
+  trendyolSlug       String
+  trendyolLabel      String
+  trendyolParentPath String?
+  ebayCategoryId     String?
+  ebayCategoryName   String?
+  ebayFeeRate        Float?
+  productCount       Int      @default(0)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([ebayCategoryId])
 }

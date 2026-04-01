@@ -949,6 +949,11 @@ function EtsyListingsPage() {
     };
   };
 
+  // Sync state (declared before fetchListings to avoid circular deps)
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const needsFirstSyncRef = useRef(false);
+
   // Load listings from DB cache (instant)
   const fetchListings = useCallback(async () => {
     if (!selectedShopId) return;
@@ -983,11 +988,9 @@ function EtsyListingsPage() {
         statusCountsCacheRef.current[selectedShopId] = data.stateCounts;
       }
 
-      // If no data and no previous sync, auto-trigger first sync
+      // If no data and never synced, flag for auto-first-sync
       if (rows.length === 0 && !data.lastSyncAt) {
-        setLoading(false);
-        syncListings();
-        return;
+        needsFirstSyncRef.current = true;
       }
     } catch (err: any) {
       console.error('Failed to fetch cached listings:', err);
@@ -997,9 +1000,6 @@ function EtsyListingsPage() {
   }, [selectedShopId, statusFilter]);
 
   // Sync listings from Etsy API → DB (manual, like Vela)
-  const [syncing, setSyncing] = useState(false);
-  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
-
   const syncListings = useCallback(async () => {
     if (!selectedShopId || syncing) return;
     setSyncing(true);
@@ -1017,18 +1017,33 @@ function EtsyListingsPage() {
       setLastSyncAt(data.lastSyncAt);
       toast.success(t('syncSuccess', { count: data.synced }), { id: toastId });
 
-      // Clear in-memory cache and refetch from DB
+      // Clear in-memory cache and refetch from DB inline (no circular call)
       Object.keys(listingsCacheRef.current).forEach(key => {
         if (key.startsWith(selectedShopId)) delete listingsCacheRef.current[key];
       });
       statusCountsCacheRef.current[selectedShopId] = {};
-      await fetchListings();
+
+      // Inline DB refetch
+      const refetchRes = await fetch(
+        `/api/clawd/etsy?action=cached_listings&shop_id=${selectedShopId}&state=${statusFilter}`
+      );
+      if (refetchRes.ok) {
+        const refetchData = await refetchRes.json();
+        const rows: EtsyListingRow[] = (refetchData.listings || []).map(mapListing);
+        setListings(rows);
+        setTotalCount(refetchData.count || rows.length);
+        if (refetchData.stateCounts) {
+          statusCountsCacheRef.current[selectedShopId] = refetchData.stateCounts;
+        }
+        const cacheKey = `${selectedShopId}:${statusFilter}`;
+        listingsCacheRef.current[cacheKey] = { listings: rows, total: refetchData.count || rows.length, ts: Date.now() };
+      }
     } catch (err: any) {
       console.error('Sync failed:', err);
       toast.error(t('syncFailed', { error: err.message }), { id: toastId });
     }
     setSyncing(false);
-  }, [selectedShopId, syncing, fetchListings]);
+  }, [selectedShopId, syncing, statusFilter]);
 
   // --- Fetch shop metadata (sections, shipping profiles, return policies) ---
   const fetchShopMeta = useCallback(async () => {
@@ -1063,6 +1078,14 @@ function EtsyListingsPage() {
       fetchShopMeta();
     }
   }, [selectedShopId, statusFilter, fetchListings, fetchShopMeta]);
+
+  // Auto-trigger first sync when DB is empty and never synced
+  useEffect(() => {
+    if (needsFirstSyncRef.current && !syncing) {
+      needsFirstSyncRef.current = false;
+      syncListings();
+    }
+  });
 
   // Reset pagination to page 0 when filters change
   useEffect(() => {

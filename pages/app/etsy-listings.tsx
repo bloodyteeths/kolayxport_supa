@@ -994,7 +994,7 @@ function EtsyListingsPage() {
         );
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json();
-          rows = (fallbackData.results || []).map(mapListing);
+          rows = (fallbackData.listings || fallbackData.results || []).map(mapListing);
           setListings(rows);
           setTotalCount(fallbackData.count || rows.length);
           listingsCacheRef.current[cacheKey] = { listings: rows, total: rows.length, ts: Date.now() };

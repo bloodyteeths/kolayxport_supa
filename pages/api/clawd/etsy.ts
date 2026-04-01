@@ -3488,6 +3488,8 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
         if (req.method === 'POST' && action === 'sync_listings') {
             const states = ['active', 'draft', 'inactive'];
             let totalUpserted = 0;
+            let totalFetched = 0;
+            let totalErrors = 0;
             const syncedAt = new Date();
 
             for (const state of states) {
@@ -3505,107 +3507,75 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
                     }
 
                     const results = (data.results || []).filter((l: any) => l.state === state);
+                    logger.info(`Sync: state=${state} offset=${offset} raw=${data.results?.length || 0} filtered=${results.length}`);
                     if (results.length === 0) break;
+                    totalFetched += results.length;
+
+                    // Build upsert data for each listing
+                    const upsertData = results.map((listing: any) => {
+                        const firstImage = listing.images?.[0] || null;
+                        return {
+                            etsyShopId: shopId,
+                            etsyListingId: listing.listing_id,
+                            title: listing.title || '',
+                            description: listing.description || '',
+                            tags: listing.tags || [],
+                            materials: listing.materials || [],
+                            priceAmount: listing.price?.amount || 0,
+                            priceDivisor: listing.price?.divisor || 100,
+                            priceCurrencyCode: listing.price?.currency_code || 'USD',
+                            views: listing.views || 0,
+                            numFavorers: listing.num_favorers || 0,
+                            quantity: listing.quantity || 0,
+                            state: listing.state || 'draft',
+                            url: listing.url || null,
+                            taxonomyId: listing.taxonomy_id || null,
+                            shopSectionId: listing.shop_section_id || null,
+                            whoMade: listing.who_made || null,
+                            whenMade: listing.when_made || null,
+                            isSupply: listing.is_supply ?? false,
+                            processingMin: listing.processing_min || null,
+                            processingMax: listing.processing_max || null,
+                            shippingProfileId: listing.shipping_profile_id || null,
+                            returnPolicyId: listing.return_policy_id || null,
+                            itemWeight: listing.item_weight != null ? listing.item_weight : null,
+                            itemWeightUnit: listing.item_weight_unit || null,
+                            itemLength: listing.item_length != null ? listing.item_length : null,
+                            itemWidth: listing.item_width != null ? listing.item_width : null,
+                            itemHeight: listing.item_height != null ? listing.item_height : null,
+                            itemDimensionsUnit: listing.item_dimensions_unit || null,
+                            isPersonalizable: listing.is_personalizable ?? false,
+                            personalizationIsRequired: listing.personalization_is_required ?? false,
+                            personalizationInstructions: listing.personalization_instructions || null,
+                            personalizationCharCountMax: listing.personalization_char_count_max || null,
+                            thumbnailUrl75x75: firstImage?.url_75x75 || null,
+                            thumbnailUrl170x135: firstImage?.url_170x135 || null,
+                            thumbnailUrl570xN: firstImage?.url_570xN || null,
+                            imageCount: listing.images?.length || 0,
+                            hasVideo: listing.has_videos ?? false,
+                            etsyCreatedTimestamp: listing.created_timestamp || 0,
+                            etsyUpdatedTimestamp: listing.updated_timestamp || 0,
+                            syncedAt,
+                        };
+                    });
 
                     // Upsert each listing
-                    for (const listing of results) {
-                        const firstImage = listing.images?.[0] || null;
+                    for (const d of upsertData) {
                         try {
                             await prisma.etsyListing.upsert({
                                 where: {
                                     etsyShopId_etsyListingId: {
-                                        etsyShopId: shopId,
-                                        etsyListingId: listing.listing_id,
+                                        etsyShopId: d.etsyShopId,
+                                        etsyListingId: d.etsyListingId,
                                     },
                                 },
-                                create: {
-                                    etsyShopId: shopId,
-                                    etsyListingId: listing.listing_id,
-                                    title: listing.title || '',
-                                    description: listing.description || '',
-                                    tags: listing.tags || [],
-                                    materials: listing.materials || [],
-                                    priceAmount: listing.price?.amount || 0,
-                                    priceDivisor: listing.price?.divisor || 100,
-                                    priceCurrencyCode: listing.price?.currency_code || 'USD',
-                                    views: listing.views || 0,
-                                    numFavorers: listing.num_favorers || 0,
-                                    quantity: listing.quantity || 0,
-                                    state: listing.state || 'draft',
-                                    url: listing.url || null,
-                                    taxonomyId: listing.taxonomy_id || null,
-                                    shopSectionId: listing.shop_section_id || null,
-                                    whoMade: listing.who_made || null,
-                                    whenMade: listing.when_made || null,
-                                    isSupply: listing.is_supply || false,
-                                    processingMin: listing.processing_min || null,
-                                    processingMax: listing.processing_max || null,
-                                    shippingProfileId: listing.shipping_profile_id || null,
-                                    returnPolicyId: listing.return_policy_id || null,
-                                    itemWeight: listing.item_weight || null,
-                                    itemWeightUnit: listing.item_weight_unit || null,
-                                    itemLength: listing.item_length || null,
-                                    itemWidth: listing.item_width || null,
-                                    itemHeight: listing.item_height || null,
-                                    itemDimensionsUnit: listing.item_dimensions_unit || null,
-                                    isPersonalizable: listing.is_personalizable || false,
-                                    personalizationIsRequired: listing.personalization_is_required || false,
-                                    personalizationInstructions: listing.personalization_instructions || null,
-                                    personalizationCharCountMax: listing.personalization_char_count_max || null,
-                                    thumbnailUrl75x75: firstImage?.url_75x75 || null,
-                                    thumbnailUrl170x135: firstImage?.url_170x135 || null,
-                                    thumbnailUrl570xN: firstImage?.url_570xN || null,
-                                    imageCount: listing.images?.length || 0,
-                                    hasVideo: listing.has_videos || false,
-                                    etsyCreatedTimestamp: listing.created_timestamp || 0,
-                                    etsyUpdatedTimestamp: listing.updated_timestamp || 0,
-                                    syncedAt,
-                                },
-                                update: {
-                                    title: listing.title || '',
-                                    description: listing.description || '',
-                                    tags: listing.tags || [],
-                                    materials: listing.materials || [],
-                                    priceAmount: listing.price?.amount || 0,
-                                    priceDivisor: listing.price?.divisor || 100,
-                                    priceCurrencyCode: listing.price?.currency_code || 'USD',
-                                    views: listing.views || 0,
-                                    numFavorers: listing.num_favorers || 0,
-                                    quantity: listing.quantity || 0,
-                                    state: listing.state || 'draft',
-                                    url: listing.url || null,
-                                    taxonomyId: listing.taxonomy_id || null,
-                                    shopSectionId: listing.shop_section_id || null,
-                                    whoMade: listing.who_made || null,
-                                    whenMade: listing.when_made || null,
-                                    isSupply: listing.is_supply || false,
-                                    processingMin: listing.processing_min || null,
-                                    processingMax: listing.processing_max || null,
-                                    shippingProfileId: listing.shipping_profile_id || null,
-                                    returnPolicyId: listing.return_policy_id || null,
-                                    itemWeight: listing.item_weight || null,
-                                    itemWeightUnit: listing.item_weight_unit || null,
-                                    itemLength: listing.item_length || null,
-                                    itemWidth: listing.item_width || null,
-                                    itemHeight: listing.item_height || null,
-                                    itemDimensionsUnit: listing.item_dimensions_unit || null,
-                                    isPersonalizable: listing.is_personalizable || false,
-                                    personalizationIsRequired: listing.personalization_is_required || false,
-                                    personalizationInstructions: listing.personalization_instructions || null,
-                                    personalizationCharCountMax: listing.personalization_char_count_max || null,
-                                    thumbnailUrl75x75: firstImage?.url_75x75 || null,
-                                    thumbnailUrl170x135: firstImage?.url_170x135 || null,
-                                    thumbnailUrl570xN: firstImage?.url_570xN || null,
-                                    imageCount: listing.images?.length || 0,
-                                    hasVideo: listing.has_videos || false,
-                                    etsyCreatedTimestamp: listing.created_timestamp || 0,
-                                    etsyUpdatedTimestamp: listing.updated_timestamp || 0,
-                                    syncedAt,
-                                },
+                                create: d,
+                                update: { ...d },
                             });
                             totalUpserted++;
                         } catch (err: any) {
-                            logger.error(`Upsert failed for listing ${listing.listing_id}`, err);
+                            totalErrors++;
+                            logger.error(`Upsert failed for listing ${d.etsyListingId}: ${err.message}`);
                         }
                     }
 
@@ -3614,13 +3584,19 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
                 }
             }
 
-            // Remove listings that no longer exist on Etsy (stale)
-            const deleted = await prisma.etsyListing.deleteMany({
-                where: {
-                    etsyShopId: shopId,
-                    syncedAt: { lt: syncedAt },
-                },
-            });
+            logger.info(`Sync complete: fetched=${totalFetched} upserted=${totalUpserted} errors=${totalErrors}`);
+
+            // Only remove stale listings if we successfully synced some
+            let deletedCount = 0;
+            if (totalUpserted > 0) {
+                const deleted = await prisma.etsyListing.deleteMany({
+                    where: {
+                        etsyShopId: shopId,
+                        syncedAt: { lt: syncedAt },
+                    },
+                });
+                deletedCount = deleted.count;
+            }
 
             // Update shop's last sync timestamp
             await prisma.etsyShop.updateMany({
@@ -3631,7 +3607,9 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
             return res.status(200).json({
                 success: true,
                 synced: totalUpserted,
-                removed: deleted.count,
+                fetched: totalFetched,
+                errors: totalErrors,
+                removed: deletedCount,
                 lastSyncAt: syncedAt.toISOString(),
             });
         }

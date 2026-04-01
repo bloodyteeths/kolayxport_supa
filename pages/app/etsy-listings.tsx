@@ -954,7 +954,7 @@ function EtsyListingsPage() {
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const needsFirstSyncRef = useRef(false);
 
-  // Load listings from DB cache (instant)
+  // Load listings — try DB cache first, fallback to Etsy API if empty
   const fetchListings = useCallback(async () => {
     if (!selectedShopId) return;
 
@@ -969,31 +969,41 @@ function EtsyListingsPage() {
 
     setLoading(true);
     try {
+      // Try DB cache first (instant)
       const res = await fetch(
         `/api/clawd/etsy?action=cached_listings&shop_id=${selectedShopId}&state=${statusFilter}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const rows: EtsyListingRow[] = (data.listings || []).map(mapListing);
+      let rows: EtsyListingRow[] = (data.listings || []).map(mapListing);
 
-      setListings(rows);
-      setTotalCount(data.count || rows.length);
-      setLastSyncAt(data.lastSyncAt || null);
-
-      // Update in-memory cache
-      listingsCacheRef.current[cacheKey] = { listings: rows, total: data.count || rows.length, ts: Date.now() };
-
-      // Update status counts from DB response
-      if (data.stateCounts) {
-        statusCountsCacheRef.current[selectedShopId] = data.stateCounts;
-      }
-
-      // If no data and never synced, flag for auto-first-sync
-      if (rows.length === 0 && !data.lastSyncAt) {
+      if (rows.length > 0) {
+        // DB has data — use it
+        setListings(rows);
+        setTotalCount(data.count || rows.length);
+        setLastSyncAt(data.lastSyncAt || null);
+        listingsCacheRef.current[cacheKey] = { listings: rows, total: data.count || rows.length, ts: Date.now() };
+        if (data.stateCounts) {
+          statusCountsCacheRef.current[selectedShopId] = data.stateCounts;
+        }
+      } else {
+        // DB empty — fallback to live Etsy API (old path, always works)
+        const state = statusFilter || 'active';
+        const fallbackRes = await fetch(
+          `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${state}&limit=100&offset=0`
+        );
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          rows = (fallbackData.results || []).map(mapListing);
+          setListings(rows);
+          setTotalCount(fallbackData.count || rows.length);
+          listingsCacheRef.current[cacheKey] = { listings: rows, total: rows.length, ts: Date.now() };
+        }
+        // Also trigger background sync to populate DB for next time
         needsFirstSyncRef.current = true;
       }
     } catch (err: any) {
-      console.error('Failed to fetch cached listings:', err);
+      console.error('Failed to fetch listings:', err);
       toast.error(t('loadFailed', { error: err.message }));
     }
     setLoading(false);

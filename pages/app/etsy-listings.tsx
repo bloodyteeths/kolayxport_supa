@@ -954,7 +954,7 @@ function EtsyListingsPage() {
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const needsFirstSyncRef = useRef(false);
 
-  // Load listings — try DB cache first, fallback to Etsy API if empty
+  // Load listings — DB cache first, Etsy API fallback
   const fetchListings = useCallback(async () => {
     if (!selectedShopId) return;
 
@@ -969,39 +969,44 @@ function EtsyListingsPage() {
 
     setLoading(true);
     try {
-      // Try DB cache first (instant)
-      const res = await fetch(
-        `/api/clawd/etsy?action=cached_listings&shop_id=${selectedShopId}&state=${statusFilter}`
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      let rows: EtsyListingRow[] = (data.listings || []).map(mapListing);
+      let rows: EtsyListingRow[] = [];
+      let count = 0;
 
-      if (rows.length > 0) {
-        // DB has data — use it
-        setListings(rows);
-        setTotalCount(data.count || rows.length);
-        setLastSyncAt(data.lastSyncAt || null);
-        listingsCacheRef.current[cacheKey] = { listings: rows, total: data.count || rows.length, ts: Date.now() };
-        if (data.stateCounts) {
-          statusCountsCacheRef.current[selectedShopId] = data.stateCounts;
+      // Try DB cache first
+      try {
+        const dbRes = await fetch(
+          `/api/clawd/etsy?action=cached_listings&shop_id=${selectedShopId}&state=${statusFilter}`
+        );
+        if (dbRes.ok) {
+          const data = await dbRes.json();
+          rows = (data.listings || []).map(mapListing);
+          count = data.count || rows.length;
+          setLastSyncAt(data.lastSyncAt || null);
+          if (data.stateCounts) {
+            statusCountsCacheRef.current[selectedShopId] = data.stateCounts;
+          }
         }
-      } else {
-        // DB empty — fallback to live Etsy API (old path, always works)
+      } catch {
+        // DB cache failed, will fallback below
+      }
+
+      // Fallback to Etsy API if DB returned nothing
+      if (rows.length === 0) {
         const state = statusFilter || 'active';
-        const fallbackRes = await fetch(
+        const apiRes = await fetch(
           `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${state}&limit=100&offset=0`
         );
-        if (fallbackRes.ok) {
-          const fallbackData = await fallbackRes.json();
-          rows = (fallbackData.listings || fallbackData.results || []).map(mapListing);
-          setListings(rows);
-          setTotalCount(fallbackData.count || rows.length);
-          listingsCacheRef.current[cacheKey] = { listings: rows, total: rows.length, ts: Date.now() };
-        }
-        // Also trigger background sync to populate DB for next time
+        if (!apiRes.ok) throw new Error(`HTTP ${apiRes.status}`);
+        const apiData = await apiRes.json();
+        rows = (apiData.listings || apiData.results || []).map(mapListing);
+        count = apiData.count || rows.length;
+        // Trigger background sync for next time
         needsFirstSyncRef.current = true;
       }
+
+      setListings(rows);
+      setTotalCount(count);
+      listingsCacheRef.current[cacheKey] = { listings: rows, total: count, ts: Date.now() };
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
       toast.error(t('loadFailed', { error: err.message }));

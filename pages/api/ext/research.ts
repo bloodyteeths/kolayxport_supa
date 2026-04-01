@@ -18,15 +18,19 @@ function checkAnonLimit(ip: string): boolean {
   return true;
 }
 
-// Etsy public API helper
-const ETSY_API_KEY = process.env.ETSY_API_KEY || '';
+// Etsy public API helper — uses same auth as main etsy.ts
 const ETSY_BASE = 'https://openapi.etsy.com/v3/application';
 
 async function etsyGet(path: string) {
+  const apiKey = (process.env.ETSY_API_KEY || '').trim().replace(/^"|"$/g, '');
+  const apiSecret = (process.env.ETSY_API_SECRET || '').trim().replace(/^"|"$/g, '');
   const res = await fetch(`${ETSY_BASE}${path}`, {
-    headers: { 'x-api-key': ETSY_API_KEY },
+    headers: { 'x-api-key': `${apiKey}:${apiSecret}` },
   });
-  if (!res.ok) throw new Error(`Etsy API error: ${res.status}`);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Etsy API error: ${res.status} — ${errText.slice(0, 200)}`);
+  }
   return res.json();
 }
 

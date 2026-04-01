@@ -1,10 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../../../lib/logger';
 import { getSupabaseServerClient } from '../../../lib/supabase';
 import { getApplicationToken } from '../../../lib/integrations/ebayClient';
 import { fetchTrendyolCategoryProducts, getExchangeRate, TRENDYOL_CATEGORIES } from '../../../lib/integrations/trendyolSearch';
 import { calculateArbitrage } from '../../../lib/arbitrage/calculator';
-import type { ArbitrageResult, EbayComparable, ArbitrageScanResponse } from '../../../lib/arbitrage/types';
+import type { ArbitrageResult, EbayComparable, TrendyolProduct, ArbitrageScanResponse } from '../../../lib/arbitrage/types';
 
 export const config = { runtime: 'nodejs' };
 
@@ -43,6 +44,147 @@ async function getItemDetails(legacyItemId: string, appToken: string) {
     categoryId: item.categoryId || '',
     categoryName: item.categoryPath || '',
   } as EbayComparable;
+}
+
+// --- Tiered product matching ---
+
+/** Tier 1: Search eBay by GTIN/barcode (exact match) */
+async function searchEbayByGtin(barcode: string, appToken: string): Promise<any[]> {
+  try {
+    const result = await callEbayAPI(
+      `/buy/browse/v1/item_summary/search?gtin=${encodeURIComponent(barcode)}&limit=10`,
+      appToken
+    );
+    return result.itemSummaries || [];
+  } catch {
+    return [];
+  }
+}
+
+/** Tier 2: Use Gemini to translate Turkish product titles to English eBay search queries */
+async function batchTranslateTitles(
+  products: TrendyolProduct[]
+): Promise<Map<number, string>> {
+  const result = new Map<number, string>();
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey || products.length === 0) return result;
+
+  try {
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: { responseMimeType: 'application/json' } as any,
+    });
+
+    // Batch up to 25 products per Gemini call
+    const batch = products.slice(0, 25).map(p => ({
+      id: p.id,
+      brand: p.brand,
+      name: p.name,
+    }));
+
+    const prompt = `You are a cross-border e-commerce expert. Translate these Turkish product listings into short English eBay search queries that real US/UK buyers would use to find this exact product type.
+
+Rules:
+- Keep brand names as-is (they're international)
+- Keep cultural terms that English buyers search for: kilim, peshtemal, cezve, lokum, baklava, hammam, ottoman, suzani, ikat
+- Include "Turkish" when it adds value (e.g., "Turkish towel", "Turkish coffee set")
+- Max 6-8 words per query
+- Focus on what the product IS, not marketing fluff
+- Include material/size only if distinctive (e.g., "copper", "hand painted", "100% cotton")
+
+Products:
+${JSON.stringify(batch)}
+
+Return a JSON array of objects: [{"id": number, "query": "english search terms"}, ...]`;
+
+    const response = await model.generateContent(prompt);
+    let raw = response.response.text().trim();
+    if (raw.startsWith('```')) {
+      raw = raw.replace(/^```(?:json)?\s*/, '').replace(/```\s*$/, '').trim();
+    }
+
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      for (const item of parsed) {
+        if (item.id && item.query && typeof item.query === 'string') {
+          result.set(item.id, item.query);
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn('Gemini translation failed, falling back to extraction', { error: String(err) });
+  }
+
+  return result;
+}
+
+/** Tier 3: Extract English/Latin words + brand as fallback search query */
+function extractEnglishQuery(product: TrendyolProduct): string {
+  const { brand, name } = product;
+  // Extract only ASCII/Latin words (English words, numbers, sizes)
+  const englishWords = name
+    .replace(/[^a-zA-Z0-9\s.,-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 1)
+    .slice(0, 5)
+    .join(' ');
+
+  if (brand && englishWords) return `${brand} ${englishWords}`.trim();
+  if (brand) return brand;
+  return englishWords;
+}
+
+/** Search eBay with query and return enriched items */
+async function searchAndEnrichEbay(
+  query: string,
+  appToken: string,
+  limit = 15,
+  enrichCount = 8
+): Promise<EbayComparable[]> {
+  const searchParams = new URLSearchParams();
+  searchParams.set('q', query);
+  searchParams.set('sort', 'newlyListed');
+  searchParams.set('limit', String(limit));
+
+  const searchResult = await callEbayAPI(
+    `/buy/browse/v1/item_summary/search?${searchParams.toString()}`,
+    appToken
+  );
+
+  const ebayItems = searchResult.itemSummaries || [];
+  if (ebayItems.length === 0) return [];
+
+  const enriched: EbayComparable[] = [];
+  const enrichLimit = Math.min(ebayItems.length, enrichCount);
+
+  for (let i = 0; i < enrichLimit; i++) {
+    const item = ebayItems[i];
+    const legacyId = item.legacyItemId;
+    const fallback: EbayComparable = {
+      title: item.title || '',
+      price: parseFloat(item.price?.value || '0'),
+      currency: item.price?.currency || 'USD',
+      itemId: item.itemId || '',
+      soldQuantity: 0,
+      condition: item.condition || '',
+      imageUrl: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl || '',
+      categoryId: item.categories?.[0]?.categoryId || '',
+      categoryName: item.categories?.[0]?.categoryName || '',
+    };
+
+    if (!legacyId) {
+      enriched.push(fallback);
+      continue;
+    }
+    try {
+      enriched.push(await getItemDetails(legacyId, appToken));
+    } catch {
+      enriched.push(fallback);
+    }
+  }
+
+  return enriched.filter(i => i.price > 0);
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -96,108 +238,95 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Get eBay app token
         const appToken = await getApplicationToken();
 
-        // Process each category: fetch Trendyol products, search eBay with English terms,
-        // then calculate arbitrage for each Trendyol product against eBay market data.
-        const results: ArbitrageResult[] = [];
-        let totalScannedCount = 0;
+        // Fetch all Trendyol products from selected categories
+        const allProducts: TrendyolProduct[] = [];
         const perCategoryLimit = Math.ceil(maxTrendyolResults / categories.length);
 
         for (const slug of categories) {
           try {
-            // Fetch Trendyol products for this category
-            const { products: trendyolProducts } = await fetchTrendyolCategoryProducts(slug);
-            const categoryProducts = trendyolProducts.slice(0, perCategoryLimit);
-            if (categoryProducts.length === 0) continue;
-            totalScannedCount += categoryProducts.length;
+            const { products } = await fetchTrendyolCategoryProducts(slug);
+            for (const p of products.slice(0, perCategoryLimit)) {
+              allProducts.push(p);
+            }
+          } catch (err) {
+            logger.warn(`Trendyol category fetch failed for "${slug}"`, { error: String(err) });
+          }
+        }
 
-            // Find the English search term for this category
-            const categoryDef = TRENDYOL_CATEGORIES.find(c => c.slug === slug);
-            const ebaySearchQuery = categoryDef?.ebaySearch || categoryDef?.label || slug.split('-x-c')[0].replace(/-/g, ' ');
+        const trendyolProducts = allProducts.slice(0, maxTrendyolResults);
+        if (trendyolProducts.length === 0) {
+          return res.json({
+            results: [], exchangeRate, totalScanned: 0,
+            profitable: 0, scanDurationMs: Date.now() - startTime,
+          } as ArbitrageScanResponse);
+        }
 
-            // Search eBay once per category using English terms
-            const searchParams = new URLSearchParams();
-            searchParams.set('q', ebaySearchQuery);
-            searchParams.set('sort', 'newlyListed');
-            searchParams.set('limit', '30');
+        // Tier 2: Batch translate all product titles via Gemini
+        const translatedQueries = await batchTranslateTitles(trendyolProducts);
 
-            let ebayItems: any[] = [];
-            try {
-              const searchResult = await callEbayAPI(
-                `/buy/browse/v1/item_summary/search?${searchParams.toString()}`,
-                appToken
-              );
-              ebayItems = searchResult.itemSummaries || [];
-            } catch (err) {
-              logger.warn(`eBay search failed for "${ebaySearchQuery}"`, { error: String(err) });
-              continue;
+        // For each Trendyol product, find eBay matches using tiered approach
+        const results: ArbitrageResult[] = [];
+        const ebaySearchCache = new Map<string, EbayComparable[]>();
+
+        for (const tp of trendyolProducts) {
+          try {
+            let ebayItems: EbayComparable[] = [];
+
+            // Tier 1: Try GTIN/barcode match (exact)
+            if (tp.barcode && tp.barcode.length >= 8) {
+              const gtinItems = await searchEbayByGtin(tp.barcode, appToken);
+              if (gtinItems.length > 0) {
+                ebayItems = await searchAndEnrichEbay(
+                  tp.barcode, appToken, 10, 6
+                );
+              }
+            }
+
+            // Tier 2: Gemini-translated search query
+            if (ebayItems.length === 0) {
+              const geminiQuery = translatedQueries.get(tp.id);
+              if (geminiQuery && geminiQuery.length >= 3) {
+                const cacheKey = geminiQuery.toLowerCase();
+                if (ebaySearchCache.has(cacheKey)) {
+                  ebayItems = ebaySearchCache.get(cacheKey)!;
+                } else {
+                  ebayItems = await searchAndEnrichEbay(geminiQuery, appToken);
+                  ebaySearchCache.set(cacheKey, ebayItems);
+                }
+              }
+            }
+
+            // Tier 3: Brand + English word extraction fallback
+            if (ebayItems.length === 0) {
+              const fallbackQuery = extractEnglishQuery(tp);
+              if (fallbackQuery && fallbackQuery.length >= 3) {
+                const cacheKey = fallbackQuery.toLowerCase();
+                if (ebaySearchCache.has(cacheKey)) {
+                  ebayItems = ebaySearchCache.get(cacheKey)!;
+                } else {
+                  ebayItems = await searchAndEnrichEbay(fallbackQuery, appToken);
+                  ebaySearchCache.set(cacheKey, ebayItems);
+                }
+              }
             }
 
             if (ebayItems.length === 0) continue;
 
-            // Enrich top eBay items with sold quantity
-            const enrichLimit = Math.min(ebayItems.length, 12);
-            const enriched: EbayComparable[] = [];
+            const result = calculateArbitrage({
+              trendyol: tp,
+              ebayItems,
+              exchangeRate,
+              shippingCostUsd,
+              feeOverridePercent,
+              includeInternationalFee,
+              highDefectRate,
+            });
 
-            for (let i = 0; i < enrichLimit; i++) {
-              const item = ebayItems[i];
-              const legacyId = item.legacyItemId;
-              if (!legacyId) {
-                enriched.push({
-                  title: item.title || '',
-                  price: parseFloat(item.price?.value || '0'),
-                  currency: item.price?.currency || 'USD',
-                  itemId: item.itemId || '',
-                  soldQuantity: 0,
-                  condition: item.condition || '',
-                  imageUrl: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl || '',
-                  categoryId: item.categories?.[0]?.categoryId || '',
-                  categoryName: item.categories?.[0]?.categoryName || '',
-                });
-                continue;
-              }
-              try {
-                const details = await getItemDetails(legacyId, appToken);
-                enriched.push(details);
-              } catch {
-                enriched.push({
-                  title: item.title || '',
-                  price: parseFloat(item.price?.value || '0'),
-                  currency: item.price?.currency || 'USD',
-                  itemId: item.itemId || '',
-                  soldQuantity: 0,
-                  condition: item.condition || '',
-                  imageUrl: item.image?.imageUrl || '',
-                  categoryId: item.categories?.[0]?.categoryId || '',
-                  categoryName: item.categories?.[0]?.categoryName || '',
-                });
-              }
-            }
-
-            const validEbayItems = enriched.filter(i => i.price > 0);
-            if (validEbayItems.length === 0) continue;
-
-            // Calculate arbitrage for each Trendyol product against the eBay market data
-            for (const tp of categoryProducts) {
-              try {
-                const result = calculateArbitrage({
-                  trendyol: tp,
-                  ebayItems: validEbayItems,
-                  exchangeRate,
-                  shippingCostUsd,
-                  feeOverridePercent,
-                  includeInternationalFee,
-                  highDefectRate,
-                });
-
-                if (result) {
-                  results.push(result);
-                }
-              } catch (err) {
-                logger.warn(`Arbitrage calc failed for Trendyol product ${tp.id}`, { error: String(err) });
-              }
+            if (result) {
+              results.push(result);
             }
           } catch (err) {
-            logger.warn(`Category scan failed for "${slug}"`, { error: String(err) });
+            logger.warn(`Arbitrage scan failed for product ${tp.id}`, { error: String(err) });
           }
         }
 
@@ -211,7 +340,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.json({
           results: sorted,
           exchangeRate,
-          totalScanned: totalScannedCount,
+          totalScanned: trendyolProducts.length,
           profitable: profitable.length,
           scanDurationMs: Date.now() - startTime,
         } as ArbitrageScanResponse);
@@ -229,47 +358,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'test_trendyol': {
         const slug = req.body.slug || 'havlu-x-c104073';
         try {
-          // Raw fetch to debug HTML content
-          const rawRes = await fetch(`https://www.trendyol.com/${slug}`, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-              'Accept': 'text/html',
-            },
-            redirect: 'follow',
-          });
-          const html = await rawRes.text();
-          const hasProducts = html.includes('"products":[');
-          const hasDiscountedPrice = html.includes('"discountedPrice"');
-          const hasPriceInfos = html.includes('"priceInfos"');
-          const idMatches = html.match(/"id":\d+/g) || [];
-          // Extract first full product object
-          const productsIdx = html.indexOf('"products":[');
-          let firstProduct = '';
-          if (productsIdx > -1) {
-            const arrStart = productsIdx + '"products":['.length;
-            let depth = 0;
-            let i = arrStart;
-            for (; i < html.length && i < arrStart + 5000; i++) {
-              if (html[i] === '{') depth++;
-              if (html[i] === '}') { depth--; if (depth === 0) { i++; break; } }
-            }
-            firstProduct = html.substring(arrStart, i);
-          }
-
           const result = await fetchTrendyolCategoryProducts(slug);
+          // Also test Gemini translation on first 3 products
+          const translations = await batchTranslateTitles(result.products.slice(0, 3));
           return res.json({
             success: true,
-            httpStatus: rawRes.status,
-            htmlLength: html.length,
-            hasProducts,
-            hasDiscountedPrice,
-            hasPriceInfos,
-            idCount: idMatches.length,
-            firstProduct: firstProduct.substring(0, 2000),
             parsedCount: result.products.length,
-            products: result.products.slice(0, 2).map(p => ({
+            products: result.products.slice(0, 5).map(p => ({
               id: p.id, name: p.name, brand: p.brand,
               priceTry: p.priceTry, imageUrl: p.imageUrl,
+              ebayQuery: translations.get(p.id) || extractEnglishQuery(p),
             })),
           });
         } catch (err: any) {

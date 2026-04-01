@@ -11,6 +11,7 @@ import {
   CheckCircle, XCircle, Loader2,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 interface MarketplaceComparisonProps {
   userId: string;
@@ -36,7 +37,7 @@ interface MarketplaceResult {
 interface MarketplaceDef {
   id: string;
   flag: string;
-  label: string;
+  labelKey: string;
 }
 
 type LoadState = 'idle' | 'loading' | 'done' | 'error';
@@ -44,13 +45,13 @@ type LoadState = 'idle' | 'loading' | 'done' | 'error';
 type SortKey = 'label' | 'totalResults' | 'avgPrice' | 'medianPrice' | 'demandScore' | 'competitionScore' | 'opportunityScore' | 'uniqueSellers' | 'freeShippingPct';
 
 const MARKETPLACES: MarketplaceDef[] = [
-  { id: 'EBAY_US', flag: '\u{1F1FA}\u{1F1F8}', label: 'ABD' },
-  { id: 'EBAY_GB', flag: '\u{1F1EC}\u{1F1E7}', label: '\u0130ngiltere' },
-  { id: 'EBAY_DE', flag: '\u{1F1E9}\u{1F1EA}', label: 'Almanya' },
-  { id: 'EBAY_FR', flag: '\u{1F1EB}\u{1F1F7}', label: 'Fransa' },
-  { id: 'EBAY_IT', flag: '\u{1F1EE}\u{1F1F9}', label: '\u0130talya' },
-  { id: 'EBAY_ES', flag: '\u{1F1EA}\u{1F1F8}', label: '\u0130spanya' },
-  { id: 'EBAY_AU', flag: '\u{1F1E6}\u{1F1FA}', label: 'Avustralya' },
+  { id: 'EBAY_US', flag: '\u{1F1FA}\u{1F1F8}', labelKey: 'mc_US' },
+  { id: 'EBAY_GB', flag: '\u{1F1EC}\u{1F1E7}', labelKey: 'mc_GB' },
+  { id: 'EBAY_DE', flag: '\u{1F1E9}\u{1F1EA}', labelKey: 'mc_DE' },
+  { id: 'EBAY_FR', flag: '\u{1F1EB}\u{1F1F7}', labelKey: 'mc_FR' },
+  { id: 'EBAY_IT', flag: '\u{1F1EE}\u{1F1F9}', labelKey: 'mc_IT' },
+  { id: 'EBAY_ES', flag: '\u{1F1EA}\u{1F1F8}', labelKey: 'mc_ES' },
+  { id: 'EBAY_AU', flag: '\u{1F1E6}\u{1F1FA}', labelKey: 'mc_AU' },
 ];
 
 const MARKETPLACE_MAP = new Map(MARKETPLACES.map(m => [m.id, m]));
@@ -64,7 +65,7 @@ async function apiCall(action: string, userId: string, params: Record<string, an
   const res = await fetch(`/api/clawd/ebay-research?${query.toString()}`);
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `API hatas\u0131: ${res.status}`);
+    throw new Error(errBody.error || `API error: ${res.status}`);
   }
   return res.json();
 }
@@ -95,6 +96,7 @@ function ScoreBadge({ score, label }: { score: number; label?: string }) {
 export default function MarketplaceComparison({ userId, onNavigate }: MarketplaceComparisonProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const t = useTranslations('ebayResearch');
 
   const [keyword, setKeyword] = useState('');
   const [selectedMarkets, setSelectedMarkets] = useState<Set<string>>(new Set(MARKETPLACES.map(m => m.id)));
@@ -104,6 +106,8 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const abortRef = useRef<AbortController | null>(null);
+
+  const getMarketLabel = useCallback((m: MarketplaceDef) => t(m.labelKey as any), [t]);
 
   const isLoading = useMemo(() => {
     for (const s of loadStates.values()) {
@@ -124,9 +128,9 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
 
   const runComparison = useCallback(async () => {
     const q = keyword.trim();
-    if (!q) { toast.error('Anahtar kelime girin'); return; }
+    if (!q) { toast.error(t('mc_enterKeyword')); return; }
     const markets = MARKETPLACES.filter(m => selectedMarkets.has(m.id));
-    if (markets.length === 0) { toast.error('En az bir pazar se\u00e7in'); return; }
+    if (markets.length === 0) { toast.error(t('mc_selectAtLeastOne')); return; }
 
     abortRef.current?.abort();
     const ctrl = new AbortController();
@@ -146,12 +150,12 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
       } catch (err: any) {
         if (ctrl.signal.aborted) return;
         setLoadStates(prev => new Map(prev).set(m.id, 'error'));
-        toast.error(`${m.flag} ${m.label}: ${err.message}`, { duration: 4000 });
+        toast.error(`${m.flag} ${t(m.labelKey as any)}: ${err.message}`, { duration: 4000 });
       }
     });
 
     await Promise.allSettled(promises);
-  }, [keyword, selectedMarkets, userId]);
+  }, [keyword, selectedMarkets, userId, t]);
 
   const sortedResults = useMemo(() => {
     const entries = Array.from(results.entries()).map(([id, data]) => ({
@@ -162,8 +166,8 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
     entries.sort((a, b) => {
       let av: any, bv: any;
       if (sortKey === 'label') {
-        av = a.market.label;
-        bv = b.market.label;
+        av = t(a.market.labelKey as any);
+        bv = t(b.market.labelKey as any);
       } else {
         av = (a.data as any)[sortKey] ?? 0;
         bv = (b.data as any)[sortKey] ?? 0;
@@ -173,7 +177,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
       return 0;
     });
     return entries;
-  }, [results, sortKey, sortDir]);
+  }, [results, sortKey, sortDir, t]);
 
   const bestMarket = useMemo(() => {
     if (sortedResults.length === 0) return null;
@@ -218,13 +222,13 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
       {/* Search Section */}
       <Paper variant="outlined" sx={{ p: 2.5 }}>
         <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Globe size={20} /> Pazar Kar\u015f\u0131la\u015ft\u0131rma
+          <Globe size={20} /> {t('marketplaceComparison')}
         </Typography>
 
         <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            placeholder="Anahtar Kelime"
+            placeholder={t('mc_keywordPlaceholder')}
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && runComparison()}
@@ -243,7 +247,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
             startIcon={isLoading ? <CircularProgress size={18} color="inherit" /> : <Search size={18} />}
             sx={{ minWidth: 130 }}
           >
-            {isLoading ? 'Y\u00fckleniyor...' : 'Kar\u015f\u0131la\u015ft\u0131r'}
+            {isLoading ? t('mc_loading') : t('mc_compare')}
           </Button>
         </Box>
 
@@ -259,7 +263,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                   disabled={isLoading}
                 />
               }
-              label={<Typography variant="body2">{m.flag} {m.label}</Typography>}
+              label={<Typography variant="body2">{m.flag} {t(m.labelKey as any)}</Typography>}
               sx={{ mr: 1.5 }}
             />
           ))}
@@ -277,7 +281,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                 <Chip
                   key={m.id}
                   size="small"
-                  label={`${m.flag} ${m.label}`}
+                  label={`${m.flag} ${t(m.labelKey as any)}`}
                   icon={
                     st === 'done' ? <CheckCircle size={14} color="#2e7d32" /> :
                     st === 'error' ? <XCircle size={14} color="#d32f2f" /> :
@@ -300,12 +304,12 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
             <Crown size={22} color="#ed6c02" />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              En \u0130yi Pazar: {bestMarket.market.flag} {bestMarket.market.label}
+              {t('mc_bestMarket', { flag: bestMarket.market.flag, label: t(bestMarket.market.labelKey as any) })}
             </Typography>
-            <ScoreBadge score={bestMarket.data.opportunityScore} label="F\u0131rsat Skoru" />
+            <ScoreBadge score={bestMarket.data.opportunityScore} label={t('mc_opportunityScore')} />
           </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1.5 }}>
-            Y\u00fcksek talep ({bestMarket.data.demandScore}), {bestMarket.data.competitionScore < 50 ? 'd\u00fc\u015f\u00fck' : 'orta'} rekabet ({bestMarket.data.competitionScore}), iyi fiyat (${bestMarket.data.avgPrice.toFixed(2)})
+            {t('mc_highDemand', { demand: bestMarket.data.demandScore })}, {bestMarket.data.competitionScore < 50 ? t('mc_lowCompetition') : t('mc_midCompetition')} {t('mc_competitionScore', { score: bestMarket.data.competitionScore })}, {t('mc_goodPrice', { price: bestMarket.data.avgPrice.toFixed(2) })}
           </Typography>
           {onNavigate && (
             <Button
@@ -314,7 +318,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
               endIcon={<ArrowRight size={16} />}
               onClick={() => onNavigate('product_database', { keyword, marketplace: bestMarket.id })}
             >
-              Bu pazarda ara
+              {t('mc_searchThisMarket')}
             </Button>
           )}
         </Paper>
@@ -323,12 +327,12 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
       {/* Price Comparison Bar Chart */}
       {hasResults && !isLoading && (
         <Paper variant="outlined" sx={{ p: 2.5 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>Ortalama Fiyat Kar\u015f\u0131la\u015ft\u0131rmas\u0131</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 1.5 }}>{t('mc_avgPriceComparison')}</Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {sortedResults.map(({ id, market, data }) => (
               <Box key={id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" sx={{ minWidth: 90, flexShrink: 0 }}>
-                  {market.flag} {market.label}
+                  {market.flag} {t(market.labelKey as any)}
                 </Typography>
                 <Box sx={{ flex: 1, position: 'relative', height: 24, bgcolor: 'grey.100', borderRadius: 1, overflow: 'hidden' }}>
                   <Box sx={{
@@ -360,15 +364,15 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
               <TableHead>
                 <TableRow>
                   {([
-                    ['label', 'Pazar'],
-                    ['totalResults', 'Toplam \u00dcr\u00fcn'],
-                    ['avgPrice', 'Ort. Fiyat'],
-                    ['medianPrice', 'Medyan Fiyat'],
-                    ['demandScore', 'Talep'],
-                    ['competitionScore', 'Rekabet'],
-                    ['opportunityScore', 'F\u0131rsat'],
-                    ['uniqueSellers', 'Sat\u0131c\u0131'],
-                    ['freeShippingPct', '\u00dccretsiz Kargo'],
+                    ['label', t('mc_colMarket')],
+                    ['totalResults', t('mc_colTotalProducts')],
+                    ['avgPrice', t('mc_colAvgPrice')],
+                    ['medianPrice', t('mc_colMedianPrice')],
+                    ['demandScore', t('mc_colDemand')],
+                    ['competitionScore', t('mc_colCompetition')],
+                    ['opportunityScore', t('mc_colOpportunity')],
+                    ['uniqueSellers', t('mc_colSellers')],
+                    ['freeShippingPct', t('mc_colFreeShipping')],
                   ] as [SortKey, string][]).map(([key, label]) => (
                     <TableCell key={key} sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
                       <TableSortLabel
@@ -391,7 +395,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           {isBest && <Crown size={16} color="#ed6c02" />}
                           <Typography variant="body2" sx={{ fontWeight: isBest ? 700 : 400 }}>
-                            {market.flag} {market.label}
+                            {market.flag} {t(market.labelKey as any)}
                           </Typography>
                         </Box>
                       </TableCell>
@@ -427,9 +431,9 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     {isBest && <Crown size={16} color="#ed6c02" />}
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      {market.flag} {market.label}
+                      {market.flag} {t(market.labelKey as any)}
                     </Typography>
-                    <ScoreBadge score={data.opportunityScore} label="F\u0131rsat" />
+                    <ScoreBadge score={data.opportunityScore} label={t('mc_opportunityLabel')} />
                   </Box>
                   <IconButton size="small">
                     {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -438,21 +442,21 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
 
                 <Box sx={{ px: 2, pb: 1.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   <Chip size="small" label={`$${data.avgPrice.toFixed(2)}`} variant="outlined" />
-                  <Chip size="small" label={`Talep: ${data.demandScore}`} sx={{ color: scoreColor(data.demandScore), borderColor: scoreColor(data.demandScore) }} variant="outlined" />
-                  <Chip size="small" label={`Rekabet: ${data.competitionScore}`} sx={{ color: scoreColor(data.competitionScore), borderColor: scoreColor(data.competitionScore) }} variant="outlined" />
+                  <Chip size="small" label={`${t('mc_demandLabel')}: ${data.demandScore}`} sx={{ color: scoreColor(data.demandScore), borderColor: scoreColor(data.demandScore) }} variant="outlined" />
+                  <Chip size="small" label={`${t('mc_competitionLabel')}: ${data.competitionScore}`} sx={{ color: scoreColor(data.competitionScore), borderColor: scoreColor(data.competitionScore) }} variant="outlined" />
                 </Box>
 
                 <Collapse in={expanded}>
                   <Box sx={{ px: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                    <MetricRow label="Toplam \u00dcr\u00fcn" value={data.totalResults.toLocaleString()} />
-                    <MetricRow label="Ort. Fiyat" value={`$${data.avgPrice.toFixed(2)}`} />
-                    <MetricRow label="Medyan Fiyat" value={`$${data.medianPrice.toFixed(2)}`} />
-                    <MetricRow label="Talep" value={`${data.demandScore} (${data.demandLabel})`} />
-                    <MetricRow label="Rekabet" value={`${data.competitionScore} (${data.competitionLabel})`} />
-                    <MetricRow label="F\u0131rsat" value={`${data.opportunityScore} (${data.opportunityLabel})`} />
-                    <MetricRow label="Sat\u0131c\u0131 Say\u0131s\u0131" value={String(data.uniqueSellers)} />
-                    <MetricRow label="\u00dccretsiz Kargo" value={`%${data.freeShippingPct.toFixed(0)}`} />
-                    <MetricRow label="Sat\u0131\u015f Oran\u0131" value={`%${(data.sellThroughRate * 100).toFixed(1)}`} />
+                    <MetricRow label={t('mc_totalProducts')} value={data.totalResults.toLocaleString()} />
+                    <MetricRow label={t('mc_avgPriceLabel')} value={`$${data.avgPrice.toFixed(2)}`} />
+                    <MetricRow label={t('mc_medianPriceLabel')} value={`$${data.medianPrice.toFixed(2)}`} />
+                    <MetricRow label={t('mc_demandLabel')} value={`${data.demandScore} (${data.demandLabel})`} />
+                    <MetricRow label={t('mc_competitionLabel')} value={`${data.competitionScore} (${data.competitionLabel})`} />
+                    <MetricRow label={t('mc_opportunityLabel')} value={`${data.opportunityScore} (${data.opportunityLabel})`} />
+                    <MetricRow label={t('mc_sellerCount')} value={String(data.uniqueSellers)} />
+                    <MetricRow label={t('mc_freeShippingLabel')} value={`%${data.freeShippingPct.toFixed(0)}`} />
+                    <MetricRow label={t('mc_sellThroughRate')} value={`%${(data.sellThroughRate * 100).toFixed(1)}`} />
                   </Box>
                 </Collapse>
               </Paper>
@@ -462,7 +466,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
       )}
 
       {!hasResults && !isLoading && loadStates.size > 0 && (
-        <Alert severity="warning">Hi\u00e7bir pazardan sonu\u00e7 al\u0131namad\u0131.</Alert>
+        <Alert severity="warning">{t('mc_noResults')}</Alert>
       )}
     </Box>
   );

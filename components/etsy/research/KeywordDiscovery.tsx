@@ -9,6 +9,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Search, Compass, Globe, Target, Zap, ArrowRight, Copy, TrendingUp, Lightbulb } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
 import type { AutocompleteSuggestion } from './shared/types';
@@ -25,6 +26,7 @@ interface KeywordDiscoveryProps {
 export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscoveryProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const t = useTranslations('etsyResearch');
   const [expandedKwIdx, setExpandedKwIdx] = useState<number | null>(null);
   const {
     kwExplorerQuery, setKwExplorerQuery,
@@ -48,9 +50,9 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
             <Compass size={18} color="#fff" />
           </Box>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Anahtar Kelime Kesif</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{t('kd_title')}</Typography>
             <Typography variant="caption" color="text.secondary">
-              Google + Amazon + Etsy verileriyle anahtar kelime onerisi
+              {t('kd_subtitle')}
             </Typography>
           </Box>
         </Box>
@@ -67,14 +69,14 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
           />
           <FormControlLabel
             control={<Switch checked={kwAlphabetSoup} onChange={e => setKwAlphabetSoup(e.target.checked)} size="small" />}
-            label={<Typography variant="caption">A-Z Genislet</Typography>}
+            label={<Typography variant="caption">{t('kd_azExpand')}</Typography>}
           />
           <Button variant="contained" onClick={searchKeywords}
             disabled={kwExplorerLoading}
             startIcon={kwExplorerLoading ? <CircularProgress size={16} /> : <Zap size={16} />}
             sx={{ background: GRADIENTS.info, borderRadius: '10px', ...(isMobile && { width: '100%' }) }}
           >
-            Kesfet
+            {t('kd_discover')}
           </Button>
         </Box>
       </Paper>
@@ -84,11 +86,11 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
       {kwSuggestions.length > 0 && (
         <>
           <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 1.5, mb: 2 }}>
-            <StatCard label="Toplam Oneri" value={String(kwSuggestions.length)} color="#2196F3"
+            <StatCard label={t('kd_totalSuggestions')} value={String(kwSuggestions.length)} color="#2196F3"
               icon={<Compass size={18} />} />
-            <StatCard label="Coklu Kaynak" value={String(kwSuggestions.filter(s => s.sourceCount > 1).length)}
+            <StatCard label={t('kd_multiSource')} value={String(kwSuggestions.filter(s => s.sourceCount > 1).length)}
               color="#4caf50" icon={<Globe size={18} />} />
-            <StatCard label="En Yuksek Skor" value={String(kwSuggestions[0]?.score || 0)}
+            <StatCard label={t('kd_highestScore')} value={String(kwSuggestions[0]?.score || 0)}
               color="#ff9800" icon={<Target size={18} />} />
           </Box>
 
@@ -117,9 +119,9 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
                     <Collapse in={isExpanded}>
                       <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', gap: 1 }}>
                         <Button size="small" variant="outlined" fullWidth onClick={(e) => { e.stopPropagation(); onNavigateToSearch(s.keyword); }}
-                          startIcon={<ArrowRight size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Arastir</Button>
-                        <Button size="small" variant="outlined" fullWidth onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.keyword); toast.success(`"${s.keyword}" kopyalandi`); }}
-                          startIcon={<Copy size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Kopyala</Button>
+                          startIcon={<ArrowRight size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('kd_research')}</Button>
+                        <Button size="small" variant="outlined" fullWidth onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.keyword); toast.success(t('kd_copied', { keyword: s.keyword })); }}
+                          startIcon={<Copy size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('kd_copy')}</Button>
                       </Box>
                     </Collapse>
                   </Paper>
@@ -133,18 +135,18 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
                 <TableHead>
                   <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                     <TableCell>#</TableCell>
-                    <TableCell>Anahtar Kelime</TableCell>
+                    <TableCell>{t('kd_keyword')}</TableCell>
                     <TableCell align="center">
                       <TableSortLabel active={kwSortKey === 'sourceCount'} direction={kwSortKey === 'sourceCount' ? kwSortDir : 'desc'} onClick={() => handleSort('sourceCount')}>
-                        Kaynaklar
+                        {t('kd_sources')}
                       </TableSortLabel>
                     </TableCell>
                     <TableCell align="center">
                       <TableSortLabel active={kwSortKey === 'score'} direction={kwSortKey === 'score' ? kwSortDir : 'desc'} onClick={() => handleSort('score')}>
-                        Skor
+                        {t('kd_score')}
                       </TableSortLabel>
                     </TableCell>
-                    <TableCell align="center">Aksiyon</TableCell>
+                    <TableCell align="center">{t('kd_action')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -173,15 +175,15 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
                       </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
-                          <Tooltip title="Ana aramaya gonder">
+                          <Tooltip title={t('kd_sendToSearch')}>
                             <IconButton size="small" onClick={() => onNavigateToSearch(s.keyword)}>
                               <ArrowRight size={14} />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Kopyala">
+                          <Tooltip title={t('kd_copy')}>
                             <IconButton size="small" onClick={() => {
                               navigator.clipboard.writeText(s.keyword);
-                              toast.success(`"${s.keyword}" kopyalandi`);
+                              toast.success(t('kd_copied', { keyword: s.keyword }));
                             }}>
                               <Copy size={14} />
                             </IconButton>
@@ -215,10 +217,10 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
           {discoveryData?.hotKeywords?.length > 0 && (
             <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <TrendingUp size={16} color="#667eea" /> Suggested Keywords
+                <TrendingUp size={16} color="#667eea" /> {t('kd_suggestedKeywords')}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                Click a keyword to auto-fill the search box
+                {t('kd_clickToFill')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
                 {discoveryData.hotKeywords.map((kw: any) => (
@@ -237,7 +239,7 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
           {discoveryData?.seasonalTips?.length > 0 && (
             <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Lightbulb size={16} color="#ff9800" /> Seasonal Tips
+                <Lightbulb size={16} color="#ff9800" /> {t('kd_seasonalTips')}
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
                 {discoveryData.seasonalTips.map((tip: string, i: number) => (
@@ -253,9 +255,9 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
           {!discoveryLoading && !discoveryData && (
             <PremiumEmptyState
               icon={<Compass size={48} />}
-              title="Anahtar Kelime Kesfet"
-              desc="Hangi kelimeleri kullanmalisiniz? Google ve Amazon'dan oneriler alin."
-              steps={['Yukariya satmak istediginiz urunu yazin (or. "baby blanket")', '"A-Z Genislet" ile uzun kuyruk kelimeler bulun', 'Yuksek skorlu kelimeleri baslik ve taglarina ekleyin']}
+              title={t('kd_emptyTitle')}
+              desc={t('kd_emptyDesc')}
+              steps={[t('kd_step1'), t('kd_step2'), t('kd_step3')]}
             />
           )}
         </>

@@ -11,6 +11,7 @@ import {
   Download, Bookmark, Copy, Star, ArrowUpDown, Trash2, Info,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +137,7 @@ function saveSavedSearches(list: SavedSearch[]) {
 // ---------------------------------------------------------------------------
 
 export default function MarketResearch({ userId, initialQuery, initialTitle }: MarketResearchProps) {
+  const t = useTranslations('ebay.research.market');
   // --- state: controls ---
   const [tab, setTab] = useState(0);
   const [query, setQuery] = useState(initialQuery || '');
@@ -211,14 +213,14 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
       const res = await fetch(`/api/clawd/ebay?${params}`);
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Arama basarisiz');
+        throw new Error(err.error || t('searchFailed'));
       }
       const data = await res.json();
       setItems(data.items || []);
       setTotalResults(data.total || 0);
       setTopKeywords(data.topKeywords || []);
       setAspectDistributions(data.aspectDistributions || []);
-      toast.success(`${data.total} sonuc bulundu`);
+      toast.success(t('resultsFound', { count: data.total }));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -244,11 +246,11 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
       if (query.trim()) params.set('q', query.trim());
 
       const res = await fetch(`/api/clawd/ebay?${params}`);
-      if (!res.ok) throw new Error((await res.json()).error || 'Satici aranamadi');
+      if (!res.ok) throw new Error((await res.json()).error || t('sellerSearchFailed'));
       const data = await res.json();
       setSellerItems(data.items || []);
       setSellerTotal(data.total || 0);
-      toast.success(`${data.total} urun bulundu (${sellerUsername})`);
+      toast.success(t('sellerResultsFound', { count: data.total, seller: sellerUsername }));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -264,7 +266,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
         user_id: userId,
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);
-      if (!res.ok) throw new Error((await res.json()).error || 'Kategoriler yuklenemedi');
+      if (!res.ok) throw new Error((await res.json()).error || t('categoriesLoadFailed'));
       const data = await res.json();
       setTopCategories(data.categories || []);
     } catch (err: any) {
@@ -287,11 +289,11 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
         limit: '50',
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);
-      if (!res.ok) throw new Error((await res.json()).error || 'Bestseller yuklenemedi');
+      if (!res.ok) throw new Error((await res.json()).error || t('bestsellerLoadFailed'));
       const data = await res.json();
       setCatBestsellers(data.items || []);
       setCatPriceStats(data.priceStats);
-      toast.success(`${data.total} urun bulundu (${categoryName})`);
+      toast.success(t('categoryBestsellerResults', { count: data.total, category: categoryName }));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -416,16 +418,16 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
     const recommendations: string[] = [];
     const missing = top20.filter((k) => !k.inMyTitle).slice(0, 5);
     if (missing.length > 0) {
-      recommendations.push(`Su eksik anahtar kelimeleri eklemeyi deneyin: ${missing.map((k) => k.keyword).join(', ')}`);
+      recommendations.push(t('seoRecommendMissingKeywords', { keywords: missing.map((k) => k.keyword).join(', ') }));
     }
     if (myTitle.length < 60) {
-      recommendations.push(`Basliginiz kisa (${myTitle.length} karakter). En az 60 karakter kullanin.`);
+      recommendations.push(t('seoRecommendTitleShort', { length: myTitle.length }));
     }
     if (myTitle.length > 80) {
-      recommendations.push(`Basliginiz uzun (${myTitle.length} karakter). 80 karakter altinda tutun.`);
+      recommendations.push(t('seoRecommendTitleLong', { length: myTitle.length }));
     }
     if (covered.length < 5) {
-      recommendations.push('Rakiplerin en cok kullandigi kelimeleri basliginiza dahil edin.');
+      recommendations.push(t('seoRecommendMoreKeywords'));
     }
 
     return { score, recommendations, avgLen, covered: covered.length, total: top20.length };
@@ -562,7 +564,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
       const ef = p * 0.1325;
       const pf = p * 0.029 + 0.30;
       const pr = p - cost - ship - ef - pf;
-      return { label: delta === 0 ? 'Ortalama' : delta < 0 ? `${delta}%` : `+${delta}%`, price: p, profit: pr, margin: p > 0 ? (pr / p) * 100 : 0 };
+      return { label: delta === 0 ? t('average') : delta < 0 ? `${delta}%` : `+${delta}%`, price: p, profit: pr, margin: p > 0 ? (pr / p) * 100 : 0 };
     });
 
     return { cost, sell, ship, ebayFee, paymentFee, totalFees, profit, margin, compare };
@@ -573,8 +575,8 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
   // ---------------------------------------------------------------------------
 
   const exportCSV = useCallback(() => {
-    if (items.length === 0) { toast.error('Disa aktarilacak veri yok'); return; }
-    const headers = ['Baslik', 'Fiyat', 'Para Birimi', 'Durum', 'Satici', 'Geri Bildirim Skoru', 'Geri Bildirim %', 'Top Rated', 'Kargo', 'URL'];
+    if (items.length === 0) { toast.error(t('noExportData')); return; }
+    const headers = [t('csvHeaders.title'), t('csvHeaders.price'), t('csvHeaders.currency'), t('csvHeaders.condition'), t('csvHeaders.seller'), t('csvHeaders.feedbackScore'), t('csvHeaders.feedbackPct'), t('csvHeaders.topRated'), t('csvHeaders.shipping'), t('csvHeaders.url')];
     const rows = items.map((i) => [
       `"${(i.title || '').replace(/"/g, '""')}"`,
       i.price?.value || '',
@@ -583,8 +585,8 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
       i.seller?.username || '',
       i.seller?.feedbackScore ?? '',
       i.seller?.feedbackPercentage || '',
-      i.topRatedBuyingExperience ? 'Evet' : 'Hayir',
-      i.shippingOptions?.[0]?.shippingCostType === 'FREE' ? 'Ucretsiz' : (i.shippingOptions?.[0]?.shippingCost?.value || 'N/A'),
+      i.topRatedBuyingExperience ? t('csvTopRatedYes') : t('csvTopRatedNo'),
+      i.shippingOptions?.[0]?.shippingCostType === 'FREE' ? t('csvFreeShipping') : (i.shippingOptions?.[0]?.shippingCost?.value || 'N/A'),
       i.itemWebUrl || '',
     ]);
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -593,7 +595,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
     const a = document.createElement('a');
     a.href = url; a.download = `ebay_research_${query.replace(/\s+/g, '_')}.csv`; a.click();
     URL.revokeObjectURL(url);
-    toast.success('CSV indirildi');
+    toast.success(t('csvDownloaded'));
   }, [items, query]);
 
   const saveSearch = useCallback(() => {
@@ -601,7 +603,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
     const updated = [entry, ...savedSearches.filter((s) => s.query !== query || s.marketplace !== marketplace)].slice(0, 20);
     saveSavedSearches(updated);
     setSavedSearches(updated);
-    toast.success('Arama kaydedildi');
+    toast.success(t('searchSaved'));
   }, [query, marketplace, categoryFilter, conditionFilter, sortOrder, myTitle, savedSearches]);
 
   const loadSearch = useCallback((s: SavedSearch) => {
@@ -651,7 +653,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <TextField
-            label="Urun Arama"
+            label={t('searchLabel')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             size="small"
@@ -660,40 +662,40 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
             onKeyDown={handleKeyDown}
           />
           <FormControl size="small" sx={{ minWidth: 110 }}>
-            <InputLabel>Pazar</InputLabel>
-            <Select value={marketplace} onChange={(e) => setMarketplace(e.target.value)} label="Pazar">
-              <MenuItem value="EBAY_US">ABD</MenuItem>
-              <MenuItem value="EBAY_GB">Ingiltere</MenuItem>
-              <MenuItem value="EBAY_DE">Almanya</MenuItem>
-              <MenuItem value="EBAY_FR">Fransa</MenuItem>
-              <MenuItem value="EBAY_IT">Italya</MenuItem>
-              <MenuItem value="EBAY_ES">Ispanya</MenuItem>
-              <MenuItem value="EBAY_AU">Avustralya</MenuItem>
+            <InputLabel>{t('marketplaceLabel')}</InputLabel>
+            <Select value={marketplace} onChange={(e) => setMarketplace(e.target.value)} label={t('marketplaceLabel')}>
+              <MenuItem value="EBAY_US">{t('marketplaceUS')}</MenuItem>
+              <MenuItem value="EBAY_GB">{t('marketplaceGB')}</MenuItem>
+              <MenuItem value="EBAY_DE">{t('marketplaceDE')}</MenuItem>
+              <MenuItem value="EBAY_FR">{t('marketplaceFR')}</MenuItem>
+              <MenuItem value="EBAY_IT">{t('marketplaceIT')}</MenuItem>
+              <MenuItem value="EBAY_ES">{t('marketplaceES')}</MenuItem>
+              <MenuItem value="EBAY_AU">{t('marketplaceAU')}</MenuItem>
             </Select>
           </FormControl>
           <TextField
-            label="Kategori ID"
+            label={t('categoryIdLabel')}
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             size="small"
             sx={{ width: 110 }}
-            placeholder="opsiyonel"
+            placeholder={t('categoryIdPlaceholder')}
           />
           <FormControl size="small" sx={{ minWidth: 90 }}>
-            <InputLabel>Durum</InputLabel>
-            <Select value={conditionFilter} onChange={(e) => setConditionFilter(e.target.value)} label="Durum">
-              <MenuItem value="">Hepsi</MenuItem>
-              <MenuItem value="1000">Yeni</MenuItem>
-              <MenuItem value="3000">Kullanilmis</MenuItem>
+            <InputLabel>{t('conditionLabel')}</InputLabel>
+            <Select value={conditionFilter} onChange={(e) => setConditionFilter(e.target.value)} label={t('conditionLabel')}>
+              <MenuItem value="">{t('conditionAll')}</MenuItem>
+              <MenuItem value="1000">{t('conditionNew')}</MenuItem>
+              <MenuItem value="3000">{t('conditionUsed')}</MenuItem>
             </Select>
           </FormControl>
           <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel>Siralama</InputLabel>
-            <Select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} label="Siralama">
-              <MenuItem value="BEST_MATCH">En Iyi Eslesme</MenuItem>
-              <MenuItem value="price">Fiyat: Dusuk→Yuksek</MenuItem>
-              <MenuItem value="-price">Fiyat: Yuksek→Dusuk</MenuItem>
-              <MenuItem value="newlyListed">Yeni Eklenen</MenuItem>
+            <InputLabel>{t('sortLabel')}</InputLabel>
+            <Select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} label={t('sortLabel')}>
+              <MenuItem value="BEST_MATCH">{t('sortBestMatch')}</MenuItem>
+              <MenuItem value="price">{t('sortPriceLowHigh')}</MenuItem>
+              <MenuItem value="-price">{t('sortPriceHighLow')}</MenuItem>
+              <MenuItem value="newlyListed">{t('sortNewest')}</MenuItem>
             </Select>
           </FormControl>
           <Button
@@ -702,20 +704,20 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
             disabled={loading || !query.trim()}
             startIcon={loading ? <CircularProgress size={16} /> : <Search size={16} />}
           >
-            Arastir
+            {t('searchButton')}
           </Button>
         </Box>
 
         {/* My Title input - always visible */}
         <TextField
-          label="Benim Basligim (SEO karsilastirma)"
+          label={t('myTitleLabel')}
           value={myTitle}
           onChange={(e) => setMyTitle(e.target.value)}
           size="small"
           fullWidth
           sx={{ mt: 1.5 }}
-          placeholder="Listeleme basliginizi girin..."
-          helperText={`${myTitle.length}/80 karakter`}
+          placeholder={t('myTitlePlaceholder')}
+          helperText={t('myTitleHelper', { count: myTitle.length })}
         />
       </Paper>
 
@@ -729,16 +731,16 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
         scrollButtons="auto"
         sx={{ mb: 2, '& .MuiTab-root': { minWidth: 'auto', fontSize: '0.8rem', px: 1.5 } }}
       >
-        <Tab icon={<DollarSign size={14} />} iconPosition="start" label="Fiyat Arastirmasi" />
-        <Tab icon={<TrendingUp size={14} />} iconPosition="start" label="SEO Analizi" />
-        <Tab icon={<Tag size={14} />} iconPosition="start" label="Anahtar Kelimeler" />
-        <Tab icon={<BarChart2 size={14} />} iconPosition="start" label="Rakip Listeleri" />
-        <Tab icon={<Users size={14} />} iconPosition="start" label="Satici Analizi" />
-        <Tab icon={<FolderTree size={14} />} iconPosition="start" label="Kategori Kesfet" />
-        <Tab icon={<Gauge size={14} />} iconPosition="start" label="Talep Skoru" />
-        <Tab icon={<Calculator size={14} />} iconPosition="start" label="Kar Hesaplama" />
-        <Tab icon={<Users size={14} />} iconPosition="start" label="Satici Derinlemesine" />
-        <Tab icon={<TrendingUp size={14} />} iconPosition="start" label="Kategori Arastirmasi" />
+        <Tab icon={<DollarSign size={14} />} iconPosition="start" label={t('tabPriceResearch')} />
+        <Tab icon={<TrendingUp size={14} />} iconPosition="start" label={t('tabSeoAnalysis')} />
+        <Tab icon={<Tag size={14} />} iconPosition="start" label={t('tabKeywords')} />
+        <Tab icon={<BarChart2 size={14} />} iconPosition="start" label={t('tabCompetitorListings')} />
+        <Tab icon={<Users size={14} />} iconPosition="start" label={t('tabSellerAnalysis')} />
+        <Tab icon={<FolderTree size={14} />} iconPosition="start" label={t('tabCategoryExplorer')} />
+        <Tab icon={<Gauge size={14} />} iconPosition="start" label={t('tabDemandScore')} />
+        <Tab icon={<Calculator size={14} />} iconPosition="start" label={t('tabProfitCalculator')} />
+        <Tab icon={<Users size={14} />} iconPosition="start" label={t('tabSellerDeepDive')} />
+        <Tab icon={<TrendingUp size={14} />} iconPosition="start" label={t('tabCategoryResearch')} />
       </Tabs>
 
       {loading && <LinearProgress sx={{ mb: 2 }} />}
@@ -752,20 +754,20 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
             <>
               {/* Stat cards */}
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                {statCard('Minimum', fmt(priceStats.min), '#4caf50')}
-                {statCard('Ortalama', fmt(priceStats.avg), '#2196f3')}
-                {statCard('Medyan', fmt(priceStats.median), '#ff9800')}
-                {statCard('Maksimum', fmt(priceStats.max), '#f44336')}
-                {statCard('Sonuc', `${priceStats.count}`, '#9c27b0')}
+                {statCard(t('minimum'), fmt(priceStats.min), '#4caf50')}
+                {statCard(t('average'), fmt(priceStats.avg), '#2196f3')}
+                {statCard(t('median'), fmt(priceStats.median), '#ff9800')}
+                {statCard(t('maximum'), fmt(priceStats.max), '#f44336')}
+                {statCard(t('results'), `${priceStats.count}`, '#9c27b0')}
               </Box>
 
               {/* Histogram */}
               {histogram.length > 1 && (
                 <Paper sx={{ p: 2, mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Fiyat Dagilimi</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('priceDistribution')}</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: 120 }}>
                     {histogram.map((b, i) => (
-                      <Tooltip key={i} title={`${b.label}: ${b.count} urun`}>
+                      <Tooltip key={i} title={t('histogramTooltip', { price: b.label, count: b.count })}>
                         <Box sx={{
                           flex: 1,
                           minWidth: 0,
@@ -792,10 +794,10 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>Fiyat Araligi</TableCell>
-                        <TableCell align="center">Urun Sayisi</TableCell>
-                        <TableCell align="center">Oran</TableCell>
-                        <TableCell sx={{ width: '30%' }}>Dagilim</TableCell>
+                        <TableCell>{t('priceRange')}</TableCell>
+                        <TableCell align="center">{t('productCount')}</TableCell>
+                        <TableCell align="center">{t('ratio')}</TableCell>
+                        <TableCell sx={{ width: '30%' }}>{t('distribution')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -818,25 +820,25 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
 
               {/* NEW vs USED comparison */}
               <Paper sx={{ p: 2, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Yeni vs Kullanilmis Karsilastirma</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('newVsUsedComparison')}</Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 140 }}>
-                    <Typography variant="caption" color="text.secondary">Yeni Urunler</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('newProducts')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: '#4caf50' }}>{conditionComparison.newCount}</Typography>
-                    <Typography variant="body2">Ort. {fmt(conditionComparison.newAvg)}</Typography>
+                    <Typography variant="body2">{t('avg')} {fmt(conditionComparison.newAvg)}</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 140 }}>
-                    <Typography variant="caption" color="text.secondary">Kullanilmis Urunler</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('usedProducts')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: '#ff9800' }}>{conditionComparison.usedCount}</Typography>
-                    <Typography variant="body2">Ort. {fmt(conditionComparison.usedAvg)}</Typography>
+                    <Typography variant="body2">{t('avg')} {fmt(conditionComparison.usedAvg)}</Typography>
                   </Paper>
                   {conditionComparison.newAvg > 0 && conditionComparison.usedAvg > 0 && (
                     <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 140 }}>
-                      <Typography variant="caption" color="text.secondary">Fiyat Farki</Typography>
+                      <Typography variant="caption" color="text.secondary">{t('priceDifference')}</Typography>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#2196f3' }}>
                         {pct(((conditionComparison.newAvg - conditionComparison.usedAvg) / conditionComparison.usedAvg) * 100)}
                       </Typography>
-                      <Typography variant="body2">Yeni daha pahali</Typography>
+                      <Typography variant="body2">{t('newMoreExpensive')}</Typography>
                     </Paper>
                   )}
                 </Box>
@@ -844,22 +846,22 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
 
               {/* Discount analysis */}
               <Paper sx={{ p: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Indirim Analizi</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('discountAnalysis')}</Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-                    <Typography variant="caption" color="text.secondary">Indirimli Urunler</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('discountedProducts')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
                       {discountAnalysis.discountedCount}/{discountAnalysis.total}
                     </Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-                    <Typography variant="caption" color="text.secondary">Indirimli Oran</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('discountedRatio')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
                       {discountAnalysis.total ? pct((discountAnalysis.discountedCount / discountAnalysis.total) * 100) : '0%'}
                     </Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-                    <Typography variant="caption" color="text.secondary">Ort. Indirim</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('avgDiscount')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: '#f44336' }}>
                       {pct(discountAnalysis.avgDiscount)}
                     </Typography>
@@ -889,7 +891,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                   {seoResult.score}/100
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  SEO Skoru — Rakiplerin populer kelimelerine gore ({seoResult.covered}/{seoResult.total} anahtar kelime eslesti)
+                  {t('seoScore', { covered: seoResult.covered, total: seoResult.total })}
                 </Typography>
                 <LinearProgress
                   variant="determinate"

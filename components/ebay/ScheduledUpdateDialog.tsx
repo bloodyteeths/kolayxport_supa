@@ -25,6 +25,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -134,9 +135,10 @@ export function useEbayScheduledUpdateExecutor(userId: string, onExecuted?: () =
             throw new Error(err.error || `HTTP ${res.status}`);
           }
 
-          toast.success(`Zamanlanmis guncelleme uygulandi: ${update.listing_title}`);
+          // Toast uses raw string here since hook has no access to t()
+          toast.success(`Scheduled update applied: ${update.listing_title}`);
         } catch (err: any) {
-          toast.error(`Zamanlanmis guncelleme basarisiz (${update.listing_title}): ${err.message}`);
+          toast.error(`Scheduled update failed (${update.listing_title}): ${err.message}`);
         }
       }
 
@@ -171,13 +173,6 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function formatChangeSummary(changes: EbayScheduledChanges): string {
-  const parts: string[] = [];
-  if (changes.price != null) parts.push(`fiyat: $${changes.price.toFixed(2)}`);
-  if (changes.quantity != null) parts.push(`stok: ${changes.quantity}`);
-  return parts.join(', ');
-}
-
 // Minimum datetime (now + 1 minute) for the picker
 function getMinDateTime(): string {
   const d = new Date(Date.now() + 60_000);
@@ -197,6 +192,7 @@ export default function ScheduledUpdateDialog({
   userId,
   onExecuted,
 }: ScheduledUpdateDialogProps) {
+  const t = useTranslations('ebayScheduled');
   const [scheduledAt, setScheduledAt] = useState('');
   const [selectedSku, setSelectedSku] = useState('');
   const [actionType, setActionType] = useState<'update_offer' | 'update_inventory_item'>('update_offer');
@@ -220,25 +216,32 @@ export default function ScheduledUpdateDialog({
 
   const hasChanges = newPrice.trim() !== '' || newQuantity.trim() !== '';
 
+  const formatChangeSummary = useCallback((changes: EbayScheduledChanges): string => {
+    const parts: string[] = [];
+    if (changes.price != null) parts.push(t('priceLabel', { price: changes.price.toFixed(2) }));
+    if (changes.quantity != null) parts.push(t('stockLabel', { quantity: changes.quantity }));
+    return parts.join(', ');
+  }, [t]);
+
   const handleSchedule = useCallback(() => {
     if (!scheduledAt) {
-      toast.error('Lutfen bir tarih ve saat secin');
+      toast.error(t('selectDate'));
       return;
     }
 
     const scheduledDate = new Date(scheduledAt);
     if (scheduledDate.getTime() <= Date.now()) {
-      toast.error('Zamanlama gelecekte olmalidir');
+      toast.error(t('futureDate'));
       return;
     }
 
     if (!selectedSku) {
-      toast.error('Lutfen bir ilan secin');
+      toast.error(t('selectListingError'));
       return;
     }
 
     if (!hasChanges) {
-      toast.error('Zamanlanacak degisiklik yok');
+      toast.error(t('noChanges'));
       return;
     }
 
@@ -264,26 +267,26 @@ export default function ScheduledUpdateDialog({
     saveScheduledUpdates(allUpdates);
 
     setPendingUpdates(getScheduledUpdates().filter((u) => u.user_id === userId));
-    toast.success('Guncelleme zamanlandi');
+    toast.success(t('updateScheduled'));
 
     // Reset form
     setNewPrice('');
     setNewQuantity('');
     setScheduledAt('');
     setSelectedSku('');
-  }, [scheduledAt, selectedSku, actionType, newPrice, newQuantity, selectedListing, userId, hasChanges]);
+  }, [scheduledAt, selectedSku, actionType, newPrice, newQuantity, selectedListing, userId, hasChanges, t]);
 
   const handleCancel = useCallback((id: string) => {
     cancelScheduledUpdate(id);
     setPendingUpdates((prev) => prev.filter((u) => u.id !== id));
-    toast.success('Zamanlanmis guncelleme iptal edildi');
-  }, []);
+    toast.success(t('updateCancelled'));
+  }, [t]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <ScheduleIcon color="primary" />
-        <Box sx={{ flex: 1 }}>Guncellemeyi Zamanla</Box>
+        <Box sx={{ flex: 1 }}>{t('dialogTitle')}</Box>
         <IconButton size="small" onClick={onClose}>
           <CloseIcon fontSize="small" />
         </IconButton>
@@ -292,9 +295,9 @@ export default function ScheduledUpdateDialog({
       <DialogContent dividers>
         {/* Select listing */}
         <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-          <InputLabel>Ilan Sec</InputLabel>
+          <InputLabel>{t('selectListing')}</InputLabel>
           <Select
-            label="Ilan Sec"
+            label={t('selectListing')}
             value={selectedSku}
             onChange={(e) => setSelectedSku(e.target.value)}
           >
@@ -310,21 +313,21 @@ export default function ScheduledUpdateDialog({
           <>
             {/* Action type */}
             <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-              <InputLabel>Islem Turu</InputLabel>
+              <InputLabel>{t('actionType')}</InputLabel>
               <Select
-                label="Islem Turu"
+                label={t('actionType')}
                 value={actionType}
                 onChange={(e) => setActionType(e.target.value as any)}
               >
-                <MenuItem value="update_offer">Teklif Guncelle (Fiyat & Stok)</MenuItem>
-                <MenuItem value="update_inventory_item">Envanter Guncelle (Stok)</MenuItem>
+                <MenuItem value="update_offer">{t('actionUpdateOffer')}</MenuItem>
+                <MenuItem value="update_inventory_item">{t('actionUpdateInventory')}</MenuItem>
               </Select>
             </FormControl>
 
             {/* Price change */}
             {actionType === 'update_offer' && (
               <TextField
-                label="Yeni Fiyat ($)"
+                label={t('newPrice')}
                 type="number"
                 size="small"
                 fullWidth
@@ -332,13 +335,13 @@ export default function ScheduledUpdateDialog({
                 onChange={(e) => setNewPrice(e.target.value)}
                 sx={{ mb: 2 }}
                 inputProps={{ min: 0, step: 0.01 }}
-                placeholder={selectedListing?.price ? `Mevcut: $${selectedListing.price}` : 'Fiyat girin'}
+                placeholder={selectedListing?.price ? t('currentPrice', { price: selectedListing.price }) : t('pricePlaceholder')}
               />
             )}
 
             {/* Quantity change */}
             <TextField
-              label="Yeni Stok Miktari"
+              label={t('newQuantity')}
               type="number"
               size="small"
               fullWidth
@@ -346,12 +349,12 @@ export default function ScheduledUpdateDialog({
               onChange={(e) => setNewQuantity(e.target.value)}
               sx={{ mb: 2 }}
               inputProps={{ min: 0 }}
-              placeholder={selectedListing?.quantity != null ? `Mevcut: ${selectedListing.quantity}` : 'Miktar girin'}
+              placeholder={selectedListing?.quantity != null ? t('currentQuantity', { quantity: selectedListing.quantity }) : t('quantityPlaceholder')}
             />
 
             {/* Date picker */}
             <TextField
-              label="Tarih & Saat"
+              label={t('dateTime')}
               type="datetime-local"
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
@@ -366,13 +369,13 @@ export default function ScheduledUpdateDialog({
             {hasChanges && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ width: '100%', mb: 0.5 }}>
-                  Zamanlanacak degisiklikler:
+                  {t('scheduledChanges')}
                 </Typography>
                 {newPrice.trim() && (
-                  <Chip label={`Fiyat: $${parseFloat(newPrice).toFixed(2)}`} size="small" color="primary" variant="outlined" />
+                  <Chip label={t('priceChange', { price: parseFloat(newPrice).toFixed(2) })} size="small" color="primary" variant="outlined" />
                 )}
                 {newQuantity.trim() && (
-                  <Chip label={`Stok: ${newQuantity}`} size="small" color="primary" variant="outlined" />
+                  <Chip label={t('stockChange', { quantity: newQuantity })} size="small" color="primary" variant="outlined" />
                 )}
               </Box>
             )}
@@ -384,7 +387,7 @@ export default function ScheduledUpdateDialog({
           <>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Zamanlanan Guncellemeler ({pendingUpdates.length})
+              {t('pendingUpdates', { count: pendingUpdates.length })}
             </Typography>
             <List dense disablePadding>
               {pendingUpdates.map((update) => (
@@ -403,7 +406,7 @@ export default function ScheduledUpdateDialog({
                           {formatDateTime(update.scheduled_at)}
                         </Typography>
                         <Chip
-                          label={update.changes.action_type === 'update_offer' ? 'Teklif' : 'Envanter'}
+                          label={update.changes.action_type === 'update_offer' ? t('actionOffer') : t('actionInventory')}
                           size="small"
                           variant="outlined"
                           sx={{ fontSize: '0.6rem', height: 18 }}
@@ -423,7 +426,7 @@ export default function ScheduledUpdateDialog({
                       size="small"
                       color="error"
                       onClick={() => handleCancel(update.id)}
-                      title="Iptal Et"
+                      title={t('cancelUpdate')}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -436,20 +439,20 @@ export default function ScheduledUpdateDialog({
 
         {pendingUpdates.length === 0 && !selectedSku && (
           <Alert severity="info" sx={{ mt: 1 }}>
-            Zamanlanmis guncelleme yok. Bir ilan secip degisikliklerinizi zamanlayabilirsiniz.
+            {t('noScheduledUpdates')}
           </Alert>
         )}
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>Iptal Et</Button>
+        <Button onClick={onClose}>{t('cancel')}</Button>
         <Button
           variant="contained"
           onClick={handleSchedule}
           disabled={!hasChanges || !scheduledAt || !selectedSku}
           startIcon={<ScheduleIcon />}
         >
-          Zamanla
+          {t('schedule')}
         </Button>
       </DialogActions>
     </Dialog>

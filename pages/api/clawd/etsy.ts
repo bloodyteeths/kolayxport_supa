@@ -2703,6 +2703,14 @@ export default async function handler(
             });
         }
 
+        // GET /api/clawd/etsy?action=listing_count — Lightweight count only (no images/data)
+        if (req.method === 'GET' && action === 'listing_count') {
+            const state = (req.query.state as string) || 'active';
+            const endpoint = `/shops/${shopId}/listings?state=${state}&limit=1&offset=0`;
+            const data = await callEtsyAPI(endpoint, accessToken);
+            return res.status(200).json({ count: data.count || 0, state });
+        }
+
         // GET /api/clawd/etsy?action=listings_with_images
         if (req.method === 'GET' && action === 'listings_with_images') {
             const limit = parseInt((req.query.limit as string) || '100');

@@ -982,38 +982,44 @@ function EtsyListingsPage() {
       setTotalCount(count);
       listingsCacheRef.current[cacheKey] = { listings: rows, total: count, ts: Date.now() };
 
-      // Fetch counts for all states (for sidebar badges) — only once per session
-      const existingCounts = statusCountsCacheRef.current[selectedShopId];
-      if (!existingCounts || !existingCounts._fetched) {
-        const allStates = ['active', 'draft', 'inactive'] as const;
-        const otherStates = allStates.filter(s => s !== state);
-        const countPromises = otherStates.map(async (s) => {
-          try {
-            const r = await fetch(
-              `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${s}&limit=1&offset=0`
-            );
-            if (r.ok) {
-              const d = await r.json();
-              return { state: s, count: d.count || 0 };
-            }
-          } catch {}
-          return { state: s, count: 0 };
-        });
-        const otherCounts = await Promise.all(countPromises);
-        const counts: Record<string, number> = { [state]: count, _fetched: 1 };
-        for (const c of otherCounts) counts[c.state] = c.count;
-        statusCountsCacheRef.current[selectedShopId] = counts;
-        setStatusCountsVersion(v => v + 1);
-      } else {
-        // Update count for current state
-        existingCounts[state] = count;
-      }
+      // Update current state count immediately
+      const existingCounts = statusCountsCacheRef.current[selectedShopId] || {};
+      existingCounts[state] = count;
+      statusCountsCacheRef.current[selectedShopId] = existingCounts;
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
       toast.error(t('loadFailed', { error: err.message }));
     }
     setLoading(false);
   }, [selectedShopId, statusFilter]);
+
+  // Fetch sidebar counts for other states (non-blocking, after listings load)
+  const fetchStatusCounts = useCallback(async () => {
+    if (!selectedShopId) return;
+    if (statusCountsCacheRef.current[selectedShopId]?._fetched) return;
+
+    const allStates = ['active', 'draft', 'inactive'] as const;
+    const countPromises = allStates.map(async (s) => {
+      // Reuse already-known count from listings fetch
+      const known = statusCountsCacheRef.current[selectedShopId]?.[s];
+      if (known !== undefined) return { state: s, count: known };
+      try {
+        const r = await fetch(
+          `/api/clawd/etsy?action=listing_count&shop_id=${selectedShopId}&state=${s}`
+        );
+        if (r.ok) {
+          const d = await r.json();
+          return { state: s, count: d.count || 0 };
+        }
+      } catch {}
+      return { state: s, count: 0 };
+    });
+    const results = await Promise.all(countPromises);
+    const counts: Record<string, number> = { _fetched: 1 };
+    for (const c of results) counts[c.state] = c.count;
+    statusCountsCacheRef.current[selectedShopId] = counts;
+    setStatusCountsVersion(v => v + 1);
+  }, [selectedShopId]);
 
   // Sync listings from Etsy API → DB (manual, like Vela)
   const syncListings = useCallback(async () => {
@@ -1090,10 +1096,10 @@ function EtsyListingsPage() {
 
   useEffect(() => {
     if (selectedShopId) {
-      fetchListings();
+      fetchListings().then(() => fetchStatusCounts());
       fetchShopMeta();
     }
-  }, [selectedShopId, statusFilter, fetchListings, fetchShopMeta]);
+  }, [selectedShopId, statusFilter, fetchListings, fetchShopMeta, fetchStatusCounts]);
 
   // NOTE: Auto-sync removed — sync is manual only (Sync button)
 

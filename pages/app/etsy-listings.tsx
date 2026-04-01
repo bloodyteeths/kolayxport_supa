@@ -949,12 +949,11 @@ function EtsyListingsPage() {
     };
   };
 
-  // Sync state (declared before fetchListings to avoid circular deps)
+  // Sync state
   const [syncing, setSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
-  const needsFirstSyncRef = useRef(false);
 
-  // Load listings — DB cache first, Etsy API fallback
+  // Load listings from Etsy API (with in-memory cache)
   const fetchListings = useCallback(async () => {
     if (!selectedShopId) return;
 
@@ -969,44 +968,39 @@ function EtsyListingsPage() {
 
     setLoading(true);
     try {
-      let rows: EtsyListingRow[] = [];
-      let count = 0;
-
-      // Try DB cache first
-      try {
-        const dbRes = await fetch(
-          `/api/clawd/etsy?action=cached_listings&shop_id=${selectedShopId}&state=${statusFilter}`
-        );
-        if (dbRes.ok) {
-          const data = await dbRes.json();
-          rows = (data.listings || []).map(mapListing);
-          count = data.count || rows.length;
-          setLastSyncAt(data.lastSyncAt || null);
-          if (data.stateCounts) {
-            statusCountsCacheRef.current[selectedShopId] = data.stateCounts;
-          }
-        }
-      } catch {
-        // DB cache failed, will fallback below
-      }
-
-      // Fallback to Etsy API if DB returned nothing
-      if (rows.length === 0) {
-        const state = statusFilter || 'active';
-        const apiRes = await fetch(
-          `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${state}&limit=100&offset=0`
-        );
-        if (!apiRes.ok) throw new Error(`HTTP ${apiRes.status}`);
-        const apiData = await apiRes.json();
-        rows = (apiData.listings || apiData.results || []).map(mapListing);
-        count = apiData.count || rows.length;
-        // Trigger background sync for next time
-        needsFirstSyncRef.current = true;
-      }
+      const state = statusFilter || 'active';
+      const apiRes = await fetch(
+        `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${state}&limit=100&offset=0`
+      );
+      if (!apiRes.ok) throw new Error(`HTTP ${apiRes.status}`);
+      const apiData = await apiRes.json();
+      const rows = (apiData.listings || []).map(mapListing);
+      const count = apiData.count || rows.length;
 
       setListings(rows);
       setTotalCount(count);
       listingsCacheRef.current[cacheKey] = { listings: rows, total: count, ts: Date.now() };
+
+      // Also fetch counts for all states (for sidebar badges)
+      if (!statusCountsCacheRef.current[selectedShopId]?.fetched) {
+        const states = ['active', 'draft', 'inactive'] as const;
+        const countPromises = states.filter(s => s !== state).map(async (s) => {
+          try {
+            const r = await fetch(
+              `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${s}&limit=1&offset=0`
+            );
+            if (r.ok) {
+              const d = await r.json();
+              return { state: s, count: d.count || 0 };
+            }
+          } catch {}
+          return { state: s, count: 0 };
+        });
+        const otherCounts = await Promise.all(countPromises);
+        const counts: Record<string, number> = { [state]: count, fetched: 1 } as any;
+        for (const c of otherCounts) counts[c.state] = c.count;
+        statusCountsCacheRef.current[selectedShopId] = counts;
+      }
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
       toast.error(t('loadFailed', { error: err.message }));
@@ -1094,13 +1088,7 @@ function EtsyListingsPage() {
     }
   }, [selectedShopId, statusFilter, fetchListings, fetchShopMeta]);
 
-  // Auto-trigger first sync when DB is empty and never synced
-  useEffect(() => {
-    if (needsFirstSyncRef.current && !syncing) {
-      needsFirstSyncRef.current = false;
-      syncListings();
-    }
-  });
+  // NOTE: Auto-sync removed — sync is manual only (Sync button)
 
   // Reset pagination to page 0 when filters change
   useEffect(() => {

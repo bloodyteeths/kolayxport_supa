@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
-import { ChevronDown, Star, Truck, BarChart3, Box, Search, Sparkles, TrendingUp, ShoppingBag, Globe, Layers, Brain, Target, Zap } from 'lucide-react';
+import { ChevronDown, Star, Truck, BarChart3, Box, Search, Sparkles, TrendingUp, ShoppingBag, Globe, Layers, Brain, Target, Zap, ArrowLeftRight, DollarSign } from 'lucide-react';
 import { Disclosure, Transition } from '@headlessui/react';
 import { supabase } from '@/lib/supabase';
 import { FAQPageJsonLd } from 'next-seo';
@@ -41,6 +41,11 @@ const features = [
     description: 'FedEx, UPS, Yurtiçi, Aras… algoritmamız en ucuz opsiyonu seçer, etiketlerinizi otomatik oluşturur.',
   },
   {
+    icon: ArrowLeftRight,
+    title: 'Trendyol → eBay Arbitraj',
+    description: 'Trendyol\'daki ürünleri otomatik tarayın, eBay fiyatlarıyla karşılaştırın, AI çeviri ile eşleştirin. Kâr, ROI, komisyon hesabı anında.',
+  },
+  {
     icon: TrendingUp,
     title: 'Finansal İstihbarat',
     description: 'Kar marjı hesaplama, komisyon analizi, gelir raporları ve satıcı performans takibi ile finansal sağlığınızı izleyin.',
@@ -58,6 +63,7 @@ const includedFeatures = [
   'Niş Keşfi & Trend Analizi',
   'Anahtar Kelime İstihbaratı',
   'Toplu Listeleme Yönetimi',
+  'Trendyol → eBay Arbitraj Tarayıcı',
   'Kar Marjı & Komisyon Hesaplayıcı',
   'Otomatik Kargo Etiketi (FedEx, UPS)',
   'Çoklu Pazaryeri Senkronizasyonu',
@@ -107,6 +113,10 @@ const faqItems = [
   {
     question: 'Pazar araştırması araçları neler sunuyor?',
     answer: 'Rakip analizi, satıcı takibi, niş keşfi, anahtar kelime istihbaratı, trend analizi ve kar marjı hesaplama gibi araçlarla veri odaklı satış kararları almanızı sağlar. eRank ve Terapeak gibi ücretli araçlara alternatiftir.',
+  },
+  {
+    question: 'Arbitraj tarayıcı nasıl çalışıyor?',
+    answer: 'Trendyol\'daki 65+ kategoriden ürünleri otomatik çeker, Gemini AI ile Türkçe ürün adlarını İngilizce eBay arama sorgularına çevirir ve eBay\'de eşleşen ürünleri bulur. Kâr, ROI, marj ve 28 farklı eBay komisyon oranını hesaplayarak en kârlı fırsatları sıralar. Tüm veriler önbelleğe alınır, arka planda tarama yapılır.',
   },
   {
     question: 'Veri güvenliğim nasıl sağlanıyor?',
@@ -314,14 +324,14 @@ export default function HomePage() {
               </div>
               <ul className="space-y-3">
                 {[
+                  'Trendyol → eBay arbitraj tarayıcı',
+                  'AI ile ürün eşleştirme & çeviri',
                   'Rakip analizi & satıcı takibi',
                   'AI başlık optimizasyonu & fiyat önerileri',
                   'Niş analizi & ürün veritabanı',
                   'Anahtar kelime istihbaratı',
                   'Listeleme oluşturma & toplu düzenleme',
-                  'Kategori & item specifics rehberi',
                   'Finansal istihbarat & kar analizi',
-                  'Sipariş yönetimi & kargo takibi',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
                     <Zap size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
@@ -329,6 +339,98 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
+            </motion.div>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Section: ARBITRAGE SCANNER */}
+      <motion.section
+        className="py-20 md:py-28 bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+        variants={sectionVariants}
+      >
+        <div className="container max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full uppercase tracking-wider">Yeni</span>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mt-4 mb-4">
+                Trendyol → eBay Arbitraj Tarayıcı
+              </h2>
+              <p className="text-lg text-slate-600 mb-8">
+                Trendyol'daki binlerce ürünü otomatik tarayın, eBay fiyatlarıyla karşılaştırın ve en kârlı fırsatları anında bulun. AI destekli çeviri ile Türkçe ürünleri eBay'de doğru eşleştirin.
+              </p>
+              <ul className="space-y-3">
+                {[
+                  '65+ Trendyol kategorisi, tek tıkla tarama',
+                  'AI ile Türkçe → İngilizce ürün eşleştirme',
+                  'Kâr, ROI, marj ve 28 eBay komisyon oranı hesabı',
+                  'Arka plan tarama — yüzlerce ürünü timeout olmadan tara',
+                  'Fiyat geçmişi takibi ve ürün izleme',
+                  'Grafik ve tablo ile görsel analiz',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                    <DollarSign size={16} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <Link href="/login" className="inline-block px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+                  Arbitraj Tarayıcıyı Dene
+                </Link>
+              </div>
+            </div>
+            <motion.div
+              className="bg-white rounded-3xl shadow-2xl p-8 border border-emerald-100"
+              whileHover={{ scale: 1.01 }}
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-emerald-50 rounded-xl px-5 py-4">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Trendyol Fiyat</p>
+                    <p className="text-lg font-bold text-slate-800">₺459</p>
+                  </div>
+                  <ArrowLeftRight size={24} className="text-emerald-500" />
+                  <div className="text-right">
+                    <p className="text-xs text-slate-500 mb-1">eBay Medyan</p>
+                    <p className="text-lg font-bold text-slate-800">$38.50</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-green-50 rounded-lg py-3">
+                    <p className="text-xs text-slate-500">Kâr</p>
+                    <p className="text-lg font-bold text-green-600">$12.40</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg py-3">
+                    <p className="text-xs text-slate-500">ROI</p>
+                    <p className="text-lg font-bold text-blue-600">+95%</p>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg py-3">
+                    <p className="text-xs text-slate-500">Skor</p>
+                    <p className="text-lg font-bold text-purple-600">78/100</p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 rounded-xl px-5 py-3">
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Ürün Maliyeti</span><span>$13.02</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Kargo</span><span>$8.00</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>eBay Komisyon</span><span>$5.10</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-semibold text-slate-800 pt-2 border-t border-slate-200 mt-1">
+                    <span>Net Kâr</span><span className="text-green-600">$12.40</span>
+                  </div>
+                </div>
+                <p className="text-center text-xs text-slate-400">
+                  Gerçek tarama örneği — Türk Peştemal kategorisi
+                </p>
+              </div>
             </motion.div>
           </div>
         </div>

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
-import { ChevronDown, Star, Truck, BarChart3, Box, ShoppingBag, Search, Tag, Brain, TrendingUp, Layers, Zap } from 'lucide-react';
+import { ChevronDown, Star, Truck, BarChart3, Box, ShoppingBag, Search, Tag, Brain, TrendingUp, Layers, Zap, ArrowLeftRight, DollarSign } from 'lucide-react';
 import { Disclosure, Transition } from '@headlessui/react';
 
 const trustLogos = [
@@ -38,6 +38,11 @@ const features = [
     description: 'FedEx, UPS, and more — our system selects the cheapest option and generates your labels automatically.',
   },
   {
+    icon: ArrowLeftRight,
+    title: 'Trendyol → eBay Arbitrage',
+    description: 'Auto-scan Trendyol products, match with eBay prices using AI translation, and find the most profitable opportunities instantly.',
+  },
+  {
     icon: TrendingUp,
     title: 'Financial Intelligence',
     description: 'Profit margin calculator, commission analysis, revenue reports, and seller performance tracking.',
@@ -55,6 +60,7 @@ const includedFeatures = [
   'Niche Discovery & Trend Analysis',
   'Keyword Intelligence',
   'Bulk Listing Management',
+  'Trendyol → eBay Arbitrage Scanner',
   'Profit Margin & Commission Calculator',
   'Automatic Shipping Labels (FedEx, UPS)',
   'Multi-Marketplace Sync',
@@ -101,6 +107,10 @@ const faqItems = [
   {
     question: 'What do the market research tools offer?',
     answer: 'Competitor analysis, seller tracking, niche discovery, keyword intelligence, trend analysis, and profit margin calculators help you make data-driven selling decisions. It\'s a built-in alternative to paid tools like eRank and Terapeak.',
+  },
+  {
+    question: 'How does the arbitrage scanner work?',
+    answer: 'It automatically pulls products from 65+ Trendyol categories, uses Gemini AI to translate Turkish product names into English eBay search queries, finds matching eBay listings, and calculates profit, ROI, and margin including 28 different eBay commission rates. All data is cached and scanning runs in the background for large scans.',
   },
   {
     question: 'How is my data secured?',
@@ -304,14 +314,14 @@ export default function HomePageEN() {
               </div>
               <ul className="space-y-3">
                 {[
+                  'Trendyol → eBay arbitrage scanner',
+                  'AI product matching & translation',
                   'Competitor analysis & seller tracking',
                   'AI title optimization & pricing suggestions',
                   'Niche analysis & product database',
                   'Keyword intelligence',
                   'Create listings & bulk editing',
-                  'Category & item specifics guidance',
                   'Financial intelligence & profit analysis',
-                  'Order management & shipping tracking',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
                     <Zap size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
@@ -319,6 +329,98 @@ export default function HomePageEN() {
                   </li>
                 ))}
               </ul>
+            </motion.div>
+          </div>
+        </div>
+      </motion.section>
+
+      {/* ARBITRAGE SCANNER */}
+      <motion.section
+        className="py-20 md:py-28 bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+        variants={sectionVariants}
+      >
+        <div className="container max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <span className="text-xs font-semibold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full uppercase tracking-wider">New</span>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mt-4 mb-4">
+                Trendyol → eBay Arbitrage Scanner
+              </h2>
+              <p className="text-lg text-slate-600 mb-8">
+                Automatically scan thousands of Trendyol products, compare with eBay prices, and find the most profitable opportunities. AI-powered translation matches Turkish products to the right eBay listings.
+              </p>
+              <ul className="space-y-3">
+                {[
+                  '65+ Trendyol categories, one-click scanning',
+                  'AI Turkish → English product matching',
+                  'Profit, ROI, margin & 28 eBay fee rate calculations',
+                  'Background scanning — scan hundreds without timeout',
+                  'Price history tracking & product watchlist',
+                  'Charts & sortable tables for visual analysis',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-slate-700">
+                    <DollarSign size={16} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <Link href="/login" className="inline-block px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out">
+                  Try the Arbitrage Scanner
+                </Link>
+              </div>
+            </div>
+            <motion.div
+              className="bg-white rounded-3xl shadow-2xl p-8 border border-emerald-100"
+              whileHover={{ scale: 1.01 }}
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-emerald-50 rounded-xl px-5 py-4">
+                  <div>
+                    <p className="text-xs text-slate-500 mb-1">Trendyol Price</p>
+                    <p className="text-lg font-bold text-slate-800">₺459</p>
+                  </div>
+                  <ArrowLeftRight size={24} className="text-emerald-500" />
+                  <div className="text-right">
+                    <p className="text-xs text-slate-500 mb-1">eBay Median</p>
+                    <p className="text-lg font-bold text-slate-800">$38.50</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-green-50 rounded-lg py-3">
+                    <p className="text-xs text-slate-500">Profit</p>
+                    <p className="text-lg font-bold text-green-600">$12.40</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg py-3">
+                    <p className="text-xs text-slate-500">ROI</p>
+                    <p className="text-lg font-bold text-blue-600">+95%</p>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg py-3">
+                    <p className="text-xs text-slate-500">Score</p>
+                    <p className="text-lg font-bold text-purple-600">78/100</p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 rounded-xl px-5 py-3">
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Product Cost</span><span>$13.02</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Shipping</span><span>$8.00</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>eBay Fees</span><span>$5.10</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-semibold text-slate-800 pt-2 border-t border-slate-200 mt-1">
+                    <span>Net Profit</span><span className="text-green-600">$12.40</span>
+                  </div>
+                </div>
+                <p className="text-center text-xs text-slate-400">
+                  Real scan example — Turkish Peshtemal category
+                </p>
+              </div>
             </motion.div>
           </div>
         </div>

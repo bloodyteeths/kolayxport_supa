@@ -4,7 +4,7 @@ import PublicLayout from '../components/PublicLayout';
 import Breadcrumb from '../components/Breadcrumb';
 import { motion } from 'framer-motion';
 import { NextSeo } from 'next-seo';
-import { Zap, Shuffle, Edit3, Package, Link2, Settings, ShieldCheck, Gift } from 'lucide-react';
+import { Zap, Shuffle, Edit3, Package, Link2, Settings, ShieldCheck, Gift, ArrowLeftRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const featureSections = [
@@ -32,6 +32,11 @@ const featureSections = [
     icon: Settings,
     title: 'Kolay Kurulum ve Kullanım',
     description: 'Google hesabınızla saniyeler içinde kaydolun. Kullanıcı dostu arayüzümüz sayesinde karmaşık ayarlarla uğraşmadan otomasyona başlayın.'
+  },
+  {
+    icon: ArrowLeftRight,
+    title: 'Trendyol → eBay Arbitraj Tarayıcı',
+    description: '65+ Trendyol kategorisinden ürünleri otomatik tarayın, Gemini AI ile İngilizce eBay sorgularına çevirin ve en kârlı arbitraj fırsatlarını bulun. Kâr, ROI, marj, 28 eBay komisyon oranı ve kargo maliyeti dahil tam finansal analiz. Arka planda tarama, fiyat takibi ve grafiklerle profesyonel arbitraj.',
   },
   {
     icon: ShieldCheck,

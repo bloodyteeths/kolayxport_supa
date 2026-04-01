@@ -11,8 +11,6 @@ import {
   CheckCircle, XCircle, Info, Zap, Plus, Minus, ShoppingBag, BarChart3,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useTranslations } from 'next-intl';
-import { useLocale } from '../../../lib/i18n/useLocale';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -304,9 +302,9 @@ function scoreColor(score: number): string {
 }
 
 function scoreBg(score: number): string {
-  if (score >= 70) return 'rgba(16,185,129,0.08)';
-  if (score >= 40) return 'rgba(245,158,11,0.08)';
-  return 'rgba(239,68,68,0.08)';
+  if (score >= 70) return 'rgba(16,185,129,0.1)';
+  if (score >= 40) return 'rgba(245,158,11,0.1)';
+  return 'rgba(239,68,68,0.1)';
 }
 
 function titleLengthColor(len: number): string {
@@ -337,16 +335,17 @@ function downloadCSV(content: string, filename: string) {
 // Sub-tab labels
 // ---------------------------------------------------------------------------
 
-// TAB_LABELS moved to component body to use translations
+const TAB_LABELS = [
+  'Anahtar Kelime Arastirmasi',
+  'Ters Listeleme Analizi',
+  'Baslik Olusturucu',
+];
 
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
 export default function KeywordIntelligence({ userId, marketplace, userListings, onNavigate }: KeywordIntelligenceProps) {
-  const t = useTranslations('ebay.keywordIntelligence');
-  const { formatDate } = useLocale();
-  const TAB_LABELS = [t('tabKeywordResearch'), t('tabReverseLookup'), t('tabTitleBuilder')];
   const [activeTab, setActiveTab] = useState(0);
 
   // --- User keywords from listings ---
@@ -406,12 +405,12 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
     try {
       const url = `/api/clawd/ebay?action=search_market&q=${encodeURIComponent(query.trim())}&limit=200&marketplace_id=${marketplace}`;
       const res = await fetch(url);
-      if (!res.ok) throw new Error(t('apiError', { status: String(res.status) }));
+      if (!res.ok) throw new Error(`API hatasi: ${res.status}`);
       const data = await res.json();
 
       const fetched: MarketItem[] = data.itemSummaries || data.items || [];
       if (fetched.length === 0) {
-        setError(t('noResults'));
+        setError('Sonuc bulunamadi. Farkli bir anahtar kelime deneyin.');
         return;
       }
 
@@ -420,7 +419,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
       setBigrams(extractNgrams(fetched, 2));
       setTrigrams(extractNgrams(fetched, 3));
     } catch (err: any) {
-      setError(err.message || t('searchError'));
+      setError(err.message || 'Arama sirasinda hata olustu.');
     } finally {
       setLoading(false);
     }
@@ -465,12 +464,12 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
       .map((r) => r.keyword)
       .join(', ');
     navigator.clipboard.writeText(text);
-    toast.success(t('top30Copied'));
+    toast.success('Top 30 anahtar kelime kopyalandi!');
   }, [sortedKeywords]);
 
   const exportCSV = useCallback(() => {
     downloadCSV(toCSV(sortedKeywords), `keywords_${query.replace(/\s+/g, '_')}.csv`);
-    toast.success(t('csvDownloaded'));
+    toast.success('CSV indirildi!');
   }, [sortedKeywords, query]);
 
   // ---------------------------------------------------------------------------
@@ -480,7 +479,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
   const doLookup = useCallback(async () => {
     const itemId = parseEbayUrl(lookupInput);
     if (!itemId) {
-      setLookupError(t('invalidInput'));
+      setLookupError('Gecerli bir eBay URL veya Item ID girin.');
       return;
     }
     setLookupLoading(true);
@@ -491,11 +490,11 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
     try {
       const url = `/api/clawd/ebay?action=get_item_details&legacy_item_id=${itemId}`;
       const res = await fetch(url);
-      if (!res.ok) throw new Error(t('apiError', { status: String(res.status) }));
+      if (!res.ok) throw new Error(`API hatasi: ${res.status}`);
       const data = await res.json();
 
       if (!data || (!data.title && !data.itemId)) {
-        setLookupError(t('listingNotFound'));
+        setLookupError('Listeleme bulunamadi.');
         return;
       }
 
@@ -508,7 +507,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
         titleWords.map((w) => ({ word: w, popular: popularSet.has(w) })),
       );
     } catch (err: any) {
-      setLookupError(err.message || t('lookupError'));
+      setLookupError(err.message || 'Listeleme alinirken hata olustu.');
     } finally {
       setLookupLoading(false);
     }
@@ -518,7 +517,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
     if (!itemDetails?.title) return;
     setQuery(itemDetails.title);
     setActiveTab(0);
-    toast.success(t('titleCopiedToSearch'));
+    toast.success('Baslik arama alanina kopyalandi!');
   }, [itemDetails]);
 
   // ---------------------------------------------------------------------------
@@ -544,7 +543,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
         setTitleText(next);
         setSelectedKeywords((prev) => new Set([...prev, word]));
       } else {
-        toast.error(t('charLimitExceeded', { max: String(MAX_TITLE_LENGTH) }));
+        toast.error(`Karakter limiti asildi! (maks ${MAX_TITLE_LENGTH})`);
       }
     },
     [titleText],
@@ -600,10 +599,10 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
         <TableHead>
           <TableRow>
             <TableCell sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{label}</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('usage')}</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('avgPrice')}</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('competition')}</TableCell>
-            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('score')}</TableCell>
+            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>Kullanim</TableCell>
+            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>Ort. Fiyat</TableCell>
+            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>Rekabet</TableCell>
+            <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>Skor</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -638,7 +637,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
             <TableRow>
               <TableCell colSpan={5} align="center">
                 <Typography variant="body2" color="text.secondary">
-                  {t('noDataYet')}
+                  Henuz veri yok. Once arama yapin.
                 </Typography>
               </TableCell>
             </TableRow>
@@ -656,10 +655,10 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
     <Box>
       {/* User's own keywords */}
       {userKeywords.length > 0 && (
-        <Paper sx={{ p: 2, mb: 2, bgcolor: '#f8faff', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
+        <Paper sx={{ p: 2, mb: 2, bgcolor: 'action.hover', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
             <Sparkles size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-            {t('popularWordsInListings')}
+            Listelerindeki popüler kelimeler:
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             {userKeywords.map(({ word, count }) => (
@@ -669,7 +668,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                 size="small"
                 variant="outlined"
                 onClick={() => setQuery(word)}
-                sx={{ cursor: 'pointer', borderColor: 'rgba(99,102,241,0.3)', color: '#6366f1', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }}
+                sx={{ cursor: 'pointer' }}
               />
             ))}
           </Box>
@@ -681,8 +680,8 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
         <TextField
           inputRef={queryInputRef}
           size="small"
-          placeholder={t('searchPlaceholder')}
-          helperText={t('searchHelperText')}
+          placeholder="ör: wireless earbuds, phone case"
+          helperText="Anahtar kelime analizi için bir ürün kelimesi girin"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && doSearch()}
@@ -700,13 +699,13 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
           onClick={doSearch}
           disabled={loading || !query.trim()}
           startIcon={loading ? <CircularProgress size={16} /> : <TrendingUp size={16} />}
-          sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}
+          sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
         >
-          {t('searchButton')}
+          Ara
         </Button>
       </Box>
 
-      {loading && <LinearProgress sx={{ mb: 2, borderRadius: 3, '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' } }} />}
+      {loading && <LinearProgress sx={{ mb: 2, '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' } }} />}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       {keywordRows.length > 0 && (
@@ -715,26 +714,24 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
           <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
             <Chip
               icon={<Hash size={14} />}
-              label={t('listingsAnalyzed', { count: items.length })}
+              label={`${items.length} listeleme analiz edildi`}
               variant="outlined"
               size="small"
-              sx={{ borderColor: 'rgba(99,102,241,0.3)', color: '#6366f1' }}
             />
             <Chip
               icon={<Type size={14} />}
-              label={t('uniqueKeywords', { count: keywordRows.length })}
+              label={`${keywordRows.length} benzersiz kelime`}
               variant="outlined"
               size="small"
-              sx={{ borderColor: 'rgba(99,102,241,0.3)', color: '#6366f1' }}
             />
             <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
-              <Tooltip title={t('copyTop30Tooltip')}>
-                <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={copyAllKeywords} sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#5558e6', bgcolor: 'rgba(99,102,241,0.04)' } }}>
-                  {t('copyAll')}
+              <Tooltip title="Top 30 anahtar kelimeyi kopyala">
+                <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={copyAllKeywords} sx={{ borderColor: '#6366f1', color: '#6366f1' }}>
+                  Tumu Kopyala
                 </Button>
               </Tooltip>
-              <Tooltip title={t('downloadCsvTooltip')}>
-                <Button size="small" variant="outlined" startIcon={<Download size={14} />} onClick={exportCSV} sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#5558e6', bgcolor: 'rgba(99,102,241,0.04)' } }}>
+              <Tooltip title="CSV olarak indir">
+                <Button size="small" variant="outlined" startIcon={<Download size={14} />} onClick={exportCSV} sx={{ borderColor: '#6366f1', color: '#6366f1' }}>
                   CSV
                 </Button>
               </Tooltip>
@@ -747,9 +744,9 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
             onChange={(_, v) => setPhraseTab(v)}
             sx={{ mb: 1, minHeight: 36, '& .MuiTab-root': { minHeight: 36, py: 0.5 }, '& .Mui-selected': { color: '#6366f1' }, '& .MuiTabs-indicator': { bgcolor: '#6366f1' } }}
           >
-            <Tab label={t('singleWords')} />
-            <Tab label={t('bigramPhrases')} />
-            <Tab label={t('trigramPhrases')} />
+            <Tab label="Tekil Kelimeler" />
+            <Tab label="Ikili Ifadeler" />
+            <Tab label="Uclu Ifadeler" />
           </Tabs>
 
           {/* Unigrams table */}
@@ -759,22 +756,22 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                      {renderSortableHeader(t('keyword'), 'keyword')}
+                      {renderSortableHeader('Anahtar Kelime', 'keyword')}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                      {renderSortableHeader(t('usagePercent'), 'usagePercent')}
+                      {renderSortableHeader('Kullanim %', 'usagePercent')}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                      {renderSortableHeader(t('avgPrice'), 'avgPrice')}
+                      {renderSortableHeader('Ort. Fiyat', 'avgPrice')}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                      {renderSortableHeader(t('competition'), 'competition')}
+                      {renderSortableHeader('Rekabet', 'competition')}
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                      {renderSortableHeader(t('score'), 'score')}
+                      {renderSortableHeader('Skor', 'score')}
                     </TableCell>
                     {onNavigate && (
-                      <TableCell align="center" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('actions')}</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>Islemler</TableCell>
                     )}
                   </TableRow>
                 </TableHead>
@@ -806,7 +803,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                       </TableCell>
                       {onNavigate && (
                         <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
-                          <Tooltip title={t('viewProducts')}>
+                          <Tooltip title="Urunleri Gor">
                             <IconButton
                               size="small"
                               onClick={(e) => {
@@ -817,7 +814,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                               <ShoppingBag size={15} />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title={t('nicheAnalysis')}>
+                          <Tooltip title="Nis Analizi">
                             <IconButton
                               size="small"
                               onClick={(e) => {
@@ -838,10 +835,10 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
           )}
 
           {/* Bigrams */}
-          {phraseTab === 1 && renderPhraseTable(bigrams, t('bigramLabel'))}
+          {phraseTab === 1 && renderPhraseTable(bigrams, 'Ikili Ifade')}
 
           {/* Trigrams */}
-          {phraseTab === 2 && renderPhraseTable(trigrams, t('trigramLabel'))}
+          {phraseTab === 2 && renderPhraseTable(trigrams, 'Uclu Ifade')}
         </>
       )}
     </Box>
@@ -857,8 +854,8 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
         <TextField
           size="small"
-          placeholder={t('lookupPlaceholder')}
-          helperText={t('lookupHelperText')}
+          placeholder="ör: https://www.ebay.com/itm/123456789 veya 123456789"
+          helperText="Bir eBay listing URL'si veya Item ID yapıştırarak anahtar kelimelerini keşfedin"
           value={lookupInput}
           onChange={(e) => setLookupInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && doLookup()}
@@ -876,13 +873,13 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
           onClick={doLookup}
           disabled={lookupLoading || !lookupInput.trim()}
           startIcon={lookupLoading ? <CircularProgress size={16} /> : <Search size={16} />}
-          sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}
+          sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
         >
-          {t('analyze')}
+          Analiz Et
         </Button>
       </Box>
 
-      {lookupLoading && <LinearProgress sx={{ mb: 2, borderRadius: 3, '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' } }} />}
+      {lookupLoading && <LinearProgress sx={{ mb: 2, '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' } }} />}
       {lookupError && <Alert severity="error" sx={{ mb: 2 }}>{lookupError}</Alert>}
 
       {itemDetails && (
@@ -890,8 +887,8 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
           {/* Title analysis */}
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary">{t('titleLabel')}</Typography>
-              <Chip label={`${(itemDetails.title || '').length} ${t('characters')}`} size="small" variant="outlined" />
+              <Typography variant="subtitle2" color="text.secondary">Baslik</Typography>
+              <Chip label={`${(itemDetails.title || '').length} karakter`} size="small" variant="outlined" />
             </Box>
             <Typography variant="body1" fontWeight={600} sx={{ mb: 1 }}>
               {itemDetails.title}
@@ -905,14 +902,14 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                   color={kw.popular ? 'success' : 'default'}
                   variant={kw.popular ? 'filled' : 'outlined'}
                   onClick={() => addKeywordToTitle(kw.word)}
-                  sx={{ cursor: 'pointer', ...(!kw.popular && { borderColor: 'rgba(99,102,241,0.3)', color: '#6366f1' }) }}
+                  sx={{ cursor: 'pointer' }}
                 />
               ))}
             </Box>
             {lookupKeywords.some((k) => k.popular) && (
               <Typography variant="caption" color="text.secondary">
                 <CheckCircle size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                {t('greenTagsInfo')}
+                Yesil etiketler populer anahtar kelimelerdir (arastirma verilerine gore)
               </Typography>
             )}
             <Box sx={{ mt: 1.5 }}>
@@ -921,9 +918,9 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                 variant="outlined"
                 startIcon={<Zap size={14} />}
                 onClick={optimizeAgainst}
-                sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#5558e6', bgcolor: 'rgba(99,102,241,0.04)' } }}
+                sx={{ borderColor: '#6366f1', color: '#6366f1' }}
               >
-                {t('optimizeAgainst')}
+                Buna Karsi Optimize Et
               </Button>
             </Box>
           </Paper>
@@ -932,17 +929,17 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>{t('priceInfo')}</Typography>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>Fiyat Bilgisi</Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2">{t('price')}</Typography>
+                    <Typography variant="body2">Fiyat:</Typography>
                     <Typography variant="body2" fontWeight={600}>
                       {itemDetails.price ? `${itemDetails.price.currency} ${itemDetails.price.value}` : 'N/A'}
                     </Typography>
                   </Box>
                   {itemDetails.shippingOptions?.[0]?.shippingCost && (
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2">{t('shipping')}</Typography>
+                      <Typography variant="body2">Kargo:</Typography>
                       <Typography variant="body2" fontWeight={600}>
                         {itemDetails.shippingOptions[0].shippingCost.currency}{' '}
                         {itemDetails.shippingOptions[0].shippingCost.value}
@@ -951,7 +948,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                   )}
                   <Divider sx={{ my: 0.5 }} />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="body2" fontWeight={600}>{t('total')}</Typography>
+                    <Typography variant="body2" fontWeight={600}>Toplam:</Typography>
                     <Typography variant="body2" fontWeight={700} color="primary">
                       {itemDetails.price
                         ? `${itemDetails.price.currency} ${(
@@ -967,24 +964,24 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
 
             <Grid item xs={12} sm={6}>
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>{t('sellerInfo')}</Typography>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>Satici Bilgisi</Typography>
                 {itemDetails.seller ? (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2">{t('username')}</Typography>
+                      <Typography variant="body2">Kullanici Adi:</Typography>
                       <Typography variant="body2" fontWeight={600}>{itemDetails.seller.username}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2">{t('feedbackScore')}</Typography>
+                      <Typography variant="body2">Geri Bildirim Skoru:</Typography>
                       <Typography variant="body2" fontWeight={600}>{itemDetails.seller.feedbackScore}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Typography variant="body2">{t('positiveRate')}</Typography>
+                      <Typography variant="body2">Olumlu Oran:</Typography>
                       <Typography variant="body2" fontWeight={600}>{itemDetails.seller.feedbackPercentage}%</Typography>
                     </Box>
                   </Box>
                 ) : (
-                  <Typography variant="body2" color="text.secondary">{t('sellerNotAvailable')}</Typography>
+                  <Typography variant="body2" color="text.secondary">Satici bilgisi mevcut degil</Typography>
                 )}
               </Paper>
             </Grid>
@@ -992,29 +989,29 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
 
           {/* Listing details */}
           <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>{t('listingDetails')}</Typography>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>Listeleme Detaylari</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2">{t('condition')}</Typography>
+                <Typography variant="body2">Durum:</Typography>
                 <Typography variant="body2" fontWeight={600}>{itemDetails.condition || 'N/A'}</Typography>
               </Box>
               {itemDetails.categories && itemDetails.categories.length > 0 && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2">{t('category')}</Typography>
+                  <Typography variant="body2">Kategori:</Typography>
                   <Typography variant="body2" fontWeight={600}>
                     {itemDetails.categories.map((c) => c.categoryName).join(' > ')}
                   </Typography>
                 </Box>
               )}
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body2">{t('imageCountLabel')}</Typography>
+                <Typography variant="body2">Gorsel Sayisi:</Typography>
                 <Typography variant="body2" fontWeight={600}>
                   {1 + (itemDetails.additionalImages?.length || 0)}
                 </Typography>
               </Box>
               {itemDetails.estimatedAvailabilities?.[0]?.estimatedSoldQuantity != null && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2">{t('estimatedSales')}</Typography>
+                  <Typography variant="body2">Tahmini Satis:</Typography>
                   <Typography variant="body2" fontWeight={600}>
                     {itemDetails.estimatedAvailabilities[0].estimatedSoldQuantity}
                   </Typography>
@@ -1022,9 +1019,9 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
               )}
               {itemDetails.itemCreationDate && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2">{t('creationDate')}</Typography>
+                  <Typography variant="body2">Olusturma Tarihi:</Typography>
                   <Typography variant="body2" fontWeight={600}>
-                    {formatDate(new Date(itemDetails.itemCreationDate))}
+                    {new Date(itemDetails.itemCreationDate).toLocaleDateString('tr-TR')}
                   </Typography>
                 </Box>
               )}
@@ -1041,14 +1038,14 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
           {itemDetails.itemSpecifics && itemDetails.itemSpecifics.length > 0 && (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                {t('itemSpecifics')} ({itemDetails.itemSpecifics.length})
+                Urun Ozellikleri ({itemDetails.itemSpecifics.length})
               </Typography>
               <TableContainer sx={{ maxHeight: 300 }}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('attribute')}</TableCell>
-                      <TableCell sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>{t('value')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>Ozellik</TableCell>
+                      <TableCell sx={{ fontWeight: 700, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>Deger</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1080,7 +1077,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
       <Box>
         {sortedKeywords.length === 0 && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            {t('doSearchFirst')}
+            Once &quot;Anahtar Kelime Arastirmasi&quot; sekmesinde bir arama yapin. Sonuclar burada kullanilacak.
           </Alert>
         )}
 
@@ -1090,10 +1087,10 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
             <Paper variant="outlined" sx={{ p: 2, height: '100%', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="subtitle2" gutterBottom>
                 <Layers size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                {t('keywordBank')}
+                Anahtar Kelime Bankasi
               </Typography>
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                {t('clickToAddToTitle')}
+                Basliga eklemek icin tiklayin
               </Typography>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxHeight: 300, overflow: 'auto' }}>
                 {sortedKeywords.map((kw) => {
@@ -1116,7 +1113,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                 })}
                 {sortedKeywords.length === 0 && (
                   <Typography variant="body2" color="text.secondary">
-                    {t('noKeywordsYet')}
+                    Henuz anahtar kelime yok.
                   </Typography>
                 )}
               </Box>
@@ -1128,7 +1125,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="subtitle2" gutterBottom>
                 <Type size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                {t('titleEditor')}
+                Baslik Duzenleyici
               </Typography>
 
               {/* Title field */}
@@ -1138,8 +1135,8 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                 multiline
                 minRows={2}
                 maxRows={3}
-                placeholder={t('titleEditorPlaceholder')}
-                helperText={t('titleEditorHelperText')}
+                placeholder="ör: Wireless Bluetooth Earbuds Noise Cancelling Headphones..."
+                helperText="Soldaki popüler kelimelerden seçerek veya kendiniz yazarak başlık oluşturun"
                 value={titleText}
                 onChange={(e) => {
                   if (e.target.value.length <= MAX_TITLE_LENGTH + 10) {
@@ -1154,10 +1151,10 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
               <Box sx={{ mb: 1 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                   <Typography variant="caption" sx={{ color: barColor, fontWeight: 600 }}>
-                    {t('charCount', { current: titleLength, max: MAX_TITLE_LENGTH })}
+                    {titleLength} / {MAX_TITLE_LENGTH} karakter
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {t('wordCount', { count: titleWordCount })}
+                    {titleWordCount} kelime
                   </Typography>
                 </Box>
                 <LinearProgress
@@ -1166,8 +1163,8 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                   sx={{
                     height: 6,
                     borderRadius: 3,
-                    bgcolor: 'rgba(99,102,241,0.08)',
-                    '& .MuiLinearProgress-bar': { background: `linear-gradient(90deg, #6366f1, ${barColor})`, borderRadius: 3 },
+                    bgcolor: '#e0e0e0',
+                    '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: 3 },
                   }}
                 />
               </Box>
@@ -1182,9 +1179,9 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                     setTitleText('');
                     setSelectedKeywords(new Set());
                   }}
-                  sx={{ borderColor: 'rgba(99,102,241,0.3)', color: '#6366f1', '&:hover': { borderColor: '#6366f1', bgcolor: 'rgba(99,102,241,0.04)' } }}
+                  sx={{ borderColor: '#6366f1', color: '#6366f1' }}
                 >
-                  {t('clear')}
+                  Temizle
                 </Button>
                 <Button
                   size="small"
@@ -1192,9 +1189,9 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                   startIcon={<Minus size={14} />}
                   onClick={removeLastWord}
                   disabled={!titleText}
-                  sx={{ borderColor: 'rgba(99,102,241,0.3)', color: '#6366f1', '&:hover': { borderColor: '#6366f1', bgcolor: 'rgba(99,102,241,0.04)' } }}
+                  sx={{ borderColor: '#6366f1', color: '#6366f1' }}
                 >
-                  {t('removeLastWord')}
+                  Son Kelimeyi Sil
                 </Button>
                 <Button
                   size="small"
@@ -1202,12 +1199,12 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                   startIcon={<Copy size={14} />}
                   onClick={() => {
                     navigator.clipboard.writeText(titleText);
-                    toast.success(t('titleCopied'));
+                    toast.success('Baslik kopyalandi!');
                   }}
                   disabled={!titleText}
-                  sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}
+                  sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
                 >
-                  {t('copy')}
+                  Kopyala
                 </Button>
               </Box>
 
@@ -1215,7 +1212,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
               {suggestedKeywords.length > 0 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                    {t('suggestedKeywords')}
+                    Onerilen kelimeler (baslikta yok):
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxHeight: 100, overflow: 'auto' }}>
                     {suggestedKeywords.slice(0, 20).map((kw) => (
@@ -1240,7 +1237,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
               <Paper variant="outlined" sx={{ p: 2, mt: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
                 <Typography variant="subtitle2" gutterBottom>
                   <Sparkles size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                  {t('suggestedTitles')}
+                  Onerilen Basliklar
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {titleVariations.map((v, i) => (
@@ -1251,32 +1248,32 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                         alignItems: 'center',
                         gap: 1,
                         p: 1,
-                        borderRadius: 2,
-                        bgcolor: '#f8faff',
-                        '&:hover': { bgcolor: 'rgba(99,102,241,0.06)' },
+                        borderRadius: 1,
+                        bgcolor: 'action.hover',
+                        '&:hover': { bgcolor: 'action.selected' },
                       }}
                     >
                       <Typography variant="body2" sx={{ flex: 1 }}>
                         {v}
                       </Typography>
                       <Chip label={`${v.length}k`} size="small" variant="outlined" />
-                      <Tooltip title={t('useThisTitle')}>
+                      <Tooltip title="Bu basligi kullan">
                         <IconButton
                           size="small"
                           onClick={() => {
                             setTitleText(v);
-                            toast.success(t('titleSelected'));
+                            toast.success('Baslik secildi!');
                           }}
                         >
                           <CheckCircle size={16} />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title={t('copyTooltip')}>
+                      <Tooltip title="Kopyala">
                         <IconButton
                           size="small"
                           onClick={() => {
                             navigator.clipboard.writeText(v);
-                            toast.success(t('copied'));
+                            toast.success('Kopyalandi!');
                           }}
                         >
                           <Copy size={14} />
@@ -1292,13 +1289,13 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
             <Paper variant="outlined" sx={{ p: 2, mt: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="subtitle2" gutterBottom>
                 <ArrowUpDown size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                {t('titleComparison')}
+                Baslik Karsilastirmasi
               </Typography>
               <TextField
                 fullWidth
                 size="small"
-                placeholder={t('comparisonPlaceholder')}
-                helperText={t('comparisonHelperText')}
+                placeholder="ör: Mevcut eBay listing başlığınızı buraya yapıştırın..."
+                helperText="Mevcut başlığınızı yapıştırarak yeni başlıkla karşılaştırma yapın"
                 value={currentTitle}
                 onChange={(e) => setCurrentTitle(e.target.value)}
                 sx={{ mb: 2 }}
@@ -1316,42 +1313,42 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                   <Grid item xs={6}>
                     <Paper
                       variant="outlined"
-                      sx={{ p: 1.5, borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', bgcolor: currentCoverage >= newCoverage ? 'rgba(245,158,11,0.06)' : 'rgba(239,68,68,0.06)' }}
+                      sx={{ p: 1.5, bgcolor: currentCoverage >= newCoverage ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}
                     >
                       <Typography variant="caption" color="text.secondary" display="block">
-                        {t('currentTitle')}
+                        Mevcut Baslik
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 1, wordBreak: 'break-word' }}>
                         {currentTitle}
                       </Typography>
                       <Chip
-                        label={t('coverage', { percent: currentCoverage })}
+                        label={`Kapsam: ${currentCoverage}%`}
                         size="small"
                         color={currentCoverage >= 50 ? 'success' : 'warning'}
                       />
                       <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                        {t('charAndWords', { chars: currentTitle.length, words: currentTitle.trim().split(/\s+/).length })}
+                        {currentTitle.length} karakter / {currentTitle.trim().split(/\s+/).length} kelime
                       </Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={6}>
                     <Paper
                       variant="outlined"
-                      sx={{ p: 1.5, borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', bgcolor: newCoverage >= currentCoverage ? 'rgba(16,185,129,0.06)' : 'rgba(245,158,11,0.06)' }}
+                      sx={{ p: 1.5, bgcolor: newCoverage >= currentCoverage ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}
                     >
                       <Typography variant="caption" color="text.secondary" display="block">
-                        {t('newTitle')}
+                        Yeni Baslik
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 1, wordBreak: 'break-word' }}>
                         {titleText}
                       </Typography>
                       <Chip
-                        label={t('coverage', { percent: newCoverage })}
+                        label={`Kapsam: ${newCoverage}%`}
                         size="small"
                         color={newCoverage >= 50 ? 'success' : 'warning'}
                       />
                       <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                        {t('charAndWords', { chars: titleText.length, words: titleWordCount })}
+                        {titleText.length} karakter / {titleWordCount} kelime
                       </Typography>
                     </Paper>
                   </Grid>
@@ -1366,10 +1363,10 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                       )}
                       <Typography variant="body2">
                         {newCoverage > currentCoverage
-                          ? t('newTitleBetter', { diff: newCoverage - currentCoverage })
+                          ? `Yeni baslik %${newCoverage - currentCoverage} daha fazla anahtar kelime kapsami sagliyor.`
                           : newCoverage === currentCoverage
-                          ? t('titlesEqual')
-                          : t('currentTitleBetter', { diff: currentCoverage - newCoverage })}
+                          ? 'Her iki baslik ayni anahtar kelime kapsamina sahip.'
+                          : `Mevcut baslik %${currentCoverage - newCoverage} daha fazla anahtar kelime kapsami sagliyor.`}
                       </Typography>
                     </Box>
                   </Grid>
@@ -1378,7 +1375,7 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
 
               {(!currentTitle || !titleText) && sortedKeywords.length > 0 && (
                 <Typography variant="body2" color="text.secondary">
-                  {t('enterBothTitles')}
+                  Karsilastirma icin hem mevcut basliginizi hem de yeni basliginizi girin.
                 </Typography>
               )}
             </Paper>
@@ -1395,11 +1392,11 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
   return (
     <Box>
       <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>
-        <Zap size={20} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
-        {t('pageTitle')}
+        <Zap size={20} color="#6366f1" style={{ verticalAlign: 'middle', marginRight: 6 }} />
+        Anahtar Kelime Istihbarati
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {t('pageDescription')}
+        Anahtar kelime arastirmasi yapin, rakip listelemeleri analiz edin ve optimize edilmis basliklar olusturun.
       </Typography>
 
       <Tabs

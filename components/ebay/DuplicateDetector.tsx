@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Box,
   Typography,
@@ -118,6 +119,7 @@ function combinedSimilarity(titleA: string, titleB: string): number {
 const SIMILARITY_THRESHOLD = 0.55;
 
 export default function DuplicateDetector({ listings, onSelect }: DuplicateDetectorProps) {
+  const t = useTranslations('ebayListings.duplicateDetector');
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null);
   const [compareMode, setCompareMode] = useState<{ groupId: number; indices: [number, number] } | null>(null);
 
@@ -210,31 +212,30 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
         <ContentCopyIcon sx={{ color: 'warning.main' }} />
         <Typography variant="subtitle1" fontWeight={600}>
-          Tekrar Tespit
+          {t('title')}
         </Typography>
         {duplicateGroups.length > 0 && (
-          <Chip label={`${duplicateGroups.length} grup`} size="small" color="warning" sx={{ ml: 1 }} />
+          <Chip label={t('groupCount', { count: duplicateGroups.length })} size="small" color="warning" sx={{ ml: 1 }} />
         )}
       </Box>
 
       {listings.length < 2 ? (
         <Alert severity="info">
-          Karsilastirma icin en az 2 ilan gerekli.
+          {t('minTwoListings')}
         </Alert>
       ) : duplicateGroups.length === 0 ? (
         <Box sx={{ py: 3, textAlign: 'center' }}>
           <Typography variant="h6" color="success.main" gutterBottom>
-            Tekrar bulunamadi
+            {t('noDuplicatesFound')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {listings.length} ilan analiz edildi, benzer baslik bulunamadi.
+            {t('analyzedNoDuplicates', { count: listings.length })}
           </Typography>
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Typography variant="body2" color="text.secondary">
-            {listings.length} ilan analiz edildi. {duplicateGroups.length} olasi tekrar grubu
-            bulundu (benzerlik esigi: %{Math.round(SIMILARITY_THRESHOLD * 100)}).
+            {t('analyzedFoundGroups', { count: listings.length, groups: duplicateGroups.length, threshold: Math.round(SIMILARITY_THRESHOLD * 100) })}
           </Typography>
 
           {duplicateGroups.map((group) => (
@@ -253,10 +254,10 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                 onClick={() => handleToggleGroup(group.id)}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="subtitle2">Olasi Tekrarlar</Typography>
-                  <Chip label={`${group.listings.length} ilan`} size="small" variant="outlined" />
+                  <Typography variant="subtitle2">{t('possibleDuplicates')}</Typography>
+                  <Chip label={t('listingCount', { count: group.listings.length })} size="small" variant="outlined" />
                   <Chip
-                    label={`Benzerlik: %${Math.round(group.similarity * 100)}`}
+                    label={t('similarity', { percent: Math.round(group.similarity * 100) })}
                     size="small"
                     color={group.similarity >= 0.8 ? 'error' : 'warning'}
                   />
@@ -273,11 +274,11 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                     <TableHead>
                       <TableRow>
                         <TableCell sx={{ width: 40 }}>#</TableCell>
-                        <TableCell>Baslik</TableCell>
-                        <TableCell sx={{ width: 80 }}>SKU</TableCell>
-                        <TableCell sx={{ width: 80 }}>Fiyat</TableCell>
-                        <TableCell sx={{ width: 60 }}>Stok</TableCell>
-                        <TableCell sx={{ width: 90 }}>Durum</TableCell>
+                        <TableCell>{t('titleCol')}</TableCell>
+                        <TableCell sx={{ width: 80 }}>{t('skuCol')}</TableCell>
+                        <TableCell sx={{ width: 80 }}>{t('priceCol')}</TableCell>
+                        <TableCell sx={{ width: 60 }}>{t('stockCol')}</TableCell>
+                        <TableCell sx={{ width: 90 }}>{t('statusCol')}</TableCell>
                         <TableCell sx={{ width: 80 }} />
                       </TableRow>
                     </TableHead>
@@ -289,7 +290,7 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                         >
                           <TableCell>
                             {idx === 0 ? (
-                              <Chip label="En iyi" size="small" color="success" />
+                              <Chip label={t('best')} size="small" color="success" />
                             ) : (
                               idx + 1
                             )}
@@ -317,7 +318,7 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                           <TableCell>{listing.quantity ?? '-'}</TableCell>
                           <TableCell>
                             <Chip
-                              label={listing.status || listing.listingStatus || 'bilinmiyor'}
+                              label={listing.status || listing.listingStatus || t('unknown')}
                               size="small"
                               color={
                                 (listing.status || listing.listingStatus) === 'ACTIVE'
@@ -333,7 +334,7 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                           </TableCell>
                           <TableCell>
                             <Box sx={{ display: 'flex', gap: 0.5 }}>
-                              <Tooltip title="Ilani Sec">
+                              <Tooltip title={t('selectListing')}>
                                 <IconButton
                                   size="small"
                                   onClick={() => onSelect(listing.sku)}
@@ -342,7 +343,7 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                                 </IconButton>
                               </Tooltip>
                               {idx > 0 && (
-                                <Tooltip title="1. ile Karsilastir">
+                                <Tooltip title={t('compareWithFirst')}>
                                   <IconButton
                                     size="small"
                                     onClick={() => handleCompare(group.id, 0, idx)}
@@ -363,7 +364,7 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                 {compareMode && compareMode.groupId === group.id && (
                   <Box sx={{ p: 2, bgcolor: 'grey.50' }}>
                     <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                      Karsilastirma
+                      {t('comparison')}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                       {compareMode.indices.map((idx) => {
@@ -372,7 +373,7 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                           <Card key={listing.sku} variant="outlined" sx={{ flex: 1 }}>
                             <CardContent>
                               <Chip
-                                label={idx === 0 ? 'En iyi' : `#${idx + 1}`}
+                                label={idx === 0 ? t('best') : `#${idx + 1}`}
                                 size="small"
                                 color={idx === 0 ? 'success' : 'default'}
                                 sx={{ mb: 1 }}
@@ -384,17 +385,17 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                                 SKU: {listing.sku}
                               </Typography>
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                Fiyat: {listing.price != null ? `$${listing.price.toFixed(2)}` : '-'}
+                                {t('price')}: {listing.price != null ? `$${listing.price.toFixed(2)}` : '-'}
                               </Typography>
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                Stok: {listing.quantity ?? '-'}
+                                {t('stock')}: {listing.quantity ?? '-'}
                               </Typography>
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                Durum: {listing.condition || '-'}
+                                {t('conditionLabel')}: {listing.condition || '-'}
                               </Typography>
                               {listing.categoryName && (
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                  Kategori: {listing.categoryName}
+                                  {t('category')}: {listing.categoryName}
                                 </Typography>
                               )}
                               {listing.description && (
@@ -423,7 +424,7 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                       onClick={() => setCompareMode(null)}
                       sx={{ mt: 1 }}
                     >
-                      Karsilastirmayi Kapat
+                      {t('closeComparison')}
                     </Button>
                   </Box>
                 )}

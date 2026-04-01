@@ -38,6 +38,7 @@ import {
   ContentCopyOutlined,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,14 +80,6 @@ interface BulkOperationsBarProps {
 
 type PriceMode = 'percent_increase' | 'percent_decrease' | 'fixed_add' | 'fixed_subtract';
 
-const CONDITION_OPTIONS: { value: string; label: string }[] = [
-  { value: 'NEW', label: 'Yeni' },
-  { value: 'LIKE_NEW', label: 'Yeni Gibi' },
-  { value: 'VERY_GOOD', label: 'Cok Iyi' },
-  { value: 'GOOD', label: 'Iyi' },
-  { value: 'ACCEPTABLE', label: 'Kabul Edilebilir' },
-];
-
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ---------------------------------------------------------------------------
@@ -101,6 +94,16 @@ export default function BulkOperationsBar({
   returnPolicies,
   onCompleted,
 }: BulkOperationsBarProps) {
+  const t = useTranslations('ebayListings');
+
+  const CONDITION_OPTIONS: { value: string; label: string }[] = [
+    { value: 'NEW', label: t('bulk.condNew') },
+    { value: 'LIKE_NEW', label: t('bulk.condLikeNew') },
+    { value: 'VERY_GOOD', label: t('bulk.condVeryGood') },
+    { value: 'GOOD', label: t('bulk.condGood') },
+    { value: 'ACCEPTABLE', label: t('bulk.condAcceptable') },
+  ];
+
   // Dialog states - existing
   const [priceDialogOpen, setPriceDialogOpen] = useState(false);
   const [stockDialogOpen, setStockDialogOpen] = useState(false);
@@ -195,9 +198,9 @@ export default function BulkOperationsBar({
     const failed = results.length - succeeded;
 
     if (failed === 0) {
-      toast.success(`${actionLabel}: ${succeeded} listeleme basariyla guncellendi`);
+      toast.success(t('bulk.successAll', { action: actionLabel, count: succeeded }));
     } else {
-      toast.error(`${actionLabel}: ${succeeded} basarili, ${failed} basarisiz`);
+      toast.error(t('bulk.successPartial', { action: actionLabel, succeeded, failed }));
     }
 
     setProcessing(false);
@@ -211,7 +214,7 @@ export default function BulkOperationsBar({
   const handlePriceSubmit = async () => {
     const amt = parseFloat(priceAmount);
     if (isNaN(amt) || amt <= 0) {
-      toast.error('Gecerli bir tutar giriniz');
+      toast.error(t('bulk.enterValidAmount'));
       return;
     }
 
@@ -255,7 +258,7 @@ export default function BulkOperationsBar({
           }
         );
       },
-      'Fiyat guncelleme'
+      t('bulk.priceUpdate')
     );
 
     setPriceAmount('');
@@ -268,7 +271,7 @@ export default function BulkOperationsBar({
   const handleStockSubmit = async () => {
     const qty = parseInt(newQuantity, 10);
     if (isNaN(qty) || qty < 0) {
-      toast.error('Gecerli bir stok miktari giriniz');
+      toast.error(t('bulk.enterValidStock'));
       return;
     }
 
@@ -290,7 +293,7 @@ export default function BulkOperationsBar({
           }
         );
       },
-      'Stok guncelleme'
+      t('bulk.stockUpdate')
     );
 
     setNewQuantity('');
@@ -305,7 +308,7 @@ export default function BulkOperationsBar({
     );
 
     if (unpublished.length === 0) {
-      toast.error('Yayinlanacak listeleme bulunamadi');
+      toast.error(t('bulk.noListingsToPublish'));
       return;
     }
 
@@ -317,7 +320,7 @@ export default function BulkOperationsBar({
           { method: 'POST' }
         );
       },
-      'Yayinlama'
+      t('bulk.publishAction')
     );
   };
 
@@ -330,7 +333,7 @@ export default function BulkOperationsBar({
     );
 
     if (published.length === 0) {
-      toast.error('Geri cekilecek listeleme bulunamadi');
+      toast.error(t('bulk.noListingsToWithdraw'));
       return;
     }
 
@@ -342,7 +345,7 @@ export default function BulkOperationsBar({
           { method: 'POST' }
         );
       },
-      'Geri cekme'
+      t('bulk.withdrawAction')
     );
   };
 
@@ -360,7 +363,7 @@ export default function BulkOperationsBar({
           { method: 'DELETE' }
         );
       },
-      'Silme'
+      t('bulk.deleteAction')
     );
   };
 
@@ -369,7 +372,7 @@ export default function BulkOperationsBar({
   // =======================================================================
   const handleCategorySubmit = async () => {
     if (!newCategoryId.trim()) {
-      toast.error('Gecerli bir kategori ID giriniz');
+      toast.error(t('bulk.enterValidCategoryId'));
       return;
     }
 
@@ -392,7 +395,7 @@ export default function BulkOperationsBar({
           }
         );
       },
-      'Kategori guncelleme'
+      t('bulk.categoryUpdate')
     );
 
     setNewCategoryId('');
@@ -418,7 +421,7 @@ export default function BulkOperationsBar({
           }
         );
       },
-      'Durum guncelleme'
+      t('bulk.conditionUpdate')
     );
 
     setNewCondition('NEW');
@@ -429,7 +432,7 @@ export default function BulkOperationsBar({
   // =======================================================================
   const handleDescriptionAppendSubmit = async () => {
     if (!appendText.trim()) {
-      toast.error('Eklenecek metin giriniz');
+      toast.error(t('bulk.enterTextToAppend'));
       return;
     }
 
@@ -456,7 +459,7 @@ export default function BulkOperationsBar({
           }
         );
       },
-      'Aciklama guncelleme'
+      t('bulk.descriptionUpdate')
     );
 
     setAppendText('');
@@ -468,7 +471,7 @@ export default function BulkOperationsBar({
   // =======================================================================
   const handleExportSelected = () => {
     if (selectedListings.length === 0) {
-      toast.error('Disa aktarilacak listeleme yok');
+      toast.error(t('bulk.noListingsToExport'));
       return;
     }
 
@@ -502,7 +505,7 @@ export default function BulkOperationsBar({
     a.click();
     URL.revokeObjectURL(url);
 
-    toast.success(`${selectedCount} listeleme CSV olarak indirildi`);
+    toast.success(t('bulk.exportedCsv', { count: selectedCount }));
   };
 
   // =======================================================================
@@ -510,7 +513,7 @@ export default function BulkOperationsBar({
   // =======================================================================
   const handleCopySubmit = async () => {
     if (!skuPrefix.trim()) {
-      toast.error('SKU on eki giriniz');
+      toast.error(t('bulk.enterSkuPrefix'));
       return;
     }
 
@@ -573,7 +576,7 @@ export default function BulkOperationsBar({
 
         return itemRes;
       },
-      'Kopyalama'
+      t('bulk.copyAction')
     );
 
     setSkuPrefix('COPY-');
@@ -595,11 +598,11 @@ export default function BulkOperationsBar({
           }}
         >
           <Typography variant="body2" sx={{ mb: 1 }}>
-            Islem devam ediyor...
+            {t('bulk.processing')}
           </Typography>
           <LinearProgress variant="determinate" value={progress} />
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-            %{Math.round(progress)} tamamlandi
+            {t('bulk.progressCompleted', { progress: Math.round(progress) })}
           </Typography>
         </Paper>
       )}
@@ -628,7 +631,7 @@ export default function BulkOperationsBar({
           }}
         >
           <Typography variant="body2" fontWeight={600} sx={{ mr: { xs: 0.5, sm: 2 } }}>
-            {selectedCount} listeleme secildi
+            {t('bulk.selectedCount', { count: selectedCount })}
           </Typography>
 
           {/* 1. Price Change */}
@@ -639,7 +642,7 @@ export default function BulkOperationsBar({
             onClick={() => setPriceDialogOpen(true)}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Toplu Fiyat
+            {t('bulk.bulkPrice')}
           </Button>
 
           {/* 2. Stock Update */}
@@ -650,7 +653,7 @@ export default function BulkOperationsBar({
             onClick={() => setStockDialogOpen(true)}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Toplu Stok
+            {t('bulk.bulkStock')}
           </Button>
 
           {/* 3. Publish */}
@@ -662,7 +665,7 @@ export default function BulkOperationsBar({
             onClick={handlePublish}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Yayinla
+            {t('bulk.publish')}
           </Button>
 
           {/* 4. Withdraw */}
@@ -674,7 +677,7 @@ export default function BulkOperationsBar({
             onClick={handleWithdraw}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Geri Cek
+            {t('bulk.withdraw')}
           </Button>
 
           {/* 5. Delete */}
@@ -686,7 +689,7 @@ export default function BulkOperationsBar({
             onClick={() => setDeleteDialogOpen(true)}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Toplu Sil
+            {t('bulk.bulkDelete')}
           </Button>
 
           {/* 6. Category Change */}
@@ -697,7 +700,7 @@ export default function BulkOperationsBar({
             onClick={() => setCategoryDialogOpen(true)}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Kategori
+            {t('bulk.category')}
           </Button>
 
           {/* 7. Condition Update */}
@@ -708,7 +711,7 @@ export default function BulkOperationsBar({
             onClick={() => setConditionDialogOpen(true)}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Durum
+            {t('bulk.condition')}
           </Button>
 
           {/* 8. Description Append */}
@@ -719,7 +722,7 @@ export default function BulkOperationsBar({
             onClick={() => setDescriptionDialogOpen(true)}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Aciklama Ekle
+            {t('bulk.appendDescription')}
           </Button>
 
           {/* 9. Export Selected */}
@@ -730,7 +733,7 @@ export default function BulkOperationsBar({
             onClick={handleExportSelected}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Disa Aktar
+            {t('bulk.export')}
           </Button>
 
           {/* 10. Copy Listings */}
@@ -741,7 +744,7 @@ export default function BulkOperationsBar({
             onClick={() => setCopyDialogOpen(true)}
             sx={{ fontSize: { xs: 11, sm: 13 } }}
           >
-            Kopyala
+            {t('bulk.copy')}
           </Button>
         </Paper>
       </Slide>
@@ -755,23 +758,23 @@ export default function BulkOperationsBar({
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Toplu Fiyat Degistir</DialogTitle>
+        <DialogTitle>{t('bulk.priceDialogTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Secilen {selectedCount} listelemenin fiyatini guncelleyin.
+            {t('bulk.priceDialogDesc', { count: selectedCount })}
           </Typography>
           <RadioGroup
             value={priceMode}
             onChange={(e) => setPriceMode(e.target.value as PriceMode)}
           >
-            <FormControlLabel value="percent_increase" control={<Radio />} label="% Artir" />
-            <FormControlLabel value="percent_decrease" control={<Radio />} label="% Azalt" />
-            <FormControlLabel value="fixed_add" control={<Radio />} label="Sabit tutar ekle" />
-            <FormControlLabel value="fixed_subtract" control={<Radio />} label="Sabit tutar cikar" />
+            <FormControlLabel value="percent_increase" control={<Radio />} label={t('bulk.percentIncrease')} />
+            <FormControlLabel value="percent_decrease" control={<Radio />} label={t('bulk.percentDecrease')} />
+            <FormControlLabel value="fixed_add" control={<Radio />} label={t('bulk.fixedAdd')} />
+            <FormControlLabel value="fixed_subtract" control={<Radio />} label={t('bulk.fixedSubtract')} />
           </RadioGroup>
 
           <TextField
-            label={priceMode.startsWith('percent') ? 'Yuzde (%)' : 'Tutar'}
+            label={priceMode.startsWith('percent') ? t('bulk.percentLabel') : t('bulk.amountLabel')}
             type="number"
             value={priceAmount}
             onChange={(e) => setPriceAmount(e.target.value)}
@@ -783,15 +786,15 @@ export default function BulkOperationsBar({
           {pricePreview.length > 0 && (
             <Box sx={{ mt: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Onizleme (ilk {pricePreview.length} listeleme)
+                {t('bulk.previewFirst', { count: pricePreview.length })}
               </Typography>
               <TableContainer>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Listeleme</TableCell>
-                      <TableCell align="right">Mevcut Fiyat</TableCell>
-                      <TableCell align="right">Yeni Fiyat</TableCell>
+                      <TableCell>{t('bulk.listingCol')}</TableCell>
+                      <TableCell align="right">{t('bulk.currentPrice')}</TableCell>
+                      <TableCell align="right">{t('bulk.newPrice')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -813,13 +816,13 @@ export default function BulkOperationsBar({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPriceDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setPriceDialogOpen(false)}>{t('bulk.cancelBtn')}</Button>
           <Button
             variant="contained"
             onClick={handlePriceSubmit}
             disabled={!priceAmount || parseFloat(priceAmount) <= 0}
           >
-            Uygula
+            {t('bulk.applyBtn')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -833,13 +836,13 @@ export default function BulkOperationsBar({
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Toplu Stok Guncelle</DialogTitle>
+        <DialogTitle>{t('bulk.stockDialogTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Secilen {selectedCount} listelemenin stok miktarini guncelleyin.
+            {t('bulk.stockDialogDesc', { count: selectedCount })}
           </Typography>
           <TextField
-            label="Yeni Stok Miktari"
+            label={t('bulk.newStockQuantity')}
             type="number"
             value={newQuantity}
             onChange={(e) => setNewQuantity(e.target.value)}
@@ -849,13 +852,13 @@ export default function BulkOperationsBar({
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setStockDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setStockDialogOpen(false)}>{t('bulk.cancelBtn')}</Button>
           <Button
             variant="contained"
             onClick={handleStockSubmit}
             disabled={!newQuantity || parseInt(newQuantity) < 0}
           >
-            Guncelle
+            {t('bulk.updateBtn')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -869,11 +872,10 @@ export default function BulkOperationsBar({
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Toplu Silme Onayi</DialogTitle>
+        <DialogTitle>{t('bulk.deleteDialogTitle')}</DialogTitle>
         <DialogContent>
           <Typography>
-            <strong>{selectedCount}</strong> listelemeyi silmek istediginize emin
-            misiniz? Bu islem geri alinamaz.
+            {t('bulk.deleteDialogDesc', { count: selectedCount })}
           </Typography>
           {selectedListings.length <= 10 && (
             <Box sx={{ mt: 2 }}>
@@ -886,9 +888,9 @@ export default function BulkOperationsBar({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setDeleteDialogOpen(false)}>{t('bulk.cancelBtn')}</Button>
           <Button variant="contained" color="error" onClick={handleDeleteSubmit}>
-            {selectedCount} Listeleme Sil
+            {t('bulk.deleteListingsBtn', { count: selectedCount })}
           </Button>
         </DialogActions>
       </Dialog>
@@ -902,25 +904,24 @@ export default function BulkOperationsBar({
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Toplu Kategori Degistir</DialogTitle>
+        <DialogTitle>{t('bulk.categoryDialogTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Secilen {selectedCount} listelemenin kategorisini guncelleyin.
-            eBay kategori ID&apos;sini giriniz.
+            {t('bulk.categoryDialogDesc', { count: selectedCount })}
           </Typography>
           <TextField
-            label="Yeni Kategori ID"
+            label={t('bulk.newCategoryId')}
             value={newCategoryId}
             onChange={(e) => setNewCategoryId(e.target.value)}
             fullWidth
             autoFocus
-            placeholder="ornegin: 11450"
-            helperText="eBay kategori ID'sini eBay Seller Center'dan bulabilirsiniz"
+            placeholder={t('bulk.categoryPlaceholder')}
+            helperText={t('bulk.categoryHelperText')}
           />
           {selectedListings.length <= 5 && (
             <Box sx={{ mt: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Etkilenen listelemeler:
+                {t('bulk.affectedListings')}
               </Typography>
               {selectedListings.map((l, i) => (
                 <Typography key={i} variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
@@ -931,13 +932,13 @@ export default function BulkOperationsBar({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCategoryDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setCategoryDialogOpen(false)}>{t('bulk.cancelBtn')}</Button>
           <Button
             variant="contained"
             onClick={handleCategorySubmit}
             disabled={!newCategoryId.trim()}
           >
-            Kategori Guncelle
+            {t('bulk.updateCategoryBtn')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -951,17 +952,17 @@ export default function BulkOperationsBar({
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Toplu Durum Degistir</DialogTitle>
+        <DialogTitle>{t('bulk.conditionDialogTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Secilen {selectedCount} listelemenin urun durumunu guncelleyin.
+            {t('bulk.conditionDialogDesc', { count: selectedCount })}
           </Typography>
           <FormControl fullWidth>
-            <InputLabel>Yeni Durum</InputLabel>
+            <InputLabel>{t('bulk.newConditionLabel')}</InputLabel>
             <Select
               value={newCondition}
               onChange={(e) => setNewCondition(e.target.value)}
-              label="Yeni Durum"
+              label={t('bulk.newConditionLabel')}
             >
               {CONDITION_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
@@ -972,9 +973,9 @@ export default function BulkOperationsBar({
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConditionDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setConditionDialogOpen(false)}>{t('bulk.cancelBtn')}</Button>
           <Button variant="contained" onClick={handleConditionSubmit}>
-            Durum Guncelle
+            {t('bulk.updateConditionBtn')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -988,10 +989,10 @@ export default function BulkOperationsBar({
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Toplu Aciklama Ekle</DialogTitle>
+        <DialogTitle>{t('bulk.descDialogTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Secilen {selectedCount} listelemenin aciklamasina metin ekleyin.
+            {t('bulk.descDialogDesc', { count: selectedCount })}
           </Typography>
 
           <RadioGroup
@@ -999,24 +1000,24 @@ export default function BulkOperationsBar({
             onChange={(e) => setAppendPosition(e.target.value as 'end' | 'start')}
             row
           >
-            <FormControlLabel value="end" control={<Radio />} label="Sona ekle" />
-            <FormControlLabel value="start" control={<Radio />} label="Basa ekle" />
+            <FormControlLabel value="end" control={<Radio />} label={t('bulk.appendEnd')} />
+            <FormControlLabel value="start" control={<Radio />} label={t('bulk.appendStart')} />
           </RadioGroup>
 
           <TextField
-            label="Eklenecek Metin"
+            label={t('bulk.textToAppend')}
             value={appendText}
             onChange={(e) => setAppendText(e.target.value)}
             fullWidth
             multiline
             rows={4}
             sx={{ mt: 1 }}
-            placeholder="Tum aciklamalara eklenecek metin..."
+            placeholder={t('bulk.textPlaceholder')}
           />
 
           {appendText.trim() && selectedListings.length > 0 && (
             <Box sx={{ mt: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Onizleme:</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{t('bulk.preview')}</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: 12 }}>
                 {appendPosition === 'end' ? (
                   <>
@@ -1038,13 +1039,13 @@ export default function BulkOperationsBar({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDescriptionDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setDescriptionDialogOpen(false)}>{t('bulk.cancelBtn')}</Button>
           <Button
             variant="contained"
             onClick={handleDescriptionAppendSubmit}
             disabled={!appendText.trim()}
           >
-            Aciklama Ekle
+            {t('bulk.appendDescBtn')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1058,33 +1059,32 @@ export default function BulkOperationsBar({
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Listeleme Kopyala</DialogTitle>
+        <DialogTitle>{t('bulk.copyDialogTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Secilen {selectedCount} listelemeyi yeni SKU&apos;larla kopyalayin.
-            Her kopyanin SKU&apos;su asagidaki on ek ile olusturulacak.
+            {t('bulk.copyDialogDesc', { count: selectedCount })}
           </Typography>
           <TextField
-            label="SKU On Eki"
+            label={t('bulk.skuPrefix')}
             value={skuPrefix}
             onChange={(e) => setSkuPrefix(e.target.value)}
             fullWidth
             autoFocus
-            helperText={`Ornek: ${skuPrefix}${selectedListings[0]?.sku || 'ORNEK-SKU'}`}
+            helperText={t('bulk.skuExample', { example: `${skuPrefix}${selectedListings[0]?.sku || 'EXAMPLE-SKU'}` })}
           />
 
           {selectedListings.length <= 10 && (
             <Box sx={{ mt: 2 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Olusturulacak kopyalar:
+                {t('bulk.copiesToCreate')}
               </Typography>
               <TableContainer>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Mevcut SKU</TableCell>
-                      <TableCell>Yeni SKU</TableCell>
-                      <TableCell>Baslik</TableCell>
+                      <TableCell>{t('bulk.currentSku')}</TableCell>
+                      <TableCell>{t('bulk.newSku')}</TableCell>
+                      <TableCell>{t('bulk.titleCol')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1106,13 +1106,13 @@ export default function BulkOperationsBar({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCopyDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setCopyDialogOpen(false)}>{t('bulk.cancelBtn')}</Button>
           <Button
             variant="contained"
             onClick={handleCopySubmit}
             disabled={!skuPrefix.trim()}
           >
-            {selectedCount} Listeleme Kopyala
+            {t('bulk.copyListingsBtn', { count: selectedCount })}
           </Button>
         </DialogActions>
       </Dialog>

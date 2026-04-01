@@ -4,10 +4,12 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   LinearProgress, Alert, Tabs, Tab, Select, MenuItem, FormControl,
   InputLabel, Tooltip, IconButton, CircularProgress, InputAdornment,
+  Dialog, DialogTitle, DialogContent,
 } from '@mui/material';
 import {
   Search, Users, TrendingUp, TrendingDown, ExternalLink, Eye, Star,
-  Copy, Download, Plus, Trash2, BarChart2, ArrowUpDown,
+  Copy, Download, Plus, Trash2, BarChart2, ArrowUpDown, ShoppingBag,
+  FileSearch, X,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -19,6 +21,7 @@ interface CompetitiveIntelligenceProps {
   userId: string;
   marketplace: string;
   userListings?: any[];
+  onNavigate?: (tool: string, data?: any) => void;
 }
 
 interface SellerItem {
@@ -198,7 +201,7 @@ const PIE_COLORS = ['#1976d2', '#e91e63', '#4caf50', '#ff9800', '#9c27b0', '#00b
 // Sub-tab 1: Seller Spy
 // ---------------------------------------------------------------------------
 
-function SellerSpy({ userId, marketplace, userListings }: { userId: string; marketplace: string; userListings?: any[] }) {
+function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: string; marketplace: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
   const suggestedSellers = useMemo(() => {
     if (!userListings?.length) return [];
     const sellers = new Map<string, { username: string; feedback: number }>();
@@ -218,6 +221,18 @@ function SellerSpy({ userId, marketplace, userListings }: { userId: string; mark
   const [profile, setProfile] = useState<SellerProfile | null>(null);
   const [sortBy, setSortBy] = useState<'price' | 'sold' | 'newest'>('sold');
   const [tracking, setTracking] = useState(false);
+
+  // Standalone keyword search state
+  const [kwInput, setKwInput] = useState('');
+  const [kwLoading, setKwLoading] = useState(false);
+  const [kwError, setKwError] = useState('');
+  const [kwItems, setKwItems] = useState<SellerItem[]>([]);
+
+  // Seller deep-dive state
+  const [deepDiveSeller, setDeepDiveSeller] = useState<string | null>(null);
+  const [deepDiveItems, setDeepDiveItems] = useState<SellerItem[]>([]);
+  const [deepDiveLoading, setDeepDiveLoading] = useState(false);
+  const [deepDiveOpen, setDeepDiveOpen] = useState(false);
 
   const searchSeller = useCallback(async () => {
     if (!sellerInput.trim()) return;
@@ -271,6 +286,79 @@ function SellerSpy({ userId, marketplace, userListings }: { userId: string; mark
     }
   }, [profile, userId, marketplace]);
 
+  // Standalone keyword search
+  const searchByKeyword = useCallback(async () => {
+    if (!kwInput.trim()) return;
+    setKwLoading(true);
+    setKwError('');
+    setKwItems([]);
+    try {
+      const params = new URLSearchParams({
+        action: 'search_market',
+        user_id: userId,
+        keywords: kwInput.trim(),
+        marketplace,
+      });
+      const res = await fetch(`/api/clawd/ebay?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Arama basarisiz');
+      const resultItems: SellerItem[] = data.items || data.itemSummaries || [];
+      if (!resultItems.length) { setKwError('Sonuc bulunamadi'); return; }
+      setKwItems(resultItems);
+      toast.success(`${resultItems.length} urun bulundu`);
+    } catch (err: any) {
+      setKwError(err.message || 'Bir hata olustu');
+    } finally {
+      setKwLoading(false);
+    }
+  }, [kwInput, userId, marketplace]);
+
+  // Seller deep-dive
+  const openSellerDeepDive = useCallback(async (sellerName: string) => {
+    setDeepDiveSeller(sellerName);
+    setDeepDiveOpen(true);
+    setDeepDiveLoading(true);
+    setDeepDiveItems([]);
+    try {
+      const params = new URLSearchParams({
+        action: 'search_seller',
+        user_id: userId,
+        seller_name: sellerName,
+        marketplace,
+      });
+      const res = await fetch(`/api/clawd/ebay?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Satici bilgileri alinamadi');
+      const resultItems: SellerItem[] = data.items || data.itemSummaries || [];
+      setDeepDiveItems(resultItems);
+    } catch (err: any) {
+      toast.error(err.message || 'Satici arama hatasi');
+    } finally {
+      setDeepDiveLoading(false);
+    }
+  }, [userId, marketplace]);
+
+  // Unique sellers from keyword search results
+  const kwSellers = useMemo(() => {
+    const map = new Map<string, { username: string; count: number; feedbackScore: number; feedbackPercentage: string }>();
+    kwItems.forEach(item => {
+      const s = item.seller;
+      if (!s?.username) return;
+      const existing = map.get(s.username);
+      if (existing) {
+        existing.count++;
+      } else {
+        map.set(s.username, {
+          username: s.username,
+          count: 1,
+          feedbackScore: s.feedbackScore || 0,
+          feedbackPercentage: s.feedbackPercentage || '0',
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [kwItems]);
+
   const prices = useMemo(() => items.map(i => parseFloat(i.price?.value || '0')).filter(p => p > 0), [items]);
 
   const sortedItems = useMemo(() => {
@@ -309,6 +397,172 @@ function SellerSpy({ userId, marketplace, userListings }: { userId: string; mark
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Standalone Keyword Search */}
+      <Paper sx={{ p: 2, border: '1px solid', borderColor: 'primary.main', borderRadius: 2 }}>
+        <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Search size={18} />
+          Pazar Arastirmasi ile Rakip Bul
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Anahtar kelime ile arama yapin, rakip saticilarini kesfet ve analiz edin.
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+          <TextField
+            size="small"
+            placeholder="Anahtar kelime girin (orn: baby monitor, wireless earbuds)..."
+            value={kwInput}
+            onChange={e => setKwInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && searchByKeyword()}
+            sx={{ flex: 1, minWidth: 250 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start"><Search size={16} /></InputAdornment>
+              ),
+            }}
+          />
+          <Button variant="contained" onClick={searchByKeyword} disabled={kwLoading || !kwInput.trim()}
+            startIcon={kwLoading ? <CircularProgress size={16} /> : <Search size={16} />}>
+            Ara
+          </Button>
+        </Box>
+        {kwLoading && <LinearProgress sx={{ mt: 1 }} />}
+        {kwError && <Alert severity="error" sx={{ mt: 1 }}>{kwError}</Alert>}
+
+        {/* Keyword search results — seller list */}
+        {kwSellers.length > 0 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              Bulunan Saticilar ({kwSellers.length})
+            </Typography>
+            <TableContainer sx={{ maxHeight: 400 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Satici</TableCell>
+                    <TableCell align="right">Listeleme</TableCell>
+                    <TableCell align="right">Puan</TableCell>
+                    <TableCell align="right">Olumlu %</TableCell>
+                    <TableCell align="center">Islemler</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {kwSellers.map((s, i) => (
+                    <TableRow key={s.username} hover>
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          fontWeight={i < 3 ? 600 : 400}
+                          sx={{ cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
+                          onClick={() => openSellerDeepDive(s.username)}
+                        >
+                          {s.username}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">{s.count}</TableCell>
+                      <TableCell align="right">{s.feedbackScore}</TableCell>
+                      <TableCell align="right">{s.feedbackPercentage}%</TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+                          <Tooltip title="Urunleri Gor">
+                            <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 1, fontSize: 11 }}
+                              startIcon={<ShoppingBag size={12} />}
+                              onClick={() => onNavigate?.('product_database', { keyword: s.username })}>
+                              Urunleri Gor
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="SEO Kontrol">
+                            <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 1, fontSize: 11 }}
+                              startIcon={<FileSearch size={12} />}
+                              onClick={() => onNavigate?.('seo_analyzer', { keyword: kwInput.trim() })}>
+                              SEO Kontrol
+                            </Button>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        )}
+      </Paper>
+
+      {/* Seller Deep-Dive Dialog */}
+      <Dialog open={deepDiveOpen} onClose={() => setDeepDiveOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Users size={20} />
+            <span>{deepDiveSeller} — Satici Detaylari</span>
+          </Box>
+          <IconButton size="small" onClick={() => setDeepDiveOpen(false)}>
+            <X size={18} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {deepDiveLoading && <LinearProgress sx={{ mb: 2 }} />}
+          {!deepDiveLoading && deepDiveItems.length === 0 && (
+            <Alert severity="info">Bu satici icin urun bulunamadi.</Alert>
+          )}
+          {deepDiveItems.length > 0 && (
+            <>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                <Button size="small" variant="contained"
+                  startIcon={<ShoppingBag size={14} />}
+                  onClick={() => { onNavigate?.('product_database', { keyword: deepDiveSeller }); setDeepDiveOpen(false); }}>
+                  Urunleri Gor
+                </Button>
+                <Button size="small" variant="outlined"
+                  startIcon={<FileSearch size={14} />}
+                  onClick={() => { onNavigate?.('seo_analyzer', { keyword: deepDiveSeller }); setDeepDiveOpen(false); }}>
+                  SEO Kontrol
+                </Button>
+              </Box>
+              <TableContainer sx={{ maxHeight: 400 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Urun</TableCell>
+                      <TableCell align="right">Fiyat</TableCell>
+                      <TableCell align="right">Tah. Satis</TableCell>
+                      <TableCell>Durum</TableCell>
+                      <TableCell align="center">Link</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {deepDiveItems.map((item, idx) => (
+                      <TableRow key={item.itemId || idx} hover>
+                        <TableCell sx={{ maxWidth: 280 }}>
+                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                            {item.image?.imageUrl && (
+                              <Box component="img" src={item.image.imageUrl} alt=""
+                                sx={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
+                            )}
+                            <Typography variant="body2" noWrap title={item.title}>{item.title}</Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell align="right">{fmt(parseFloat(item.price?.value || '0'))}</TableCell>
+                        <TableCell align="right">{item.estimatedSold ?? '-'}</TableCell>
+                        <TableCell>
+                          <Chip label={item.condition || 'N/A'} size="small" variant="outlined" />
+                        </TableCell>
+                        <TableCell align="center">
+                          {item.itemWebUrl && (
+                            <IconButton size="small" href={item.itemWebUrl} target="_blank" rel="noopener">
+                              <ExternalLink size={14} />
+                            </IconButton>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Suggested Sellers from user listings */}
       {suggestedSellers.length > 0 && (
         <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
@@ -835,12 +1089,42 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
 // Sub-tab 3: Market Trends
 // ---------------------------------------------------------------------------
 
-function MarketTrends({ marketplace }: { marketplace: string }) {
+function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string; onNavigate?: (tool: string, data?: any) => void; userId?: string }) {
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentSnapshot, setCurrentSnapshot] = useState<MarketSnapshot | null>(null);
   const [savedSnapshots, setSavedSnapshots] = useState<MarketSnapshot[]>(() => loadSnapshots());
+
+  // Seller deep-dive in trends
+  const [trendDeepDiveSeller, setTrendDeepDiveSeller] = useState<string | null>(null);
+  const [trendDeepDiveItems, setTrendDeepDiveItems] = useState<SellerItem[]>([]);
+  const [trendDeepDiveLoading, setTrendDeepDiveLoading] = useState(false);
+  const [trendDeepDiveOpen, setTrendDeepDiveOpen] = useState(false);
+
+  const openTrendSellerDeepDive = useCallback(async (sellerName: string) => {
+    if (!userId) return;
+    setTrendDeepDiveSeller(sellerName);
+    setTrendDeepDiveOpen(true);
+    setTrendDeepDiveLoading(true);
+    setTrendDeepDiveItems([]);
+    try {
+      const params = new URLSearchParams({
+        action: 'search_seller',
+        user_id: userId,
+        seller_name: sellerName,
+        marketplace,
+      });
+      const res = await fetch(`/api/clawd/ebay?${params}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Satici bilgileri alinamadi');
+      setTrendDeepDiveItems(data.items || data.itemSummaries || []);
+    } catch (err: any) {
+      toast.error(err.message || 'Satici arama hatasi');
+    } finally {
+      setTrendDeepDiveLoading(false);
+    }
+  }, [userId, marketplace]);
 
   const searchMarket = useCallback(async () => {
     if (!keyword.trim()) return;
@@ -1056,6 +1340,7 @@ function MarketTrends({ marketplace }: { marketplace: string }) {
                     <TableCell align="right">Listeleme</TableCell>
                     <TableCell align="right">Pazar Payı</TableCell>
                     <TableCell>Pay</TableCell>
+                    <TableCell align="center">Islemler</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1063,7 +1348,14 @@ function MarketTrends({ marketplace }: { marketplace: string }) {
                     <TableRow key={i} hover>
                       <TableCell>{i + 1}</TableCell>
                       <TableCell>
-                        <Typography variant="body2" fontWeight={i < 3 ? 600 : 400}>{s.username}</Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight={i < 3 ? 600 : 400}
+                          sx={{ cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
+                          onClick={() => openTrendSellerDeepDive(s.username)}
+                        >
+                          {s.username}
+                        </Typography>
                       </TableCell>
                       <TableCell align="right">{s.count}</TableCell>
                       <TableCell align="right">{pct(s.share)}</TableCell>
@@ -1074,12 +1366,105 @@ function MarketTrends({ marketplace }: { marketplace: string }) {
                           </Box>
                         </Box>
                       </TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+                          <Tooltip title="Urunleri Gor">
+                            <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 1, fontSize: 11 }}
+                              startIcon={<ShoppingBag size={12} />}
+                              onClick={() => onNavigate?.('product_database', { keyword: s.username })}>
+                              Urunleri Gor
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="SEO Kontrol">
+                            <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 1, fontSize: 11 }}
+                              startIcon={<FileSearch size={12} />}
+                              onClick={() => onNavigate?.('seo_analyzer', { keyword: keyword.trim() })}>
+                              SEO Kontrol
+                            </Button>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TableContainer>
           </Paper>
+
+          {/* Trend Seller Deep-Dive Dialog */}
+          <Dialog open={trendDeepDiveOpen} onClose={() => setTrendDeepDiveOpen(false)} maxWidth="md" fullWidth>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Users size={20} />
+                <span>{trendDeepDiveSeller} — Satici Detaylari</span>
+              </Box>
+              <IconButton size="small" onClick={() => setTrendDeepDiveOpen(false)}>
+                <X size={18} />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent dividers>
+              {trendDeepDiveLoading && <LinearProgress sx={{ mb: 2 }} />}
+              {!trendDeepDiveLoading && trendDeepDiveItems.length === 0 && (
+                <Alert severity="info">Bu satici icin urun bulunamadi.</Alert>
+              )}
+              {trendDeepDiveItems.length > 0 && (
+                <>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                    <Button size="small" variant="contained"
+                      startIcon={<ShoppingBag size={14} />}
+                      onClick={() => { onNavigate?.('product_database', { keyword: trendDeepDiveSeller }); setTrendDeepDiveOpen(false); }}>
+                      Urunleri Gor
+                    </Button>
+                    <Button size="small" variant="outlined"
+                      startIcon={<FileSearch size={14} />}
+                      onClick={() => { onNavigate?.('seo_analyzer', { keyword: trendDeepDiveSeller }); setTrendDeepDiveOpen(false); }}>
+                      SEO Kontrol
+                    </Button>
+                  </Box>
+                  <TableContainer sx={{ maxHeight: 400 }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Urun</TableCell>
+                          <TableCell align="right">Fiyat</TableCell>
+                          <TableCell align="right">Tah. Satis</TableCell>
+                          <TableCell>Durum</TableCell>
+                          <TableCell align="center">Link</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {trendDeepDiveItems.map((item, idx) => (
+                          <TableRow key={item.itemId || idx} hover>
+                            <TableCell sx={{ maxWidth: 280 }}>
+                              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                {item.image?.imageUrl && (
+                                  <Box component="img" src={item.image.imageUrl} alt=""
+                                    sx={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }} />
+                                )}
+                                <Typography variant="body2" noWrap title={item.title}>{item.title}</Typography>
+                              </Box>
+                            </TableCell>
+                            <TableCell align="right">{fmt(parseFloat(item.price?.value || '0'))}</TableCell>
+                            <TableCell align="right">{item.estimatedSold ?? '-'}</TableCell>
+                            <TableCell>
+                              <Chip label={item.condition || 'N/A'} size="small" variant="outlined" />
+                            </TableCell>
+                            <TableCell align="center">
+                              {item.itemWebUrl && (
+                                <IconButton size="small" href={item.itemWebUrl} target="_blank" rel="noopener">
+                                  <ExternalLink size={14} />
+                                </IconButton>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
 
           {/* Trend History */}
           {previousSnapshots.length > 0 && (
@@ -1223,7 +1608,7 @@ function MarketTrends({ marketplace }: { marketplace: string }) {
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function CompetitiveIntelligence({ userId, marketplace, userListings }: CompetitiveIntelligenceProps) {
+export default function CompetitiveIntelligence({ userId, marketplace, userListings, onNavigate }: CompetitiveIntelligenceProps) {
   const [activeTab, setActiveTab] = useState(0);
 
   return (
@@ -1236,9 +1621,9 @@ export default function CompetitiveIntelligence({ userId, marketplace, userListi
         </Tabs>
       </Paper>
 
-      {activeTab === 0 && <SellerSpy userId={userId} marketplace={marketplace} userListings={userListings} />}
+      {activeTab === 0 && <SellerSpy userId={userId} marketplace={marketplace} userListings={userListings} onNavigate={onNavigate} />}
       {activeTab === 1 && <ListingComparison marketplace={marketplace} />}
-      {activeTab === 2 && <MarketTrends marketplace={marketplace} />}
+      {activeTab === 2 && <MarketTrends marketplace={marketplace} onNavigate={onNavigate} userId={userId} />}
     </Box>
   );
 }

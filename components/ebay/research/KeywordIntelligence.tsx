@@ -8,7 +8,7 @@ import {
 import {
   Search, TrendingUp, Copy, Download, RotateCcw, ExternalLink,
   ArrowUpDown, Trash2, Sparkles, Type, Hash, Layers, Eye,
-  CheckCircle, XCircle, Info, Zap, Plus, Minus,
+  CheckCircle, XCircle, Info, Zap, Plus, Minus, ShoppingBag, BarChart3,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -20,6 +20,7 @@ interface KeywordIntelligenceProps {
   userId: string;
   marketplace: string;
   userListings?: any[];
+  onNavigate?: (tool: string, data?: any) => void;
 }
 
 interface MarketItem {
@@ -313,9 +314,9 @@ function titleLengthColor(len: number): string {
 }
 
 function toCSV(rows: KeywordRow[]): string {
-  const header = 'Keyword,Usage %,Avg Price,Competition,Score';
+  const header = 'Keyword,Count,Usage %,Avg Price,Competition,Score';
   const lines = rows.map(
-    (r) => `"${r.keyword}",${r.usagePercent.toFixed(1)},${r.avgPrice.toFixed(2)},${r.competition},${r.score}`,
+    (r) => `"${r.keyword}",${r.count},${r.usagePercent.toFixed(1)},${r.avgPrice.toFixed(2)},${r.competition},${r.score}`,
   );
   return [header, ...lines].join('\n');
 }
@@ -344,7 +345,7 @@ const TAB_LABELS = [
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function KeywordIntelligence({ userId, marketplace, userListings }: KeywordIntelligenceProps) {
+export default function KeywordIntelligence({ userId, marketplace, userListings, onNavigate }: KeywordIntelligenceProps) {
   const [activeTab, setActiveTab] = useState(0);
 
   // --- User keywords from listings ---
@@ -767,6 +768,9 @@ export default function KeywordIntelligence({ userId, marketplace, userListings 
                     <TableCell align="right" sx={{ fontWeight: 700 }}>
                       {renderSortableHeader('Skor', 'score')}
                     </TableCell>
+                    {onNavigate && (
+                      <TableCell align="center" sx={{ fontWeight: 700 }}>Islemler</TableCell>
+                    )}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -795,6 +799,32 @@ export default function KeywordIntelligence({ userId, marketplace, userListings 
                           }}
                         />
                       </TableCell>
+                      {onNavigate && (
+                        <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
+                          <Tooltip title="Urunleri Gor">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigate('product_database', { keyword: row.keyword });
+                              }}
+                            >
+                              <ShoppingBag size={15} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Nis Analizi">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigate('niche_finder', { keyword: row.keyword });
+                              }}
+                            >
+                              <BarChart3 size={15} />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

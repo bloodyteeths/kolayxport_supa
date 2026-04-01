@@ -9,6 +9,7 @@ import {
 import {
   DollarSign, Calculator, TrendingUp, TrendingDown, Package,
   Download, Trash2, Plus, BarChart2, Target, Info, ArrowUpDown,
+  List, FileSpreadsheet,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -72,6 +73,21 @@ const STORAGE_KEY = 'kolayxport_roi_entries';
 
 const VOLUME_TIERS = [10, 25, 50, 100];
 const VOLUME_DISCOUNT_PER_TIER = 0.05;
+
+const COMMON_FEE_PRESETS = [
+  { label: 'Electronics', rate: 15 },
+  { label: 'Clothing & Accessories', rate: 15 },
+  { label: 'Books & Magazines', rate: 14.6 },
+  { label: 'Collectibles & Art', rate: 15 },
+  { label: 'Home & Garden', rate: 15 },
+  { label: 'Toys & Hobbies', rate: 15 },
+  { label: 'Auto Parts & Accessories', rate: 14.6 },
+  { label: 'Sporting Goods', rate: 14.6 },
+  { label: 'Health & Beauty', rate: 15 },
+  { label: 'Jewelry & Watches', rate: 15 },
+  { label: 'Cell Phones & Accessories', rate: 15 },
+  { label: 'Computers & Tablets', rate: 12.9 },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -142,6 +158,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
   }, [userListings]);
 
   const [sellingPrice, setSellingPrice] = useState<string>(avgUserPrice > 0 ? avgUserPrice.toFixed(2) : '29.99');
+  const [selectedListingId, setSelectedListingId] = useState<string>('');
 
   // Update selling price when user listings load
   useEffect(() => {
@@ -149,6 +166,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
   }, [avgUserPrice]);
 
   const [categoryIdx, setCategoryIdx] = useState<number>(0);
+  const [feePreset, setFeePreset] = useState<string>('');
   const [shippingCharged, setShippingCharged] = useState<string>('5.99');
   const [actualShippingCost, setActualShippingCost] = useState<string>('4.50');
   const [productCost, setProductCost] = useState<string>('8.00');
@@ -156,6 +174,31 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
   const [isPromoted, setIsPromoted] = useState(false);
   const [adRate, setAdRate] = useState<number>(5);
   const [freeInsertions, setFreeInsertions] = useState(true);
+
+  // Auto-fill from selected listing
+  const handleListingSelect = useCallback((listingId: string) => {
+    setSelectedListingId(listingId);
+    if (!listingId || !userListings?.length) return;
+    const listing = userListings.find(
+      (l) => (l.itemId || l.listingId || l.id) === listingId,
+    );
+    if (!listing) return;
+    const price = parseFloat(listing.price?.value || listing.currentPrice || '0');
+    if (price > 0) setSellingPrice(price.toFixed(2));
+    toast.success(`"${(listing.title || '').slice(0, 40)}..." yüklendi`);
+  }, [userListings]);
+
+  // Handle fee preset selection
+  const handleFeePreset = useCallback((presetLabel: string) => {
+    setFeePreset(presetLabel);
+    if (!presetLabel) return;
+    const preset = COMMON_FEE_PRESETS.find((p) => p.label === presetLabel);
+    if (!preset) return;
+    // Find the closest matching EBAY_CATEGORIES entry or use "Genel" (index 0)
+    const closestIdx = EBAY_CATEGORIES.findIndex((c) => Math.abs(c.rate - preset.rate) < 1);
+    setCategoryIdx(closestIdx >= 0 ? closestIdx : 0);
+    toast.success(`${preset.label} - ${pct(preset.rate)} ücret oranı uygulandı`);
+  }, []);
 
   const category = EBAY_CATEGORIES[categoryIdx];
   const sp = parseFloat(sellingPrice) || 0;
@@ -173,16 +216,105 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
   const profitMargin = sp > 0 ? (profit / sp) * 100 : 0;
   const roi = pc > 0 ? (profit / pc) * 100 : 0;
 
+  // CSV export for current calculation
+  const handleExportCalc = useCallback(() => {
+    const headers = ['Alan', 'Deger'];
+    const rows = [
+      ['Kategori', category.label],
+      ['Satis Fiyati', sp.toFixed(2)],
+      ['Kargo (Aliciya)', sc.toFixed(2)],
+      ['Gercek Kargo', asc.toFixed(2)],
+      ['Urun Maliyeti', pc.toFixed(2)],
+      ['Final Value Fee', fees.finalValueFee.toFixed(2)],
+      ['Odeme Islem Ucreti', fees.paymentFee.toFixed(2)],
+      ['Uluslararasi Ucret', fees.internationalFee.toFixed(2)],
+      ['Listeleme Ucreti', fees.insertionFee.toFixed(2)],
+      ['Promoted Ucreti', fees.promotedFee.toFixed(2)],
+      ['Toplam Ucretler', fees.totalFees.toFixed(2)],
+      ['Net Gelir', netRevenue.toFixed(2)],
+      ['Kar', profit.toFixed(2)],
+      ['Kar Marji %', profitMargin.toFixed(1)],
+      ['ROI %', roi.toFixed(1)],
+    ];
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gelir-hesaplama-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('CSV indirildi');
+  }, [category, sp, sc, asc, pc, fees, netRevenue, profit, profitMargin, roi]);
+
   return (
     <Box>
       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <Calculator size={20} /> Gelir Hesaplayıcı
       </Typography>
 
+      {/* Listing Picker from userListings */}
+      {userListings && userListings.length > 0 && (
+        <Paper sx={{ p: 2, mb: 2, bgcolor: 'action.hover' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <List size={16} /> Listelerimden Seç
+          </Typography>
+          <FormControl fullWidth size="small">
+            <InputLabel>Bir listeleme seçin</InputLabel>
+            <Select
+              value={selectedListingId}
+              label="Bir listeleme seçin"
+              onChange={(e) => handleListingSelect(e.target.value as string)}
+              MenuProps={{ PaperProps: { sx: { maxHeight: 300 } } }}
+            >
+              <MenuItem value="">
+                <em>Seçim kaldır</em>
+              </MenuItem>
+              {userListings.map((l, idx) => {
+                const id = l.itemId || l.listingId || l.id || `listing-${idx}`;
+                const title = (l.title || 'İsimsiz Ürün').slice(0, 60);
+                const price = parseFloat(l.price?.value || l.currentPrice || '0');
+                return (
+                  <MenuItem key={id} value={id}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 2 }}>
+                      <Typography variant="body2" noWrap sx={{ flex: 1 }}>{title}</Typography>
+                      {price > 0 && (
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', whiteSpace: 'nowrap' }}>
+                          {fmt(price)}
+                        </Typography>
+                      )}
+                    </Box>
+                  </MenuItem>
+                );
+              })}
+            </Select>
+          </FormControl>
+        </Paper>
+      )}
+
       <Paper sx={{ p: 2, mb: 3 }}>
         <Typography variant="subtitle2" sx={{ mb: 2 }}>Satış Bilgileri</Typography>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2 }}>
+          {/* Category Fee Presets */}
+          <FormControl fullWidth size="small">
+            <InputLabel>Hızlı Kategori Ücreti</InputLabel>
+            <Select
+              value={feePreset}
+              label="Hızlı Kategori Ücreti"
+              onChange={(e) => handleFeePreset(e.target.value as string)}
+            >
+              <MenuItem value="">
+                <em>Manuel seç</em>
+              </MenuItem>
+              {COMMON_FEE_PRESETS.map((p) => (
+                <MenuItem key={p.label} value={p.label}>
+                  {p.label} ({pct(p.rate)})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
           <FormControl fullWidth size="small">
             <InputLabel>Kategori</InputLabel>
             <Select
@@ -299,7 +431,17 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
 
       {/* Results */}
       <Paper sx={{ p: 2 }}>
-        <Typography variant="subtitle2" sx={{ mb: 2 }}>Hesaplama Sonuçları</Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="subtitle2">Hesaplama Sonuçları</Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<FileSpreadsheet size={14} />}
+            onClick={handleExportCalc}
+          >
+            CSV İndir
+          </Button>
+        </Box>
 
         <TableContainer>
           <Table size="small">
@@ -819,7 +961,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
 // Sub-tab 3: ROI Tracker
 // ---------------------------------------------------------------------------
 
-function ROITracker() {
+function ROITracker({ userListings }: { userListings?: any[] }) {
   const [entries, setEntries] = useState<ROIEntry[]>([]);
   const [productName, setProductName] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
@@ -829,8 +971,24 @@ function ROITracker() {
   const [categoryIdx, setCategoryIdx] = useState(0);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [selectedListingId, setSelectedListingId] = useState<string>('');
 
   const category = EBAY_CATEGORIES[categoryIdx];
+
+  // Auto-fill from selected listing
+  const handleListingSelect = useCallback((listingId: string) => {
+    setSelectedListingId(listingId);
+    if (!listingId || !userListings?.length) return;
+    const listing = userListings.find(
+      (l) => (l.itemId || l.listingId || l.id) === listingId,
+    );
+    if (!listing) return;
+    const title = listing.title || '';
+    const price = parseFloat(listing.price?.value || listing.currentPrice || '0');
+    if (title) setProductName(title.slice(0, 80));
+    if (price > 0) setSellingPrice(price.toFixed(2));
+    toast.success(`"${title.slice(0, 40)}..." yüklendi`);
+  }, [userListings]);
 
   // Load from localStorage
   useEffect(() => {
@@ -1064,9 +1222,98 @@ function ROITracker() {
         <TrendingUp size={20} /> Yatırım Getiri Takipçisi
       </Typography>
 
+      {/* Quick Summary Stats */}
+      {summary && (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr 1fr', sm: '1fr 1fr 1fr 1fr' },
+            gap: 1.5,
+            mb: 3,
+          }}
+        >
+          <Paper
+            variant="outlined"
+            sx={{ p: 1.5, textAlign: 'center', borderLeft: '3px solid', borderLeftColor: 'primary.main' }}
+          >
+            <Typography variant="caption" color="text.secondary">Toplam Gelir</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{fmt(summary.totalRevenue)}</Typography>
+          </Paper>
+          <Paper
+            variant="outlined"
+            sx={{ p: 1.5, textAlign: 'center', borderLeft: '3px solid', borderLeftColor: summary.totalProfit >= 0 ? 'success.main' : 'error.main' }}
+          >
+            <Typography variant="caption" color="text.secondary">Toplam Kar</Typography>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 700, color: summary.totalProfit >= 0 ? 'success.main' : 'error.main' }}
+            >
+              {fmt(summary.totalProfit)}
+            </Typography>
+          </Paper>
+          <Paper
+            variant="outlined"
+            sx={{ p: 1.5, textAlign: 'center', borderLeft: '3px solid', borderLeftColor: summary.avgMargin >= 20 ? 'success.main' : 'warning.main' }}
+          >
+            <Typography variant="caption" color="text.secondary">Ort. Marj</Typography>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 700, color: summary.avgMargin >= 0 ? 'success.main' : 'error.main' }}
+            >
+              {pct(summary.avgMargin)}
+            </Typography>
+          </Paper>
+          <Paper
+            variant="outlined"
+            sx={{ p: 1.5, textAlign: 'center', borderLeft: '3px solid', borderLeftColor: 'info.main' }}
+          >
+            <Typography variant="caption" color="text.secondary">Kayit Sayisi</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{summary.count}</Typography>
+          </Paper>
+        </Box>
+      )}
+
       {/* Entry Form */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Typography variant="subtitle2" sx={{ mb: 2 }}>Yeni Kayıt Ekle</Typography>
+
+        {/* Listing Picker */}
+        {userListings && userListings.length > 0 && (
+          <Box sx={{ mb: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Listelerimden Seç</InputLabel>
+              <Select
+                value={selectedListingId}
+                label="Listelerimden Seç"
+                onChange={(e) => handleListingSelect(e.target.value as string)}
+                startAdornment={<List size={16} style={{ marginRight: 8, opacity: 0.6 }} />}
+                MenuProps={{ PaperProps: { sx: { maxHeight: 300 } } }}
+              >
+                <MenuItem value="">
+                  <em>Manuel giriş</em>
+                </MenuItem>
+                {userListings.map((l, idx) => {
+                  const id = l.itemId || l.listingId || l.id || `listing-${idx}`;
+                  const title = (l.title || 'İsimsiz Ürün').slice(0, 60);
+                  const price = parseFloat(l.price?.value || l.currentPrice || '0');
+                  return (
+                    <MenuItem key={id} value={id}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 2 }}>
+                        <Typography variant="body2" noWrap sx={{ flex: 1 }}>{title}</Typography>
+                        {price > 0 && (
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', whiteSpace: 'nowrap' }}>
+                            {fmt(price)}
+                          </Typography>
+                        )}
+                      </Box>
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+          </Box>
+        )}
+
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2, mb: 2 }}>
           <TextField
             label="Ürün Adı"
@@ -1384,7 +1631,7 @@ export default function FinancialIntelligence({ userId, marketplace, userListing
         <SourcingCalculator marketplace={marketplace} />
       </TabPanel>
       <TabPanel value={activeTab} index={2}>
-        <ROITracker />
+        <ROITracker userListings={userListings} />
       </TabPanel>
     </Box>
   );

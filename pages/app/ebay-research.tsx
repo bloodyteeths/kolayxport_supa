@@ -2706,14 +2706,14 @@ function EbayResearchPage() {
       {/* Section 0: Arastirma */}
       {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} userListings={userListings} userListingsLoading={userListingsLoading} onNavigate={handleNavigate} />}
       {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} userListings={userListings} onNavigate={handleNavigate} />}
-      {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
+      {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
       {mainTab === 0 && subTab === 3 && <ArbitrageScanner userId={userId} />}
       {mainTab === 0 && subTab === 4 && <MarketplaceComparison userId={userId} onNavigate={handleNavigate} />}
 
       {/* Section 1: Takip */}
       {mainTab === 1 && subTab === 0 && <ProductTracker userId={userId} userListings={userListings} />}
       {mainTab === 1 && subTab === 1 && <SellerTracker userId={userId} userListings={userListings} />}
-      {mainTab === 1 && subTab === 2 && <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
+      {mainTab === 1 && subTab === 2 && <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
 
       {/* Section 2: Optimizasyon */}
       {mainTab === 2 && subTab === 0 && <SeoAnalyzer userId={userId} onNavigate={handleNavigate} />}

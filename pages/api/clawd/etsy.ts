@@ -508,6 +508,396 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         return res.status(200).json({ shops });
     }
 
+    // --- analyze_niche: Enhanced demand scoring with real metrics ---
+    if (action === 'analyze_niche' && req.method === 'GET') {
+        const keywords = req.query.keywords as string;
+        if (!keywords) return res.status(400).json({ error: 'keywords is required' });
+
+        const minPrice = req.query.min_price as string;
+        const maxPrice = req.query.max_price as string;
+        const sortOn = (req.query.sort_on as string) || 'score';
+
+        // Fetch 200 results (2 pages)
+        const allResults: any[] = [];
+        let totalCount = 0;
+
+        for (let page = 0; page < 2; page++) {
+            const params = new URLSearchParams({
+                keywords, limit: '100', offset: String(page * 100),
+                sort_on: sortOn, sort_order: 'desc',
+            });
+            if (minPrice) params.set('min_price', minPrice);
+            if (maxPrice) params.set('max_price', maxPrice);
+
+            const data = page === 0
+                ? await callEtsyPublicAPI(`/listings/active?${params}`)
+                : await rateLimitedPublicCall(`/listings/active?${params}`);
+
+            if (page === 0) totalCount = data.count || 0;
+            allResults.push(...(data.results || []));
+            if ((data.results || []).length < 100) break;
+        }
+
+        const items = allResults.map((l: any) => ({
+            listing_id: l.listing_id,
+            title: l.title || '',
+            price: l.price ? l.price.amount / l.price.divisor : 0,
+            views: l.views || 0,
+            num_favorers: l.num_favorers || 0,
+            tags: l.tags || [],
+            shop_id: l.shop_id,
+            quantity: l.quantity || 0,
+            created_timestamp: l.created_timestamp || 0,
+        }));
+
+        const prices = items.map((i: any) => i.price).filter((p: number) => p > 0).sort((a: number, b: number) => a - b);
+        const avgPrice = prices.length > 0 ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
+        const medianPrice = prices.length > 0 ? prices[Math.floor(prices.length / 2)] : 0;
+
+        // Unique shops
+        const uniqueShops = new Set(items.map((i: any) => i.shop_id).filter(Boolean));
+        const shopCount = uniqueShops.size;
+
+        // Engagement metrics
+        const avgFavorites = items.length > 0 ? items.reduce((s: number, i: any) => s + i.num_favorers, 0) / items.length : 0;
+        const avgViews = items.length > 0 ? items.reduce((s: number, i: any) => s + i.views, 0) / items.length : 0;
+        const avgEngagement = avgViews > 0 ? avgFavorites / avgViews : 0;
+
+        // Sales velocity estimation per listing
+        const now = Math.floor(Date.now() / 1000);
+        const velocities = items.map((i: any) => {
+            const ageMonths = Math.max(1, (now - (i.created_timestamp || now)) / (30 * 24 * 3600));
+            const estMonthlySales = (i.num_favorers / ageMonths) * 0.03; // ~3% conversion from favorites
+            return { listing_id: i.listing_id, estMonthlySales: Math.round(estMonthlySales * 10) / 10, ageMonths: Math.round(ageMonths) };
+        });
+        const avgEstSales = velocities.length > 0
+            ? velocities.reduce((s, v) => s + v.estMonthlySales, 0) / velocities.length : 0;
+
+        // Price spread
+        const priceSpread = avgPrice > 0 && prices.length > 0 ? (prices[prices.length - 1] - prices[0]) / avgPrice : 0;
+
+        // Real Demand Score (weighted composite 0-100)
+        // 1. Search volume proxy (normalized by category baseline ~5000)
+        const searchVolumeScore = Math.min(25, Math.round((totalCount / 5000) * 25));
+        // 2. Engagement quality (favorites-to-views ratio vs 2% baseline)
+        const engagementScore = Math.min(20, Math.round((avgEngagement / 0.02) * 10));
+        // 3. Sales velocity (est monthly sales vs 1.0 baseline)
+        const velocityScore = Math.min(25, Math.round((avgEstSales / 1.0) * 12.5));
+        // 4. Competition ratio (inverted: fewer shops per result = less competition = better)
+        const competitionRatio = totalCount > 0 ? shopCount / Math.min(totalCount, 200) : 1;
+        const competitionScore = Math.min(15, Math.round((1 - competitionRatio) * 15));
+        // 5. Price room (margin opportunity from median to min)
+        const priceRoom = medianPrice > 0 ? (medianPrice - (prices[0] || 0)) / medianPrice : 0;
+        const priceRoomScore = Math.min(15, Math.round(priceRoom * 30));
+
+        const demandScore = Math.min(100, searchVolumeScore + engagementScore + velocityScore + competitionScore + priceRoomScore);
+
+        // Saturation index: low ratio = dominated by few shops
+        const saturationIndex = totalCount > 0 ? Math.round((shopCount / Math.min(totalCount, 200)) * 100) : 0;
+
+        // Top seller concentration: % of favorites held by top 5 shops
+        const shopFavs: Record<number, number> = {};
+        items.forEach((i: any) => { shopFavs[i.shop_id] = (shopFavs[i.shop_id] || 0) + i.num_favorers; });
+        const sortedShopFavs = Object.values(shopFavs).sort((a, b) => b - a);
+        const totalFavs = sortedShopFavs.reduce((a, b) => a + b, 0);
+        const top5Favs = sortedShopFavs.slice(0, 5).reduce((a, b) => a + b, 0);
+        const top5Concentration = totalFavs > 0 ? Math.round((top5Favs / totalFavs) * 100) : 0;
+
+        // New seller signal: shops with listings that have <50 total favs appearing in results
+        const newSellerCount = items.filter((i: any) => i.num_favorers < 50).length;
+        const newSellerPct = items.length > 0 ? Math.round((newSellerCount / items.length) * 100) : 0;
+
+        return res.status(200).json({
+            query: keywords,
+            totalResults: totalCount,
+            itemCount: items.length,
+            demandScore: {
+                score: demandScore,
+                breakdown: {
+                    searchVolume: searchVolumeScore,
+                    engagement: engagementScore,
+                    velocity: velocityScore,
+                    competition: competitionScore,
+                    priceRoom: priceRoomScore,
+                },
+                level: demandScore >= 70 ? 'high' : demandScore >= 40 ? 'medium' : 'low',
+            },
+            priceStats: {
+                min: prices[0] || 0,
+                max: prices[prices.length - 1] || 0,
+                avg: Math.round(avgPrice * 100) / 100,
+                median: Math.round(medianPrice * 100) / 100,
+                spread: Math.round(priceSpread * 100) / 100,
+            },
+            competition: {
+                uniqueShops: shopCount,
+                saturationIndex,
+                top5Concentration,
+                newSellerPct,
+                barrierLevel: top5Concentration > 70 ? 'high' : top5Concentration > 40 ? 'medium' : 'low',
+            },
+            velocity: {
+                avgEstMonthlySales: Math.round(avgEstSales * 10) / 10,
+                medianEstMonthlySales: velocities.length > 0
+                    ? Math.round(velocities.sort((a, b) => a.estMonthlySales - b.estMonthlySales)[Math.floor(velocities.length / 2)].estMonthlySales * 10) / 10
+                    : 0,
+                topPerformers: velocities.sort((a, b) => b.estMonthlySales - a.estMonthlySales).slice(0, 5),
+            },
+            engagement: {
+                avgFavorites: Math.round(avgFavorites),
+                avgViews: Math.round(avgViews),
+                avgEngagementRate: Math.round(avgEngagement * 10000) / 100,
+            },
+        });
+    }
+
+    // --- estimate_sales_velocity: Per-listing velocity for a keyword ---
+    if (action === 'estimate_sales_velocity' && req.method === 'GET') {
+        const keywords = req.query.keywords as string;
+        if (!keywords) return res.status(400).json({ error: 'keywords is required' });
+
+        // Fetch first page only (48 results) for quick estimation
+        const params = new URLSearchParams({
+            keywords, limit: '100', offset: '0',
+            sort_on: 'score', sort_order: 'desc',
+        });
+        const data = await callEtsyPublicAPI(`/listings/active?${params}`);
+        const results = data.results || [];
+        const now = Math.floor(Date.now() / 1000);
+
+        const velocities = results.map((l: any) => {
+            const price = l.price ? l.price.amount / l.price.divisor : 0;
+            const ageMonths = Math.max(1, (now - (l.created_timestamp || now)) / (30 * 24 * 3600));
+            const favRate = l.num_favorers / ageMonths;
+            const estMonthlySales = favRate * 0.03; // ~3% fav-to-sale conversion
+            const estMonthlyRevenue = estMonthlySales * price;
+
+            return {
+                listing_id: l.listing_id,
+                title: (l.title || '').slice(0, 80),
+                price: Math.round(price * 100) / 100,
+                favorites: l.num_favorers || 0,
+                views: l.views || 0,
+                ageMonths: Math.round(ageMonths),
+                favRate: Math.round(favRate * 10) / 10,
+                estMonthlySales: Math.round(estMonthlySales * 10) / 10,
+                estMonthlyRevenue: Math.round(estMonthlyRevenue * 100) / 100,
+            };
+        });
+
+        velocities.sort((a: any, b: any) => b.estMonthlySales - a.estMonthlySales);
+
+        const allSales = velocities.map((v: any) => v.estMonthlySales);
+        const median = allSales.length > 0 ? allSales[Math.floor(allSales.length / 2)] : 0;
+        const avg = allSales.length > 0 ? allSales.reduce((a: number, b: number) => a + b, 0) / allSales.length : 0;
+        const p90 = allSales.length > 0 ? allSales[Math.floor(allSales.length * 0.1)] : 0; // top 10%
+
+        return res.status(200).json({
+            query: keywords,
+            totalResults: data.count || 0,
+            analyzed: velocities.length,
+            summary: {
+                avgEstMonthlySales: Math.round(avg * 10) / 10,
+                medianEstMonthlySales: Math.round(median * 10) / 10,
+                top10pctSales: Math.round(p90 * 10) / 10,
+            },
+            listings: velocities.slice(0, 20),
+        });
+    }
+
+    // --- analyze_competition: Competition analysis for a keyword ---
+    if (action === 'analyze_competition' && req.method === 'GET') {
+        const keywords = req.query.keywords as string;
+        if (!keywords) return res.status(400).json({ error: 'keywords is required' });
+
+        // Fetch 200 results
+        const allResults: any[] = [];
+        let totalCount = 0;
+
+        for (let page = 0; page < 2; page++) {
+            const params = new URLSearchParams({
+                keywords, limit: '100', offset: String(page * 100),
+                sort_on: 'score', sort_order: 'desc',
+            });
+            const data = page === 0
+                ? await callEtsyPublicAPI(`/listings/active?${params}`)
+                : await rateLimitedPublicCall(`/listings/active?${params}`);
+
+            if (page === 0) totalCount = data.count || 0;
+            allResults.push(...(data.results || []));
+            if ((data.results || []).length < 100) break;
+        }
+
+        // Shop-level aggregation
+        const shopMap: Record<number, { count: number; totalFavs: number; totalViews: number; prices: number[] }> = {};
+        allResults.forEach((l: any) => {
+            const shopId = l.shop_id;
+            if (!shopId) return;
+            if (!shopMap[shopId]) shopMap[shopId] = { count: 0, totalFavs: 0, totalViews: 0, prices: [] };
+            shopMap[shopId].count++;
+            shopMap[shopId].totalFavs += l.num_favorers || 0;
+            shopMap[shopId].totalViews += l.views || 0;
+            const price = l.price ? l.price.amount / l.price.divisor : 0;
+            if (price > 0) shopMap[shopId].prices.push(price);
+        });
+
+        const shopEntries = Object.entries(shopMap)
+            .map(([id, data]) => ({
+                shop_id: Number(id),
+                listingCount: data.count,
+                totalFavs: data.totalFavs,
+                totalViews: data.totalViews,
+                avgPrice: data.prices.length > 0 ? Math.round((data.prices.reduce((a, b) => a + b, 0) / data.prices.length) * 100) / 100 : 0,
+            }))
+            .sort((a, b) => b.totalFavs - a.totalFavs);
+
+        const shopCount = shopEntries.length;
+        const totalFavs = shopEntries.reduce((s, e) => s + e.totalFavs, 0);
+        const top5Favs = shopEntries.slice(0, 5).reduce((s, e) => s + e.totalFavs, 0);
+        const top5Concentration = totalFavs > 0 ? Math.round((top5Favs / totalFavs) * 100) : 0;
+
+        // Saturation: unique shops / results sampled
+        const saturationIndex = allResults.length > 0 ? Math.round((shopCount / allResults.length) * 100) : 0;
+
+        // New seller success: listings with <50 favs that appear in top 100
+        const top100 = allResults.slice(0, 100);
+        const newSellerListings = top100.filter((l: any) => (l.num_favorers || 0) < 50);
+        const newSellerSuccessRate = top100.length > 0 ? Math.round((newSellerListings.length / top100.length) * 100) : 0;
+
+        // Price tier analysis
+        const prices = allResults.map((l: any) => l.price ? l.price.amount / l.price.divisor : 0).filter((p: number) => p > 0);
+        const priceTiers = [
+            { label: 'Budget ($0-25)', min: 0, max: 25 },
+            { label: 'Mid ($25-75)', min: 25, max: 75 },
+            { label: 'Premium ($75-150)', min: 75, max: 150 },
+            { label: 'Luxury ($150+)', min: 150, max: Infinity },
+        ].map(tier => {
+            const inTier = allResults.filter((l: any) => {
+                const p = l.price ? l.price.amount / l.price.divisor : 0;
+                return p >= tier.min && p < tier.max;
+            });
+            const tierFavs = inTier.reduce((s: number, l: any) => s + (l.num_favorers || 0), 0);
+            const avgFavs = inTier.length > 0 ? Math.round(tierFavs / inTier.length) : 0;
+            return {
+                ...tier,
+                count: inTier.length,
+                pct: allResults.length > 0 ? Math.round((inTier.length / allResults.length) * 100) : 0,
+                avgFavorites: avgFavs,
+            };
+        });
+
+        // Entry difficulty score (0-100, higher = harder)
+        const avgListingCount = shopEntries.length > 0 ? shopEntries.reduce((s, e) => s + e.listingCount, 0) / shopEntries.length : 0;
+        const entryDifficulty = Math.min(100, Math.round(
+            (top5Concentration * 0.4) +
+            (Math.min(totalCount, 50000) / 500) +
+            (avgListingCount * 2)
+        ));
+
+        return res.status(200).json({
+            query: keywords,
+            totalResults: totalCount,
+            analyzed: allResults.length,
+            competition: {
+                uniqueShops: shopCount,
+                saturationIndex,
+                top5Concentration,
+                newSellerSuccessRate,
+                entryDifficulty,
+                difficultyLevel: entryDifficulty >= 70 ? 'hard' : entryDifficulty >= 40 ? 'moderate' : 'easy',
+            },
+            priceTiers,
+            topShops: shopEntries.slice(0, 10),
+        });
+    }
+
+    // --- get_shop_reviews: Fetch reviews for a public shop ---
+    if (action === 'get_shop_reviews' && req.method === 'GET') {
+        const shopId = req.query.target_shop_id as string;
+        if (!shopId) return res.status(400).json({ error: 'target_shop_id is required' });
+
+        const limit = Math.min(parseInt((req.query.limit as string) || '25'), 100);
+        const data = await callEtsyPublicAPI(`/shops/${shopId}/reviews?limit=${limit}`);
+        const reviews = (data.results || []).map((r: any) => ({
+            review_id: r.review_id,
+            rating: r.rating,
+            review: r.review || '',
+            created_timestamp: r.created_timestamp,
+            buyer_user_id: r.buyer_user_id,
+            listing_id: r.listing_id,
+            transaction_id: r.transaction_id,
+        }));
+
+        const avgRating = reviews.length > 0
+            ? Math.round((reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length) * 10) / 10
+            : 0;
+        const ratingDist = [5, 4, 3, 2, 1].map(r => ({
+            rating: r,
+            count: reviews.filter((rv: any) => rv.rating === r).length,
+        }));
+
+        return res.status(200).json({
+            total: data.count || reviews.length,
+            reviews,
+            avgRating,
+            ratingDistribution: ratingDist,
+        });
+    }
+
+    // --- analyze_listing_url: Fetch and analyze any Etsy listing ---
+    if (action === 'analyze_listing_url' && req.method === 'GET') {
+        const listingId = req.query.listing_id as string;
+        if (!listingId) return res.status(400).json({ error: 'listing_id is required' });
+
+        const data = await callEtsyPublicAPI(`/listings/${listingId}`);
+        const price = data.price ? data.price.amount / data.price.divisor : 0;
+        const now = Math.floor(Date.now() / 1000);
+        const ageMonths = Math.max(1, (now - (data.created_timestamp || now)) / (30 * 24 * 3600));
+
+        // SEO score components
+        const titleLen = (data.title || '').length;
+        const tagCount = (data.tags || []).length;
+        const descLen = (data.description || '').length;
+        const titleScore = titleLen >= 100 && titleLen <= 140 ? 25 : titleLen >= 70 ? 20 : titleLen >= 40 ? 12 : 5;
+        const tagScore = tagCount >= 13 ? 25 : tagCount >= 10 ? 20 : tagCount >= 5 ? 12 : 5;
+        const descScore = descLen >= 500 ? 25 : descLen >= 200 ? 18 : descLen >= 50 ? 10 : 3;
+        const imageScore = data.images?.length >= 8 ? 25 : data.images?.length >= 5 ? 18 : data.images?.length >= 2 ? 10 : 3;
+        const seoScore = Math.min(100, titleScore + tagScore + descScore + imageScore);
+
+        // Velocity
+        const favRate = (data.num_favorers || 0) / ageMonths;
+        const estMonthlySales = favRate * 0.03;
+
+        return res.status(200).json({
+            listing_id: data.listing_id,
+            title: data.title || '',
+            description: (data.description || '').slice(0, 500),
+            price: Math.round(price * 100) / 100,
+            tags: data.tags || [],
+            views: data.views || 0,
+            num_favorers: data.num_favorers || 0,
+            quantity: data.quantity || 0,
+            shop_id: data.shop_id,
+            taxonomy_id: data.taxonomy_id,
+            url: data.url || '',
+            created_timestamp: data.created_timestamp,
+            imageCount: data.images?.length || 0,
+            ageMonths: Math.round(ageMonths),
+            seoScore: {
+                total: seoScore,
+                title: titleScore,
+                tags: tagScore,
+                description: descScore,
+                images: imageScore,
+                level: seoScore >= 70 ? 'good' : seoScore >= 40 ? 'fair' : 'poor',
+            },
+            velocity: {
+                favRate: Math.round(favRate * 10) / 10,
+                estMonthlySales: Math.round(estMonthlySales * 10) / 10,
+            },
+        });
+    }
+
     return res.status(400).json({ error: 'Invalid public action' });
 }
 
@@ -544,7 +934,11 @@ export default async function handler(
 
     // --- Public Etsy API actions (no OAuth needed, just x-api-key) ---
     const publicAction = req.query.action as string;
-    if (publicAction && ['search_market', 'get_public_shop', 'get_public_shop_listings', 'batch_shops'].includes(publicAction)) {
+    if (publicAction && [
+      'search_market', 'get_public_shop', 'get_public_shop_listings', 'batch_shops', 'taxonomy',
+      'analyze_niche', 'estimate_sales_velocity', 'analyze_competition',
+      'get_shop_reviews', 'analyze_listing_url',
+    ].includes(publicAction)) {
         try {
             return await handlePublicAction(req, res, publicAction);
         } catch (error: any) {

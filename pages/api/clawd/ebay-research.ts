@@ -410,6 +410,23 @@ export default async function handler(
               ? { min: Math.min(...prices), max: Math.max(...prices) }
               : { min: 0, max: 0 };
 
+          // Price distribution buckets
+          const priceBuckets: { range: string; count: number; min: number; max: number }[] = [];
+          if (prices.length > 0) {
+            const bucketSize = Math.max(Math.ceil((priceSpread.max - priceSpread.min) / 10), 1);
+            for (let i = 0; i < 10; i++) {
+              const bucketMin = priceSpread.min + i * bucketSize;
+              const bucketMax = bucketMin + bucketSize;
+              const count = prices.filter(p => p >= bucketMin && (i === 9 ? p <= bucketMax : p < bucketMax)).length;
+              priceBuckets.push({
+                range: `$${Math.round(bucketMin)}-${Math.round(bucketMax)}`,
+                count,
+                min: bucketMin,
+                max: bucketMax,
+              });
+            }
+          }
+
           // Seller analysis
           const sellerMap: Record<string, number> = {};
           items.forEach((item: Record<string, unknown>) => {
@@ -508,27 +525,43 @@ export default async function handler(
             .filter(Boolean);
 
           // Calculate demand score (0-100)
-          // Based on: total results, avg sold quantity of enriched items
+          // Better demand: weight by sell-through (sold/listed ratio), not just raw volume
           const avgSold =
             enrichedCount > 0 ? totalEnrichedSold / enrichedCount : 0;
-          const demandScore = Math.min(
-            100,
-            Math.round(
-              (Math.min(totalResults, 10000) / 10000) * 40 +
-                Math.min(avgSold, 100) * 0.6
-            )
-          );
+          const sellThroughRate = enrichedCount > 0 && items.length > 0
+            ? Math.min(avgSold / Math.max(items.length / enrichedCount, 1), 1)
+            : 0;
+          const demandScore = Math.min(100, Math.round(
+            Math.min(Math.log10(Math.max(totalResults, 1)) / 5, 1) * 25 + // 0-25 for market size (log scale)
+            Math.min(avgSold, 50) * 1.0 + // 0-50 for avg sold per item
+            sellThroughRate * 25 // 0-25 for sell-through rate
+          ));
 
           // Calculate competition score (0-100)
-          // Based on: unique sellers, seller concentration, total listings
-          const competitionScore = Math.min(
-            100,
-            Math.round(
-              Math.min(uniqueSellers, 200) * 0.3 +
-                (100 - sellerConcentration) * 0.3 +
-                (Math.min(totalResults, 10000) / 10000) * 40
-            )
-          );
+          // Higher = more competitive, lower = easier entry
+          const listingsPerSeller = uniqueSellers > 0 ? totalResults / uniqueSellers : 0;
+          const competitionScore = Math.min(100, Math.round(
+            Math.min(uniqueSellers, 500) * 0.1 + // 0-50 for seller count
+            Math.min(listingsPerSeller, 20) * 1.5 + // 0-30 for listings density
+            (sellerConcentration > 50 ? 20 : sellerConcentration > 30 ? 10 : 0) // 0-20 for dominance
+          ));
+
+          // Opportunity = high demand + low competition = good opportunity
+          const opportunityScore = Math.min(100, Math.max(0, Math.round(
+            demandScore * 0.6 + (100 - competitionScore) * 0.4
+          )));
+
+          // Score explanations
+          const demandLabel = demandScore >= 70 ? 'Yüksek talep — bu niş aktif olarak satılıyor'
+            : demandScore >= 40 ? 'Orta talep — satış potansiyeli var ama rekabetle dikkatli olun'
+            : 'Düşük talep — bu niş çok az satış yapıyor, girmeden önce iyi düşünün';
+          const competitionLabel = competitionScore >= 70 ? 'Yüksek rekabet — birçok güçlü satıcı mevcut, giriş zor'
+            : competitionScore >= 40 ? 'Orta rekabet — alan var ama fark yaratmanız gerekir'
+            : 'Düşük rekabet — az satıcı, giriş fırsatı yüksek';
+          const opportunityLabel = opportunityScore >= 70 ? 'Mükemmel fırsat! Yüksek talep, düşük rekabet'
+            : opportunityScore >= 50 ? 'İyi fırsat — potansiyel var, stratejik giriş gerekir'
+            : opportunityScore >= 30 ? 'Riskli — talep/rekabet dengesi olumsuz'
+            : 'Düşük fırsat — bu nişe girmek önerilmez';
 
           logger.info('Niche analysis completed', {
             userId,
@@ -538,6 +571,7 @@ export default async function handler(
             uniqueSellers,
             demandScore,
             competitionScore,
+            opportunityScore,
           });
 
           return res.status(200).json({
@@ -548,6 +582,7 @@ export default async function handler(
             avgPrice: Math.round(avgPrice * 100) / 100,
             medianPrice: Math.round(medianPrice * 100) / 100,
             priceSpread,
+            priceDistribution: priceBuckets,
             uniqueSellers,
             sellerConcentration: Math.round(sellerConcentration * 10) / 10,
             topSellers,
@@ -556,7 +591,14 @@ export default async function handler(
             aspectDistributions: aspectCounts,
             topProducts,
             demandScore,
+            demandLabel,
             competitionScore,
+            competitionLabel,
+            opportunityScore,
+            opportunityLabel,
+            sellThroughRate: Math.round(sellThroughRate * 1000) / 10,
+            avgSoldPerItem: Math.round(avgSold * 10) / 10,
+            listingsPerSeller: Math.round(listingsPerSeller * 10) / 10,
           });
         }
 

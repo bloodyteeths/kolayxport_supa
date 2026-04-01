@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, TextField, Button, Chip, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, CircularProgress,
@@ -16,6 +16,8 @@ interface SeoAnalyzerProps {
   userId: string;
   marketplace?: string;
   onNavigate?: (tool: string, data: any) => void;
+  navigateData?: any;
+  onConsumeNavigateData?: () => void;
 }
 
 interface KeywordCoverage {
@@ -125,7 +127,7 @@ function KeywordCard({ kw, expanded, onToggle }: { kw: KeywordCoverage; expanded
   );
 }
 
-export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, onNavigate }: SeoAnalyzerProps) {
+export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, onNavigate, navigateData, onConsumeNavigateData }: SeoAnalyzerProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -139,6 +141,14 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
   const [optimizedTitle, setOptimizedTitle] = useState('');
 
   const [expandedKeywords, setExpandedKeywords] = useState<Set<number>>(new Set());
+
+  // Consume navigateData to pre-fill keyword
+  useEffect(() => {
+    if (navigateData?.keyword) {
+      setKeyword(navigateData.keyword);
+      onConsumeNavigateData?.();
+    }
+  }, [navigateData, onConsumeNavigateData]);
 
   const handleAnalyze = async () => {
     if (!keyword.trim()) {
@@ -261,7 +271,8 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
         <Stack spacing={2} sx={{ mt: 2 }}>
           <TextField
             label="Anahtar Kelime"
-            placeholder="örn: baby monitor wireless"
+            placeholder="ör: wireless bluetooth earbuds"
+            helperText="Analiz etmek istediğiniz ürün anahtar kelimesini girin"
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             fullWidth
@@ -277,7 +288,8 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
 
           <TextField
             label="Senin Başlığın"
-            placeholder="Mevcut ilan başlığınızı girin (opsiyonel)"
+            placeholder="ör: Premium Wireless Bluetooth Earbuds with Noise Cancellation"
+            helperText="Kendi başlığınızı girerek rakiplerle karşılaştırın (opsiyonel)"
             value={myTitle}
             onChange={e => setMyTitle(e.target.value)}
             fullWidth
@@ -329,13 +341,15 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
               borderColor: ScoreColor(result.seoScore),
             }}
           >
-            <Typography
-              variant="h1"
-              fontWeight={800}
-              sx={{ color: ScoreColor(result.seoScore), fontSize: { xs: 64, md: 80 }, lineHeight: 1 }}
-            >
-              {result.seoScore}
-            </Typography>
+            <Tooltip title="0-100 arası SEO skoru. 80+ mükemmel, 60-80 iyi, 60 altı iyileştirme gerekli." arrow>
+              <Typography
+                variant="h1"
+                fontWeight={800}
+                sx={{ color: ScoreColor(result.seoScore), fontSize: { xs: 64, md: 80 }, lineHeight: 1, cursor: 'help' }}
+              >
+                {result.seoScore}
+              </Typography>
+            </Tooltip>
             <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1 }}>
               SEO Skoru / 100
             </Typography>

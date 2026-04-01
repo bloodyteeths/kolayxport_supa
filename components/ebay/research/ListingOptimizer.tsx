@@ -22,6 +22,7 @@ interface ListingOptimizerProps {
   userId: string;
   marketplace: string;
   userListings?: any[];
+  onNavigate?: (tool: string, data?: any) => void;
 }
 
 interface ListingImage {
@@ -333,7 +334,7 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function ListingOptimizer({ userId, marketplace, userListings }: ListingOptimizerProps) {
+export default function ListingOptimizer({ userId, marketplace, userListings, onNavigate }: ListingOptimizerProps) {
   // ── State ──
   const [subTab, setSubTab] = useState(0);
   const [listings, setListings] = useState<ScoredListing[]>([]);
@@ -412,7 +413,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings }: 
   const searchMarket = useCallback(async (query: string, limit = 10): Promise<MarketItem[]> => {
     try {
       const res = await fetch(
-        `/api/clawd/ebay?action=search_market&keywords=${encodeURIComponent(query)}&marketplace_id=${marketplace}&limit=${limit}&userId=${userId}`
+        `/api/clawd/ebay?action=search_market&q=${encodeURIComponent(query)}&marketplace_id=${marketplace}&limit=${limit}&userId=${userId}`
       );
       if (!res.ok) return [];
       const data = await res.json();
@@ -422,19 +423,10 @@ export default function ListingOptimizer({ userId, marketplace, userListings }: 
     }
   }, [marketplace, userId]);
 
-  // ── Fetch item aspects for a category ──
-  const fetchItemAspects = useCallback(async (categoryId: string): Promise<AspectConstraint[]> => {
-    try {
-      const res = await fetch(
-        `/api/clawd/ebay?action=item_aspects&category_id=${categoryId}&marketplace_id=${marketplace}&userId=${userId}`
-      );
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.aspects || [];
-    } catch {
-      return [];
-    }
-  }, [marketplace, userId]);
+  // ── Fetch item aspects for a category (no backend action available — return empty) ──
+  const fetchItemAspects = useCallback(async (_categoryId: string): Promise<AspectConstraint[]> => {
+    return [];
+  }, []);
 
   // ── Auto-Optimizer logic ──
   const selectedListing = useMemo(
@@ -610,13 +602,14 @@ export default function ListingOptimizer({ userId, marketplace, userListings }: 
     setManualListing(null);
     try {
       let itemId = input;
-      const urlMatch = input.match(/\/itm\/(\d+)/);
+      // Match ebay.com/itm/Title-Here/123456789 or ebay.com/itm/123456789
+      const urlMatch = input.match(/\/itm\/(?:[^/]*\/)?(\d+)/);
       if (urlMatch) itemId = urlMatch[1];
       const idMatch = itemId.match(/(\d{10,14})/);
       if (idMatch) itemId = idMatch[1];
 
       const res = await fetch(
-        `/api/clawd/ebay?action=listing&sku=${itemId}&marketplace_id=${marketplace}&userId=${userId}`
+        `/api/clawd/ebay?action=get_item_details&legacy_item_id=${itemId}&marketplace_id=${marketplace}&userId=${userId}`
       );
       if (!res.ok) throw new Error('Listeleme bulunamadi');
       const data = await res.json();

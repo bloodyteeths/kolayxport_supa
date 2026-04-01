@@ -461,6 +461,310 @@ ${listingSummaries}`;
   return { status: 200, data: { optimized: parsed.optimizations || parsed.optimized } };
 }
 
+async function handleNicheReport(body: any) {
+  const { query, demandScore, priceStats, competition, velocity, engagement, topTags, topKeywords } = body;
+
+  if (!query) {
+    return { status: 400, data: { error: 'query alanı zorunludur.' } };
+  }
+
+  const model = getGeminiModel();
+  const prompt = `Sen derin niş analizi yapan bir Etsy pazar uzmanısın. Aşağıdaki verilere dayanarak detaylı ve eyleme dönüştürülebilir niş raporu hazırla.
+
+ÖNEMLİ DİL KURALI: Tüm anahtar kelimeler, tagler ve keyword örnekleri MUTLAKA İNGİLİZCE olmalıdır. Sadece analiz metni, açıklamalar ve yorumlar Türkçe olmalıdır.
+
+NİŞ: "${query}"
+
+VERİLER:
+- Talep skoru: ${demandScore ?? 'N/A'}
+- Fiyat istatistikleri: Min: $${priceStats?.min ?? 'N/A'}, Ort: $${priceStats?.avg ?? 'N/A'}, Medyan: $${priceStats?.median ?? 'N/A'}, Max: $${priceStats?.max ?? 'N/A'}
+- Rekabet seviyesi: ${competition ?? 'N/A'}
+- Satış hızı (velocity): ${velocity ?? 'N/A'}
+- Etkileşim (engagement): ${engagement ?? 'N/A'}
+- En çok kullanılan etiketler: ${Array.isArray(topTags) ? topTags.slice(0, 20).map((t: any) => typeof t === 'string' ? t : `${t.tag} (${t.pct}%)`).join(', ') : 'N/A'}
+- En çok kullanılan anahtar kelimeler: ${Array.isArray(topKeywords) ? topKeywords.slice(0, 15).map((k: any) => typeof k === 'string' ? k : `${k.keyword} (${k.pct}%)`).join(', ') : 'N/A'}
+
+JSON formatında döndür:
+{
+  "verdict": "GİR" | "DİKKATLİ OL" | "KAÇIN",
+  "confidence": 0-100,
+  "summary": "2-3 cümlelik Türkçe özet",
+  "strengths": ["güçlü yön 1 (Türkçe)", ...],
+  "weaknesses": ["zayıf yön 1 (Türkçe)", ...],
+  "opportunities": ["fırsat 1 (Türkçe)", ...],
+  "entry_strategy": "Detaylı Türkçe giriş stratejisi, İngilizce keyword örnekleri ile",
+  "pricing_recommendation": { "min": number, "sweet_spot": number, "max": number, "reasoning": "Türkçe açıklama" },
+  "keyword_strategy": { "primary": ["english keyword"], "secondary": ["english keyword"], "long_tail": ["english long tail phrase"] },
+  "action_items": ["Türkçe aksiyon maddesi, İngilizce keyword örnekleriyle", ...]
+}`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    console.error('[AI Etsy] niche_report JSON parse failed:', text.slice(0, 500));
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  const requiredKeys = ['verdict', 'confidence', 'summary', 'strengths', 'weaknesses', 'opportunities', 'entry_strategy', 'pricing_recommendation', 'keyword_strategy', 'action_items'];
+  const missingKeys = requiredKeys.filter((k) => !(k in parsed));
+  if (missingKeys.length > 0) {
+    console.error('[AI Etsy] niche_report missing keys:', missingKeys);
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  return { status: 200, data: { report: parsed } };
+}
+
+async function handleShopSpyReport(body: any) {
+  const { shopName, shopData, topListings, topTags } = body;
+
+  if (!shopName) {
+    return { status: 400, data: { error: 'shopName alanı zorunludur.' } };
+  }
+
+  const model = getGeminiModel();
+  const listingsText = Array.isArray(topListings)
+    ? topListings.slice(0, 10).map((l: any, i: number) => `  ${i + 1}. "${l.title}" — $${l.price}, ${l.favorites} favori`).join('\n')
+    : 'N/A';
+
+  const prompt = `Sen rakip mağaza analizi yapan bir Etsy strateji uzmanısın. Aşağıdaki mağaza verilerini analiz et.
+
+ÖNEMLİ DİL KURALA: Tüm tag örnekleri ve keyword önerileri MUTLAKA İNGİLİZCE olmalıdır. Analiz metni Türkçe olmalıdır.
+
+MAĞAZA: "${shopName}"
+
+MAĞAZA VERİLERİ:
+- Toplam satış: ${shopData?.sales ?? 'N/A'}
+- Değerlendirme: ${shopData?.rating ?? 'N/A'}★
+- Aktif ilan sayısı: ${shopData?.listings ?? 'N/A'}
+- Katılım tarihi: ${shopData?.joinDate ?? 'N/A'}
+
+EN İYİ İLANLAR:
+${listingsText}
+
+EN ÇOK KULLANILAN ETIKETLER: ${Array.isArray(topTags) ? topTags.slice(0, 20).map((t: any) => typeof t === 'string' ? t : `${t.tag} (${t.pct}%)`).join(', ') : 'N/A'}
+
+JSON formatında döndür:
+{
+  "shop_grade": "A+" ile "F" arası not,
+  "estimated_monthly_revenue": tahmini aylık gelir (sayı),
+  "revenue_reasoning": "Türkçe gelir tahmini açıklaması",
+  "strategy_summary": "Türkçe strateji özeti",
+  "strengths": ["güçlü yön (Türkçe)", ...],
+  "weaknesses": ["zayıf yön (Türkçe)", ...],
+  "pricing_insights": "Türkçe fiyatlandırma analizi, $ tutarları ile",
+  "tag_strategy": "Türkçe tag analizi, İngilizce tag örnekleri ile",
+  "what_to_learn": ["öğrenilecek (Türkçe)", ...],
+  "what_to_avoid": ["kaçınılacak (Türkçe)", ...]
+}`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    console.error('[AI Etsy] shop_spy_report JSON parse failed:', text.slice(0, 500));
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  const requiredKeys = ['shop_grade', 'estimated_monthly_revenue', 'strategy_summary', 'strengths', 'weaknesses', 'pricing_insights', 'tag_strategy', 'what_to_learn', 'what_to_avoid'];
+  const missingKeys = requiredKeys.filter((k) => !(k in parsed));
+  if (missingKeys.length > 0) {
+    console.error('[AI Etsy] shop_spy_report missing keys:', missingKeys);
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  return { status: 200, data: { report: parsed } };
+}
+
+async function handleListingAudit(body: any) {
+  const { title, description, tags, price, favorites, views, imageCount, seoScore, marketAvgPrice, marketAvgFavorites } = body;
+
+  if (!title) {
+    return { status: 400, data: { error: 'title alanı zorunludur.' } };
+  }
+
+  const model = getGeminiModel();
+  const prompt = `Sen Etsy ilan denetimi yapan bir SEO ve satış uzmanısın. Aşağıdaki ilanı kapsamlı şekilde denetle.
+
+ÖNEMLİ DİL KURALI: Optimize edilmiş başlık ve tag önerileri MUTLAKA İNGİLİZCE olmalıdır. Geri bildirim metinleri Türkçe olmalıdır.
+
+İLAN VERİLERİ:
+- Başlık: ${title}
+- Açıklama: ${(description || 'N/A').slice(0, 500)}
+- Taglar: ${Array.isArray(tags) ? tags.join(', ') : tags || 'Yok'}
+- Fiyat: $${price ?? 'N/A'}
+- Favoriler: ${favorites ?? 'N/A'}
+- Görüntülenme: ${views ?? 'N/A'}
+- Görsel sayısı: ${imageCount ?? 'N/A'}
+- SEO skoru: ${seoScore ?? 'N/A'}
+
+PAZAR KARŞILAŞTIRMA:
+- Pazar ortalama fiyat: $${marketAvgPrice ?? 'N/A'}
+- Pazar ortalama favori: ${marketAvgFavorites ?? 'N/A'}
+
+JSON formatında döndür:
+{
+  "overall_grade": "A+" ile "F" arası not,
+  "overall_score": 0-100,
+  "title_score": 0-100,
+  "title_feedback": "Türkçe başlık geri bildirimi",
+  "tags_score": 0-100,
+  "tags_feedback": "Türkçe tag geri bildirimi, İngilizce tag önerileri ile",
+  "description_score": 0-100,
+  "description_feedback": "Türkçe açıklama geri bildirimi",
+  "pricing_score": 0-100,
+  "pricing_feedback": "Türkçe fiyatlandırma geri bildirimi",
+  "image_score": 0-100,
+  "image_feedback": "Türkçe görsel geri bildirimi",
+  "quick_wins": ["Türkçe hızlı kazanım 1", ...],
+  "optimized_title": "English optimized title suggestion",
+  "suggested_tags": ["english tag 1", "english tag 2", ...]
+}`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    console.error('[AI Etsy] listing_audit JSON parse failed:', text.slice(0, 500));
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  const requiredKeys = ['overall_grade', 'overall_score', 'title_score', 'title_feedback', 'tags_score', 'tags_feedback', 'description_score', 'pricing_score', 'quick_wins', 'optimized_title', 'suggested_tags'];
+  const missingKeys = requiredKeys.filter((k) => !(k in parsed));
+  if (missingKeys.length > 0) {
+    console.error('[AI Etsy] listing_audit missing keys:', missingKeys);
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  return { status: 200, data: { audit: parsed } };
+}
+
+async function handleReviewSentiment(body: any) {
+  const { shopName, reviews } = body;
+
+  if (!shopName || !Array.isArray(reviews) || reviews.length === 0) {
+    return { status: 400, data: { error: 'shopName ve reviews alanları zorunludur.' } };
+  }
+
+  const model = getGeminiModel();
+  const reviewsText = reviews.slice(0, 50).map((r: any, i: number) =>
+    `  ${i + 1}. [${r.rating}★] "${(r.review || '').slice(0, 200)}" (${r.created_timestamp || 'N/A'})`
+  ).join('\n');
+
+  const prompt = `Sen müşteri yorumlarını analiz eden bir Etsy pazar araştırma uzmanısın. Aşağıdaki rakip mağaza yorumlarından duygu analizi yap.
+
+ÖNEMLİ DİL KURALI: Analiz metni Türkçe olmalıdır. Alıntılar orijinal dilde kalmalıdır.
+
+MAĞAZA: "${shopName}"
+
+YORUMLAR:
+${reviewsText}
+
+JSON formatında döndür:
+{
+  "overall_sentiment": "Çok Olumlu" | "Olumlu" | "Karışık" | "Olumsuz",
+  "sentiment_score": 0-100,
+  "themes": [{ "theme": "Türkçe tema adı", "count": sayı, "sentiment": "positive" | "negative" | "neutral", "example": "orijinal alıntı" }, ...],
+  "buyer_loves": ["alıcıların sevdiği şeyler (Türkçe)"],
+  "buyer_complaints": ["alıcı şikayetleri (Türkçe)"],
+  "product_insights": ["ürün geliştirme için Türkçe öneriler"],
+  "service_insights": ["hizmet geliştirme için Türkçe öneriler"]
+}`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    console.error('[AI Etsy] review_sentiment JSON parse failed:', text.slice(0, 500));
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  const requiredKeys = ['overall_sentiment', 'sentiment_score', 'themes', 'buyer_loves', 'buyer_complaints', 'product_insights', 'service_insights'];
+  const missingKeys = requiredKeys.filter((k) => !(k in parsed));
+  if (missingKeys.length > 0) {
+    console.error('[AI Etsy] review_sentiment missing keys:', missingKeys);
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  return { status: 200, data: { sentiment: parsed } };
+}
+
+async function handlePriceRecommendation(body: any) {
+  const { query, myPrice, priceStats, sweetSpot, priceRangeBreakdown, avgFavorites, productDescription } = body;
+
+  if (!query) {
+    return { status: 400, data: { error: 'query alanı zorunludur.' } };
+  }
+
+  const model = getGeminiModel();
+  const breakdownText = Array.isArray(priceRangeBreakdown)
+    ? priceRangeBreakdown.map((r: any) => `  $${r.min}-$${r.max}: ${r.count} ilan (${r.pct}%)`).join('\n')
+    : 'N/A';
+
+  const prompt = `Sen Etsy fiyatlandırma stratejisi uzmanısın. Aşağıdaki pazar verilerine dayanarak optimal fiyat önerisi yap.
+
+ÖNEMLİ DİL KURALI: Analiz metni ve açıklamalar Türkçe olmalıdır.
+
+ÜRÜN: "${query}"
+${productDescription ? `Ürün açıklaması: ${productDescription.slice(0, 300)}` : ''}
+
+FİYAT VERİLERİ:
+- Mevcut fiyatım: ${myPrice ? `$${myPrice}` : 'Belirtilmedi'}
+- Pazar min: $${priceStats?.min ?? 'N/A'}
+- Pazar ort: $${priceStats?.avg ?? 'N/A'}
+- Pazar medyan: $${priceStats?.median ?? 'N/A'}
+- Pazar max: $${priceStats?.max ?? 'N/A'}
+- Sweet spot: $${sweetSpot ?? 'N/A'}
+- Ortalama favori: ${avgFavorites ?? 'N/A'}
+
+FİYAT ARALIĞI DAĞILIMI:
+${breakdownText}
+
+JSON formatında döndür:
+{
+  "recommended_price": önerilen fiyat (sayı),
+  "price_range": { "min": sayı, "max": sayı },
+  "confidence": 0-100,
+  "strategy": "Penetrasyon" | "Premium" | "Rekabetçi" | "Değer",
+  "reasoning": "Türkçe detaylı açıklama",
+  "price_positioning": "Türkçe — fiyatınızın pazardaki yeri",
+  "tips": ["Türkçe fiyatlandırma ipucu 1", ...]
+}`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    console.error('[AI Etsy] price_recommendation JSON parse failed:', text.slice(0, 500));
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  const requiredKeys = ['recommended_price', 'price_range', 'confidence', 'strategy', 'reasoning', 'price_positioning', 'tips'];
+  const missingKeys = requiredKeys.filter((k) => !(k in parsed));
+  if (missingKeys.length > 0) {
+    console.error('[AI Etsy] price_recommendation missing keys:', missingKeys);
+    return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
+  }
+
+  return { status: 200, data: { recommendation: parsed } };
+}
+
 // ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
@@ -523,9 +827,24 @@ export default async function handler(
       case 'market_analysis':
         result = await handleMarketAnalysis(body);
         break;
+      case 'niche_report':
+        result = await handleNicheReport(body);
+        break;
+      case 'shop_spy_report':
+        result = await handleShopSpyReport(body);
+        break;
+      case 'listing_audit':
+        result = await handleListingAudit(body);
+        break;
+      case 'review_sentiment':
+        result = await handleReviewSentiment(body);
+        break;
+      case 'price_recommendation':
+        result = await handlePriceRecommendation(body);
+        break;
       default:
         return res.status(400).json({
-          error: `Geçersiz action: "${action}". Desteklenen eylemler: suggest_tags, optimize_title, generate_description, generate_alt_text, bulk_optimize, market_analysis`,
+          error: `Geçersiz action: "${action}". Desteklenen eylemler: suggest_tags, optimize_title, generate_description, generate_alt_text, bulk_optimize, market_analysis, niche_report, shop_spy_report, listing_audit, review_sentiment, price_recommendation`,
         });
     }
 

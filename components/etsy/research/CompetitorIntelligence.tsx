@@ -1,0 +1,647 @@
+import React, { useState, useMemo, useCallback } from 'react';
+import {
+  Box, Typography, Paper, Chip, Alert, Divider, Button, TextField,
+  CircularProgress, LinearProgress,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
+  IconButton, useMediaQuery, Collapse,
+} from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import {
+  Store, Star, Users, ExternalLink, Search, ShoppingCart,
+  Eye, Heart, ShoppingBag, Sparkles, DollarSign, Target, Calendar,
+  Zap, MessageSquare, ThumbsUp, ThumbsDown,
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
+
+import { useEtsyResearchStore, useComputedShopStats, useComputedDeepDive } from '@/lib/stores/useEtsyResearchStore';
+import { StatCard, ScoreRing, GradientBar, PremiumEmptyState, GRADIENTS, glassCard } from './shared/ui';
+import { fmt, pct, sortArray } from './shared/utils';
+import type { SortDir } from './shared/types';
+
+export default function CompetitorIntelligence() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [expandedShopIdx, setExpandedShopIdx] = useState<number | null>(null);
+  const [expandedListingIdx, setExpandedListingIdx] = useState<number | null>(null);
+  // ---------------------------------------------------------------------------
+  // Store
+  // ---------------------------------------------------------------------------
+  const {
+    shopsLoading, shopDiscoveryFailed, serverShopIds,
+    deepDiveShopId, deepDiveShop, deepDiveLoading,
+    aiAnalysis, aiLoading, items, discoveredShops,
+    discoverShops, setDeepDiveShopId, searchShopDeepDive, generateAiInsights,
+  } = useEtsyResearchStore();
+
+  const shopSpyReport = useEtsyResearchStore(s => s.shopSpyReport);
+  const shopSpyReportLoading = useEtsyResearchStore(s => s.shopSpyReportLoading);
+  const shopReviews = useEtsyResearchStore(s => s.shopReviews);
+  const shopReviewsLoading = useEtsyResearchStore(s => s.shopReviewsLoading);
+  const reviewSentiment = useEtsyResearchStore(s => s.reviewSentiment);
+  const reviewSentimentLoading = useEtsyResearchStore(s => s.reviewSentimentLoading);
+  const fetchShopSpyReport = useEtsyResearchStore(s => s.fetchShopSpyReport);
+  const fetchShopReviews = useEtsyResearchStore(s => s.fetchShopReviews);
+  const fetchReviewSentiment = useEtsyResearchStore(s => s.fetchReviewSentiment);
+
+  const shopStats = useComputedShopStats();
+  const deepDiveStats = useComputedDeepDive();
+
+  const hasData = items.length > 0;
+
+  // ---------------------------------------------------------------------------
+  // Local sort state
+  // ---------------------------------------------------------------------------
+  const [shopSortKey, setShopSortKey] = useState('num_sales');
+  const [shopSortDir, setShopSortDir] = useState<SortDir>('desc');
+  const [bestListingSortKey, setBestListingSortKey] = useState('num_favorers');
+  const [bestListingSortDir, setBestListingSortDir] = useState<SortDir>('desc');
+
+  const toggleSort = useCallback((key: string, currentKey: string, currentDir: SortDir, setKey: (k: string) => void, setDir: (d: SortDir) => void) => {
+    if (currentKey === key) setDir(currentDir === 'asc' ? 'desc' : 'asc');
+    else { setKey(key); setDir('desc'); }
+  }, []);
+
+  const sortedShops = useMemo(
+    () => shopStats ? sortArray(shopStats.shops, shopSortKey, shopSortDir) : [],
+    [shopStats, shopSortKey, shopSortDir],
+  );
+
+  const sortedBestListings = useMemo(
+    () => deepDiveStats ? sortArray(deepDiveStats.bestListings, bestListingSortKey, bestListingSortDir) : [],
+    [deepDiveStats, bestListingSortKey, bestListingSortDir],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+  return (
+    <Box>
+      {/* ================================================================ */}
+      {/* SHOP DISCOVERY                                                    */}
+      {/* ================================================================ */}
+      {shopsLoading && <LinearProgress sx={{ mb: 2, borderRadius: 4, height: 4 }} />}
+      {shopStats && shopStats.shops.length > 0 ? (
+        <>
+          <Paper sx={{ ...glassCard, p: isMobile ? 1.5 : 2.5, mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Magaza Yogunlugu</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 1.5, mb: 2 }}>
+              <StatCard label="Toplam Magaza" value={String(shopStats.shops.length)} color="#667eea" icon={<Store size={18} />} />
+              <StatCard label="Ort. Puan" value={`${shopStats.avgRating}`} color="#ff9800" icon={<Star size={18} />} />
+              <StatCard label="Top 5 Payi" value={shopStats.totalListings > 0 ? pct((shopStats.top5Sales / shopStats.totalListings) * 100) : '0%'} color="#9c27b0" icon={<Users size={18} />} />
+            </Box>
+
+            {/* Concentration bar */}
+            <Box sx={{ display: 'flex', height: 24, borderRadius: '12px', overflow: 'hidden' }}>
+              <Box sx={{
+                width: `${shopStats.totalListings ? (shopStats.top5Sales / shopStats.totalListings) * 100 : 0}%`,
+                background: GRADIENTS.primary, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem', fontWeight: 600 }}>Top 5</Typography>
+              </Box>
+              <Box sx={{ flex: 1, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>Diger</Typography>
+              </Box>
+            </Box>
+          </Paper>
+
+          {isMobile ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {sortedShops.map((s, i) => {
+                const isExpanded = expandedShopIdx === i;
+                return (
+                  <Paper key={s.shop_id} sx={{
+                    ...glassCard, p: 1.5, cursor: 'pointer',
+                    borderLeft: i < 3 ? '3px solid #667eea' : 'none',
+                  }} onClick={() => setExpandedShopIdx(isExpanded ? null : i)}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>{s.shop_name}</Typography>
+                        <Box sx={{ display: 'flex', gap: 1, mt: 0.3, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 600 }}>{s.num_sales.toLocaleString()} satis</Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                            <Star size={10} color="#ff9800" fill="#ff9800" />
+                            <Typography variant="caption">{s.review_average.toFixed(1)}</Typography>
+                          </Box>
+                          {s.avgPrice && <Typography variant="caption" color="text.secondary">{fmt(s.avgPrice)}</Typography>}
+                        </Box>
+                      </Box>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: i < 3 ? '#667eea' : '#999' }}>#{i + 1}</Typography>
+                    </Box>
+                    <Collapse in={isExpanded}>
+                      <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', gap: 1.5 }}>
+                          <Typography variant="caption" color="text.secondary">Yorum: {s.review_count.toLocaleString()}</Typography>
+                          <Typography variant="caption" color="text.secondary">Urun: {s.listing_active_count}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                          <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDeepDiveShopId(String(s.shop_id)); }}
+                            sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Analiz</Button>
+                          <IconButton size="small" onClick={(e) => { e.stopPropagation(); window.open(s.url, '_blank'); }}>
+                            <ExternalLink size={14} />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    </Collapse>
+                  </Paper>
+                );
+              })}
+            </Box>
+          ) : (
+          <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
+            <TableContainer sx={{ maxHeight: 500 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
+                    <TableCell>#</TableCell>
+                    <TableCell>Magaza</TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='num_sales'} direction={shopSortKey==='num_sales'?shopSortDir:'desc'} onClick={()=>toggleSort('num_sales',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Satis</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='review_average'} direction={shopSortKey==='review_average'?shopSortDir:'desc'} onClick={()=>toggleSort('review_average',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Puan</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='review_count'} direction={shopSortKey==='review_count'?shopSortDir:'desc'} onClick={()=>toggleSort('review_count',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Yorum</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='listingCount'} direction={shopSortKey==='listingCount'?shopSortDir:'desc'} onClick={()=>toggleSort('listingCount',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Urun</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='avgPrice'} direction={shopSortKey==='avgPrice'?shopSortDir:'desc'} onClick={()=>toggleSort('avgPrice',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Ort. Fiyat</TableSortLabel></TableCell>
+                    <TableCell sx={{ width: 40 }} />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortedShops.map((s, i) => (
+                    <TableRow key={s.shop_id} hover sx={{
+                      '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
+                      borderLeft: i < 3 ? '3px solid #667eea' : 'none',
+                    }}>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: i < 3 ? '#667eea' : '#999' }}>
+                          {i + 1}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{
+                          fontWeight: 600, cursor: 'pointer',
+                          '&:hover': { textDecoration: 'underline', color: 'primary.main' },
+                        }} onClick={() => { setDeepDiveShopId(String(s.shop_id)); }}>
+                          {s.shop_name}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center"><Typography variant="body2" sx={{ fontWeight: 700 }}>{s.num_sales.toLocaleString()}</Typography></TableCell>
+                      <TableCell align="center">
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.3 }}>
+                          <Star size={12} color="#ff9800" fill="#ff9800" /> {s.review_average.toFixed(1)}
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">{s.review_count.toLocaleString()}</TableCell>
+                      <TableCell align="center">{s.listing_active_count}</TableCell>
+                      <TableCell align="center">{s.avgPrice ? fmt(s.avgPrice) : '-'}</TableCell>
+                      <TableCell>
+                        <IconButton size="small" onClick={() => window.open(s.url, '_blank')}>
+                          <ExternalLink size={14} />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+          )}
+        </>
+      ) : !shopsLoading && (
+        shopDiscoveryFailed && serverShopIds.length > 0
+          ? <Alert severity="error" sx={{ borderRadius: '12px', mb: 2 }}
+              action={<Button color="inherit" size="small" onClick={() => discoverShops(serverShopIds)}>Tekrar Dene</Button>}
+            >
+              Mağaza bilgileri alınamadı. Tekrar deneyin.
+            </Alert>
+          : hasData
+            ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Mağaza bilgileri yükleniyor...</Alert>
+            : <PremiumEmptyState icon={<Users size={48} />} title="Mağaza Analizi"
+                desc="Aynı nişte satan mağazaları keşfedin."
+                steps={['Bir anahtar kelime araması yapın', 'Aramanızla ilgili mağazalar otomatik bulunur', 'Satış sayısı, puan ve ortalama fiyatlarını karşılaştırın']}
+              />
+      )}
+
+      {/* ================================================================ */}
+      {/* SHOP DEEP DIVE                                                    */}
+      {/* ================================================================ */}
+      <Divider sx={{ my: 3 }} />
+      <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Mağaza Derinlemesine Analiz</Typography>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <TextField label="Magaza ID" value={deepDiveShopId}
+            onChange={e => setDeepDiveShopId(e.target.value)} size="small"
+            sx={{ flex: 1, minWidth: isMobile ? 0 : 200 }} placeholder="Magaza ID girin..."
+            onKeyDown={e => e.key === 'Enter' && searchShopDeepDive()}
+          />
+          <Button variant="contained" onClick={searchShopDeepDive}
+            disabled={deepDiveLoading || !deepDiveShopId.trim()}
+            startIcon={deepDiveLoading ? <CircularProgress size={16} /> : <Search size={16} />}
+            sx={{ background: GRADIENTS.primary, borderRadius: '10px', ...(isMobile && { width: '100%' }) }}
+          >
+            Analiz Et
+          </Button>
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+          Magaza Analizi tabindan magaza adina tiklayarak da gelebilirsiniz.
+        </Typography>
+      </Paper>
+
+      {deepDiveLoading && <LinearProgress sx={{ mb: 2, borderRadius: 4, height: 4 }} />}
+
+      {deepDiveShop && (
+        <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>{deepDiveShop.shop_name}</Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 1.5 }}>
+            <StatCard label="Toplam Satis" value={deepDiveShop.num_sales.toLocaleString()} color="#11998e" icon={<ShoppingCart size={18} />} />
+            <StatCard label="Puan" value={`${deepDiveShop.review_average.toFixed(1)}`} color="#ff9800" icon={<Star size={18} />} />
+            <StatCard label="Yorum" value={deepDiveShop.review_count.toLocaleString()} color="#2196F3" icon={<Eye size={18} />} />
+            <StatCard label="Aktif Urun" value={String(deepDiveShop.listing_active_count)} color="#9c27b0" icon={<ShoppingBag size={18} />} />
+          </Box>
+        </Paper>
+      )}
+
+      {deepDiveStats && (
+        <>
+          <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 1.5, mb: 2 }}>
+            <StatCard label="Min Fiyat" value={fmt(deepDiveStats.priceMin)} color="#11998e" />
+            <StatCard label="Ort. Fiyat" value={fmt(deepDiveStats.priceAvg)} color="#2196F3" />
+            <StatCard label="Max Fiyat" value={fmt(deepDiveStats.priceMax)} color="#f44336" />
+            <StatCard label="Ort. Favori" value={String(deepDiveStats.avgFav)} color="#e91e63" icon={<Heart size={18} />} />
+            <StatCard label="Ort. Grnm" value={String(deepDiveStats.avgViews)} color="#ff9800" icon={<Eye size={18} />} />
+          </Box>
+
+          <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>En Cok Kullanilan Tagler</Typography>
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+              {deepDiveStats.topTags.map(t => (
+                <Chip key={t.tag} label={`${t.tag} (%${t.pct})`} size="small" variant="outlined"
+                  onClick={() => { navigator.clipboard.writeText(t.tag); toast.success('Kopyalandi'); }}
+                  sx={{ cursor: 'pointer', borderRadius: '8px' }}
+                />
+              ))}
+            </Box>
+          </Paper>
+
+          {isMobile ? (
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>En Populer Urunler</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {sortedBestListings.map((l, i) => {
+                  const isExpanded = expandedListingIdx === i;
+                  return (
+                    <Paper key={l.listing_id} sx={{
+                      ...glassCard, p: 1.5, cursor: 'pointer',
+                      borderLeft: i < 3 ? '3px solid #667eea' : 'none',
+                    }} onClick={() => setExpandedListingIdx(isExpanded ? null : i)}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {l.title}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, mt: 0.3, alignItems: 'center' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmt(l.price)}</Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                              <Heart size={10} color="#e91e63" />
+                              <Typography variant="caption" sx={{ fontWeight: 600 }}>{l.num_favorers.toLocaleString()}</Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: i < 3 ? '#667eea' : '#999' }}>#{i + 1}</Typography>
+                      </Box>
+                      <Collapse in={isExpanded}>
+                        <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">Goruntuleme: {l.views.toLocaleString()}</Typography>
+                          <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); window.open(l.url, '_blank'); }}
+                            startIcon={<ExternalLink size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Etsy</Button>
+                        </Box>
+                      </Collapse>
+                    </Paper>
+                  );
+                })}
+              </Box>
+            </Box>
+          ) : (
+          <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
+            <Box sx={{ p: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>En Populer Urunler</Typography>
+            </Box>
+            <TableContainer sx={{ maxHeight: 400 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
+                    <TableCell>#</TableCell>
+                    <TableCell>Baslik</TableCell>
+                    <TableCell align="right"><TableSortLabel active={bestListingSortKey==='price'} direction={bestListingSortKey==='price'?bestListingSortDir:'desc'} onClick={()=>toggleSort('price',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Fiyat</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={bestListingSortKey==='num_favorers'} direction={bestListingSortKey==='num_favorers'?bestListingSortDir:'desc'} onClick={()=>toggleSort('num_favorers',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Favori</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={bestListingSortKey==='views'} direction={bestListingSortKey==='views'?bestListingSortDir:'desc'} onClick={()=>toggleSort('views',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Grnm</TableSortLabel></TableCell>
+                    <TableCell sx={{ width: 40 }} />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortedBestListings.map((l, i) => (
+                    <TableRow key={l.listing_id} hover sx={{
+                      '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
+                      borderLeft: i < 3 ? '3px solid #667eea' : 'none',
+                    }}>
+                      <TableCell>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: i < 3 ? '#667eea' : '#999' }}>{i + 1}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {l.title}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">{fmt(l.price)}</TableCell>
+                      <TableCell align="center">
+                        <Typography sx={{ fontWeight: 700, color: l.num_favorers > 100 ? '#11998e' : '#ff9800' }}>
+                          {l.num_favorers.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">{l.views.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <IconButton size="small" onClick={() => window.open(l.url, '_blank')}><ExternalLink size={14} /></IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+          )}
+        </>
+      )}
+
+      {/* Shop Spy AI Report */}
+      {deepDiveShop && (
+        <Box sx={{ mt: 2 }}>
+          <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: shopSpyReport ? 2 : 0, flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Zap size={16} color="#ff9800" /> AI Magaza Raporu
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, ...(isMobile && { width: '100%' }) }}>
+                <Button size="small" variant="outlined" onClick={fetchShopReviews}
+                  disabled={shopReviewsLoading}
+                  startIcon={shopReviewsLoading ? <CircularProgress size={14} /> : <MessageSquare size={14} />}
+                  sx={{ borderRadius: '10px', ...(isMobile && { flex: 1 }) }}>
+                  Yorumlari Yukle
+                </Button>
+                <Button size="small" variant="contained" onClick={fetchShopSpyReport}
+                  disabled={shopSpyReportLoading || !deepDiveStats}
+                  startIcon={shopSpyReportLoading ? <CircularProgress size={14} /> : <Zap size={14} />}
+                  sx={{ background: GRADIENTS.primary, borderRadius: '10px', ...(isMobile && { flex: 1 }) }}>
+                  AI Raporu
+                </Button>
+              </Box>
+            </Box>
+
+            {(shopSpyReportLoading || shopReviewsLoading) && <LinearProgress sx={{ mt: 1, mb: 1, borderRadius: 4, height: 3 }} />}
+
+            {shopSpyReport && (
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h3" sx={{ fontWeight: 900, color: shopSpyReport.shop_grade?.startsWith('A') ? '#4caf50' : shopSpyReport.shop_grade?.startsWith('B') ? '#2196F3' : '#ff9800' }}>
+                      {shopSpyReport.shop_grade}
+                    </Typography>
+                    <Typography variant="caption">Mağaza Notu</Typography>
+                  </Box>
+                  <Divider orientation="vertical" flexItem />
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      Tahmini Aylık Gelir: ${shopSpyReport.estimated_monthly_revenue?.toLocaleString()}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">{shopSpyReport.revenue_reasoning}</Typography>
+                  </Box>
+                </Box>
+
+                <Typography variant="body2" sx={{ mb: 2 }}>{shopSpyReport.strategy_summary}</Typography>
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 1.5, mb: 2 }}>
+                  {[
+                    { title: 'Guclu Yanlar', items: shopSpyReport.strengths, color: '#4caf50', icon: <ThumbsUp size={14} /> },
+                    { title: 'Zayif Yanlar', items: shopSpyReport.weaknesses, color: '#f44336', icon: <ThumbsDown size={14} /> },
+                  ].map(section => (
+                    <Paper key={section.title} sx={{ ...glassCard, p: 1.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: section.color, display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                        {section.icon} {section.title}
+                      </Typography>
+                      {(section.items || []).map((item: string, i: number) => (
+                        <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {item}</Typography>
+                      ))}
+                    </Paper>
+                  ))}
+                </Box>
+
+                {shopSpyReport.what_to_learn?.length > 0 && (
+                  <Alert severity="success" sx={{ mb: 1.5, borderRadius: '12px' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Öğrenilecekler</Typography>
+                    {shopSpyReport.what_to_learn.map((item: string, i: number) => (
+                      <Typography key={i} variant="body2" sx={{ fontSize: '0.8rem' }}>• {item}</Typography>
+                    ))}
+                  </Alert>
+                )}
+                {shopSpyReport.what_to_avoid?.length > 0 && (
+                  <Alert severity="warning" sx={{ borderRadius: '12px' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Kaçınılacaklar</Typography>
+                    {shopSpyReport.what_to_avoid.map((item: string, i: number) => (
+                      <Typography key={i} variant="body2" sx={{ fontSize: '0.8rem' }}>• {item}</Typography>
+                    ))}
+                  </Alert>
+                )}
+              </Box>
+            )}
+          </Paper>
+
+          {/* Review Sentiment */}
+          {shopReviews && (
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <MessageSquare size={16} color="#2196F3" /> Müşteri Yorumları ({shopReviews.reviews?.length || 0})
+                </Typography>
+                <Button size="small" variant="contained" onClick={fetchReviewSentiment}
+                  disabled={reviewSentimentLoading || !shopReviews.reviews?.length}
+                  startIcon={reviewSentimentLoading ? <CircularProgress size={14} /> : <Zap size={14} />}
+                  sx={{ background: GRADIENTS.primary, borderRadius: '10px' }}>
+                  Duygu Analizi
+                </Button>
+              </Box>
+
+              {/* Rating distribution */}
+              {shopReviews.ratingDistribution && (
+                <Box sx={{ mb: 2 }}>
+                  {[5, 4, 3, 2, 1].map(star => {
+                    const count = shopReviews.ratingDistribution[star] || 0;
+                    const total = shopReviews.reviews?.length || 1;
+                    const pctVal = (count / total) * 100;
+                    return (
+                      <Box key={star} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.3 }}>
+                        <Typography variant="caption" sx={{ minWidth: 20, fontWeight: 600 }}>{star}★</Typography>
+                        <Box sx={{ flex: 1, bgcolor: '#f0f0f0', borderRadius: 3, height: 8, overflow: 'hidden' }}>
+                          <Box sx={{ width: `${pctVal}%`, height: 8, borderRadius: 3, bgcolor: star >= 4 ? '#4caf50' : star === 3 ? '#ff9800' : '#f44336' }} />
+                        </Box>
+                        <Typography variant="caption" sx={{ minWidth: 30 }}>{count}</Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
+
+              {reviewSentimentLoading && <LinearProgress sx={{ mb: 1, borderRadius: 4, height: 3 }} />}
+
+              {reviewSentiment && (
+                <Box>
+                  <Alert severity={reviewSentiment.sentiment_score > 70 ? 'success' : reviewSentiment.sentiment_score > 40 ? 'warning' : 'error'}
+                    sx={{ mb: 2, borderRadius: '12px' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      {reviewSentiment.overall_sentiment} (Skor: {reviewSentiment.sentiment_score}/100)
+                    </Typography>
+                  </Alert>
+
+                  <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 1.5, mb: 2 }}>
+                    <Paper sx={{ ...glassCard, p: 1.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#4caf50', mb: 0.5, display: 'block' }}>
+                        <ThumbsUp size={12} /> Musteriler Seviyor
+                      </Typography>
+                      {(reviewSentiment.buyer_loves || []).map((item: string, i: number) => (
+                        <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {item}</Typography>
+                      ))}
+                    </Paper>
+                    <Paper sx={{ ...glassCard, p: 1.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#f44336', mb: 0.5, display: 'block' }}>
+                        <ThumbsDown size={12} /> Sikayetler
+                      </Typography>
+                      {(reviewSentiment.buyer_complaints || []).map((item: string, i: number) => (
+                        <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {item}</Typography>
+                      ))}
+                    </Paper>
+                  </Box>
+
+                  {reviewSentiment.product_insights?.length > 0 && (
+                    <Alert severity="info" sx={{ borderRadius: '12px' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Ürün Geliştirme Fırsatları</Typography>
+                      {reviewSentiment.product_insights.map((item: string, i: number) => (
+                        <Typography key={i} variant="body2" sx={{ fontSize: '0.8rem' }}>• {item}</Typography>
+                      ))}
+                    </Alert>
+                  )}
+                </Box>
+              )}
+            </Paper>
+          )}
+        </Box>
+      )}
+
+      {!deepDiveLoading && !deepDiveShop && !discoveredShops.length && !shopsLoading && (
+        <PremiumEmptyState icon={<Store size={48} />} title="Mağaza & AI Analizi"
+          desc="Rakip mağazaları keşfedin ve AI ile pazar analizi alın."
+          steps={['Önce bir anahtar kelime araması yapın', 'Rakip mağazalar otomatik keşfedilir', 'Bir mağazayı derinlemesine analiz edin veya AI özeti alın']} />
+      )}
+
+      {/* ================================================================ */}
+      {/* AI MARKET ANALYSIS                                                */}
+      {/* ================================================================ */}
+      <Box sx={{ mt: 3 }}>
+        <Divider sx={{ mb: 2 }} />
+        <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Sparkles size={18} color="#9c27b0" /> AI Pazar Analizi
+        </Typography>
+        <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Gemini AI ile pazar verilerinizi analiz edin
+          </Typography>
+          <Button variant="contained" onClick={generateAiInsights}
+            disabled={aiLoading || items.length === 0} size="large"
+            startIcon={aiLoading ? <CircularProgress size={16} /> : <Sparkles size={16} />}
+            sx={{
+              background: GRADIENTS.purple, borderRadius: '12px', px: 4,
+              boxShadow: '0 4px 12px rgba(123,31,162,0.3)',
+            }}
+          >
+            {aiLoading ? 'Analiz ediliyor...' : 'AI Analizi Baslat'}
+          </Button>
+          {items.length === 0 && (
+            <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+              Oncelikle bir arama yapin
+            </Typography>
+          )}
+        </Paper>
+
+        {aiLoading && <LinearProgress sx={{ mb: 2, borderRadius: 4, height: 4 }} />}
+
+        {aiAnalysis && (
+          <>
+            <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
+              <ScoreRing score={aiAnalysis.opportunity_score} size={140} label="Firsat" />
+              <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
+                Seviye: <strong>{aiAnalysis.opportunity_level}</strong>
+              </Typography>
+            </Paper>
+
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Pazar Ozeti</Typography>
+              <Typography variant="body2">{aiAnalysis.market_summary}</Typography>
+            </Paper>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
+              {[
+                { title: 'Fiyatlandirma Stratejisi', text: aiAnalysis.pricing_strategy, color: '#2196F3', icon: <DollarSign size={16} /> },
+                { title: 'Nis Pozisyonlama', text: aiAnalysis.niche_positioning, color: '#9c27b0', icon: <Target size={16} /> },
+                { title: 'Rekabet Analizi', text: aiAnalysis.competition_analysis, color: '#eb3349', icon: <Users size={16} /> },
+                { title: 'Mevsimsel Tavsiyeler', text: aiAnalysis.seasonal_advice, color: '#ff9800', icon: <Calendar size={16} /> },
+              ].map(card => (
+                <Paper key={card.title} sx={{ ...glassCard, p: 2.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Box sx={{
+                      width: 28, height: 28, borderRadius: '8px', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', bgcolor: `${card.color}15`,
+                    }}>{card.icon}</Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: card.color }}>{card.title}</Typography>
+                  </Box>
+                  <Typography variant="body2">{card.text}</Typography>
+                </Paper>
+              ))}
+            </Box>
+
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Baslik Optimizasyonu</Typography>
+              <Typography variant="body2">{aiAnalysis.title_recommendations}</Typography>
+            </Paper>
+
+            {aiAnalysis.tag_recommendations?.length > 0 && (
+              <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Onerilen Tagler</Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                  {aiAnalysis.tag_recommendations.map((tag: string, i: number) => (
+                    <Chip key={i} label={tag} size="small" variant="outlined"
+                      onClick={() => { navigator.clipboard.writeText(tag); toast.success('Kopyalandi'); }}
+                      sx={{ cursor: 'pointer', borderRadius: '8px', borderColor: '#9c27b0', color: '#9c27b0' }}
+                    />
+                  ))}
+                </Box>
+              </Paper>
+            )}
+
+            {aiAnalysis.action_items?.length > 0 && (
+              <Paper sx={{ ...glassCard, p: 2.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#11998e' }}>
+                  Yapilacaklar Listesi
+                </Typography>
+                {aiAnalysis.action_items.map((item: string, i: number) => (
+                  <Box key={i} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
+                    <Box sx={{
+                      width: 22, height: 22, borderRadius: '6px', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center', background: GRADIENTS.success,
+                      flexShrink: 0, mt: 0.2,
+                    }}>
+                      <Typography variant="caption" sx={{ color: '#fff', fontWeight: 700, fontSize: '0.65rem' }}>{i + 1}</Typography>
+                    </Box>
+                    <Typography variant="body2">{item}</Typography>
+                  </Box>
+                ))}
+              </Paper>
+            )}
+          </>
+        )}
+      </Box>
+    </Box>
+  );
+}

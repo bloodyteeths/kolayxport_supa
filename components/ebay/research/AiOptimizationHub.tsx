@@ -1,13 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box, Typography, TextField, Button, Paper, Chip, Select, MenuItem,
   FormControl, InputLabel, Alert, CircularProgress, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, IconButton, Stack,
-  LinearProgress, useMediaQuery, useTheme,
+  LinearProgress, useMediaQuery, useTheme, Tooltip,
 } from '@mui/material';
 import {
   Type, Edit3, DollarSign, BarChart2, Tag, Zap, Sparkles, Copy,
-  CheckCircle, AlertTriangle, Info,
+  CheckCircle, AlertTriangle, Info, X, Code,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -15,6 +15,8 @@ interface AiOptimizationHubProps {
   userId: string;
   marketplace?: string;
   onNavigate?: (tool: string, data: any) => void;
+  navigateData?: any;
+  onConsumeNavigateData?: () => void;
 }
 
 interface MarketContext {
@@ -84,6 +86,16 @@ function copyToClipboard(text: string) {
   );
 }
 
+function stripHtml(html: string): string {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
+const DEFAULT_ASPECT_NAMES = [
+  'Brand', 'Model', 'Color', 'Size', 'Material', 'Type', 'Style', 'Country/Region of Manufacture',
+];
+
 function scoreColor(score: number): string {
   if (score >= 80) return '#2e7d32';
   if (score >= 60) return '#ed6c02';
@@ -130,7 +142,7 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Mevcut Başlık" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label="Mevcut Başlık" placeholder="ör: Wireless Earbuds Bluetooth 5.0 Headphones" helperText="Optimize etmek istediğiniz mevcut başlığı yapıştırın" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
       <TextField label="Kategori (opsiyonel)" value={category} onChange={e => setCategory(e.target.value)} fullWidth />
       <Button
         variant="contained"
@@ -192,9 +204,24 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
   const [title, setTitle] = useState('');
   const [condition, setCondition] = useState('NEW');
   const [price, setPrice] = useState('');
+  const [aspectsText, setAspectsText] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [result, setResult] = useState<any>(null);
+
+  const parseAspects = useCallback((): Record<string, string> | undefined => {
+    if (!aspectsText.trim()) return undefined;
+    const aspects: Record<string, string> = {};
+    aspectsText.split('\n').forEach(line => {
+      const sep = line.indexOf(':');
+      if (sep > 0) {
+        const key = line.slice(0, sep).trim();
+        const val = line.slice(sep + 1).trim();
+        if (key && val) aspects[key] = val;
+      }
+    });
+    return Object.keys(aspects).length > 0 ? aspects : undefined;
+  }, [aspectsText]);
 
   const run = useCallback(async () => {
     if (!title.trim()) { toast.error('Ürün başlığı giriniz'); return; }
@@ -208,6 +235,7 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
         title,
         condition,
         price: price ? parseFloat(price) : undefined,
+        aspects: parseAspects(),
         marketResearch: market,
       }, userId);
       setResult(res);
@@ -217,11 +245,11 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
       setLoading(false);
       setStatus('');
     }
-  }, [title, condition, price, userId, marketplace]);
+  }, [title, condition, price, parseAspects, userId, marketplace]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Ürün Başlığı" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label="Ürün Başlığı" placeholder="ör: LED Strip Lights 50ft RGB Color Changing" helperText="Ürün başlığını girin — AI profesyonel HTML açıklama oluşturacak" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
       <FormControl fullWidth>
         <InputLabel>Durum</InputLabel>
         <Select value={condition} label="Durum" onChange={e => setCondition(e.target.value)}>
@@ -231,6 +259,16 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
         </Select>
       </FormControl>
       <TextField label="Fiyat" type="number" value={price} onChange={e => setPrice(e.target.value)} fullWidth />
+      <TextField
+        label="Özellikler (opsiyonel)"
+        placeholder={"Brand: Nike\nSize: 10\nColor: Black\nMaterial: Leather"}
+        value={aspectsText}
+        onChange={e => setAspectsText(e.target.value)}
+        fullWidth
+        multiline
+        rows={3}
+        helperText="Her satıra bir özellik: Anahtar: Değer"
+      />
       <Button
         variant="contained"
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Edit3 size={18} />}
@@ -247,9 +285,18 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
             sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1, bgcolor: '#fafafa', maxHeight: 400, overflow: 'auto' }}
             dangerouslySetInnerHTML={{ __html: result.description }}
           />
-          <Button size="small" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(result.description)} sx={{ mt: 1.5 }}>
-            Kopyala
-          </Button>
+          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+            <Tooltip title="HTML etiketleri olmadan düz metin kopyalar">
+              <Button size="small" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(stripHtml(result.description))}>
+                Metin Kopyala
+              </Button>
+            </Tooltip>
+            <Tooltip title="HTML etiketleriyle birlikte kopyalar">
+              <Button size="small" variant="outlined" startIcon={<Code size={14} />} onClick={() => copyToClipboard(result.description)}>
+                HTML Kopyala
+              </Button>
+            </Tooltip>
+          </Stack>
         </Paper>
       )}
     </Box>
@@ -296,7 +343,7 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Ürün Başlığı" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label="Ürün Başlığı" placeholder="ör: Apple AirPods Pro 2nd Generation" helperText="Fiyat önerisi almak istediğiniz ürünün başlığını girin" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
       <FormControl fullWidth>
         <InputLabel>Durum</InputLabel>
         <Select value={condition} label="Durum" onChange={e => setCondition(e.target.value)}>
@@ -398,6 +445,7 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [imageCount, setImageCount] = useState('');
+  const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [result, setResult] = useState<any>(null);
@@ -413,6 +461,7 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
       const res = await callAi('analyze_listing', {
         title,
         description: description || undefined,
+        categoryName: category || undefined,
         price: price ? parseFloat(price) : undefined,
         imageCount: imageCount ? parseInt(imageCount) : undefined,
         marketResearch: market,
@@ -424,11 +473,12 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
       setLoading(false);
       setStatus('');
     }
-  }, [title, description, price, imageCount, userId, marketplace]);
+  }, [title, description, category, price, imageCount, userId, marketplace]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Ürün Başlığı" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label="Ürün Başlığı" placeholder="ör: https://www.ebay.com/itm/123456789" helperText="eBay listing URL'si veya ürün başlığı girin — AI detaylı analiz yapacak" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label="Kategori (opsiyonel)" value={category} onChange={e => setCategory(e.target.value)} fullWidth />
       <TextField label="Açıklama (opsiyonel)" value={description} onChange={e => setDescription(e.target.value)} fullWidth multiline rows={3} />
       <Stack direction="row" spacing={2}>
         <TextField label="Fiyat (opsiyonel)" type="number" value={price} onChange={e => setPrice(e.target.value)} fullWidth />
@@ -502,12 +552,26 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
 function AspectSuggester({ userId, marketplace }: { userId: string; marketplace: string }) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
+  const [aspectNames, setAspectNames] = useState<string[]>([...DEFAULT_ASPECT_NAMES]);
+  const [newAspect, setNewAspect] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [result, setResult] = useState<any>(null);
 
+  const addAspect = useCallback(() => {
+    const names = newAspect.split(',').map(n => n.trim()).filter(Boolean);
+    if (names.length === 0) return;
+    setAspectNames(prev => [...prev, ...names.filter(n => !prev.includes(n))]);
+    setNewAspect('');
+  }, [newAspect]);
+
+  const removeAspect = useCallback((name: string) => {
+    setAspectNames(prev => prev.filter(n => n !== name));
+  }, []);
+
   const run = useCallback(async () => {
     if (!title.trim()) { toast.error('Ürün başlığı giriniz'); return; }
+    if (aspectNames.length === 0) { toast.error('En az bir özellik adı ekleyin'); return; }
     setLoading(true);
     setResult(null);
     try {
@@ -517,6 +581,7 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
       const res = await callAi('suggest_aspects', {
         title,
         categoryName: category || undefined,
+        aspectNames,
         marketResearch: market,
       }, userId);
       setResult(res);
@@ -526,15 +591,45 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
       setLoading(false);
       setStatus('');
     }
-  }, [title, category, userId, marketplace]);
+  }, [title, category, aspectNames, userId, marketplace]);
 
   const aspects = result?.aspects || {};
   const aspectEntries = Object.entries(aspects);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Ürün Başlığı" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label="Ürün Başlığı" placeholder="ör: Samsung Galaxy S24 Ultra 256GB Unlocked" helperText="Ürün başlığını girin — AI en uygun özellikleri önerecek" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
       <TextField label="Kategori" value={category} onChange={e => setCategory(e.target.value)} fullWidth />
+
+      <Box>
+        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Özellik Adları</Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+          {aspectNames.map(name => (
+            <Chip
+              key={name}
+              label={name}
+              size="small"
+              onDelete={() => removeAspect(name)}
+              deleteIcon={<X size={12} />}
+            />
+          ))}
+        </Box>
+        <Stack direction="row" spacing={1}>
+          <TextField
+            size="small"
+            label="Yeni özellik ekle"
+            placeholder="Virgülle ayırarak birden fazla ekleyin"
+            value={newAspect}
+            onChange={e => setNewAspect(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAspect(); } }}
+            fullWidth
+          />
+          <Button size="small" variant="outlined" onClick={addAspect} sx={{ flexShrink: 0 }}>
+            Ekle
+          </Button>
+        </Stack>
+      </Box>
+
       <Button
         variant="contained"
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Tag size={18} />}
@@ -664,10 +759,19 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
 // ---------------------------------------------------------------------------
 // Main Hub
 // ---------------------------------------------------------------------------
-export default function AiOptimizationHub({ userId, marketplace = 'EBAY_US', onNavigate }: AiOptimizationHubProps) {
+export default function AiOptimizationHub({ userId, marketplace = 'EBAY_US', onNavigate, navigateData, onConsumeNavigateData }: AiOptimizationHubProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('title');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // Consume navigateData — auto-select the right AI tab based on incoming data
+  useEffect(() => {
+    if (!navigateData) return;
+    if (navigateData.tab && ['title', 'description', 'price', 'analyze', 'aspects', 'bulk'].includes(navigateData.tab)) {
+      setActiveTab(navigateData.tab);
+    }
+    onConsumeNavigateData?.();
+  }, [navigateData, onConsumeNavigateData]);
 
   return (
     <Box>

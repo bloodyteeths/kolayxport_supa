@@ -707,3 +707,15 @@ model TrendyolCategoryMap {
   @@index([isActive])
   @@index([ebayCategoryId])
 }
+
+model ResearchCache {
+  id        String   @id @default(cuid())
+  userId    String
+  cacheKey  String
+  data      Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([userId, cacheKey])
+  @@index([expiresAt])
+}

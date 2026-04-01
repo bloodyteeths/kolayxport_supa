@@ -533,7 +533,7 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 // TAB 1: Product Database
 // ---------------------------------------------------------------------------
 
-function ProductDatabase({ userId, userListings = [], userListingsLoading = false, onNavigate }: { userId: string; userListings?: any[]; userListingsLoading?: boolean; onNavigate?: (tool: string, data?: any) => void }) {
+function ProductDatabase({ userId, userListings = [], userListingsLoading = false, onNavigate, navigateData, onConsumeNavigateData }: { userId: string; userListings?: any[]; userListingsLoading?: boolean; onNavigate?: (tool: string, data?: any) => void; navigateData?: any; onConsumeNavigateData?: () => void }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -556,6 +556,14 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
   const [showFilters, setShowFilters] = useState(!isMobile);
   const [trackingIds, setTrackingIds] = useState<Set<string>>(new Set());
   const productSort = useTableSort<ProductResult>(results, '', 'desc');
+
+  // Consume navigateData to pre-fill keyword and auto-search
+  useEffect(() => {
+    if (navigateData?.keyword) {
+      setFilters(prev => ({ ...prev, keyword: navigateData.keyword }));
+      onConsumeNavigateData?.();
+    }
+  }, [navigateData, onConsumeNavigateData]);
 
   const handleSearch = useCallback(async (append = false) => {
     if (!filters.keyword.trim() && !filters.categoryId.trim()) {
@@ -1605,7 +1613,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
 // TAB 3: Niche Finder
 // ---------------------------------------------------------------------------
 
-function NicheFinder({ userId, userListings, onNavigate }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
+function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsumeNavigateData }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void; navigateData?: any; onConsumeNavigateData?: () => void }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -1618,6 +1626,14 @@ function NicheFinder({ userId, userListings, onNavigate }: { userId: string; use
   const [savingNiche, setSavingNiche] = useState(false);
   const [categoryAnalyzing, setCategoryAnalyzing] = useState<string | null>(null);
   const nicheProductSort = useTableSort<ProductResult>(report?.topProducts || [], 'estimatedSold', 'desc');
+
+  // Consume navigateData to pre-fill keyword
+  useEffect(() => {
+    if (navigateData?.keyword) {
+      setKeyword(navigateData.keyword);
+      onConsumeNavigateData?.();
+    }
+  }, [navigateData, onConsumeNavigateData]);
 
   const fetchSavedNiches = useCallback(async () => {
     setLoadingNiches(true);
@@ -1655,7 +1671,10 @@ function NicheFinder({ userId, userListings, onNavigate }: { userId: string; use
         freeShippingPct: data.freeShippingPct || 0,
         sellerConcentration: data.sellerConcentration || 0,
         topProducts: (data.topProducts || []).filter(Boolean).map(mapNicheProduct),
-        aspects: [],
+        aspects: Object.entries(data.aspectDistributions || {}).map(([name, values]: [string, any]) => {
+          const total = Object.values(values as Record<string, number>).reduce((s: number, c: number) => s + c, 0);
+          return { name, count: total, percentage: data.totalResults ? Math.round((total / data.totalResults) * 100) : 0 };
+        }),
         priceDistribution: data.priceDistribution || [],
         opportunityScore: data.opportunityScore || 0,
         demandLabel: data.demandLabel || '',
@@ -1693,7 +1712,10 @@ function NicheFinder({ userId, userListings, onNavigate }: { userId: string; use
         freeShippingPct: data.freeShippingPct || 0,
         sellerConcentration: data.sellerConcentration || 0,
         topProducts: (data.topProducts || []).filter(Boolean).map(mapNicheProduct),
-        aspects: [],
+        aspects: Object.entries(data.aspectDistributions || {}).map(([name, values]: [string, any]) => {
+          const total = Object.values(values as Record<string, number>).reduce((s: number, c: number) => s + c, 0);
+          return { name, count: total, percentage: data.totalResults ? Math.round((total / data.totalResults) * 100) : 0 };
+        }),
         priceDistribution: data.priceDistribution || [],
         opportunityScore: data.opportunityScore || 0,
         demandLabel: data.demandLabel || '',
@@ -2645,6 +2667,8 @@ function EbayResearchPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  const clearNavigateData = useCallback(() => setNavigateData(null), []);
+
   // Global search: detect eBay URL vs keyword vs @seller
   const handleGlobalSearch = useCallback(() => {
     const q = globalSearch.trim();
@@ -2823,8 +2847,8 @@ function EbayResearchPage() {
       )}
 
       {/* Section 0: Arastirma */}
-      {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} userListings={userListings} userListingsLoading={userListingsLoading} onNavigate={handleNavigate} />}
-      {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} userListings={userListings} onNavigate={handleNavigate} />}
+      {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} userListings={userListings} userListingsLoading={userListingsLoading} onNavigate={handleNavigate} navigateData={navigateData} onConsumeNavigateData={clearNavigateData} />}
+      {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} userListings={userListings} onNavigate={handleNavigate} navigateData={navigateData} onConsumeNavigateData={clearNavigateData} />}
       {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
       {mainTab === 0 && subTab === 3 && <ArbitrageScanner userId={userId} />}
       {mainTab === 0 && subTab === 4 && <MarketplaceComparison userId={userId} onNavigate={handleNavigate} />}
@@ -2837,10 +2861,10 @@ function EbayResearchPage() {
       {mainTab === 1 && subTab === 2 && <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
 
       {/* Section 2: Optimizasyon */}
-      {mainTab === 2 && subTab === 0 && <SeoAnalyzer userId={userId} onNavigate={handleNavigate} />}
-      {mainTab === 2 && subTab === 1 && <AiOptimizationHub userId={userId} />}
-      {mainTab === 2 && subTab === 2 && <ListingOptimizer userId={userId} marketplace="EBAY_US" userListings={userListings} />}
-      {mainTab === 2 && subTab === 3 && <FinancialIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
+      {mainTab === 2 && subTab === 0 && <SeoAnalyzer userId={userId} onNavigate={handleNavigate} navigateData={navigateData} onConsumeNavigateData={clearNavigateData} />}
+      {mainTab === 2 && subTab === 1 && <AiOptimizationHub userId={userId} onNavigate={handleNavigate} navigateData={navigateData} onConsumeNavigateData={clearNavigateData} />}
+      {mainTab === 2 && subTab === 2 && <ListingOptimizer userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
+      {mainTab === 2 && subTab === 3 && <FinancialIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
     </Box>
   );
 }

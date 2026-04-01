@@ -21,6 +21,7 @@ interface FinancialIntelligenceProps {
   userId: string;
   marketplace: string;
   userListings?: any[];
+  onNavigate?: (tool: string, data?: any) => void;
 }
 
 interface EbayCategory {
@@ -567,7 +568,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
     if (!keyword.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/clawd/ebay?action=search&query=${encodeURIComponent(keyword)}&marketplace=${marketplace}&limit=50`);
+      const res = await fetch(`/api/clawd/ebay?action=search_market&q=${encodeURIComponent(keyword)}&marketplace=${marketplace}&limit=50`);
       if (!res.ok) throw new Error('Arama başarısız');
       const data = await res.json();
       const items = data.itemSummaries || [];
@@ -1584,7 +1585,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
 // Main Component
 // ---------------------------------------------------------------------------
 
-export default function FinancialIntelligence({ userId, marketplace, userListings }: FinancialIntelligenceProps) {
+export default function FinancialIntelligence({ userId, marketplace, userListings, onNavigate }: FinancialIntelligenceProps) {
   const [activeTab, setActiveTab] = useState(0);
 
   return (

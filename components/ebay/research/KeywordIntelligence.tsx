@@ -680,7 +680,8 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
         <TextField
           inputRef={queryInputRef}
           size="small"
-          placeholder="Urun anahtar kelimesi girin..."
+          placeholder="ör: wireless earbuds, phone case"
+          helperText="Anahtar kelime analizi için bir ürün kelimesi girin"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && doSearch()}
@@ -852,7 +853,8 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
         <TextField
           size="small"
-          placeholder="eBay URL veya Item ID girin..."
+          placeholder="ör: https://www.ebay.com/itm/123456789 veya 123456789"
+          helperText="Bir eBay listing URL'si veya Item ID yapıştırarak anahtar kelimelerini keşfedin"
           value={lookupInput}
           onChange={(e) => setLookupInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && doLookup()}
@@ -1130,7 +1132,8 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
                 multiline
                 minRows={2}
                 maxRows={3}
-                placeholder="Basliginizi buraya yazmaya baslayin veya soldaki kelimelerden secin..."
+                placeholder="ör: Wireless Bluetooth Earbuds Noise Cancelling Headphones..."
+                helperText="Soldaki popüler kelimelerden seçerek veya kendiniz yazarak başlık oluşturun"
                 value={titleText}
                 onChange={(e) => {
                   if (e.target.value.length <= MAX_TITLE_LENGTH + 10) {

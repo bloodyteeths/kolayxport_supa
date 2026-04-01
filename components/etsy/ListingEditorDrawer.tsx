@@ -378,7 +378,7 @@ export default function ListingEditorDrawer({
   const [rankAnalysisOpen, setRankAnalysisOpen] = useState(false);
 
   // Tab state — replaces accordion expanded state
-  const [activeTab, setActiveTab] = useState<string>('seo');
+  const [activeTab, setActiveTab] = useState<string>('images');
   // Keep expanded for backwards compat — maps to activeTab
   const expanded = activeTab;
   const theme = useTheme();
@@ -1254,14 +1254,14 @@ export default function ListingEditorDrawer({
 
   // Tab config for sidebar navigation
   const editorTabs = [
-    { id: 'seo', label: 'SEO', icon: <SearchIcon fontSize="small" /> },
-    { id: 'basics', label: 'Temel', icon: <TextFieldsIcon fontSize="small" /> },
-    { id: 'pricing', label: 'Fiyat', icon: <AttachMoneyIcon fontSize="small" /> },
     { id: 'images', label: 'Görseller', icon: <ImageIcon fontSize="small" /> },
     { id: 'video', label: 'Video', icon: <VideocamIcon fontSize="small" /> },
-    { id: 'personalization', label: 'Kişisel', icon: <BrushIcon fontSize="small" /> },
-    { id: 'variations', label: 'Varyasyon', icon: <ViewModuleIcon fontSize="small" /> },
+    { id: 'seo', label: 'SEO', icon: <SearchIcon fontSize="small" /> },
+    { id: 'basics', label: 'Temel', icon: <TextFieldsIcon fontSize="small" /> },
     { id: 'details', label: 'Detaylar', icon: <TuneIcon fontSize="small" /> },
+    { id: 'pricing', label: 'Fiyat', icon: <AttachMoneyIcon fontSize="small" /> },
+    { id: 'variations', label: 'Varyasyon', icon: <ViewModuleIcon fontSize="small" /> },
+    { id: 'personalization', label: 'Kişisel', icon: <BrushIcon fontSize="small" /> },
     { id: 'actions', label: 'İşlemler', icon: <SettingsIcon fontSize="small" /> },
   ];
 
@@ -1297,16 +1297,12 @@ export default function ListingEditorDrawer({
         >
           {/* Back button + Title */}
           <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, mr: 1 }}>
-            <IconButton onClick={onClose} sx={{ mr: 1 }}>
+            <IconButton onClick={onClose} sx={{ mr: 1, minWidth: 44, minHeight: 44 }}>
               <ArrowBackIcon />
             </IconButton>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="subtitle1" fontWeight={600} noWrap title={listing?.title}>
-                {listing?.title
-                  ? listing.title.length > (isMobileEditor ? 30 : 60)
-                    ? listing.title.substring(0, isMobileEditor ? 30 : 60) + '...'
-                    : listing.title
-                  : 'Liste Düzenle'}
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography variant="subtitle1" fontWeight={600} noWrap title={listing?.title} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {listing?.title || 'Liste Düzenle'}
               </Typography>
               {listing && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
@@ -1359,31 +1355,12 @@ export default function ListingEditorDrawer({
               </span>
             </Tooltip>
             {fields && (
-              <>
-                <Tooltip title="Profil Kaydet">
-                  <IconButton size="small" onClick={() => setSaveTemplateOpen(true)}>
-                    <BookmarkBorderIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Profil Uygula">
-                  <IconButton size="small" onClick={() => setLoadTemplateOpen(true)}>
-                    <FolderOpenIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </>
-            )}
-            {listing?.url && (
-              <Tooltip title="Etsy'de Görüntüle">
-                <IconButton size="small" component="a" href={listing.url} target="_blank" rel="noopener noreferrer">
-                  <OpenInNewIcon fontSize="small" />
+              <Tooltip title="Profil Uygula">
+                <IconButton size="small" onClick={() => setLoadTemplateOpen(true)}>
+                  <FolderOpenIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip title="Kopyala">
-              <IconButton size="small" onClick={handleCopy} disabled={copying}>
-                {copying ? <CircularProgress size={18} /> : <ContentCopyIcon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
           </Box>
         </Box>
 
@@ -1393,100 +1370,55 @@ export default function ListingEditorDrawer({
         ) : fetchError ? (
           renderErrorState()
         ) : fields && listing ? (
-          <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-            {/* Left sidebar tabs — desktop only */}
-            {!isMobileEditor && (
-              <Box
-                sx={{
-                  width: 180,
-                  minWidth: 180,
-                  borderRight: '1px solid',
-                  borderColor: 'divider',
-                  bgcolor: '#f8f9fb',
-                  overflowY: 'auto',
-                  py: 1,
-                }}
-              >
-                {editorTabs.map((tab) => (
-                  <Box
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1.5,
-                      px: 2,
-                      py: 1.25,
-                      cursor: 'pointer',
-                      borderLeft: '3px solid',
-                      borderColor: activeTab === tab.id ? 'primary.main' : 'transparent',
-                      bgcolor: activeTab === tab.id ? 'white' : 'transparent',
-                      color: activeTab === tab.id ? 'primary.main' : 'text.secondary',
-                      fontWeight: activeTab === tab.id ? 600 : 400,
-                      transition: 'all 0.15s ease',
-                      '&:hover': {
-                        bgcolor: activeTab === tab.id ? 'white' : 'grey.100',
-                      },
-                    }}
-                  >
-                    {tab.icon}
-                    <Typography variant="body2" sx={{ fontWeight: 'inherit', fontSize: '0.85rem' }}>
-                      {tab.label}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            )}
-
-            {/* Mobile horizontal tabs */}
-            {isMobileEditor && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 'auto',
-                  left: 0,
-                  right: 0,
-                  zIndex: 5,
-                  bgcolor: 'background.paper',
-                  borderBottom: '1px solid',
-                  borderColor: 'divider',
-                  overflowX: 'auto',
-                  WebkitOverflowScrolling: 'touch',
-                  '&::-webkit-scrollbar': { display: 'none' },
-                  display: 'flex',
-                  gap: 0,
-                }}
-              >
-                {editorTabs.map((tab) => (
-                  <Box
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 0.25,
-                      px: 1.5,
-                      py: 1,
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                      borderBottom: '2px solid',
-                      borderColor: activeTab === tab.id ? 'primary.main' : 'transparent',
-                      color: activeTab === tab.id ? 'primary.main' : 'text.secondary',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {tab.icon}
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: activeTab === tab.id ? 600 : 400, whiteSpace: 'nowrap' }}>
-                      {tab.label}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            )}
+          <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            {/* Horizontal tabs at top — GetVela style */}
+            <Box
+              sx={{
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                bgcolor: 'background.paper',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                '&::-webkit-scrollbar': { height: 0 },
+                display: 'flex',
+                gap: 0,
+                px: { xs: 1, md: 2 },
+                flexShrink: 0,
+              }}
+            >
+              {editorTabs.map((tab) => (
+                <Box
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.75,
+                    px: { xs: 1.5, md: 2 },
+                    py: 1.25,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    borderBottom: '2px solid',
+                    borderColor: activeTab === tab.id ? 'primary.main' : 'transparent',
+                    color: activeTab === tab.id ? 'primary.main' : 'text.secondary',
+                    fontWeight: activeTab === tab.id ? 600 : 400,
+                    transition: 'all 0.15s ease',
+                    '&:hover': {
+                      color: activeTab === tab.id ? 'primary.main' : 'text.primary',
+                      bgcolor: activeTab === tab.id ? 'transparent' : 'action.hover',
+                    },
+                  }}
+                >
+                  {tab.icon}
+                  <Typography variant="body2" sx={{ fontWeight: 'inherit', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                    {tab.label}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
 
             {/* Main content area */}
-            <Box sx={{ flex: 1, overflow: 'auto', pb: 10, pt: isMobileEditor ? '60px' : 0 }}>
+            <Box sx={{ flex: 1, overflow: 'auto', pb: 10 }}>
             {/* ============================================================ */}
             {/* SEO Analizi */}
             {/* ============================================================ */}
@@ -1567,23 +1499,21 @@ export default function ListingEditorDrawer({
                           </Box>
                           <Tooltip title="Sıralama analizi">
                             <IconButton
-                              size="small"
                               onClick={() => handleAnalyzeRanking(kw.keyword)}
                               disabled={rankAnalysisLoading === kw.keyword}
-                              sx={{ color: '#666', '&:hover': { color: '#1976d2' } }}
+                              sx={{ color: '#666', '&:hover': { color: '#1976d2' }, minWidth: 40, minHeight: 40 }}
                             >
-                              {rankAnalysisLoading === kw.keyword ? <CircularProgress size={16} /> : <AutoFixHighIcon fontSize="small" />}
+                              {rankAnalysisLoading === kw.keyword ? <CircularProgress size={18} /> : <AutoFixHighIcon fontSize="small" />}
                             </IconButton>
                           </Tooltip>
                           <IconButton
-                            size="small"
                             onClick={async () => {
                               try {
                                 await fetch(`/api/clawd/etsy?action=remove_tracked_keyword&keyword_id=${kw.id}&shop_id=${shopId}`, { method: 'DELETE' });
                                 setTrackedKeywords(prev => prev.filter(k => k.id !== kw.id));
                               } catch { /* silent */ }
                             }}
-                            sx={{ color: '#999', '&:hover': { color: '#eb3349' } }}
+                            sx={{ color: '#999', '&:hover': { color: '#eb3349' }, minWidth: 40, minHeight: 40 }}
                           >
                             <CloseIcon fontSize="small" />
                           </IconButton>
@@ -1604,14 +1534,14 @@ export default function ListingEditorDrawer({
                       value={rankKeyword}
                       onChange={(e) => setRankKeyword(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleRankCheck(); }}
-                      sx={{ flex: 1 }}
+                      sx={{ flex: 1, '& .MuiInputBase-root': { minHeight: 44 } }}
                     />
                     <Button
                       variant="contained"
                       size="small"
                       onClick={handleRankCheck}
                       disabled={rankLoading || !rankKeyword.trim()}
-                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', minWidth: 80, height: 40 }}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', minWidth: 80, minHeight: 44 }}
                     >
                       {rankLoading ? <CircularProgress size={16} /> : 'Kontrol'}
                     </Button>
@@ -1926,7 +1856,7 @@ export default function ListingEditorDrawer({
                                   setAiTagSuggestions([]);
                                   toast.success('Tum etiketler degistirildi');
                                 }}
-                                sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
+                                sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.5, px: 1, minWidth: 0, minHeight: 32 }}
                               >
                                 Tumunu Degistir
                               </Button>
@@ -1941,7 +1871,7 @@ export default function ListingEditorDrawer({
                                 toast.success(`${merged.length - fields.tags.length} etiket eklendi`);
                               }}
                               disabled={fields.tags.length >= 13 || aiTagSuggestions.every((t) => fields.tags.includes(t))}
-                              sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
+                              sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.5, px: 1, minWidth: 0, minHeight: 32 }}
                             >
                               Bosluklara Ekle
                             </Button>
@@ -2147,7 +2077,7 @@ export default function ListingEditorDrawer({
             {/* Liste Detayları */}
             {/* ============================================================ */}
             {activeTab === 'details' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+              <Box sx={{ p: { xs: 1.5, md: 3 }, '& .MuiInputBase-root': { minHeight: 44 } }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {/* Who made */}
                   <FormControl size="small" fullWidth>
@@ -2216,8 +2146,8 @@ export default function ListingEditorDrawer({
                       </Select>
                     </FormControl>
                     <Tooltip title="Yeni bolum ekle">
-                      <IconButton size="small" onClick={() => setCreateSectionOpen(true)} sx={{ mt: 0.5 }}>
-                        <AddIcon fontSize="small" />
+                      <IconButton onClick={() => setCreateSectionOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
+                        <AddIcon />
                       </IconButton>
                     </Tooltip>
                   </Box>
@@ -2249,8 +2179,8 @@ export default function ListingEditorDrawer({
                       </Select>
                     </FormControl>
                     <Tooltip title="Yeni kargo profili ekle">
-                      <IconButton size="small" onClick={() => setCreateShippingOpen(true)} sx={{ mt: 0.5 }}>
-                        <AddIcon fontSize="small" />
+                      <IconButton onClick={() => setCreateShippingOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
+                        <AddIcon />
                       </IconButton>
                     </Tooltip>
                   </Box>
@@ -2290,8 +2220,8 @@ export default function ListingEditorDrawer({
                       </Select>
                     </FormControl>
                     <Tooltip title="Yeni iade politikasi ekle">
-                      <IconButton size="small" onClick={() => setCreateReturnOpen(true)} sx={{ mt: 0.5 }}>
-                        <AddIcon fontSize="small" />
+                      <IconButton onClick={() => setCreateReturnOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
+                        <AddIcon />
                       </IconButton>
                     </Tooltip>
                   </Box>
@@ -2491,66 +2421,164 @@ export default function ListingEditorDrawer({
           </Box>
         ) : null}
 
-        {/* Footer — Save button (sticky at bottom of drawer) */}
+        {/* Footer — GetVela-style bottom bar */}
         {fields && listing && !loading && !fetchError && (
           <Box
             sx={{
               position: 'sticky',
               bottom: 0,
-              p: 2,
+              px: { xs: 1.5, md: 3 },
+              py: 1.5,
               borderTop: '1px solid',
               borderColor: 'divider',
               bgcolor: 'background.paper',
               zIndex: 10,
-              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+              paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
             }}
           >
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="contained"
-                size="large"
-                sx={{
-                  flex: 1,
-                  background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                  '&:hover': { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
-                }}
-                startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-                onClick={handleSave}
-                disabled={saving || !hasChanges()}
-              >
-                {saving ? 'Etsy\'ye kaydediliyor...' : listing?.state === 'active' ? 'Etsy\'ye Kaydet' : 'Etsy\'ye Draft Kaydet'}
-              </Button>
+            {/* Cancel */}
+            <Button
+              variant="outlined"
+              size="medium"
+              onClick={onClose}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: '8px',
+                borderColor: '#e2e8f0',
+                color: '#475569',
+                '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
+              }}
+            >
+              İptal
+            </Button>
+
+            {/* View on Etsy */}
+            {listing?.url && (
               <Button
                 variant="outlined"
-                size="large"
-                startIcon={<ScheduleIcon />}
-                onClick={() => setScheduleDialogOpen(true)}
-                disabled={saving}
-                sx={{ position: 'relative', minWidth: 'auto', px: 2 }}
+                size="medium"
+                component="a"
+                href={listing.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                startIcon={<OpenInNewIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  borderColor: '#e2e8f0',
+                  color: '#475569',
+                  '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
+                  display: { xs: 'none', sm: 'inline-flex' },
+                }}
               >
-                Zamanla
-                {pendingScheduleCount > 0 && (
-                  <Chip
-                    label={pendingScheduleCount}
-                    size="small"
-                    color="warning"
-                    sx={{
-                      position: 'absolute',
-                      top: -8,
-                      right: -8,
-                      height: 20,
-                      minWidth: 20,
-                      fontSize: '0.7rem',
-                    }}
-                  />
-                )}
+                Etsy&apos;de Gör
               </Button>
-            </Box>
-            {pendingScheduleCount > 0 && (
-              <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: 'block', textAlign: 'right' }}>
-                {pendingScheduleCount} bekleyen güncelleme
-              </Typography>
             )}
+
+            {/* Save as Profile */}
+            <Button
+              variant="outlined"
+              size="medium"
+              onClick={() => setSaveTemplateOpen(true)}
+              startIcon={<BookmarkBorderIcon sx={{ fontSize: '16px !important' }} />}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: '8px',
+                borderColor: '#e2e8f0',
+                color: '#475569',
+                '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
+                display: { xs: 'none', sm: 'inline-flex' },
+              }}
+            >
+              Profil Kaydet
+            </Button>
+
+            {/* Copy */}
+            <Button
+              variant="outlined"
+              size="medium"
+              onClick={handleCopy}
+              disabled={copying}
+              startIcon={copying ? <CircularProgress size={16} /> : <ContentCopyIcon sx={{ fontSize: '16px !important' }} />}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: '8px',
+                borderColor: '#e2e8f0',
+                color: '#475569',
+                '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
+                display: { xs: 'none', sm: 'inline-flex' },
+              }}
+            >
+              Kopyala
+            </Button>
+
+            {/* Schedule */}
+            <Button
+              variant="outlined"
+              size="medium"
+              startIcon={<ScheduleIcon sx={{ fontSize: '16px !important' }} />}
+              onClick={() => setScheduleDialogOpen(true)}
+              disabled={saving}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: '8px',
+                borderColor: '#e2e8f0',
+                color: '#475569',
+                position: 'relative',
+                '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
+                display: { xs: 'none', md: 'inline-flex' },
+              }}
+            >
+              Zamanla
+              {pendingScheduleCount > 0 && (
+                <Chip
+                  label={pendingScheduleCount}
+                  size="small"
+                  color="warning"
+                  sx={{
+                    position: 'absolute',
+                    top: -8,
+                    right: -8,
+                    height: 20,
+                    minWidth: 20,
+                    fontSize: '0.7rem',
+                  }}
+                />
+              )}
+            </Button>
+
+            {/* Spacer */}
+            <Box sx={{ flex: 1 }} />
+
+            {/* Save/Publish — green button, rightmost */}
+            <Button
+              variant="contained"
+              size="medium"
+              sx={{
+                textTransform: 'none',
+                fontWeight: 700,
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
+                px: 3,
+                minHeight: 48,
+                '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
+                '&.Mui-disabled': { background: '#e2e8f0', color: '#94a3b8' },
+              }}
+              startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
+              onClick={handleSave}
+              disabled={saving || !hasChanges()}
+            >
+              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+            </Button>
           </Box>
         )}
       </Drawer>

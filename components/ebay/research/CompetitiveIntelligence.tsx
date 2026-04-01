@@ -323,7 +323,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
       const params = new URLSearchParams({
         action: 'search_seller',
         user_id: userId,
-        seller_name: sellerName,
+        seller: sellerName,
         marketplace,
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);
@@ -1112,7 +1112,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
       const params = new URLSearchParams({
         action: 'search_seller',
         user_id: userId,
-        seller_name: sellerName,
+        seller: sellerName,
         marketplace,
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);

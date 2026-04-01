@@ -14,6 +14,7 @@ import {
   DollarSign, Users, FolderTree, Gauge, Package, Target,
   ChevronDown, ChevronUp, Edit3, Tag, Clock, AlertTriangle,
   Save, X, Copy, ShoppingBag, Globe, Filter, ArrowUpDown,
+  Sparkles, Zap,
 } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -24,6 +25,8 @@ import CompetitiveIntelligence from '@/components/ebay/research/CompetitiveIntel
 import ListingOptimizer from '@/components/ebay/research/ListingOptimizer';
 import FinancialIntelligence from '@/components/ebay/research/FinancialIntelligence';
 import ArbitrageScanner from '@/components/ebay/research/ArbitrageScanner';
+import SeoAnalyzer from '@/components/ebay/research/SeoAnalyzer';
+import AiOptimizationHub from '@/components/ebay/research/AiOptimizationHub';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -414,7 +417,7 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 // TAB 1: Product Database
 // ---------------------------------------------------------------------------
 
-function ProductDatabase({ userId, userListings = [], userListingsLoading = false }: { userId: string; userListings?: any[]; userListingsLoading?: boolean }) {
+function ProductDatabase({ userId, userListings = [], userListingsLoading = false, onNavigate }: { userId: string; userListings?: any[]; userListingsLoading?: boolean; onNavigate?: (tool: string, data?: any) => void }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -429,6 +432,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
   });
   const [results, setResults] = useState<ProductResult[]>([]);
   const [priceStats, setPriceStats] = useState<PriceStats | null>(null);
+  const [topKeywords, setTopKeywords] = useState<{ word: string; count: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -464,6 +468,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         setResults(items);
       }
       setPriceStats(data.priceStats || null);
+      if (!append) setTopKeywords(data.topKeywords || []);
       setOffset(newOffset + items.length);
       setHasMore((data.total || 0) > newOffset + items.length);
     } catch (err: any) {
@@ -643,6 +648,30 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
       {/* Price Stats */}
       <PriceStatsBar stats={priceStats} />
 
+      {/* Top Keywords */}
+      {topKeywords.length > 0 && (
+        <Paper sx={{ p: 1.5, mb: 2, overflow: 'hidden' }} variant="outlined">
+          <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+            Trend Kelimeler:
+          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {topKeywords.slice(0, 15).map((kw, i) => (
+              <Chip
+                key={i}
+                label={`${kw.word} (${kw.count})`}
+                size="small"
+                variant="outlined"
+                clickable
+                onClick={() => {
+                  setFilters(prev => ({ ...prev, keyword: kw.word }));
+                }}
+                sx={{ fontSize: '0.7rem', height: 24, fontWeight: i < 5 ? 700 : 400, color: i < 3 ? 'primary.main' : 'text.secondary' }}
+              />
+            ))}
+          </Box>
+        </Paper>
+      )}
+
       {/* Loading */}
       {loading && <LinearProgress sx={{ mb: 1 }} />}
 
@@ -664,7 +693,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         /* Mobile Card View */
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {results.map(product => (
-            <MobileProductCard key={product.itemId} product={product} onTrack={handleTrack} onSellerSearch={handleSellerSearch} tracked={trackingIds.has(product.itemId)} />
+            <MobileProductCard key={product.itemId} product={product} onTrack={handleTrack} onSellerSearch={handleSellerSearch} tracked={trackingIds.has(product.itemId)} onNavigate={onNavigate} />
           ))}
         </Box>
       ) : (
@@ -755,21 +784,37 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                     )}
                   </TableCell>
                   <TableCell align="center">
-                    <Tooltip title={trackingIds.has(product.itemId) ? 'Takipte' : 'Takip Et'}>
-                      <IconButton
-                        size="small"
-                        color={trackingIds.has(product.itemId) ? 'primary' : 'default'}
-                        onClick={() => handleTrack(product)}
-                        disabled={trackingIds.has(product.itemId)}
-                      >
-                        <Bookmark size={16} fill={trackingIds.has(product.itemId) ? 'currentColor' : 'none'} />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="eBay'de Aç">
-                      <IconButton size="small" component="a" href={product.itemUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink size={16} />
-                      </IconButton>
-                    </Tooltip>
+                    <Box sx={{ display: 'flex', gap: 0.25, justifyContent: 'center' }}>
+                      <Tooltip title={trackingIds.has(product.itemId) ? 'Takipte' : 'Takip Et'}>
+                        <IconButton
+                          size="small"
+                          color={trackingIds.has(product.itemId) ? 'primary' : 'default'}
+                          onClick={() => handleTrack(product)}
+                          disabled={trackingIds.has(product.itemId)}
+                        >
+                          <Bookmark size={16} fill={trackingIds.has(product.itemId) ? 'currentColor' : 'none'} />
+                        </IconButton>
+                      </Tooltip>
+                      {onNavigate && (
+                        <Tooltip title="Nis Analizi">
+                          <IconButton size="small" onClick={() => onNavigate('niche_finder', { keyword: product.title.split(' ').slice(0, 4).join(' ') })}>
+                            <Gauge size={16} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {onNavigate && (
+                        <Tooltip title="SEO Kontrol">
+                          <IconButton size="small" onClick={() => onNavigate('seo_analyzer', { keyword: product.title.split(' ').slice(0, 4).join(' '), title: product.title })}>
+                            <Target size={16} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      <Tooltip title="eBay'de Aç">
+                        <IconButton size="small" component="a" href={product.itemUrl} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink size={16} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -791,9 +836,10 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
 }
 
 // Mobile product card for search results
-function MobileProductCard({ product, onTrack, onSellerSearch, tracked }: {
+function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNavigate }: {
   product: ProductResult; onTrack: (p: ProductResult) => void;
   onSellerSearch: (s: string) => void; tracked: boolean;
+  onNavigate?: (tool: string, data?: any) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -844,17 +890,35 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked }: {
             </Typography>
           </Box>
           <Divider />
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <Button
-              size="small" variant="outlined" fullWidth
+              size="small" variant="outlined" sx={{ flex: '1 1 45%' }}
               startIcon={<Bookmark size={14} fill={tracked ? 'currentColor' : 'none'} />}
               onClick={() => onTrack(product)}
               disabled={tracked}
             >
               {tracked ? 'Takipte' : 'Takip Et'}
             </Button>
+            {onNavigate && (
+              <Button
+                size="small" variant="outlined" sx={{ flex: '1 1 45%' }}
+                startIcon={<Gauge size={14} />}
+                onClick={() => onNavigate('niche_finder', { keyword: product.title.split(' ').slice(0, 4).join(' ') })}
+              >
+                Nis Analizi
+              </Button>
+            )}
+            {onNavigate && (
+              <Button
+                size="small" variant="outlined" sx={{ flex: '1 1 45%' }}
+                startIcon={<Target size={14} />}
+                onClick={() => onNavigate('seo_analyzer', { keyword: product.title.split(' ').slice(0, 4).join(' '), title: product.title })}
+              >
+                SEO
+              </Button>
+            )}
             <Button
-              size="small" variant="outlined" fullWidth
+              size="small" variant="outlined" sx={{ flex: '1 1 45%' }}
               startIcon={<ExternalLink size={14} />}
               component="a" href={product.itemUrl} target="_blank" rel="noopener noreferrer"
             >
@@ -1346,7 +1410,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags }
 // TAB 3: Niche Finder
 // ---------------------------------------------------------------------------
 
-function NicheFinder({ userId, userListings }: { userId: string; userListings?: any[] }) {
+function NicheFinder({ userId, userListings, onNavigate }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -1613,6 +1677,16 @@ function NicheFinder({ userId, userListings }: { userId: string; userListings?: 
                 >
                   Kaydet
                 </Button>
+                {onNavigate && (
+                  <>
+                    <Button size="small" variant="outlined" startIcon={<Search size={14} />} onClick={() => onNavigate('product_database', { keyword: report.keyword })}>
+                      Urunleri Gor
+                    </Button>
+                    <Button size="small" variant="outlined" startIcon={<Target size={14} />} onClick={() => onNavigate('seo_analyzer', { keyword: report.keyword })}>
+                      SEO
+                    </Button>
+                  </>
+                )}
               </Box>
             </Box>
 
@@ -2180,10 +2254,12 @@ const SECTIONS = [
   {
     label: 'Optimizasyon',
     icon: <TrendingUp size={18} />,
-    description: 'Liste ve finansal iyilestirme',
+    description: 'SEO, AI ve finansal iyilestirme',
     welcome: 'Listelerinizi iyilestirin ve karliligimizi artirin',
     subTabs: [
-      { label: 'Liste Iyilestirme', icon: <Target size={14} /> },
+      { label: 'SEO Analizi', icon: <Target size={14} /> },
+      { label: 'AI Asistan', icon: <Sparkles size={14} /> },
+      { label: 'Liste Iyilestirme', icon: <Zap size={14} /> },
       { label: 'Finansal Hesaplamalar', icon: <DollarSign size={14} /> },
     ],
   },
@@ -2243,41 +2319,114 @@ function EbayResearchPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mainTab, setMainTab] = useState(0);
-  const [subTab, setSubTab] = useState(-1); // -1 = welcome state
+  const [subTab, setSubTab] = useState(0); // auto-select first tool
   const [userListings, setUserListings] = useState<any[]>([]);
   const [userListingsLoading, setUserListingsLoading] = useState(true);
+  const [userListingsError, setUserListingsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
-    setUserListingsLoading(true);
-    console.log('[eBay Research] Fetching user listings for userId:', userId);
-    fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`, {
-      credentials: 'same-origin',
-    })
-      .then(async (r) => {
-        console.log('[eBay Research] Listings response status:', r.status);
-        if (!r.ok) {
-          const errText = await r.text().catch(() => '');
-          console.error('[eBay Research] Listings fetch failed:', r.status, errText);
-          return { listings: [] };
+
+    // Try localStorage cache first (1-hour TTL)
+    const CACHE_KEY = `kolayxport_ebay_listings_${userId}`;
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { listings, ts } = JSON.parse(cached);
+        if (Date.now() - ts < 3600000 && listings?.length > 0) {
+          setUserListings(listings);
+          setUserListingsLoading(false);
+          return;
         }
-        return r.json();
-      })
-      .then(data => {
-        console.log('[eBay Research] Got listings:', data.listings?.length || 0);
-        setUserListings(data.listings || []);
-      })
-      .catch((err) => {
-        console.error('[eBay Research] Listings fetch error:', err);
-        setUserListings([]);
-      })
-      .finally(() => setUserListingsLoading(false));
+      }
+    } catch { /* ignore cache errors */ }
+
+    let attempt = 0;
+    const maxAttempts = 3;
+
+    const fetchListings = async () => {
+      setUserListingsLoading(true);
+      setUserListingsError(null);
+      while (attempt < maxAttempts) {
+        try {
+          const r = await fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`, {
+            credentials: 'same-origin',
+          });
+          if (!r.ok) {
+            const errText = await r.text().catch(() => '');
+            if (r.status === 401 || r.status === 403) {
+              setUserListingsError('auth');
+              setUserListings([]);
+              setUserListingsLoading(false);
+              return;
+            }
+            throw new Error(`${r.status}: ${errText}`);
+          }
+          const data = await r.json();
+          const listings = data.listings || [];
+          setUserListings(listings);
+          if (listings.length > 0) {
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify({ listings, ts: Date.now() })); } catch { /* quota */ }
+          }
+          setUserListingsLoading(false);
+          return;
+        } catch (err: any) {
+          attempt++;
+          if (attempt >= maxAttempts) {
+            setUserListingsError('network');
+            setUserListings([]);
+            setUserListingsLoading(false);
+            return;
+          }
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        }
+      }
+    };
+    fetchListings();
   }, [userId]);
+
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [navigateData, setNavigateData] = useState<any>(null);
 
   const handleMainTabChange = (_: any, v: number) => {
     setMainTab(v);
-    setSubTab(-1); // reset to welcome when switching sections
+    setSubTab(0); // auto-select first tool in new section
   };
+
+  // Cross-tool navigation handler
+  const handleNavigate = useCallback((tool: string, data?: any) => {
+    setNavigateData(data || null);
+    switch (tool) {
+      case 'product_database': setMainTab(0); setSubTab(0); break;
+      case 'niche_finder': setMainTab(0); setSubTab(1); break;
+      case 'keyword_intelligence': setMainTab(0); setSubTab(2); break;
+      case 'product_tracker': setMainTab(1); setSubTab(0); break;
+      case 'seller_tracker': setMainTab(1); setSubTab(1); break;
+      case 'competitive_intelligence': setMainTab(1); setSubTab(2); break;
+      case 'seo_analyzer': setMainTab(2); setSubTab(0); break;
+      case 'ai_hub': setMainTab(2); setSubTab(1); break;
+      case 'listing_optimizer': setMainTab(2); setSubTab(2); break;
+      case 'financial': setMainTab(2); setSubTab(3); break;
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Global search: detect eBay URL vs keyword vs @seller
+  const handleGlobalSearch = useCallback(() => {
+    const q = globalSearch.trim();
+    if (!q) return;
+    if (q.includes('ebay.com/itm/')) {
+      // eBay URL → go to product tracker
+      handleNavigate('product_tracker', { addUrl: q });
+    } else if (q.startsWith('@')) {
+      // Seller name → go to seller tracker
+      handleNavigate('seller_tracker', { username: q.slice(1) });
+    } else {
+      // Keyword → go to product database with search
+      handleNavigate('product_database', { keyword: q });
+    }
+    setGlobalSearch('');
+  }, [globalSearch, handleNavigate]);
 
   if (!userId) {
     return (
@@ -2302,6 +2451,25 @@ function EbayResearchPage() {
           Pazar arastirmasi, urun takibi, nis analizi ve rakip izleme
         </Typography>
       </Box>
+
+      {/* Global Search Bar */}
+      <Paper sx={{ p: 1.5, mb: 2, display: 'flex', gap: 1, alignItems: 'center' }} variant="outlined">
+        <TextField
+          size="small"
+          fullWidth
+          placeholder="Anahtar kelime ara, eBay URL yapistir veya @satici_adi gir..."
+          value={globalSearch}
+          onChange={e => setGlobalSearch(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><Search size={18} /></InputAdornment>,
+          }}
+          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+        />
+        <Button variant="contained" onClick={handleGlobalSearch} disabled={!globalSearch.trim()} sx={{ minWidth: isMobile ? 50 : 80, borderRadius: 2 }}>
+          {isMobile ? <Search size={18} /> : 'Ara'}
+        </Button>
+      </Paper>
 
       {/* Main Section Tabs */}
       <Paper sx={{ mb: 2, overflow: 'hidden', width: '100%', maxWidth: '100%' }} variant="outlined">
@@ -2393,18 +2561,26 @@ function EbayResearchPage() {
         </Paper>
       )}
       {!userListingsLoading && userListings.length === 0 && (
-        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: '#fff8f0', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box', flexWrap: 'wrap', gap: 1 }}>
-          <Typography variant="body2" color="warning.main" sx={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
-            eBay listeleriniz yuklenemedi. Araclar manual arama ile calisir.
+        <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: userListingsError === 'auth' ? '#fff0f0' : '#fff8f0', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box', flexWrap: 'wrap', gap: 1 }}>
+          <Typography variant="body2" color={userListingsError === 'auth' ? 'error.main' : 'warning.main'} sx={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
+            {userListingsError === 'auth'
+              ? 'eBay hesabiniz bagli degil. Ayarlardan eBay hesabinizi baglayiniz.'
+              : 'eBay listeleriniz yuklenemedi. Tum araclar manual arama ile calisir.'}
           </Typography>
           <Button size="small" variant="outlined" onClick={() => {
             setUserListingsLoading(true);
+            setUserListingsError(null);
             fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`, {
               credentials: 'same-origin',
             })
               .then(async (r) => r.ok ? r.json() : { listings: [] })
-              .then(data => setUserListings(data.listings || []))
-              .catch(() => setUserListings([]))
+              .then(data => {
+                setUserListings(data.listings || []);
+                if (data.listings?.length > 0) {
+                  try { localStorage.setItem(`kolayxport_ebay_listings_${userId}`, JSON.stringify({ listings: data.listings, ts: Date.now() })); } catch { /* */ }
+                }
+              })
+              .catch(() => { setUserListings([]); setUserListingsError('network'); })
               .finally(() => setUserListingsLoading(false));
           }}>
             Tekrar Dene
@@ -2412,12 +2588,9 @@ function EbayResearchPage() {
         </Paper>
       )}
 
-      {/* Welcome state or active tool */}
-      {subTab === -1 && <SectionWelcome section={currentSection} userListings={userListings} sectionIndex={mainTab} />}
-
       {/* Section 0: Arastirma */}
-      {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} userListings={userListings} userListingsLoading={userListingsLoading} />}
-      {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} userListings={userListings} />}
+      {mainTab === 0 && subTab === 0 && <ProductDatabase userId={userId} userListings={userListings} userListingsLoading={userListingsLoading} onNavigate={handleNavigate} />}
+      {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} userListings={userListings} onNavigate={handleNavigate} />}
       {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
       {mainTab === 0 && subTab === 3 && <ArbitrageScanner userId={userId} />}
 
@@ -2427,8 +2600,10 @@ function EbayResearchPage() {
       {mainTab === 1 && subTab === 2 && <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
 
       {/* Section 2: Optimizasyon */}
-      {mainTab === 2 && subTab === 0 && <ListingOptimizer userId={userId} marketplace="EBAY_US" userListings={userListings} />}
-      {mainTab === 2 && subTab === 1 && <FinancialIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
+      {mainTab === 2 && subTab === 0 && <SeoAnalyzer userId={userId} onNavigate={handleNavigate} />}
+      {mainTab === 2 && subTab === 1 && <AiOptimizationHub userId={userId} />}
+      {mainTab === 2 && subTab === 2 && <ListingOptimizer userId={userId} marketplace="EBAY_US" userListings={userListings} />}
+      {mainTab === 2 && subTab === 3 && <FinancialIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
     </Box>
   );
 }

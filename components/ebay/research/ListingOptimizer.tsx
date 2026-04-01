@@ -339,6 +339,11 @@ export default function ListingOptimizer({ userId, marketplace, userListings }: 
   const [listings, setListings] = useState<ScoredListing[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Standalone analysis (works without userListings)
+  const [manualUrl, setManualUrl] = useState('');
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualListing, setManualListing] = useState<ScoredListing | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Auto-Optimizer state
@@ -597,6 +602,48 @@ export default function ListingOptimizer({ userId, marketplace, userListings }: 
     }
   }, [benchmarkListing, searchMarket]);
 
+  // ── Standalone: Analyze any eBay listing by URL ──
+  const analyzeByUrl = useCallback(async () => {
+    const input = manualUrl.trim();
+    if (!input) return;
+    setManualLoading(true);
+    setManualListing(null);
+    try {
+      let itemId = input;
+      const urlMatch = input.match(/\/itm\/(\d+)/);
+      if (urlMatch) itemId = urlMatch[1];
+      const idMatch = itemId.match(/(\d{10,14})/);
+      if (idMatch) itemId = idMatch[1];
+
+      const res = await fetch(
+        `/api/clawd/ebay?action=listing&sku=${itemId}&marketplace_id=${marketplace}&userId=${userId}`
+      );
+      if (!res.ok) throw new Error('Listeleme bulunamadi');
+      const data = await res.json();
+
+      const listing: MyListing = {
+        itemId: data.legacyItemId || data.itemId || itemId,
+        legacyItemId: data.legacyItemId || itemId,
+        title: data.product?.title || data.title || '',
+        price: data.price || { value: '0', currency: 'USD' },
+        image: data.product?.imageUrls?.[0] ? { imageUrl: data.product.imageUrls[0] } : undefined,
+        additionalImages: (data.product?.imageUrls || []).slice(1).map((u: string) => ({ imageUrl: u })),
+        description: data.product?.description || data.description || '',
+        condition: data.condition || '',
+        aspects: data.product?.aspects || data.aspects || {},
+        itemWebUrl: data.itemWebUrl || `https://www.ebay.com/itm/${itemId}`,
+      };
+
+      const scored = scoreListing(listing);
+      setManualListing(scored);
+      toast.success('Listeleme analiz edildi');
+    } catch (err: any) {
+      toast.error(err.message || 'Analiz basarisiz');
+    } finally {
+      setManualLoading(false);
+    }
+  }, [manualUrl, marketplace, userId]);
+
   // ── Copy to clipboard ──
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -609,6 +656,49 @@ export default function ListingOptimizer({ userId, marketplace, userListings }: 
 
   return (
     <Box>
+      {/* Standalone URL Analysis — always available */}
+      <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
+        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+          <Search size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+          Herhangi Bir Listelemeyi Analiz Et
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="eBay URL veya Item ID yapistirin..."
+            value={manualUrl}
+            onChange={e => setManualUrl(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && analyzeByUrl()}
+            sx={{ flex: '2 1 250px' }}
+            InputProps={{ startAdornment: <InputAdornment position="start"><ExternalLink size={16} /></InputAdornment> }}
+          />
+          <Button variant="contained" onClick={analyzeByUrl} disabled={manualLoading || !manualUrl.trim()} sx={{ minWidth: 120 }}>
+            {manualLoading ? <CircularProgress size={20} /> : 'Analiz Et'}
+          </Button>
+        </Box>
+        {manualListing && (
+          <Paper sx={{ mt: 2, p: 2, bgcolor: '#f8fafc' }} variant="outlined">
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <ScoreBadge score={manualListing.health.total} size={64} />
+              <Box sx={{ flex: 1, minWidth: 200 }}>
+                <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>{manualListing.title}</Typography>
+                <ScoreBar label="Başlık" score={manualListing.health.title} max={25} icon={<FileText size={14} />} />
+                <ScoreBar label="Açıklama" score={manualListing.health.description} max={25} icon={<FileText size={14} />} />
+                <ScoreBar label="Resimler" score={manualListing.health.images} max={25} icon={<ImageIcon size={14} />} />
+                <ScoreBar label="Özellikler" score={manualListing.health.aspects} max={25} icon={<Tag size={14} />} />
+              </Box>
+            </Box>
+            <Box sx={{ mt: 1.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Chip label={`Başlık: ${manualListing.titleLength} karakter`} size="small" variant="outlined" />
+              <Chip label={`Açıklama: ${manualListing.descriptionLength} karakter`} size="small" variant="outlined" />
+              <Chip label={`${manualListing.imageCount} resim`} size="small" variant="outlined" />
+              <Chip label={`${manualListing.aspectCount} özellik`} size="small" variant="outlined" />
+            </Box>
+          </Paper>
+        )}
+      </Paper>
+
       {/* Sub-tabs */}
       <Tabs
         value={subTab}

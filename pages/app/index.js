@@ -59,49 +59,49 @@ const DashboardLandingContent = ({ user }) => {
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || t('defaultUser');
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? t('greetingMorning') : hour < 18 ? t('greetingAfternoon') : t('greetingEvening');
+  const greeting = hour < 12 ? t('greeting.morning') : hour < 18 ? t('greeting.afternoon') : t('greeting.evening');
 
   const quickActions = [
     {
       href: '/app/etsy-listings',
       icon: Store,
       label: 'Etsy Listings',
-      description: t('etsyListingsDesc'),
+      description: t('features.etsyListings'),
       color: { bg: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)', icon: '#ea580c' },
     },
     {
       href: '/app/ebay-listings',
       icon: ShoppingBag,
       label: 'eBay Listings',
-      description: t('ebayListingsDesc'),
+      description: t('features.ebayListings'),
       color: { bg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', icon: '#2563eb' },
     },
     {
       href: '/app/labels',
       icon: Truck,
-      label: t('shippingLabel'),
-      description: t('shippingLabelDesc'),
+      label: t('features.shippingLabel'),
+      description: t('features.shippingLabelDesc'),
       color: { bg: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', icon: '#16a34a' },
     },
     {
       href: '/app/analytics',
       icon: BarChart3,
-      label: t('analytics'),
-      description: t('analyticsDesc'),
+      label: 'Analitik',
+      description: t('features.analyticsDesc'),
       color: { bg: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)', icon: '#7c3aed' },
     },
     {
       href: '/app/ebay-research',
       icon: Target,
-      label: t('marketResearch'),
-      description: t('marketResearchDesc'),
+      label: t('features.marketResearch'),
+      description: t('features.marketResearchDesc'),
       color: { bg: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)', icon: '#e11d48' },
     },
     {
       href: '/app/senkron',
       icon: ShoppingCart,
-      label: t('sync'),
-      description: t('syncDesc'),
+      label: t('features.syncLabel'),
+      description: t('features.syncDesc'),
       color: { bg: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', icon: '#059669' },
     },
   ];
@@ -142,7 +142,7 @@ const DashboardLandingContent = ({ user }) => {
               href="/ozellikler"
               className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
             >
-              {t('discoverFeatures')} <ArrowRight size={14} />
+              {t('exploreFeatures')} <ArrowRight size={14} />
             </Link>
           </div>
         </div>
@@ -164,12 +164,12 @@ const DashboardLandingContent = ({ user }) => {
           {t('recentUpdates')}
         </h2>
         <div className="divide-y divide-slate-100">
-          <TimelineItem text={t('update1')} />
-          <TimelineItem text={t('update2')} />
-          <TimelineItem text={t('update3')} />
-          <TimelineItem text={t('update4')} />
-          <TimelineItem text={t('update5')} />
-          <TimelineItem text={t('update6')} />
+          <TimelineItem text={t('updates.aiListing')} />
+          <TimelineItem text={t('updates.marketResearch')} />
+          <TimelineItem text={t('updates.fullIntegration')} />
+          <TimelineItem text={t('updates.shippingLabels')} />
+          <TimelineItem text={t('updates.secureAuth')} />
+          <TimelineItem text={t('updates.platformLive')} />
         </div>
       </div>
     </div>

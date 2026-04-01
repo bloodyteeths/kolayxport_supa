@@ -255,7 +255,7 @@ function ScoreBar({ label, score, max, icon }: { label: string; score: number; m
 // ---------------------------------------------------------------------------
 
 function DistributionBar({ good, warning, critical, total }: { good: number; warning: number; critical: number; total: number }) {
-  const t = useTranslations('ebay.research.listing');
+  const t = useTranslations('ebay.listingOptimizer');
   if (total === 0) return null;
   const gPct = (good / total) * 100;
   const wPct = (warning / total) * 100;
@@ -289,7 +289,7 @@ function DistributionBar({ good, warning, critical, total }: { good: number; war
 function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }: {
   label: string; myValue: number; avgValue: number; unit?: string; higherIsBetter?: boolean;
 }) {
-  const t = useTranslations('ebay.research.listing');
+  const t = useTranslations('ebay.listingOptimizer');
   const max = Math.max(myValue, avgValue, 1);
   const myPct = (myValue / max) * 100;
   const avgPct = (avgValue / max) * 100;
@@ -338,7 +338,7 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
 // ---------------------------------------------------------------------------
 
 export default function ListingOptimizer({ userId, marketplace, userListings, onNavigate }: ListingOptimizerProps) {
-  const t = useTranslations('ebay.research.listing');
+  const t = useTranslations('ebay.listingOptimizer');
   // ── State ──
   const [subTab, setSubTab] = useState(0);
   const [listings, setListings] = useState<ScoredListing[]>([]);

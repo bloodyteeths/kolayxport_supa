@@ -476,7 +476,7 @@ model EtsyShop {
 model EtsyListing {
   id            String @id @default(cuid())
   etsyShopId    String // Etsy shop ID
-  etsyListingId Int // Etsy's listing_id
+  etsyListingId BigInt // Etsy's listing_id (exceeds INT4 max)
 
   // Core
   title       String
@@ -510,8 +510,8 @@ model EtsyListing {
   processingMax Int?
 
   // Shipping
-  shippingProfileId Int?
-  returnPolicyId    Int?
+  shippingProfileId BigInt?
+  returnPolicyId    BigInt?
 
   // Dimensions
   itemWeight         Float?

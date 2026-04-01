@@ -97,9 +97,9 @@ const DEFAULT_ASPECT_NAMES = [
 ];
 
 function scoreColor(score: number): string {
-  if (score >= 80) return '#2e7d32';
-  if (score >= 60) return '#ed6c02';
-  return '#d32f2f';
+  if (score >= 80) return '#10b981';
+  if (score >= 60) return '#f59e0b';
+  return '#ef4444';
 }
 
 function severityToMui(severity: string): 'error' | 'warning' | 'info' {
@@ -149,30 +149,38 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Sparkles size={18} />}
         onClick={run}
         disabled={loading}
+        sx={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+          borderRadius: 2,
+          textTransform: 'none',
+          fontWeight: 600,
+          '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)', boxShadow: '0 4px 12px rgba(99,102,241,0.4)' },
+        }}
       >
         {loading ? status : 'AI ile Optimize Et'}
       </Button>
 
       {result && (
-        <Paper sx={{ p: 2, mt: 1 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>Karşılaştırma</Typography>
+        <Paper sx={{ p: 2, mt: 1, bgcolor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, color: '#1e1b4b', fontWeight: 700 }}>Karşılaştırma</Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <Box sx={{ p: 1.5, bgcolor: '#fff5f5', borderRadius: 1, border: '1px solid #ffcdd2' }}>
+            <Box sx={{ p: 1.5, bgcolor: '#fff5f5', borderRadius: 2, border: '1px solid rgba(239,68,68,0.15)' }}>
               <Typography variant="caption" color="error">Önceki</Typography>
               <Typography>{title}</Typography>
             </Box>
-            <Box sx={{ p: 1.5, bgcolor: '#f1f8e9', borderRadius: 1, border: '1px solid #c5e1a5' }}>
-              <Typography variant="caption" color="success.main">Sonra</Typography>
+            <Box sx={{ p: 1.5, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid rgba(16,185,129,0.2)', boxShadow: '0 0 8px rgba(16,185,129,0.08)' }}>
+              <Typography variant="caption" sx={{ color: '#10b981' }}>Sonra</Typography>
               <Typography fontWeight={600}>{result.optimizedTitle}</Typography>
             </Box>
           </Box>
 
           {result.score && (
             <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-              <Typography variant="body2">
-                Skor: <span style={{ color: scoreColor(result.score.before) }}>{result.score.before}</span>
+              <Typography variant="body2" fontWeight={600}>
+                Skor: <span style={{ color: scoreColor(result.score.before), fontSize: '1.1rem', fontWeight: 700 }}>{result.score.before}</span>
                 {' → '}
-                <span style={{ color: scoreColor(result.score.after) }}>{result.score.after}</span>
+                <span style={{ color: scoreColor(result.score.after), fontSize: '1.1rem', fontWeight: 700 }}>{result.score.after}</span>
               </Typography>
             </Box>
           )}
@@ -188,7 +196,10 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
             </Box>
           )}
 
-          <Button size="small" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(result.optimizedTitle)} sx={{ mt: 1.5 }}>
+          <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(result.optimizedTitle)} sx={{
+            mt: 1.5, color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', textTransform: 'none', fontWeight: 600,
+            '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' },
+          }}>
             Kopyala
           </Button>
         </Paper>
@@ -274,25 +285,37 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Edit3 size={18} />}
         onClick={run}
         disabled={loading}
+        sx={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+          borderRadius: 2, textTransform: 'none', fontWeight: 600,
+          '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
+        }}
       >
         {loading ? status : 'Açıklama Oluştur'}
       </Button>
 
       {result?.description && (
-        <Paper sx={{ p: 2, mt: 1 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>Oluşturulan Açıklama</Typography>
+        <Paper sx={{ p: 2, mt: 1, bgcolor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, color: '#1e1b4b', fontWeight: 700 }}>Oluşturulan Açıklama</Typography>
           <Box
-            sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 1, bgcolor: '#fafafa', maxHeight: 400, overflow: 'auto' }}
+            sx={{ p: 2, border: '1px solid rgba(99,102,241,0.08)', borderRadius: 2, bgcolor: '#f8faff', maxHeight: 400, overflow: 'auto' }}
             dangerouslySetInnerHTML={{ __html: result.description }}
           />
           <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
             <Tooltip title="HTML etiketleri olmadan düz metin kopyalar">
-              <Button size="small" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(stripHtml(result.description))}>
+              <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(stripHtml(result.description))} sx={{
+                color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', textTransform: 'none', fontWeight: 600,
+                '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' },
+              }}>
                 Metin Kopyala
               </Button>
             </Tooltip>
             <Tooltip title="HTML etiketleriyle birlikte kopyalar">
-              <Button size="small" variant="outlined" startIcon={<Code size={14} />} onClick={() => copyToClipboard(result.description)}>
+              <Button size="small" variant="outlined" startIcon={<Code size={14} />} onClick={() => copyToClipboard(result.description)} sx={{
+                color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)', textTransform: 'none', fontWeight: 600,
+                '&:hover': { bgcolor: '#8b5cf6', color: '#fff', borderColor: '#8b5cf6' },
+              }}>
                 HTML Kopyala
               </Button>
             </Tooltip>
@@ -358,14 +381,20 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <DollarSign size={18} />}
         onClick={run}
         disabled={loading}
+        sx={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+          borderRadius: 2, textTransform: 'none', fontWeight: 600,
+          '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
+        }}
       >
         {loading ? status : 'Fiyat Önerisi Al'}
       </Button>
 
       {result && (
-        <Paper sx={{ p: 2, mt: 1 }}>
+        <Paper sx={{ p: 2, mt: 1, bgcolor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
           <Box sx={{ textAlign: 'center', mb: 2 }}>
-            <Typography variant="h3" fontWeight={700} color="primary">
+            <Typography variant="h3" fontWeight={700} sx={{ color: '#6366f1' }}>
               ${typeof result.suggestedPrice === 'number' ? result.suggestedPrice.toFixed(2) : result.suggestedPrice}
             </Typography>
             <Typography variant="body2" color="text.secondary">Önerilen Fiyat</Typography>
@@ -378,7 +407,7 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
                 <Typography variant="caption" fontWeight={600}>${typeof result.suggestedPrice === 'number' ? result.suggestedPrice.toFixed(2) : result.suggestedPrice}</Typography>
                 <Typography variant="caption">${result.priceRange.max?.toFixed(2)}</Typography>
               </Box>
-              <Box sx={{ position: 'relative', height: 8, bgcolor: '#e0e0e0', borderRadius: 4, overflow: 'hidden' }}>
+              <Box sx={{ position: 'relative', height: 8, bgcolor: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
                 {result.priceRange.min != null && result.priceRange.max != null && (
                   <Box
                     sx={{
@@ -388,8 +417,9 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
                       width: 12,
                       height: 12,
                       borderRadius: '50%',
-                      bgcolor: 'primary.main',
+                      bgcolor: '#6366f1',
                       transform: 'translateX(-50%)',
+                      boxShadow: '0 0 6px rgba(99,102,241,0.4)',
                     }}
                   />
                 )}
@@ -398,7 +428,7 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
                   value={result.priceRange.min != null && result.priceRange.max != null
                     ? ((result.suggestedPrice - result.priceRange.min) / (result.priceRange.max - result.priceRange.min)) * 100
                     : 50}
-                  sx={{ height: 8, borderRadius: 4 }}
+                  sx={{ height: 8, borderRadius: 4, '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }, backgroundColor: '#e5e7eb' }}
                 />
               </Box>
             </Box>
@@ -412,8 +442,8 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
           )}
 
           {marketCtx && (marketCtx.avgPrice || marketCtx.medianPrice) && (
-            <Box sx={{ p: 1.5, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Pazar Verileri</Typography>
+            <Box sx={{ p: 1.5, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)' }}>
+              <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 700, color: '#1e1b4b' }}>Pazar Verileri</Typography>
               <Stack direction="row" spacing={3}>
                 {marketCtx.avgPrice != null && (
                   <Typography variant="body2">Ortalama: <b>${marketCtx.avgPrice.toFixed(2)}</b></Typography>
@@ -428,7 +458,10 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
             </Box>
           )}
 
-          <Button size="small" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(String(result.suggestedPrice))} sx={{ mt: 1.5 }}>
+          <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(String(result.suggestedPrice))} sx={{
+            mt: 1.5, color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', textTransform: 'none', fontWeight: 600,
+            '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' },
+          }}>
             Kopyala
           </Button>
         </Paper>
@@ -489,12 +522,18 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <BarChart2 size={18} />}
         onClick={run}
         disabled={loading}
+        sx={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+          borderRadius: 2, textTransform: 'none', fontWeight: 600,
+          '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
+        }}
       >
         {loading ? status : 'Analiz Et'}
       </Button>
 
       {result && (
-        <Paper sx={{ p: 2, mt: 1 }}>
+        <Paper sx={{ p: 2, mt: 1, bgcolor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
           <Box sx={{ textAlign: 'center', mb: 2 }}>
             <Box
               sx={{
@@ -506,9 +545,10 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
                 borderRadius: '50%',
                 border: `4px solid ${scoreColor(result.score)}`,
                 mb: 1,
+                boxShadow: `0 0 12px ${scoreColor(result.score)}30`,
               }}
             >
-              <Typography variant="h4" fontWeight={700} color={scoreColor(result.score)}>
+              <Typography variant="h4" fontWeight={700} sx={{ color: scoreColor(result.score), fontSize: '1.8rem' }}>
                 {result.score}
               </Typography>
             </Box>
@@ -635,17 +675,23 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Tag size={18} />}
         onClick={run}
         disabled={loading}
+        sx={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+          borderRadius: 2, textTransform: 'none', fontWeight: 600,
+          '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
+        }}
       >
         {loading ? status : 'Özellik Öner'}
       </Button>
 
       {aspectEntries.length > 0 && (
-        <TableContainer component={Paper} sx={{ mt: 1 }}>
+        <TableContainer component={Paper} sx={{ mt: 1, boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
           <Table size="small">
             <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 600 }}>Özellik</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Önerilen Değerler</TableCell>
+              <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Özellik</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Önerilen Değerler</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -720,18 +766,24 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Zap size={18} />}
         onClick={run}
         disabled={loading}
+        sx={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+          borderRadius: 2, textTransform: 'none', fontWeight: 600,
+          '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
+        }}
       >
         {loading ? 'AI çalışıyor...' : 'Toplu Optimize Et'}
       </Button>
 
       {result?.results?.length > 0 && (
-        <TableContainer component={Paper} sx={{ mt: 1 }}>
+        <TableContainer component={Paper} sx={{ mt: 1, boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
           <Table size="small">
             <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 600 }}>Orijinal</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Optimize Edilmiş</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: 60 }} />
+              <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Orijinal</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Optimize Edilmiş</TableCell>
+                <TableCell sx={{ fontWeight: 700, width: 60 }} />
               </TableRow>
             </TableHead>
             <TableBody>
@@ -741,7 +793,7 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
                     <Typography variant="body2">{r.original}</Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" fontWeight={500} color="success.main">{r.optimized}</Typography>
+                    <Typography variant="body2" fontWeight={500} sx={{ color: '#10b981' }}>{r.optimized}</Typography>
                   </TableCell>
                   <TableCell>
                     <IconButton size="small" onClick={() => copyToClipboard(r.optimized)}>
@@ -777,7 +829,7 @@ export default function AiOptimizationHub({ userId, marketplace = 'EBAY_US', onN
 
   return (
     <Box>
-      <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+      <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: '#1e1b4b' }}>
         AI Optimizasyon Merkezi
       </Typography>
 
@@ -788,12 +840,44 @@ export default function AiOptimizationHub({ userId, marketplace = 'EBAY_US', onN
             icon={<>{tab.icon}</>}
             label={isMobile ? undefined : tab.label}
             onClick={() => setActiveTab(tab.key)}
-            color={activeTab === tab.key ? 'primary' : 'default'}
-            variant={activeTab === tab.key ? 'filled' : 'outlined'}
-            sx={{ flexShrink: 0, fontWeight: activeTab === tab.key ? 600 : 400 }}
+            variant="filled"
+            sx={{
+              flexShrink: 0,
+              fontWeight: activeTab === tab.key ? 600 : 400,
+              ...(activeTab === tab.key
+                ? {
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    color: '#fff',
+                    boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                    '& .MuiChip-icon': { color: '#fff' },
+                  }
+                : {
+                    bgcolor: '#f8faff',
+                    color: '#6366f1',
+                    border: '1px solid rgba(99,102,241,0.2)',
+                    '& .MuiChip-icon': { color: '#6366f1' },
+                    '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' },
+                  }),
+            }}
           />
         ))}
       </Box>
+
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+        <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
+          AI Araçları Rehberi
+        </Typography>
+        <Typography variant="body2" color="text.secondary" component="div">
+          <ul style={{ margin: 0, paddingLeft: 16 }}>
+            <li><strong>Başlık Optimize:</strong> Mevcut başlığınızı AI ile optimize edin — pazar araştırması otomatik yapılır</li>
+            <li><strong>Açıklama Yaz:</strong> Profesyonel HTML ürün açıklaması oluşturun</li>
+            <li><strong>Fiyat Öner:</strong> Pazar verilerine dayalı rekabetçi fiyat önerisi alın</li>
+            <li><strong>Liste Analiz:</strong> Herhangi bir eBay listesini 0-100 arasında puanlayın</li>
+            <li><strong>Özellik Öner:</strong> Eksik ürün özelliklerini AI ile tamamlayın</li>
+            <li><strong>Toplu Optimize:</strong> 10 başlığa kadar tek seferde optimize edin</li>
+          </ul>
+        </Typography>
+      </Paper>
 
       <Box sx={{ maxWidth: 720 }}>
         {activeTab === 'title' && <TitleOptimizer userId={userId} marketplace={marketplace} />}

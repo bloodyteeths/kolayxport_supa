@@ -81,17 +81,25 @@ async function ebayAiCall(action: string, userId: string, body: Record<string, a
 }
 
 function ScoreColor(score: number): string {
-  if (score >= 70) return '#2e7d32';
-  if (score >= 40) return '#ed6c02';
-  return '#d32f2f';
+  if (score >= 70) return '#10b981';
+  if (score >= 40) return '#f59e0b';
+  return '#ef4444';
 }
 
 function StatCard({ icon, label, value, subtitle }: { icon: React.ReactNode; label: string; value: string | number; subtitle?: string }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2, flex: '1 1 0', minWidth: 140, textAlign: 'center' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1, color: 'text.secondary' }}>{icon}</Box>
+    <Paper variant="outlined" sx={{
+      p: 2, flex: '1 1 0', minWidth: 140, textAlign: 'center',
+      bgcolor: '#f8faff',
+      border: '1px solid rgba(99,102,241,0.08)',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+      borderRadius: 3,
+      transition: 'all 0.2s ease',
+      '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' },
+    }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1, color: '#6366f1' }}>{icon}</Box>
       <Typography variant="caption" color="text.secondary">{label}</Typography>
-      <Typography variant="h6" fontWeight={700}>{value}</Typography>
+      <Typography variant="h6" fontWeight={700} sx={{ color: '#1e1b4b' }}>{value}</Typography>
       {subtitle && <Typography variant="caption" color="text.secondary">{subtitle}</Typography>}
     </Paper>
   );
@@ -103,8 +111,11 @@ function KeywordCard({ kw, expanded, onToggle }: { kw: KeywordCoverage; expanded
       variant="outlined"
       sx={{
         mb: 1,
-        bgcolor: !kw.inMyTitle ? 'rgba(211,47,47,0.04)' : 'transparent',
-        border: !kw.inMyTitle ? '1px solid rgba(211,47,47,0.2)' : undefined,
+        bgcolor: !kw.inMyTitle ? 'rgba(239,68,68,0.04)' : '#f8faff',
+        border: !kw.inMyTitle ? '1px solid rgba(239,68,68,0.15)' : '1px solid rgba(99,102,241,0.08)',
+        borderRadius: 2,
+        transition: 'all 0.2s ease',
+        '&:hover': { boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', p: 1.5, cursor: 'pointer' }} onClick={onToggle}>
@@ -113,8 +124,8 @@ function KeywordCard({ kw, expanded, onToggle }: { kw: KeywordCoverage; expanded
           <Typography variant="caption" color="text.secondary">Kullanım: %{kw.percentage.toFixed(1)}</Typography>
         </Box>
         {kw.inMyTitle
-          ? <CheckCircle size={18} color="#2e7d32" />
-          : <XCircle size={18} color="#d32f2f" />
+          ? <CheckCircle size={18} color="#10b981" />
+          : <XCircle size={18} color="#ef4444" />
         }
         {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </Box>
@@ -226,30 +237,36 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
     const medianPos = ((median - min) / range) * 100;
 
     return (
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-          <DollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+      <Paper variant="outlined" sx={{
+        p: 2.5,
+        bgcolor: '#fff',
+        border: '1px solid rgba(99,102,241,0.08)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        borderRadius: 3,
+      }}>
+        <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
+          <DollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 4, color: '#6366f1' }} />
           Fiyat Konumlandırma
         </Typography>
         <Box sx={{ position: 'relative', height: 40, mt: 2, mb: 3 }}>
-          <Box sx={{ position: 'absolute', top: 12, left: 0, right: 0, height: 8, bgcolor: 'grey.200', borderRadius: 4 }} />
+          <Box sx={{ position: 'absolute', top: 12, left: 0, right: 0, height: 8, background: 'linear-gradient(90deg, #e5e7eb, #f0edff)', borderRadius: 4 }} />
           <Tooltip title={`Min: $${min.toFixed(2)}`}>
-            <Box sx={{ position: 'absolute', top: 8, left: 0, width: 16, height: 16, bgcolor: '#2196f3', borderRadius: '50%' }} />
+            <Box sx={{ position: 'absolute', top: 8, left: 0, width: 16, height: 16, bgcolor: '#6366f1', borderRadius: '50%', boxShadow: '0 0 6px rgba(99,102,241,0.4)' }} />
           </Tooltip>
           <Tooltip title={`Ort: $${avg.toFixed(2)}`}>
             <Box sx={{ position: 'absolute', top: 4, left: `${avgPos}%`, transform: 'translateX(-50%)', textAlign: 'center' }}>
-              <Box sx={{ width: 20, height: 20, bgcolor: '#4caf50', borderRadius: '50%', mx: 'auto' }} />
-              <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>Ort</Typography>
+              <Box sx={{ width: 20, height: 20, bgcolor: '#10b981', borderRadius: '50%', mx: 'auto', boxShadow: '0 0 6px rgba(16,185,129,0.4)' }} />
+              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', fontWeight: 600 }}>Ort</Typography>
             </Box>
           </Tooltip>
           <Tooltip title={`Medyan: $${median.toFixed(2)}`}>
             <Box sx={{ position: 'absolute', top: 4, left: `${medianPos}%`, transform: 'translateX(-50%)', textAlign: 'center' }}>
-              <Box sx={{ width: 20, height: 20, bgcolor: '#ff9800', borderRadius: '50%', mx: 'auto' }} />
-              <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>Med</Typography>
+              <Box sx={{ width: 20, height: 20, bgcolor: '#f59e0b', borderRadius: '50%', mx: 'auto', boxShadow: '0 0 6px rgba(245,158,11,0.4)' }} />
+              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', fontWeight: 600 }}>Med</Typography>
             </Box>
           </Tooltip>
           <Tooltip title={`Max: $${max.toFixed(2)}`}>
-            <Box sx={{ position: 'absolute', top: 8, right: 0, width: 16, height: 16, bgcolor: '#f44336', borderRadius: '50%' }} />
+            <Box sx={{ position: 'absolute', top: 8, right: 0, width: 16, height: 16, bgcolor: '#ef4444', borderRadius: '50%', boxShadow: '0 0 6px rgba(239,68,68,0.4)' }} />
           </Tooltip>
         </Box>
         <Stack direction="row" justifyContent="space-between">
@@ -262,9 +279,15 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
 
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto' }}>
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, mb: 3 }}>
-        <Typography variant="h6" fontWeight={700} gutterBottom>
-          <Target size={20} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+      <Paper variant="outlined" sx={{
+        p: { xs: 2, md: 3 }, mb: 3,
+        bgcolor: '#f8faff',
+        border: '1px solid rgba(99,102,241,0.08)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        borderRadius: 3,
+      }}>
+        <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
+          <Target size={20} style={{ verticalAlign: 'middle', marginRight: 8, color: '#6366f1' }} />
           SEO Analizi
         </Typography>
 
@@ -320,7 +343,13 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
               onClick={handleAnalyze}
               disabled={loading || !keyword.trim()}
               startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Search size={18} />}
-              sx={{ minWidth: 140, textTransform: 'none', fontWeight: 600 }}
+              sx={{
+                minWidth: 140, textTransform: 'none', fontWeight: 600,
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                borderRadius: 2,
+                '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)', boxShadow: '0 4px 12px rgba(99,102,241,0.4)' },
+              }}
             >
               {loading ? 'Analiz ediliyor...' : 'Analiz Et'}
             </Button>
@@ -328,29 +357,67 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
         </Stack>
       </Paper>
 
-      {loading && <LinearProgress sx={{ mb: 2 }} />}
+      {loading && <LinearProgress sx={{ mb: 2, borderRadius: 2, '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }, backgroundColor: '#e5e7eb' }} />}
+
+      {!result && !loading && (
+        <Paper sx={{ p: 2, mb: 3, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+          <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
+            SEO Analizi Nedir?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" component="div">
+            <ul style={{ margin: 0, paddingLeft: 16 }}>
+              <li>Başlığınızın anahtar kelime kapsama oranını ölçer</li>
+              <li>Rakip listelemelerdeki en popüler kelimeleri gösterir</li>
+              <li>Fiyat konumlandırmanızı pazar ortalamasıyla karşılaştırır</li>
+              <li>AI ile başlığınızı otomatik optimize edebilirsiniz</li>
+            </ul>
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: '#6366f1' }}>
+            Örnek: "wireless bluetooth earbuds" yazıp analiz edin
+          </Typography>
+        </Paper>
+      )}
 
       {result && (
         <Stack spacing={3}>
           <Paper
             variant="outlined"
             sx={{
-              p: 3,
+              p: 4,
               textAlign: 'center',
-              bgcolor: `${ScoreColor(result.seoScore)}08`,
-              borderColor: ScoreColor(result.seoScore),
+              background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)',
+              border: '1px solid rgba(99,102,241,0.08)',
+              boxShadow: '0 4px 24px rgba(99,102,241,0.12)',
+              borderRadius: 4,
+              position: 'relative',
+              overflow: 'visible',
             }}
           >
-            <Tooltip title="0-100 arası SEO skoru. 80+ mükemmel, 60-80 iyi, 60 altı iyileştirme gerekli." arrow>
-              <Typography
-                variant="h1"
-                fontWeight={800}
-                sx={{ color: ScoreColor(result.seoScore), fontSize: { xs: 64, md: 80 }, lineHeight: 1, cursor: 'help' }}
-              >
-                {result.seoScore}
-              </Typography>
-            </Tooltip>
-            <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1 }}>
+            <Box sx={{ position: 'relative', display: 'inline-flex', mb: 1 }}>
+              <svg width="140" height="140" viewBox="0 0 140 140" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="70" cy="70" r="60" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                <circle
+                  cx="70" cy="70" r="60" fill="none"
+                  stroke={ScoreColor(result.seoScore)}
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(result.seoScore / 100) * 377} 377`}
+                  style={{ filter: `drop-shadow(0 0 8px ${ScoreColor(result.seoScore)}40)` }}
+                />
+              </svg>
+              <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Tooltip title="0-100 arası SEO skoru. 80+ mükemmel, 60-80 iyi, 60 altı iyileştirme gerekli." arrow>
+                  <Typography
+                    variant="h2"
+                    fontWeight={800}
+                    sx={{ color: ScoreColor(result.seoScore), fontSize: { xs: 40, md: 48 }, lineHeight: 1, cursor: 'help' }}
+                  >
+                    {result.seoScore}
+                  </Typography>
+                </Tooltip>
+              </Box>
+            </Box>
+            <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1, fontWeight: 500 }}>
               SEO Skoru / 100
             </Typography>
           </Paper>
@@ -380,9 +447,15 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
             />
           </Stack>
 
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-              <BarChart2 size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+          <Paper variant="outlined" sx={{
+            p: 2,
+            bgcolor: '#fff',
+            border: '1px solid rgba(99,102,241,0.08)',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+            borderRadius: 3,
+          }}>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
+              <BarChart2 size={16} style={{ verticalAlign: 'middle', marginRight: 4, color: '#6366f1' }} />
               Anahtar Kelime Kapsama Analizi
             </Typography>
 
@@ -401,11 +474,11 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
               <TableContainer sx={{ mt: 1 }}>
                 <Table size="small">
                   <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Anahtar Kelime</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="right">Kullanım %</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Başlığında?</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="right">Sayı</TableCell>
+                    <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
+                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Anahtar Kelime</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">Kullanım %</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="center">Başlığında?</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">Sayı</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -413,7 +486,9 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                       <TableRow
                         key={idx}
                         sx={{
-                          bgcolor: !kw.inMyTitle ? 'rgba(211,47,47,0.04)' : 'transparent',
+                          bgcolor: !kw.inMyTitle ? 'rgba(239,68,68,0.04)' : idx % 2 === 0 ? '#f8faff' : '#fff',
+                          transition: 'background-color 0.15s ease',
+                          '&:hover': { bgcolor: !kw.inMyTitle ? 'rgba(239,68,68,0.08)' : 'rgba(99,102,241,0.06)' },
                         }}
                       >
                         <TableCell>
@@ -426,15 +501,15 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                             <LinearProgress
                               variant="determinate"
                               value={Math.min(kw.percentage, 100)}
-                              sx={{ width: 60, height: 6, borderRadius: 3 }}
+                              sx={{ width: 60, height: 6, borderRadius: 3, '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }, backgroundColor: '#e5e7eb' }}
                             />
                             <Typography variant="body2">%{kw.percentage.toFixed(1)}</Typography>
                           </Box>
                         </TableCell>
                         <TableCell align="center">
                           {kw.inMyTitle
-                            ? <CheckCircle size={18} color="#2e7d32" />
-                            : <XCircle size={18} color="#d32f2f" />
+                            ? <CheckCircle size={18} color="#10b981" />
+                            : <XCircle size={18} color="#ef4444" />
                           }
                         </TableCell>
                         <TableCell align="right">{kw.count}</TableCell>
@@ -449,9 +524,15 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
           {renderPriceBar()}
 
           {result.aspectAnalysis?.length > 0 && (
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                <BarChart2 size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+            <Paper variant="outlined" sx={{
+              p: 2,
+              bgcolor: '#fff',
+              border: '1px solid rgba(99,102,241,0.08)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+              borderRadius: 3,
+            }}>
+              <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
+                <BarChart2 size={16} style={{ verticalAlign: 'middle', marginRight: 4, color: '#6366f1' }} />
                 Özellik Analizi
               </Typography>
               <Stack spacing={2} sx={{ mt: 1 }}>
@@ -476,14 +557,27 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
           )}
 
           {result.recommendations?.length > 0 && (
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                <Sparkles size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+            <Paper variant="outlined" sx={{
+              p: 2,
+              bgcolor: '#fff',
+              border: '1px solid rgba(99,102,241,0.08)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+              borderRadius: 3,
+            }}>
+              <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
+                <Sparkles size={16} style={{ verticalAlign: 'middle', marginRight: 4, color: '#8b5cf6' }} />
                 Öneriler
               </Typography>
               <Stack spacing={1} sx={{ mt: 1 }}>
                 {result.recommendations.map((rec, idx) => (
-                  <Alert key={idx} severity="info" sx={{ '& .MuiAlert-message': { fontSize: '0.875rem' } }}>
+                  <Alert key={idx} severity="info" sx={{
+                    '& .MuiAlert-message': { fontSize: '0.875rem' },
+                    bgcolor: '#f8faff',
+                    borderLeft: '3px solid #6366f1',
+                    border: '1px solid rgba(99,102,241,0.12)',
+                    borderLeftWidth: '3px',
+                    '& .MuiAlert-icon': { color: '#6366f1' },
+                  }}>
                     {rec}
                   </Alert>
                 ))}
@@ -492,14 +586,26 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
           )}
 
           {myTitle.trim() && (
-            <Paper variant="outlined" sx={{ p: 2 }}>
+            <Paper variant="outlined" sx={{
+              p: 2,
+              bgcolor: '#fff',
+              border: '1px solid rgba(99,102,241,0.08)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+              borderRadius: 3,
+            }}>
               <Button
                 variant="contained"
                 onClick={handleOptimizeTitle}
                 disabled={optimizing}
                 startIcon={optimizing ? <CircularProgress size={18} color="inherit" /> : <Sparkles size={18} />}
                 fullWidth={isMobile}
-                sx={{ textTransform: 'none', fontWeight: 600 }}
+                sx={{
+                  textTransform: 'none', fontWeight: 600,
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                  borderRadius: 2,
+                  '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
+                }}
               >
                 {optimizing ? 'Optimize ediliyor...' : 'AI ile Başlığı Optimize Et'}
               </Button>
@@ -507,7 +613,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
               {optimizedTitle && (
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="caption" color="text.secondary" fontWeight={600}>Mevcut Başlık:</Typography>
-                  <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: 'rgba(211,47,47,0.04)' }}>
+                  <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#fff5f5', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Typography variant="body2">{myTitle}</Typography>
                       <IconButton size="small" onClick={() => copyToClipboard(myTitle)}>
@@ -517,7 +623,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                   </Paper>
 
                   <Typography variant="caption" color="text.secondary" fontWeight={600}>Optimize Edilmiş Başlık:</Typography>
-                  <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(46,125,50,0.04)', borderColor: '#2e7d32' }}>
+                  <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f0fdf4', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 2, boxShadow: '0 0 8px rgba(16,185,129,0.08)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Typography variant="body2" fontWeight={600}>{optimizedTitle}</Typography>
                       <IconButton size="small" onClick={() => copyToClipboard(optimizedTitle)}>

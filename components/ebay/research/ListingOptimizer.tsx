@@ -210,9 +210,9 @@ function ScoreBadge({ score, size = 56 }: { score: number; size?: number }) {
   const offset = circumference - (score / 100) * circumference;
 
   return (
-    <Box sx={{ position: 'relative', width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+    <Box sx={{ position: 'relative', width: size, height: size, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', filter: `drop-shadow(0 0 ${size * 0.15}px ${color}40)` }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e0e0e0" strokeWidth={4} />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(99,102,241,0.08)" strokeWidth={4} />
         <circle
           cx={size / 2} cy={size / 2} r={radius} fill="none"
           stroke={color} strokeWidth={4}
@@ -239,7 +239,7 @@ function ScoreBar({ label, score, max, icon }: { label: string; score: number; m
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
       <Box sx={{ color: '#666', display: 'flex', alignItems: 'center' }}>{icon}</Box>
       <Typography variant="body2" sx={{ width: 100, fontWeight: 500, fontSize: 13 }}>{label}</Typography>
-      <Box sx={{ flex: 1, bgcolor: '#f0f0f0', borderRadius: 1, height: 8, overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, bgcolor: 'rgba(99,102,241,0.06)', borderRadius: 1, height: 8, overflow: 'hidden' }}>
         <Box sx={{ width: `${(score / max) * 100}%`, height: '100%', bgcolor: color, borderRadius: 1, transition: 'width 0.4s' }} />
       </Box>
       <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13, color, minWidth: 40, textAlign: 'right' }}>
@@ -310,7 +310,7 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
       </Box>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
         <Typography variant="caption" sx={{ width: 50, fontSize: 11, color: '#666' }}>Sizin</Typography>
-        <Box sx={{ flex: 1, bgcolor: '#f0f0f0', borderRadius: 1, height: 10, overflow: 'hidden' }}>
+        <Box sx={{ flex: 1, bgcolor: 'rgba(99,102,241,0.06)', borderRadius: 1, height: 10, overflow: 'hidden' }}>
           <Box sx={{ width: `${myPct}%`, height: '100%', bgcolor: isWinning ? '#4caf50' : '#ff9800', borderRadius: 1, transition: 'width 0.4s' }} />
         </Box>
         <Typography variant="caption" sx={{ minWidth: 50, textAlign: 'right', fontWeight: 600, fontSize: 12 }}>
@@ -319,8 +319,8 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
       </Box>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.3 }}>
         <Typography variant="caption" sx={{ width: 50, fontSize: 11, color: '#666' }}>Ort.</Typography>
-        <Box sx={{ flex: 1, bgcolor: '#f0f0f0', borderRadius: 1, height: 10, overflow: 'hidden' }}>
-          <Box sx={{ width: `${avgPct}%`, height: '100%', bgcolor: '#90caf9', borderRadius: 1, transition: 'width 0.4s' }} />
+        <Box sx={{ flex: 1, bgcolor: 'rgba(99,102,241,0.06)', borderRadius: 1, height: 10, overflow: 'hidden' }}>
+          <Box sx={{ width: `${avgPct}%`, height: '100%', bgcolor: 'rgba(99,102,241,0.25)', borderRadius: 1, transition: 'width 0.4s' }} />
         </Box>
         <Typography variant="caption" sx={{ minWidth: 50, textAlign: 'right', fontWeight: 600, fontSize: 12 }}>
           {formatVal(avgValue)}
@@ -650,7 +650,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
   return (
     <Box>
       {/* Standalone URL Analysis — always available */}
-      <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#f8faff', border: '1px solid rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
           <Search size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
           Herhangi Bir Listelemeyi Analiz Et
@@ -667,12 +667,25 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             sx={{ flex: '2 1 250px' }}
             InputProps={{ startAdornment: <InputAdornment position="start"><ExternalLink size={16} /></InputAdornment> }}
           />
-          <Button variant="contained" onClick={analyzeByUrl} disabled={manualLoading || !manualUrl.trim()} sx={{ minWidth: 120 }}>
+          <Button variant="contained" onClick={analyzeByUrl} disabled={manualLoading || !manualUrl.trim()} sx={{ minWidth: 120, background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}>
             {manualLoading ? <CircularProgress size={20} /> : 'Analiz Et'}
           </Button>
         </Box>
+        {!manualListing && !manualLoading && (
+          <Paper sx={{ p: 2, mt: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Listing Optimizer</Typography>
+            <Typography variant="body2" color="text.secondary" component="div">
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                <li>eBay URL yapistirarak herhangi bir listelemeyi analiz edin</li>
+                <li>Baslik uzunlugu, aciklama kalitesi, gorsel sayisi ve ozellikler puanlanir</li>
+                <li>Her sorun icin &quot;AI ile Duzelt&quot; butonu ile otomatik iyilestirme yapin</li>
+                <li>Kendi listeleriniz yuklendiyse, hepsini tek tikla tarayin</li>
+              </ul>
+            </Typography>
+          </Paper>
+        )}
         {manualListing && (
-          <Paper sx={{ mt: 2, p: 2, bgcolor: '#f8fafc' }} variant="outlined">
+          <Paper sx={{ mt: 2, p: 2, bgcolor: '#f8faff', border: '1px solid rgba(99,102,241,0.08)', borderRadius: 3 }}>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <ScoreBadge score={manualListing.health.total} size={64} />
               <Box sx={{ flex: 1, minWidth: 200 }}>
@@ -699,7 +712,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         onChange={(_, v) => setSubTab(v)}
         variant="scrollable"
         scrollButtons="auto"
-        sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}
+        sx={{ borderBottom: 1, borderColor: 'divider', mb: 1, '& .Mui-selected': { color: '#6366f1' }, '& .MuiTabs-indicator': { bgcolor: '#6366f1' } }}
       >
         <Tab
           label="Listeleme Sağlık Panosu"
@@ -731,7 +744,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         {!loading && listings.length > 0 && (
           <>
             {/* Summary Cards */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Grid container spacing={2} alignItems="center">
                 <Grid item xs={6} sm={3}>
                   <Box sx={{ textAlign: 'center' }}>
@@ -799,7 +812,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
-                  <TableRow>
+                  <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                     <TableCell sx={{ fontWeight: 700, fontSize: 12, width: 40 }}></TableCell>
                     <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Görsel</TableCell>
                     <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Başlık</TableCell>
@@ -815,7 +828,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                       <React.Fragment key={listing.itemId}>
                         <TableRow
                           hover
-                          sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#fafafa' } }}
+                          sx={{ cursor: 'pointer', '&:hover': { bgcolor: 'rgba(99,102,241,0.03)' } }}
                           onClick={() => setExpandedId(isExpanded ? null : listing.itemId)}
                         >
                           <TableCell sx={{ p: 0.5 }}>
@@ -864,7 +877,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         <TableRow>
                           <TableCell colSpan={6} sx={{ p: 0, border: isExpanded ? undefined : 'none' }}>
                             <Collapse in={isExpanded} unmountOnExit>
-                              <Box sx={{ p: 2, bgcolor: '#fafafa' }}>
+                              <Box sx={{ p: 2, bgcolor: '#f8faff' }}>
                                 <Typography variant="body2" sx={{ fontWeight: 700, mb: 1, fontSize: 13 }}>
                                   Sağlık Detayları
                                 </Typography>
@@ -935,7 +948,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
       ───────────────────────────────────────────────────────────────────── */}
       <TabPanel value={subTab} index={1}>
         {/* Listing selector */}
-        <Paper sx={{ p: 2, mb: 2 }}>
+        <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <FormControl fullWidth size="small">
             <InputLabel sx={{ fontSize: 13 }}>Listeleme Seçin</InputLabel>
             <Select
@@ -996,7 +1009,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
 
         {/* Current Issues Summary */}
         {selectedListing && !optimizing && !suggestedTitle && (
-          <Paper sx={{ p: 2, mb: 2 }}>
+          <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <Typography variant="body2" sx={{ fontWeight: 700, mb: 1, fontSize: 13 }}>
               Mevcut Durum
             </Typography>
@@ -1011,7 +1024,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         )}
 
         {optimizing && (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <CircularProgress size={40} />
             <Typography variant="body2" sx={{ mt: 1, color: '#666' }}>
               Pazar analizi yapılıyor ve öneriler hazırlanıyor...
@@ -1024,7 +1037,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
           <>
             {/* Before/After Score */}
             {optimizedScore && (
-              <Paper sx={{ p: 2, mb: 2 }}>
+              <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
                 <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5, fontSize: 14 }}>
                   Tahmini Skor Karşılaştırması
                 </Typography>
@@ -1052,7 +1065,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             )}
 
             {/* Title Optimization */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <FileText size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
@@ -1065,7 +1078,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 <Typography variant="caption" sx={{ fontWeight: 600, color: '#999', fontSize: 11 }}>
                   MEVCUT BAŞLIK ({selectedListing.titleLength} karakter)
                 </Typography>
-                <Paper variant="outlined" sx={{ p: 1.5, mt: 0.5, bgcolor: '#fff8e1' }}>
+                <Paper variant="outlined" sx={{ p: 1.5, mt: 0.5, bgcolor: '#fef3c7', borderColor: '#f59e0b40', borderRadius: 2, boxShadow: '0 1px 4px rgba(245,158,11,0.08)' }}>
                   <Typography variant="body2" sx={{ fontSize: 13 }}>
                     {selectedListing.title}
                   </Typography>
@@ -1105,7 +1118,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 <Typography variant="caption" sx={{ fontWeight: 600, color: '#999', fontSize: 11 }}>
                   ÖNERİLEN BAŞLIK ({suggestedTitle.length} karakter)
                 </Typography>
-                <Paper variant="outlined" sx={{ p: 1.5, mt: 0.5, bgcolor: '#e8f5e9' }}>
+                <Paper variant="outlined" sx={{ p: 1.5, mt: 0.5, bgcolor: '#d1fae5', borderColor: '#10b98140', borderRadius: 2, boxShadow: '0 1px 4px rgba(16,185,129,0.08)' }}>
                   <Typography variant="body2" sx={{ fontSize: 13 }}>
                     {suggestedTitle}
                   </Typography>
@@ -1129,7 +1142,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             </Paper>
 
             {/* Item Specifics Recommendations */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <Tag size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
@@ -1211,7 +1224,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             </Paper>
 
             {/* Image Analysis */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <ImageIcon size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
@@ -1220,15 +1233,15 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f5f5f5', borderRadius: 1, minWidth: 80 }}>
+                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', minWidth: 80 }}>
                   <Typography variant="h5" sx={{ fontWeight: 700, color: selectedListing.imageCount >= 8 ? '#4caf50' : '#ff9800' }}>
                     {selectedListing.imageCount}
                   </Typography>
                   <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>Mevcut</Typography>
                 </Box>
                 <ArrowRight size={20} color="#999" />
-                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f5f5f5', borderRadius: 1, minWidth: 80 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: '#1976d2' }}>
+                <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', minWidth: 80 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 700, color: '#6366f1' }}>
                     {marketAvgImages || '-'}
                   </Typography>
                   <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>Rakip Ort.</Typography>
@@ -1247,7 +1260,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             </Paper>
 
             {/* Pricing Analysis */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <TrendingUp size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
@@ -1258,7 +1271,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               {marketAvgPrice > 0 ? (
                 <>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f5f5f5', borderRadius: 1, minWidth: 100 }}>
+                    <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', minWidth: 100 }}>
                       <Typography variant="h6" sx={{ fontWeight: 700 }}>
                         {selectedListing.price?.currency === 'USD' ? '$' : selectedListing.price?.currency}
                         {selectedListing.price?.value}
@@ -1266,8 +1279,8 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                       <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>Sizin Fiyatınız</Typography>
                     </Box>
                     <ArrowRight size={20} color="#999" />
-                    <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f5f5f5', borderRadius: 1, minWidth: 100 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#1976d2' }}>
+                    <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', minWidth: 100 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: '#6366f1' }}>
                         {fmt(marketAvgPrice)}
                       </Typography>
                       <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>Pazar Ortalaması</Typography>
@@ -1345,7 +1358,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
       ───────────────────────────────────────────────────────────────────── */}
       <TabPanel value={subTab} index={2}>
         {/* Listing selector */}
-        <Paper sx={{ p: 2, mb: 2 }}>
+        <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <FormControl fullWidth size="small">
             <InputLabel sx={{ fontSize: 13 }}>Listeleme Seçin</InputLabel>
             <Select
@@ -1405,7 +1418,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         </Paper>
 
         {benchmarking && (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <CircularProgress size={40} />
             <Typography variant="body2" sx={{ mt: 1, color: '#666' }}>
               Rakipler analiz ediliyor...
@@ -1417,7 +1430,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         {benchmarkListing && competitorMetrics && !benchmarking && (
           <>
             {/* Overall Position */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <Award size={18} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
@@ -1445,7 +1458,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             </Paper>
 
             {/* Metric Comparisons */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="body2" sx={{ fontWeight: 700, mb: 2, fontSize: 14 }}>
                 Metrik Karşılaştırması
               </Typography>
@@ -1489,7 +1502,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             </Paper>
 
             {/* Comparison Table */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5, fontSize: 14 }}>
                 Sizin Listeleme vs Pazar Ortalaması
               </Typography>
@@ -1497,7 +1510,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               <TableContainer>
                 <Table size="small">
                   <TableHead>
-                    <TableRow>
+                    <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                       <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Metrik</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>Sizin</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>Pazar Ort.</TableCell>
@@ -1556,7 +1569,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             </Paper>
 
             {/* Actionable Recommendations */}
-            <Paper sx={{ p: 2, mb: 2 }}>
+            <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <ShieldCheck size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
@@ -1605,7 +1618,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             </Paper>
 
             {/* Top Competitors List */}
-            <Paper sx={{ p: 2 }}>
+            <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5, fontSize: 14 }}>
                 Rakip Listeleri (İlk {competitorItems.length})
               </Typography>
@@ -1613,7 +1626,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               <TableContainer sx={{ maxHeight: 400 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
-                    <TableRow>
+                    <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                       <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Görsel</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Başlık</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: 'right' }}>Fiyat</TableCell>

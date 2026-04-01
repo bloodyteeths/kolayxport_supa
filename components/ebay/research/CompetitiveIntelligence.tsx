@@ -184,10 +184,10 @@ function Histogram({ values, bins = 8 }: { values: number[]; bins?: number }) {
       {buckets.map((count, i) => (
         <Tooltip key={i} title={`${fmt(min + i * step)} - ${fmt(min + (i + 1) * step)}: ${count} ürün`}>
           <Box sx={{
-            flex: 1, bgcolor: '#1976d2', borderRadius: '4px 4px 0 0',
+            flex: 1, background: 'linear-gradient(180deg, #6366f1, #8b5cf6)', borderRadius: '4px 4px 0 0',
             height: maxCount ? `${(count / maxCount) * 100}%` : 0,
             minHeight: count ? 4 : 0, cursor: 'pointer',
-            '&:hover': { bgcolor: '#1565c0' },
+            '&:hover': { background: 'linear-gradient(180deg, #5558e6, #7c4feb)' },
           }} />
         </Tooltip>
       ))}
@@ -195,7 +195,7 @@ function Histogram({ values, bins = 8 }: { values: number[]; bins?: number }) {
   );
 }
 
-const PIE_COLORS = ['#1976d2', '#e91e63', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4', '#f44336', '#8bc34a', '#ff5722', '#607d8b'];
+const PIE_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#64748b'];
 
 // ---------------------------------------------------------------------------
 // Sub-tab 1: Seller Spy
@@ -398,8 +398,8 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {/* Standalone Keyword Search */}
-      <Paper sx={{ p: 2, border: '1px solid', borderColor: 'primary.main', borderRadius: 2 }}>
-        <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Paper sx={{ p: 2, border: '1px solid rgba(99,102,241,0.15)', borderRadius: 3, bgcolor: '#f8faff', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+        <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#6366f1' }}>
           <Search size={18} />
           Pazar Arastirmasi ile Rakip Bul
         </Typography>
@@ -422,12 +422,28 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
             }}
           />
           <Button variant="contained" onClick={searchByKeyword} disabled={kwLoading || !kwInput.trim()}
-            startIcon={kwLoading ? <CircularProgress size={16} /> : <Search size={16} />}>
+            startIcon={kwLoading ? <CircularProgress size={16} /> : <Search size={16} />}
+            sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}>
             Ara
           </Button>
         </Box>
         {kwLoading && <LinearProgress sx={{ mt: 1 }} />}
         {kwError && <Alert severity="error" sx={{ mt: 1 }}>{kwError}</Alert>}
+
+        {/* Tips — show when no results */}
+        {!kwLoading && kwSellers.length === 0 && !kwError && (
+          <Paper sx={{ p: 2, mt: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Rakip Analizi Nasil Kullanilir?</Typography>
+            <Typography variant="body2" color="text.secondary" component="div">
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                <li>Bir anahtar kelime arayarak pazardaki rakipleri gorun</li>
+                <li>Satici adina tiklayarak magaza detaylarini inceleyin</li>
+                <li>Anlik goruntuyu kaydederek fiyat degisimlerini takip edin</li>
+                <li>Pazar trendleri sekmesinde zaman icindeki degisimleri izleyin</li>
+              </ul>
+            </Typography>
+          </Paper>
+        )}
 
         {/* Keyword search results — seller list */}
         {kwSellers.length > 0 && (
@@ -438,7 +454,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
             <TableContainer sx={{ maxHeight: 400 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
-                  <TableRow>
+                  <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                     <TableCell>Satici</TableCell>
                     <TableCell align="right">Listeleme</TableCell>
                     <TableCell align="right">Puan</TableCell>
@@ -491,8 +507,8 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
 
       {/* Seller Deep-Dive Dialog */}
       <Dialog open={deepDiveOpen} onClose={() => setDeepDiveOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '1px solid rgba(99,102,241,0.12)' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#6366f1' }}>
             <Users size={20} />
             <span>{deepDiveSeller} — Satici Detaylari</span>
           </Box>
@@ -510,12 +526,14 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
               <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                 <Button size="small" variant="contained"
                   startIcon={<ShoppingBag size={14} />}
-                  onClick={() => { onNavigate?.('product_database', { keyword: deepDiveSeller }); setDeepDiveOpen(false); }}>
+                  onClick={() => { onNavigate?.('product_database', { keyword: deepDiveSeller }); setDeepDiveOpen(false); }}
+                  sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}>
                   Urunleri Gor
                 </Button>
                 <Button size="small" variant="outlined"
                   startIcon={<FileSearch size={14} />}
-                  onClick={() => { onNavigate?.('seo_analyzer', { keyword: deepDiveSeller }); setDeepDiveOpen(false); }}>
+                  onClick={() => { onNavigate?.('seo_analyzer', { keyword: deepDiveSeller }); setDeepDiveOpen(false); }}
+                  sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#5558e6', bgcolor: 'rgba(99,102,241,0.04)' } }}>
                   SEO Kontrol
                 </Button>
               </Box>
@@ -566,8 +584,8 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
 
       {/* Suggested Sellers from user listings */}
       {suggestedSellers.length > 0 && (
-        <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        <Paper sx={{ p: 2, bgcolor: '#f8faff', border: '1px solid rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, color: '#6366f1' }}>
             <Users size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
             Senin satıcı hesabın:
           </Typography>
@@ -587,7 +605,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
       )}
 
       {/* Search Input */}
-      <Paper sx={{ p: 2 }}>
+      <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
@@ -604,7 +622,8 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
             }}
           />
           <Button variant="contained" onClick={searchSeller} disabled={loading || !sellerInput.trim()}
-            startIcon={loading ? <CircularProgress size={16} /> : <Search size={16} />}>
+            startIcon={loading ? <CircularProgress size={16} /> : <Search size={16} />}
+            sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}>
             Ara
           </Button>
         </Box>
@@ -615,7 +634,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
 
       {/* Seller Profile Card */}
       {profile && (
-        <Paper sx={{ p: 2 }}>
+        <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
             <Box>
               <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -641,7 +660,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
 
       {/* Inventory Summary */}
       {inventoryStats && (
-        <Paper sx={{ p: 2 }}>
+        <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>Envanter Özeti</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 2 }}>
             <Box>
@@ -666,7 +685,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
 
       {/* Product Table */}
       {items.length > 0 && (
-        <Paper sx={{ p: 2 }}>
+        <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
             <Typography variant="subtitle1" fontWeight={600}>Ürünler ({items.length})</Typography>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -681,7 +700,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
           <TableContainer sx={{ maxHeight: 500 }}>
             <Table size="small" stickyHeader>
               <TableHead>
-                <TableRow>
+                <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                   <TableCell>Ürün</TableCell>
                   <TableCell align="right">Fiyat</TableCell>
                   <TableCell align="right">Tah. Satış</TableCell>
@@ -737,13 +756,13 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
       {items.length > 0 && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
           {/* Category Breakdown */}
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <Typography variant="subtitle1" fontWeight={600} gutterBottom>Kategori Dağılımı</Typography>
             <PieChart data={categoryBreakdown} />
           </Paper>
 
           {/* Price Distribution */}
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <Typography variant="subtitle1" fontWeight={600} gutterBottom>Fiyat Dağılımı</Typography>
             <Histogram values={prices} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
@@ -753,7 +772,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
           </Paper>
 
           {/* Top Keywords */}
-          <Paper sx={{ p: 2, gridColumn: { md: '1 / -1' } }}>
+          <Paper sx={{ p: 2, gridColumn: { md: '1 / -1' }, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <Typography variant="subtitle1" fontWeight={600} gutterBottom>En Çok Kullanılan Anahtar Kelimeler</Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {topKeywords.slice(0, 30).map((kw, i) => (
@@ -875,7 +894,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Paper sx={{ p: 2 }}>
+      <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Typography variant="subtitle1" fontWeight={600} gutterBottom>
           Listeleme Karşılaştırması (maks. 5)
         </Typography>
@@ -923,7 +942,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
 
       {/* Comparison Table */}
       {validListings.length > 0 && (
-        <Paper sx={{ p: 2 }}>
+        <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <TableContainer>
             <Table size="small">
               <TableHead>
@@ -1236,7 +1255,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {/* Search */}
-      <Paper sx={{ p: 2 }}>
+      <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
@@ -1265,7 +1284,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
       {/* Current Market Snapshot */}
       {currentSnapshot && (
         <>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Typography variant="subtitle1" fontWeight={600}>
                 Pazar Anlık Görüntüsü: &quot;{currentSnapshot.keyword}&quot;
@@ -1338,7 +1357,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  <TableRow>
+                  <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                     <TableCell>#</TableCell>
                     <TableCell>Satıcı</TableCell>
                     <TableCell align="right">Listeleme</TableCell>
@@ -1366,7 +1385,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                       <TableCell sx={{ minWidth: 120 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Box sx={{ flex: 1, bgcolor: '#e0e0e0', borderRadius: 1, height: 8 }}>
-                            <Box sx={{ width: `${Math.min(s.share, 100)}%`, bgcolor: '#1976d2', borderRadius: 1, height: '100%' }} />
+                            <Box sx={{ width: `${Math.min(s.share, 100)}%`, bgcolor: '#6366f1', borderRadius: 1, height: '100%' }} />
                           </Box>
                         </Box>
                       </TableCell>
@@ -1396,9 +1415,10 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
           </Paper>
 
           {/* Trend Seller Deep-Dive Dialog */}
-          <Dialog open={trendDeepDiveOpen} onClose={() => setTrendDeepDiveOpen(false)} maxWidth="md" fullWidth>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Dialog open={trendDeepDiveOpen} onClose={() => setTrendDeepDiveOpen(false)} maxWidth="md" fullWidth
+            PaperProps={{ sx: { borderRadius: 3 } }}>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '1px solid rgba(99,102,241,0.12)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#6366f1' }}>
                 <Users size={20} />
                 <span>{trendDeepDiveSeller} — Satici Detaylari</span>
               </Box>
@@ -1472,7 +1492,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
 
           {/* Trend History */}
           {previousSnapshots.length > 0 && (
-            <Paper sx={{ p: 2 }}>
+            <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="subtitle1" fontWeight={600} gutterBottom>
                 Trend Geçmişi: &quot;{currentSnapshot.keyword}&quot;
               </Typography>
@@ -1560,7 +1580,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
 
       {/* All Saved Snapshots Summary */}
       {!currentSnapshot && savedSnapshots.length > 0 && (
-        <Paper sx={{ p: 2 }}>
+        <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>Kayıtlı Anlık Görüntüler</Typography>
           <Typography variant="body2" color="text.secondary" gutterBottom>
             Trend analizi için bir anahtar kelime arayın. Önceki anlık görüntülerle karşılaştırma yapılacaktır.
@@ -1617,8 +1637,9 @@ export default function CompetitiveIntelligence({ userId, marketplace, userListi
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Paper sx={{ px: 1 }}>
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto">
+      <Paper sx={{ px: 1, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
+        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto"
+          sx={{ '& .Mui-selected': { color: '#6366f1' }, '& .MuiTabs-indicator': { bgcolor: '#6366f1' } }}>
           <Tab icon={<Eye size={16} />} iconPosition="start" label="Satıcı İstihbaratı" sx={{ textTransform: 'none', minHeight: 48 }} />
           <Tab icon={<ArrowUpDown size={16} />} iconPosition="start" label="Listeleme Karşılaştırması" sx={{ textTransform: 'none', minHeight: 48 }} />
           <Tab icon={<TrendingUp size={16} />} iconPosition="start" label="Pazar Trendleri" sx={{ textTransform: 'none', minHeight: 48 }} />

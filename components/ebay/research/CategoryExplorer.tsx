@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Box, Typography, Paper, Chip, CircularProgress, LinearProgress,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -94,9 +94,10 @@ function CategoryTreeNode({
           py: 0.75,
           px: 1,
           cursor: 'pointer',
-          borderRadius: 1,
-          bgcolor: isSelected ? 'primary.50' : 'transparent',
-          '&:hover': { bgcolor: isSelected ? 'primary.50' : 'grey.50' },
+          borderRadius: 1.5,
+          bgcolor: isSelected ? 'rgba(99,102,241,0.08)' : 'transparent',
+          '&:hover': { bgcolor: isSelected ? 'rgba(99,102,241,0.08)' : '#f8faff' },
+          transition: 'all 0.15s ease',
         }}
         onClick={() => {
           onSelect(node.categoryId, node.categoryName);
@@ -104,7 +105,7 @@ function CategoryTreeNode({
         }}
       >
         {hasChildren ? (
-          <IconButton size="small" sx={{ mr: 0.5, p: 0.25 }} onClick={(e) => { e.stopPropagation(); setExpanded(prev => !prev); }}>
+          <IconButton size="small" sx={{ mr: 0.5, p: 0.25, color: '#6366f1' }} onClick={(e) => { e.stopPropagation(); setExpanded(prev => !prev); }}>
             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </IconButton>
         ) : (
@@ -112,7 +113,7 @@ function CategoryTreeNode({
         )}
         <Typography
           variant="body2"
-          sx={{ fontWeight: isSelected ? 700 : 400, color: isSelected ? 'primary.main' : 'text.primary' }}
+          sx={{ fontWeight: isSelected ? 700 : 400, color: isSelected ? '#6366f1' : 'text.primary' }}
         >
           {node.categoryName}
         </Typography>
@@ -146,6 +147,18 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
 
   const [bestsellers, setBestsellers] = useState<BestsellerItem[]>([]);
   const [bestsellersLoading, setBestsellersLoading] = useState(false);
+  const didAutoSelect = useRef(false);
+
+  // Auto-select the first popular category on mount
+  useEffect(() => {
+    if (didAutoSelect.current || selectedCategory) return;
+    didAutoSelect.current = true;
+    const first = POPULAR_CATEGORIES[0];
+    if (first) {
+      selectCategory(first.id, first.name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stats = useMemo(() => {
     if (bestsellers.length === 0) return null;
@@ -204,9 +217,15 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
       {/* Header */}
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
-        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
-          <Layers size={20} />
+      <Paper variant="outlined" sx={{
+        p: { xs: 2, md: 2.5 },
+        bgcolor: '#f8faff',
+        border: '1px solid rgba(99,102,241,0.08)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        borderRadius: 3,
+      }}>
+        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700, color: '#1e1b4b' }}>
+          <Layers size={20} color="#6366f1" />
           Kategori Keşfet
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -215,10 +234,19 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
       </Paper>
 
       {/* Popular Categories Grid */}
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
-        <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <TrendingUp size={16} />
+      <Paper variant="outlined" sx={{
+        p: { xs: 2, md: 2.5 },
+        bgcolor: '#fff',
+        border: '1px solid rgba(99,102,241,0.08)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        borderRadius: 3,
+      }}>
+        <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1e1b4b' }}>
+          <TrendingUp size={16} color="#6366f1" />
           Popüler Kategoriler
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Popüler bir kategori seçin veya aşağıdaki arama ile bulun
         </Typography>
         <Box
           sx={{
@@ -237,20 +265,29 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                 p: 1.5,
                 textAlign: 'center',
                 cursor: 'pointer',
-                borderColor: selectedCategory?.id === cat.id ? 'primary.main' : 'divider',
-                bgcolor: selectedCategory?.id === cat.id ? 'primary.50' : 'transparent',
-                transition: 'all 0.15s ease',
-                '&:hover': { borderColor: 'primary.main', bgcolor: 'grey.50' },
+                borderColor: selectedCategory?.id === cat.id ? '#6366f1' : 'rgba(99,102,241,0.08)',
+                bgcolor: selectedCategory?.id === cat.id ? 'rgba(99,102,241,0.06)' : '#fff',
+                boxShadow: selectedCategory?.id === cat.id ? '0 0 0 2px rgba(99,102,241,0.3)' : '0 1px 4px rgba(0,0,0,0.04)',
+                transition: 'all 0.2s ease',
+                borderRadius: 2.5,
+                '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', borderColor: '#6366f1' },
               }}
             >
-              <Typography variant="h6" sx={{ lineHeight: 1 }}>{cat.icon}</Typography>
+              <Box sx={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 36, height: 36, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)',
+                mb: 0.5,
+              }}>
+                <Typography variant="h6" sx={{ lineHeight: 1 }}>{cat.icon}</Typography>
+              </Box>
               <Typography
                 variant="caption"
                 sx={{
-                  mt: 0.5,
                   display: 'block',
                   fontWeight: selectedCategory?.id === cat.id ? 700 : 500,
                   fontSize: { xs: '0.68rem', md: '0.75rem' },
+                  color: selectedCategory?.id === cat.id ? '#6366f1' : 'text.primary',
                 }}
               >
                 {cat.name}
@@ -261,13 +298,19 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
       </Paper>
 
       {/* Category Tree Browser */}
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
+      <Paper variant="outlined" sx={{
+        p: { xs: 2, md: 2.5 },
+        bgcolor: '#fff',
+        border: '1px solid rgba(99,102,241,0.08)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        borderRadius: 3,
+      }}>
         <Box
           sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
           onClick={loadCategoryTree}
         >
-          <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Grid size={16} />
+          <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1e1b4b' }}>
+            <Grid size={16} color="#6366f1" />
             Kategori Ağacı
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -299,10 +342,16 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
 
       {/* Bestsellers Section */}
       {selectedCategory && (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 2.5 } }}>
+        <Paper variant="outlined" sx={{
+          p: { xs: 2, md: 2.5 },
+          bgcolor: '#fff',
+          border: '1px solid rgba(99,102,241,0.08)',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+          borderRadius: 3,
+        }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-            <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Package size={16} />
+            <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1e1b4b' }}>
+              <Package size={16} color="#6366f1" />
               {selectedCategory.name} — Çok Satanlar
             </Typography>
             {onNavigate && (
@@ -312,7 +361,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                   variant="outlined"
                   endIcon={<ArrowRight size={14} />}
                   onClick={() => onNavigate('product_database', { categoryId: selectedCategory.id })}
-                  sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                  sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', fontWeight: 600, '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' } }}
                 >
                   Bu kategoride ara
                 </Button>
@@ -321,7 +370,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                   variant="outlined"
                   endIcon={<BarChart2 size={14} />}
                   onClick={() => onNavigate('niche_finder', { categoryId: selectedCategory.id })}
-                  sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                  sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)', fontWeight: 600, '&:hover': { bgcolor: '#8b5cf6', color: '#fff', borderColor: '#8b5cf6' } }}
                 >
                   Niş Analizi
                 </Button>
@@ -329,24 +378,32 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
             )}
           </Box>
 
-          {bestsellersLoading && <LinearProgress sx={{ mt: 2 }} />}
+          {bestsellersLoading && <LinearProgress sx={{ mt: 2, borderRadius: 2, '& .MuiLinearProgress-bar': { background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }, backgroundColor: '#e5e7eb' }} />}
 
           {/* Stats */}
           {stats && !bestsellersLoading && (
             <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-              <Paper variant="outlined" sx={{ p: 1.5, flex: 1, textAlign: 'center' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, color: 'text.secondary' }}>
+              <Paper variant="outlined" sx={{
+                p: 1.5, flex: 1, textAlign: 'center',
+                bgcolor: '#f8faff', border: '1px solid rgba(99,102,241,0.08)',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 2.5,
+              }}>
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, color: '#6366f1' }}>
                   <Package size={18} />
                 </Box>
                 <Typography variant="caption" color="text.secondary">Ürün Sayısı</Typography>
-                <Typography variant="h6" fontWeight={700}>{stats.count}</Typography>
+                <Typography variant="h6" fontWeight={700} sx={{ color: '#1e1b4b' }}>{stats.count}</Typography>
               </Paper>
-              <Paper variant="outlined" sx={{ p: 1.5, flex: 1, textAlign: 'center' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, color: 'text.secondary' }}>
+              <Paper variant="outlined" sx={{
+                p: 1.5, flex: 1, textAlign: 'center',
+                bgcolor: '#f8faff', border: '1px solid rgba(99,102,241,0.08)',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 2.5,
+              }}>
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, color: '#6366f1' }}>
                   <DollarSign size={18} />
                 </Box>
                 <Typography variant="caption" color="text.secondary">Ort. Fiyat</Typography>
-                <Typography variant="h6" fontWeight={700}>${stats.avgPrice.toFixed(2)}</Typography>
+                <Typography variant="h6" fontWeight={700} sx={{ color: '#6366f1' }}>${stats.avgPrice.toFixed(2)}</Typography>
               </Paper>
             </Stack>
           )}
@@ -356,25 +413,29 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
             <TableContainer sx={{ mt: 2 }}>
               <Table size="small">
                 <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700, width: 56 }}>Görsel</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Başlık</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }} align="right">Fiyat</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Durum</TableCell>
+                  <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
+                    <TableCell sx={{ fontWeight: 700, width: 56, color: '#1e1b4b' }}>Görsel</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Başlık</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">Fiyat</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Durum</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {bestsellers.map((item, idx) => {
                     const imgUrl = getItemImage(item);
                     return (
-                      <TableRow key={item.itemId || idx}>
+                      <TableRow key={item.itemId || idx} sx={{
+                        bgcolor: idx % 2 === 0 ? '#f8faff' : '#fff',
+                        transition: 'background-color 0.15s ease',
+                        '&:hover': { bgcolor: 'rgba(99,102,241,0.06)' },
+                      }}>
                         <TableCell>
                           {imgUrl ? (
                             <Box
                               component="img"
                               src={imgUrl}
                               alt=""
-                              sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 1 }}
+                              sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 2 }}
                             />
                           ) : (
                             <Box sx={{ width: 40, height: 40, bgcolor: 'grey.200', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -388,7 +449,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                           </Typography>
                         </TableCell>
                         <TableCell align="right">
-                          <Typography variant="body2" fontWeight={600}>{getItemPrice(item)}</Typography>
+                          <Typography variant="body2" fontWeight={700} sx={{ color: '#6366f1' }}>{getItemPrice(item)}</Typography>
                         </TableCell>
                         <TableCell>
                           <Chip label={item.condition || '-'} size="small" variant="outlined" />
@@ -407,14 +468,22 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
               {bestsellers.map((item, idx) => {
                 const imgUrl = getItemImage(item);
                 return (
-                  <Paper key={item.itemId || idx} variant="outlined" sx={{ p: 1.5 }}>
+                  <Paper key={item.itemId || idx} variant="outlined" sx={{
+                    p: 1.5,
+                    bgcolor: '#fff',
+                    border: '1px solid rgba(99,102,241,0.08)',
+                    boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+                    borderRadius: 2.5,
+                    transition: 'all 0.2s ease',
+                    '&:hover': { boxShadow: '0 2px 12px rgba(0,0,0,0.08)' },
+                  }}>
                     <Box sx={{ display: 'flex', gap: 1.5 }}>
                       {imgUrl ? (
                         <Box
                           component="img"
                           src={imgUrl}
                           alt=""
-                          sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
+                          sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 2, flexShrink: 0 }}
                         />
                       ) : (
                         <Box sx={{ width: 40, height: 40, bgcolor: 'grey.200', borderRadius: 1, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -426,7 +495,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                           {item.title}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
-                          <Typography variant="body2" fontWeight={700}>{getItemPrice(item)}</Typography>
+                          <Typography variant="body2" fontWeight={700} sx={{ color: '#6366f1' }}>{getItemPrice(item)}</Typography>
                           {item.condition && <Chip label={item.condition} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
                         </Box>
                       </Box>

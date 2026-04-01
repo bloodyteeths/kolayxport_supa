@@ -74,9 +74,9 @@ async function apiCall(action: string, userId: string, params: Record<string, an
 }
 
 function scoreColor(score: number): string {
-  if (score >= 70) return '#2e7d32';
-  if (score >= 40) return '#ed6c02';
-  return '#d32f2f';
+  if (score >= 70) return '#10b981';
+  if (score >= 40) return '#f59e0b';
+  return '#ef4444';
 }
 
 function ScoreBadge({ score, label }: { score: number; label?: string }) {
@@ -87,9 +87,11 @@ function ScoreBadge({ score, label }: { score: number; label?: string }) {
         size="small"
         sx={{
           fontWeight: 700,
+          fontSize: '0.85rem',
           color: '#fff',
           bgcolor: scoreColor(score),
           minWidth: 44,
+          boxShadow: `0 0 6px ${scoreColor(score)}40`,
         }}
       />
     </Tooltip>
@@ -262,9 +264,15 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
       {/* Header */}
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
-        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <BarChart3 size={20} /> Nis Karsilastirma
+      <Paper variant="outlined" sx={{
+        p: 2.5,
+        background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)',
+        border: '1px solid rgba(99,102,241,0.08)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        borderRadius: 3,
+      }}>
+        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, color: '#1e1b4b', fontWeight: 700 }}>
+          <BarChart3 size={20} color="#6366f1" /> Nis Karsilastirma
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -272,10 +280,16 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
             <Paper
               key={index}
               variant="outlined"
-              sx={{ p: 2, bgcolor: slot.data ? '#fafafa' : undefined }}
+              sx={{
+                p: 2,
+                bgcolor: slot.data ? '#f8faff' : '#fff',
+                border: '1px solid rgba(99,102,241,0.08)',
+                boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+                borderRadius: 3,
+              }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e1b4b' }}>
                   Nis {index + 1}
                 </Typography>
                 {slot.data && (
@@ -349,7 +363,13 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                   onClick={() => analyzeNiche(index)}
                   disabled={slot.loading || !slot.keyword.trim()}
                   startIcon={slot.loading ? <CircularProgress size={16} color="inherit" /> : <Search size={16} />}
-                  sx={{ minWidth: 110, whiteSpace: 'nowrap' }}
+                  sx={{
+                    minWidth: 110, whiteSpace: 'nowrap',
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                    borderRadius: 2, textTransform: 'none', fontWeight: 600,
+                    '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
+                  }}
                 >
                   {slot.loading ? 'Analiz...' : 'Analiz Et'}
                 </Button>
@@ -363,7 +383,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
             size="small"
             startIcon={<Plus size={16} />}
             onClick={addSlot}
-            sx={{ mt: 1.5 }}
+            sx={{ mt: 1.5, color: '#6366f1', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }}
           >
             Nis Ekle
           </Button>
@@ -375,14 +395,19 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
         <>
           {/* Desktop Table */}
           {!isMobile && (
-            <Paper variant="outlined">
+            <Paper variant="outlined" sx={{
+              boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+              borderRadius: 3,
+              border: '1px solid rgba(99,102,241,0.08)',
+              overflow: 'hidden',
+            }}>
               <TableContainer>
                 <Table size="small">
                   <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 150 }}>Metrik</TableCell>
+                    <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
+                      <TableCell sx={{ fontWeight: 700, minWidth: 150, color: '#1e1b4b' }}>Metrik</TableCell>
                       {slots.map((slot, i) => slot.data && (
-                        <TableCell key={i} sx={{ fontWeight: 600, textAlign: 'center' }}>
+                        <TableCell key={i} sx={{ fontWeight: 700, textAlign: 'center', color: '#1e1b4b' }}>
                           {slot.data.query}
                         </TableCell>
                       ))}
@@ -393,9 +418,10 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                       const values = slots.map(s => s.data ? (s.data as any)[metric.key] as number : undefined);
                       const winnerIdx = getWinnerIndex(values, metric.higherIsBetter);
 
+                      const metricIdx = METRICS.indexOf(metric);
                       return (
-                        <TableRow key={metric.key}>
-                          <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        <TableRow key={metric.key} sx={{ bgcolor: metricIdx % 2 === 0 ? '#f8faff' : '#fff' }}>
+                          <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap', color: '#1e1b4b' }}>
                             {metric.label}
                           </TableCell>
                           {slots.map((slot, i) => {
@@ -410,8 +436,9 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                                 key={i}
                                 sx={{
                                   textAlign: 'center',
-                                  bgcolor: isWinner ? '#e8f5e9' : undefined,
+                                  bgcolor: isWinner ? 'rgba(16,185,129,0.08)' : undefined,
                                   fontWeight: isWinner ? 700 : 400,
+                                  boxShadow: isWinner ? 'inset 0 0 0 1px rgba(16,185,129,0.2)' : undefined,
                                 }}
                               >
                                 {metric.isScore ? (
@@ -439,8 +466,14 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                 const winnerIdx = getWinnerIndex(values, metric.higherIsBetter);
 
                 return (
-                  <Paper key={metric.key} variant="outlined" sx={{ p: 1.5 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', mb: 0.5, display: 'block' }}>
+                  <Paper key={metric.key} variant="outlined" sx={{
+                    p: 1.5,
+                    bgcolor: '#fff',
+                    border: '1px solid rgba(99,102,241,0.08)',
+                    boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+                    borderRadius: 2.5,
+                  }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#1e1b4b', mb: 0.5, display: 'block' }}>
                       {metric.label}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1 }}>
@@ -458,8 +491,9 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                               flex: 1,
                               textAlign: 'center',
                               p: 1,
-                              borderRadius: 1,
-                              bgcolor: isWinner ? '#e8f5e9' : '#f5f5f5',
+                              borderRadius: 2,
+                              bgcolor: isWinner ? 'rgba(16,185,129,0.08)' : '#f8faff',
+                              boxShadow: isWinner ? '0 0 0 2px rgba(16,185,129,0.3)' : 'none',
                             }}
                           >
                             <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mb: 0.5 }}>
@@ -484,10 +518,16 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
 
           {/* Verdict */}
           {bestNiche?.data && (
-            <Paper variant="outlined" sx={{ p: 2.5, bgcolor: '#f0fff4' }}>
+            <Paper variant="outlined" sx={{
+              p: 2.5,
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #f8faff 100%)',
+              border: '1px solid rgba(16,185,129,0.15)',
+              boxShadow: '0 2px 16px rgba(16,185,129,0.1)',
+              borderRadius: 3,
+            }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-                <Crown size={22} color="#ed6c02" />
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                <Crown size={22} color="#f59e0b" />
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e1b4b' }}>
                   En Iyi Nis: {bestNiche.data.query}
                 </Typography>
                 <ScoreBadge score={bestNiche.data.opportunityScore} label="Firsat Skoru" />
@@ -511,6 +551,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                         variant="outlined"
                         endIcon={<ArrowRight size={14} />}
                         onClick={() => onNavigate('product_database', { keyword: slot.data!.query })}
+                        sx={{ color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' } }}
                       >
                         Urunleri Gor
                       </Button>
@@ -519,6 +560,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                         variant="outlined"
                         endIcon={<ShieldCheck size={14} />}
                         onClick={() => onNavigate('seo_analyzer', { keyword: slot.data!.query })}
+                        sx={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#8b5cf6', color: '#fff', borderColor: '#8b5cf6' } }}
                       >
                         SEO Kontrol
                       </Button>
@@ -531,11 +573,19 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
         </>
       )}
 
-      {/* No data state */}
-      {!canCompare && !anyLoading && loadedSlots.length > 0 && (
-        <Alert severity="info">
-          Karşılaştırma tablosunu görmek için en az 2 niş analiz edin. Yukarıdaki alanlara anahtar kelime yazıp &quot;Analiz Et&quot; butonuna tıklayın.
-        </Alert>
+      {/* Tips — show when less than 2 niches have data */}
+      {!canCompare && !anyLoading && (
+        <Paper sx={{ p: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+          <Typography variant="subtitle2" fontWeight={700} gutterBottom>Nis Karsilastirma Nasil Kullanilir?</Typography>
+          <Typography variant="body2" color="text.secondary" component="div">
+            <ul style={{ margin: 0, paddingLeft: 16 }}>
+              <li>En az 2 nis anahtar kelime girin (or: &quot;wireless earbuds&quot; vs &quot;bluetooth speaker&quot;)</li>
+              <li>Talep, rekabet, firsat skoru ve fiyat araliklarini yan yana karsilastirin</li>
+              <li>Kazanan nis yesil ile vurgulanir — en dusuk rekabet + en yuksek talep</li>
+              <li>Kaydedilmis nislerinizi de karsilastirmaya ekleyebilirsiniz</li>
+            </ul>
+          </Typography>
+        </Paper>
       )}
     </Box>
   );

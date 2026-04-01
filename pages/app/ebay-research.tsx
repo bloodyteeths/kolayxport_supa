@@ -14,12 +14,14 @@ import {
   DollarSign, Users, FolderTree, Gauge, Package, Target,
   ChevronDown, ChevronUp, Edit3, Tag, Clock, AlertTriangle,
   Save, X, Copy, ShoppingBag, Globe, Filter, ArrowUpDown,
-  Sparkles, Zap, Download, Layers,
+  Sparkles, Zap, Download, Layers, Lightbulb,
 } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 import KeywordIntelligence from '@/components/ebay/research/KeywordIntelligence';
 import CompetitiveIntelligence from '@/components/ebay/research/CompetitiveIntelligence';
 import ListingOptimizer from '@/components/ebay/research/ListingOptimizer';
@@ -159,51 +161,58 @@ function useTableSort<T>(items: T[], defaultKey: string = '', defaultDir: SortDi
   return { sorted, sortKey, sortDir, handleSort };
 }
 
-const CONDITIONS = [
-  { value: '', label: 'Tümü' },
-  { value: 'New', label: 'Yeni' },
-  { value: 'Used', label: 'Kullanılmış' },
-  { value: 'OpenBox', label: 'Açık Kutu' },
-  { value: 'Refurbished', label: 'Yenilenmiş' },
+const CONDITIONS_DATA = [
+  { value: '', labelKey: 'conditionAll' },
+  { value: 'New', labelKey: 'conditionNew' },
+  { value: 'Used', labelKey: 'conditionUsed' },
+  { value: 'OpenBox', labelKey: 'conditionOpenBox' },
+  { value: 'Refurbished', labelKey: 'conditionRefurbished' },
 ];
 
-const SORT_OPTIONS = [
-  { value: 'BestMatch', label: 'En İyi Eşleşme' },
-  { value: 'PricePlusShippingLowest', label: 'Fiyat: Düşükten Yükseğe' },
-  { value: 'PricePlusShippingHighest', label: 'Fiyat: Yüksekten Düşüğe' },
-  { value: 'StartTimeNewest', label: 'En Yeni Listelenen' },
+const SORT_DATA = [
+  { value: 'BestMatch', labelKey: 'sortBestMatch' },
+  { value: 'PricePlusShippingLowest', labelKey: 'sortPriceLow' },
+  { value: 'PricePlusShippingHighest', labelKey: 'sortPriceHigh' },
+  { value: 'StartTimeNewest', labelKey: 'sortNewest' },
 ];
 
-const MARKETPLACES = [
-  { value: 'EBAY_US', label: 'ABD', flag: '🇺🇸' },
-  { value: 'EBAY_GB', label: 'İngiltere', flag: '🇬🇧' },
-  { value: 'EBAY_DE', label: 'Almanya', flag: '🇩🇪' },
-  { value: 'EBAY_FR', label: 'Fransa', flag: '🇫🇷' },
-  { value: 'EBAY_IT', label: 'İtalya', flag: '🇮🇹' },
-  { value: 'EBAY_ES', label: 'İspanya', flag: '🇪🇸' },
-  { value: 'EBAY_AU', label: 'Avustralya', flag: '🇦🇺' },
+const MARKETPLACES_DATA = [
+  { value: 'EBAY_US', labelKey: 'marketplaceUS', flag: '🇺🇸' },
+  { value: 'EBAY_GB', labelKey: 'marketplaceGB', flag: '🇬🇧' },
+  { value: 'EBAY_DE', labelKey: 'marketplaceDE', flag: '🇩🇪' },
+  { value: 'EBAY_FR', labelKey: 'marketplaceFR', flag: '🇫🇷' },
+  { value: 'EBAY_IT', labelKey: 'marketplaceIT', flag: '🇮🇹' },
+  { value: 'EBAY_ES', labelKey: 'marketplaceES', flag: '🇪🇸' },
+  { value: 'EBAY_AU', labelKey: 'marketplaceAU', flag: '🇦🇺' },
 ];
 
-const POPULAR_CATEGORIES = [
-  { id: '11450', name: 'Giyim & Aksesuar', emoji: '👗' },
-  { id: '58058', name: 'Cep Telefonu & Aksesuar', emoji: '📱' },
-  { id: '11700', name: 'Ev & Bahce', emoji: '🏠' },
-  { id: '220', name: 'Oyuncak & Hobi', emoji: '🧸' },
-  { id: '26395', name: 'Saglik & Guzellik', emoji: '💄' },
-  { id: '6000', name: 'Motorlar & Parca', emoji: '🚗' },
-  { id: '64482', name: 'Spor Malzemesi', emoji: '⚽' },
-  { id: '293', name: 'Elektronik', emoji: '🔌' },
-  { id: '12576', name: 'Bebek Urunleri', emoji: '👶' },
-  { id: '625', name: 'Kamera & Foto', emoji: '📷' },
-  { id: '175672', name: 'Mucevher & Saat', emoji: '💎' },
-  { id: '15032', name: 'Evcil Hayvan', emoji: '🐾' },
+const POPULAR_CATEGORIES_DATA = [
+  { id: '11450', nameKey: 'catClothing', emoji: '👗' },
+  { id: '58058', nameKey: 'catPhones', emoji: '📱' },
+  { id: '11700', nameKey: 'catHome', emoji: '🏠' },
+  { id: '220', nameKey: 'catToys', emoji: '🧸' },
+  { id: '26395', nameKey: 'catHealth', emoji: '💄' },
+  { id: '6000', nameKey: 'catMotors', emoji: '🚗' },
+  { id: '64482', nameKey: 'catSports', emoji: '⚽' },
+  { id: '293', nameKey: 'catElectronics', emoji: '🔌' },
+  { id: '12576', nameKey: 'catBaby', emoji: '👶' },
+  { id: '625', nameKey: 'catCamera', emoji: '📷' },
+  { id: '175672', nameKey: 'catJewelry', emoji: '💎' },
+  { id: '15032', nameKey: 'catPets', emoji: '🐾' },
 ];
 
 const SCORE_COLOR = (score: number, invert = false) => {
   const s = invert ? 100 - score : score;
-  if (s >= 70) return '#2e7d32';
-  if (s >= 40) return '#ed6c02';
-  return '#d32f2f';
+  if (s >= 70) return '#10b981';
+  if (s >= 40) return '#f59e0b';
+  return '#ef4444';
+};
+
+const SCORE_GLOW = (score: number, invert = false) => {
+  const s = invert ? 100 - score : score;
+  if (s >= 70) return 'rgba(16,185,129,0.25)';
+  if (s >= 40) return 'rgba(245,158,11,0.25)';
+  return 'rgba(239,68,68,0.25)';
 };
 
 // ---------------------------------------------------------------------------
@@ -211,6 +220,8 @@ const SCORE_COLOR = (score: number, invert = false) => {
 // ---------------------------------------------------------------------------
 
 function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price: number; soldQuantity?: number; timestamp: string }[]; title?: string; onClose: () => void }) {
+  const t = useTranslations('ebayResearch');
+  const { formatDate } = useLocale();
   if (!snapshots || snapshots.length < 2) return null;
   const data = snapshots.slice(-30);
   const prices = data.map(s => s.price);
@@ -243,23 +254,28 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
         </Box>
         <IconButton size="small" onClick={onClose}><X size={18} /></IconButton>
       </DialogTitle>
-      <DialogContent>
+      <DialogContent sx={{ bgcolor: '#fafbff' }}>
         <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-          <Chip label={`Son: $${latest.price.toFixed(2)}`} color="primary" size="small" />
-          <Chip label={`Min: $${min.toFixed(2)}`} size="small" variant="outlined" />
-          <Chip label={`Max: $${max.toFixed(2)}`} size="small" variant="outlined" />
+          <Chip label={`Son: $${latest.price.toFixed(2)}`} size="small" sx={{ bgcolor: '#6366f1', color: '#fff', fontWeight: 600 }} />
+          <Chip label={`Min: $${min.toFixed(2)}`} size="small" variant="outlined" sx={{ borderColor: 'rgba(99,102,241,0.3)' }} />
+          <Chip label={`Max: $${max.toFixed(2)}`} size="small" variant="outlined" sx={{ borderColor: 'rgba(99,102,241,0.3)' }} />
           <Chip
             label={`${changeVal >= 0 ? '+' : ''}${changeVal.toFixed(1)}%`}
             size="small"
-            sx={{ bgcolor: changeVal >= 0 ? '#e8f5e9' : '#ffebee', color: changeVal >= 0 ? '#2e7d32' : '#c62828', fontWeight: 600 }}
+            sx={{
+              bgcolor: changeVal >= 0 ? '#ecfdf5' : '#fef2f2',
+              color: changeVal >= 0 ? '#059669' : '#dc2626',
+              fontWeight: 600,
+              boxShadow: changeVal >= 0 ? '0 0 8px rgba(16,185,129,0.3)' : '0 0 8px rgba(239,68,68,0.3)',
+            }}
           />
         </Box>
         <Box sx={{ width: '100%', overflowX: 'auto' }}>
           <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: '100%', maxHeight: 220 }}>
             <defs>
               <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#1976d2" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#1976d2" stopOpacity="0.02" />
+                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#6366f1" stopOpacity="0.02" />
               </linearGradient>
             </defs>
             {/* Grid lines */}
@@ -268,22 +284,22 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
               const val = min + range * pct;
               return (
                 <g key={pct}>
-                  <line x1={padX} y1={y} x2={svgW - padX} y2={y} stroke="#e0e0e0" strokeDasharray="4" />
-                  <text x={padX - 4} y={y + 4} textAnchor="end" fontSize="10" fill="#999">${val.toFixed(0)}</text>
+                  <line x1={padX} y1={y} x2={svgW - padX} y2={y} stroke="#e5e7eb" strokeDasharray="4" />
+                  <text x={padX - 4} y={y + 4} textAnchor="end" fontSize="10" fill="#9ca3af">${val.toFixed(0)}</text>
                 </g>
               );
             })}
             {/* Area fill */}
             <path d={areaD} fill="url(#priceGrad)" />
             {/* Price line */}
-            <path d={pathD} fill="none" stroke="#1976d2" strokeWidth="2" strokeLinejoin="round" />
+            <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinejoin="round" />
             {/* Data points */}
             {points.map((p, i) => (
               <g key={i}>
-                <circle cx={p.x} cy={p.y} r={i === points.length - 1 ? 5 : 3} fill={i === points.length - 1 ? '#1976d2' : '#90caf9'} stroke="#fff" strokeWidth="1.5" />
+                <circle cx={p.x} cy={p.y} r={i === points.length - 1 ? 5 : 3} fill={i === points.length - 1 ? '#6366f1' : '#a5b4fc'} stroke="#fff" strokeWidth="1.5" />
                 {(i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2)) && (
-                  <text x={p.x} y={svgH - 4} textAnchor="middle" fontSize="9" fill="#999">
-                    {new Date(p.timestamp).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}
+                  <text x={p.x} y={svgH - 4} textAnchor="middle" fontSize="9" fill="#9ca3af">
+                    {formatDate(p.timestamp, { day: '2-digit', month: '2-digit' })}
                   </text>
                 )}
               </g>
@@ -298,12 +314,12 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
               {data.map((s, i) => {
                 const maxSold = Math.max(...data.map(d => d.soldQuantity || 0), 1);
                 return (
-                  <Tooltip key={i} title={`${s.soldQuantity || 0} satis - ${new Date(s.timestamp).toLocaleDateString('tr-TR')}`}>
+                  <Tooltip key={i} title={`${s.soldQuantity || 0} sold - ${formatDate(s.timestamp)}`}>
                     <Box sx={{
                       flex: 1, minWidth: 3,
                       height: `${Math.max(((s.soldQuantity || 0) / maxSold) * 100, 3)}%`,
-                      bgcolor: '#66bb6a', borderRadius: '1px 1px 0 0',
-                      '&:hover': { bgcolor: '#43a047' },
+                      bgcolor: '#10b981', borderRadius: '2px 2px 0 0',
+                      '&:hover': { bgcolor: '#059669' },
                     }} />
                   </Tooltip>
                 );
@@ -317,6 +333,7 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
 }
 
 function MiniPriceChart({ snapshots, title, expandable = true }: { snapshots: { price: number; soldQuantity?: number; timestamp: string }[]; title?: string; expandable?: boolean }) {
+  const { formatDate } = useLocale();
   const [expanded, setExpanded] = useState(false);
   if (!snapshots || snapshots.length < 2) return <Typography variant="caption" color="text.secondary">Veri yok</Typography>;
   const prices = snapshots.map(s => s.price);
@@ -331,13 +348,14 @@ function MiniPriceChart({ snapshots, title, expandable = true }: { snapshots: { 
         title={expandable ? 'Tikla: Detayli grafik' : undefined}
       >
         {snapshots.slice(-30).map((s, i, arr) => (
-          <Tooltip key={i} title={`$${s.price.toFixed(2)} - ${new Date(s.timestamp).toLocaleDateString('tr-TR')}`}>
+          <Tooltip key={i} title={`$${s.price.toFixed(2)} - ${formatDate(s.timestamp)}`}>
             <Box sx={{
               flex: 1, minWidth: 2, maxWidth: 6,
               height: `${Math.max(((s.price - min) / range) * 100, 5)}%`,
-              bgcolor: i === arr.length - 1 ? '#1976d2' : '#90caf9',
-              borderRadius: '1px 1px 0 0',
-              '&:hover': { bgcolor: '#1565c0' },
+              bgcolor: i === arr.length - 1 ? '#6366f1' : '#818cf8',
+              borderRadius: '2px 2px 0 0',
+              boxShadow: i === arr.length - 1 ? '0 0 6px rgba(99,102,241,0.4)' : 'none',
+              '&:hover': { bgcolor: '#4f46e5' },
             }} />
           </Tooltip>
         ))}
@@ -348,40 +366,57 @@ function MiniPriceChart({ snapshots, title, expandable = true }: { snapshots: { 
 }
 
 function ScoreDisplay({ label, score, invert = false }: { label: string; score: number; invert?: boolean }) {
+  const t = useTranslations('ebayResearch');
   const color = SCORE_COLOR(score, invert);
+  const glow = SCORE_GLOW(score, invert);
+  const pct = Math.min(score, 100);
+  const rad = 40;
+  const circ = 2 * Math.PI * rad;
+  const dashOff = circ - (pct / 100) * circ;
   return (
     <Box sx={{ textAlign: 'center', p: 2 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+      <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', fontWeight: 600, letterSpacing: '0.02em' }}>
         {label}
       </Typography>
-      <Typography variant="h3" sx={{ fontWeight: 800, color, lineHeight: 1 }}>
-        {score}
-      </Typography>
-      <Typography variant="caption" color="text.secondary">/100</Typography>
+      <Box sx={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 96, height: 96, boxShadow: `0 0 20px ${glow}`, borderRadius: '50%' }}>
+        <svg width="96" height="96" style={{ position: 'absolute', top: 0, left: 0 }}>
+          <circle cx="48" cy="48" r={rad} fill="none" stroke="#f0f0f5" strokeWidth="6" />
+          <circle cx="48" cy="48" r={rad} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round"
+            strokeDasharray={circ} strokeDashoffset={dashOff}
+            transform="rotate(-90 48 48)" style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+        </svg>
+        <Box sx={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Typography sx={{ fontWeight: 900, fontSize: '1.75rem', color, lineHeight: 1 }}>
+            {score}
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>/100</Typography>
+        </Box>
+      </Box>
     </Box>
   );
 }
 
 function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string | number; sub?: string }) {
   return (
-    <Paper sx={{ p: 1.5, textAlign: 'center', flex: '1 1 140px', minWidth: 120 }} variant="outlined">
-      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, color: 'primary.main' }}>{icon}</Box>
+    <Paper sx={{ p: 1.5, textAlign: 'center', flex: '1 1 140px', minWidth: 120, background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.1)', borderLeft: '3px solid', borderLeftColor: 'primary.main' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, color: '#6366f1' }}>{icon}</Box>
       <Typography variant="caption" color="text.secondary" display="block">{label}</Typography>
-      <Typography variant="subtitle1" fontWeight={700}>{value}</Typography>
+      <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: '1.25rem' }}>{value}</Typography>
       {sub && <Typography variant="caption" color="text.secondary">{sub}</Typography>}
     </Paper>
   );
 }
 
 function PriceStatsBar({ stats }: { stats: PriceStats | null }) {
+  const t = useTranslations('ebayResearch');
   if (!stats) return null;
   return (
-    <Paper sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center' }} variant="outlined">
+    <Paper sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #fafbff 0%, #f5f0ff 100%)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
       <Chip icon={<DollarSign size={14} />} label={`Min: $${stats.min.toFixed(2)}`} size="small" variant="outlined" />
       <Chip icon={<BarChart2 size={14} />} label={`Ort: $${stats.avg.toFixed(2)}`} size="small" color="primary" variant="outlined" />
       <Chip icon={<Target size={14} />} label={`Medyan: $${stats.median.toFixed(2)}`} size="small" variant="outlined" />
       <Chip icon={<DollarSign size={14} />} label={`Max: $${stats.max.toFixed(2)}`} size="small" variant="outlined" />
-      <Chip icon={<Package size={14} />} label={`${stats.totalResults.toLocaleString('tr-TR')} sonuç`} size="small" color="secondary" />
+      <Chip icon={<Package size={14} />} label={`${stats.totalResults.toLocaleString()} sonu\u00e7`} size="small" color="secondary" />
     </Paper>
   );
 }
@@ -389,8 +424,10 @@ function PriceStatsBar({ stats }: { stats: PriceStats | null }) {
 function EmptyState({ message, sub }: { message: string; sub?: string }) {
   return (
     <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
-      <Package size={48} strokeWidth={1} />
-      <Typography variant="h6" sx={{ mt: 2, fontWeight: 600 }}>{message}</Typography>
+      <Box sx={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #ede9fe 0%, #e0f2fe 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+        <Package size={40} strokeWidth={1.5} style={{ color: '#6366f1' }} />
+      </Box>
+      <Typography variant="h6" sx={{ mt: 2, fontWeight: 700 }}>{message}</Typography>
       {sub && <Typography variant="body2" sx={{ mt: 1 }}>{sub}</Typography>}
     </Box>
   );
@@ -405,22 +442,23 @@ function PriceChangeChip({ change }: { change: number }) {
       label={`${up ? '+' : ''}${change.toFixed(1)}%`}
       size="small"
       sx={{
-        bgcolor: up ? '#e8f5e9' : '#ffebee',
-        color: up ? '#2e7d32' : '#c62828',
+        bgcolor: up ? '#ecfdf5' : '#fef2f2',
+        color: up ? '#059669' : '#dc2626',
         fontWeight: 600,
+        boxShadow: up ? '0 0 8px rgba(16,185,129,0.3)' : '0 0 8px rgba(239,68,68,0.3)',
       }}
     />
   );
 }
 
 function SoldBadge({ count }: { count: number }) {
-  const color = count > 10 ? '#2e7d32' : count > 0 ? '#ed6c02' : '#9e9e9e';
-  const bg = count > 10 ? '#e8f5e9' : count > 0 ? '#fff3e0' : '#f5f5f5';
+  const color = count > 10 ? '#10b981' : count > 0 ? '#f59e0b' : '#9e9e9e';
+  const bg = count > 10 ? '#ecfdf5' : count > 0 ? '#fffbeb' : '#f5f5f5';
   return (
     <Chip
-      label={`${count} satış`}
+      label={`${count} {t('sales')}`}
       size="small"
-      sx={{ bgcolor: bg, color, fontWeight: 600, fontSize: '0.75rem' }}
+      sx={{ bgcolor: bg, color, fontWeight: 600, fontSize: '0.75rem', boxShadow: count > 0 ? '0 1px 4px rgba(0,0,0,0.06)' : 'none' }}
     />
   );
 }
@@ -436,11 +474,12 @@ function SimpleHistogram({ data }: { data: { range: string; count: number }[] })
             <Box sx={{
               width: '100%', maxWidth: 40,
               height: `${Math.max((d.count / maxCount) * 80, 4)}px`,
-              bgcolor: '#1976d2',
-              borderRadius: '2px 2px 0 0',
-              '&:hover': { bgcolor: '#1565c0' },
+              background: 'linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%)',
+              borderRadius: '4px 4px 0 0',
+              transition: 'all 0.2s ease',
+              '&:hover': { background: 'linear-gradient(180deg, #4f46e5 0%, #7c3aed 100%)', transform: 'scaleY(1.05)' },
             }} />
-            <Typography variant="caption" sx={{ fontSize: '0.6rem', mt: 0.5, writingMode: 'vertical-lr', transform: 'rotate(180deg)', maxHeight: 50, overflow: 'hidden' }}>
+            <Typography variant="caption" sx={{ fontSize: '0.6rem', mt: 0.5, writingMode: 'vertical-lr', transform: 'rotate(180deg)', maxHeight: 50, overflow: 'hidden', color: '#64748b' }}>
               {d.range}
             </Typography>
           </Box>
@@ -503,7 +542,7 @@ async function apiCall(action: string, userId: string, params: Record<string, an
   const res = await fetch(`/api/clawd/ebay-research?${query.toString()}`);
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `API hatası: ${res.status}`);
+    throw new Error(errBody.error || `API error: ${res.status}`);
   }
   return res.json();
 }
@@ -516,7 +555,7 @@ async function apiPost(action: string, userId: string, body: Record<string, any>
   });
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `API hatası: ${res.status}`);
+    throw new Error(errBody.error || `API error: ${res.status}`);
   }
   return res.json();
 }
@@ -534,6 +573,8 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 // ---------------------------------------------------------------------------
 
 function ProductDatabase({ userId, userListings = [], userListingsLoading = false, onNavigate, navigateData, onConsumeNavigateData }: { userId: string; userListings?: any[]; userListingsLoading?: boolean; onNavigate?: (tool: string, data?: any) => void; navigateData?: any; onConsumeNavigateData?: () => void }) {
+  const t = useTranslations('ebayResearch');
+  const { formatDate, formatDateTime, formatNumber } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -555,6 +596,9 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
   const [searched, setSearched] = useState(false);
   const [showFilters, setShowFilters] = useState(!isMobile);
   const [trackingIds, setTrackingIds] = useState<Set<string>>(new Set());
+  const [autoLoaded, setAutoLoaded] = useState(false);
+  const [showTips, setShowTips] = useState(false);
+  const [autoLoadTrigger, setAutoLoadTrigger] = useState(0);
   const productSort = useTableSort<ProductResult>(results, '', 'desc');
 
   // Consume navigateData to pre-fill keyword and auto-search
@@ -564,6 +608,16 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
       onConsumeNavigateData?.();
     }
   }, [navigateData, onConsumeNavigateData]);
+
+  // Auto-load trending products on mount
+  useEffect(() => {
+    if (results.length > 0 || navigateData?.keyword) return;
+    const trendingKeywords = ['wireless earbuds', 'phone case', 'led lights', 'yoga mat', 'bluetooth speaker', 'watch band'];
+    const randomKeyword = trendingKeywords[Math.floor(Math.random() * trendingKeywords.length)];
+    setFilters(prev => ({ ...prev, keyword: randomKeyword }));
+    setAutoLoaded(true);
+    setAutoLoadTrigger(1);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = useCallback(async (append = false) => {
     if (!filters.keyword.trim() && !filters.categoryId.trim()) {
@@ -596,7 +650,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
       setOffset(newOffset + items.length);
       setHasMore((data.total || 0) > newOffset + items.length);
     } catch (err: any) {
-      toast.error(err.message || 'Arama başarısız');
+      toast.error(err.message || t('searchFailed'));
     } finally {
       setLoading(false);
     }
@@ -609,9 +663,9 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         title: product.title,
       });
       setTrackingIds(prev => new Set(prev).add(product.itemId));
-      toast.success('Ürün takibe alındı');
+      toast.success(t('productTracked'));
     } catch (err: any) {
-      toast.error(err.message || 'Takip başarısız');
+      toast.error(err.message || t('trackFailed'));
     }
   }, [userId]);
 
@@ -628,6 +682,14 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryChipClicked]);
+
+  // Trigger auto-load search after keyword is set
+  useEffect(() => {
+    if (autoLoadTrigger > 0) {
+      handleSearch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoadTrigger]);
 
   const userCategories = useMemo(() => {
     const cats = new Map<string, { id: string; name: string; count: number }>();
@@ -650,10 +712,16 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
   return (
     <Box>
       {/* Search Form */}
-      <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
+      <Paper sx={{
+        p: 2, mb: 2,
+        background: '#fff',
+        boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+        borderRadius: 3,
+        border: '1px solid rgba(99,102,241,0.08)',
+      }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 1 : 0 }}>
-          <Typography variant="subtitle1" fontWeight={700}>
-            <Search size={18} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+          <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#1e1b4b' }}>
+            <Search size={18} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
             Ürün Arama
           </Typography>
           {isMobile && (
@@ -676,12 +744,23 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                   label={`${cat.name} (${cat.count})`}
                   size="small"
                   variant={filters.categoryId === cat.id ? 'filled' : 'outlined'}
-                  color={filters.categoryId === cat.id ? 'primary' : 'default'}
                   onClick={() => {
                     setFilters(prev => ({ ...prev, categoryId: cat.id }));
                     setCategoryChipClicked(c => c + 1);
                   }}
-                  sx={{ cursor: 'pointer' }}
+                  sx={{
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    ...(filters.categoryId === cat.id ? {
+                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                      color: '#fff',
+                      boxShadow: '0 2px 6px rgba(99,102,241,0.2)',
+                      '&:hover': { background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' },
+                    } : {
+                      borderColor: 'rgba(99,102,241,0.2)',
+                      '&:hover': { borderColor: '#6366f1', bgcolor: 'rgba(99,102,241,0.04)' },
+                    }),
+                  }}
                 />
               ))}
             </Box>
@@ -697,7 +776,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             helperText="Anahtar kelime veya eBay URL yapistirin — en az 2 karakter"
             value={filters.keyword}
             onChange={e => updateFilter('keyword', e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSearch()}
+            onKeyDown={e => { if (e.key === 'Enter') { setAutoLoaded(false); handleSearch(); } }}
             sx={{ flex: '2 1 250px' }}
             InputProps={{
               startAdornment: <InputAdornment position="start"><Search size={16} /></InputAdornment>,
@@ -710,10 +789,49 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             onChange={e => updateFilter('categoryId', e.target.value)}
             sx={{ flex: '1 1 120px', maxWidth: 160 }}
           />
-          <Button variant="contained" onClick={() => handleSearch()} disabled={loading} sx={{ minWidth: 100 }}>
-            {loading ? <CircularProgress size={20} /> : 'Ara'}
+          <Button variant="contained" onClick={() => { setAutoLoaded(false); handleSearch(); }} disabled={loading} sx={{
+            minWidth: 100,
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+            borderRadius: 2,
+            transition: 'all 0.2s ease',
+            '&:hover': { background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', boxShadow: '0 4px 12px rgba(99,102,241,0.4)' },
+          }}>
+            {loading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Ara'}
           </Button>
+          <Chip
+            icon={<Lightbulb size={14} />}
+            label="Ipuclari"
+            size="small"
+            variant={showTips ? 'filled' : 'outlined'}
+            onClick={() => setShowTips(v => !v)}
+            sx={{
+              cursor: 'pointer', alignSelf: 'center',
+              ...(showTips ? {
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                color: '#fff',
+              } : {
+                borderColor: 'rgba(99,102,241,0.3)',
+                color: '#6366f1',
+              }),
+            }}
+          />
         </Box>
+
+        {/* Tips */}
+        <Collapse in={showTips}>
+          <Paper sx={{ p: 2, mt: 1.5, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)' }}>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Ipuclari</Typography>
+            <Typography variant="body2" color="text.secondary" component="div">
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                <li>Genel kelimeler yerine spesifik urun adlari arayin (or: &quot;bluetooth earbuds&quot; yerine &quot;wireless earbuds bluetooth 5.3&quot;)</li>
+                <li>Fiyat araligi filtresini kullanarak karli urunleri bulun</li>
+                <li>Begediginiz urunleri &quot;Takip Et&quot; ile fiyat degisikliklerini izleyin</li>
+                <li>&quot;Nis Analizi&quot; butonu ile bir urun kategorisinin rekabet seviyesini ogrenin</li>
+              </ul>
+            </Typography>
+          </Paper>
+        </Collapse>
 
         {/* Extended Filters */}
         <Collapse in={showFilters || !isMobile}>
@@ -722,8 +840,8 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 130 } }}>
               <InputLabel>Pazar Yeri</InputLabel>
               <Select value={filters.marketplace} label="Pazar Yeri" onChange={e => updateFilter('marketplace', e.target.value)}>
-                {MARKETPLACES.map(m => (
-                  <MenuItem key={m.value} value={m.value}>{m.flag} {m.label}</MenuItem>
+                {MARKETPLACES_DATA.map(m => (
+                  <MenuItem key={m.value} value={m.value}>{m.flag} {t(m.labelKey)}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -732,18 +850,18 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 120 } }}>
               <InputLabel>Durum</InputLabel>
               <Select value={filters.condition} label="Durum" onChange={e => updateFilter('condition', e.target.value)}>
-                {CONDITIONS.map(c => (
-                  <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>
+                {CONDITIONS_DATA.map(c => (
+                  <MenuItem key={c.value} value={c.value}>{t(c.labelKey)}</MenuItem>
                 ))}
               </Select>
             </FormControl>
 
             {/* Sort */}
             <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 170 } }}>
-              <InputLabel>Sıralama</InputLabel>
-              <Select value={filters.sortBy} label="Sıralama" onChange={e => updateFilter('sortBy', e.target.value)}>
-                {SORT_OPTIONS.map(s => (
-                  <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>
+              <InputLabel>{t('sorting')}</InputLabel>
+              <Select value={filters.sortBy} label={t('sorting')} onChange={e => updateFilter('sortBy', e.target.value)}>
+                {SORT_DATA.map(s => (
+                  <MenuItem key={s.value} value={s.value}>{t(s.labelKey)}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -771,13 +889,29 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         </Collapse>
       </Paper>
 
+      {/* Auto-loaded trending banner */}
+      {autoLoaded && results.length > 0 && (
+        <Paper sx={{ p: 1.5, mb: 2, background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <TrendingUp size={16} color="#6366f1" />
+          <Typography variant="body2" color="text.secondary">
+            Trend urunler gosteriliyor — kendi aramanizi yaparak baslayin
+          </Typography>
+        </Paper>
+      )}
+
       {/* Price Stats */}
       <PriceStatsBar stats={priceStats} />
 
       {/* Top Keywords */}
       {topKeywords.length > 0 && (
-        <Paper sx={{ p: 1.5, mb: 2, overflow: 'hidden' }} variant="outlined">
-          <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+        <Paper sx={{
+          p: 1.5, mb: 2, overflow: 'hidden',
+          background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)',
+          border: '1px solid rgba(99,102,241,0.1)',
+          borderRadius: 3,
+          boxShadow: '0 1px 8px rgba(99,102,241,0.06)',
+        }}>
+          <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: '#6366f1' }}>
             Trend Kelimeler:
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -786,12 +920,25 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                 key={i}
                 label={`${kw.word} (${kw.count})`}
                 size="small"
-                variant="outlined"
                 clickable
                 onClick={() => {
                   setFilters(prev => ({ ...prev, keyword: kw.word }));
                 }}
-                sx={{ fontSize: '0.7rem', height: 24, fontWeight: i < 5 ? 700 : 400, color: i < 3 ? 'primary.main' : 'text.secondary' }}
+                sx={{
+                  fontSize: '0.7rem', height: 24,
+                  fontWeight: i < 5 ? 700 : 400,
+                  transition: 'all 0.2s ease',
+                  ...(i < 3 ? {
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    color: '#fff',
+                    boxShadow: '0 2px 6px rgba(99,102,241,0.2)',
+                  } : {
+                    bgcolor: '#fff',
+                    color: '#64748b',
+                    border: '1px solid rgba(99,102,241,0.15)',
+                  }),
+                  '&:hover': { boxShadow: '0 2px 8px rgba(99,102,241,0.25)', transform: 'translateY(-1px)' },
+                }}
               />
             ))}
           </Box>
@@ -799,22 +946,22 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
       )}
 
       {/* Loading */}
-      {loading && <LinearProgress sx={{ mb: 1 }} />}
+      {loading && <LinearProgress sx={{ mb: 1, borderRadius: 2, '& .MuiLinearProgress-bar': { background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' } }} />}
 
       {/* Results */}
       {!searched && userListings.length > 0 ? (
-        <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#f0f7ff' }}>
+        <Paper sx={{ p: 3, textAlign: 'center', background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', boxShadow: '0 2px 16px rgba(0,0,0,0.04)' }}>
           <Typography variant="body1" fontWeight={600} sx={{ mb: 1 }}>
             Aramaya başla veya kategorilerinden birini seç
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {userListings.length} aktif listen var. Yukarıdaki kategorilerine tıklayarak pazarı keşfet.
+            {userListings.length} {t('activeListingsHint')}
           </Typography>
         </Paper>
       ) : !searched ? (
-        <EmptyState message="Aramaya başlayın" sub="Yukarıdaki alanları kullanarak eBay'de ürün arayın" />
+        <EmptyState message={t('startSearch')} sub={t('searchHint')} />
       ) : results.length === 0 && !loading ? (
-        <EmptyState message="Sonuç bulunamadı" sub="Filtrelerinizi değiştirerek tekrar deneyin" />
+        <EmptyState message={t('noResults')} sub={t('changeFiltersHint')} />
       ) : isMobile ? (
         /* Mobile Card View */
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -824,12 +971,12 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         </Box>
       ) : (
         /* Desktop Table View */
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                <TableCell sx={{ width: 60 }}>Resim</TableCell>
-                <TableCell>Başlık</TableCell>
+              <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
+                <TableCell sx={{ width: 60, fontWeight: 700, color: '#1e1b4b' }}>Resim</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('title')}</TableCell>
                 <TableCell align="right" sortDirection={productSort.sortKey === 'price' ? productSort.sortDir : false}>
                   <TableSortLabel active={productSort.sortKey === 'price'} direction={productSort.sortKey === 'price' ? productSort.sortDir : 'desc'} onClick={() => productSort.handleSort('price')}>
                     Fiyat
@@ -840,21 +987,21 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                     Satış
                   </TableSortLabel>
                 </TableCell>
-                <TableCell>Durum</TableCell>
-                <TableCell>Satıcı</TableCell>
-                <TableCell>Kargo</TableCell>
-                <TableCell align="center">Aksiyon</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Durum</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('seller')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Kargo</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700, color: '#1e1b4b' }}>Aksiyon</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {productSort.sorted.map(product => (
-                <TableRow key={product.itemId} hover sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
+                <TableRow key={product.itemId} hover sx={{ transition: 'all 0.15s ease', '&:hover': { bgcolor: '#f8faff', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' } }}>
                   <TableCell>
                     <Box
                       component="img"
                       src={product.imageUrl || '/placeholder-product.png'}
                       alt=""
-                      sx={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 1, bgcolor: '#f5f5f5' }}
+                      sx={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 2, bgcolor: '#f5f5f5', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
                       onError={(e: any) => { e.target.src = '/placeholder-product.png'; }}
                     />
                   </TableCell>
@@ -866,8 +1013,8 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                       target="_blank"
                       rel="noopener noreferrer"
                       sx={{
-                        color: 'primary.main', textDecoration: 'none', fontWeight: 500,
-                        '&:hover': { textDecoration: 'underline' },
+                        color: '#6366f1', textDecoration: 'none', fontWeight: 500,
+                        '&:hover': { textDecoration: 'underline', color: '#4f46e5' },
                         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                       }}
                     >
@@ -878,7 +1025,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" fontWeight={700}>${product.price.toFixed(2)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#6366f1' }}>${product.price.toFixed(2)}</Typography>
                   </TableCell>
                   <TableCell align="center">
                     <SoldBadge count={product.estimatedSold} />
@@ -889,20 +1036,20 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                   <TableCell>
                     <Typography
                       variant="caption"
-                      sx={{ cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
+                      sx={{ cursor: 'pointer', color: '#6366f1', '&:hover': { textDecoration: 'underline', color: '#4f46e5' } }}
                       onClick={() => handleSellerSearch(product.seller)}
                     >
                       {product.seller}
                     </Typography>
                     {product.sellerFeedback > 0 && (
                       <Typography variant="caption" display="block" color="text.secondary">
-                        ({product.sellerFeedback.toLocaleString('tr-TR')})
+                        ({product.sellerFeedback.toLocaleString()})
                       </Typography>
                     )}
                   </TableCell>
                   <TableCell>
                     {product.freeShipping ? (
-                      <Chip label="Ücretsiz" size="small" color="success" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                      <Chip label={t('free')} size="small" color="success" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
                     ) : product.shippingCost != null ? (
                       <Typography variant="caption">${product.shippingCost.toFixed(2)}</Typography>
                     ) : (
@@ -917,26 +1064,27 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                           color={trackingIds.has(product.itemId) ? 'primary' : 'default'}
                           onClick={() => handleTrack(product)}
                           disabled={trackingIds.has(product.itemId)}
+                          sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }}
                         >
                           <Bookmark size={16} fill={trackingIds.has(product.itemId) ? 'currentColor' : 'none'} />
                         </IconButton>
                       </Tooltip>
                       {onNavigate && (
                         <Tooltip title="Nis Analizi">
-                          <IconButton size="small" onClick={() => onNavigate('niche_finder', { keyword: product.title.split(' ').slice(0, 4).join(' ') })}>
+                          <IconButton size="small" sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }} onClick={() => onNavigate('niche_finder', { keyword: product.title.split(' ').slice(0, 4).join(' ') })}>
                             <Gauge size={16} />
                           </IconButton>
                         </Tooltip>
                       )}
                       {onNavigate && (
                         <Tooltip title="SEO Kontrol">
-                          <IconButton size="small" onClick={() => onNavigate('seo_analyzer', { keyword: product.title.split(' ').slice(0, 4).join(' '), title: product.title })}>
+                          <IconButton size="small" sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }} onClick={() => onNavigate('seo_analyzer', { keyword: product.title.split(' ').slice(0, 4).join(' '), title: product.title })}>
                             <Target size={16} />
                           </IconButton>
                         </Tooltip>
                       )}
-                      <Tooltip title="eBay'de Aç">
-                        <IconButton size="small" component="a" href={product.itemUrl} target="_blank" rel="noopener noreferrer">
+                      <Tooltip title={t('openOnEbay')}>
+                        <IconButton size="small" component="a" href={product.itemUrl} target="_blank" rel="noopener noreferrer" sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }}>
                           <ExternalLink size={16} />
                         </IconButton>
                       </Tooltip>
@@ -952,7 +1100,11 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
       {/* Load More */}
       {hasMore && results.length > 0 && !loading && (
         <Box sx={{ textAlign: 'center', mt: 2 }}>
-          <Button variant="outlined" onClick={() => handleSearch(true)} startIcon={<ChevronDown size={16} />}>
+          <Button variant="outlined" onClick={() => handleSearch(true)} startIcon={<ChevronDown size={16} />} sx={{
+            borderColor: '#6366f1', color: '#6366f1', borderRadius: 2,
+            transition: 'all 0.2s ease',
+            '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)', boxShadow: '0 2px 8px rgba(99,102,241,0.15)' },
+          }}>
             Daha Fazla Yükle
           </Button>
         </Box>
@@ -967,15 +1119,17 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
   onSellerSearch: (s: string) => void; tracked: boolean;
   onNavigate?: (tool: string, data?: any) => void;
 }) {
+  const t = useTranslations('ebayResearch');
+  const { formatDate, formatDateTime } = useLocale();
   const [expanded, setExpanded] = useState(false);
   return (
-    <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+    <Paper sx={{ overflow: 'hidden', background: '#fff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.08)' } }}>
       <Box sx={{ display: 'flex', gap: 1.5, p: 1.5, cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
         <Box
           component="img"
           src={product.imageUrl || '/placeholder-product.png'}
           alt=""
-          sx={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
+          sx={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 2, flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}
           onError={(e: any) => { e.target.src = '/placeholder-product.png'; }}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -985,7 +1139,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
             {product.title}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-            <Typography variant="subtitle2" fontWeight={700} color="primary.main">${product.price.toFixed(2)}</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#6366f1' }}>${product.price.toFixed(2)}</Typography>
             <SoldBadge count={product.estimatedSold} />
             {product.topRated && <Star size={14} color="#ed6c02" fill="#ed6c02" />}
           </Box>
@@ -1000,13 +1154,13 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
             <Typography variant="caption">{product.condition}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" color="text.secondary">Satıcı:</Typography>
+            <Typography variant="caption" color="text.secondary">{t('seller')}:</Typography>
             <Typography
               variant="caption"
-              sx={{ cursor: 'pointer', color: 'primary.main' }}
+              sx={{ cursor: 'pointer', color: '#6366f1', '&:hover': { textDecoration: 'underline', color: '#4f46e5' } }}
               onClick={(e) => { e.stopPropagation(); onSellerSearch(product.seller); }}
             >
-              {product.seller} ({product.sellerFeedback.toLocaleString('tr-TR')})
+              {product.seller} ({product.sellerFeedback.toLocaleString()})
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1018,7 +1172,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
           <Divider />
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <Button
-              size="small" variant="outlined" sx={{ flex: '1 1 45%' }}
+              size="small" variant="outlined" sx={{ flex: '1 1 45%', borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}
               startIcon={<Bookmark size={14} fill={tracked ? 'currentColor' : 'none'} />}
               onClick={() => onTrack(product)}
               disabled={tracked}
@@ -1027,7 +1181,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
             </Button>
             {onNavigate && (
               <Button
-                size="small" variant="outlined" sx={{ flex: '1 1 45%' }}
+                size="small" variant="outlined" sx={{ flex: '1 1 45%', borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}
                 startIcon={<Gauge size={14} />}
                 onClick={() => onNavigate('niche_finder', { keyword: product.title.split(' ').slice(0, 4).join(' ') })}
               >
@@ -1036,7 +1190,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
             )}
             {onNavigate && (
               <Button
-                size="small" variant="outlined" sx={{ flex: '1 1 45%' }}
+                size="small" variant="outlined" sx={{ flex: '1 1 45%', borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}
                 startIcon={<Target size={14} />}
                 onClick={() => onNavigate('seo_analyzer', { keyword: product.title.split(' ').slice(0, 4).join(' '), title: product.title })}
               >
@@ -1044,7 +1198,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
               </Button>
             )}
             <Button
-              size="small" variant="outlined" sx={{ flex: '1 1 45%' }}
+              size="small" variant="outlined" sx={{ flex: '1 1 45%', borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}
               startIcon={<ExternalLink size={14} />}
               component="a" href={product.itemUrl} target="_blank" rel="noopener noreferrer"
             >
@@ -1062,6 +1216,8 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
 // ---------------------------------------------------------------------------
 
 function ProductTracker({ userId, userListings, onNavigate }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
+  const t = useTranslations('ebayResearch');
+  const { formatDate, formatDateTime } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -1118,7 +1274,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
       const data = await apiCall('tracked_products', userId);
       setTracked(data.products || []);
     } catch (err: any) {
-      toast.error(err.message || 'Takip edilen ürünler yüklenemedi');
+      toast.error(err.message || t('trackedProductsLoadFailed'));
     } finally {
       setLoading(false);
     }
@@ -1130,10 +1286,10 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
     setRefreshing(true);
     try {
       await apiPost('refresh_tracked', userId);
-      toast.success('Tüm ürünler güncellendi');
+      toast.success(t('allProductsUpdated'));
       await fetchTracked();
     } catch (err: any) {
-      toast.error(err.message || 'Güncelleme başarısız');
+      toast.error(err.message || t('updateFailed'));
     } finally {
       setRefreshing(false);
     }
@@ -1151,12 +1307,12 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
       if (idMatch) itemId = idMatch[1];
 
       await apiPost('track_product', userId, { legacyItemId: itemId });
-      toast.success('Ürün takibe alındı');
+      toast.success(t('productTracked'));
       setAddDialogOpen(false);
       setAddItemId('');
       await fetchTracked();
     } catch (err: any) {
-      toast.error(err.message || 'Ürün eklenemedi');
+      toast.error(err.message || t('productAddFailed'));
     } finally {
       setAddLoading(false);
     }
@@ -1166,9 +1322,9 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
     try {
       await apiPost('untrack_product', userId, { id });
       setTracked(prev => prev.filter(p => p.id !== id));
-      toast.success('Ürün takipten çıkarıldı');
+      toast.success(t('productUntracked'));
     } catch (err: any) {
-      toast.error(err.message || 'Silme başarısız');
+      toast.error(err.message || t('deleteFailed'));
     }
   }, [userId]);
 
@@ -1219,21 +1375,30 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
   return (
     <Box>
       {/* Actions Bar */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+      <Box sx={{
+        display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center',
+        p: 2, borderRadius: 3,
+        background: 'linear-gradient(135deg, #fafbff 0%, #f0f1ff 100%)',
+        border: '1px solid rgba(99,102,241,0.08)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+      }}>
         <Button
           variant="contained"
           startIcon={refreshing ? <CircularProgress size={16} color="inherit" /> : <RefreshCw size={16} />}
           onClick={handleRefreshAll}
           disabled={refreshing || tracked.length === 0}
+          sx={{ bgcolor: '#6366f1', '&:hover': { bgcolor: '#4f46e5' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
         >
           Takip Edilen Ürünleri Yenile
         </Button>
-        <Button variant="outlined" startIcon={<Plus size={16} />} onClick={() => setAddDialogOpen(true)}>
+        <Button variant="outlined" startIcon={<Plus size={16} />} onClick={() => setAddDialogOpen(true)}
+          sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+        >
           URL/ID ile Ekle
         </Button>
-        <Tooltip title="CSV Olarak İndir">
+        <Tooltip title={t('downloadCSV')}>
           <span>
-            <IconButton size="small" onClick={handleExportCsv} disabled={tracked.length === 0}>
+            <IconButton size="small" onClick={handleExportCsv} disabled={tracked.length === 0} sx={{ color: '#6366f1' }}>
               <Download size={18} />
             </IconButton>
           </span>
@@ -1242,24 +1407,37 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
           {lastUpdateTime && (
             <Chip
               icon={<Clock size={12} />}
-              label={`Son Güncelleme: ${lastUpdateTime.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
+              label={`${t('lastUpdate')}: ${formatDateTime(lastUpdateTime, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
               size="small"
               variant="outlined"
-              sx={{ height: 24, fontSize: '0.7rem' }}
+              sx={{ height: 24, fontSize: '0.7rem', borderColor: 'rgba(99,102,241,0.2)', color: '#6366f1' }}
             />
           )}
-          <Typography variant="caption" color="text.secondary">
-            {tracked.length} ürün takipte
+          <Typography variant="caption" sx={{ color: '#6366f1', fontWeight: 600 }}>
+            {tracked.length} {t('productsTracked')}
           </Typography>
         </Box>
       </Box>
 
       {/* Product List */}
       {tracked.length === 0 ? (
-        <EmptyState
-          message="Henuz takip ettiginiz urun yok"
-          sub="Urun Veritabani'nda bir urun bulup 'Takip Et' butonuna tiklayin. Fiyat ve stok degisikliklerini otomatik izleyin."
-        />
+        <Box>
+          <EmptyState
+            message="Henuz takip ettiginiz urun yok"
+            sub="Urun Veritabani'nda bir urun bulup 'Takip Et' butonuna tiklayin. Fiyat ve stok degisikliklerini otomatik izleyin."
+          />
+          <Paper sx={{ p: 2, mt: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Urun Takibi Nasil Kullanilir?</Typography>
+            <Typography variant="body2" color="text.secondary" component="div">
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                <li>Urun Veritabani&apos;nda begendiiginiz urunleri &quot;Takip Et&quot; butonuyla ekleyin</li>
+                <li>Fiyat dususu ve stok degisikliklerinde otomatik uyari alirsiniz</li>
+                <li>Her urun icin notlar ve etiketler ekleyerek organize edin</li>
+                <li>CSV olarak disari aktararak raporlayin</li>
+              </ul>
+            </Typography>
+          </Paper>
+        </Box>
       ) : isMobile ? (
         /* Mobile Card View */
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -1276,24 +1454,24 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
         </Box>
       ) : (
         /* Desktop Table View */
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                <TableCell sx={{ width: 60 }}>Resim</TableCell>
-                <TableCell>Başlık</TableCell>
+              <TableRow sx={{ background: 'linear-gradient(135deg, #f8f9ff 0%, #eef0ff 100%)' }}>
+                <TableCell sx={{ width: 60, fontWeight: 600, color: '#4338ca' }}>Resim</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#4338ca' }}>{t('title')}</TableCell>
                 <TableCell align="right" sortDirection={trackedSort.sortKey === 'currentPrice' ? trackedSort.sortDir : false}>
                   <TableSortLabel active={trackedSort.sortKey === 'currentPrice'} direction={trackedSort.sortKey === 'currentPrice' ? trackedSort.sortDir : 'desc'} onClick={() => trackedSort.handleSort('currentPrice')}>
                     Fiyat
                   </TableSortLabel>
                 </TableCell>
-                <TableCell align="center">Değişim</TableCell>
+                <TableCell align="center">{t('change')}</TableCell>
                 <TableCell align="center" sortDirection={trackedSort.sortKey === 'totalSold' ? trackedSort.sortDir : false}>
                   <TableSortLabel active={trackedSort.sortKey === 'totalSold'} direction={trackedSort.sortKey === 'totalSold' ? trackedSort.sortDir : 'desc'} onClick={() => trackedSort.handleSort('totalSold')}>
                     Satış
                   </TableSortLabel>
                 </TableCell>
-                <TableCell>Fiyat Geçmişi</TableCell>
+                <TableCell>{t('priceHistory')}</TableCell>
                 <TableCell>Notlar</TableCell>
                 <TableCell>Etiketler</TableCell>
                 <TableCell align="center">Son Kontrol</TableCell>
@@ -1302,13 +1480,13 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
             </TableHead>
             <TableBody>
               {trackedSort.sorted.map(product => (
-                <TableRow key={product.id} hover>
+                <TableRow key={product.id} hover sx={{ '&:hover': { bgcolor: 'rgba(99,102,241,0.03)' } }}>
                   <TableCell>
                     <Box
                       component="img"
                       src={product.imageUrl || '/placeholder-product.png'}
                       alt=""
-                      sx={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 1 }}
+                      sx={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 2 }}
                       onError={(e: any) => { e.target.src = '/placeholder-product.png'; }}
                     />
                   </TableCell>
@@ -1323,7 +1501,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" fontWeight={700}>${(product.currentPrice || 0).toFixed(2)}</Typography>
+                    <Typography variant="body2" fontWeight={700} sx={{ color: '#6366f1' }}>${(product.currentPrice || 0).toFixed(2)}</Typography>
                     {product.snapshots?.length > 1 && (() => {
                       const oldest = product.snapshots[product.snapshots.length - 1];
                       return oldest.price !== product.currentPrice ? (
@@ -1386,7 +1564,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                   </TableCell>
                   <TableCell align="center">
                     <Typography variant="caption" color="text.secondary">
-                      {product.lastCheckedAt ? new Date(product.lastCheckedAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                      {product.lastCheckedAt ? formatDateTime(product.lastCheckedAt, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
@@ -1424,10 +1602,10 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
 
       {/* Add by URL/ID Dialog */}
       <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>URL veya ID ile Ürün Ekle</DialogTitle>
+        <DialogTitle>{t('addProductByUrl')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            eBay ürün URL&apos;sini veya Legacy Item ID&apos;sini girin.
+            {t('enterProductUrlOrId')}
           </Typography>
           <TextField
             fullWidth
@@ -1449,7 +1627,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
 
       {/* Tags Dialog */}
       <Dialog open={!!tagDialog} onClose={() => setTagDialog(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Etiketleri Düzenle</DialogTitle>
+        <DialogTitle>{t('editTags')}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2, mt: 1 }}>
             {tagDialog?.tags.map(tag => (
@@ -1463,7 +1641,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
               />
             ))}
             {(!tagDialog?.tags || tagDialog.tags.length === 0) && (
-              <Typography variant="caption" color="text.secondary">Henüz etiket yok</Typography>
+              <Typography variant="caption" color="text.secondary">{t('noTagsYet')}</Typography>
             )}
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -1488,7 +1666,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
       {/* Notes inline edit dialog for mobile */}
       {isMobile && editingNotes && (
         <Dialog open={!!editingNotes} onClose={() => setEditingNotes(null)} maxWidth="sm" fullWidth>
-          <DialogTitle>Not Düzenle</DialogTitle>
+          <DialogTitle>{t('editNote')}</DialogTitle>
           <DialogContent>
             <TextField
               fullWidth
@@ -1516,21 +1694,23 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
   onOpenTags: (id: string, tags: string[]) => void;
   onNavigate?: (tool: string, data?: any) => void;
 }) {
+  const t = useTranslations('ebayResearch');
+  const { formatDate, formatDateTime } = useLocale();
   const [expanded, setExpanded] = useState(false);
   return (
-    <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+    <Paper sx={{ overflow: 'hidden', background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
       <Box sx={{ display: 'flex', gap: 1.5, p: 1.5, cursor: 'pointer' }} onClick={() => setExpanded(!expanded)}>
         <Box
           component="img"
           src={product.imageUrl || '/placeholder-product.png'}
           alt=""
-          sx={{ width: 55, height: 55, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
+          sx={{ width: 55, height: 55, objectFit: 'cover', borderRadius: 2, flexShrink: 0 }}
           onError={(e: any) => { e.target.src = '/placeholder-product.png'; }}
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="body2" fontWeight={500} noWrap>{product.title}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-            <Typography variant="subtitle2" fontWeight={700}>${(product.currentPrice || 0).toFixed(2)}</Typography>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#6366f1' }}>${(product.currentPrice || 0).toFixed(2)}</Typography>
             {product.snapshots?.length > 1 ? (() => {
               const oldest = product.snapshots[product.snapshots.length - 1];
               const change = oldest.price > 0 ? ((product.currentPrice - oldest.price) / oldest.price) * 100 : 0;
@@ -1550,18 +1730,18 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
         <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {product.snapshots?.length > 1 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography variant="caption" color="text.secondary">İlk Fiyat:</Typography>
+              <Typography variant="caption" color="text.secondary">{t('firstPrice')}:</Typography>
               <Typography variant="caption">${product.snapshots[product.snapshots.length - 1].price.toFixed(2)}</Typography>
             </Box>
           )}
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" color="text.secondary">Satış:</Typography>
+            <Typography variant="caption" color="text.secondary">{t('sales')}:</Typography>
             <Typography variant="caption">{product.totalSold ?? 0}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography variant="caption" color="text.secondary">Son Kontrol:</Typography>
             <Typography variant="caption">
-              {product.lastCheckedAt ? new Date(product.lastCheckedAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+              {product.lastCheckedAt ? formatDateTime(product.lastCheckedAt, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
             </Typography>
           </Box>
           {(product.itemWebUrl || product.legacyItemId) && (
@@ -1573,7 +1753,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
           )}
           {/* Price Chart */}
           <Box>
-            <Typography variant="caption" color="text.secondary">Fiyat Geçmişi:</Typography>
+            <Typography variant="caption" color="text.secondary">{t('priceHistory')}:</Typography>
             <MiniPriceChart snapshots={product.snapshots} />
           </Box>
           {/* Notes */}
@@ -1616,6 +1796,8 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
 // ---------------------------------------------------------------------------
 
 function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsumeNavigateData }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void; navigateData?: any; onConsumeNavigateData?: () => void }) {
+  const t = useTranslations('ebayResearch');
+  const { formatDate } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -1627,6 +1809,9 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
   const [loadingNiches, setLoadingNiches] = useState(true);
   const [savingNiche, setSavingNiche] = useState(false);
   const [categoryAnalyzing, setCategoryAnalyzing] = useState<string | null>(null);
+  const [autoLoaded, setAutoLoaded] = useState(false);
+  const [showTips, setShowTips] = useState(false);
+  const [autoLoadTrigger, setAutoLoadTrigger] = useState(0);
   const nicheProductSort = useTableSort<ProductResult>(report?.topProducts || [], 'estimatedSold', 'desc');
 
   // Consume navigateData to pre-fill keyword
@@ -1636,6 +1821,16 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       onConsumeNavigateData?.();
     }
   }, [navigateData, onConsumeNavigateData]);
+
+  // Auto-load a trending niche on mount
+  useEffect(() => {
+    if (report || navigateData?.keyword) return;
+    const trendingKeywords = ['wireless earbuds', 'phone case iphone', 'led strip lights', 'yoga accessories', 'car accessories'];
+    const randomKeyword = trendingKeywords[Math.floor(Math.random() * trendingKeywords.length)];
+    setKeyword(randomKeyword);
+    setAutoLoaded(true);
+    setAutoLoadTrigger(1);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchSavedNiches = useCallback(async () => {
     setLoadingNiches(true);
@@ -1688,11 +1883,19 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       };
       setReport(mapped);
     } catch (err: any) {
-      toast.error(err.message || 'Analiz başarısız');
+      toast.error(err.message || t('analysisFailed'));
     } finally {
       setLoading(false);
     }
   }, [keyword, marketplace, userId]);
+
+  // Trigger auto-load analysis after keyword is set
+  useEffect(() => {
+    if (autoLoadTrigger > 0) {
+      handleAnalyze();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoadTrigger]);
 
   const handleCategoryAnalyze = useCallback(async (categoryId: string, categoryName: string) => {
     setCategoryAnalyzing(categoryId);
@@ -1750,10 +1953,10 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         demandScore: report.demandScore,
         competitionScore: report.competitionScore,
       });
-      toast.success('Niş kaydedildi');
+      toast.success(t('nicheSaved'));
       await fetchSavedNiches();
     } catch (err: any) {
-      toast.error(err.message || 'Kaydetme başarısız');
+      toast.error(err.message || t('saveFailed'));
     } finally {
       setSavingNiche(false);
     }
@@ -1763,9 +1966,9 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
     try {
       await apiPost('delete_niche', userId, { id });
       setSavedNiches(prev => prev.filter(n => n.id !== id));
-      toast.success('Niş silindi');
+      toast.success(t('nicheDeleted'));
     } catch (err: any) {
-      toast.error(err.message || 'Silme başarısız');
+      toast.error(err.message || t('deleteFailed'));
     }
   }, [userId]);
 
@@ -1804,9 +2007,15 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
   return (
     <Box>
       {/* Search */}
-      <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
-        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
-          <Gauge size={18} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+      <Paper sx={{
+        p: 2, mb: 2,
+        background: '#fff',
+        boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+        borderRadius: 3,
+        border: '1px solid rgba(99,102,241,0.08)',
+      }}>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1, color: '#1e1b4b' }}>
+          <Gauge size={18} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
           Niş Analizi
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -1817,7 +2026,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             helperText="Nis analizi icin bir urun kategorisi veya anahtar kelime girin"
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
+            onKeyDown={e => { if (e.key === 'Enter') { setAutoLoaded(false); handleAnalyze(); } }}
             sx={{ flex: '2 1 250px' }}
             InputProps={{
               startAdornment: <InputAdornment position="start"><Search size={16} /></InputAdornment>,
@@ -1826,43 +2035,102 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
           <FormControl size="small" sx={{ minWidth: 130 }}>
             <InputLabel>Pazar Yeri</InputLabel>
             <Select value={marketplace} label="Pazar Yeri" onChange={e => setMarketplace(e.target.value)}>
-              {MARKETPLACES.map(m => (
-                <MenuItem key={m.value} value={m.value}>{m.flag} {m.label}</MenuItem>
+              {MARKETPLACES_DATA.map(m => (
+                <MenuItem key={m.value} value={m.value}>{m.flag} {t(m.labelKey)}</MenuItem>
               ))}
             </Select>
           </FormControl>
-          <Button variant="contained" onClick={handleAnalyze} disabled={loading} sx={{ minWidth: 110 }}>
-            {loading ? <CircularProgress size={20} /> : 'Analiz Et'}
+          <Button variant="contained" onClick={() => { setAutoLoaded(false); handleAnalyze(); }} disabled={loading} sx={{
+            minWidth: 110,
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+            borderRadius: 2,
+            transition: 'all 0.2s ease',
+            '&:hover': { background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', boxShadow: '0 4px 12px rgba(99,102,241,0.4)' },
+          }}>
+            {loading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Analiz Et'}
           </Button>
+          <Chip
+            icon={<Lightbulb size={14} />}
+            label="Ipuclari"
+            size="small"
+            variant={showTips ? 'filled' : 'outlined'}
+            onClick={() => setShowTips(v => !v)}
+            sx={{
+              cursor: 'pointer', alignSelf: 'center',
+              ...(showTips ? {
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                color: '#fff',
+              } : {
+                borderColor: 'rgba(99,102,241,0.3)',
+                color: '#6366f1',
+              }),
+            }}
+          />
         </Box>
+
+        {/* Tips */}
+        <Collapse in={showTips}>
+          <Paper sx={{ p: 2, mt: 1.5, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)' }}>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Ipuclari</Typography>
+            <Typography variant="body2" color="text.secondary" component="div">
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                <li>Dusuk rekabet + yuksek talep = en iyi firsatlar</li>
+                <li>Firsat skoru 70+ olan nislere odaklanin</li>
+                <li>Nis kaydedin ve duzenli olarak fiyat/rekabet degisimlerini kontrol edin</li>
+                <li>En cok satan urunleri inceleyerek hangi ozelliklerin onemli oldugunu anlayin</li>
+              </ul>
+            </Typography>
+          </Paper>
+        </Collapse>
       </Paper>
+
+      {/* Auto-loaded trending banner */}
+      {autoLoaded && report && (
+        <Paper sx={{ p: 1.5, mb: 2, background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <TrendingUp size={16} color="#6366f1" />
+          <Typography variant="body2" color="text.secondary">
+            Ornek nis analizi gosteriliyor — kendi nis aramanizi yapin
+          </Typography>
+        </Paper>
+      )}
 
       {/* Trending Categories — shown when no report */}
       {!report && !loading && (
-        <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-            <TrendingUp size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+        <Paper sx={{
+          p: 2, mb: 2,
+          background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)',
+          border: '1px solid rgba(99,102,241,0.1)',
+          borderRadius: 3,
+          boxShadow: '0 2px 12px rgba(99,102,241,0.06)',
+        }}>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5, color: '#1e1b4b' }}>
+            <TrendingUp size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
             Populer Kategoriler — Tikla, Analiz Otomatik Baslasin
           </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+          <Typography variant="caption" sx={{ display: 'block', mb: 1.5, color: '#64748b' }}>
             Anahtar kelime bilmene gerek yok! Bir kategori sec, o niste neler satiliyor gorelim.
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-            {POPULAR_CATEGORIES.map(cat => (
+            {POPULAR_CATEGORIES_DATA.map(cat => (
               <Paper
                 key={cat.id}
                 variant="outlined"
-                onClick={() => handleCategoryAnalyze(cat.id, cat.name)}
+                onClick={() => { setAutoLoaded(false); handleCategoryAnalyze(cat.id, t(cat.nameKey)); }}
                 sx={{
                   p: 2, cursor: 'pointer', textAlign: 'center',
                   minWidth: isMobile ? '48%' : 130, flex: '1 1 130px', maxWidth: 170,
-                  transition: 'all 0.2s',
-                  '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover', transform: 'translateY(-2px)', boxShadow: 1 },
+                  background: '#fff',
+                  borderRadius: 3,
+                  border: '1px solid rgba(99,102,241,0.1)',
+                  boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
+                  transition: 'all 0.25s ease',
+                  '&:hover': { borderColor: '#6366f1', bgcolor: '#f8faff', transform: 'translateY(-3px)', boxShadow: '0 4px 16px rgba(99,102,241,0.15)' },
                   opacity: categoryAnalyzing === cat.id ? 0.6 : 1,
                 }}
               >
                 <Typography sx={{ fontSize: '1.5rem', mb: 0.5 }}>{cat.emoji}</Typography>
-                <Typography variant="caption" fontWeight={600} sx={{ lineHeight: 1.2 }}>{cat.name}</Typography>
+                <Typography variant="caption" fontWeight={600} sx={{ lineHeight: 1.2 }}>{t(cat.nameKey)}</Typography>
                 {categoryAnalyzing === cat.id && <CircularProgress size={14} sx={{ mt: 0.5, display: 'block', mx: 'auto' }} />}
               </Paper>
             ))}
@@ -1870,16 +2138,22 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         </Paper>
       )}
 
-      {loading && <LinearProgress sx={{ mb: 2 }} />}
+      {loading && <LinearProgress sx={{ mb: 2, borderRadius: 2, '& .MuiLinearProgress-bar': { background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' } }} />}
 
       {/* Niche Report Card */}
       {report && (
         <Box>
           {/* Score Cards */}
-          <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
+          <Paper sx={{
+            p: 2, mb: 2,
+            background: '#fff',
+            boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+            borderRadius: 3,
+            border: '1px solid rgba(99,102,241,0.08)',
+          }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="h6" fontWeight={700}>
-                &ldquo;{report.keyword}&rdquo; Niş Raporu
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e1b4b' }}>
+                &ldquo;{report.keyword}&rdquo; {t('nicheReport')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
@@ -1895,15 +2169,16 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                   startIcon={savingNiche ? <CircularProgress size={14} /> : <Save size={14} />}
                   onClick={handleSaveNiche}
                   disabled={savingNiche}
+                  sx={{ borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}
                 >
                   Kaydet
                 </Button>
                 {onNavigate && (
                   <>
-                    <Button size="small" variant="outlined" startIcon={<Search size={14} />} onClick={() => onNavigate('product_database', { keyword: report.keyword })}>
+                    <Button size="small" variant="outlined" startIcon={<Search size={14} />} onClick={() => onNavigate('product_database', { keyword: report.keyword })} sx={{ borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}>
                       Urunleri Gor
                     </Button>
-                    <Button size="small" variant="outlined" startIcon={<Target size={14} />} onClick={() => onNavigate('seo_analyzer', { keyword: report.keyword })}>
+                    <Button size="small" variant="outlined" startIcon={<Target size={14} />} onClick={() => onNavigate('seo_analyzer', { keyword: report.keyword })} sx={{ borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}>
                       SEO
                     </Button>
                   </>
@@ -1912,14 +2187,14 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap', mb: 2 }}>
-              <Paper variant="outlined" sx={{ minWidth: { xs: '45%', sm: 140 } }}>
+              <Paper sx={{ minWidth: { xs: '45%', sm: 140 }, background: '#fff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.1)', boxShadow: '0 1px 8px rgba(99,102,241,0.06)', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 2px 16px rgba(99,102,241,0.12)' } }}>
                 <ScoreDisplay label="Talep Skoru" score={report.demandScore} />
               </Paper>
-              <Paper variant="outlined" sx={{ minWidth: { xs: '45%', sm: 140 } }}>
+              <Paper sx={{ minWidth: { xs: '45%', sm: 140 }, background: '#fff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.1)', boxShadow: '0 1px 8px rgba(99,102,241,0.06)', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 2px 16px rgba(99,102,241,0.12)' } }}>
                 <ScoreDisplay label="Rekabet Skoru" score={report.competitionScore} invert />
               </Paper>
-              <Paper variant="outlined" sx={{ minWidth: { xs: '90%', sm: 140 } }}>
-                <ScoreDisplay label="Fırsat Skoru" score={report.opportunityScore || 0} />
+              <Paper sx={{ minWidth: { xs: '90%', sm: 140 }, background: '#fff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.1)', boxShadow: '0 2px 12px rgba(99,102,241,0.08)', transition: 'all 0.2s ease', '&:hover': { boxShadow: '0 4px 20px rgba(99,102,241,0.15)' } }}>
+                <ScoreDisplay label={t('opportunityScore')} score={report.opportunityScore || 0} />
               </Paper>
             </Box>
 
@@ -1937,37 +2212,43 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
               )}
               {report.opportunityLabel && (
                 <Alert severity={(report.opportunityScore || 0) >= 70 ? 'success' : (report.opportunityScore || 0) >= 50 ? 'info' : (report.opportunityScore || 0) >= 30 ? 'warning' : 'error'} sx={{ py: 0 }}>
-                  <Typography variant="body2"><strong>Sonuç:</strong> {report.opportunityLabel}</Typography>
+                  <Typography variant="body2"><strong>{t('result')}:</strong> {report.opportunityLabel}</Typography>
                 </Alert>
               )}
             </Box>
 
             {/* Stats Grid */}
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <StatCard icon={<Package size={16} />} label="Toplam Listeleme" value={report.totalListings.toLocaleString('tr-TR')} />
-              <StatCard icon={<Users size={16} />} label="Benzersiz Satıcı" value={report.uniqueSellers.toLocaleString('tr-TR')} />
+              <StatCard icon={<Package size={16} />} label={t('totalListings')} value={report.totalListings.toLocaleString()} />
+              <StatCard icon={<Users size={16} />} label={t('uniqueSellers')} value={report.uniqueSellers.toLocaleString()} />
               <StatCard icon={<DollarSign size={16} />} label="Ort. Fiyat" value={`$${report.avgPrice.toFixed(2)}`} />
               <StatCard icon={<Target size={16} />} label="Medyan Fiyat" value={`$${report.medianPrice.toFixed(2)}`} />
-              <StatCard icon={<ArrowUpDown size={16} />} label="Fiyat Aralığı" value={`$${report.priceMin.toFixed(0)} - $${report.priceMax.toFixed(0)}`} />
-              <StatCard icon={<ShoppingBag size={16} />} label="Ücretsiz Kargo" value={`%${report.freeShippingPct.toFixed(0)}`} />
-              <StatCard icon={<Users size={16} />} label="Satıcı Yoğunluğu" value={`%${report.sellerConcentration.toFixed(0)}`} sub="Top 10 satıcı payı" />
+              <StatCard icon={<ArrowUpDown size={16} />} label={t('priceRange')} value={`$${report.priceMin.toFixed(0)} - $${report.priceMax.toFixed(0)}`} />
+              <StatCard icon={<ShoppingBag size={16} />} label={t('freeShipping')} value={`%${report.freeShippingPct.toFixed(0)}`} />
+              <StatCard icon={<Users size={16} />} label={t('sellerDensity')} value={`%${report.sellerConcentration.toFixed(0)}`} sub={t('top10SellerShare')} />
               {report.avgSoldPerItem !== undefined && (
-                <StatCard icon={<TrendingUp size={16} />} label="Ort. Satış/Ürün" value={report.avgSoldPerItem || 0} sub="Top 20 ortalama" />
+                <StatCard icon={<TrendingUp size={16} />} label={t('avgSalesPerProduct')} value={report.avgSoldPerItem || 0} sub={t('top20Average')} />
               )}
               {report.sellThroughRate !== undefined && (
-                <StatCard icon={<BarChart2 size={16} />} label="Satış Oranı" value={`%${(report.sellThroughRate || 0).toFixed(1)}`} sub="Talep/arz oranı" />
+                <StatCard icon={<BarChart2 size={16} />} label={t('sellThroughRate')} value={`%${(report.sellThroughRate || 0).toFixed(1)}`} sub={t('demandSupplyRatio')} />
               )}
               {report.listingsPerSeller !== undefined && (
-                <StatCard icon={<Users size={16} />} label="Liste/Satıcı" value={(report.listingsPerSeller || 0).toFixed(1)} sub="Satıcı başı ortalama" />
+                <StatCard icon={<Users size={16} />} label={t('listingsPerSeller')} value={(report.listingsPerSeller || 0).toFixed(1)} sub={t('avgPerSeller')} />
               )}
             </Box>
           </Paper>
 
           {/* Price Distribution */}
           {report.priceDistribution && report.priceDistribution.length > 0 && (
-            <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                <BarChart2 size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+            <Paper sx={{
+              p: 2, mb: 2,
+              background: '#fff',
+              boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+              borderRadius: 3,
+              border: '1px solid rgba(99,102,241,0.08)',
+            }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, color: '#1e1b4b' }}>
+                <BarChart2 size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
                 Fiyat Dağılımı
               </Typography>
               <SimpleHistogram data={report.priceDistribution} />
@@ -1976,9 +2257,15 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
 
           {/* Aspect Analysis */}
           {report.aspects && report.aspects.length > 0 && (
-            <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                <FolderTree size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+            <Paper sx={{
+              p: 2, mb: 2,
+              background: '#fff',
+              boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+              borderRadius: 3,
+              border: '1px solid rgba(99,102,241,0.08)',
+            }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, color: '#1e1b4b' }}>
+                <FolderTree size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
                 Özellik Analizi
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -1987,10 +2274,15 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                     key={a.name}
                     label={`${a.name} (${a.count})`}
                     size="small"
-                    variant="outlined"
                     sx={{
-                      bgcolor: `rgba(25, 118, 210, ${Math.min(a.percentage / 100, 0.3)})`,
+                      bgcolor: `rgba(99, 102, 241, ${Math.min(a.percentage / 100, 0.3)})`,
+                      color: a.percentage > 40 ? '#fff' : '#1e1b4b',
                       fontWeight: a.percentage > 30 ? 600 : 400,
+                      borderLeft: '3px solid',
+                      borderLeftColor: `rgba(99, 102, 241, ${Math.min(a.percentage / 50, 1)})`,
+                      borderRadius: 2,
+                      transition: 'all 0.2s ease',
+                      '&:hover': { boxShadow: '0 2px 8px rgba(99,102,241,0.2)', transform: 'translateY(-1px)' },
                     }}
                   />
                 ))}
@@ -2000,25 +2292,31 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
 
           {/* Top Products */}
           {report.topProducts && report.topProducts.length > 0 && (
-            <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                <Star size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+            <Paper sx={{
+              p: 2, mb: 2,
+              background: '#fff',
+              boxShadow: '0 2px 16px rgba(0,0,0,0.06)',
+              borderRadius: 3,
+              border: '1px solid rgba(99,102,241,0.08)',
+            }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, color: '#1e1b4b' }}>
+                <Star size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: '#f59e0b' }} />
                 En Çok Satan Ürünler
               </Typography>
               {isMobile ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {nicheProductSort.sorted.slice(0, 10).map(p => (
-                    <Paper key={p.itemId} variant="outlined" sx={{ p: 1.5 }}>
+                    <Paper key={p.itemId} sx={{ p: 1.5, background: '#fff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.04)', transition: 'all 0.2s ease', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' } }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <Typography variant="body2" fontWeight={500} sx={{
                           flex: 1, mr: 1,
                           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                         }}>
-                          <a href={p.itemUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'none' }}>
+                          <a href={p.itemUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#6366f1', textDecoration: 'none' }}>
                             {p.title}
                           </a>
                         </Typography>
-                        <Typography variant="subtitle2" fontWeight={700} sx={{ flexShrink: 0 }}>${p.price.toFixed(2)}</Typography>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, flexShrink: 0, color: '#6366f1' }}>${p.price.toFixed(2)}</Typography>
                       </Box>
                       <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
                         <SoldBadge count={p.estimatedSold} />
@@ -2031,8 +2329,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
-                      <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                        <TableCell>Başlık</TableCell>
+                      <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
+                        <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('title')}</TableCell>
                         <TableCell align="right" sortDirection={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : false}>
                           <TableSortLabel active={nicheProductSort.sortKey === 'price'} direction={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : 'desc'} onClick={() => nicheProductSort.handleSort('price')}>
                             Fiyat
@@ -2043,12 +2341,12 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                             Satış
                           </TableSortLabel>
                         </TableCell>
-                        <TableCell>Satıcı</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('seller')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {nicheProductSort.sorted.slice(0, 20).map(p => (
-                        <TableRow key={p.itemId} hover>
+                        <TableRow key={p.itemId} hover sx={{ transition: 'all 0.15s ease', '&:hover': { bgcolor: '#f8faff', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' } }}>
                           <TableCell sx={{ maxWidth: 350 }}>
                             <Typography
                               variant="body2"
@@ -2057,8 +2355,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                               target="_blank"
                               rel="noopener noreferrer"
                               sx={{
-                                color: 'primary.main', textDecoration: 'none',
-                                '&:hover': { textDecoration: 'underline' },
+                                color: '#6366f1', textDecoration: 'none', fontWeight: 500,
+                                '&:hover': { textDecoration: 'underline', color: '#4f46e5' },
                                 display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                               }}
                             >
@@ -2066,7 +2364,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                             </Typography>
                           </TableCell>
                           <TableCell align="right">
-                            <Typography variant="body2" fontWeight={600}>${p.price.toFixed(2)}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#6366f1' }}>${p.price.toFixed(2)}</Typography>
                           </TableCell>
                           <TableCell align="center">
                             <SoldBadge count={p.estimatedSold} />
@@ -2086,13 +2384,13 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       )}
 
       {!report && !loading && (
-        <EmptyState message="Niş Analizi Başlatın" sub="Anahtar kelime girerek pazar fırsatlarını keşfedin" />
+        <EmptyState message={t('startNicheAnalysis')} sub={t('nicheAnalysisHint')} />
       )}
 
       {/* Saved Niches */}
       <Divider sx={{ my: 3 }} />
-      <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>
-        <Bookmark size={18} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+      <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5, color: '#1e1b4b' }}>
+        <Bookmark size={18} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
         Kaydedilen Nişler
       </Typography>
 
@@ -2107,16 +2405,25 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {savedNiches.map(niche => (
-            <Paper key={niche.id} variant="outlined" sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Paper key={niche.id} sx={{
+              p: 1.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+              background: '#fff',
+              borderRadius: 3,
+              border: '1px solid rgba(99,102,241,0.08)',
+              borderLeft: `4px solid ${SCORE_COLOR((niche as any).opportunityScore || Math.max(niche.demandScore - niche.competitionScore, 0))}`,
+              boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+              transition: 'all 0.2s ease',
+              '&:hover': { boxShadow: '0 4px 16px rgba(0,0,0,0.08)', transform: 'translateY(-1px)' },
+            }}>
               <Box sx={{ flex: 1, minWidth: 150 }}>
                 <Typography variant="body2" fontWeight={600}>{(niche as any).keyword || (niche as any).query || '—'}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {(niche.savedAt || (niche as any).createdAt) ? new Date(niche.savedAt || (niche as any).createdAt).toLocaleDateString('tr-TR') : ''}
+                  {(niche.savedAt || (niche as any).createdAt) ? formatDate(niche.savedAt || (niche as any).createdAt) : ''}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <Chip
-                  label={`Talep: ${niche.demandScore}`}
+                  label={`${t('demand')}: ${niche.demandScore}`}
                   size="small"
                   sx={{ bgcolor: `${SCORE_COLOR(niche.demandScore)}22`, color: SCORE_COLOR(niche.demandScore), fontWeight: 600 }}
                 />
@@ -2125,16 +2432,16 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                   size="small"
                   sx={{ bgcolor: `${SCORE_COLOR(niche.competitionScore, true)}22`, color: SCORE_COLOR(niche.competitionScore, true), fontWeight: 600 }}
                 />
-                <Chip label={`${niche.totalListings.toLocaleString('tr-TR')} ürün`} size="small" variant="outlined" />
+                <Chip label={`${niche.totalListings.toLocaleString()} ürün`} size="small" variant="outlined" />
               </Box>
               <Box sx={{ display: 'flex', gap: 0.5 }}>
-                <Tooltip title="Raporu Yükle">
-                  <IconButton size="small" onClick={() => handleLoadNiche(niche)}>
+                <Tooltip title={t('loadReport')}>
+                  <IconButton size="small" onClick={() => handleLoadNiche(niche)} sx={{ borderRadius: 2, bgcolor: 'rgba(99,102,241,0.06)', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.15)' } }}>
                     <Eye size={16} />
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Sil">
-                  <IconButton size="small" color="error" onClick={() => niche.id && handleDeleteNiche(niche.id)}>
+                  <IconButton size="small" color="error" onClick={() => niche.id && handleDeleteNiche(niche.id)} sx={{ borderRadius: 2, transition: 'all 0.2s ease' }}>
                     <Trash2 size={16} />
                   </IconButton>
                 </Tooltip>
@@ -2152,6 +2459,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
 // ---------------------------------------------------------------------------
 
 function SellerTracker({ userId, userListings, onNavigate }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
+  const t = useTranslations('ebayResearch');
+  const { formatDate, formatDateTime } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -2169,7 +2478,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
       const data = await apiCall('tracked_sellers', userId);
       setSellers(data.sellers || []);
     } catch (err: any) {
-      toast.error(err.message || 'Satıcılar yüklenemedi');
+      toast.error(err.message || t('sellersLoadFailed'));
     } finally {
       setLoading(false);
     }
@@ -2182,11 +2491,11 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
     setAdding(true);
     try {
       await apiPost('track_seller', userId, { username: username.trim() });
-      toast.success('Satıcı takibe alındı');
+      toast.success(t('sellerTracked'));
       setUsername('');
       await fetchSellers();
     } catch (err: any) {
-      toast.error(err.message || 'Satıcı eklenemedi');
+      toast.error(err.message || t('sellerAddFailed'));
     } finally {
       setAdding(false);
     }
@@ -2196,9 +2505,9 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
     try {
       await apiPost('untrack_seller', userId, { id });
       setSellers(prev => prev.filter(s => s.id !== id));
-      toast.success('Satıcı takipten çıkarıldı');
+      toast.success(t('sellerUntracked'));
     } catch (err: any) {
-      toast.error(err.message || 'Silme başarısız');
+      toast.error(err.message || t('deleteFailed'));
     }
   }, [userId]);
 
@@ -2230,8 +2539,13 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
   return (
     <Box>
       {/* Add Seller Form */}
-      <Paper sx={{ p: 2, mb: 2 }} variant="outlined">
-        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+      <Paper sx={{
+        p: 2, mb: 2, borderRadius: 3,
+        background: 'linear-gradient(135deg, #fafbff 0%, #f0f1ff 100%)',
+        border: '1px solid rgba(99,102,241,0.08)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+      }}>
+        <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1, color: '#312e81' }}>
           <Users size={18} style={{ verticalAlign: 'middle', marginRight: 6 }} />
           Satıcı Takip Et
         </Typography>
@@ -2244,7 +2558,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
             value={username}
             onChange={e => setUsername(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAddSeller()}
-            sx={{ flex: 1 }}
+            sx={{ flex: 1, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             InputProps={{
               startAdornment: <InputAdornment position="start"><Users size={16} /></InputAdornment>,
             }}
@@ -2253,7 +2567,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
             variant="contained"
             onClick={handleAddSeller}
             disabled={adding || !username.trim()}
-            sx={{ minWidth: 100 }}
+            sx={{ minWidth: 100, bgcolor: '#6366f1', '&:hover': { bgcolor: '#4f46e5' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
           >
             {adding ? <CircularProgress size={18} /> : 'Takip Et'}
           </Button>
@@ -2262,33 +2576,47 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
 
       {/* Seller List */}
       {sellers.length === 0 ? (
-        <EmptyState
-          message="Henuz takip ettiginiz satici yok"
-          sub="Rakip saticilari ekleyerek fiyat ve stok degisikliklerini izleyin. Yukaridaki alana eBay kullanici adi girin."
-        />
+        <Box>
+          <EmptyState
+            message="Henuz takip ettiginiz satici yok"
+            sub="Rakip saticilari ekleyerek fiyat ve stok degisikliklerini izleyin. Yukaridaki alana eBay kullanici adi girin."
+          />
+          <Paper sx={{ p: 2, mt: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Satici Takibi Nasil Kullanilir?</Typography>
+            <Typography variant="body2" color="text.secondary" component="div">
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                <li>Rakip saticilarin eBay kullanici adini girin</li>
+                <li>Yeni urun, fiyat degisikligi ve stok guncellemelerini otomatik takip edin</li>
+                <li>Satici puanini ve olumlu geri bildirim oranini izleyin</li>
+                <li>Saticinin urunlerini gorup kendi nisleriyle karsilastirin</li>
+              </ul>
+            </Typography>
+          </Paper>
+        </Box>
       ) : isMobile ? (
         /* Mobile Card View */
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {sellers.map(seller => (
-            <Paper key={seller.id} variant="outlined" sx={{ p: 1.5 }}>
+            <Paper key={seller.id} sx={{ p: 1.5, background: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                 <Box>
-                  <Typography variant="subtitle2" fontWeight={700}>{seller.sellerUsername}</Typography>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ fontSize: '0.95rem', color: '#1e1b4b' }}>{seller.sellerUsername}</Typography>
                   <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                     <Chip
                       icon={<Star size={12} />}
-                      label={(seller.feedbackScore || 0).toLocaleString('tr-TR')}
+                      label={(seller.feedbackScore || 0).toLocaleString()}
                       size="small"
                       variant="outlined"
-                      sx={{ height: 22 }}
+                      sx={{ height: 22, borderColor: 'rgba(99,102,241,0.3)', fontWeight: 600, color: '#6366f1' }}
                     />
                     <Chip
                       label={`%${seller.feedbackPct || '0'} olumlu`}
                       size="small"
                       sx={{
                         height: 22,
-                        bgcolor: parseFloat(seller.feedbackPct || '0') >= 98 ? '#e8f5e9' : parseFloat(seller.feedbackPct || '0') >= 95 ? '#fff3e0' : '#ffebee',
-                        color: parseFloat(seller.feedbackPct || '0') >= 98 ? '#2e7d32' : parseFloat(seller.feedbackPct || '0') >= 95 ? '#ed6c02' : '#c62828',
+                        bgcolor: parseFloat(seller.feedbackPct || '0') >= 98 ? '#ecfdf5' : parseFloat(seller.feedbackPct || '0') >= 95 ? '#fffbeb' : '#fef2f2',
+                        color: parseFloat(seller.feedbackPct || '0') >= 98 ? '#059669' : parseFloat(seller.feedbackPct || '0') >= 95 ? '#d97706' : '#dc2626',
+                        fontWeight: 600,
                       }}
                     />
                   </Box>
@@ -2360,18 +2688,18 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
               </Box>
 
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, textAlign: 'right' }}>
-                Son kontrol: {seller.lastCheckedAt ? new Date(seller.lastCheckedAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                Son kontrol: {seller.lastCheckedAt ? formatDateTime(seller.lastCheckedAt, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
               </Typography>
             </Paper>
           ))}
         </Box>
       ) : (
         /* Desktop Table View */
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} sx={{ borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f5f5f5' }}>
-                <TableCell>Kullanıcı Adı</TableCell>
+              <TableRow sx={{ background: 'linear-gradient(135deg, #f8f9ff 0%, #eef0ff 100%)' }}>
+                <TableCell sx={{ fontWeight: 600, color: '#4338ca' }}>{t('username')}</TableCell>
                 <TableCell align="center" sortDirection={sellerSort.sortKey === 'feedbackScore' ? sellerSort.sortDir : false}>
                   <TableSortLabel active={sellerSort.sortKey === 'feedbackScore'} direction={sellerSort.sortKey === 'feedbackScore' ? sellerSort.sortDir : 'desc'} onClick={() => sellerSort.handleSort('feedbackScore')}>
                     Puan
@@ -2385,24 +2713,25 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
             </TableHead>
             <TableBody>
               {sellerSort.sorted.map(seller => (
-                <TableRow key={seller.id} hover>
+                <TableRow key={seller.id} hover sx={{ '&:hover': { bgcolor: 'rgba(99,102,241,0.03)' } }}>
                   <TableCell>
-                    <Typography variant="body2" fontWeight={600}>{seller.sellerUsername}</Typography>
+                    <Typography variant="body2" fontWeight={700} sx={{ fontSize: '0.9rem', color: '#1e1b4b' }}>{seller.sellerUsername}</Typography>
                   </TableCell>
                   <TableCell align="center">
                     <Chip
                       icon={<Star size={12} />}
-                      label={(seller.feedbackScore || 0).toLocaleString('tr-TR')}
+                      label={(seller.feedbackScore || 0).toLocaleString()}
                       size="small"
                       variant="outlined"
+                      sx={{ borderColor: 'rgba(99,102,241,0.3)', fontWeight: 600, color: '#6366f1' }}
                     />
                   </TableCell>
                   <TableCell align="center">
                     <Typography
                       variant="body2"
                       sx={{
-                        fontWeight: 600,
-                        color: parseFloat(seller.feedbackPct || '0') >= 98 ? '#2e7d32' : parseFloat(seller.feedbackPct || '0') >= 95 ? '#ed6c02' : '#c62828',
+                        fontWeight: 700,
+                        color: parseFloat(seller.feedbackPct || '0') >= 98 ? '#059669' : parseFloat(seller.feedbackPct || '0') >= 95 ? '#d97706' : '#dc2626',
                       }}
                     >
                       %{seller.feedbackPct || '0'}
@@ -2438,7 +2767,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                   </TableCell>
                   <TableCell align="center">
                     <Typography variant="caption" color="text.secondary">
-                      {seller.lastCheckedAt ? new Date(seller.lastCheckedAt).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                      {seller.lastCheckedAt ? formatDateTime(seller.lastCheckedAt, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
@@ -2462,7 +2791,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                           <ExternalLink size={16} />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Kaldır">
+                      <Tooltip title={t('remove')}>
                         <IconButton size="small" color="error" onClick={() => handleRemoveSeller(seller.id)}>
                           <Trash2 size={16} />
                         </IconButton>
@@ -2525,6 +2854,7 @@ const SECTIONS = [
 ];
 
 function SectionWelcome({ section, userListings = [], sectionIndex }: { section: typeof SECTIONS[number]; userListings?: any[]; sectionIndex?: number }) {
+  const t = useTranslations('ebayResearch');
   const hasListings = userListings.length > 0;
 
   const personalizedMessage = hasListings
@@ -2539,21 +2869,20 @@ function SectionWelcome({ section, userListings = [], sectionIndex }: { section:
 
   return (
     <Paper
-      variant="outlined"
       sx={{
         p: { xs: 2, sm: 4 },
         textAlign: 'center',
-        borderStyle: 'dashed',
-        borderColor: 'primary.light',
-        bgcolor: 'action.hover',
-        borderRadius: 3,
+        background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 50%, #e0f2fe 100%)',
+        borderRadius: 4,
+        boxShadow: '0 4px 24px rgba(99,102,241,0.08)',
+        border: '1px solid rgba(99,102,241,0.1)',
         overflow: 'hidden',
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',
       }}
     >
-      <Box sx={{ color: 'primary.main', mb: 2 }}>{React.cloneElement(section.icon as React.ReactElement, { size: 40, strokeWidth: 1.5 })}</Box>
+      <Box sx={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #ede9fe 0%, #e0f2fe 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>{React.cloneElement(section.icon as React.ReactElement, { size: 36, strokeWidth: 1.5, style: { color: '#6366f1' } })}</Box>
       <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
         {section.label}
       </Typography>
@@ -2573,6 +2902,8 @@ function SectionWelcome({ section, userListings = [], sectionIndex }: { section:
 }
 
 function EbayResearchPage() {
+  const t = useTranslations('ebayResearch');
+  const { formatDate, formatDateTime, formatNumber } = useLocale();
   const { user } = useAuth() as any;
   const userId = user?.id as string | undefined;
   const theme = useTheme();
@@ -2708,7 +3039,7 @@ function EbayResearchPage() {
 
       {/* Header */}
       <Box sx={{ mb: 2, overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
-        <Typography variant={isMobile ? 'h6' : 'h5'} fontWeight={800} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <Typography variant={isMobile ? 'h6' : 'h5'} sx={{ fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1e1b4b', letterSpacing: '-0.02em' }}>
           eBay Urun Istihbarati
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
@@ -2717,7 +3048,7 @@ function EbayResearchPage() {
       </Box>
 
       {/* Global Search Bar */}
-      <Paper sx={{ p: 1.5, mb: 2, display: 'flex', gap: 1, alignItems: 'center' }} variant="outlined">
+      <Paper sx={{ p: 2, mb: 2, display: 'flex', gap: 1, alignItems: 'center', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', borderRadius: 3, boxShadow: '0 4px 20px rgba(99,102,241,0.15)' }}>
         <TextField
           size="small"
           fullWidth
@@ -2727,17 +3058,17 @@ function EbayResearchPage() {
           onChange={e => setGlobalSearch(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
           InputProps={{
-            startAdornment: <InputAdornment position="start"><Search size={18} /></InputAdornment>,
+            startAdornment: <InputAdornment position="start"><Search size={18} style={{ color: '#6366f1' }} /></InputAdornment>,
           }}
-          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+          sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#fff', '& fieldset': { border: 'none' } }, '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.7)' } }}
         />
-        <Button variant="contained" onClick={handleGlobalSearch} disabled={!globalSearch.trim()} sx={{ minWidth: isMobile ? 50 : 80, borderRadius: 2 }}>
+        <Button variant="contained" onClick={handleGlobalSearch} disabled={!globalSearch.trim()} sx={{ minWidth: isMobile ? 50 : 80, borderRadius: 2, bgcolor: '#fff', color: '#6366f1', fontWeight: 700, '&:hover': { bgcolor: '#f0edff' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)', color: 'rgba(99,102,241,0.4)' } }}>
           {isMobile ? <Search size={18} /> : 'Ara'}
         </Button>
       </Paper>
 
       {/* Main Section Tabs */}
-      <Paper sx={{ mb: 2, overflow: 'hidden', width: '100%', maxWidth: '100%' }} variant="outlined">
+      <Paper sx={{ mb: 2, overflow: 'hidden', width: '100%', maxWidth: '100%', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', background: '#fff' }}>
         <Tabs
           value={mainTab}
           onChange={handleMainTabChange}
@@ -2785,8 +3116,6 @@ function EbayResearchPage() {
             label={st.label}
             clickable
             onClick={() => setSubTab(i)}
-            variant={subTab === i ? 'filled' : 'outlined'}
-            color={subTab === i ? 'primary' : 'default'}
             sx={{
               fontWeight: subTab === i ? 700 : 500,
               fontSize: '0.8rem',
@@ -2794,14 +3123,22 @@ function EbayResearchPage() {
               px: 0.5,
               flexShrink: 0,
               whiteSpace: 'nowrap',
-              '& .MuiChip-icon': { fontSize: 14 },
-              transition: 'all 0.15s ease',
+              transition: 'all 0.2s ease',
               ...(subTab === i
-                ? {}
+                ? {
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    color: '#fff',
+                    boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
+                    border: 'none',
+                    '& .MuiChip-icon': { fontSize: 14, color: '#fff' },
+                  }
                 : {
+                    background: '#f8faff',
+                    border: '1px solid rgba(99,102,241,0.15)',
+                    color: '#4b5563',
                     '&:hover': {
-                      bgcolor: 'action.hover',
-                      borderColor: 'primary.main',
+                      background: '#f0edff',
+                      borderColor: '#6366f1',
                     },
                   }),
             }}
@@ -2878,8 +3215,10 @@ function EbayResearchPage() {
 
 // --- Layout wrapper ---
 function EbayResearchPageWithLayout(props: any): JSX.Element {
+  const t = useTranslations('ebayResearch');
+  const { formatDate, formatDateTime, formatNumber } = useLocale();
   return (
-    <AppLayout title="eBay Ürün İstihbaratı — KolayXport">
+    <AppLayout title={t('pageTitle')}>
       <EbayResearchPage {...props} />
     </AppLayout>
   );

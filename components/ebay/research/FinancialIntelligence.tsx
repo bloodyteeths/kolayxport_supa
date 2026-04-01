@@ -256,7 +256,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
 
       {/* Listing Picker from userListings */}
       {userListings && userListings.length > 0 && (
-        <Paper sx={{ p: 2, mb: 2, bgcolor: 'action.hover' }}>
+        <Paper sx={{ p: 2, mb: 2, bgcolor: '#f8faff', border: '1px solid rgba(99,102,241,0.08)', borderRadius: 3 }}>
           <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             <List size={16} /> Listelerimden Seç
           </Typography>
@@ -293,7 +293,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
         </Paper>
       )}
 
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Typography variant="subtitle2" sx={{ mb: 2 }}>Satış Bilgileri</Typography>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2 }}>
@@ -435,7 +435,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
       </Paper>
 
       {/* Results */}
-      <Paper sx={{ p: 2 }}>
+      <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="subtitle2">Hesaplama Sonuçları</Typography>
           <Button
@@ -443,6 +443,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
             variant="outlined"
             startIcon={<FileSpreadsheet size={14} />}
             onClick={handleExportCalc}
+            sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#5558e6', bgcolor: 'rgba(99,102,241,0.04)' } }}
           >
             CSV İndir
           </Button>
@@ -504,10 +505,10 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
               </TableRow>
 
               <TableRow sx={{ '& td': { borderTop: '2px solid', borderColor: 'divider' } }}>
-                <TableCell sx={{ fontWeight: 700, fontSize: '1.05rem' }}>Kâr</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '1.1rem' }}>Kâr</TableCell>
                 <TableCell
                   align="right"
-                  sx={{ fontWeight: 700, fontSize: '1.05rem', color: profit >= 0 ? 'success.main' : 'error.main' }}
+                  sx={{ fontWeight: 800, fontSize: '1.3rem', color: profit >= 0 ? '#10b981' : '#ef4444', textShadow: profit >= 0 ? '0 0 12px rgba(16,185,129,0.3)' : '0 0 12px rgba(239,68,68,0.3)' }}
                 >
                   {fmt(profit)}
                 </TableCell>
@@ -520,7 +521,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 500 }}>ROI (Yatırım Getirisi)</TableCell>
-                <TableCell align="right" sx={{ color: roi >= 0 ? 'success.main' : 'error.main' }}>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: '1.1rem', color: '#6366f1' }}>
                   {pct(roi)}
                 </TableCell>
               </TableRow>
@@ -719,7 +720,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
       </Typography>
 
       {/* Search */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Typography variant="subtitle2" sx={{ mb: 2 }}>Pazar Araştırması</Typography>
         <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
           <TextField
@@ -756,7 +757,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
       </Paper>
 
       {/* Inputs */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Typography variant="subtitle2" sx={{ mb: 2 }}>Maliyet Girdileri</Typography>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
           <FormControl fullWidth size="small">
@@ -826,7 +827,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
 
       {/* Calculated Results */}
       {sc > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
+        <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle2" sx={{ mb: 2 }}>Hesaplama Sonuçları</Typography>
           <TableContainer>
             <Table size="small">
@@ -877,14 +878,14 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
 
       {/* Scenario Comparison */}
       {scenarios.length > 0 && sc > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
+        <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle2" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Target size={16} /> Senaryo Karşılaştırması
           </Typography>
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow>
+                <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                   <TableCell sx={{ fontWeight: 700 }}>Senaryo</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Fiyat</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Ücretler</TableCell>
@@ -921,7 +922,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
 
       {/* Bulk Sourcing */}
       {bulkAnalysis.length > 0 && sc > 0 && (
-        <Paper sx={{ p: 2 }}>
+        <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle2" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
             <BarChart2 size={16} /> Toplu Tedarik Analizi
           </Typography>
@@ -931,7 +932,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow>
+                <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                   <TableCell sx={{ fontWeight: 700 }}>Adet</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>İndirim</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Birim Maliyet</TableCell>
@@ -1246,14 +1247,14 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
         >
           <Paper
             variant="outlined"
-            sx={{ p: 1.5, textAlign: 'center', borderLeft: '3px solid', borderLeftColor: 'primary.main' }}
+            sx={{ p: 1.5, textAlign: 'center', borderLeft: '4px solid #6366f1', borderColor: 'rgba(99,102,241,0.08)', borderLeftColor: '#6366f1', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
           >
             <Typography variant="caption" color="text.secondary">Toplam Gelir</Typography>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>{fmt(summary.totalRevenue)}</Typography>
           </Paper>
           <Paper
             variant="outlined"
-            sx={{ p: 1.5, textAlign: 'center', borderLeft: '3px solid', borderLeftColor: summary.totalProfit >= 0 ? 'success.main' : 'error.main' }}
+            sx={{ p: 1.5, textAlign: 'center', borderLeft: '4px solid', borderLeftColor: summary.totalProfit >= 0 ? '#10b981' : '#ef4444', borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
           >
             <Typography variant="caption" color="text.secondary">Toplam Kar</Typography>
             <Typography
@@ -1265,7 +1266,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
           </Paper>
           <Paper
             variant="outlined"
-            sx={{ p: 1.5, textAlign: 'center', borderLeft: '3px solid', borderLeftColor: summary.avgMargin >= 20 ? 'success.main' : 'warning.main' }}
+            sx={{ p: 1.5, textAlign: 'center', borderLeft: '4px solid', borderLeftColor: summary.avgMargin >= 20 ? '#10b981' : '#f59e0b', borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
           >
             <Typography variant="caption" color="text.secondary">Ort. Marj</Typography>
             <Typography
@@ -1277,7 +1278,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
           </Paper>
           <Paper
             variant="outlined"
-            sx={{ p: 1.5, textAlign: 'center', borderLeft: '3px solid', borderLeftColor: 'info.main' }}
+            sx={{ p: 1.5, textAlign: 'center', borderLeft: '4px solid #06b6d4', borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
           >
             <Typography variant="caption" color="text.secondary">Kayit Sayisi</Typography>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>{summary.count}</Typography>
@@ -1286,7 +1287,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
       )}
 
       {/* Entry Form */}
-      <Paper sx={{ p: 2, mb: 3 }}>
+      <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Typography variant="subtitle2" sx={{ mb: 2 }}>Yeni Kayıt Ekle</Typography>
 
         {/* Listing Picker */}
@@ -1389,6 +1390,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
           variant="contained"
           startIcon={<Plus size={16} />}
           onClick={handleAdd}
+          sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}
         >
           Kayıt Ekle
         </Button>
@@ -1396,7 +1398,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
 
       {/* Summary Dashboard */}
       {summary && (
-        <Paper sx={{ p: 2, mb: 3 }}>
+        <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle2" sx={{ mb: 2 }}>Özet Gösterge Paneli</Typography>
           <Box
             sx={{
@@ -1406,15 +1408,15 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
               mb: 2,
             }}
           >
-            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Typography variant="caption" color="text.secondary">Toplam Gelir</Typography>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>{fmt(summary.totalRevenue)}</Typography>
             </Paper>
-            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Typography variant="caption" color="text.secondary">Toplam Maliyet</Typography>
               <Typography variant="h6" sx={{ fontWeight: 700, color: 'error.main' }}>{fmt(summary.totalCosts)}</Typography>
             </Paper>
-            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Typography variant="caption" color="text.secondary">Toplam Kâr</Typography>
               <Typography
                 variant="h6"
@@ -1423,7 +1425,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
                 {fmt(summary.totalProfit)}
               </Typography>
             </Paper>
-            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Typography variant="caption" color="text.secondary">Ort. Marj</Typography>
               <Typography
                 variant="h6"
@@ -1432,7 +1434,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
                 {pct(summary.avgMargin)}
               </Typography>
             </Paper>
-            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+            <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Typography variant="caption" color="text.secondary">Ort. ROI</Typography>
               <Typography
                 variant="h6"
@@ -1444,7 +1446,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
           </Box>
 
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 200 }}>
+            <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 200, borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <TrendingUp size={14} color="green" />
                 <Typography variant="caption" color="text.secondary">En İyi Ürün</Typography>
@@ -1452,7 +1454,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
               <Typography variant="body2" sx={{ fontWeight: 600 }}>{summary.bestProduct}</Typography>
               <Typography variant="body2" sx={{ color: 'success.main' }}>Kâr: {fmt(summary.bestProfit)}</Typography>
             </Paper>
-            <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 200 }}>
+            <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 200, borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <TrendingDown size={14} color="red" />
                 <Typography variant="caption" color="text.secondary">En Kötü Ürün</Typography>
@@ -1471,12 +1473,12 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
 
       {/* Monthly Summary */}
       {monthlySummary && monthlySummary.length > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
+        <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle2" sx={{ mb: 2 }}>Aylık Özet</Typography>
           <TableContainer>
             <Table size="small">
               <TableHead>
-                <TableRow>
+                <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                   <TableCell sx={{ fontWeight: 700 }}>Ay</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Satış</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Gelir</TableCell>
@@ -1507,7 +1509,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
 
       {/* Entries Table */}
       {entries.length > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
+        <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="subtitle2">
               Tüm Kayıtlar ({entries.length})
@@ -1518,6 +1520,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
                 variant="outlined"
                 startIcon={<Download size={14} />}
                 onClick={handleExportCSV}
+                sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#5558e6', bgcolor: 'rgba(99,102,241,0.04)' } }}
               >
                 CSV İndir
               </Button>
@@ -1608,18 +1611,30 @@ export default function FinancialIntelligence({ userId, marketplace, userListing
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-        <DollarSign size={22} />
+        <DollarSign size={22} color="#6366f1" />
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Finansal Zekâ
         </Typography>
       </Box>
 
-      <Paper sx={{ mb: 2 }}>
+      <Paper sx={{ p: 2, mb: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
+        <Typography variant="subtitle2" fontWeight={700} gutterBottom>Finansal Araclar Rehberi</Typography>
+        <Typography variant="body2" color="text.secondary" component="div">
+          <ul style={{ margin: 0, paddingLeft: 16 }}>
+            <li><strong>Gelir Hesaplayici:</strong> Satis fiyati, kargo ve eBay komisyonunu girerek net karinizi hesaplayin</li>
+            <li><strong>Kaynak Hesaplayici:</strong> Bir urunu aramadan once karliliginizi simule edin</li>
+            <li><strong>ROI Takip:</strong> Urunlerinizin gercek karliliginizi kaydedin ve zaman icinde izleyin</li>
+          </ul>
+        </Typography>
+      </Paper>
+
+      <Paper sx={{ mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Tabs
           value={activeTab}
           onChange={(_, v) => setActiveTab(v)}
           variant="scrollable"
           scrollButtons="auto"
+          sx={{ '& .Mui-selected': { color: '#6366f1' }, '& .MuiTabs-indicator': { bgcolor: '#6366f1' } }}
         >
           <Tab
             label="Gelir Hesaplayıcı"

@@ -102,6 +102,10 @@ interface EtsyResearchState {
   pinnedListing: EtsyMarketItem | null;
   comparisonVisible: boolean;
 
+  // --- Discovery (pre-loaded) ---
+  discoveryData: any | null;
+  discoveryLoading: boolean;
+
   // --- Actions ---
   setQuery: (q: string) => void;
   setMyTitle: (t: string) => void;
@@ -140,6 +144,7 @@ interface EtsyResearchState {
   addTrackedKeyword: (shopId: string, userListings?: any[]) => Promise<void>;
   removeTrackedKeyword: (keywordId: string, shopId: string) => Promise<void>;
   fetchRankHistory: (keywordId: string, shopId: string) => Promise<void>;
+  fetchDiscoveryData: () => Promise<void>;
   exportCSV: () => void;
   saveSearch: () => void;
   loadSearch: (s: SavedSearch) => void;
@@ -206,6 +211,8 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
   selectedListingId: null,
   pinnedListing: null,
   comparisonVisible: false,
+  discoveryData: null,
+  discoveryLoading: false,
 
   // --- Setters ---
   setQuery: (q) => set({ query: q }),
@@ -643,6 +650,21 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
 
   initSavedSearches: () => {
     set({ savedSearches: loadSavedSearches() });
+  },
+
+  fetchDiscoveryData: async () => {
+    if (get().discoveryData || get().discoveryLoading) return;
+    set({ discoveryLoading: true });
+    try {
+      const res = await fetch('/api/clawd/etsy?action=get_discovery_data');
+      if (!res.ok) throw new Error('Discovery fetch failed');
+      const data = await res.json();
+      set({ discoveryData: data });
+    } catch (err) {
+      console.error('[Discovery]', err);
+    } finally {
+      set({ discoveryLoading: false });
+    }
   },
 }));
 

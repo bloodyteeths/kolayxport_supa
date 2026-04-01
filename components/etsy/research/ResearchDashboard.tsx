@@ -1,12 +1,12 @@
 import React from 'react';
 import {
   Box, Typography, Paper, Button, Chip, IconButton, Tooltip,
-  useMediaQuery,
+  useMediaQuery, Skeleton, Card, CardMedia, CardContent, Grid,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
   Search, TrendingUp, BarChart2, Compass, Trash2, Clock,
-  ArrowRight, Zap, Star,
+  ArrowRight, Zap, Star, Flame, Lightbulb,
 } from 'lucide-react';
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
 import { GRADIENTS, glassCard, StatCard, ScoreRing } from './shared/ui';
@@ -21,6 +21,7 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
   const {
     items, totalResults, savedSearches, query,
     setQuery, loadSearch, deleteSaved, initSavedSearches,
+    discoveryData, discoveryLoading, searchMarket,
   } = useEtsyResearchStore();
 
   React.useEffect(() => { initSavedSearches(); }, [initSavedSearches]);
@@ -146,28 +147,127 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
         </Paper>
       )}
 
-      {/* Empty state when no data */}
-      {!hasData && savedSearches.length === 0 && (
-        <Paper sx={{
-          ...glassCard, p: 4, textAlign: 'center', my: 2,
-          background: 'linear-gradient(135deg, rgba(102,126,234,0.03) 0%, rgba(118,75,162,0.03) 100%)',
-        }}>
-          <Box sx={{ mb: 2 }}>
-            <Search size={48} color="#667eea" style={{ opacity: 0.5 }} />
-          </Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Etsy Araştırma Merkezi</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Rakipleri analiz edin, trendleri keşfedin, fiyatlandırma stratejinizi belirleyin.
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<Search size={16} />}
-            onClick={() => onNavigateToSection(1, 100)}
-            sx={{ background: GRADIENTS.primary, borderRadius: '12px', textTransform: 'none', fontWeight: 600, px: 3, ...(isMobile && { width: '100%' }) }}
-          >
-            İlk Araştırmanızı Yapın
-          </Button>
-        </Paper>
+      {/* Discovery data — shown when no search results yet */}
+      {!hasData && (
+        <>
+          {/* Skeleton loaders while discovery data loads */}
+          {discoveryLoading && (
+            <Box sx={{ mb: 3 }}>
+              <Skeleton variant="text" width={200} height={32} sx={{ mb: 1.5 }} />
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} variant="rounded" height={220} sx={{ borderRadius: '16px' }} />
+                ))}
+              </Box>
+              <Skeleton variant="text" width={180} height={32} sx={{ mt: 3, mb: 1 }} />
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                  <Skeleton key={i} variant="rounded" width={90} height={32} sx={{ borderRadius: '16px' }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Trending Niches */}
+          {discoveryData?.trendingNiches?.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Flame size={18} color="#f44336" /> Trending Niches
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+                {discoveryData.trendingNiches.map((niche: any) => (
+                  <Card key={niche.query} sx={{
+                    ...glassCard, cursor: 'pointer', overflow: 'hidden',
+                    '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 32px rgba(0,0,0,0.12)' },
+                    transition: 'all 0.2s',
+                  }} onClick={() => { setQuery(niche.query); setTimeout(() => searchMarket(), 50); onNavigateToSection(1, 100); }}>
+                    {niche.topItems?.[0]?.image_url && (
+                      <CardMedia component="img" height={140} image={niche.topItems[0].image_url}
+                        alt={niche.query} sx={{ objectFit: 'cover' }} />
+                    )}
+                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, textTransform: 'capitalize' }}>
+                        {niche.query}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {niche.totalResults?.toLocaleString()} results
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          ${niche.priceStats?.avg?.toFixed(2)} avg
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#e91e63', display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                          <Star size={10} /> {niche.avgFavorites} fav
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Hot Keywords */}
+          {discoveryData?.hotKeywords?.length > 0 && (
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TrendingUp size={16} color="#667eea" /> Hot Keywords
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+                {discoveryData.hotKeywords.map((kw: any) => (
+                  <Chip key={kw.keyword} label={`${kw.keyword} (${kw.count})`} size="small" variant="outlined"
+                    onClick={() => { setQuery(kw.keyword); setTimeout(() => searchMarket(), 50); onNavigateToSection(1, 100); }}
+                    sx={{
+                      cursor: 'pointer', borderRadius: '10px', fontWeight: 600, fontSize: '0.78rem',
+                      '&:hover': { bgcolor: 'rgba(102,126,234,0.08)', borderColor: '#667eea' },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Paper>
+          )}
+
+          {/* Seasonal Tips */}
+          {discoveryData?.seasonalTips?.length > 0 && (
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Lightbulb size={16} color="#ff9800" /> Seasonal Tips
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {discoveryData.seasonalTips.map((tip: string, i: number) => (
+                  <Typography key={i} variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Box component="span" sx={{ color: '#ff9800', fontWeight: 700, mt: '2px' }}>•</Box>
+                    {tip}
+                  </Typography>
+                ))}
+              </Box>
+            </Paper>
+          )}
+
+          {/* Fallback empty state when no discovery data either */}
+          {!discoveryLoading && !discoveryData && savedSearches.length === 0 && (
+            <Paper sx={{
+              ...glassCard, p: 4, textAlign: 'center', my: 2,
+              background: 'linear-gradient(135deg, rgba(102,126,234,0.03) 0%, rgba(118,75,162,0.03) 100%)',
+            }}>
+              <Box sx={{ mb: 2 }}>
+                <Search size={48} color="#667eea" style={{ opacity: 0.5 }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Etsy Araştırma Merkezi</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Rakipleri analiz edin, trendleri keşfedin, fiyatlandırma stratejinizi belirleyin.
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<Search size={16} />}
+                onClick={() => onNavigateToSection(1, 100)}
+                sx={{ background: GRADIENTS.primary, borderRadius: '12px', textTransform: 'none', fontWeight: 600, px: 3, ...(isMobile && { width: '100%' }) }}
+              >
+                İlk Araştırmanızı Yapın
+              </Button>
+            </Paper>
+          )}
+        </>
       )}
     </Box>
   );

@@ -3,13 +3,13 @@ import {
   Box, Typography, Paper, Chip, Alert, Divider, Button, TextField,
   CircularProgress, LinearProgress,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
-  IconButton, useMediaQuery, Collapse,
+  IconButton, useMediaQuery, Collapse, Skeleton, Card, CardContent,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
   Store, Star, Users, ExternalLink, Search, ShoppingCart,
   Eye, Heart, ShoppingBag, Sparkles, DollarSign, Target, Calendar,
-  Zap, MessageSquare, ThumbsUp, ThumbsDown,
+  Zap, MessageSquare, ThumbsUp, ThumbsDown, Flame,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -42,6 +42,10 @@ export default function CompetitorIntelligence() {
   const fetchShopSpyReport = useEtsyResearchStore(s => s.fetchShopSpyReport);
   const fetchShopReviews = useEtsyResearchStore(s => s.fetchShopReviews);
   const fetchReviewSentiment = useEtsyResearchStore(s => s.fetchReviewSentiment);
+  const discoveryData = useEtsyResearchStore(s => s.discoveryData);
+  const discoveryLoading = useEtsyResearchStore(s => s.discoveryLoading);
+  const setQuery = useEtsyResearchStore(s => s.setQuery);
+  const searchMarket = useEtsyResearchStore(s => s.searchMarket);
 
   const shopStats = useComputedShopStats();
   const deepDiveStats = useComputedDeepDive();
@@ -212,10 +216,64 @@ export default function CompetitorIntelligence() {
             </Alert>
           : hasData
             ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Mağaza bilgileri yükleniyor...</Alert>
-            : <PremiumEmptyState icon={<Users size={48} />} title="Mağaza Analizi"
-                desc="Aynı nişte satan mağazaları keşfedin."
-                steps={['Bir anahtar kelime araması yapın', 'Aramanızla ilgili mağazalar otomatik bulunur', 'Satış sayısı, puan ve ortalama fiyatlarını karşılaştırın']}
-              />
+            : (
+              <>
+                {/* Discovery: top items from trending niches as competitor preview */}
+                {discoveryLoading && (
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2 }}>
+                    {[1, 2, 3, 4].map(i => (
+                      <Skeleton key={i} variant="rounded" height={120} sx={{ borderRadius: '16px' }} />
+                    ))}
+                  </Box>
+                )}
+
+                {discoveryData?.trendingNiches?.length > 0 ? (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Flame size={18} color="#f44336" /> Top Listings from Trending Niches
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                      Click a niche to search and discover competitor shops
+                    </Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                      {discoveryData.trendingNiches.map((niche: any) => (
+                        <Card key={niche.query} sx={{
+                          ...glassCard, cursor: 'pointer',
+                          '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' },
+                          transition: 'all 0.2s',
+                        }} onClick={() => { setQuery(niche.query); setTimeout(() => searchMarket(), 50); }}>
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, textTransform: 'capitalize', mb: 1 }}>
+                              {niche.query}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 1 }}>
+                              <Chip label={`${niche.totalResults?.toLocaleString()} results`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                              <Chip label={`$${niche.priceStats?.avg?.toFixed(2)} avg`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                            </Box>
+                            {niche.topItems?.slice(0, 3).map((item: any) => (
+                              <Box key={item.listing_id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                {item.image_url && (
+                                  <Box component="img" src={item.image_url} alt="" sx={{ width: 28, height: 28, borderRadius: '6px', objectFit: 'cover' }} />
+                                )}
+                                <Typography variant="caption" sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {item.title}
+                                </Typography>
+                                <Typography variant="caption" sx={{ fontWeight: 600, color: '#667eea' }}>${item.price}</Typography>
+                              </Box>
+                            ))}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </Box>
+                  </Box>
+                ) : !discoveryLoading && (
+                  <PremiumEmptyState icon={<Users size={48} />} title="Mağaza Analizi"
+                    desc="Aynı nişte satan mağazaları keşfedin."
+                    steps={['Bir anahtar kelime araması yapın', 'Aramanızla ilgili mağazalar otomatik bulunur', 'Satış sayısı, puan ve ortalama fiyatlarını karşılaştırın']}
+                  />
+                )}
+              </>
+            )
       )}
 
       {/* ================================================================ */}
@@ -398,10 +456,10 @@ export default function CompetitorIntelligence() {
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h3" sx={{ fontWeight: 900, color: shopSpyReport.shop_grade?.startsWith('A') ? '#4caf50' : shopSpyReport.shop_grade?.startsWith('B') ? '#2196F3' : '#ff9800' }}>
-                      {shopSpyReport.shop_grade}
+                    <Typography variant="h3" sx={{ fontWeight: 900, color: (shopSpyReport.shop_score ?? 0) >= 70 ? '#4caf50' : (shopSpyReport.shop_score ?? 0) >= 50 ? '#2196F3' : '#ff9800' }}>
+                      {shopSpyReport.shop_score}
                     </Typography>
-                    <Typography variant="caption">Mağaza Notu</Typography>
+                    <Typography variant="caption">Mağaza Skoru</Typography>
                   </Box>
                   <Divider orientation="vertical" flexItem />
                   <Box>

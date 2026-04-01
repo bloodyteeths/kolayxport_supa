@@ -4,10 +4,10 @@ import {
   InputAdornment, CircularProgress, LinearProgress,
   Switch, FormControlLabel,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
-  Tooltip, IconButton, useMediaQuery, Collapse,
+  Tooltip, IconButton, useMediaQuery, Collapse, Skeleton,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Search, Compass, Globe, Target, Zap, ArrowRight, Copy } from 'lucide-react';
+import { Search, Compass, Globe, Target, Zap, ArrowRight, Copy, TrendingUp, Lightbulb } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
@@ -31,6 +31,7 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
     kwSuggestions, kwExplorerLoading,
     kwAlphabetSoup, setKwAlphabetSoup,
     query, searchKeywords,
+    discoveryData, discoveryLoading,
   } = useEtsyResearchStore();
 
   const { sorted: sortedKwSuggestions, sortKey: kwSortKey, sortDir: kwSortDir, handleSort } =
@@ -198,12 +199,66 @@ export default function KeywordDiscovery({ onNavigateToSearch }: KeywordDiscover
       )}
 
       {!kwExplorerLoading && kwSuggestions.length === 0 && (
-        <PremiumEmptyState
-          icon={<Compass size={48} />}
-          title="Anahtar Kelime Kesfet"
-          desc="Hangi kelimeleri kullanmalisiniz? Google ve Amazon'dan oneriler alin."
-          steps={['Yukariya satmak istediginiz urunu yazin (or. "baby blanket")', '"A-Z Genislet" ile uzun kuyruk kelimeler bulun', 'Yuksek skorlu kelimeleri baslik ve taglarina ekleyin']}
-        />
+        <>
+          {/* Discovery suggestions */}
+          {discoveryLoading && (
+            <Box sx={{ mb: 2 }}>
+              <Skeleton variant="text" width={180} height={28} sx={{ mb: 1 }} />
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <Skeleton key={i} variant="rounded" width={100} height={32} sx={{ borderRadius: '16px' }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {discoveryData?.hotKeywords?.length > 0 && (
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TrendingUp size={16} color="#667eea" /> Suggested Keywords
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                Click a keyword to auto-fill the search box
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+                {discoveryData.hotKeywords.map((kw: any) => (
+                  <Chip key={kw.keyword} label={`${kw.keyword} (${kw.count})`} size="small" variant="outlined"
+                    onClick={() => { setKwExplorerQuery(kw.keyword); }}
+                    sx={{
+                      cursor: 'pointer', borderRadius: '10px', fontWeight: 600, fontSize: '0.78rem',
+                      '&:hover': { bgcolor: 'rgba(102,126,234,0.08)', borderColor: '#667eea' },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Paper>
+          )}
+
+          {discoveryData?.seasonalTips?.length > 0 && (
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Lightbulb size={16} color="#ff9800" /> Seasonal Tips
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+                {discoveryData.seasonalTips.map((tip: string, i: number) => (
+                  <Typography key={i} variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Box component="span" sx={{ color: '#ff9800', fontWeight: 700, mt: '2px' }}>•</Box>
+                    {tip}
+                  </Typography>
+                ))}
+              </Box>
+            </Paper>
+          )}
+
+          {!discoveryLoading && !discoveryData && (
+            <PremiumEmptyState
+              icon={<Compass size={48} />}
+              title="Anahtar Kelime Kesfet"
+              desc="Hangi kelimeleri kullanmalisiniz? Google ve Amazon'dan oneriler alin."
+              steps={['Yukariya satmak istediginiz urunu yazin (or. "baby blanket")', '"A-Z Genislet" ile uzun kuyruk kelimeler bulun', 'Yuksek skorlu kelimeleri baslik ve taglarina ekleyin']}
+            />
+          )}
+        </>
       )}
     </Box>
   );

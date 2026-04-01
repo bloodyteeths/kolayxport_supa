@@ -69,6 +69,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
+import { useTranslations } from 'next-intl';
 
 import { Tabs, Tab } from '@mui/material';
 import SEOIndicator from '@/components/ebay/SEOIndicator';
@@ -115,11 +116,11 @@ interface EbayListingRow {
 // ---------------------------------------------------------------------------
 
 const CONDITION_LABELS: Record<string, string> = {
-  NEW: 'Yeni',
-  LIKE_NEW: 'Yeni Gibi',
-  VERY_GOOD: 'Cok Iyi',
-  GOOD: 'Iyi',
-  ACCEPTABLE: 'Kabul Edilebilir',
+  NEW: 'New',
+  LIKE_NEW: 'Like New',
+  VERY_GOOD: 'Very Good',
+  GOOD: 'Good',
+  ACCEPTABLE: 'Acceptable',
 };
 
 function formatPrice(price: EbayListingRow['price']): string {
@@ -147,19 +148,19 @@ function calculateHealth(listing: EbayListingRow): HealthBreakdown {
   const titleLen = listing.title?.length || 0;
   const titleScore = titleLen >= 80 ? 25 : titleLen >= 60 ? 15 : 5;
   const titleColor = titleLen >= 80 ? '#4caf50' : titleLen >= 60 ? '#ff9800' : '#f44336';
-  const titleLabel = `${titleLen} karakter baslik`;
+  const titleLabel = `${titleLen} chars title`;
 
   // Description: 500+ chars = green(25), 200-499 = yellow(15), <200 = red(5)
   const descLen = listing.description?.length || 0;
   const descScore = descLen >= 500 ? 25 : descLen >= 200 ? 15 : 5;
   const descColor = descLen >= 500 ? '#4caf50' : descLen >= 200 ? '#ff9800' : '#f44336';
-  const descLabel = `${descLen} karakter aciklama`;
+  const descLabel = `${descLen} chars description`;
 
   // Images: 12+ = green(25), 5-11 = yellow(15), <5 = red(5)
   const imgCount = listing.imageCount || 0;
   const imagesScore = imgCount >= 12 ? 25 : imgCount >= 5 ? 15 : 5;
   const imagesColor = imgCount >= 12 ? '#4caf50' : imgCount >= 5 ? '#ff9800' : '#f44336';
-  const imagesLabel = `${imgCount} gorsel`;
+  const imagesLabel = `${imgCount} images`;
 
   // Aspects (Item Specifics): 5+ = green(25), 3-4 = yellow(15), <3 = red(5)
   const aspectCount = Object.keys(listing.aspects || {}).length;
@@ -196,6 +197,7 @@ function MobileListingCard({
   const [expanded, setExpanded] = useState(false);
   const health = calculateHealth(listing);
   const isPublished = listing.status === 'PUBLISHED';
+  const t = useTranslations('ebayListings');
 
   return (
     <Paper sx={{ mb: 1.5, overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
@@ -386,6 +388,7 @@ function MobileListingCard({
 function EbayListingsPage() {
   const { user } = useAuth();
   const userId = (user as any)?.id;
+  const t = useTranslations('ebayListings');
 
   // --- State ---
   const [listings, setListings] = useState<EbayListingRow[]>([]);
@@ -566,10 +569,10 @@ function EbayListingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sku: listing.sku, offerId: listing.offerId, title: newTitle }),
       });
-      if (!res.ok) throw new Error('Güncelleme başarısız');
+      if (!res.ok) throw new Error(t('updateFailed'));
 
       setAppliedTitles(prev => new Map(prev).set(listingId, originalTitle));
-      toast.success('Başlık güncellendi');
+      toast.success(t('titleUpdated'));
       fetchListings();
     } catch (err: any) {
       toast.error(err.message);
@@ -589,10 +592,10 @@ function EbayListingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sku: listing.sku, offerId: listing.offerId, title: originalTitle }),
       });
-      if (!res.ok) throw new Error('Geri alma başarısız');
+      if (!res.ok) throw new Error(t('revertFailed'));
 
       setAppliedTitles(prev => { const m = new Map(prev); m.delete(listingId); return m; });
-      toast.success('Başlık geri alındı');
+      toast.success(t('titleReverted'));
       fetchListings();
     } catch (err: any) {
       toast.error(err.message);
@@ -1359,10 +1362,10 @@ function EbayListingsPage() {
             >
               <MenuItem value="all">Tum Durumlar</MenuItem>
               <MenuItem value="NEW">Yeni</MenuItem>
-              <MenuItem value="LIKE_NEW">Yeni Gibi</MenuItem>
-              <MenuItem value="VERY_GOOD">Cok Iyi</MenuItem>
-              <MenuItem value="GOOD">Iyi</MenuItem>
-              <MenuItem value="ACCEPTABLE">Kabul Edilebilir</MenuItem>
+              <MenuItem value="LIKE_NEW">{t('condLikeNew')}</MenuItem>
+              <MenuItem value="VERY_GOOD">{t('condVeryGood')}</MenuItem>
+              <MenuItem value="GOOD">{t('condGood')}</MenuItem>
+              <MenuItem value="ACCEPTABLE">{t('condAcceptable')}</MenuItem>
             </Select>
           </FormControl>
 
@@ -1457,24 +1460,24 @@ function EbayListingsPage() {
           <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIBulkOptimize(); }}>
             <ListItemIcon><AutoFixHighIcon fontSize="small" /></ListItemIcon>
             <ListItemText
-              primary="Başlıkları Optimize Et"
-              secondary="AI ile tüm başlıklarını eBay SEO'ya uygun hale getir"
+              primary={t('optimizeTitles')}
+              secondary={t('optimizeTitlesDesc')}
             />
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIAnalyze(); }}>
             <ListItemIcon><PsychologyIcon fontSize="small" /></ListItemIcon>
             <ListItemText
               primary="Listeleri Analiz Et"
-              secondary="AI en çok satış getirecek iyileştirmeleri önersin"
+              secondary={t('aiAnalysisDesc')}
             />
           </MenuItem>
           <Divider />
-          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>Düzenleme Araçları</ListSubheader>
+          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('editingTools')}</ListSubheader>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setFindReplaceOpen(true); }}>
             <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
             <ListItemText
-              primary="Bul & Değiştir"
-              secondary="Birden fazla listede aynı anda değişiklik yap"
+              primary={t('findReplace')}
+              secondary={t('findReplaceDesc')}
             />
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
@@ -1485,19 +1488,19 @@ function EbayListingsPage() {
             />
           </MenuItem>
 
-          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>Fiyat & Şablon</ListSubheader>
+          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('priceTemplates')}</ListSubheader>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setSmartPricingOpen(true); }}>
             <ListItemIcon><AttachMoneyIcon fontSize="small" /></ListItemIcon>
             <ListItemText
-              primary="Akıllı Fiyatlandırma"
-              secondary="Rakiplere göre fiyatını otomatik ayarla"
+              primary={t('smartPricing')}
+              secondary={t('smartPricingDesc')}
             />
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setTemplatesOpen(true); }}>
             <ListItemIcon><ViewListIcon fontSize="small" /></ListItemIcon>
             <ListItemText
-              primary="Şablonlar"
-              secondary="Hazır şablonlardan hızlıca liste oluştur"
+              primary={t('templates')}
+              secondary={t('templatesDesc')}
             />
           </MenuItem>
 
@@ -1505,17 +1508,17 @@ function EbayListingsPage() {
           <MenuItem onClick={() => { setMoreMenuAnchor(null); handleCSVFileSelect(); }}>
             <ListItemIcon><UploadFileIcon fontSize="small" /></ListItemIcon>
             <ListItemText
-              primary="CSV İçeri Aktar"
-              secondary="Excel/CSV dosyasından toplu liste yükle"
+              primary={t('csvImport')}
+              secondary={t('csvImportDesc')}
             />
           </MenuItem>
 
-          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>Güvenlik</ListSubheader>
+          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('security')}</ListSubheader>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setBackupManagerOpen(true); }}>
             <ListItemIcon><BackupIcon fontSize="small" /></ListItemIcon>
             <ListItemText
-              primary="Yedek Yönetimi"
-              secondary="Yaptığın değişiklikleri geri al"
+              primary={t('backupManager')}
+              secondary={t('backupManagerDesc')}
             />
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setScheduledOpen(true); }}>
@@ -1525,8 +1528,8 @@ function EbayListingsPage() {
               </Badge>
             </ListItemIcon>
             <ListItemText
-              primary={`Zamanlı Görevler${scheduledCount > 0 ? ` (${scheduledCount})` : ''}`}
-              secondary="İleri tarihli otomatik güncellemeler"
+              primary={`${t('scheduledTasks')}${scheduledCount > 0 ? ` (${scheduledCount})` : ''}`}
+              secondary={t('scheduledUpdatesDesc')}
             />
           </MenuItem>
         </Menu>
@@ -1923,7 +1926,7 @@ function EbayListingsPage() {
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {aiDialogMode === 'titles' ? <AutoFixHighIcon color="primary" /> : <PsychologyIcon color="primary" />}
-            {aiDialogMode === 'titles' ? 'AI Başlık Optimizasyonu' : 'AI Liste Analizi'}
+            {aiDialogMode === 'titles' ? t('aiTitleOptimization') : t('aiListAnalysis')}
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {aiDialogMode === 'titles' && !aiLoading && Array.isArray(aiResults) && aiResults.length > 0 && (
@@ -1971,7 +1974,7 @@ function EbayListingsPage() {
           ) : aiDialogMode === 'titles' && Array.isArray(aiResults) ? (
             <Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                AI, başlıklarınızı eBay SEO kurallarına göre optimize etti:
+                {t('aiOptimizedTitles')}
               </Typography>
               {aiResults.map((r: any, i: number) => {
                 // Build visual diff: highlight words that changed
@@ -1990,7 +1993,7 @@ function EbayListingsPage() {
                         </span>
                       ))}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">AI Önerisi:</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('aiSuggestion')}:</Typography>
                     <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
                       {optWords.map((w: string, wi: number) => (
                         <span key={wi} style={{ color: origSet.has(w.toLowerCase()) ? undefined : '#4caf50', fontWeight: origSet.has(w.toLowerCase()) ? undefined : 700 }}>
@@ -2008,7 +2011,7 @@ function EbayListingsPage() {
                           Uygula
                         </Button>
                       )}
-                      <Button size="small" variant="outlined" onClick={() => { navigator.clipboard.writeText(r.optimized); toast.success('Kopyalandı'); }}>
+                      <Button size="small" variant="outlined" onClick={() => { navigator.clipboard.writeText(r.optimized); toast.success(t('copied')); }}>
                         Kopyala
                       </Button>
                     </Box>
@@ -2029,7 +2032,7 @@ function EbayListingsPage() {
                   </Typography>
                 </Box>
                 <Box>
-                  <Typography variant="h6" fontWeight={700}>AI Puanı: {aiResults.score}/100</Typography>
+                  <Typography variant="h6" fontWeight={700}>{t('aiScore')}: {aiResults.score}/100</Typography>
                   <Typography variant="body2" color="text.secondary">
                     {filteredListings[0]?.title?.substring(0, 60)}...
                   </Typography>
@@ -2050,7 +2053,7 @@ function EbayListingsPage() {
 
               {aiResults.tips?.length > 0 && (
                 <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>İpuçları:</Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>{t('tips')}:</Typography>
                   {aiResults.tips.map((tip: string, i: number) => (
                     <Typography key={i} variant="body2" sx={{ mb: 0.5 }}>
                       • {tip}

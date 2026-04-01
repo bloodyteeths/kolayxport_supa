@@ -2,10 +2,10 @@ import React from 'react';
 import {
   Box, Typography, Paper, Chip, Alert, Divider, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
-  IconButton, useMediaQuery,
+  IconButton, useMediaQuery, Skeleton,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { CheckCircle, Hash, Tag, Heart, Copy } from 'lucide-react';
+import { CheckCircle, Hash, Tag, Heart, Copy, TrendingUp } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 import {
@@ -29,6 +29,10 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
   const kwShowMissing = useEtsyResearchStore(s => s.kwShowMissing);
   const setKwShowMissing = useEtsyResearchStore(s => s.setKwShowMissing);
   const myTitle = useEtsyResearchStore(s => s.myTitle);
+  const discoveryData = useEtsyResearchStore(s => s.discoveryData);
+  const discoveryLoading = useEtsyResearchStore(s => s.discoveryLoading);
+  const setQuery = useEtsyResearchStore(s => s.setQuery);
+  const searchMarket = useEtsyResearchStore(s => s.searchMarket);
 
   const { enrichedKeywords, bigrams, trigrams } = useComputedKeywords();
   const { enrichedTags, tagGaps, myTagsSet, tagCombos } = useComputedTags(userListings);
@@ -221,10 +225,56 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
       ) : !loading && (
         hasData
           ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Aramanizda tag verisi bulunamadi. Farkli bir anahtar kelime deneyin.</Alert>
-          : <PremiumEmptyState icon={<Hash size={48} />} title="Kelime & Tag Analizi"
-              desc="Rakiplerin kullandigi taglari ve anahtar kelimeleri kesfedin."
-              steps={['Once bir anahtar kelime aramasi yapin', 'Rakiplerin en cok kullandigi taglar ve kelimeler listelenir', 'Eksiklerinizi gorun — tiklayarak kopyalayin']}
-            />
+          : (
+            <>
+              {/* Discovery hot keywords with frequency bars */}
+              {discoveryLoading && (
+                <Box sx={{ mb: 2 }}>
+                  <Skeleton variant="text" width={200} height={28} sx={{ mb: 1 }} />
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Skeleton variant="text" width={100} height={20} />
+                      <Skeleton variant="rounded" sx={{ flex: 1 }} height={12} />
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
+              {discoveryData?.hotKeywords?.length > 0 ? (
+                <Paper sx={{ ...glassCard, p: 2.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TrendingUp size={16} color="#667eea" /> Hot Keywords — Click to Research
+                  </Typography>
+                  {(() => {
+                    const maxCount = Math.max(...discoveryData.hotKeywords.map((kw: any) => kw.count), 1);
+                    return discoveryData.hotKeywords.map((kw: any) => (
+                      <Box key={kw.keyword} sx={{
+                        display: 'flex', alignItems: 'center', gap: 1, mb: 0.8, cursor: 'pointer',
+                        p: 0.5, borderRadius: '8px', '&:hover': { bgcolor: 'rgba(102,126,234,0.06)' },
+                      }} onClick={() => { setQuery(kw.keyword); setTimeout(() => searchMarket(), 50); }}>
+                        <Typography variant="body2" sx={{ minWidth: isMobile ? 100 : 150, fontWeight: 600, fontSize: '0.85rem' }}>
+                          {kw.keyword}
+                        </Typography>
+                        <Box sx={{ flex: 1, bgcolor: '#f0f0f0', borderRadius: 3, height: 10, overflow: 'hidden' }}>
+                          <Box sx={{
+                            width: `${(kw.count / maxCount) * 100}%`, height: 10, borderRadius: 3,
+                            background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                            transition: 'width 0.5s',
+                          }} />
+                        </Box>
+                        <Typography variant="caption" sx={{ minWidth: 30, fontWeight: 700, textAlign: 'right' }}>{kw.count}</Typography>
+                      </Box>
+                    ));
+                  })()}
+                </Paper>
+              ) : !discoveryLoading && (
+                <PremiumEmptyState icon={<Hash size={48} />} title="Kelime & Tag Analizi"
+                  desc="Rakiplerin kullandigi taglari ve anahtar kelimeleri kesfedin."
+                  steps={['Once bir anahtar kelime aramasi yapin', 'Rakiplerin en cok kullandigi taglar ve kelimeler listelenir', 'Eksiklerinizi gorun — tiklayarak kopyalayin']}
+                />
+              )}
+            </>
+          )
       )}
 
       {/* --- Keywords (merged from tab 4) --- */}

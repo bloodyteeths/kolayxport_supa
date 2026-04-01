@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography, Button, Paper, Chip, Alert, CircularProgress, LinearProgress, useMediaQuery } from '@mui/material';
+import { Box, Typography, Button, Paper, Chip, Alert, CircularProgress, LinearProgress, useMediaQuery, Skeleton } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { TrendingUp, BarChart2, Calendar, Activity } from 'lucide-react';
+import { TrendingUp, BarChart2, Calendar, Activity, Lightbulb, Flame } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
@@ -21,6 +21,8 @@ export default function TrendAnalyzer() {
     kwExplorerQuery,
     fetchTrends,
     setQuery,
+    discoveryData,
+    discoveryLoading,
   } = useEtsyResearchStore();
 
   return (
@@ -163,12 +165,66 @@ export default function TrendAnalyzer() {
       )}
 
       {!trendLoading && !trendData && (
-        <PremiumEmptyState
-          icon={<Activity size={48} />}
-          title="Trend Analizi"
-          desc="Ürün kategoriniz yılın hangi aylarında popüler? Ne zaman stok yapmalısınız?"
-          steps={['Önce "Pazar Araştırma" bölümünde bir anahtar kelime arayın', 'Bu sekmeye gelin ve "Trend Analizi Başlat" butonuna tıklayın', 'Mevsimsel takvim ve yükselen aramaları görün']}
-        />
+        <>
+          {/* Discovery: suggested searches + seasonal tips */}
+          {discoveryLoading && (
+            <Box sx={{ mb: 2 }}>
+              <Skeleton variant="text" width={220} height={28} sx={{ mb: 1 }} />
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {[1, 2, 3, 4].map(i => (
+                  <Skeleton key={i} variant="rounded" width={120} height={36} sx={{ borderRadius: '10px' }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {discoveryData?.trendingNiches?.length > 0 && (
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Flame size={16} color="#f44336" /> Suggested Trend Searches
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                Click a niche to set it as search query, then run Trend Analysis
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {discoveryData.trendingNiches.map((niche: any) => (
+                  <Chip key={niche.query} label={niche.query} variant="outlined"
+                    onClick={() => { setQuery(niche.query); toast.success(`"${niche.query}" arama alanina eklendi`); }}
+                    sx={{
+                      cursor: 'pointer', borderRadius: '10px', fontWeight: 600, textTransform: 'capitalize',
+                      '&:hover': { bgcolor: 'rgba(17,153,142,0.08)', borderColor: '#11998e' },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Paper>
+          )}
+
+          {discoveryData?.seasonalTips?.length > 0 && (
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Lightbulb size={16} color="#ff9800" /> Seasonal Tips
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+                {discoveryData.seasonalTips.map((tip: string, i: number) => (
+                  <Typography key={i} variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Box component="span" sx={{ color: '#ff9800', fontWeight: 700, mt: '2px' }}>•</Box>
+                    {tip}
+                  </Typography>
+                ))}
+              </Box>
+            </Paper>
+          )}
+
+          {!discoveryLoading && !discoveryData && (
+            <PremiumEmptyState
+              icon={<Activity size={48} />}
+              title="Trend Analizi"
+              desc="Ürün kategoriniz yılın hangi aylarında popüler? Ne zaman stok yapmalısınız?"
+              steps={['Önce "Pazar Araştırma" bölümünde bir anahtar kelime arayın', 'Bu sekmeye gelin ve "Trend Analizi Başlat" butonuna tıklayın', 'Mevsimsel takvim ve yükselen aramaları görün']}
+            />
+          )}
+        </>
       )}
     </Box>
   );

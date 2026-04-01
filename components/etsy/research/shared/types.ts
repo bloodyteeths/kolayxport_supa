@@ -134,3 +134,18 @@ export interface FeeProfile {
 }
 
 export type SortDir = 'asc' | 'desc';
+
+export interface DiscoveryNiche {
+  query: string;
+  totalResults: number;
+  topItems: { listing_id: number; title: string; price: number; image_url: string; num_favorers: number; views: number }[];
+  priceStats: { min: number; avg: number; median: number; max: number };
+  avgFavorites: number;
+}
+
+export interface DiscoveryData {
+  trendingNiches: DiscoveryNiche[];
+  hotKeywords: { keyword: string; count: number }[];
+  seasonalTips: string[];
+  lastUpdated: string;
+}

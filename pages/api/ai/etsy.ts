@@ -550,7 +550,7 @@ EN ÇOK KULLANILAN ETIKETLER: ${Array.isArray(topTags) ? topTags.slice(0, 20).ma
 
 JSON formatında döndür:
 {
-  "shop_grade": "A+" ile "F" arası not,
+  "shop_score": 0-100 arası tam sayı puan (90-100: olağanüstü, 70-89: iyi, 50-69: geliştirilmeli, 50 altı: zayıf),
   "estimated_monthly_revenue": tahmini aylık gelir (sayı),
   "revenue_reasoning": "Türkçe gelir tahmini açıklaması",
   "strategy_summary": "Türkçe strateji özeti",
@@ -573,7 +573,7 @@ JSON formatında döndür:
     return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
   }
 
-  const requiredKeys = ['shop_grade', 'estimated_monthly_revenue', 'strategy_summary', 'strengths', 'weaknesses', 'pricing_insights', 'tag_strategy', 'what_to_learn', 'what_to_avoid'];
+  const requiredKeys = ['shop_score', 'estimated_monthly_revenue', 'strategy_summary', 'strengths', 'weaknesses', 'pricing_insights', 'tag_strategy', 'what_to_learn', 'what_to_avoid'];
   const missingKeys = requiredKeys.filter((k) => !(k in parsed));
   if (missingKeys.length > 0) {
     console.error('[AI Etsy] shop_spy_report missing keys:', missingKeys);
@@ -611,8 +611,7 @@ PAZAR KARŞILAŞTIRMA:
 
 JSON formatında döndür:
 {
-  "overall_grade": "A+" ile "F" arası not,
-  "overall_score": 0-100,
+  "overall_score": 0-100 arası tam sayı puan (90-100: olağanüstü, 70-89: iyi, 50-69: geliştirilmeli, 50 altı: zayıf),
   "title_score": 0-100,
   "title_feedback": "Türkçe başlık geri bildirimi",
   "tags_score": 0-100,
@@ -639,7 +638,7 @@ JSON formatında döndür:
     return { status: 500, data: { error: 'AI yanıtı işlenemedi' } };
   }
 
-  const requiredKeys = ['overall_grade', 'overall_score', 'title_score', 'title_feedback', 'tags_score', 'tags_feedback', 'description_score', 'pricing_score', 'quick_wins', 'optimized_title', 'suggested_tags'];
+  const requiredKeys = ['overall_score', 'title_score', 'title_feedback', 'tags_score', 'tags_feedback', 'description_score', 'pricing_score', 'quick_wins', 'optimized_title', 'suggested_tags'];
   const missingKeys = requiredKeys.filter((k) => !(k in parsed));
   if (missingKeys.length > 0) {
     console.error('[AI Etsy] listing_audit missing keys:', missingKeys);

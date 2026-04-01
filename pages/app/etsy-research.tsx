@@ -13,6 +13,7 @@ import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
+import { useTranslations } from 'next-intl';
 
 // Lazy load sub-components for performance
 const ResearchDashboard = lazy(() => import('@/components/etsy/research/ResearchDashboard'));
@@ -32,21 +33,11 @@ interface ShopInfo {
   shopName: string;
 }
 
-// Section definitions matching the original structure
-const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: -1, tab: -1 },
-  { id: 'niche', label: 'Niş Analizi', icon: BarChart2, section: 1, tab: 100, desc: 'Talep, fiyat ve rekabet' },
-  { id: 'keywords', label: 'Kelime & Tag', icon: Hash, section: 1, tab: 101, desc: 'Tag boşlukları ve kelimeler' },
-  { id: 'competitors', label: 'Mağaza & AI', icon: Store, section: 1, tab: 102, desc: 'Rakip analizi ve AI' },
-  { id: 'discovery', label: 'Kelime Keşif', icon: Compass, section: 2, tab: 0, desc: 'Yeni kelimeler bul' },
-  { id: 'trends', label: 'Trendler', icon: Activity, section: 2, tab: 1, desc: 'Mevsimsel analiz' },
-  { id: 'seo', label: 'Mağazam', icon: Target, section: 0, tab: 9, desc: 'SEO, kâr, sıralama' },
-];
-
 const SIDEBAR_WIDTH = 220;
 
 function EtsyResearchPage() {
   const { user } = useAuth();
+  const t = useTranslations('etsyResearch');
   const [shops, setShops] = useState<ShopInfo[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string>('');
   const [listings, setListings] = useState<any[]>([]);
@@ -57,7 +48,21 @@ function EtsyResearchPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const { setQuery, searchMarket } = useEtsyResearchStore();
+  const { setQuery, searchMarket, fetchDiscoveryData } = useEtsyResearchStore();
+
+  // Auto-fetch discovery data on mount (trending niches, hot keywords)
+  useEffect(() => { fetchDiscoveryData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Section definitions matching the original structure
+  const NAV_ITEMS = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: -1, tab: -1 },
+    { id: 'niche', label: t('navNiche'), icon: BarChart2, section: 1, tab: 100, desc: t('navNicheDesc') },
+    { id: 'keywords', label: t('navKeywords'), icon: Hash, section: 1, tab: 101, desc: t('navKeywordsDesc') },
+    { id: 'competitors', label: t('navCompetitors'), icon: Store, section: 1, tab: 102, desc: t('navCompetitorsDesc') },
+    { id: 'discovery', label: t('navDiscovery'), icon: Compass, section: 2, tab: 0, desc: t('navDiscoveryDesc') },
+    { id: 'trends', label: t('navTrends'), icon: Activity, section: 2, tab: 1, desc: t('navTrendsDesc') },
+    { id: 'seo', label: t('navMyShop'), icon: Target, section: 0, tab: 9, desc: t('navMyShopDesc') },
+  ];
 
   // Fetch shops
   useEffect(() => {
@@ -83,7 +88,7 @@ function EtsyResearchPage() {
     })();
   }, [(user as any)?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch listings for Mağazam section
+  // Fetch listings for My Shop section
   useEffect(() => {
     if (!selectedShopId) return;
     (async () => {
@@ -118,7 +123,7 @@ function EtsyResearchPage() {
 
   if (loading) {
     return (
-      <AppLayout title="Etsy Araştırma | KolayXport">
+      <AppLayout title={t('pageTitle')}>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
           <CircularProgress />
         </Box>
@@ -128,10 +133,10 @@ function EtsyResearchPage() {
 
   if (shops.length === 0) {
     return (
-      <AppLayout title="Etsy Araştırma | KolayXport">
+      <AppLayout title={t('pageTitle')}>
         <Box sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary">
-            Henüz bağlı bir Etsy mağazanız yok. Ayarlar sayfasından bağlayın.
+            {t('noShopsConnected')}
           </Typography>
         </Box>
       </AppLayout>
@@ -208,7 +213,7 @@ function EtsyResearchPage() {
   };
 
   return (
-    <AppLayout title="Etsy Araştırma | KolayXport">
+    <AppLayout title={t('pageTitle')}>
       <Toaster position="top-right" />
       <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 64px)' }}>
         {/* Desktop sidebar */}
@@ -263,6 +268,7 @@ function EtsyResearchPage() {
 }
 
 function SearchBar() {
+  const t = useTranslations('etsyResearch');
   const {
     query, minPrice, maxPrice, sortOn, loading,
     setQuery, setMinPrice, setMaxPrice, setSortOn, searchMarket,
@@ -277,7 +283,7 @@ function SearchBar() {
       <Paper sx={{ p: { xs: 1.5, md: 2 }, borderRadius: '12px', position: 'relative', zIndex: 1 }}>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <TextField
-            label="Ne satıyorsunuz?"
+            label={t('whatAreYouSelling')}
             value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
             size="small" sx={{ flex: 2, minWidth: 200 }}
             placeholder="flower girl dress, baby blanket..."
@@ -294,12 +300,12 @@ function SearchBar() {
             size="small" type="number" sx={{ width: 80 }}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
           />
-          <TextField label="Sıralama" value={sortOn} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSortOn(e.target.value)}
+          <TextField label={t('sorting')} value={sortOn} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSortOn(e.target.value)}
             size="small" select sx={{ width: 130 }} SelectProps={{ native: true }}>
-            <option value="score">En İyi Eşleşme</option>
-            <option value="price">Fiyat</option>
-            <option value="created">Yeni Eklenen</option>
-            <option value="updated">Son Güncellenen</option>
+            <option value="score">{t('bestMatch')}</option>
+            <option value="price">{t('price')}</option>
+            <option value="created">{t('newlyAdded')}</option>
+            <option value="updated">{t('lastUpdated')}</option>
           </TextField>
           <Button variant="contained" onClick={searchMarket}
             disabled={loading || !query.trim()}
@@ -309,7 +315,7 @@ function SearchBar() {
               boxShadow: '0 4px 12px rgba(102,126,234,0.4)',
             }}
           >
-            Araştır
+            {t('research')}
           </Button>
         </Box>
       </Paper>

@@ -4,14 +4,16 @@ import {
   FormControlLabel, Switch, Alert, Tooltip, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, IconButton, Autocomplete,
   Avatar, CircularProgress, LinearProgress, Tabs, Tab, useMediaQuery,
-  Collapse,
+  Collapse, Skeleton,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
   Info, CheckCircle, XCircle, Copy, TrendingUp, Target,
-  ShoppingBag, Trash2, Search, Zap, Link, AlertTriangle,
+  ShoppingBag, Trash2, Search, Zap, Link, AlertTriangle, Lightbulb,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 import {
   useEtsyResearchStore,
@@ -39,6 +41,8 @@ interface ListingSEOProps {
 export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const t = useTranslations('etsy.research');
+  const { config, formatDate, formatNumber } = useLocale();
   // ---- sub-tab state (0=Profit, 1=SEO, 2=Rank) ----
   const [tab, setTab] = useState(0);
 
@@ -47,7 +51,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
   const [sellingPrice, setSellingPrice] = useState('');
   const [shippingCost, setShippingCost] = useState('');
   const [includeOffsiteAds, setIncludeOffsiteAds] = useState(false);
-  const [shopRegion, setShopRegion] = useState<'us' | 'tr'>('tr');
+  const [shopRegion, setShopRegion] = useState<'us' | 'tr'>(config.defaultEtsyFeeRegion);
   const [etsyAdsRoas, setEtsyAdsRoas] = useState('');
 
   // ---- Store selectors ----
@@ -78,6 +82,8 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
   const fetchTrackedKeywords = useEtsyResearchStore(s => s.fetchTrackedKeywords);
   const addTrackedKeyword = useEtsyResearchStore(s => s.addTrackedKeyword);
   const removeTrackedKeyword = useEtsyResearchStore(s => s.removeTrackedKeyword);
+  const discoveryData = useEtsyResearchStore(s => s.discoveryData);
+  const discoveryLoading = useEtsyResearchStore(s => s.discoveryLoading);
   const fetchRankHistory = useEtsyResearchStore(s => s.fetchRankHistory);
   const setRankKeywordInput = useEtsyResearchStore(s => s.setRankKeywordInput);
   const setRankListingId = useEtsyResearchStore(s => s.setRankListingId);
@@ -91,7 +97,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
   // ---- Fee profiles ----
   const FEE_PROFILES: Record<'us' | 'tr', FeeProfile> = useMemo(() => ({
     us: {
-      label: 'ABD Mağaza',
+      label: t('usShop'),
       currency: '$',
       listingFee: 0.20,
       transactionRate: 0.065,
@@ -100,10 +106,10 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
       offsiteAdsRate: 0.15,
       regulatoryFee: 0,
       vatRate: 0,
-      notes: 'İşlem ücreti %6.5, ödeme işleme %3 + $0.25',
+      notes: t('etsyFeeNotesUS'),
     },
     tr: {
-      label: 'Türkiye Mağaza',
+      label: t('turkeyShop'),
       currency: '$',
       listingFee: 0.20,
       transactionRate: 0.065,
@@ -112,9 +118,9 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
       offsiteAdsRate: 0.15,
       regulatoryFee: 0.0227,
       vatRate: 0,
-      notes: 'İşlem ücreti %6.5, ödeme işleme %6.5 + 3₺, düzenleyici işletim ücreti %2.27',
+      notes: t('etsyFeeNotesTR'),
     },
-  }), []);
+  }), [t]);
 
   // ---- Profit calculation ----
   const profitCalc: ProfitCalc = useMemo(() => {
@@ -141,7 +147,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
       const adCost = roas > 0 ? p / roas : 0;
       const pr = p - cost - ship - fees.listingFee - tf - pp - rf - oa - adCost;
       return {
-        label: delta === 0 ? 'Ortalama' : delta < 0 ? `${delta}%` : `+${delta}%`,
+        label: delta === 0 ? t('average') : delta < 0 ? `${delta}%` : `+${delta}%`,
         price: p, profit: pr, margin: p > 0 ? (pr / p) * 100 : 0,
       };
     });
@@ -156,23 +162,23 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
       {/* Listing Analyzer */}
       <Paper sx={{ ...glassCard, p: 2.5, mb: 3 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Link size={16} color="#667eea" /> Listing Analiz Aracı
+          <Link size={16} color="#667eea" /> {t('listingAnalysisTool')}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-          Herhangi bir Etsy listing URL'i veya ID'si girin — SEO skoru, fiyat analizi ve AI denetimi alın
+          {t('listingAnalysisDesc')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <TextField
             value={analyzeInput} onChange={e => setAnalyzeInput(e.target.value)}
             size="small" sx={{ flex: 1, minWidth: isMobile ? '100%' : 'auto' }}
-            placeholder="https://www.etsy.com/listing/123456789/... veya sadece ID"
+            placeholder={t('urlPlaceholder')}
             onKeyDown={e => e.key === 'Enter' && fetchListingAnalysis(extractListingId(analyzeInput))}
           />
           <Button variant="contained" onClick={() => fetchListingAnalysis(extractListingId(analyzeInput))}
             disabled={listingAnalysisLoading || !analyzeInput.trim()}
             startIcon={listingAnalysisLoading ? <CircularProgress size={14} /> : <Search size={14} />}
             sx={{ background: GRADIENTS.primary, borderRadius: '10px', ...(isMobile && { width: '100%' }) }}>
-            Analiz Et
+            {t('analyzeButton')}
           </Button>
         </Box>
       </Paper>
@@ -192,10 +198,10 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                 <ScoreRing score={listingAnalysis.seoScore.total} size={isMobile ? 70 : 80} label="SEO" />
                 <Box sx={{ flex: 1 }}>
                   {[
-                    { label: 'Başlık', value: listingAnalysis.seoScore.title, max: 25 },
-                    { label: 'Tagler', value: listingAnalysis.seoScore.tags, max: 25 },
-                    { label: 'Açıklama', value: listingAnalysis.seoScore.description, max: 25 },
-                    { label: 'Görseller', value: listingAnalysis.seoScore.images, max: 25 },
+                    { label: t('title'), value: listingAnalysis.seoScore.title, max: 25 },
+                    { label: t('tags'), value: listingAnalysis.seoScore.tags, max: 25 },
+                    { label: t('description'), value: listingAnalysis.seoScore.description, max: 25 },
+                    { label: t('images'), value: listingAnalysis.seoScore.images, max: 25 },
                   ].map(s => (
                     <Box key={s.label} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                       <Typography variant="caption" sx={{ minWidth: 70, fontWeight: 600 }}>{s.label}</Typography>
@@ -215,9 +221,9 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
           {listingAnalysis.velocity && (
             <Alert severity="info" sx={{ mb: 2, borderRadius: '12px' }}>
               <Typography variant="body2">
-                Tahmini aylık satış: <strong>{listingAnalysis.velocity.estMonthlySales?.toFixed(1)}</strong> |
-                Yaş: <strong>{listingAnalysis.velocity.ageMonths?.toFixed(0)} ay</strong> |
-                Favori: <strong>{listingAnalysis.listing?.num_favorers?.toLocaleString()}</strong>
+                {t('estMonthlySales')}: <strong>{listingAnalysis.velocity.estMonthlySales?.toFixed(1)}</strong> |
+                {t('age')}: <strong>{listingAnalysis.velocity.ageMonths?.toFixed(0)} {t('ageMonths')}</strong> |
+                {t('favorite')}: <strong>{formatNumber(listingAnalysis.listing?.num_favorers ?? 0)}</strong>
               </Typography>
             </Alert>
           )}
@@ -226,12 +232,12 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
           {listingAnalysis.listing?.tags?.length > 0 && (
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-                Tagler ({listingAnalysis.listing.tags.length}/13)
+                {t('tagsCount', { count: listingAnalysis.listing.tags.length })}
               </Typography>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                 {listingAnalysis.listing.tags.map((tag: string, i: number) => (
                   <Chip key={i} label={tag} size="small" variant="outlined"
-                    onClick={() => { navigator.clipboard.writeText(tag); toast.success('Kopyalandı'); }}
+                    onClick={() => { navigator.clipboard.writeText(tag); toast.success(t('copied')); }}
                     sx={{ cursor: 'pointer', borderRadius: '8px' }} />
                 ))}
               </Box>
@@ -244,7 +250,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
               disabled={listingAuditLoading}
               startIcon={listingAuditLoading ? <CircularProgress size={14} /> : <Zap size={14} />}
               sx={{ background: GRADIENTS.primary, borderRadius: '10px' }}>
-              {listingAudit ? 'Yeniden Denetle' : 'AI Denetimi'}
+              {listingAudit ? t('reAudit') : t('aiAudit')}
             </Button>
           </Box>
 
@@ -254,21 +260,21 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
             <Box sx={{ mt: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                 <Typography variant="h3" sx={{ fontWeight: 900,
-                  color: listingAudit.overall_grade?.startsWith('A') ? '#4caf50' : listingAudit.overall_grade?.startsWith('B') ? '#2196F3' : '#ff9800' }}>
-                  {listingAudit.overall_grade}
+                  color: (listingAudit.overall_score ?? 0) >= 70 ? '#4caf50' : (listingAudit.overall_score ?? 0) >= 50 ? '#2196F3' : '#ff9800' }}>
+                  {listingAudit.overall_score}
                 </Typography>
                 <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Genel Skor: {listingAudit.overall_score}/100</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('overallScore')}: {listingAudit.overall_score}/100</Typography>
                 </Box>
               </Box>
 
               {/* Per-category scores */}
               {[
-                { label: 'Başlık', score: listingAudit.title_score, feedback: listingAudit.title_feedback },
-                { label: 'Tagler', score: listingAudit.tags_score, feedback: listingAudit.tags_feedback },
-                { label: 'Açıklama', score: listingAudit.description_score, feedback: listingAudit.description_feedback },
-                { label: 'Fiyat', score: listingAudit.pricing_score, feedback: listingAudit.pricing_feedback },
-                { label: 'Görseller', score: listingAudit.image_score, feedback: listingAudit.image_feedback },
+                { label: t('title'), score: listingAudit.title_score, feedback: listingAudit.title_feedback },
+                { label: t('tags'), score: listingAudit.tags_score, feedback: listingAudit.tags_feedback },
+                { label: t('description'), score: listingAudit.description_score, feedback: listingAudit.description_feedback },
+                { label: t('price'), score: listingAudit.pricing_score, feedback: listingAudit.pricing_feedback },
+                { label: t('images'), score: listingAudit.image_score, feedback: listingAudit.image_feedback },
               ].map(cat => (
                 <Box key={cat.label} sx={{ mb: 1.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.3 }}>
@@ -282,7 +288,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
               {/* Quick wins */}
               {listingAudit.quick_wins?.length > 0 && (
                 <Alert severity="success" sx={{ mt: 2, borderRadius: '12px' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Hızlı Kazanımlar</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('quickWins')}</Typography>
                   {listingAudit.quick_wins.map((item: string, i: number) => (
                     <Typography key={i} variant="body2" sx={{ fontSize: '0.8rem' }}>• {item}</Typography>
                   ))}
@@ -292,11 +298,11 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
               {/* Suggested tags */}
               {listingAudit.suggested_tags?.length > 0 && (
                 <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Önerilen Tagler</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('suggestedTags')}</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                     {listingAudit.suggested_tags.map((tag: string, i: number) => (
                       <Chip key={i} label={tag} size="small" color="primary" variant="outlined"
-                        onClick={() => { navigator.clipboard.writeText(tag); toast.success('Kopyalandı'); }}
+                        onClick={() => { navigator.clipboard.writeText(tag); toast.success(t('copied')); }}
                         sx={{ cursor: 'pointer', borderRadius: '8px' }} />
                     ))}
                   </Box>
@@ -309,9 +315,9 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
 
       {/* Sub-tab pills */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={pillTabsSx} variant="scrollable" scrollButtons="auto">
-        <Tab label="Kâr Hesaplayıcı" />
-        <Tab label="SEO Karşılaştırma" />
-        <Tab label="Sıralama Takibi" />
+        <Tab label={t('profitCalculator')} />
+        <Tab label={t('seoComparison')} />
+        <Tab label={t('rankTracking')} />
       </Tabs>
 
       {/* ================================================================ */}
@@ -322,7 +328,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                Etsy Kâr Hesaplayıcı
+                {t('etsyProfitCalculator')}
               </Typography>
               {/* Region selector */}
               <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -335,7 +341,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                     ...(shopRegion === 'tr' ? { background: GRADIENTS.primary } : {}),
                   }}
                 >
-                  Türkiye Mağaza
+                  {t('turkeyShop')}
                 </Button>
                 <Button
                   size="small"
@@ -346,7 +352,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                     ...(shopRegion === 'us' ? { background: GRADIENTS.primary } : {}),
                   }}
                 >
-                  ABD Mağaza
+                  {t('usShop')}
                 </Button>
               </Box>
             </Box>
@@ -354,44 +360,44 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
               <Typography variant="caption">{profitCalc.fees.notes}</Typography>
             </Alert>
             <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? 1.5 : 2, mb: 2 }}>
-              <TextField label="Alis Maliyeti ($)" value={purchaseCost}
+              <TextField label={t('purchaseCost')} value={purchaseCost}
                 onChange={e => setPurchaseCost(e.target.value)}
                 size="small" type="number" fullWidth
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
               />
-              <TextField label="Satis Fiyati ($)" value={sellingPrice || (priceStats?.avg.toFixed(2) || '')}
+              <TextField label={t('sellingPrice')} value={sellingPrice || (priceStats?.avg.toFixed(2) || '')}
                 onChange={e => setSellingPrice(e.target.value)}
                 size="small" type="number" fullWidth
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-                helperText={priceStats ? `Pazar ortalamasi: ${fmt(priceStats.avg)}` : 'Fiyat girin'}
+                helperText={priceStats ? `${t('marketAverage')}: ${fmt(priceStats.avg)}` : t('enterPrice')}
               />
-              <TextField label="Kargo Maliyeti ($)" value={shippingCost}
+              <TextField label={t('shippingCost')} value={shippingCost}
                 onChange={e => setShippingCost(e.target.value)}
                 size="small" type="number" fullWidth
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
               />
             </Box>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1 }}>
-              <TextField label="Etsy Ads ROAS" value={etsyAdsRoas}
+              <TextField label={t('etsyAdsRoas')} value={etsyAdsRoas}
                 onChange={e => setEtsyAdsRoas(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
-                placeholder="ör: 3"
+                placeholder={t('roasExample')}
                 helperText={etsyAdsRoas && parseFloat(etsyAdsRoas) > 0
-                  ? `Her $1 reklam harcamasına $${etsyAdsRoas} gelir → satış başı reklam maliyeti: ${fmt(profitCalc.etsyAdsCost)}`
-                  : 'ROAS girin (ör: 3 = $3 gelir / $1 harcama). Boş bırakırsanız reklam maliyeti hesaplanmaz.'
+                  ? t('roasHintWithValue', { roas: etsyAdsRoas, cost: fmt(profitCalc.etsyAdsCost) })
+                  : t('roasHint')
                 }
               />
             </Box>
             <FormControlLabel
               control={<Switch checked={includeOffsiteAds} onChange={e => setIncludeOffsiteAds(e.target.checked)} size="small" />}
-              label={<Typography variant="body2">Offsite Ads dahil et (%15) — yıllık $10K altında zorunlu</Typography>}
+              label={<Typography variant="body2">{t('offsiteAdsSwitch')}</Typography>}
             />
           </Paper>
 
           <Paper sx={{ ...glassCard, overflow: 'hidden', mb: 2 }}>
             <Box sx={{ p: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                Etsy Ücret Detayları ({shopRegion === 'tr' ? 'Türkiye' : 'ABD'} Mağaza)
+                {t('feeDetails')} ({shopRegion === 'tr' ? t('turkeyLabel') : t('usLabel')} {t('feeDetailsSuffix')})
               </Typography>
             </Box>
             <TableContainer>
@@ -632,27 +638,58 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
               )}
             </>
           ) : !loading && (
-            <PremiumEmptyState
-              icon={<TrendingUp size={48} />}
-              title="SEO Karşılaştırma"
-              desc={userListings?.length
-                ? 'Üstten bir listeleme seçin, sonra "Pazar Araştırma" bölümünden arama yapın — başlık ve taglar otomatik doldurulur.'
-                : 'Başlığınız ve taglarınız rakiplere kıyasla ne kadar güçlü?'
-              }
-              steps={userListings?.length
-                ? [
-                    'Üstteki "Listelemenizi Seçin" kutusundan bir ürün seçin',
-                    '"Pazar Araştırma" bölümüne geçip rakiplerinizi aratın',
-                    'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
-                  ]
-                : [
-                    '"Pazar Araştırma" bölümüne geçin ve bir anahtar kelime arayın',
-                    'Arama çubuğundaki "SEO karşılaştırma için başlık/tag girin" bölümünü açın',
-                    'Kendi listeleme başlığınızı ve taglarınızı girin',
-                    'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
-                  ]
-              }
-            />
+            <>
+              {/* SEO seasonal tips from discovery */}
+              {discoveryLoading && (
+                <Box sx={{ mb: 2 }}>
+                  <Skeleton variant="text" width={200} height={28} sx={{ mb: 1 }} />
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} variant="text" width="80%" height={20} sx={{ mb: 0.5 }} />
+                  ))}
+                </Box>
+              )}
+
+              {discoveryData?.seasonalTips?.length > 0 && (
+                <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Lightbulb size={16} color="#ff9800" /> SEO Seasonal Tips
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                    Keep these in mind when optimizing your listing titles and tags
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+                    {discoveryData.seasonalTips.map((tip: string, i: number) => (
+                      <Typography key={i} variant="body2" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                        <Box component="span" sx={{ color: '#ff9800', fontWeight: 700, mt: '2px' }}>•</Box>
+                        {tip}
+                      </Typography>
+                    ))}
+                  </Box>
+                </Paper>
+              )}
+
+              <PremiumEmptyState
+                icon={<TrendingUp size={48} />}
+                title="SEO Karşılaştırma"
+                desc={userListings?.length
+                  ? 'Üstten bir listeleme seçin, sonra "Pazar Araştırma" bölümünden arama yapın — başlık ve taglar otomatik doldurulur.'
+                  : 'Başlığınız ve taglarınız rakiplere kıyasla ne kadar güçlü?'
+                }
+                steps={userListings?.length
+                  ? [
+                      'Üstteki "Listelemenizi Seçin" kutusundan bir ürün seçin',
+                      '"Pazar Araştırma" bölümüne geçip rakiplerinizi aratın',
+                      'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
+                    ]
+                  : [
+                      '"Pazar Araştırma" bölümüne geçin ve bir anahtar kelime arayın',
+                      'Arama çubuğundaki "SEO karşılaştırma için başlık/tag girin" bölümünü açın',
+                      'Kendi listeleme başlığınızı ve taglarınızı girin',
+                      'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
+                    ]
+                }
+              />
+            </>
           )}
         </Box>
       )}

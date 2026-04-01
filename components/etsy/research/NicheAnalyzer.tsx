@@ -3,12 +3,12 @@ import {
   Box, Typography, Paper, Alert, Chip, Button, Divider,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TableSortLabel, Tooltip, IconButton, CircularProgress, LinearProgress,
-  useMediaQuery, Collapse,
+  useMediaQuery, Collapse, Skeleton, Card, CardMedia, CardContent,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
   DollarSign, BarChart2, Target, TrendingUp, ShoppingBag,
-  Heart, Gauge, Info, ExternalLink, Zap, AlertTriangle, CheckCircle, XCircle, Pin,
+  Heart, Gauge, Info, ExternalLink, Zap, AlertTriangle, CheckCircle, XCircle, Pin, Flame, Star,
 } from 'lucide-react';
 
 import { useEtsyResearchStore, useComputedPrices, useComputedDemandScore } from '@/lib/stores/useEtsyResearchStore';
@@ -37,6 +37,10 @@ export default function NicheAnalyzer() {
   const fetchNicheAiReport = useEtsyResearchStore(s => s.fetchNicheAiReport);
   const pinListing = useEtsyResearchStore(s => s.pinListing);
   const pinnedListing = useEtsyResearchStore(s => s.pinnedListing);
+  const discoveryData = useEtsyResearchStore(s => s.discoveryData);
+  const discoveryLoading = useEtsyResearchStore(s => s.discoveryLoading);
+  const setQuery = useEtsyResearchStore(s => s.setQuery);
+  const searchMarket = useEtsyResearchStore(s => s.searchMarket);
 
   const { priceStats, histogram, maxBucketCount, priceRangeBreakdown, sweetSpot } = useComputedPrices();
   const demandScore = useComputedDemandScore();
@@ -171,10 +175,58 @@ export default function NicheAnalyzer() {
             </Paper>
           )}
         </>
-      ) : !loading && <PremiumEmptyState icon={<BarChart2 size={48} />} title="Pazar Sonuçları"
-          desc="Fiyat analizi, talep skoru ve rakip ürünleri tek sayfada."
-          steps={['Yukarıdaki arama çubuğuna ürün kategorinizi yazın (ör. "personalized necklace")', 'Araştır butonuna tıklayın', 'Fiyat dağılımı, talep skoru ve rakip listesi otomatik görünür']}
-        />}
+      ) : !loading && (
+        <>
+          {/* Discovery trending niches as clickable starting points */}
+          {discoveryLoading && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 2 }}>
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} variant="rounded" height={200} sx={{ borderRadius: '16px' }} />
+              ))}
+            </Box>
+          )}
+
+          {discoveryData?.trendingNiches?.length > 0 ? (
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Flame size={18} color="#f44336" /> Trending Niches — Click to Analyze
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+                {discoveryData.trendingNiches.map((niche: any) => (
+                  <Card key={niche.query} sx={{
+                    ...glassCard, cursor: 'pointer', overflow: 'hidden',
+                    '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 12px 32px rgba(0,0,0,0.12)' },
+                    transition: 'all 0.2s',
+                  }} onClick={() => { setQuery(niche.query); setTimeout(() => searchMarket(), 50); }}>
+                    {niche.topItems?.[0]?.image_url && (
+                      <CardMedia component="img" height={130} image={niche.topItems[0].image_url}
+                        alt={niche.query} sx={{ objectFit: 'cover' }} />
+                    )}
+                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, textTransform: 'capitalize', mb: 0.5 }}>
+                        {niche.query}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Chip label={`${niche.totalResults?.toLocaleString()} results`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                        <Chip label={`$${niche.priceStats?.avg?.toFixed(2)} avg`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                          <Star size={11} color="#e91e63" />
+                          <Typography variant="caption" sx={{ color: '#e91e63', fontWeight: 600 }}>{niche.avgFavorites}</Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Box>
+            </Box>
+          ) : !discoveryLoading && (
+            <PremiumEmptyState icon={<BarChart2 size={48} />} title="Pazar Sonuçları"
+              desc="Fiyat analizi, talep skoru ve rakip ürünleri tek sayfada."
+              steps={['Yukarıdaki arama çubuğuna ürün kategorinizi yazın (ör. "personalized necklace")', 'Araştır butonuna tıklayın', 'Fiyat dağılımı, talep skoru ve rakip listesi otomatik görünür']}
+            />
+          )}
+        </>
+      )}
 
       {/* --- Demand Score --- */}
       {demandScore && (

@@ -72,6 +72,7 @@ import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
+import { useTranslations } from 'next-intl';
 
 import SEOIndicator from '@/components/etsy/SEOIndicator';
 import ListingEditorDrawer from '@/components/etsy/ListingEditorDrawer';
@@ -178,10 +179,10 @@ const STATE_COLORS: Record<string, 'success' | 'default' | 'error' | 'warning'> 
 };
 
 const STATE_LABELS: Record<string, string> = {
-  active: 'Aktif',
-  draft: 'Taslak',
-  inactive: 'Deaktif',
-  expired: 'Sur. Dolmus',
+  active: 'Active',
+  draft: 'Draft',
+  inactive: 'Inactive',
+  expired: 'Expired',
 };
 
 // ---------------------------------------------------------------------------
@@ -782,6 +783,7 @@ function EtsyListingsPage() {
   const { user } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const t = useTranslations('etsyListings');
 
   // --- State ---
   const [listings, setListings] = useState<EtsyListingRow[]>([]);
@@ -1771,10 +1773,10 @@ function EtsyListingsPage() {
               {!isMobile && (
                 <>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.78rem' }}>
-                    ·&nbsp;&nbsp;{quickStats.totalViews.toLocaleString()} goruntuleme
+                    ·&nbsp;&nbsp;{quickStats.totalViews.toLocaleString()} {t('views')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.78rem' }}>
-                    ·&nbsp;&nbsp;{quickStats.totalFavs.toLocaleString()} favori
+                    ·&nbsp;&nbsp;{quickStats.totalFavs.toLocaleString()} {t('favorites')}
                   </Typography>
                 </>
               )}
@@ -1837,8 +1839,8 @@ function EtsyListingsPage() {
                     }}
                     sx={{ fontSize: '0.82rem' }}
                   >
-                    <MenuItem value="active">Aktif</MenuItem>
-                    <MenuItem value="draft">Taslak</MenuItem>
+                    <MenuItem value="active">{t('stateActive')}</MenuItem>
+                    <MenuItem value="draft">{t('stateDraft')}</MenuItem>
                     <MenuItem value="inactive">Deaktif</MenuItem>
                     <MenuItem value="expired">Sur. Dolmus</MenuItem>
                   </Select>
@@ -1922,7 +1924,7 @@ function EtsyListingsPage() {
                 }}
               >
                 <AddIcon sx={{ mr: 0.5, fontSize: 18 }} />
-                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Yeni Listing</Box>
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>{t('newListing')}</Box>
               </Button>
             </Box>
           </Paper>
@@ -1962,31 +1964,27 @@ function EtsyListingsPage() {
             </MenuItem>
           </Menu>
 
-          {/* Selection toolbar: when items are selected */}
+          {/* Selection toolbar: Vela-style — N selected + Delete, Export, Copy, Edit */}
           {selectedCount > 0 && selectedShopId && (
-            <Paper sx={{ px: 1.5, py: 1, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', bgcolor: 'primary.50', border: '1px solid', borderColor: 'primary.200' }}>
-              <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main', mr: 1 }}>
-                {selectedCount} secildi
+            <Paper
+              sx={{
+                px: 1.5, py: 1, mb: 1.5,
+                display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap',
+                bgcolor: 'primary.50',
+                border: '1px solid', borderColor: 'primary.200',
+                borderRadius: 2,
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main', mr: 0.5, whiteSpace: 'nowrap' }}>
+                {selectedCount} selected
               </Typography>
-              <Button
-                variant="contained"
-                size="small"
-                onClick={() => setBulkEditorOpen(true)}
-                sx={{
-                  minHeight: 36, textTransform: 'none', fontWeight: 700, borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
-                  '&:hover': { background: 'linear-gradient(135deg, #1d4ed8, #4338ca)' },
-                }}
-              >
-                <EditIcon sx={{ mr: 0.5, fontSize: 18 }} />
-                {isMobile ? 'Duzenle' : 'Toplu Duzenle'}
-              </Button>
               <BulkOperationsBar
                 selectedCount={selectedCount}
                 selectedListings={selectedListings}
                 shopSections={shopSections}
                 shopId={selectedShopId}
                 allShops={shops}
+                onOpenBulkEditor={() => setBulkEditorOpen(true)}
                 onCompleted={() => {
                   setSelectedIds({ type: 'include' as const, ids: new Set<GridRowId>() });
                   const cacheKey = `${selectedShopId}:${statusFilter}`;
@@ -1994,6 +1992,19 @@ function EtsyListingsPage() {
                   fetchListings();
                 }}
               />
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => setBulkEditorOpen(true)}
+                startIcon={<EditIcon sx={{ fontSize: '16px !important' }} />}
+                sx={{
+                  minHeight: 36, textTransform: 'none', fontWeight: 700, borderRadius: '8px', ml: 'auto',
+                  background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
+                  '&:hover': { background: 'linear-gradient(135deg, #1d4ed8, #4338ca)' },
+                }}
+              >
+                {isMobile ? 'Edit' : 'Bulk Edit'}
+              </Button>
             </Paper>
           )}
 
@@ -2388,6 +2399,8 @@ function EtsyListingsPage() {
         shopId={selectedShopId}
         shopName={shops.find(s => s.shopId === selectedShopId)?.shopName}
         shopSections={shopSections}
+        shippingProfiles={shippingProfiles}
+        returnPolicies={returnPolicies}
         onCompleted={() => {
           setBulkEditorOpen(false);
           setSelectedIds({ type: 'include' as const, ids: new Set<GridRowId>() });

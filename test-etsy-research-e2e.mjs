@@ -322,10 +322,10 @@ async function run() {
       ],
       topTags: ['baby', 'crochet', 'handmade'],
     }, { auth: true });
-    // Response: { report: { shop_grade, estimated_monthly_revenue, ... } }
+    // Response: { report: { shop_score, estimated_monthly_revenue, ... } }
     const report = d.report || d;
-    assert(report.shop_grade, 'No shop grade');
-    return `Shop grade: ${report.shop_grade}, revenue est: $${report.estimated_monthly_revenue || '?'}`;
+    assert(report.shop_score != null, 'No shop score');
+    return `Shop score: ${report.shop_score}/100, revenue est: $${report.estimated_monthly_revenue || '?'}`;
   });
 
   await test(16, 'AI listing_audit', async () => {
@@ -339,11 +339,11 @@ async function run() {
       favorites: 100,
       views: 2000,
     }, { auth: true });
-    // Response: { audit: { overall_grade, quick_wins, ... } }
+    // Response: { audit: { overall_score, quick_wins, ... } }
     const audit = d.audit || d;
-    assert(audit.overall_grade, 'No audit grade');
+    assert(audit.overall_score != null, 'No audit score');
     assert(audit.quick_wins, 'No quick wins');
-    return `Grade: ${audit.overall_grade}, quick wins: ${audit.quick_wins?.length || '?'}`;
+    return `Score: ${audit.overall_score}/100, quick wins: ${audit.quick_wins?.length || '?'}`;
   });
 
   await test(17, 'AI review_sentiment', async () => {

@@ -898,6 +898,105 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         });
     }
 
+    // --- get_discovery_data: Pre-loaded trending data for empty states ---
+    if (action === 'get_discovery_data' && req.method === 'GET') {
+        // Seasonal query rotation
+        const SEASONAL_QUERIES: Record<number, string[]> = {
+            1: ['new year gifts', 'winter home decor', 'cozy blanket'],
+            2: ['valentines day gift', 'personalized jewelry', 'couple gifts'],
+            3: ['spring decor', 'easter gifts', 'garden planter'],
+            4: ['mothers day gift', 'spring jewelry', 'personalized necklace'],
+            5: ['summer decor', 'beach accessories', 'outdoor furniture'],
+            6: ['fathers day gift', 'mens accessories', 'grilling gifts'],
+            7: ['summer wedding', 'bridesmaid gifts', 'beach towel'],
+            8: ['back to school', 'teacher gifts', 'dorm decor'],
+            9: ['fall decor', 'halloween costume', 'autumn wreath'],
+            10: ['halloween decor', 'fall wedding', 'harvest centerpiece'],
+            11: ['thanksgiving decor', 'black friday deals', 'christmas ornament'],
+            12: ['christmas gift', 'holiday ornaments', 'winter wedding'],
+        };
+
+        const SEASONAL_TIPS: Record<number, string[]> = {
+            1: ['Yeni yıl hediye trendi hâlâ devam ediyor — kişiselleştirilmiş ürünler popüler', 'Kış dekorasyonu için son fırsat — Şubat\'a kadar stok yapın'],
+            2: ['Sevgililer Günü yaklaşıyor — kişiselleştirilmiş takılar en çok satanlar', 'El yapımı kartlar ve hediye kutuları talebinde artış bekleniyor'],
+            3: ['Bahar dekoru sezonu başladı — çiçekli ve pastel ürünler yükselişte', 'Paskalya hediyeleri için son 2 hafta — stokları kontrol edin'],
+            4: ['Anneler Günü yaklaşıyor — kişiselleştirilmiş ürünlerde talep artışı', 'Bahar düğün sezonu başladı — düğün hediyeleri nişini kontrol edin'],
+            5: ['Yaz düğün sezonu dorukta — gelin/damat hediyeleri popüler', 'Yaz dekorasyonu ve açık hava ürünleri talebi artıyor'],
+            6: ['Babalar Günü yaklaşıyor — erkek aksesuarları ve kişisel hediyeler trend', 'Yaz tatili sezonu — plaj ve seyahat ürünlerinde artış'],
+            7: ['Yaz düğünleri için son hazırlıklar — nedime hediyeleri popüler', 'Okul alışverişi sezonu yaklaşıyor — öğretmen hediyeleri planlayın'],
+            8: ['Okul sezonu başladı — öğretmen hediyeleri ve yurt dekoru trend', 'Sonbahar ürünleri için stok hazırlığı zamanı'],
+            9: ['Sonbahar dekoru en popüler dönemde — çelenkler ve mumlar yükselişte', 'Halloween kostüm ve dekor satışları başladı'],
+            10: ['Halloween en yoğun döneminde — son dakika ürünleri hâlâ satılır', 'Noel ürünleri için hazırlıklara HEMEN başlayın'],
+            11: ['Noel alışveriş sezonu BAŞLADI — en yoğun satış dönemi', 'Black Friday/Cyber Monday kampanyalarınızı aktif edin'],
+            12: ['Son dakika Noel hediyeleri — dijital ürünler ve hızlı kargo öne çıkıyor', 'Yeni yıl ürünleri için şimdiden hazırlanın'],
+        };
+
+        const month = new Date().getMonth() + 1;
+        const queries = SEASONAL_QUERIES[month] || SEASONAL_QUERIES[4];
+        const tips = SEASONAL_TIPS[month] || [];
+
+        // Fetch 3 niches in parallel (48 results each)
+        const nichePromises = queries.map(async (query) => {
+            try {
+                const params = new URLSearchParams({
+                    keywords: query, limit: '48', offset: '0',
+                    sort_on: 'score', sort_order: 'desc',
+                });
+                const data = await callEtsyPublicAPI(`/listings/active?${params}`);
+                const results = (data.results || []);
+                const items = results.map((l: any) => ({
+                    listing_id: l.listing_id,
+                    title: (l.title || '').slice(0, 80),
+                    price: l.price ? l.price.amount / l.price.divisor : 0,
+                    image_url: l.images?.[0]?.url_170x135 || '',
+                    num_favorers: l.num_favorers || 0,
+                    views: l.views || 0,
+                }));
+                const prices = items.map((i: any) => i.price).filter((p: number) => p > 0).sort((a: number, b: number) => a - b);
+                const avg = prices.length ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
+                const mid = Math.floor(prices.length / 2);
+                return {
+                    query,
+                    totalResults: data.count || 0,
+                    topItems: items.slice(0, 6),
+                    priceStats: {
+                        min: prices[0] || 0,
+                        max: prices[prices.length - 1] || 0,
+                        avg: Math.round(avg * 100) / 100,
+                        median: prices.length ? prices[mid] : 0,
+                    },
+                    avgFavorites: items.length ? Math.round(items.reduce((s: number, i: any) => s + i.num_favorers, 0) / items.length) : 0,
+                };
+            } catch (err) {
+                return { query, totalResults: 0, topItems: [], priceStats: { min: 0, avg: 0, median: 0, max: 0 }, avgFavorites: 0 };
+            }
+        });
+
+        const trendingNiches = await Promise.all(nichePromises);
+
+        // Extract hot keywords from all results
+        const kwMap: Record<string, number> = {};
+        for (const niche of trendingNiches) {
+            for (const item of niche.topItems) {
+                const words = item.title.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((w: string) => w.length > 2);
+                words.forEach((w: string) => { kwMap[w] = (kwMap[w] || 0) + 1; });
+            }
+        }
+        const stopWords = new Set(['the', 'for', 'and', 'with', 'gift', 'her', 'him', 'set', 'new', 'day', 'best', 'custom', 'from']);
+        const hotKeywords = Object.entries(kwMap)
+            .filter(([kw]) => !stopWords.has(kw))
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 20)
+            .map(([keyword, count]) => ({ keyword, count }));
+
+        return res.status(200).json({
+            trendingNiches,
+            hotKeywords,
+            seasonalTips: tips,
+            lastUpdated: new Date().toISOString(),
+        });
+    }
+
     return res.status(400).json({ error: 'Invalid public action' });
 }
 
@@ -937,7 +1036,7 @@ export default async function handler(
     if (publicAction && [
       'search_market', 'get_public_shop', 'get_public_shop_listings', 'batch_shops', 'taxonomy',
       'analyze_niche', 'estimate_sales_velocity', 'analyze_competition',
-      'get_shop_reviews', 'analyze_listing_url',
+      'get_shop_reviews', 'analyze_listing_url', 'get_discovery_data',
     ].includes(publicAction)) {
         try {
             return await handlePublicAction(req, res, publicAction);

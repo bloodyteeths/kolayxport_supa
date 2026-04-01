@@ -52,6 +52,8 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-hot-toast';
 
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 import SEOIndicator from './SEOIndicator';
 import ImageManager from './ImageManager';
 import VideoUploader from './VideoUploader';
@@ -180,24 +182,11 @@ interface EditableFields {
 // Constants
 // ---------------------------------------------------------------------------
 
-const WHO_MADE_OPTIONS = [
-  { value: 'i_did', label: 'Ben yaptim' },
-  { value: 'collective', label: 'Ekibimiz yapti' },
-  { value: 'someone_else', label: 'Baskasi yapti' },
-];
+const WHO_MADE_KEYS = ['i_did', 'collective', 'someone_else'] as const;
+const WHO_MADE_I18N: Record<string, string> = { i_did: 'iDid', collective: 'collective', someone_else: 'someoneElse' };
 
-const WHEN_MADE_OPTIONS = [
-  { value: 'made_to_order', label: 'Siparise ozel' },
-  { value: '2020_2025', label: '2020-2025' },
-  { value: '2010_2019', label: '2010-2019' },
-  { value: '2004_2009', label: '2004-2009' },
-  { value: 'before_2004', label: '2004 oncesi' },
-  { value: '2000_2003', label: '2000-2003' },
-  { value: '1990s', label: '1990\'lar' },
-  { value: '1980s', label: '1980\'ler' },
-  { value: '1970s', label: '1970\'ler' },
-  { value: '1960s', label: '1960\'lar' },
-];
+const WHEN_MADE_KEYS = ['made_to_order', '2020_2025', '2010_2019', '2004_2009', 'before_2004', '2000_2003', '1990s', '1980s', '1970s', '1960s'] as const;
+const WHEN_MADE_I18N: Record<string, string> = { made_to_order: 'madeToOrder', '2020_2025': '2020_2025', '2010_2019': '2010_2019', '2004_2009': '2004_2009', before_2004: 'before_2004', '2000_2003': '2000_2003', '1990s': '1990s', '1980s': '1980s', '1970s': '1970s', '1960s': '1960s' };
 
 const WEIGHT_UNITS = [
   { value: 'oz', label: 'oz' },
@@ -326,6 +315,9 @@ export default function ListingEditorDrawer({
   marketResearchData,
   refreshKey,
 }: ListingEditorDrawerProps) {
+  const t = useTranslations('etsy');
+  const { config, formatDate } = useLocale();
+
   // Loading / data state
   const [loading, setLoading] = useState(false);
   const [listing, setListing] = useState<ListingData | null>(null);
@@ -411,7 +403,7 @@ export default function ListingEditorDrawer({
 
   // Shipping profile creation form
   const [newShipping, setNewShipping] = useState({
-    title: '', origin_country_iso: 'TR', primary_cost: '0', secondary_cost: '0',
+    title: '', origin_country_iso: config.defaultCountryOfOrigin || 'TR', primary_cost: '0', secondary_cost: '0',
     min_processing_days: '1', max_processing_days: '3',
     destination_country_iso: '',
   });
@@ -426,11 +418,11 @@ export default function ListingEditorDrawer({
 
   const handleCreateShippingProfile = async () => {
     if (!newShipping.title.trim()) {
-      toast.error('Profil adi zorunludur');
+      toast.error(t('editor.profileNameRequired'));
       return;
     }
     if (Number(newShipping.min_processing_days) > Number(newShipping.max_processing_days)) {
-      toast.error('Min hazirlama suresi max\'tan buyuk olamaz');
+      toast.error(t('editor.minGreaterThanMax'));
       return;
     }
     setCreateLoading(true);
@@ -454,14 +446,14 @@ export default function ListingEditorDrawer({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Kargo profili olusturulamadi');
+        throw new Error(err.error || t('editor.shippingProfileFailed'));
       }
-      toast.success('Kargo profili olusturuldu');
+      toast.success(t('editor.shippingProfileCreated'));
       setCreateShippingOpen(false);
-      setNewShipping({ title: '', origin_country_iso: 'TR', primary_cost: '0', secondary_cost: '0', min_processing_days: '1', max_processing_days: '3', destination_country_iso: '' });
+      setNewShipping({ title: '', origin_country_iso: config.defaultCountryOfOrigin || 'TR', primary_cost: '0', secondary_cost: '0', min_processing_days: '1', max_processing_days: '3', destination_country_iso: '' });
       onSaved();
     } catch (e: any) {
-      toast.error(e.message || 'Hata olustu');
+      toast.error(e.message || t('editor.errorOccurred'));
     } finally {
       setCreateLoading(false);
     }
@@ -479,13 +471,13 @@ export default function ListingEditorDrawer({
           return_deadline: newReturn.return_deadline ? parseInt(newReturn.return_deadline) : undefined,
         }),
       });
-      if (!res.ok) throw new Error('Iade politikasi olusturulamadi');
-      toast.success('Iade politikasi olusturuldu');
+      if (!res.ok) throw new Error(t('editor.returnPolicyFailed'));
+      toast.success(t('editor.returnPolicyCreated'));
       setCreateReturnOpen(false);
       setNewReturn({ accepts_returns: true, accepts_exchanges: true, return_deadline: '30' });
       onSaved();
     } catch (e: any) {
-      toast.error(e.message || 'Hata olustu');
+      toast.error(e.message || t('editor.errorOccurred'));
     } finally {
       setCreateLoading(false);
     }
@@ -499,13 +491,13 @@ export default function ListingEditorDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newSectionTitle }),
       });
-      if (!res.ok) throw new Error('Bolum olusturulamadi');
-      toast.success('Magaza bolumu olusturuldu');
+      if (!res.ok) throw new Error(t('editor.shopSectionFailed'));
+      toast.success(t('editor.shopSectionCreated'));
       setCreateSectionOpen(false);
       setNewSectionTitle('');
       onSaved();
     } catch (e: any) {
-      toast.error(e.message || 'Hata olustu');
+      toast.error(e.message || t('editor.errorOccurred'));
     } finally {
       setCreateLoading(false);
     }
@@ -537,8 +529,8 @@ export default function ListingEditorDrawer({
       setFields(initial);
       originalFieldsRef.current = { ...initial, tags: [...initial.tags], materials: [...initial.materials] };
     } catch (err: any) {
-      setFetchError(err.message || 'Liste detaylari yuklenemedi');
-      toast.error('Liste detaylari yuklenemedi');
+      setFetchError(err.message || t('editor.listingDetailsFailed'));
+      toast.error(t('editor.listingDetailsFailed'));
     } finally {
       setLoading(false);
     }
@@ -640,7 +632,7 @@ export default function ListingEditorDrawer({
 
       return await res.json();
     } catch (err: any) {
-      toast.error(err.message || 'AI istegi basarisiz');
+      toast.error(err.message || t('editor.aiRequestFailed'));
       return null;
     } finally {
       setAiLoading((prev) => ({ ...prev, [action]: false }));
@@ -651,23 +643,23 @@ export default function ListingEditorDrawer({
     const result = await callAI('optimize_title');
     const newTitle = result?.optimized_title || result?.title;
     if (!newTitle) {
-      toast.error('AI baslik olusturamadi — tekrar deneyin');
+      toast.error(t('editor.aiTitleFailed'));
       return;
     }
     // Reject garbled single-character output
     if (typeof newTitle !== 'string' || newTitle.split(/[\s,]+/).filter(Boolean).every((w: string) => w.length <= 1)) {
-      toast.error('AI bozuk baslik uretti — tekrar deneyin');
+      toast.error(t('editor.aiBrokenTitle'));
       return;
     }
     updateField('title', newTitle);
-    toast.success('Baslik optimize edildi');
+    toast.success(t('editor.titleOptimized'));
   }, [callAI]);
 
   const handleAIGenerateDescription = useCallback(async () => {
     const result = await callAI('generate_description');
     if (result?.description) {
       updateField('description', result.description);
-      toast.success('Aciklama olusturuldu');
+      toast.success(t('editor.descriptionCreated'));
     }
   }, [callAI]);
 
@@ -676,7 +668,7 @@ export default function ListingEditorDrawer({
     const tags = result?.suggestions || result?.tags;
     if (tags && Array.isArray(tags)) {
       setAiTagSuggestions(tags);
-      toast.success(`${tags.length} etiket onerisi alindi`);
+      toast.success(t('editor.tagSuggestionsReceived', { count: tags.length }));
     }
   }, [callAI]);
 
@@ -688,7 +680,7 @@ export default function ListingEditorDrawer({
       const res = await fetch(
         `/api/clawd/etsy?action=check_keyword_rank&keyword=${encodeURIComponent(rankKeyword.trim())}&listing_id=${listingId}&shop_id=${shopId}`
       );
-      if (!res.ok) throw new Error('Sıralama kontrol edilemedi');
+      if (!res.ok) throw new Error(t('editor.rankCheckFailed'));
       const data = await res.json();
       setRankResult(data);
     } catch (err: any) {
@@ -1178,7 +1170,7 @@ export default function ListingEditorDrawer({
         throw new Error(data.error || `Kopyalama basarisiz (HTTP ${res.status})`);
       }
 
-      toast.success('Liste kopyalandi — taslak açılıyor');
+      toast.success(t('editor.listingCopied'));
       onSaved(); // refresh parent listing list
 
       // Open the copied listing in the editor
@@ -1209,7 +1201,7 @@ export default function ListingEditorDrawer({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || err.details || 'Silme basarisiz');
+        throw new Error(err.error || err.details || t('editor.deleteFailed'));
       }
 
       toast.success('Liste silindi');
@@ -1217,7 +1209,7 @@ export default function ListingEditorDrawer({
       onSaved();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || 'Silme basarisiz');
+      toast.error(err.message || t('editor.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -1254,15 +1246,15 @@ export default function ListingEditorDrawer({
 
   // Tab config for sidebar navigation
   const editorTabs = [
-    { id: 'images', label: 'Görseller', icon: <ImageIcon fontSize="small" /> },
-    { id: 'video', label: 'Video', icon: <VideocamIcon fontSize="small" /> },
-    { id: 'seo', label: 'SEO', icon: <SearchIcon fontSize="small" /> },
-    { id: 'basics', label: 'Temel', icon: <TextFieldsIcon fontSize="small" /> },
-    { id: 'details', label: 'Detaylar', icon: <TuneIcon fontSize="small" /> },
-    { id: 'pricing', label: 'Fiyat', icon: <AttachMoneyIcon fontSize="small" /> },
-    { id: 'variations', label: 'Varyasyon', icon: <ViewModuleIcon fontSize="small" /> },
-    { id: 'personalization', label: 'Kişisel', icon: <BrushIcon fontSize="small" /> },
-    { id: 'actions', label: 'İşlemler', icon: <SettingsIcon fontSize="small" /> },
+    { id: 'images', label: t('editor.tabImages'), icon: <ImageIcon fontSize="small" /> },
+    { id: 'video', label: t('editor.tabVideo'), icon: <VideocamIcon fontSize="small" /> },
+    { id: 'seo', label: t('editor.tabSeo'), icon: <SearchIcon fontSize="small" /> },
+    { id: 'basics', label: t('editor.tabBasics'), icon: <TextFieldsIcon fontSize="small" /> },
+    { id: 'details', label: t('editor.tabDetails'), icon: <TuneIcon fontSize="small" /> },
+    { id: 'pricing', label: t('editor.tabPricing'), icon: <AttachMoneyIcon fontSize="small" /> },
+    { id: 'variations', label: t('editor.tabVariations'), icon: <ViewModuleIcon fontSize="small" /> },
+    { id: 'personalization', label: t('editor.tabPersonalization'), icon: <BrushIcon fontSize="small" /> },
+    { id: 'actions', label: t('editor.tabActions'), icon: <SettingsIcon fontSize="small" /> },
   ];
 
   return (
@@ -1434,7 +1426,7 @@ export default function ListingEditorDrawer({
                 {/* Organic Rank Tracking — inline */}
                 <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #eee' }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-                    Organik Arama Sıralaması
+                    {t('editor.organicSearchRanking')}
                   </Typography>
 
                   {/* Tracked keywords table */}
@@ -1459,13 +1451,13 @@ export default function ListingEditorDrawer({
                             </Typography>
                             {kw.checkedAt ? (
                               <Typography variant="caption" color="text.secondary">
-                                {new Date(kw.checkedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                {formatDate(new Date(kw.checkedAt), { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                 {(kw.snapshotCount ?? 0) > 1 && ' · '}
                                 {(kw.snapshotCount ?? 0) > 1 && `${kw.snapshotCount} kontrol`}
                               </Typography>
                             ) : (
                               <Typography variant="caption" sx={{ color: '#999', fontStyle: 'italic' }}>
-                                Sıra kontrol bekliyor...
+                                {t('editor.rankWaiting')}
                               </Typography>
                             )}
                           </Box>
@@ -1522,7 +1514,7 @@ export default function ListingEditorDrawer({
                     </Box>
                   ) : (
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Henüz takip edilen anahtar kelime yok
+                      {t('editor.noTrackedKeywords')}
                     </Typography>
                   )}
 
@@ -1556,11 +1548,11 @@ export default function ListingEditorDrawer({
                             <strong style={{ color: rankResult.rank <= 10 ? '#11998e' : rankResult.rank <= 48 ? '#F2994A' : '#eb3349', fontSize: '1.1rem' }}>
                               #{rankResult.rank}
                             </strong>
-                            {' '}· Sayfa {rankResult.page} · {rankResult.totalResults.toLocaleString()} sonuç
+                            {' '}· {t('editor.page')} {rankResult.page} · {rankResult.totalResults.toLocaleString()} {t('editor.results')}
                           </Typography>
                         ) : (
                           <Typography variant="body2" color="text.secondary">
-                            İlk 500 sonuçta bulunamadı ({rankResult.totalResults.toLocaleString()} toplam)
+                            {t('editor.notFoundIn500')} ({rankResult.totalResults.toLocaleString()} {t('editor.total')})
                           </Typography>
                         )}
                       </Box>
@@ -1587,7 +1579,7 @@ export default function ListingEditorDrawer({
                   {/* Title */}
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>Baslik</Typography>
+                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{t('editor.titleLabel')}</Typography>
                       <Button
                         size="small"
                         startIcon={aiLoading.optimize_title ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
@@ -1616,7 +1608,7 @@ export default function ListingEditorDrawer({
                   {/* Description */}
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>Aciklama</Typography>
+                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{t('editor.descriptionLabel')}</Typography>
                       <Button
                         size="small"
                         startIcon={aiLoading.generate_description ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
@@ -1818,7 +1810,7 @@ export default function ListingEditorDrawer({
                           disabled={!!aiLoading.suggest_tags || !fields.title}
                           sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75, px: 1.5 }}
                         >
-                          AI ile Tumunu Degistir
+                          {t('editor.aiReplaceAll')}
                         </Button>
                       )}
                       {/* Research data availability indicator */}
@@ -1858,7 +1850,7 @@ export default function ListingEditorDrawer({
                                 }}
                                 sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.5, px: 1, minWidth: 0, minHeight: 32 }}
                               >
-                                Tumunu Degistir
+                                {t('editor.replaceAll')}
                               </Button>
                             )}
                             <Button
@@ -1873,7 +1865,7 @@ export default function ListingEditorDrawer({
                               disabled={fields.tags.length >= 13 || aiTagSuggestions.every((t) => fields.tags.includes(t))}
                               sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.5, px: 1, minWidth: 0, minHeight: 32 }}
                             >
-                              Bosluklara Ekle
+                              {t('editor.addToGaps')}
                             </Button>
                           </Box>
                         </Box>
@@ -2081,15 +2073,15 @@ export default function ListingEditorDrawer({
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {/* Who made */}
                   <FormControl size="small" fullWidth>
-                    <InputLabel>Kim yapti</InputLabel>
+                    <InputLabel>{t('editor.whoMadeLabel')}</InputLabel>
                     <Select
                       value={fields.who_made}
-                      label="Kim yapti"
+                      label={t('editor.whoMadeLabel')}
                       onChange={(e: SelectChangeEvent) => updateField('who_made', e.target.value)}
                     >
-                      {WHO_MADE_OPTIONS.map((opt) => (
-                        <MenuItem key={opt.value} value={opt.value}>
-                          {opt.label}
+                      {WHO_MADE_KEYS.map((val) => (
+                        <MenuItem key={val} value={val}>
+                          {t(`whoMade.${WHO_MADE_I18N[val]}`)}
                         </MenuItem>
                       ))}
                     </Select>
@@ -2097,15 +2089,15 @@ export default function ListingEditorDrawer({
 
                   {/* When made */}
                   <FormControl size="small" fullWidth>
-                    <InputLabel>Ne zaman yapildi</InputLabel>
+                    <InputLabel>{t('editor.whenMadeLabel')}</InputLabel>
                     <Select
                       value={fields.when_made}
-                      label="Ne zaman yapildi"
+                      label={t('editor.whenMadeLabel')}
                       onChange={(e: SelectChangeEvent) => updateField('when_made', e.target.value)}
                     >
-                      {WHEN_MADE_OPTIONS.map((opt) => (
-                        <MenuItem key={opt.value} value={opt.value}>
-                          {opt.label}
+                      {WHEN_MADE_KEYS.map((val) => (
+                        <MenuItem key={val} value={val}>
+                          {t(`whenMade.${WHEN_MADE_I18N[val]}`)}
                         </MenuItem>
                       ))}
                     </Select>
@@ -2496,7 +2488,7 @@ export default function ListingEditorDrawer({
                 display: { xs: 'none', sm: 'inline-flex' },
               }}
             >
-              Profil Kaydet
+              {t('editor.saveProfile')}
             </Button>
 
             {/* Copy */}
@@ -2577,7 +2569,7 @@ export default function ListingEditorDrawer({
               onClick={handleSave}
               disabled={saving || !hasChanges()}
             >
-              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+              {saving ? t('editor.saving') : t('editor.save')}
             </Button>
           </Box>
         )}
@@ -2587,7 +2579,7 @@ export default function ListingEditorDrawer({
       {/* Delete Confirmation Dialog */}
       {/* ================================================================ */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Listeyi Sil</DialogTitle>
+        <DialogTitle>{t('editor.deleteListing')}</DialogTitle>
         <DialogContent>
           <Typography>
             Bu listeyi kalici olarak silmek istediginizden emin misiniz? Bu islem geri alinamaz.
@@ -2600,7 +2592,7 @@ export default function ListingEditorDrawer({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
-            Iptal
+            {t('editor.cancel')}
           </Button>
           <Button
             onClick={handleDelete}
@@ -2609,7 +2601,7 @@ export default function ListingEditorDrawer({
             disabled={deleting}
             startIcon={deleting ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon />}
           >
-            {deleting ? 'Siliniyor...' : 'Sil'}
+            {deleting ? t('editor.deleting') : t('editor.delete')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2618,15 +2610,15 @@ export default function ListingEditorDrawer({
       {/* Publish Confirmation Dialog */}
       {/* ================================================================ */}
       <Dialog open={publishDialogOpen} onClose={() => setPublishDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Listingi Yayinla</DialogTitle>
+        <DialogTitle>{t('editor.publishListing')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Bu listingi yayinlamak istediginize emin misiniz?
+            {t('editor.publishConfirm')}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPublishDialogOpen(false)} disabled={publishing}>
-            Iptal
+            {t('editor.cancel')}
           </Button>
           <Button
             onClick={() => {
@@ -2638,7 +2630,7 @@ export default function ListingEditorDrawer({
             disabled={publishing}
             startIcon={publishing ? <CircularProgress size={18} color="inherit" /> : <PublishIcon />}
           >
-            Yayinla
+            {t('editor.publish')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2647,15 +2639,15 @@ export default function ListingEditorDrawer({
       {/* Deactivate Confirmation Dialog */}
       {/* ================================================================ */}
       <Dialog open={deactivateDialogOpen} onClose={() => setDeactivateDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Listingi Deaktif Et</DialogTitle>
+        <DialogTitle>{t('editor.deactivateListing')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Bu listingi deaktif etmek istediginize emin misiniz? Listing Etsy&apos;de gorunmez olacak.
+            {t('editor.deactivateConfirm')}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeactivateDialogOpen(false)} disabled={deactivating}>
-            Iptal
+            {t('editor.cancel')}
           </Button>
           <Button
             onClick={() => {
@@ -2667,7 +2659,7 @@ export default function ListingEditorDrawer({
             disabled={deactivating}
             startIcon={deactivating ? <CircularProgress size={18} color="inherit" /> : <BlockIcon />}
           >
-            Deaktif Et
+            {t('editor.deactivateButton')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2739,61 +2731,47 @@ export default function ListingEditorDrawer({
 
       {/* Create Shipping Profile Dialog */}
       <Dialog open={createShippingOpen} onClose={() => setCreateShippingOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Yeni Kargo Profili Olustur</DialogTitle>
+        <DialogTitle>{t('editor.createShippingTitle')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: '12px !important' }}>
           <TextField
-            label="Profil Adi"
-            placeholder="ornek: Turkiye'den ABD'ye Standart Kargo"
+            label={t('editor.profileName')}
+            placeholder={t('editor.profileNamePlaceholder')}
             size="small"
             fullWidth
             required
             value={newShipping.title}
             onChange={(e) => setNewShipping(s => ({ ...s, title: e.target.value }))}
-            helperText="Bu isim listing duzenlerken kargo profili secerken gorunecek"
+            helperText={t('editor.profileNameHelperText')}
           />
 
           <Divider />
 
           {/* Origin & Destination */}
-          <Typography variant="subtitle2" color="text.secondary">Gonderim Rotasi</Typography>
+          <Typography variant="subtitle2" color="text.secondary">{t('editor.shippingRoute')}</Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <FormControl fullWidth size="small" required>
-              <InputLabel>Gonderim Ulkesi</InputLabel>
+              <InputLabel>{t('editor.originCountry')}</InputLabel>
               <Select
                 value={newShipping.origin_country_iso}
-                label="Gonderim Ulkesi"
+                label={t('editor.originCountry')}
                 onChange={(e) => setNewShipping(s => ({ ...s, origin_country_iso: e.target.value }))}
               >
-                <MenuItem value="TR">Turkiye</MenuItem>
-                <MenuItem value="US">ABD</MenuItem>
-                <MenuItem value="GB">Ingiltere</MenuItem>
-                <MenuItem value="DE">Almanya</MenuItem>
-                <MenuItem value="FR">Fransa</MenuItem>
-                <MenuItem value="CA">Kanada</MenuItem>
-                <MenuItem value="AU">Avustralya</MenuItem>
-                <MenuItem value="NL">Hollanda</MenuItem>
-                <MenuItem value="IT">Italya</MenuItem>
-                <MenuItem value="ES">Ispanya</MenuItem>
+                {['TR','US','GB','DE','FR','CA','AU','NL','IT','ES'].map(code => (
+                  <MenuItem key={code} value={code}>{t(`countries.${code}`)}</MenuItem>
+                ))}
               </Select>
             </FormControl>
             <FormControl fullWidth size="small">
-              <InputLabel>Hedef Ulke</InputLabel>
+              <InputLabel>{t('editor.destinationCountry')}</InputLabel>
               <Select
                 value={newShipping.destination_country_iso}
-                label="Hedef Ulke"
+                label={t('editor.destinationCountry')}
                 onChange={(e) => setNewShipping(s => ({ ...s, destination_country_iso: e.target.value }))}
               >
-                <MenuItem value=""><em>Tum Dunya (varsayilan)</em></MenuItem>
-                <MenuItem value="US">ABD</MenuItem>
-                <MenuItem value="GB">Ingiltere</MenuItem>
-                <MenuItem value="DE">Almanya</MenuItem>
-                <MenuItem value="FR">Fransa</MenuItem>
-                <MenuItem value="CA">Kanada</MenuItem>
-                <MenuItem value="AU">Avustralya</MenuItem>
-                <MenuItem value="TR">Turkiye</MenuItem>
-                <MenuItem value="NL">Hollanda</MenuItem>
-                <MenuItem value="IT">Italya</MenuItem>
-                <MenuItem value="ES">Ispanya</MenuItem>
+                <MenuItem value=""><em>{t('editor.allWorldDefault')}</em></MenuItem>
+                {['US','GB','DE','FR','CA','AU','TR','NL','IT','ES'].map(code => (
+                  <MenuItem key={code} value={code}>{t(`countries.${code}`)}</MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Box>
@@ -2801,103 +2779,103 @@ export default function ListingEditorDrawer({
           <Divider />
 
           {/* Shipping costs */}
-          <Typography variant="subtitle2" color="text.secondary">Kargo Ucretleri (USD)</Typography>
+          <Typography variant="subtitle2" color="text.secondary">{t('editor.shippingCosts')}</Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
-              label="Ilk Urun Kargo Ucreti"
+              label={t('editor.primaryShippingCost')}
               type="number"
               size="small"
               fullWidth
               value={newShipping.primary_cost}
               onChange={(e) => setNewShipping(s => ({ ...s, primary_cost: e.target.value }))}
               inputProps={{ min: 0, step: '0.01' }}
-              helperText="Siparisin ilk urunu icin"
+              helperText={t('editor.primaryShippingHelperText')}
             />
             <TextField
-              label="Ek Urun Kargo Ucreti"
+              label={t('editor.secondaryShippingCost')}
               type="number"
               size="small"
               fullWidth
               value={newShipping.secondary_cost}
               onChange={(e) => setNewShipping(s => ({ ...s, secondary_cost: e.target.value }))}
               inputProps={{ min: 0, step: '0.01' }}
-              helperText="Her ek urun icin"
+              helperText={t('editor.secondaryShippingHelperText')}
             />
           </Box>
 
           <Divider />
 
           {/* Processing time */}
-          <Typography variant="subtitle2" color="text.secondary">Hazirlama Suresi (is gunu)</Typography>
+          <Typography variant="subtitle2" color="text.secondary">{t('editor.processingTime')}</Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
-              label="Minimum"
+              label={t('editor.minimum')}
               type="number"
               size="small"
               fullWidth
               value={newShipping.min_processing_days}
               onChange={(e) => setNewShipping(s => ({ ...s, min_processing_days: e.target.value }))}
               inputProps={{ min: 1, max: 45 }}
-              helperText="Siparis sonrasi min hazirlama"
+              helperText={t('editor.minProcessingHelperText')}
             />
             <TextField
-              label="Maksimum"
+              label={t('editor.maximum')}
               type="number"
               size="small"
               fullWidth
               value={newShipping.max_processing_days}
               onChange={(e) => setNewShipping(s => ({ ...s, max_processing_days: e.target.value }))}
               inputProps={{ min: 1, max: 45 }}
-              helperText="Siparis sonrasi max hazirlama"
+              helperText={t('editor.maxProcessingHelperText')}
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateShippingOpen(false)}>Iptal</Button>
+          <Button onClick={() => setCreateShippingOpen(false)}>{t('editor.cancel')}</Button>
           <Button
             variant="contained"
             onClick={handleCreateShippingProfile}
             disabled={createLoading || !newShipping.title.trim()}
           >
-            {createLoading ? <CircularProgress size={20} /> : 'Kargo Profili Olustur'}
+            {createLoading ? <CircularProgress size={20} /> : t('editor.createShippingProfile')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Create Return Policy Dialog */}
       <Dialog open={createReturnOpen} onClose={() => setCreateReturnOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Yeni Iade Politikasi</DialogTitle>
+        <DialogTitle>{t('editor.createReturnPolicyTitle')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
           <FormControlLabel
             control={<Switch checked={newReturn.accepts_returns} onChange={(e) => setNewReturn(s => ({ ...s, accepts_returns: e.target.checked }))} />}
-            label="Iade kabul ediliyor"
+            label={t('editor.acceptsReturns')}
           />
           <FormControlLabel
             control={<Switch checked={newReturn.accepts_exchanges} onChange={(e) => setNewReturn(s => ({ ...s, accepts_exchanges: e.target.checked }))} />}
-            label="Degisim kabul ediliyor"
+            label={t('editor.acceptsExchanges')}
           />
           {newReturn.accepts_returns && (
-            <TextField label="Iade suresi (gun)" type="number" size="small" fullWidth value={newReturn.return_deadline} onChange={(e) => setNewReturn(s => ({ ...s, return_deadline: e.target.value }))} inputProps={{ min: 1 }} />
+            <TextField label={t('editor.returnDeadline')} type="number" size="small" fullWidth value={newReturn.return_deadline} onChange={(e) => setNewReturn(s => ({ ...s, return_deadline: e.target.value }))} inputProps={{ min: 1 }} />
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateReturnOpen(false)}>Iptal</Button>
+          <Button onClick={() => setCreateReturnOpen(false)}>{t('editor.cancel')}</Button>
           <Button variant="contained" onClick={handleCreateReturnPolicy} disabled={createLoading}>
-            {createLoading ? <CircularProgress size={20} /> : 'Olustur'}
+            {createLoading ? <CircularProgress size={20} /> : t('editor.create')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Create Shop Section Dialog */}
       <Dialog open={createSectionOpen} onClose={() => setCreateSectionOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Yeni Magaza Bolumu</DialogTitle>
+        <DialogTitle>{t('editor.createSectionTitle')}</DialogTitle>
         <DialogContent sx={{ pt: '8px !important' }}>
-          <TextField label="Bolum adi" size="small" fullWidth value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} />
+          <TextField label={t('editor.sectionName')} size="small" fullWidth value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateSectionOpen(false)}>Iptal</Button>
+          <Button onClick={() => setCreateSectionOpen(false)}>{t('editor.cancel')}</Button>
           <Button variant="contained" onClick={handleCreateSection} disabled={createLoading || !newSectionTitle}>
-            {createLoading ? <CircularProgress size={20} /> : 'Olustur'}
+            {createLoading ? <CircularProgress size={20} /> : t('editor.create')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2906,7 +2884,7 @@ export default function ListingEditorDrawer({
       <Dialog open={rankAnalysisOpen} onClose={() => setRankAnalysisOpen(false)} maxWidth="md" fullWidth sx={{ zIndex: 1500 }}>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>Sıralama Analizi</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('editor.rankingAnalysis')}</Typography>
             {rankAnalysis?.market && (
               <Typography variant="caption" color="text.secondary">
                 Sıra: #{rankAnalysis.market.userRank ?? '500+'} · {rankAnalysis.market.totalResults?.toLocaleString()} sonuç

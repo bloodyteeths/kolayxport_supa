@@ -175,3 +175,5 @@ public/worker-*.js
 public/worker-*.js.map
 public/fallback-*.js
 public/swe-worker-*.js
+package-lock.json
+yarn.lock.backup

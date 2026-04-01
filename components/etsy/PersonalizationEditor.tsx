@@ -24,6 +24,7 @@ import AddIcon from '@mui/icons-material/Add';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 type PersonalizationQuestionType = 'text_input' | 'dropdown' | 'unlabeled_upload' | 'labeled_upload';
 
@@ -57,13 +58,6 @@ interface PersonalizationEditorProps {
   onSaved: () => void;
 }
 
-const QUESTION_TYPE_LABELS: Record<PersonalizationQuestionType, string> = {
-  text_input: 'Metin Girisi',
-  dropdown: 'Acilir Menu',
-  unlabeled_upload: 'Dosya Yukleme',
-  labeled_upload: 'Etiketli Dosya Yukleme',
-};
-
 const MAX_QUESTIONS = 5;
 
 function createEmptyQuestion(): PersonalizationQuestion {
@@ -74,68 +68,6 @@ function createEmptyQuestion(): PersonalizationQuestion {
     required: false,
     max_allowed_characters: 256,
   };
-}
-
-function validateQuestions(questions: PersonalizationQuestion[]): string | null {
-  if (questions.length === 0) {
-    return 'En az bir soru eklemelisiniz';
-  }
-  if (questions.length > MAX_QUESTIONS) {
-    return `Maksimum ${MAX_QUESTIONS} soru eklenebilir`;
-  }
-
-  const uploadCount = questions.filter(
-    (q) => q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload'
-  ).length;
-  if (uploadCount > 1) {
-    return 'Listeleme basina en fazla 1 yukleme sorusu eklenebilir';
-  }
-
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-
-    if (!q.question_text || q.question_text.length < 1 || q.question_text.length > 45) {
-      return `Soru ${i + 1}: Soru metni 1-45 karakter olmalidir`;
-    }
-    if (q.instructions && q.instructions.length > 120) {
-      return `Soru ${i + 1}: Talimatlar en fazla 120 karakter olmalidir`;
-    }
-
-    if (q.question_type === 'text_input') {
-      if (!q.max_allowed_characters || q.max_allowed_characters < 1 || q.max_allowed_characters > 1024) {
-        return `Soru ${i + 1}: Maksimum karakter sayisi 1-1024 araliginda olmalidir`;
-      }
-    }
-
-    if (q.question_type === 'dropdown') {
-      if (q.instructions) {
-        return `Soru ${i + 1}: Acilir menu sorularinda talimat alani kullanilamaz`;
-      }
-      if (!q.options || q.options.length < 1 || q.options.length > 30) {
-        return `Soru ${i + 1}: Acilir menu icin 1-30 arasi secenek gereklidir`;
-      }
-      for (let j = 0; j < q.options.length; j++) {
-        if (!q.options[j].label || q.options[j].label.length < 1 || q.options[j].label.length > 20) {
-          return `Soru ${i + 1}, secenek ${j + 1}: Etiket 1-20 karakter olmalidir`;
-        }
-      }
-    }
-
-    if (q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload') {
-      if (q.max_allowed_files !== undefined) {
-        if (q.max_allowed_files < 1 || q.max_allowed_files > 10) {
-          return `Soru ${i + 1}: Dosya sayisi 1-10 araliginda olmalidir`;
-        }
-      }
-      if (q.question_type === 'labeled_upload' && q.options && q.max_allowed_files) {
-        if (q.options.length !== q.max_allowed_files) {
-          return `Soru ${i + 1}: Etiket sayisi dosya sayisina esit olmalidir`;
-        }
-      }
-    }
-  }
-
-  return null;
 }
 
 // ─── Legacy Mode Component ───────────────────────────────────────────────────
@@ -151,6 +83,7 @@ function LegacyModeEditor({
   legacy: LegacyPersonalization;
   onSaved: () => void;
 }) {
+  const t = useTranslations('etsy.personalization');
   const [isPersonalizable, setIsPersonalizable] = useState(legacy.is_personalizable);
   const [isRequired, setIsRequired] = useState(legacy.personalization_is_required);
   const [instructions, setInstructions] = useState(legacy.personalization_instructions || '');
@@ -185,7 +118,7 @@ function LegacyModeEditor({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Kisisellestirme kaydedilemedi');
+        throw new Error(data.error || t('toastSaveFailed'));
       }
 
       if (overrideOff) {
@@ -193,11 +126,11 @@ function LegacyModeEditor({
       }
 
       toast.success(
-        overrideOff ? 'Kisisellestirme kapatildi' : 'Kisisellestirme kaydedildi'
+        overrideOff ? t('toastTurnedOff') : t('toastSaved')
       );
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Bir hata olustu');
+      toast.error(err.message || t('toastError'));
     } finally {
       setSaving(false);
     }
@@ -213,7 +146,7 @@ function LegacyModeEditor({
             disabled={saving}
           />
         }
-        label="Kisisellestirme"
+        label={t('personalizationToggle')}
       />
 
       {isPersonalizable && (
@@ -227,23 +160,23 @@ function LegacyModeEditor({
                 disabled={saving}
               />
             }
-            label="Zorunlu"
+            label={t('required')}
           />
 
           <TextField
-            label="Talimatlar"
+            label={t('instructions')}
             size="small"
             fullWidth
             multiline
             rows={3}
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
-            placeholder="Orn: Lutfen istediginiz ismi yazin"
+            placeholder={t('instructionsPlaceholder')}
             disabled={saving}
           />
 
           <TextField
-            label="Maksimum Karakter"
+            label={t('maxCharacters')}
             size="small"
             type="number"
             fullWidth
@@ -253,7 +186,7 @@ function LegacyModeEditor({
               setCharCountMax(Math.min(Math.max(val, 0), 1024));
             }}
             inputProps={{ min: 1, max: 1024 }}
-            helperText="Varsayilan: 256, Maksimum: 1024"
+            helperText={t('maxCharactersHelper')}
             disabled={saving}
           />
         </>
@@ -267,7 +200,7 @@ function LegacyModeEditor({
           onClick={() => handleSave()}
           disabled={saving}
         >
-          Kaydet
+          {t('save')}
         </Button>
 
         {isPersonalizable && (
@@ -278,7 +211,7 @@ function LegacyModeEditor({
             onClick={() => handleSave(true)}
             disabled={saving}
           >
-            Kisisellestirmeyi Kapat
+            {t('turnOffPersonalization')}
           </Button>
         )}
       </Box>
@@ -301,6 +234,7 @@ function AdvancedModeEditor({
   onSaved: () => void;
   onFallbackToLegacy: () => void;
 }) {
+  const t = useTranslations('etsy.personalization');
   const [questions, setQuestions] = useState<PersonalizationQuestion[]>(
     initialQuestions.length > 0 ? initialQuestions : []
   );
@@ -310,6 +244,75 @@ function AdvancedModeEditor({
     initialQuestions.length === 0 ? false : 0
   );
   const [newOptionText, setNewOptionText] = useState<Record<number, string>>({});
+
+  const QUESTION_TYPE_LABELS: Record<PersonalizationQuestionType, string> = {
+    text_input: t('typeTextInput'),
+    dropdown: t('typeDropdown'),
+    unlabeled_upload: t('typeUnlabeledUpload'),
+    labeled_upload: t('typeLabeledUpload'),
+  };
+
+  const validateQuestions = useCallback((qs: PersonalizationQuestion[]): string | null => {
+    if (qs.length === 0) {
+      return t('validateMinOneQuestion');
+    }
+    if (qs.length > MAX_QUESTIONS) {
+      return t('validateMaxQuestions', { max: MAX_QUESTIONS });
+    }
+
+    const uploadCount = qs.filter(
+      (q) => q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload'
+    ).length;
+    if (uploadCount > 1) {
+      return t('validateMaxOneUpload');
+    }
+
+    for (let i = 0; i < qs.length; i++) {
+      const q = qs[i];
+
+      if (!q.question_text || q.question_text.length < 1 || q.question_text.length > 45) {
+        return t('validateQuestionTextLength', { index: i + 1 });
+      }
+      if (q.instructions && q.instructions.length > 120) {
+        return t('validateInstructionsLength', { index: i + 1 });
+      }
+
+      if (q.question_type === 'text_input') {
+        if (!q.max_allowed_characters || q.max_allowed_characters < 1 || q.max_allowed_characters > 1024) {
+          return t('validateMaxCharRange', { index: i + 1 });
+        }
+      }
+
+      if (q.question_type === 'dropdown') {
+        if (q.instructions) {
+          return t('validateDropdownNoInstructions', { index: i + 1 });
+        }
+        if (!q.options || q.options.length < 1 || q.options.length > 30) {
+          return t('validateDropdownOptionsRange', { index: i + 1 });
+        }
+        for (let j = 0; j < q.options.length; j++) {
+          if (!q.options[j].label || q.options[j].label.length < 1 || q.options[j].label.length > 20) {
+            return t('validateOptionLabelLength', { index: i + 1, optIndex: j + 1 });
+          }
+        }
+      }
+
+      if (q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload') {
+        if (q.max_allowed_files !== undefined) {
+          if (q.max_allowed_files < 1 || q.max_allowed_files > 10) {
+            return t('validateFileCountRange', { index: i + 1 });
+          }
+        }
+        if (q.question_type === 'labeled_upload' && q.options && q.max_allowed_files) {
+          if (q.options.length !== q.max_allowed_files) {
+            return t('validateLabelCountMatch', { index: i + 1 });
+          }
+        }
+      }
+    }
+
+    return null;
+  }, [t]);
 
   const updateQuestion = useCallback(
     (index: number, updates: Partial<PersonalizationQuestion>) => {
@@ -360,12 +363,12 @@ function AdvancedModeEditor({
 
   const addQuestion = useCallback(() => {
     if (questions.length >= MAX_QUESTIONS) {
-      toast.error(`Maksimum ${MAX_QUESTIONS} soru eklenebilir`);
+      toast.error(t('toastMaxQuestions', { max: MAX_QUESTIONS }));
       return;
     }
     setQuestions((prev) => [...prev, createEmptyQuestion()]);
     setExpandedIndex(questions.length);
-  }, [questions.length]);
+  }, [questions.length, t]);
 
   const removeQuestion = useCallback((index: number) => {
     setQuestions((prev) => prev.filter((_, i) => i !== index));
@@ -377,7 +380,7 @@ function AdvancedModeEditor({
       const text = (newOptionText[questionIndex] || '').trim();
       if (!text) return;
       if (text.length > 20) {
-        toast.error('Secenek etiketi en fazla 20 karakter olmalidir');
+        toast.error(t('toastOptionLabelMax'));
         return;
       }
 
@@ -387,7 +390,7 @@ function AdvancedModeEditor({
         const currentOptions = q.options || [];
 
         if (q.question_type === 'dropdown' && currentOptions.length >= 30) {
-          toast.error('Acilir menude en fazla 30 secenek olabilir');
+          toast.error(t('toastMaxDropdownOptions'));
           return prev;
         }
 
@@ -398,7 +401,7 @@ function AdvancedModeEditor({
 
       setNewOptionText((prev) => ({ ...prev, [questionIndex]: '' }));
     },
-    [newOptionText]
+    [newOptionText, t]
   );
 
   const removeOption = useCallback((questionIndex: number, optionIndex: number) => {
@@ -467,24 +470,24 @@ function AdvancedModeEditor({
       if (!res.ok) {
         // If multi-question API is not available, fall back to legacy
         if (res.status === 400 || res.status === 404) {
-          toast.error('Coklu soru API\'si henuz aktif degil. Lutfen standart modu kullanin.');
+          toast.error(t('toastMultiQuestionNotAvailable'));
           onFallbackToLegacy();
           return;
         }
-        throw new Error(data.error || 'Kisisellestirme kaydedilemedi');
+        throw new Error(data.error || t('toastSaveFailed'));
       }
 
-      toast.success('Kisisellestirme sorulari kaydedildi');
+      toast.success(t('toastQuestionsSaved'));
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Bir hata olustu');
+      toast.error(err.message || t('toastError'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleRemoveAll = async () => {
-    if (!confirm('Tum kisisellestirme sorularini kaldirmak istediginizden emin misiniz?')) {
+    if (!confirm(t('confirmRemoveAll'))) {
       return;
     }
 
@@ -499,14 +502,14 @@ function AdvancedModeEditor({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Kisisellestirme kaldirilamadi');
+        throw new Error(data.error || t('toastRemoveFailed'));
       }
 
       setQuestions([]);
-      toast.success('Tum kisisellestirme sorulari kaldirildi');
+      toast.success(t('toastAllRemoved'));
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Bir hata olustu');
+      toast.error(err.message || t('toastError'));
     } finally {
       setRemoving(false);
     }
@@ -515,12 +518,12 @@ function AdvancedModeEditor({
   return (
     <Box>
       <Alert severity="info" sx={{ mb: 2 }}>
-        Bu ozellik Etsy&apos;nin yeni coklu soru API&apos;sini kullanir. Henuz tum magazalarda aktif olmayabilir.
+        {t('advancedInfo')}
       </Alert>
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="subtitle1" fontWeight={600}>
-          Kisisellestirme Sorulari ({questions.length}/{MAX_QUESTIONS})
+          {t('questionsTitle', { count: questions.length, max: MAX_QUESTIONS })}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           {questions.length > 0 && (
@@ -532,7 +535,7 @@ function AdvancedModeEditor({
               onClick={handleRemoveAll}
               disabled={saving || removing}
             >
-              Tumunu Kaldir
+              {t('removeAll')}
             </Button>
           )}
           <Button
@@ -542,14 +545,14 @@ function AdvancedModeEditor({
             onClick={handleSave}
             disabled={saving || removing || questions.length === 0}
           >
-            Kaydet
+            {t('save')}
           </Button>
         </Box>
       </Box>
 
       {questions.length === 0 && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: 'center', py: 3 }}>
-          Henuz kisisellestirme sorusu eklenmemis. Asagidaki butonu kullanarak soru ekleyebilirsiniz.
+          {t('noQuestions')}
         </Typography>
       )}
 
@@ -569,9 +572,9 @@ function AdvancedModeEditor({
                 variant="outlined"
               />
               <Typography variant="body2" sx={{ flexGrow: 1 }} noWrap>
-                {q.question_text || `Soru ${index + 1}`}
+                {q.question_text || t('questionPlaceholder', { index: index + 1 })}
               </Typography>
-              {q.required && <Chip label="Zorunlu" size="small" color="warning" />}
+              {q.required && <Chip label={t('required')} size="small" color="warning" />}
               <IconButton
                 size="small"
                 color="error"
@@ -589,10 +592,10 @@ function AdvancedModeEditor({
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {/* Question type selector */}
               <FormControl size="small" fullWidth>
-                <InputLabel>Soru Tipi</InputLabel>
+                <InputLabel>{t('questionType')}</InputLabel>
                 <Select
                   value={q.question_type}
-                  label="Soru Tipi"
+                  label={t('questionType')}
                   onChange={(e) => {
                     const newType = e.target.value as PersonalizationQuestionType;
                     if (
@@ -601,7 +604,7 @@ function AdvancedModeEditor({
                       q.question_type !== 'unlabeled_upload' &&
                       q.question_type !== 'labeled_upload'
                     ) {
-                      toast.error('Listeleme basina en fazla 1 yukleme sorusu eklenebilir');
+                      toast.error(t('toastMaxOneUpload'));
                       return;
                     }
                     handleTypeChange(index, newType);
@@ -617,20 +620,20 @@ function AdvancedModeEditor({
 
               {/* Question text */}
               <TextField
-                label="Soru Metni"
+                label={t('questionText')}
                 size="small"
                 fullWidth
                 value={q.question_text}
                 onChange={(e) => updateQuestion(index, { question_text: e.target.value })}
                 inputProps={{ maxLength: 45 }}
-                helperText={`${q.question_text.length}/45 karakter`}
+                helperText={t('charCount', { count: q.question_text.length })}
                 error={q.question_text.length > 45 || (q.question_text.length > 0 && q.question_text.length < 1)}
               />
 
               {/* Instructions - not for dropdown */}
               {q.question_type !== 'dropdown' && (
                 <TextField
-                  label="Talimatlar (opsiyonel)"
+                  label={t('instructionsOptional')}
                   size="small"
                   fullWidth
                   multiline
@@ -638,7 +641,7 @@ function AdvancedModeEditor({
                   value={q.instructions || ''}
                   onChange={(e) => updateQuestion(index, { instructions: e.target.value })}
                   inputProps={{ maxLength: 120 }}
-                  helperText={`${(q.instructions || '').length}/120 karakter`}
+                  helperText={t('instructionsCharCount', { count: (q.instructions || '').length })}
                   error={(q.instructions || '').length > 120}
                 />
               )}
@@ -652,13 +655,13 @@ function AdvancedModeEditor({
                     size="small"
                   />
                 }
-                label="Zorunlu"
+                label={t('required')}
               />
 
               {/* Text input: max characters */}
               {q.question_type === 'text_input' && (
                 <TextField
-                  label="Maksimum Karakter Sayisi"
+                  label={t('maxCharCount')}
                   size="small"
                   type="number"
                   fullWidth
@@ -668,7 +671,7 @@ function AdvancedModeEditor({
                     updateQuestion(index, { max_allowed_characters: Math.min(Math.max(val, 0), 1024) });
                   }}
                   inputProps={{ min: 1, max: 1024 }}
-                  helperText="1-1024 arasi"
+                  helperText={t('maxCharRange')}
                   error={
                     q.max_allowed_characters !== undefined &&
                     (q.max_allowed_characters < 1 || q.max_allowed_characters > 1024)
@@ -679,7 +682,7 @@ function AdvancedModeEditor({
               {/* Upload types: max files */}
               {(q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload') && (
                 <TextField
-                  label="Maksimum Dosya Sayisi"
+                  label={t('maxFileCount')}
                   size="small"
                   type="number"
                   fullWidth
@@ -706,7 +709,7 @@ function AdvancedModeEditor({
                     updateQuestion(index, updates);
                   }}
                   inputProps={{ min: 1, max: 10 }}
-                  helperText="1-10 arasi"
+                  helperText={t('maxFileRange')}
                   error={
                     q.max_allowed_files !== undefined &&
                     (q.max_allowed_files < 1 || q.max_allowed_files > 10)
@@ -718,14 +721,14 @@ function AdvancedModeEditor({
               {q.question_type === 'dropdown' && (
                 <Box>
                   <Typography variant="body2" fontWeight={500} sx={{ mb: 1 }}>
-                    Secenekler ({(q.options || []).length}/30)
+                    {t('options', { count: (q.options || []).length })}
                   </Typography>
 
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
                     {(q.options || []).map((opt, optIdx) => (
                       <Chip
                         key={optIdx}
-                        label={opt.label || '(bos)'}
+                        label={opt.label || t('emptyOption')}
                         size="small"
                         onDelete={() => removeOption(index, optIdx)}
                         color={opt.label.length < 1 || opt.label.length > 20 ? 'error' : 'default'}
@@ -735,7 +738,7 @@ function AdvancedModeEditor({
 
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                     <TextField
-                      label="Yeni secenek"
+                      label={t('newOption')}
                       size="small"
                       value={newOptionText[index] || ''}
                       onChange={(e) =>
@@ -748,7 +751,7 @@ function AdvancedModeEditor({
                         }
                       }}
                       inputProps={{ maxLength: 20 }}
-                      helperText={`${(newOptionText[index] || '').length}/20 karakter`}
+                      helperText={t('optionCharCount', { count: (newOptionText[index] || '').length })}
                       sx={{ flexGrow: 1 }}
                     />
                     <IconButton
@@ -767,13 +770,13 @@ function AdvancedModeEditor({
               {q.question_type === 'labeled_upload' && (
                 <Box>
                   <Typography variant="body2" fontWeight={500} sx={{ mb: 1 }}>
-                    Dosya Etiketleri (dosya sayisina esit olmalidir)
+                    {t('fileLabels')}
                   </Typography>
 
                   {(q.options || []).map((opt, optIdx) => (
                     <TextField
                       key={optIdx}
-                      label={`Etiket ${optIdx + 1}`}
+                      label={t('labelN', { index: optIdx + 1 })}
                       size="small"
                       fullWidth
                       value={opt.label}
@@ -789,7 +792,7 @@ function AdvancedModeEditor({
                         });
                       }}
                       inputProps={{ maxLength: 20 }}
-                      helperText={`${opt.label.length}/20 karakter`}
+                      helperText={t('optionCharCount', { count: opt.label.length })}
                       error={opt.label.length < 1 || opt.label.length > 20}
                       sx={{ mb: 1 }}
                     />
@@ -809,7 +812,7 @@ function AdvancedModeEditor({
         fullWidth
         sx={{ mt: 1 }}
       >
-        Soru Ekle
+        {t('addQuestion')}
       </Button>
     </Box>
   );
@@ -824,6 +827,7 @@ export default function PersonalizationEditor({
   legacy,
   onSaved,
 }: PersonalizationEditorProps) {
+  const t = useTranslations('etsy.personalization');
   const [advancedMode, setAdvancedMode] = useState(false);
 
   const handleFallbackToLegacy = useCallback(() => {
@@ -835,7 +839,7 @@ export default function PersonalizationEditor({
       {/* Mode toggle */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="subtitle1" fontWeight={600}>
-          Kisisellestirme
+          {t('title')}
         </Typography>
         <FormControlLabel
           control={
@@ -847,7 +851,7 @@ export default function PersonalizationEditor({
           }
           label={
             <Typography variant="body2" color="text.secondary">
-              Gelismis Mod (Beta)
+              {t('advancedMode')}
             </Typography>
           }
           labelPlacement="start"

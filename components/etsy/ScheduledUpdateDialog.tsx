@@ -20,6 +20,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,6 +87,8 @@ export function cancelScheduledUpdate(id: string) {
 // ---------------------------------------------------------------------------
 
 export function useScheduledUpdateExecutor() {
+  const t = useTranslations('etsy.scheduledUpdate');
+
   useEffect(() => {
     const execute = async () => {
       const updates = getScheduledUpdates();
@@ -117,9 +120,9 @@ export function useScheduledUpdateExecutor() {
             throw new Error(err.error || `HTTP ${res.status}`);
           }
 
-          toast.success(`Zamanlanmis guncelleme uygulandi (Listing ${update.listing_id})`);
+          toast.success(t('toastApplied', { listingId: update.listing_id }));
         } catch (err: any) {
-          toast.error(`Zamanlanmis guncelleme basarisiz: ${err.message}`);
+          toast.error(t('toastFailed', { message: err.message }));
         }
       }
 
@@ -132,7 +135,7 @@ export function useScheduledUpdateExecutor() {
     execute();
     const interval = setInterval(execute, 30_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [t]);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,16 +151,6 @@ function formatDateTime(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function formatChangeSummary(changes: ScheduledChanges): string {
-  const parts: string[] = [];
-  if (changes.title !== undefined) parts.push('baslik');
-  if (changes.description !== undefined) parts.push('aciklama');
-  if (changes.tags !== undefined) parts.push('etiketler');
-  if (changes.price !== undefined) parts.push('fiyat');
-  if (changes.quantity !== undefined) parts.push('stok');
-  return parts.join(', ');
 }
 
 // Minimum datetime (now + 1 minute) for the picker
@@ -181,6 +174,7 @@ export default function ScheduledUpdateDialog({
   changes,
   onScheduled,
 }: ScheduledUpdateDialogProps) {
+  const t = useTranslations('etsy.scheduledUpdate');
   const [scheduledAt, setScheduledAt] = useState('');
   const [pendingUpdates, setPendingUpdates] = useState<ScheduledUpdate[]>([]);
 
@@ -194,20 +188,30 @@ export default function ScheduledUpdateDialog({
 
   const hasChangeFields = Object.keys(changes).length > 0;
 
+  const formatChangeSummary = useCallback((ch: ScheduledChanges): string => {
+    const parts: string[] = [];
+    if (ch.title !== undefined) parts.push(t('changeSummaryTitle'));
+    if (ch.description !== undefined) parts.push(t('changeSummaryDescription'));
+    if (ch.tags !== undefined) parts.push(t('changeSummaryTags'));
+    if (ch.price !== undefined) parts.push(t('changeSummaryPrice'));
+    if (ch.quantity !== undefined) parts.push(t('changeSummaryQuantity'));
+    return parts.join(', ');
+  }, [t]);
+
   const handleSchedule = useCallback(() => {
     if (!scheduledAt) {
-      toast.error('Lutfen bir tarih ve saat secin');
+      toast.error(t('toastSelectDateTime'));
       return;
     }
 
     const scheduledDate = new Date(scheduledAt);
     if (scheduledDate.getTime() <= Date.now()) {
-      toast.error('Zamanlama gelecekte olmalidir');
+      toast.error(t('toastFutureRequired'));
       return;
     }
 
     if (!hasChangeFields) {
-      toast.error('Zamanlanacak degisiklik yok');
+      toast.error(t('toastNoChanges'));
       return;
     }
 
@@ -225,22 +229,22 @@ export default function ScheduledUpdateDialog({
     saveScheduledUpdates(allUpdates);
 
     setPendingUpdates(getScheduledUpdatesForListing(listingId));
-    toast.success('Guncelleme zamanlandi');
+    toast.success(t('toastScheduled'));
     onScheduled();
     onClose();
-  }, [scheduledAt, changes, listingId, shopId, hasChangeFields, onScheduled, onClose]);
+  }, [scheduledAt, changes, listingId, shopId, hasChangeFields, onScheduled, onClose, t]);
 
   const handleCancel = useCallback((id: string) => {
     cancelScheduledUpdate(id);
     setPendingUpdates((prev) => prev.filter((u) => u.id !== id));
-    toast.success('Zamanlanmis guncelleme iptal edildi');
-  }, []);
+    toast.success(t('toastCancelled'));
+  }, [t]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <ScheduleIcon color="primary" />
-        <Box sx={{ flex: 1 }}>Guncellemeyi Zamanla</Box>
+        <Box sx={{ flex: 1 }}>{t('dialogTitle')}</Box>
         <IconButton size="small" onClick={onClose}>
           <CloseIcon fontSize="small" />
         </IconButton>
@@ -256,18 +260,18 @@ export default function ScheduledUpdateDialog({
               </Typography>
             )}
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Zamanlanacak degisiklikler:
+              {t('changesToSchedule')}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {changes.title !== undefined && <Chip label="Baslik" size="small" color="primary" variant="outlined" />}
-              {changes.description !== undefined && <Chip label="Aciklama" size="small" color="primary" variant="outlined" />}
-              {changes.tags !== undefined && <Chip label="Etiketler" size="small" color="primary" variant="outlined" />}
-              {changes.price !== undefined && <Chip label={`Fiyat: ${changes.price}`} size="small" color="primary" variant="outlined" />}
-              {changes.quantity !== undefined && <Chip label={`Stok: ${changes.quantity}`} size="small" color="primary" variant="outlined" />}
+              {changes.title !== undefined && <Chip label={t('titleChip')} size="small" color="primary" variant="outlined" />}
+              {changes.description !== undefined && <Chip label={t('descriptionChip')} size="small" color="primary" variant="outlined" />}
+              {changes.tags !== undefined && <Chip label={t('tagsChip')} size="small" color="primary" variant="outlined" />}
+              {changes.price !== undefined && <Chip label={t('priceChip', { price: changes.price })} size="small" color="primary" variant="outlined" />}
+              {changes.quantity !== undefined && <Chip label={t('quantityChip', { quantity: changes.quantity })} size="small" color="primary" variant="outlined" />}
             </Box>
 
             <TextField
-              label="Tarih & Saat"
+              label={t('dateTimeLabel')}
               type="datetime-local"
               value={scheduledAt}
               onChange={(e) => setScheduledAt(e.target.value)}
@@ -279,7 +283,7 @@ export default function ScheduledUpdateDialog({
           </Box>
         ) : (
           <Typography color="text.secondary" sx={{ mb: 2 }}>
-            Zamanlanacak degisiklik yok. Oncelikle alanlarda degisiklik yapin.
+            {t('noChanges')}
           </Typography>
         )}
 
@@ -288,7 +292,7 @@ export default function ScheduledUpdateDialog({
           <>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Zamanlanan Guncellemeler ({pendingUpdates.length})
+              {t('pendingUpdates', { count: pendingUpdates.length })}
             </Typography>
             <List dense disablePadding>
               {pendingUpdates.map((update) => (
@@ -312,7 +316,7 @@ export default function ScheduledUpdateDialog({
                       size="small"
                       color="error"
                       onClick={() => handleCancel(update.id)}
-                      title="Iptal Et"
+                      title={t('cancelTooltip')}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -325,14 +329,14 @@ export default function ScheduledUpdateDialog({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>Iptal Et</Button>
+        <Button onClick={onClose}>{t('cancelButton')}</Button>
         <Button
           variant="contained"
           onClick={handleSchedule}
           disabled={!hasChangeFields || !scheduledAt}
           startIcon={<ScheduleIcon />}
         >
-          Zamanla
+          {t('scheduleButton')}
         </Button>
       </DialogActions>
     </Dialog>

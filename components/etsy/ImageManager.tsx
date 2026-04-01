@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Box,
   IconButton,
@@ -53,6 +54,7 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 export default function ImageManager({ listingId, shopId, images, onImagesChanged }: ImageManagerProps) {
+  const t = useTranslations('etsy.imageManager');
   const [uploading, setUploading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<ImageInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -101,7 +103,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
-      toast.error('Desteklenen formatlar: JPEG, PNG, GIF, WebP');
+      toast.error(t('supportedFormats'));
       return;
     }
 
@@ -114,7 +116,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     if (!uploadFile) return;
 
     if (sortedImages.length >= 10) {
-      toast.error('Maksimum 10 gorsel yuklenebilir');
+      toast.error(t('maxImagesError'));
       return;
     }
 
@@ -142,14 +144,14 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Gorsel yuklenemedi');
+        throw new Error(err.error || t('uploadFailed'));
       }
 
-      toast.success('Gorsel yuklendi');
+      toast.success(t('uploadSuccess'));
       setUploadDialogOpen(false);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Gorsel yuklenirken hata olustu');
+      toast.error(err.message || t('uploadError'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -169,14 +171,14 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Gorsel silinemedi');
+        throw new Error(err.error || t('deleteFailed'));
       }
 
-      toast.success('Gorsel silindi');
+      toast.success(t('deleteSuccess'));
       setDeleteConfirm(null);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Gorsel silinirken hata olustu');
+      toast.error(err.message || t('deleteError'));
     } finally {
       setDeleting(false);
     }
@@ -206,7 +208,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       });
       if (!uploadA.ok) {
         const err = await uploadA.json();
-        throw new Error(err.error || 'Siralama degistirilemedi (adim 1)');
+        throw new Error(err.error || t('reorderFailedStep1'));
       }
 
       const uploadB = await fetch(uploadEndpoint, {
@@ -220,13 +222,13 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       });
       if (!uploadB.ok) {
         const err = await uploadB.json();
-        throw new Error(err.error || 'Siralama degistirilemedi (adim 2)');
+        throw new Error(err.error || t('reorderFailedStep2'));
       }
 
-      toast.success('Siralama guncellendi');
+      toast.success(t('reorderSuccess'));
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Siralama degistirilirken hata olustu');
+      toast.error(err.message || t('reorderError'));
     } finally {
       setSwapping(null);
     }
@@ -253,7 +255,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
   const handleAiGenerate = async () => {
     if (!aiPrompt.trim()) {
-      toast.error('Bir prompt girin');
+      toast.error(t('enterPrompt'));
       return;
     }
 
@@ -281,18 +283,18 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Gorsel olusturulamadi');
+        throw new Error(err.error || t('generateFailed'));
       }
 
       const data = await res.json();
       if (data.image_base64) {
         setAiResult({ base64: data.image_base64, mimeType: data.mime_type || 'image/png' });
-        toast.success('Gorsel olusturuldu!');
+        toast.success(t('generateSuccess'));
       } else {
-        throw new Error(data.text || 'Gorsel olusturulamadi');
+        throw new Error(data.text || t('generateFailed'));
       }
     } catch (err: any) {
-      toast.error(err.message || 'AI gorsel olusturma hatasi');
+      toast.error(err.message || t('aiGenerateError'));
     } finally {
       setAiGenerating(false);
     }
@@ -302,7 +304,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     if (!aiResult) return;
 
     if (sortedImages.length >= 10) {
-      toast.error('Maksimum 10 gorsel yuklenebilir');
+      toast.error(t('maxImagesError'));
       return;
     }
 
@@ -324,14 +326,14 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Gorsel yuklenemedi');
+        throw new Error(err.error || t('uploadFailed'));
       }
 
-      toast.success('AI gorseli listinge yuklendi!');
+      toast.success(t('aiUploadSuccess'));
       setAiDialogOpen(false);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Gorsel yuklenirken hata olustu');
+      toast.error(err.message || t('uploadError'));
     } finally {
       setAiUploading(false);
     }
@@ -358,13 +360,13 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Alt metin guncellenemedi');
+        throw new Error(err.error || t('altTextUpdateFailed'));
       }
-      toast.success('Alt metin guncellendi');
+      toast.success(t('altTextUpdateSuccess'));
       setEditAltImage(null);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Alt metin guncellenirken hata olustu');
+      toast.error(err.message || t('altTextUpdateError'));
     } finally {
       setSavingAlt(false);
     }
@@ -375,7 +377,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   return (
     <Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Gorseller ({sortedImages.length}/10)
+        {t('imagesCount', { count: sortedImages.length })}
       </Typography>
 
       <Box
@@ -405,7 +407,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             >
               <img
                 src={img.url_570xN}
-                alt={img.alt_text || `Gorsel ${img.rank}`}
+                alt={img.alt_text || t('imageRankAlt', { rank: img.rank })}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
 
@@ -436,7 +438,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 }}
               >
                 {isPrimary && (
-                  <Tooltip title="Ana gorsel">
+                  <Tooltip title={t('primaryImage')}>
                     <StarIcon sx={{ fontSize: 18, color: '#f59e0b', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }} />
                   </Tooltip>
                 )}
@@ -459,7 +461,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               </Box>
 
               {/* Alt text indicator — click to edit */}
-              <Tooltip title={img.alt_text ? `${img.alt_text} (duzenlemek icin tikla)` : 'Alt metin ekle (tikla)'}>
+              <Tooltip title={img.alt_text ? t('altTextClickToEdit', { text: img.alt_text }) : t('addAltText')}>
                 <Box
                   onClick={(e) => { e.stopPropagation(); openAltEdit(img); }}
                   sx={{
@@ -479,7 +481,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                     '&:hover': { backgroundColor: img.alt_text ? 'rgba(0,0,0,0.8)' : 'rgba(245,158,11,0.9)' },
                   }}
                 >
-                  {img.alt_text || '+ Alt metin ekle'}
+                  {img.alt_text || t('addAltTextShort')}
                 </Box>
               </Tooltip>
 
@@ -513,7 +515,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 </IconButton>
 
                 {idx > 0 && (
-                  <Tooltip title="Yukari tasi" placement="left">
+                  <Tooltip title={t('moveUp')} placement="left">
                     <IconButton
                       size="small"
                       onClick={() => handleSwap('up', img)}
@@ -532,7 +534,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 )}
 
                 {idx < sortedImages.length - 1 && (
-                  <Tooltip title="Asagi tasi" placement="left">
+                  <Tooltip title={t('moveDown')} placement="left">
                     <IconButton
                       size="small"
                       onClick={() => handleSwap('down', img)}
@@ -550,7 +552,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   </Tooltip>
                 )}
 
-                <Tooltip title="Alt metin duzenle" placement="left">
+                <Tooltip title={t('editAltText')} placement="left">
                   <IconButton
                     size="small"
                     onClick={() => openAltEdit(img)}
@@ -591,7 +593,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
           >
             <AddPhotoAlternateIcon sx={{ fontSize: 32, color: '#94a3b8' }} />
             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-              Ekle
+              {t('add')}
             </Typography>
           </Box>
         )}
@@ -616,7 +618,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
           >
             <AutoFixHighIcon sx={{ fontSize: 32, color: '#a855f7' }} />
             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-              AI Gorsel
+              {t('aiImage')}
             </Typography>
           </Box>
         )}
@@ -638,7 +640,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Gorsel Yukle</DialogTitle>
+        <DialogTitle>{t('uploadDialogTitle')}</DialogTitle>
         <DialogContent>
           {!uploadPreview ? (
             <Box
@@ -655,17 +657,17 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             >
               <AddPhotoAlternateIcon sx={{ fontSize: 48, color: '#94a3b8' }} />
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Gorsel secmek icin tiklayin
+                {t('clickToSelectImage')}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                JPEG, PNG, GIF, WebP
+                {t('formatsList')}
               </Typography>
             </Box>
           ) : (
             <Box sx={{ textAlign: 'center', mb: 2 }}>
               <img
                 src={uploadPreview}
-                alt="Onizleme"
+                alt={t('preview')}
                 style={{
                   maxWidth: '100%',
                   maxHeight: 200,
@@ -679,32 +681,32 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 sx={{ display: 'block', mt: 1, cursor: 'pointer' }}
                 onClick={() => fileInputRef.current?.click()}
               >
-                Farkli gorsel sec
+                {t('selectDifferentImage')}
               </Typography>
             </Box>
           )}
 
           <TextField
-            label="Alt Metin (SEO)"
-            placeholder="Or: el yapimi ahsap bileklik, dogal tas"
+            label={t('altTextSeoLabel')}
+            placeholder={t('altTextPlaceholder')}
             fullWidth
             size="small"
             value={uploadAltText}
             onChange={(e) => setUploadAltText(e.target.value)}
             sx={{ mt: 2 }}
-            helperText="Arama motorlari icin aciklayici metin"
+            helperText={t('altTextHelperText')}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
-            Iptal
+            {t('cancel')}
           </Button>
           <Button
             onClick={handleUploadSubmit}
             variant="contained"
             disabled={!uploadFile || uploading}
           >
-            {uploading ? <CircularProgress size={20} /> : 'Yukle'}
+            {uploading ? <CircularProgress size={20} /> : t('upload')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -718,16 +720,16 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <AutoFixHighIcon sx={{ color: '#a855f7' }} />
-          AI ile Gorsel Olustur
+          {t('aiDialogTitle')}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Urun gorselinizi AI ile olusturun. Referans gorsel ekleyerek benzer stil/urun gorseli uretebilirsiniz.
+            {t('aiDialogDescription')}
           </Typography>
 
           <TextField
-            label="Prompt"
-            placeholder="ornek: Professional product photo of a handmade wooden phone stand on white background, studio lighting"
+            label={t('promptLabel')}
+            placeholder={t('promptPlaceholder')}
             fullWidth
             multiline
             minRows={3}
@@ -735,7 +737,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             onChange={(e) => setAiPrompt(e.target.value)}
             disabled={aiGenerating}
             sx={{ mb: 2 }}
-            helperText="Ingilizce prompt daha iyi sonuc verir"
+            helperText={t('promptHelperText')}
           />
 
           {/* Reference image (optional) */}
@@ -749,7 +751,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
           <Box sx={{ mb: 2 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-              Referans Gorsel (opsiyonel)
+              {t('referenceImage')}
             </Typography>
 
             {/* Selected reference preview */}
@@ -757,12 +759,12 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <img
                   src={aiRefPreview}
-                  alt="Referans"
+                  alt={t('referenceImage')}
                   style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '2px solid #a855f7' }}
                 />
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                    {aiRefFile ? 'Yuklenen gorsel' : 'Listing gorseli'}
+                    {aiRefFile ? t('uploadedImage') : t('listingImage')}
                   </Typography>
                   <Button
                     size="small"
@@ -774,7 +776,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                       if (aiRefInputRef.current) aiRefInputRef.current.value = '';
                     }}
                   >
-                    Kaldir
+                    {t('remove')}
                   </Button>
                 </Box>
               </Box>
@@ -784,7 +786,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 {sortedImages.length > 0 && (
                   <Box sx={{ mb: 1 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                      Mevcut gorsellerden sec:
+                      {t('selectFromExisting')}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                       {sortedImages.map((img) => (
@@ -810,7 +812,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                         >
                           <img
                             src={img.url_170x135 || img.url_75x75}
-                            alt={img.alt_text || `Gorsel ${img.rank}`}
+                            alt={img.alt_text || t('imageRankAlt', { rank: img.rank })}
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           />
                         </Box>
@@ -827,7 +829,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   disabled={aiGenerating}
                   startIcon={<AddPhotoAlternateIcon />}
                 >
-                  Bilgisayardan Yukle
+                  {t('uploadFromComputer')}
                 </Button>
               </>
             )}
@@ -847,17 +849,17 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               '&:hover': { bgcolor: '#9333ea' },
             }}
           >
-            {aiGenerating ? 'Olusturuluyor...' : 'Gorsel Olustur'}
+            {aiGenerating ? t('generating') : t('generateImage')}
           </Button>
 
           {/* Result preview */}
           {aiResult && (
             <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom sx={{ textAlign: 'center' }}>Olusturulan Gorsel:</Typography>
+              <Typography variant="subtitle2" gutterBottom sx={{ textAlign: 'center' }}>{t('generatedImage')}</Typography>
               <Box sx={{ textAlign: 'center' }}>
                 <img
                   src={`data:${aiResult.mimeType};base64,${aiResult.base64}`}
-                  alt="AI gorsel"
+                  alt={t('aiImageAlt')}
                   style={{
                     maxWidth: '100%',
                     maxHeight: 300,
@@ -871,7 +873,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               <TextField
                 size="small"
                 fullWidth
-                placeholder="Degisiklik istegi: ornek: make the background darker, add more contrast..."
+                placeholder={t('followUpPlaceholder')}
                 value={aiFollowUp}
                 onChange={(e) => setAiFollowUp(e.target.value)}
                 disabled={aiGenerating}
@@ -904,7 +906,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   size="small"
                   startIcon={aiGenerating ? <CircularProgress size={14} /> : null}
                 >
-                  {aiFollowUp.trim() ? 'Degisiklikle Olustur' : 'Ayni Promptla Olustur'}
+                  {aiFollowUp.trim() ? t('regenerateWithChanges') : t('regenerateSamePrompt')}
                 </Button>
                 <Button
                   variant="contained"
@@ -914,7 +916,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   color="success"
                   size="small"
                 >
-                  {aiUploading ? 'Yukleniyor...' : 'Kabul Et ve Yukle'}
+                  {aiUploading ? t('uploading') : t('acceptAndUpload')}
                 </Button>
               </Box>
             </Box>
@@ -922,21 +924,21 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAiDialogOpen(false)} disabled={aiGenerating || aiUploading}>
-            Kapat
+            {t('close')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteConfirm} onClose={() => !deleting && setDeleteConfirm(null)} maxWidth="xs">
-        <DialogTitle>Gorseli Sil</DialogTitle>
+        <DialogTitle>{t('deleteDialogTitle')}</DialogTitle>
         <DialogContent>
-          <Typography>Bu gorseli silmek istediginize emin misiniz?</Typography>
+          <Typography>{t('deleteConfirmation')}</Typography>
           {deleteConfirm && (
             <Box sx={{ mt: 2, textAlign: 'center' }}>
               <img
                 src={deleteConfirm.url_570xN}
-                alt="Silinecek gorsel"
+                alt={t('imageToDelete')}
                 style={{ maxWidth: 160, borderRadius: 8 }}
               />
             </Box>
@@ -944,10 +946,10 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteConfirm(null)} disabled={deleting}>
-            Iptal
+            {t('cancel')}
           </Button>
           <Button onClick={handleDelete} color="error" variant="contained" disabled={deleting}>
-            {deleting ? <CircularProgress size={20} /> : 'Sil'}
+            {deleting ? <CircularProgress size={20} /> : t('delete')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -959,20 +961,20 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Alt Metin Duzenle</DialogTitle>
+        <DialogTitle>{t('altTextEditTitle')}</DialogTitle>
         <DialogContent>
           {editAltImage && (
             <Box sx={{ textAlign: 'center', mb: 2 }}>
               <img
                 src={editAltImage.url_570xN}
-                alt="Duzenlenecek gorsel"
+                alt={t('imageToEdit')}
                 style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8, objectFit: 'contain' }}
               />
             </Box>
           )}
           <TextField
-            label="Alt Metin (SEO)"
-            placeholder="Or: handmade wooden bracelet, natural stone beads"
+            label={t('altTextSeoLabel')}
+            placeholder={t('altTextEditPlaceholder')}
             fullWidth
             size="small"
             multiline
@@ -980,7 +982,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             value={editAltText}
             onChange={(e) => setEditAltText(e.target.value)}
             disabled={savingAlt}
-            helperText="Arama motorlari icin aciklayici metin (Ingilizce onerilir)"
+            helperText={t('altTextEditHelperText')}
             inputProps={{ maxLength: 250 }}
           />
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', textAlign: 'right' }}>
@@ -989,7 +991,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditAltImage(null)} disabled={savingAlt}>
-            Iptal
+            {t('cancel')}
           </Button>
           <Button
             onClick={handleSaveAltText}
@@ -997,7 +999,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             disabled={savingAlt}
             color="success"
           >
-            {savingAlt ? <CircularProgress size={20} /> : 'Kaydet'}
+            {savingAlt ? <CircularProgress size={20} /> : t('save')}
           </Button>
         </DialogActions>
       </Dialog>

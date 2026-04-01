@@ -19,6 +19,7 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import ImageIcon from '@mui/icons-material/Image';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 interface ImageManagerProps {
   images: string[];
@@ -32,6 +33,7 @@ const VALID_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_SIZE = 12 * 1024 * 1024; // 12MB
 
 export default function ImageManager({ images, onImagesChanged, maxImages = 24, productTitle }: ImageManagerProps) {
+  const t = useTranslations('ebay.imageManager');
   const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0); // 0-100
@@ -56,11 +58,11 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
   // Upload a single file and return the public URL
   const uploadFile = useCallback(async (file: File): Promise<string | null> => {
     if (!VALID_TYPES.includes(file.type)) {
-      toast.error(`${file.name}: Desteklenmeyen format. JPEG, PNG, GIF, WebP kullanin.`);
+      toast.error(t('unsupportedFormat', { name: file.name }));
       return null;
     }
     if (file.size > MAX_SIZE) {
-      toast.error(`${file.name}: Dosya 12MB'dan buyuk.`);
+      toast.error(t('fileTooLarge', { name: file.name }));
       return null;
     }
 
@@ -74,7 +76,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `${file.name} yuklenemedi`);
+      throw new Error(err.error || t('uploadFailedFile', { name: file.name }));
     }
 
     const data = await res.json();
@@ -87,7 +89,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
 
     const allowed = files.slice(0, remaining);
     if (allowed.length < files.length) {
-      toast.error(`Maksimum ${maxImages} gorsel. ${files.length - allowed.length} dosya atlanacak.`);
+      toast.error(t('maxImagesSkipped', { max: maxImages, count: files.length - allowed.length }));
     }
     if (allowed.length === 0) return;
 
@@ -101,7 +103,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
         const url = await uploadFile(file);
         if (url) newUrls.push(url);
       } catch (err: any) {
-        toast.error(err.message || 'Gorsel yuklenemedi');
+        toast.error(err.message || t('imageUploadFailed'));
       }
       completed++;
       setUploadProgress(Math.round((completed / allowed.length) * 100));
@@ -109,7 +111,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
 
     if (newUrls.length > 0) {
       onImagesChanged([...sortedImages, ...newUrls]);
-      toast.success(`${newUrls.length} gorsel yuklendi`);
+      toast.success(t('imagesUploaded', { count: newUrls.length }));
     }
 
     setUploading(false);
@@ -144,7 +146,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
 
     const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
     if (files.length === 0) {
-      toast.error('Sadece gorsel dosyalari surukleyebilirsiniz');
+      toast.error(t('onlyImageFiles'));
       return;
     }
     await uploadFiles(files);
@@ -193,7 +195,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('Referans gorsel 10MB\'dan kucuk olmali');
+      toast.error(t('refImageTooLarge'));
       return;
     }
     const reader = new FileReader();
@@ -211,7 +213,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
 
   const handleAIGenerate = async () => {
     if (!aiPrompt.trim()) {
-      toast.error('Prompt gereklidir');
+      toast.error(t('promptRequired'));
       return;
     }
 
@@ -239,7 +241,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || `Gorsel uretilemedi: ${res.status}`);
+        throw new Error(data.error || t('generationFailed', { status: String(res.status) }));
       }
 
       if (data.image_base64) {
@@ -248,10 +250,10 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
           mimeType: data.mime_type || 'image/jpeg',
         });
       } else {
-        throw new Error('Gorsel donmedi');
+        throw new Error(t('noImageReturned'));
       }
     } catch (err: any) {
-      toast.error(err.message || 'AI gorsel olusturma basarisiz');
+      toast.error(err.message || t('aiGenerationFailed'));
     } finally {
       setAiGenerating(false);
     }
@@ -261,7 +263,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
   const handleAcceptAIImage = async () => {
     if (!aiPreview) return;
     if (remaining <= 0) {
-      toast.error(`Maksimum ${maxImages} gorsel`);
+      toast.error(t('maxImagesReached', { max: maxImages }));
       return;
     }
 
@@ -281,12 +283,12 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
       const url = await uploadFile(file);
       if (url) {
         onImagesChanged([...sortedImages, url]);
-        toast.success('AI gorsel listeye eklendi');
+        toast.success(t('aiImageAdded'));
         setAiPreview(null);
         setAiOpen(false);
       }
     } catch (err: any) {
-      toast.error(err.message || 'Gorsel yuklenemedi');
+      toast.error(err.message || t('imageUploadFailed'));
     } finally {
       setAiUploading(false);
     }
@@ -316,7 +318,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
           <Box>
             <CircularProgress size={28} sx={{ mb: 1 }} />
             <Typography variant="body2" fontWeight={600}>
-              Gorseller yukleniyor... %{uploadProgress}
+              {t('uploadingProgress', { progress: uploadProgress })}
             </Typography>
             <LinearProgress variant="determinate" value={uploadProgress} sx={{ mt: 1, mx: 'auto', maxWidth: 300, borderRadius: 1 }} />
           </Box>
@@ -325,12 +327,12 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
             <AddPhotoAlternateIcon sx={{ fontSize: 36, color: dragOver ? '#1976d2' : '#94a3b8', mb: 0.5 }} />
             <Typography variant="body2" fontWeight={600} color={dragOver ? 'primary' : 'text.secondary'}>
               {sortedImages.length === 0
-                ? 'Gorselleri surukle birak veya tikla'
-                : `Daha fazla gorsel ekle (${remaining} kaldi)`
+                ? t('dropOrClick')
+                : t('addMore', { remaining })
               }
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              JPEG, PNG, GIF, WebP — Maks. 12MB — Birden fazla secebilirsiniz
+              {t('formatHint')}
             </Typography>
           </Box>
         )}
@@ -340,7 +342,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
       {sortedImages.length > 0 && (
         <>
           <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-            {sortedImages.length}/{maxImages} gorsel — Siralamak icin surukle birak. Ilk gorsel kapak fotografi olur.
+            {t('imageCount', { count: sortedImages.length, max: maxImages })}
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 1 }}>
             {sortedImages.map((imgUrl, index) => (
@@ -364,7 +366,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
               >
                 <img
                   src={imgUrl}
-                  alt={`Gorsel ${index + 1}`}
+                  alt={t('imageAlt', { index: index + 1 })}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
                 />
                 {/* Rank badge */}
@@ -403,7 +405,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                       py: 0.25,
                     }}
                   >
-                    KAPAK
+                    {t('cover')}
                   </Box>
                 )}
                 {/* Delete button */}
@@ -441,7 +443,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
           onClick={handleOpenAI}
           disabled={remaining <= 0}
         >
-          AI ile Gorsel Olustur
+          {t('aiGenerate')}
         </Button>
       </Box>
 
@@ -464,23 +466,23 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
 
       {/* Delete confirmation dialog */}
       <Dialog open={deleteConfirmIndex !== null} onClose={() => setDeleteConfirmIndex(null)} maxWidth="xs" sx={{ zIndex: 1500 }}>
-        <DialogTitle>Gorseli Sil</DialogTitle>
+        <DialogTitle>{t('deleteTitle')}</DialogTitle>
         <DialogContent>
-          <Typography>Bu gorseli silmek istediginize emin misiniz?</Typography>
+          <Typography>{t('deleteConfirm')}</Typography>
           {deleteConfirmIndex !== null && sortedImages[deleteConfirmIndex] && (
             <Box sx={{ mt: 2, textAlign: 'center' }}>
               <img
                 src={sortedImages[deleteConfirmIndex]}
-                alt="Silinecek gorsel"
+                alt={t('imageToDelete')}
                 style={{ maxWidth: 120, borderRadius: 8 }}
               />
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmIndex(null)}>Iptal</Button>
+          <Button onClick={() => setDeleteConfirmIndex(null)}>{t('cancel')}</Button>
           <Button onClick={handleDelete} color="error" variant="contained">
-            Sil
+            {t('delete')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -496,7 +498,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <AutoFixHighIcon color="primary" />
-            AI Gorsel Olusturucu
+            {t('aiGeneratorTitle')}
           </Box>
           <IconButton size="small" onClick={() => setAiOpen(false)} disabled={aiGenerating || aiUploading}>
             <CloseIcon />
@@ -506,21 +508,21 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             {/* Prompt */}
             <TextField
-              label="Ne olusturmak istiyorsunuz?"
+              label={t('promptLabel')}
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
               multiline
               rows={3}
               fullWidth
               size="small"
-              placeholder="Ornegin: Beyaz arka planda profesyonel urun fotografi, ahsap bebek oyuncagi"
+              placeholder={t('promptPlaceholder')}
               disabled={aiGenerating}
             />
 
             {/* Reference image */}
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                Referans Gorsel (istege bagli)
+                {t('referenceImageOptional')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Button
@@ -530,14 +532,14 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                   onClick={() => refImageInputRef.current?.click()}
                   disabled={aiGenerating}
                 >
-                  Dosyadan Yukle
+                  {t('uploadFromFile')}
                 </Button>
                 {/* Show current reference */}
                 {(aiRefImage || aiRefUrl) && (
                   <>
                     <img
                       src={aiRefImage ? `data:${aiRefImage.mimeType};base64,${aiRefImage.base64}` : aiRefUrl!}
-                      alt="Referans"
+                      alt={t('referenceAlt')}
                       style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4, border: '2px solid #1976d2' }}
                     />
                     <Button
@@ -556,7 +558,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
               {sortedImages.length > 0 && (
                 <Box sx={{ mt: 1 }}>
                   <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                    Veya mevcut gorsellerden sec:
+                    {t('orPickExisting')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                     {sortedImages.map((imgUrl, idx) => (
@@ -581,7 +583,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                       >
                         <img
                           src={imgUrl}
-                          alt={`Ref ${idx + 1}`}
+                          alt={t('refAlt', { index: idx + 1 })}
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       </Box>
@@ -599,7 +601,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
               startIcon={aiGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
               fullWidth
             >
-              {aiGenerating ? 'Olusturuluyor...' : 'Gorsel Olustur'}
+              {aiGenerating ? t('generating') : t('generateImage')}
             </Button>
 
             {/* Preview */}
@@ -607,7 +609,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
               <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
                 <img
                   src={`data:${aiPreview.mimeType};base64,${aiPreview.base64}`}
-                  alt="AI Generated"
+                  alt={t('aiGeneratedAlt')}
                   style={{ width: '100%', display: 'block' }}
                 />
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 1.5, bgcolor: '#f9fafb' }}>
@@ -619,7 +621,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                     startIcon={aiUploading ? <CircularProgress size={16} color="inherit" /> : <AddPhotoAlternateIcon />}
                     fullWidth
                   >
-                    {aiUploading ? 'Ekleniyor...' : 'Listeye Ekle'}
+                    {aiUploading ? t('adding') : t('addToListing')}
                   </Button>
 
                   {/* Follow-up prompt for regeneration */}
@@ -628,7 +630,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                     onChange={(e) => setAiFollowUp(e.target.value)}
                     size="small"
                     fullWidth
-                    placeholder="Degisiklik istegi yazin... (bos birakirsaniz ayni prompt kullanilir)"
+                    placeholder={t('followUpPlaceholder')}
                     disabled={aiGenerating}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
@@ -655,7 +657,7 @@ export default function ImageManager({ images, onImagesChanged, maxImages = 24, 
                       startIcon={aiGenerating ? <CircularProgress size={14} /> : undefined}
                       fullWidth
                     >
-                      {aiFollowUp.trim() ? 'Degisiklikle Olustur' : 'Ayni Promptla Yeniden'}
+                      {aiFollowUp.trim() ? t('regenerateWithChanges') : t('regenerateSamePrompt')}
                     </Button>
                   </Box>
                 </Box>

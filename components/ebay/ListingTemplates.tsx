@@ -35,6 +35,7 @@ import ApplyIcon from '@mui/icons-material/PlayArrow';
 import AddIcon from '@mui/icons-material/Add';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -130,30 +131,30 @@ function generateId(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Condition labels (for preview)
+// Condition / format label key maps
 // ---------------------------------------------------------------------------
 
-const CONDITION_LABELS: Record<string, string> = {
-  NEW: 'Yeni',
-  LIKE_NEW: 'Yeni Gibi',
-  NEW_OTHER: 'Yeni (Diger)',
-  NEW_WITH_DEFECTS: 'Yeni (Kusurlu)',
-  MANUFACTURER_REFURBISHED: 'Uretici Yenilemis',
-  CERTIFIED_REFURBISHED: 'Sertifikali Yenilemis',
-  EXCELLENT_REFURBISHED: 'Mukemmel Yenilemis',
-  VERY_GOOD_REFURBISHED: 'Cok Iyi Yenilemis',
-  GOOD_REFURBISHED: 'Iyi Yenilemis',
-  SELLER_REFURBISHED: 'Satici Yenilemis',
-  USED_EXCELLENT: 'Kullanilmis - Mukemmel',
-  USED_VERY_GOOD: 'Kullanilmis - Cok Iyi',
-  USED_GOOD: 'Kullanilmis - Iyi',
-  USED_ACCEPTABLE: 'Kullanilmis - Kabul Edilebilir',
-  FOR_PARTS_OR_NOT_WORKING: 'Parca icin / Calismayan',
+const CONDITION_KEYS: Record<string, string> = {
+  NEW: 'conditionNew',
+  LIKE_NEW: 'conditionLikeNew',
+  NEW_OTHER: 'conditionNewOther',
+  NEW_WITH_DEFECTS: 'conditionNewWithDefects',
+  MANUFACTURER_REFURBISHED: 'conditionManufacturerRefurbished',
+  CERTIFIED_REFURBISHED: 'conditionCertifiedRefurbished',
+  EXCELLENT_REFURBISHED: 'conditionExcellentRefurbished',
+  VERY_GOOD_REFURBISHED: 'conditionVeryGoodRefurbished',
+  GOOD_REFURBISHED: 'conditionGoodRefurbished',
+  SELLER_REFURBISHED: 'conditionSellerRefurbished',
+  USED_EXCELLENT: 'conditionUsedExcellent',
+  USED_VERY_GOOD: 'conditionUsedVeryGood',
+  USED_GOOD: 'conditionUsedGood',
+  USED_ACCEPTABLE: 'conditionUsedAcceptable',
+  FOR_PARTS_OR_NOT_WORKING: 'conditionForParts',
 };
 
-const FORMAT_LABELS: Record<string, string> = {
-  FIXED_PRICE: 'Sabit Fiyat',
-  AUCTION: 'Acik Artirma',
+const FORMAT_KEYS: Record<string, string> = {
+  FIXED_PRICE: 'formatFixedPrice',
+  AUCTION: 'formatAuction',
 };
 
 // ===================================================================
@@ -167,6 +168,7 @@ interface SaveTemplateDialogProps {
 }
 
 export function SaveTemplateDialog({ open, onClose, currentFields }: SaveTemplateDialogProps) {
+  const t = useTranslations('ebay.templates');
   const [name, setName] = useState('');
 
   useEffect(() => {
@@ -175,7 +177,7 @@ export function SaveTemplateDialog({ open, onClose, currentFields }: SaveTemplat
 
   const handleSave = () => {
     if (!name.trim()) {
-      toast.error('Sablon adi giriniz');
+      toast.error(t('enterTemplateName'));
       return;
     }
 
@@ -203,18 +205,18 @@ export function SaveTemplateDialog({ open, onClose, currentFields }: SaveTemplat
 
     templates.push(newTemplate);
     saveTemplates(templates);
-    toast.success('Sablon kaydedildi');
+    toast.success(t('templateSaved'));
     onClose();
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Sablon Kaydet</DialogTitle>
+      <DialogTitle>{t('saveTemplate')}</DialogTitle>
       <DialogContent>
         <TextField
           autoFocus
           fullWidth
-          label="Sablon Adi"
+          label={t('templateNameLabel')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           size="small"
@@ -224,13 +226,13 @@ export function SaveTemplateDialog({ open, onClose, currentFields }: SaveTemplat
           }}
         />
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-          Kaydedilecek alanlar: Baslik, Aciklama, Fiyat, Durum, Kategori, Ozellikler, Politikalar, Format
+          {t('savedFieldsInfo')}
         </Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Iptal</Button>
+        <Button onClick={onClose}>{t('cancelBtn')}</Button>
         <Button onClick={handleSave} variant="contained" startIcon={<SaveIcon />}>
-          Kaydet
+          {t('saveBtn')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -248,6 +250,7 @@ interface LoadTemplateDialogProps {
 }
 
 export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialogProps) {
+  const t = useTranslations('ebay.templates');
   const [templates, setTemplates] = useState<EbayListingTemplate[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -263,18 +266,18 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
     const updated = templates.filter((t) => t.id !== id);
     setTemplates(updated);
     saveTemplates(updated);
-    toast.success('Sablon silindi');
+    toast.success(t('templateDeleted'));
   };
 
   const handleRename = (id: string) => {
     if (!editName.trim()) return;
-    const updated = templates.map((t) =>
-      t.id === id ? { ...t, name: editName.trim() } : t,
+    const updated = templates.map((tpl) =>
+      tpl.id === id ? { ...tpl, name: editName.trim() } : tpl,
     );
     setTemplates(updated);
     saveTemplates(updated);
     setEditingId(null);
-    toast.success('Sablon yeniden adlandirildi');
+    toast.success(t('templateRenamed'));
   };
 
   const startEditing = (template: EbayListingTemplate) => {
@@ -286,22 +289,22 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
     const copy: EbayListingTemplate = {
       ...template,
       id: generateId(),
-      name: `${template.name} (Kopya)`,
+      name: t('copyName', { name: template.name }),
       createdAt: new Date().toISOString(),
     };
     const updated = [...templates, copy];
     setTemplates(updated);
     saveTemplates(updated);
-    toast.success('Sablon kopyalandi');
+    toast.success(t('templateDuplicated'));
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>eBay Sablonlarim</DialogTitle>
+      <DialogTitle>{t('myTemplates')}</DialogTitle>
       <DialogContent>
         {templates.length === 0 ? (
           <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-            Henuz kayitli sablon yok. Bir ilan olusturma ekraninda &ldquo;Sablon Kaydet&rdquo; butonunu kullanin.
+            {t('noTemplatesYet')}
           </Typography>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
@@ -322,10 +325,10 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         sx={{ flex: 1 }}
                       />
                       <Button size="small" onClick={() => handleRename(template.id)}>
-                        Kaydet
+                        {t('saveBtn')}
                       </Button>
                       <Button size="small" onClick={() => setEditingId(null)}>
-                        Iptal
+                        {t('cancelBtn')}
                       </Button>
                     </Box>
                   ) : (
@@ -338,7 +341,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                   <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {template.fields.title && (
                       <Chip
-                        label={`Baslik: ${template.fields.title.substring(0, 30)}${template.fields.title.length > 30 ? '...' : ''}`}
+                        label={t('titlePreview', { value: template.fields.title.substring(0, 30) + (template.fields.title.length > 30 ? '...' : '') })}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -346,7 +349,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.condition && (
                       <Chip
-                        label={CONDITION_LABELS[template.fields.condition] || template.fields.condition}
+                        label={CONDITION_KEYS[template.fields.condition] ? t(CONDITION_KEYS[template.fields.condition]) : template.fields.condition}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -354,7 +357,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.price != null && (
                       <Chip
-                        label={`Fiyat: $${template.fields.price.toFixed(2)}`}
+                        label={t('pricePreview', { value: template.fields.price.toFixed(2) })}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -362,7 +365,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.categoryName && (
                       <Chip
-                        label={`Kategori: ${template.fields.categoryName.substring(0, 25)}${template.fields.categoryName.length > 25 ? '...' : ''}`}
+                        label={t('categoryPreview', { value: template.fields.categoryName.substring(0, 25) + (template.fields.categoryName.length > 25 ? '...' : '') })}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -370,7 +373,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.aspects && Object.keys(template.fields.aspects).length > 0 && (
                       <Chip
-                        label={`${Object.keys(template.fields.aspects).length} ozellik`}
+                        label={t('aspectsCount', { count: Object.keys(template.fields.aspects).length })}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -378,7 +381,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.format && (
                       <Chip
-                        label={FORMAT_LABELS[template.fields.format] || template.fields.format}
+                        label={FORMAT_KEYS[template.fields.format] ? t(FORMAT_KEYS[template.fields.format]) : template.fields.format}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -386,7 +389,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.listingPolicies && (
                       <Chip
-                        label="Politikalar var"
+                        label={t('hasPolicies')}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -394,7 +397,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.description && (
                       <Chip
-                        label="Aciklama var"
+                        label={t('hasDescription')}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -417,19 +420,19 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     }}
                     sx={{ textTransform: 'none', fontSize: '0.75rem' }}
                   >
-                    Uygula
+                    {t('apply')}
                   </Button>
-                  <Tooltip title="Kopyala">
+                  <Tooltip title={t('duplicateTooltip')}>
                     <IconButton size="small" onClick={() => handleDuplicate(template)}>
                       <ContentCopyIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Yeniden Adlandir">
+                  <Tooltip title={t('renameTooltip')}>
                     <IconButton size="small" onClick={() => startEditing(template)}>
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Sablonu Sil">
+                  <Tooltip title={t('deleteTooltip')}>
                     <IconButton size="small" color="error" onClick={() => handleDelete(template.id)}>
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -441,7 +444,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Kapat</Button>
+        <Button onClick={onClose}>{t('close')}</Button>
       </DialogActions>
     </Dialog>
   );
@@ -458,6 +461,7 @@ interface AspectProfileMenuProps {
 }
 
 export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }: AspectProfileMenuProps) {
+  const t = useTranslations('ebay.templates');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [profiles, setProfiles] = useState<AspectProfile[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -478,7 +482,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
   // Apply: replace aspects entirely
   const handleApply = (profile: AspectProfile) => {
     onApplyAspects({ ...profile.aspects });
-    toast.success(`"${profile.name}" ozellikleri uygulandi`);
+    toast.success(t('aspectsApplied', { name: profile.name }));
     handleClose();
   };
 
@@ -496,19 +500,19 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
       }
     }
     onApplyAspects(merged);
-    toast.success('Ozellikler birlestirildi');
+    toast.success(t('aspectsMerged'));
     handleClose();
   };
 
   // Save current aspects as a profile
   const handleSaveProfile = () => {
     if (!newProfileName.trim()) {
-      toast.error('Profil adi giriniz');
+      toast.error(t('enterProfileName'));
       return;
     }
     const aspectKeys = Object.keys(currentAspects);
     if (aspectKeys.length === 0) {
-      toast.error('Kaydedilecek ozellik yok');
+      toast.error(t('noAspectsToSave'));
       return;
     }
 
@@ -523,7 +527,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
 
     allProfiles.push(newProfile);
     saveAspectProfiles(allProfiles);
-    toast.success('Ozellik profili kaydedildi');
+    toast.success(t('profileSaved'));
     setSaveDialogOpen(false);
     setNewProfileName('');
   };
@@ -539,7 +543,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
         onClick={handleOpenMenu}
         sx={{ textTransform: 'none', fontSize: '0.75rem' }}
       >
-        Ozellik Profili
+        {t('aspectProfileBtn')}
       </Button>
 
       <Menu
@@ -559,7 +563,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
           <ListItemIcon>
             <AddIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Yeni Profil Olustur</ListItemText>
+          <ListItemText>{t('createNewProfile')}</ListItemText>
         </MenuItem>
 
         {/* Manage profiles */}
@@ -572,7 +576,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
           <ListItemIcon>
             <FolderOpenIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Profilleri Yonet</ListItemText>
+          <ListItemText>{t('manageProfiles')}</ListItemText>
         </MenuItem>
 
         {profiles.length > 0 && <Divider />}
@@ -602,7 +606,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
               </Box>
               {profile.categoryId && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 0.3 }}>
-                  Kategori: {profile.categoryId}
+                  {t('categoryLabel', { id: profile.categoryId })}
                 </Typography>
               )}
               <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, width: '100%' }}>
@@ -615,7 +619,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
                   }}
                   sx={{ textTransform: 'none', fontSize: '0.65rem', py: 0, minHeight: 24, flex: 1 }}
                 >
-                  Uygula
+                  {t('apply')}
                 </Button>
                 <Button
                   size="small"
@@ -626,7 +630,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
                   }}
                   sx={{ textTransform: 'none', fontSize: '0.65rem', py: 0, minHeight: 24, flex: 1 }}
                 >
-                  Birlestir
+                  {t('mergeBtn')}
                 </Button>
               </Box>
             </MenuItem>
@@ -636,12 +640,12 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
 
       {/* Save Aspect Profile Dialog */}
       <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Ozellik Profili Kaydet</DialogTitle>
+        <DialogTitle>{t('saveAspectProfile')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             fullWidth
-            label="Profil Adi"
+            label={t('profileNameLabel')}
             value={newProfileName}
             onChange={(e) => setNewProfileName(e.target.value)}
             size="small"
@@ -662,19 +666,19 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
           </Box>
           {aspectCount === 0 && (
             <Typography variant="caption" color="error" sx={{ mt: 1 }}>
-              Kaydedilecek ozellik yok
+              {t('noAspectsWarning')}
             </Typography>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSaveDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setSaveDialogOpen(false)}>{t('cancelBtn')}</Button>
           <Button
             onClick={handleSaveProfile}
             variant="contained"
             disabled={aspectCount === 0}
             startIcon={<SaveIcon />}
           >
-            Kaydet
+            {t('saveBtn')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -698,6 +702,7 @@ interface ManageAspectProfilesDialogProps {
 }
 
 function ManageAspectProfilesDialog({ open, onClose }: ManageAspectProfilesDialogProps) {
+  const t = useTranslations('ebay.templates');
   const [profiles, setProfiles] = useState<AspectProfile[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -713,7 +718,7 @@ function ManageAspectProfilesDialog({ open, onClose }: ManageAspectProfilesDialo
     const updated = profiles.filter((p) => p.id !== id);
     setProfiles(updated);
     saveAspectProfiles(updated);
-    toast.success('Ozellik profili silindi');
+    toast.success(t('profileDeleted'));
   };
 
   const handleRename = (id: string) => {
@@ -724,16 +729,16 @@ function ManageAspectProfilesDialog({ open, onClose }: ManageAspectProfilesDialo
     setProfiles(updated);
     saveAspectProfiles(updated);
     setEditingId(null);
-    toast.success('Profil yeniden adlandirildi');
+    toast.success(t('profileRenamed'));
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Ozellik Profillerini Yonet</DialogTitle>
+      <DialogTitle>{t('manageAspectProfiles')}</DialogTitle>
       <DialogContent>
         {profiles.length === 0 ? (
           <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-            Henuz kayitli ozellik profili yok.
+            {t('noProfilesYet')}
           </Typography>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
@@ -754,10 +759,10 @@ function ManageAspectProfilesDialog({ open, onClose }: ManageAspectProfilesDialo
                         sx={{ flex: 1 }}
                       />
                       <Button size="small" onClick={() => handleRename(profile.id)}>
-                        Kaydet
+                        {t('saveBtn')}
                       </Button>
                       <Button size="small" onClick={() => setEditingId(null)}>
-                        Iptal
+                        {t('cancelBtn')}
                       </Button>
                     </Box>
                   ) : (
@@ -778,12 +783,12 @@ function ManageAspectProfilesDialog({ open, onClose }: ManageAspectProfilesDialo
                   </Box>
 
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                    {new Date(profile.createdAt).toLocaleDateString('tr-TR')} &middot; {Object.keys(profile.aspects).length} ozellik
-                    {profile.categoryId && ` &middot; Kategori: ${profile.categoryId}`}
+                    {new Date(profile.createdAt).toLocaleDateString('tr-TR')} &middot; {t('aspectCount', { count: Object.keys(profile.aspects).length })}
+                    {profile.categoryId && ` \u00B7 ${t('categoryLabel', { id: profile.categoryId })}`}
                   </Typography>
                 </CardContent>
                 <CardActions sx={{ pt: 0, px: 2, pb: 1 }}>
-                  <Tooltip title="Yeniden Adlandir">
+                  <Tooltip title={t('renameTooltip')}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -794,7 +799,7 @@ function ManageAspectProfilesDialog({ open, onClose }: ManageAspectProfilesDialo
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Profili Sil">
+                  <Tooltip title={t('deleteProfileTooltip')}>
                     <IconButton size="small" color="error" onClick={() => handleDelete(profile.id)}>
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -806,7 +811,7 @@ function ManageAspectProfilesDialog({ open, onClose }: ManageAspectProfilesDialo
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Kapat</Button>
+        <Button onClick={onClose}>{t('close')}</Button>
       </DialogActions>
     </Dialog>
   );
@@ -822,6 +827,7 @@ interface ListingTemplatesProps {
 }
 
 export default function ListingTemplates({ onApply, listings }: ListingTemplatesProps) {
+  const t = useTranslations('ebay.templates');
   const [templates, setTemplates] = useState<EbayListingTemplate[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
@@ -852,7 +858,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
           onClick={() => setLoadDialogOpen(true)}
           sx={{ textTransform: 'none' }}
         >
-          Sablonlarim ({templates.length})
+          {t('myTemplatesBtn', { count: templates.length })}
         </Button>
       </Box>
 
@@ -860,7 +866,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
       {listings.length > 0 && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Mevcut Ilanlardan Sablon Olustur
+            {t('createFromListings')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 300, overflow: 'auto' }}>
             {listings.slice(0, 10).map((listing) => (
@@ -878,7 +884,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                       <Box sx={{ display: 'flex', gap: 0.5, mt: 0.3 }}>
                         {listing.condition && (
                           <Chip
-                            label={CONDITION_LABELS[listing.condition] || listing.condition}
+                            label={CONDITION_KEYS[listing.condition] ? t(CONDITION_KEYS[listing.condition]) : listing.condition}
                             size="small"
                             sx={{ fontSize: '0.6rem', height: 18 }}
                           />
@@ -899,7 +905,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                         )}
                       </Box>
                     </Box>
-                    <Tooltip title="Sablon Olarak Kaydet">
+                    <Tooltip title={t('saveAsTemplate')}>
                       <IconButton
                         size="small"
                         onClick={() => handleCreateFromListing(listing)}
@@ -919,7 +925,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
       {templates.length > 0 && (
         <Box>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Kayitli Sablonlar
+            {t('savedTemplates')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {templates.map((template) => (
@@ -931,7 +937,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                   <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {template.fields.title && (
                       <Chip
-                        label={`Baslik: ${template.fields.title.substring(0, 25)}...`}
+                        label={t('titlePreview', { value: template.fields.title.substring(0, 25) + '...' })}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.6rem', height: 18 }}
@@ -939,7 +945,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                     )}
                     {template.fields.condition && (
                       <Chip
-                        label={CONDITION_LABELS[template.fields.condition] || template.fields.condition}
+                        label={CONDITION_KEYS[template.fields.condition] ? t(CONDITION_KEYS[template.fields.condition]) : template.fields.condition}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.6rem', height: 18 }}
@@ -966,17 +972,17 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                     onClick={() => onApply(template)}
                     sx={{ textTransform: 'none', fontSize: '0.75rem' }}
                   >
-                    Uygula
+                    {t('apply')}
                   </Button>
-                  <Tooltip title="Sablonu Sil">
+                  <Tooltip title={t('deleteTooltip')}>
                     <IconButton
                       size="small"
                       color="error"
                       onClick={() => {
-                        const updated = templates.filter((t) => t.id !== template.id);
+                        const updated = templates.filter((tpl) => tpl.id !== template.id);
                         setTemplates(updated);
                         saveTemplates(updated);
-                        toast.success('Sablon silindi');
+                        toast.success(t('templateDeleted'));
                       }}
                     >
                       <DeleteIcon fontSize="small" />

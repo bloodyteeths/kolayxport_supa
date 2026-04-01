@@ -42,6 +42,7 @@ import {
   PlayArrow as PlayArrowIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -88,16 +89,16 @@ interface SmartPricingProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-const CONDITION_LABELS: Record<PricingRule['condition'], string> = {
-  price_too_high: 'Fiyat cok yuksek',
-  price_too_low: 'Fiyat cok dusuk',
-  match_competitor: 'Rakibi esle',
+const CONDITION_KEYS: Record<PricingRule['condition'], string> = {
+  price_too_high: 'conditionPriceTooHigh',
+  price_too_low: 'conditionPriceTooLow',
+  match_competitor: 'conditionMatchCompetitor',
 };
 
-const CONDITION_DESCRIPTIONS: Record<PricingRule['condition'], string> = {
-  price_too_high: 'Piyasa ortalamasinin ustunde olan urunlerin fiyatini dusur',
-  price_too_low: 'Piyasa ortalamasinin altinda olan urunlerin fiyatini artir',
-  match_competitor: 'En dusuk rakip fiyatina yakin fiyat belirle',
+const CONDITION_DESC_KEYS: Record<PricingRule['condition'], string> = {
+  price_too_high: 'conditionDescPriceTooHigh',
+  price_too_low: 'conditionDescPriceTooLow',
+  match_competitor: 'conditionDescMatchCompetitor',
 };
 
 const LS_RULES_KEY = 'ebay_pricing_rules';
@@ -111,6 +112,8 @@ function generateId(): string {
 // ---------------------------------------------------------------------------
 
 export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartPricingProps) {
+  const t = useTranslations('ebay.smartPricing');
+
   // --- Pricing rules state ---
   const [rules, setRules] = useState<PricingRule[]>([]);
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null);
@@ -181,7 +184,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
   // --- Fetch market data ---
   const fetchMarketData = async () => {
     if (listings.length === 0) {
-      toast.error('Arastirma yapilacak ilan yok');
+      toast.error(t('noListingsToResearch'));
       return;
     }
 
@@ -232,9 +235,9 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
     setLoadingMarket(false);
 
     if (results.length === 0) {
-      toast.error('Piyasa verisi bulunamadi');
+      toast.error(t('noMarketDataFound'));
     } else {
-      toast.success(`${results.length} urun icin piyasa verisi yuklendi`);
+      toast.success(t('marketDataLoaded', { count: results.length }));
     }
   };
 
@@ -242,13 +245,13 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
   const handleSimulate = () => {
     const enabledRules = rules.filter((r) => r.enabled);
     if (enabledRules.length === 0) {
-      toast.error('Aktif kural yok');
+      toast.error(t('noActiveRules'));
       setSimResults([]);
       return;
     }
 
     if (marketData.length === 0 && listings.length === 0) {
-      toast.error('Simulasyon icin ilan veya piyasa verisi gerekli');
+      toast.error(t('simulationNeedsData'));
       setSimResults([]);
       return;
     }
@@ -310,7 +313,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
           title: title.length > 50 ? title.slice(0, 50) + '...' : title,
           oldPrice: `$${currentPrice.toFixed(2)}`,
           newPrice: `$${newPrice.toFixed(2)}`,
-          rule: rule.name || CONDITION_LABELS[rule.condition],
+          rule: rule.name || t(CONDITION_KEYS[rule.condition]),
           diff: `${diff > 0 ? '+' : ''}$${diff.toFixed(2)} (${diff > 0 ? '+' : ''}${diffPercent}%)`,
         });
 
@@ -365,9 +368,9 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
     setApplyProgress(0);
 
     if (failed === 0) {
-      toast.success(`${succeeded} urunun fiyati guncellendi`);
+      toast.success(t('priceUpdateSuccess', { count: succeeded }));
     } else {
-      toast.error(`Fiyat guncelleme: ${succeeded} basarili, ${failed} basarisiz`);
+      toast.error(t('priceUpdatePartial', { success: succeeded, failed }));
     }
 
     setSimResults(null);
@@ -383,14 +386,14 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <SearchIcon color="primary" fontSize="small" />
         <Typography variant="subtitle1" fontWeight={600}>
-          Piyasa Arastirmasi
+          {t('marketResearch')}
         </Typography>
         {marketData.length > 0 && (
-          <Chip label={`${marketData.length} urun`} size="small" color="info" />
+          <Chip label={t('productsLabel', { count: marketData.length })} size="small" color="info" />
         )}
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        eBay piyasa verilerini cekerek akilli fiyatlandirma kurallari tanimlayin.
+        {t('marketResearchDesc')}
       </Typography>
 
       <Button
@@ -401,7 +404,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
         disabled={loadingMarket || listings.length === 0}
         sx={{ mb: 2 }}
       >
-        {loadingMarket ? 'Arastiriliyor...' : 'Piyasa Verisi Cek'}
+        {loadingMarket ? t('researching') : t('fetchMarketData')}
       </Button>
 
       {/* Market data results */}
@@ -410,12 +413,12 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell>Urun</TableCell>
-                <TableCell align="right">Fiyatiniz</TableCell>
-                <TableCell align="right">Piyasa Ort.</TableCell>
-                <TableCell align="right">En Dusuk</TableCell>
-                <TableCell align="right">En Yuksek</TableCell>
-                <TableCell align="right">Rakip</TableCell>
+                <TableCell>{t('productCol')}</TableCell>
+                <TableCell align="right">{t('yourPriceCol')}</TableCell>
+                <TableCell align="right">{t('marketAvgCol')}</TableCell>
+                <TableCell align="right">{t('lowestCol')}</TableCell>
+                <TableCell align="right">{t('highestCol')}</TableCell>
+                <TableCell align="right">{t('competitorCol')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -455,15 +458,15 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
       {/* PRICING RULES SECTION                                         */}
       {/* ============================================================= */}
       <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
-        Fiyat Kurallari
+        {t('pricingRules')}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Otomatik fiyat ayarlama kurallari tanimlayin. Once simule edin, sonra uygulayin.
+        {t('pricingRulesDesc')}
       </Typography>
 
       {rules.length === 0 && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Henuz kural eklenmedi. &quot;Fiyat Kurali Ekle&quot; ile baslayin.
+          {t('noRulesYet')}
         </Alert>
       )}
 
@@ -473,11 +476,11 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
             <CardContent sx={{ pb: '8px !important' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                 <Typography variant="subtitle2" sx={{ flex: 1, minWidth: 120 }}>
-                  {rule.name || 'Isimsiz Kural'}
+                  {rule.name || t('unnamedRule')}
                 </Typography>
                 <Chip
                   size="small"
-                  label={CONDITION_LABELS[rule.condition]}
+                  label={t(CONDITION_KEYS[rule.condition])}
                   color={
                     rule.condition === 'price_too_high'
                       ? 'warning'
@@ -493,21 +496,21 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                   variant="outlined"
                 />
                 <Typography variant="caption" color="text.secondary">
-                  Esik: %{rule.threshold_percent}
+                  {t('thresholdLabel', { percent: rule.threshold_percent })}
                 </Typography>
                 {rule.price_floor != null && (
                   <Typography variant="caption" color="text.secondary">
-                    Taban: ${rule.price_floor}
+                    {t('floorLabel', { value: rule.price_floor })}
                   </Typography>
                 )}
                 {rule.price_ceiling != null && (
                   <Typography variant="caption" color="text.secondary">
-                    Tavan: ${rule.price_ceiling}
+                    {t('ceilingLabel', { value: rule.price_ceiling })}
                   </Typography>
                 )}
               </Box>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                {CONDITION_DESCRIPTIONS[rule.condition]}
+                {t(CONDITION_DESC_KEYS[rule.condition])}
               </Typography>
             </CardContent>
             <CardActions sx={{ pt: 0 }}>
@@ -526,7 +529,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
 
       <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
         <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={handleOpenAddRule}>
-          Fiyat Kurali Ekle
+          {t('addPricingRule')}
         </Button>
         <Button
           variant="contained"
@@ -535,7 +538,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
           disabled={rules.filter((r) => r.enabled).length === 0 || simulating}
           startIcon={simulating ? <CircularProgress size={16} /> : <PlayArrowIcon />}
         >
-          Simule Et
+          {t('simulate')}
         </Button>
       </Box>
 
@@ -543,11 +546,11 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
       {simResults !== null && (
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Simulasyon Sonuclari
+            {t('simulationResults')}
           </Typography>
           {simResults.length === 0 ? (
             <Alert severity="info">
-              Hicbir urun mevcut kurallara uymadi. Piyasa verisi cekin veya kural esiklerini ayarlayin.
+              {t('noMatchAlert')}
             </Alert>
           ) : (
             <>
@@ -555,11 +558,11 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Urun</TableCell>
-                      <TableCell align="right">Mevcut Fiyat</TableCell>
-                      <TableCell align="right">Yeni Fiyat</TableCell>
-                      <TableCell align="right">Fark</TableCell>
-                      <TableCell>Kural</TableCell>
+                      <TableCell>{t('productCol')}</TableCell>
+                      <TableCell align="right">{t('currentPriceCol')}</TableCell>
+                      <TableCell align="right">{t('newPriceCol')}</TableCell>
+                      <TableCell align="right">{t('differenceCol')}</TableCell>
+                      <TableCell>{t('ruleCol')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -592,7 +595,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                 <Box sx={{ mb: 2 }}>
                   <LinearProgress variant="determinate" value={applyProgress} />
                   <Typography variant="caption" color="text.secondary">
-                    %{Math.round(applyProgress)} tamamlandi
+                    {t('progressPercent', { percent: Math.round(applyProgress) })}
                   </Typography>
                 </Box>
               )}
@@ -606,7 +609,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                   disabled={applying}
                   startIcon={applying ? <CircularProgress size={16} /> : <PlayArrowIcon />}
                 >
-                  {applying ? 'Uygulaniyor...' : `${simResults.length} Fiyat Degisikligi Uygula`}
+                  {applying ? t('applying') : t('applyChanges', { count: simResults.length })}
                 </Button>
                 <Button
                   variant="outlined"
@@ -614,7 +617,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                   onClick={() => setSimResults(null)}
                   disabled={applying}
                 >
-                  Temizle
+                  {t('clear')}
                 </Button>
               </Box>
             </>
@@ -627,13 +630,13 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
       {/* ================================================================= */}
       <Dialog open={ruleDialogOpen} onClose={() => setRuleDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          {editingRule && rules.find((r) => r.id === editingRule.id) ? 'Kurali Duzenle' : 'Fiyat Kurali Ekle'}
+          {editingRule && rules.find((r) => r.id === editingRule.id) ? t('editRule') : t('addRule')}
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
           {editingRule && (
             <>
               <TextField
-                label="Kural Adi"
+                label={t('ruleNameLabel')}
                 size="small"
                 fullWidth
                 value={editingRule.name}
@@ -641,9 +644,9 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
               />
 
               <FormControl size="small" fullWidth>
-                <InputLabel>Kosul</InputLabel>
+                <InputLabel>{t('conditionLabel')}</InputLabel>
                 <Select
-                  label="Kosul"
+                  label={t('conditionLabel')}
                   value={editingRule.condition}
                   onChange={(e) =>
                     setEditingRule({
@@ -652,14 +655,14 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                     })
                   }
                 >
-                  <MenuItem value="price_too_high">Fiyat cok yuksek (piyasa ust.)</MenuItem>
-                  <MenuItem value="price_too_low">Fiyat cok dusuk (piyasa alt.)</MenuItem>
-                  <MenuItem value="match_competitor">Rakibi esle (en dusuk fiyat)</MenuItem>
+                  <MenuItem value="price_too_high">{t('conditionPriceTooHigh')}</MenuItem>
+                  <MenuItem value="price_too_low">{t('conditionPriceTooLow')}</MenuItem>
+                  <MenuItem value="match_competitor">{t('conditionMatchCompetitor')}</MenuItem>
                 </Select>
               </FormControl>
 
               <TextField
-                label="Esik Yuzdesi (%)"
+                label={t('thresholdPercentLabel')}
                 type="number"
                 size="small"
                 value={editingRule.threshold_percent}
@@ -674,14 +677,14 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                 InputProps={{
                   endAdornment: <InputAdornment position="end">%</InputAdornment>,
                 }}
-                helperText="Piyasa fiyatindan ne kadar sapma olursa kural tetiklenir"
+                helperText={t('thresholdHelperText')}
               />
 
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <FormControl size="small" sx={{ flex: 1 }}>
-                  <InputLabel>Ayarlama</InputLabel>
+                  <InputLabel>{t('adjustmentLabel')}</InputLabel>
                   <Select
-                    label="Ayarlama"
+                    label={t('adjustmentLabel')}
                     value={editingRule.adjustment_type}
                     onChange={(e) =>
                       setEditingRule({
@@ -690,12 +693,12 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                       })
                     }
                   >
-                    <MenuItem value="decrease">Dusur</MenuItem>
-                    <MenuItem value="increase">Artir</MenuItem>
+                    <MenuItem value="decrease">{t('decrease')}</MenuItem>
+                    <MenuItem value="increase">{t('increase')}</MenuItem>
                   </Select>
                 </FormControl>
                 <TextField
-                  label="Yuzde (%)"
+                  label={t('percentLabel')}
                   type="number"
                   size="small"
                   value={editingRule.adjustment_percent}
@@ -715,7 +718,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
 
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <TextField
-                  label="Taban Fiyat ($)"
+                  label={t('priceFloorLabel')}
                   type="number"
                   size="small"
                   value={editingRule.price_floor ?? ''}
@@ -727,11 +730,11 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                   }
                   sx={{ flex: 1 }}
                   inputProps={{ min: 0, step: 0.01 }}
-                  placeholder="Opsiyonel"
-                  helperText="Fiyat bu degerin altina dusmez"
+                  placeholder={t('optional')}
+                  helperText={t('floorHelperText')}
                 />
                 <TextField
-                  label="Tavan Fiyat ($)"
+                  label={t('priceCeilingLabel')}
                   type="number"
                   size="small"
                   value={editingRule.price_ceiling ?? ''}
@@ -743,17 +746,17 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                   }
                   sx={{ flex: 1 }}
                   inputProps={{ min: 0, step: 0.01 }}
-                  placeholder="Opsiyonel"
-                  helperText="Fiyat bu degerin ustune cikmaz"
+                  placeholder={t('optional')}
+                  helperText={t('ceilingHelperText')}
                 />
               </Box>
             </>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRuleDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setRuleDialogOpen(false)}>{t('cancelBtn')}</Button>
           <Button variant="contained" onClick={handleSaveRule} disabled={!editingRule?.name}>
-            Kaydet
+            {t('saveBtn')}
           </Button>
         </DialogActions>
       </Dialog>

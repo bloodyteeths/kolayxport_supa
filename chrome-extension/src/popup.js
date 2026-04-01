@@ -1,418 +1,456 @@
 /**
- * Kolayxport Etsy Order Sync - Popup Script
- * Manages the extension popup UI and user interactions
+ * KolayXport Extension Popup v7.0
+ * Marketplace toggle (Etsy | eBay) + 4 tabs: Research, Tracker, Orders, Settings
  */
 
-// DOM Elements
-const elements = {
-  authStatus: document.getElementById('authStatus'),
-  authMessage: document.getElementById('authMessage'),
-  totalSynced: document.getElementById('totalSynced'),
-  pendingSync: document.getElementById('pendingSync'),
-  lastSync: document.getElementById('lastSync'),
-  syncNowBtn: document.getElementById('syncNowBtn'),
-  openEtsyBtn: document.getElementById('openEtsyBtn'),
-  fullImportBtn: document.getElementById('fullImportBtn'),
-  refreshAuthBtn: document.getElementById('refreshAuthBtn')
-};
+const $ = (id) => document.getElementById(id);
 
-// State
 let isAuthenticated = false;
 let currentTab = null;
-let isOnEtsyOrders = false;
+let activeMarketplace = 'etsy';
 
-// Initialize popup
+// ---------------------------------------------------------------------------
+// Marketplace Toggle
+// ---------------------------------------------------------------------------
+document.querySelectorAll('.mp-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.mp-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    activeMarketplace = chip.dataset.mp;
+
+    const etsyPanel = $('etsy-research-panel');
+    const ebayPanel = $('ebay-research-panel');
+    if (etsyPanel && ebayPanel) {
+      if (activeMarketplace === 'ebay') {
+        etsyPanel.classList.add('hidden');
+        ebayPanel.classList.remove('hidden');
+        checkEbayCurrentPage();
+      } else {
+        etsyPanel.classList.remove('hidden');
+        ebayPanel.classList.add('hidden');
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tab Navigation
+// ---------------------------------------------------------------------------
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Initialize
+// ---------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', async () => {
   await checkAuthStatus();
   await checkCurrentTab();
   await loadSyncStats();
+  await loadSettings();
   setupEventListeners();
+  autoDetectMarketplace();
 });
 
-// Check authentication status
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
 async function checkAuthStatus() {
   try {
-    console.log('Checking auth status from popup...');
     const response = await chrome.runtime.sendMessage({ action: 'getAuthStatus' });
-    console.log('Auth status response:', response);
-    
     isAuthenticated = response.authenticated;
-    
-    updateAuthUI(isAuthenticated, response);
+
+    const badge = $('authBadge');
+    if (badge) badge.className = 'auth-badge ' + (isAuthenticated ? 'connected' : 'disconnected');
+
+    const status = $('authStatus');
+    if (status) {
+      status.textContent = isAuthenticated ? 'Bağlı' : 'Bağlantı Yok';
+      status.className = 'status-badge ' + (isAuthenticated ? 'connected' : 'disconnected');
+    }
+
+    const settingsStatus = $('settingsAuthStatus');
+    if (settingsStatus) {
+      settingsStatus.textContent = isAuthenticated ? 'Bağlı' : 'Bağlantı Yok';
+      settingsStatus.className = 'status-badge ' + (isAuthenticated ? 'connected' : 'disconnected');
+    }
+
+    const planEl = $('settingsPlan');
+    if (planEl) planEl.textContent = isAuthenticated ? 'Starter' : 'Ücretsiz';
+
+    const msg = $('authMessage');
+    if (msg) msg.textContent = isAuthenticated
+      ? 'KolayXport hesabınıza bağlısınız.'
+      : 'Lütfen kolayxport.com\'a giriş yapın.';
+
+    updateButtonStates();
   } catch (error) {
-    console.error('Failed to check auth status:', error);
-    updateAuthUI(false, { error: error.message });
+    console.error('Auth check failed:', error);
   }
 }
 
-// Check if current tab is Etsy orders page
 async function checkCurrentTab() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     currentTab = tab;
-    isOnEtsyOrders = tab.url && tab.url.includes('etsy.com/your/orders');
-    
-    // Enable/disable buttons based on context
     updateButtonStates();
   } catch (error) {
-    console.error('Failed to check current tab:', error);
+    console.error('Tab check failed:', error);
   }
 }
 
-// Load sync statistics
+function updateButtonStates() {
+  const isOnOrders = currentTab?.url?.includes('etsy.com/your/orders') ||
+    currentTab?.url?.includes('shop-manager');
+
+  const syncBtn = $('syncNowBtn');
+  const importBtn = $('fullImportBtn');
+  if (syncBtn) syncBtn.disabled = !isAuthenticated || !isOnOrders;
+  if (importBtn) importBtn.disabled = !isAuthenticated || !isOnOrders;
+}
+
+// ---------------------------------------------------------------------------
+// Sync Stats (preserved from v5)
+// ---------------------------------------------------------------------------
 async function loadSyncStats() {
   try {
-    // Get stats from storage
     const result = await chrome.storage.local.get(['syncStats', 'kx_synced_orders']);
     const stats = result.syncStats || {};
     const syncedOrders = result.kx_synced_orders || [];
-    
-    // Update UI
-    elements.totalSynced.textContent = stats.totalSynced || syncedOrders.length;
-    
-    // Fix date formatting
-    if (stats.lastSyncTime) {
-      const lastSyncDate = new Date(stats.lastSyncTime);
-      if (!isNaN(lastSyncDate.getTime())) {
-        elements.lastSync.textContent = formatRelativeTime(lastSyncDate);
-      } else {
-        elements.lastSync.textContent = 'Invalid date';
-      }
-    } else {
-      elements.lastSync.textContent = 'Hiçbir zaman';
+
+    const totalEl = $('totalSynced');
+    if (totalEl) totalEl.textContent = stats.totalSynced || syncedOrders.length;
+
+    const lastEl = $('lastSync');
+    if (lastEl && stats.lastSyncTime) {
+      const d = new Date(stats.lastSyncTime);
+      if (!isNaN(d.getTime())) lastEl.textContent = formatRelativeTime(d);
     }
-    
-    // Get pending count from content script if on Etsy page
-    if (isOnEtsyOrders && currentTab) {
+
+    if (currentTab?.id) {
       try {
         const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getStatus' });
-        if (response && typeof response.pendingCount === 'number') {
-          elements.pendingSync.textContent = response.pendingCount;
-        } else {
-          elements.pendingSync.textContent = '0';
+        const pendingEl = $('pendingSync');
+        if (pendingEl && response?.pendingCount !== undefined) {
+          pendingEl.textContent = response.pendingCount;
         }
-      } catch (error) {
-        console.log('Could not get pending count from content script:', error.message);
-        elements.pendingSync.textContent = '0';
-      }
-    } else {
-      elements.pendingSync.textContent = '0';
+      } catch { /* content script may not be loaded */ }
     }
   } catch (error) {
-    console.error('Failed to load sync stats:', error);
+    console.error('Failed to load stats:', error);
   }
 }
 
-// Update authentication UI
-function updateAuthUI(authenticated, response = {}) {
-  if (authenticated) {
-    elements.authStatus.textContent = 'Bağlandı';
-    elements.authStatus.className = 'status-badge connected';
-    elements.authMessage.textContent = 'Kolayxport hesabınız bağlandı';
-  } else {
-    elements.authStatus.textContent = 'Bağlantı Kesildi';
-    elements.authStatus.className = 'status-badge disconnected';
-    
-    if (response.error) {
-      elements.authMessage.textContent = `Hata: ${response.error}`;
-    } else {
-      elements.authMessage.textContent = 'Siparişleri senkronlamak için Kolayxport\'a giriş yapın';
-    }
-  }
-  
-  // Add debug info for development
-  if (response.debug) {
-    console.log('Auth debug info:', response.debug);
-  }
-  
-  updateButtonStates();
+function formatRelativeTime(date) {
+  const diff = Date.now() - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Az önce';
+  if (mins < 60) return `${mins}dk önce`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}sa önce`;
+  return `${Math.floor(hours / 24)}g önce`;
 }
 
-// Update button states based on context
-function updateButtonStates() {
-  // Sync Now button - enabled if authenticated and on Etsy orders page
-  elements.syncNowBtn.disabled = !isAuthenticated || !isOnEtsyOrders;
-  
-  // Full Import button - same requirements as Sync Now
-  elements.fullImportBtn.disabled = !isAuthenticated || !isOnEtsyOrders;
-  
-  // Update button tooltips
-  if (!isAuthenticated) {
-    elements.syncNowBtn.title = 'Önce Kolayxport\'a giriş yapın';
-    elements.fullImportBtn.title = 'Önce Kolayxport\'a giriş yapın';
-  } else if (!isOnEtsyOrders) {
-    elements.syncNowBtn.title = 'Etsy siparişler sayfanıza gidin';
-    elements.fullImportBtn.title = 'Etsy siparişler sayfanıza gidin';
-  } else {
-    elements.syncNowBtn.title = 'Mevcut sayfadaki görünür siparişleri senkronla';
-    elements.fullImportBtn.title = 'Tüm geçmiş siparişleri içe aktar (zaman alabilir)';
-  }
-}
-
-// Setup event listeners
+// ---------------------------------------------------------------------------
+// Event Listeners
+// ---------------------------------------------------------------------------
 function setupEventListeners() {
-  // Refresh Auth button
-  elements.refreshAuthBtn.addEventListener('click', async () => {
-    elements.refreshAuthBtn.textContent = '⟳ Kontrol ediliyor...';
-    elements.refreshAuthBtn.disabled = true;
-    
-    await checkAuthStatus();
-    
-    elements.refreshAuthBtn.textContent = '🔄 Yenile';
-    elements.refreshAuthBtn.disabled = false;
+  // Orders tab
+  $('syncNowBtn')?.addEventListener('click', handleSyncNow);
+  $('openEtsyBtn')?.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'https://www.etsy.com/your/orders/sold' });
   });
-  
-  // Add logs viewer button
-  const logsBtn = document.createElement('button');
-  logsBtn.textContent = '📋 Logları Görüntüle';
-  logsBtn.className = 'btn-secondary';
-  logsBtn.addEventListener('click', showLogs);
-  document.querySelector('.actions').appendChild(logsBtn);
-  
-  // Sync Now button
-  elements.syncNowBtn.addEventListener('click', async () => {
-    if (!currentTab || !isOnEtsyOrders) return;
-    
-    try {
-      elements.syncNowBtn.disabled = true;
-      elements.syncNowBtn.innerHTML = '<span class="loading"></span> Senkronlanıyor...';
-      
-      console.log('🎯 Triggering sync from popup...');
-      console.log('Current tab URL:', currentTab.url);
-      console.log('Tab ID:', currentTab.id);
-      
-      // First check if content script is loaded
-      let response;
+  $('fullImportBtn')?.addEventListener('click', handleFullImport);
+  $('refreshAuthBtn')?.addEventListener('click', async () => {
+    const btn = $('refreshAuthBtn');
+    btn.disabled = true;
+    await checkAuthStatus();
+    btn.disabled = false;
+  });
+
+  // Research tab (Etsy)
+  $('researchBtn')?.addEventListener('click', handleResearch);
+  $('researchQuery')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleResearch();
+  });
+
+  // Research tab (eBay)
+  $('ebayResearchBtn')?.addEventListener('click', handleEbayResearch);
+  $('ebayResearchQuery')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleEbayResearch();
+  });
+  $('ebayTrackBtn')?.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'https://kolayxport.com/app/ebay-research' });
+  });
+
+  // Settings tab
+  $('clearCacheBtn')?.addEventListener('click', handleClearCache);
+  ['toggleSearch', 'toggleListing', 'toggleShop', 'toggleEbaySearch', 'toggleEbayListing'].forEach(id => {
+    $(id)?.addEventListener('change', saveSettings);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sync Handlers (preserved from v5)
+// ---------------------------------------------------------------------------
+async function handleSyncNow() {
+  const btn = $('syncNowBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span> Senkronlanıyor...';
+
+  try {
+    if (currentTab?.id) {
       try {
-        response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getStatus' });
-        console.log('✅ Content script is loaded, status:', response);
-      } catch (contentError) {
-        console.warn('❌ Content script not loaded, injecting...');
-        
-        // Inject content script manually
+        await chrome.tabs.sendMessage(currentTab.id, { action: 'scrapeNow' });
+      } catch {
         await chrome.scripting.executeScript({
           target: { tabId: currentTab.id },
           files: ['src/content.js']
         });
-        
-        // Wait a moment for script to initialize
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        response = await chrome.tabs.sendMessage(currentTab.id, { action: 'getStatus' });
-        console.log('✅ Content script injected and loaded, status:', response);
+        await new Promise(r => setTimeout(r, 1000));
+        await chrome.tabs.sendMessage(currentTab.id, { action: 'scrapeNow' });
       }
-      
-      // Now trigger sync
-      const syncResponse = await chrome.tabs.sendMessage(currentTab.id, { action: 'scrapeNow' });
-      console.log('🚀 Sync triggered:', syncResponse);
-      
-      // Don't close popup - let background process handle it
-      showMessage('Senkron başlatıldı! Siparişler arka planda senkronlanacak.', 'success');
-      
-      // Reload stats after a moment
-      setTimeout(async () => {
-        await loadSyncStats();
-        elements.syncNowBtn.innerHTML = `
-          <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-          </svg>
-          Şimdi Senkronla
-        `;
-        elements.syncNowBtn.disabled = false;
-      }, 2000);
-      
-    } catch (error) {
-      console.error('❌ Failed to trigger sync:', error);
-      
-      let errorMessage = 'Senkron başlatılamadı.';
-      if (error.message.includes('Could not establish connection')) {
-        errorMessage = 'İçerik scripti yüklenemedi. Etsy sayfasını yenileyin ve tekrar deneyin.';
-      } else if (error.message.includes('Frame with ID')) {
-        errorMessage = 'Sayfa hazır değil. Biraz bekleyin ve tekrar deneyin.';
-      }
-      
-      showMessage(errorMessage, 'error');
-      
-      elements.syncNowBtn.innerHTML = `
-        <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
-          <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-        </svg>
-        Şimdi Senkronla
-      `;
-      elements.syncNowBtn.disabled = false;
     }
-  });
-  
-  // Open Etsy button
-  elements.openEtsyBtn.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://www.etsy.com/your/orders/sold' });
-    window.close();
-  });
-  
-  // Full Import button
-  elements.fullImportBtn.addEventListener('click', async () => {
-    if (!currentTab || !isOnEtsyOrders) return;
-    
-    const confirmed = confirm(
-      'Bu işlem geçmiş verileri içe aktarmak için tüm siparişlerinizi tarayacak. ' +
-      'Sipariş hacminize bağlı olarak birkaç dakika sürebilir. Devam etmek istiyor musunuz?'
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-      elements.fullImportBtn.disabled = true;
-      elements.fullImportBtn.innerHTML = '<span class="loading"></span> İçe aktarılıyor...';
-      
+    btn.textContent = '✅ Senkron başlatıldı';
+    setTimeout(() => { btn.textContent = '🔄 Şimdi Senkronla'; btn.disabled = false; }, 2000);
+    setTimeout(loadSyncStats, 3000);
+  } catch (error) {
+    btn.textContent = '❌ Hata';
+    console.error('Sync error:', error);
+    setTimeout(() => { btn.textContent = '🔄 Şimdi Senkronla'; btn.disabled = false; }, 2000);
+  }
+}
+
+async function handleFullImport() {
+  const btn = $('fullImportBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ İçe aktarılıyor...';
+
+  try {
+    if (currentTab?.id) {
       await chrome.tabs.sendMessage(currentTab.id, { action: 'fullImport' });
-      
-      showMessage('Tam içe aktarma başlatıldı. Bu sekmeyi açık tutun.', 'success');
-    } catch (error) {
-      console.error('Failed to start import:', error);
-      showMessage('İçe aktarma başlatılamadı. Sayfayı yenileyin ve tekrar deneyin.', 'error');
-      elements.fullImportBtn.disabled = false;
+      btn.textContent = '✅ İçe aktarım başlatıldı';
     }
-  });
-  
-  // Listen for updates from background script
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'syncComplete' || request.action === 'importComplete') {
-      loadSyncStats();
-    }
-  });
-}
-
-// Utility functions
-function formatRelativeTime(date) {
-  const now = new Date();
-  const diff = now - date;
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  
-  if (seconds < 60) {
-    return 'Just now';
-  } else if (minutes < 60) {
-    return `${minutes}m ago`;
-  } else if (hours < 24) {
-    return `${hours}h ago`;
-  } else if (days < 7) {
-    return `${days}d ago`;
-  } else {
-    return date.toLocaleDateString();
+  } catch (error) {
+    btn.textContent = '❌ Hata';
+    console.error('Import error:', error);
   }
+  setTimeout(() => { btn.textContent = '📥 Tüm İçe Aktar'; btn.disabled = false; }, 3000);
 }
 
-function showMessage(text, type) {
-  // Create message element
-  const message = document.createElement('div');
-  message.className = `message ${type} show`;
-  message.textContent = text;
-  
-  // Insert after actions
-  const actions = document.querySelector('.actions');
-  actions.parentNode.insertBefore(message, actions.nextSibling);
-  
-  // Remove after 5 seconds
-  setTimeout(() => {
-    message.remove();
-  }, 5000);
-}
+// ---------------------------------------------------------------------------
+// Research Tab
+// ---------------------------------------------------------------------------
+async function handleResearch() {
+  const query = $('researchQuery').value.trim();
+  if (!query) return;
 
-// Show logs in a modal
-function showLogs() {
-  chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-    const tab = tabs[0];
-    if (tab && tab.url && tab.url.includes('etsy.com')) {
-      try {
-        const response = await chrome.tabs.sendMessage(tab.id, { action: 'getLogs' });
-        displayLogsModal(response.logs || []);
-      } catch (error) {
-        showMessage('Etsy sayfasından loglar alınamadı', 'error');
-      }
-    } else {
-      // Get logs from storage
-      const result = await chrome.storage.local.get(['kx_logs']);
-      displayLogsModal(result.kx_logs || []);
-    }
-  });
-}
+  $('researchLoading').classList.remove('hidden');
+  $('researchResults').classList.add('hidden');
 
-function displayLogsModal(logs) {
-  // Create modal
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.8);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  `;
-  
-  const content = document.createElement('div');
-  content.style.cssText = `
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    max-width: 500px;
-    max-height: 80vh;
-    overflow-y: auto;
-    font-family: monospace;
-    font-size: 12px;
-  `;
-  
-  const header = document.createElement('div');
-  header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;';
-  header.innerHTML = `
-    <h3 style="margin: 0;">Eklenti Logları (${logs.length})</h3>
-    <button id="closeLogs" style="background: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">&times;</button>
-  `;
-  
-  const logContainer = document.createElement('div');
-  logContainer.style.cssText = 'max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;';
-  
-  if (logs.length === 0) {
-    logContainer.innerHTML = '<em>Hiç log bulunmuyor</em>';
-  } else {
-    logs.slice(-50).forEach(log => {
-      const logEntry = document.createElement('div');
-      logEntry.style.cssText = `
-        margin-bottom: 8px;
-        padding: 5px;
-        border-left: 3px solid ${
-          log.level === 'error' ? '#f44336' :
-          log.level === 'success' ? '#4caf50' :
-          log.level === 'warn' ? '#ff9800' : '#2196f3'
-        };
-        background: #f9f9f9;
-      `;
-      
-      const time = new Date(log.timestamp).toLocaleTimeString();
-      logEntry.innerHTML = `
-        <div style="font-weight: bold; color: #666;">${time} - ${log.level.toUpperCase()}</div>
-        <div>${log.message}</div>
-        ${log.data ? `<div style="color: #666; font-size: 11px;">${JSON.stringify(log.data, null, 2)}</div>` : ''}
-      `;
-      
-      logContainer.appendChild(logEntry);
+  try {
+    const data = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: 'kx_research', action: 'search_enrich', params: { query, listingIds: [] } },
+        (response) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (response?.error) reject(new Error(response.error));
+          else resolve(response);
+        }
+      );
     });
+
+    if (data?.summary) {
+      const s = data.summary;
+      $('researchQueryLabel').textContent = `"${query}" Sonuçları`;
+      $('rTotalResults').textContent = fmtNum(s.totalResults);
+      $('rAvgPrice').textContent = '$' + (s.avgPrice || 0).toFixed(2);
+      $('rPriceRange').textContent = '$' + (s.minPrice || 0).toFixed(0) + ' - $' + (s.maxPrice || 0).toFixed(0);
+      $('rAvgFav').textContent = fmtNum(s.avgFavorites);
+      $('rShops').textContent = s.uniqueShops;
+
+      const compEl = $('rCompetition');
+      compEl.textContent = s.competition === 'low' ? 'Düşük' : s.competition === 'medium' ? 'Orta' : 'Yüksek';
+      compEl.className = 'stat-mini-value comp-' + s.competition;
+
+      $('researchResults').classList.remove('hidden');
+    }
+  } catch (error) {
+    console.error('Research error:', error);
   }
-  
-  content.appendChild(header);
-  content.appendChild(logContainer);
-  modal.appendChild(content);
-  document.body.appendChild(modal);
-  
-  // Close modal
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal || e.target.id === 'closeLogs') {
-      modal.remove();
+
+  $('researchLoading').classList.add('hidden');
+}
+
+function fmtNum(n) {
+  if (!n) return '0';
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return String(n);
+}
+
+// ---------------------------------------------------------------------------
+// eBay Research Tab
+// ---------------------------------------------------------------------------
+async function handleEbayResearch() {
+  const query = $('ebayResearchQuery').value.trim();
+  if (!query) return;
+
+  $('ebayResearchLoading').classList.remove('hidden');
+  $('ebayResearchResults').classList.add('hidden');
+
+  try {
+    const data = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: 'kx_ebay_research', action: 'search_enrich', params: { query, marketplace: 'EBAY_US' } },
+        (response) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else if (response?.error) reject(new Error(response.error));
+          else resolve(response);
+        }
+      );
+    });
+
+    const s = data?.summary || data || {};
+    if (s.totalResults || s.total || s.avgPrice || s.avg_price) {
+      $('ebayResearchQueryLabel').textContent = `"${query}" Sonuclari`;
+      $('erTotalResults').textContent = fmtNum(s.totalResults || s.total || 0);
+      $('erAvgPrice').textContent = '$' + (s.avgPrice || s.avg_price || 0).toFixed(2);
+      $('erPriceRange').textContent = '$' + (s.minPrice || s.min_price || 0).toFixed(0) + ' - $' + (s.maxPrice || s.max_price || 0).toFixed(0);
+      $('erSellers').textContent = s.uniqueSellers || s.uniqueShops || s.unique_sellers || 0;
+
+      const sellers = s.uniqueSellers || s.uniqueShops || s.unique_sellers || 0;
+      const comp = s.competition || (sellers < 20 ? 'low' : sellers < 100 ? 'medium' : 'high');
+      const compEl = $('erCompetition');
+      compEl.textContent = comp === 'low' ? 'Dusuk' : comp === 'medium' ? 'Orta' : 'Yuksek';
+      compEl.className = 'stat-mini-value comp-' + comp;
+
+      $('ebayResearchResults').classList.remove('hidden');
+    }
+  } catch (error) {
+    console.error('eBay research error:', error);
+  }
+
+  $('ebayResearchLoading').classList.add('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// Auto-detect marketplace from current tab
+// ---------------------------------------------------------------------------
+function autoDetectMarketplace() {
+  if (!currentTab?.url) return;
+  const url = currentTab.url;
+
+  if (url.includes('ebay.com') || url.includes('ebay.co.uk') || url.includes('ebay.de') ||
+      url.includes('ebay.fr') || url.includes('ebay.it') || url.includes('ebay.es') ||
+      url.includes('ebay.com.au')) {
+    // Auto-switch to eBay tab
+    document.querySelectorAll('.mp-chip').forEach(c => c.classList.remove('active'));
+    const ebayChip = document.querySelector('.mp-chip[data-mp="ebay"]');
+    if (ebayChip) ebayChip.classList.add('active');
+    activeMarketplace = 'ebay';
+
+    const etsyPanel = $('etsy-research-panel');
+    const ebayPanel = $('ebay-research-panel');
+    if (etsyPanel) etsyPanel.classList.add('hidden');
+    if (ebayPanel) ebayPanel.classList.remove('hidden');
+
+    checkEbayCurrentPage();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// eBay current page info
+// ---------------------------------------------------------------------------
+async function checkEbayCurrentPage() {
+  if (!currentTab?.url || !currentTab.url.includes('/itm/')) return;
+
+  const ebayAuthStatus = $('ebayAuthStatus');
+  if (ebayAuthStatus) {
+    ebayAuthStatus.textContent = isAuthenticated ? 'Bagli' : 'Baglanti Yok';
+    ebayAuthStatus.className = 'status-badge ' + (isAuthenticated ? 'connected' : 'disconnected');
+  }
+
+  try {
+    // Extract item info from the page
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: currentTab.id },
+      func: () => {
+        const titleEl = document.querySelector('h1.x-item-title__mainTitle') ||
+                        document.querySelector('#itemTitle') ||
+                        document.querySelector('h1[data-testid="x-item-title"]');
+        const priceEl = document.querySelector('.x-price-primary span') ||
+                        document.querySelector('#prcIsum') ||
+                        document.querySelector('.x-bin-price__content span');
+        return {
+          title: titleEl ? titleEl.textContent.trim() : '',
+          price: priceEl ? priceEl.textContent.trim() : '',
+        };
+      }
+    });
+
+    const pageInfo = results?.[0]?.result;
+    if (pageInfo && (pageInfo.title || pageInfo.price)) {
+      const currentPageEl = $('ebayCurrentPage');
+      if (currentPageEl) currentPageEl.classList.remove('hidden');
+
+      const titleEl = $('ebayPageTitle');
+      if (titleEl) titleEl.textContent = pageInfo.title || 'Baslik bulunamadi';
+
+      const priceEl = $('ebayPagePrice');
+      if (priceEl) priceEl.textContent = pageInfo.price ? `Fiyat: ${pageInfo.price}` : '';
+
+      const trackBtn = $('ebayTrackBtn');
+      if (trackBtn) trackBtn.classList.remove('hidden');
+    }
+  } catch (err) {
+    console.log('Could not read eBay page info:', err.message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Settings Tab
+// ---------------------------------------------------------------------------
+async function loadSettings() {
+  const result = await chrome.storage.local.get('kx_settings');
+  const s = result.kx_settings || { search: true, listing: true, shop: true, ebaySearch: true, ebayListing: true };
+  const se = $('toggleSearch'); if (se) se.checked = s.search !== false;
+  const le = $('toggleListing'); if (le) le.checked = s.listing !== false;
+  const sh = $('toggleShop'); if (sh) sh.checked = s.shop !== false;
+  const es = $('toggleEbaySearch'); if (es) es.checked = s.ebaySearch !== false;
+  const el = $('toggleEbayListing'); if (el) el.checked = s.ebayListing !== false;
+}
+
+async function saveSettings() {
+  await chrome.storage.local.set({
+    kx_settings: {
+      search: $('toggleSearch')?.checked ?? true,
+      listing: $('toggleListing')?.checked ?? true,
+      shop: $('toggleShop')?.checked ?? true,
+      ebaySearch: $('toggleEbaySearch')?.checked ?? true,
+      ebayListing: $('toggleEbayListing')?.checked ?? true,
     }
   });
+}
+
+async function handleClearCache() {
+  const btn = $('clearCacheBtn');
+  btn.disabled = true;
+  btn.textContent = 'Temizleniyor...';
+
+  try {
+    const all = await chrome.storage.local.get(null);
+    const cacheKeys = Object.keys(all).filter(k => k.startsWith('kx_cache_'));
+    if (cacheKeys.length > 0) await chrome.storage.local.remove(cacheKeys);
+    await chrome.storage.local.remove('kx_cache_index');
+    btn.textContent = '✅ Temizlendi';
+  } catch {
+    btn.textContent = '❌ Hata';
+  }
+  setTimeout(() => { btn.textContent = 'Temizle'; btn.disabled = false; }, 2000);
 }

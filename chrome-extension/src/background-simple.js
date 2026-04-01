@@ -6,6 +6,11 @@
 // Configuration
 const KOLAYXPORT_DOMAIN = 'kolayxport.com';
 const KOLAYXPORT_APP_URL = 'https://kolayxport.com/app';
+const API_BASE = 'https://kolayxport.com';
+
+function getApiBase() {
+  return API_BASE;
+}
 const BADGE_COLORS = {
   success: '#4CAF50',
   error: '#F44336',
@@ -45,6 +50,104 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleMessage(request, sender, sendResponse) {
+  // --- Research API handler ---
+  if (request.type === 'kx_research') {
+    try {
+      if (!authToken) {
+        await checkAuthentication();
+      }
+      const headers = { 'Content-Type': 'application/json' };
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+        headers['X-Extension-Auth'] = authToken;
+        headers['X-Extension-Version'] = chrome.runtime.getManifest().version;
+      }
+
+      const apiBase = getApiBase();
+      const response = await fetch(`${apiBase}/api/ext/research`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ action: request.action, ...request.params }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'API error' }));
+        sendResponse({ error: err.error || `HTTP ${response.status}` });
+        return;
+      }
+
+      const data = await response.json();
+      sendResponse(data);
+    } catch (err) {
+      sendResponse({ error: err.message || 'Research API error' });
+    }
+    return;
+  }
+
+  // --- eBay Research API handler ---
+  if (request.type === 'kx_ebay_research') {
+    try {
+      if (!authToken) {
+        await checkAuthentication();
+      }
+
+      // Get user ID and API key from storage
+      const stored = await chrome.storage.local.get(['kx_user', 'kx_api_key']);
+      const userId = stored.kx_user?.id || '';
+      const apiKey = stored.kx_api_key || '6d8a3ea6c932f48f65f6a4c0f71ee47395fd9fc77d0fbf6b46956f48129199e1';
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+        headers['X-Extension-Auth'] = authToken;
+        headers['X-Extension-Version'] = chrome.runtime.getManifest().version;
+      }
+      headers['x-api-key'] = apiKey;
+
+      const apiBase = getApiBase();
+      const action = request.action;
+      const params = request.params || {};
+      let url = '';
+
+      switch (action) {
+        case 'search_enrich':
+          url = `${apiBase}/api/clawd/ebay-research?action=product_database&q=${encodeURIComponent(params.query || '')}&user_id=${encodeURIComponent(userId)}&limit=50`;
+          break;
+        case 'listing_enrich':
+          url = `${apiBase}/api/clawd/ebay?action=get_item_details&legacy_item_id=${encodeURIComponent(params.itemId || '')}&user_id=${encodeURIComponent(userId)}`;
+          break;
+        case 'seo_analyze':
+          url = `${apiBase}/api/clawd/ebay?action=analyze_seo&q=${encodeURIComponent(params.query || '')}&my_title=${encodeURIComponent(params.title || '')}&user_id=${encodeURIComponent(userId)}`;
+          break;
+        case 'niche_analyze':
+          url = `${apiBase}/api/clawd/ebay-research?action=niche_analyze&q=${encodeURIComponent(params.query || '')}&user_id=${encodeURIComponent(userId)}`;
+          break;
+        default:
+          sendResponse({ error: `Unknown eBay action: ${action}` });
+          return;
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'eBay API error' }));
+        sendResponse({ error: err.error || `HTTP ${response.status}` });
+        return;
+      }
+
+      const data = await response.json();
+      sendResponse(data);
+    } catch (err) {
+      sendResponse({ error: err.message || 'eBay Research API error' });
+    }
+    return;
+  }
+
   switch (request.action) {
     case 'getCookies':
       const cookies = await getCookies(request.domain);

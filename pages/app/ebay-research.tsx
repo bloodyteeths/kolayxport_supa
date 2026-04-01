@@ -14,7 +14,7 @@ import {
   DollarSign, Users, FolderTree, Gauge, Package, Target,
   ChevronDown, ChevronUp, Edit3, Tag, Clock, AlertTriangle,
   Save, X, Copy, ShoppingBag, Globe, Filter, ArrowUpDown,
-  Sparkles, Zap,
+  Sparkles, Zap, Download, Layers,
 } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -28,6 +28,8 @@ import ArbitrageScanner from '@/components/ebay/research/ArbitrageScanner';
 import SeoAnalyzer from '@/components/ebay/research/SeoAnalyzer';
 import AiOptimizationHub from '@/components/ebay/research/AiOptimizationHub';
 import MarketplaceComparison from '@/components/ebay/research/MarketplaceComparison';
+import CategoryExplorer from '@/components/ebay/research/CategoryExplorer';
+import NicheComparison from '@/components/ebay/research/NicheComparison';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1049,7 +1051,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
 // TAB 2: Product Tracker
 // ---------------------------------------------------------------------------
 
-function ProductTracker({ userId, userListings }: { userId: string; userListings?: any[] }) {
+function ProductTracker({ userId, userListings, onNavigate }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -1064,6 +1066,41 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
   const [tagDialog, setTagDialog] = useState<{ id: string; tags: string[] } | null>(null);
   const [newTag, setNewTag] = useState('');
   const trackedSort = useTableSort<TrackedProduct>(tracked, 'currentPrice', 'desc');
+
+  const lastUpdateTime = useMemo(() => {
+    if (tracked.length === 0) return null;
+    const dates = tracked.map(p => p.lastCheckedAt).filter(Boolean).map(d => new Date(d).getTime());
+    if (dates.length === 0) return null;
+    return new Date(Math.max(...dates));
+  }, [tracked]);
+
+  const handleExportCsv = useCallback(() => {
+    if (tracked.length === 0) return;
+    const headers = ['title', 'currentPrice', 'previousPrice', 'priceChange%', 'legacyItemId', 'notes', 'tags', 'lastUpdated'];
+    const rows = tracked.map(p => {
+      const prevPrice = p.snapshots?.length > 1 ? p.snapshots[p.snapshots.length - 1].price : p.currentPrice;
+      const change = prevPrice > 0 ? (((p.currentPrice - prevPrice) / prevPrice) * 100).toFixed(2) : '0';
+      return [
+        `"${(p.title || '').replace(/"/g, '""')}"`,
+        p.currentPrice?.toFixed(2) ?? '',
+        prevPrice?.toFixed(2) ?? '',
+        change,
+        p.legacyItemId || '',
+        `"${(p.notes || '').replace(/"/g, '""')}"`,
+        `"${(p.tags || []).join(', ')}"`,
+        p.lastCheckedAt || '',
+      ].join(',');
+    });
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tracked-products-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('CSV indirildi');
+  }, [tracked]);
 
   const fetchTracked = useCallback(async () => {
     setLoading(true);
@@ -1184,9 +1221,27 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
         <Button variant="outlined" startIcon={<Plus size={16} />} onClick={() => setAddDialogOpen(true)}>
           URL/ID ile Ekle
         </Button>
-        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-          {tracked.length} ürün takipte
-        </Typography>
+        <Tooltip title="CSV Olarak İndir">
+          <span>
+            <IconButton size="small" onClick={handleExportCsv} disabled={tracked.length === 0}>
+              <Download size={18} />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+          {lastUpdateTime && (
+            <Chip
+              icon={<Clock size={12} />}
+              label={`Son Güncelleme: ${lastUpdateTime.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
+              size="small"
+              variant="outlined"
+              sx={{ height: 24, fontSize: '0.7rem' }}
+            />
+          )}
+          <Typography variant="caption" color="text.secondary">
+            {tracked.length} ürün takipte
+          </Typography>
+        </Box>
       </Box>
 
       {/* Product List */}
@@ -1205,6 +1260,7 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
               onRemove={handleRemove}
               onEditNotes={(id, notes) => { setEditingNotes(id); setNotesText(notes); }}
               onOpenTags={(id, tags) => setTagDialog({ id, tags })}
+              onNavigate={onNavigate}
             />
           ))}
         </Box>
@@ -1325,6 +1381,20 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
                   </TableCell>
                   <TableCell align="center">
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      {onNavigate && (
+                        <>
+                          <Tooltip title="SEO Analizi">
+                            <IconButton size="small" onClick={() => onNavigate('seo_analyzer', { keyword: product.title })}>
+                              <Target size={16} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="AI Asistan">
+                            <IconButton size="small" onClick={() => onNavigate('ai_hub', { title: product.title })}>
+                              <Sparkles size={16} />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
                       {product.itemWebUrl || product.legacyItemId ? (
                         <IconButton size="small" component="a" href={product.itemWebUrl || `https://www.ebay.com/itm/${product.legacyItemId}`} target="_blank" rel="noopener noreferrer">
                           <ExternalLink size={16} />
@@ -1429,11 +1499,12 @@ function ProductTracker({ userId, userListings }: { userId: string; userListings
   );
 }
 
-function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags }: {
+function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, onNavigate }: {
   product: TrackedProduct;
   onRemove: (id: string) => void;
   onEditNotes: (id: string, notes: string) => void;
   onOpenTags: (id: string, tags: string[]) => void;
+  onNavigate?: (tool: string, data?: any) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -1503,13 +1574,23 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags }
             </Box>
           )}
           <Divider />
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             <Button size="small" variant="outlined" onClick={() => onEditNotes(product.id, product.notes || '')} startIcon={<Edit3 size={12} />}>
               Not
             </Button>
             <Button size="small" variant="outlined" onClick={() => onOpenTags(product.id, product.tags || [])} startIcon={<Tag size={12} />}>
               Etiket
             </Button>
+            {onNavigate && (
+              <>
+                <Button size="small" variant="outlined" onClick={() => onNavigate('seo_analyzer', { keyword: product.title })} startIcon={<Target size={12} />}>
+                  SEO
+                </Button>
+                <Button size="small" variant="outlined" onClick={() => onNavigate('ai_hub', { title: product.title })} startIcon={<Sparkles size={12} />}>
+                  AI
+                </Button>
+              </>
+            )}
             <Button size="small" variant="outlined" color="error" onClick={() => onRemove(product.id)} startIcon={<Trash2 size={12} />} sx={{ ml: 'auto' }}>
               Sil
             </Button>
@@ -2044,7 +2125,7 @@ function NicheFinder({ userId, userListings, onNavigate }: { userId: string; use
 // TAB 4: Seller Tracker
 // ---------------------------------------------------------------------------
 
-function SellerTracker({ userId, userListings }: { userId: string; userListings?: any[] }) {
+function SellerTracker({ userId, userListings, onNavigate }: { userId: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -2219,15 +2300,34 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
                 )}
               </Box>
 
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {onNavigate && (
+                  <>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<Package size={14} />}
+                      onClick={() => onNavigate('product_database', { keyword: seller.sellerUsername })}
+                    >
+                      Ürünleri Gör
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<Eye size={14} />}
+                      onClick={() => onNavigate('competitive_intelligence', { seller: seller.sellerUsername })}
+                    >
+                      Rakip Analizi
+                    </Button>
+                  </>
+                )}
                 <Button
                   size="small"
                   variant="outlined"
-                  fullWidth
-                  startIcon={<Eye size={14} />}
+                  startIcon={<ExternalLink size={14} />}
                   onClick={() => handleViewProducts(seller.sellerUsername)}
                 >
-                  Ürünleri Gör
+                  eBay'de Gör
                 </Button>
               </Box>
 
@@ -2315,9 +2415,23 @@ function SellerTracker({ userId, userListings }: { userId: string; userListings?
                   </TableCell>
                   <TableCell align="center">
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
-                      <Tooltip title="Ürünleri Gör">
+                      {onNavigate && (
+                        <>
+                          <Tooltip title="Ürünleri Gör">
+                            <IconButton size="small" onClick={() => onNavigate('product_database', { keyword: seller.sellerUsername })}>
+                              <Package size={16} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Rakip Analizi">
+                            <IconButton size="small" onClick={() => onNavigate('competitive_intelligence', { seller: seller.sellerUsername })}>
+                              <Eye size={16} />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
+                      <Tooltip title="eBay'de Gör">
                         <IconButton size="small" onClick={() => handleViewProducts(seller.sellerUsername)}>
-                          <Eye size={16} />
+                          <ExternalLink size={16} />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Kaldır">
@@ -2353,6 +2467,8 @@ const SECTIONS = [
       { label: 'Anahtar Kelime Analizi', icon: <Tag size={14} /> },
       { label: 'Arbitraj Bulucu', icon: <Globe size={14} /> },
       { label: 'Pazar Karsilastirma', icon: <Globe size={14} /> },
+      { label: 'Kategori Kesif', icon: <Layers size={14} /> },
+      { label: 'Nis Karsilastirma', icon: <BarChart2 size={14} /> },
     ],
   },
   {
@@ -2522,6 +2638,9 @@ function EbayResearchPage() {
       case 'ai_hub': setMainTab(2); setSubTab(1); break;
       case 'listing_optimizer': setMainTab(2); setSubTab(2); break;
       case 'financial': setMainTab(2); setSubTab(3); break;
+      case 'marketplace_comparison': setMainTab(0); setSubTab(4); break;
+      case 'category_explorer': setMainTab(0); setSubTab(5); break;
+      case 'niche_comparison': setMainTab(0); setSubTab(6); break;
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
@@ -2709,10 +2828,12 @@ function EbayResearchPage() {
       {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
       {mainTab === 0 && subTab === 3 && <ArbitrageScanner userId={userId} />}
       {mainTab === 0 && subTab === 4 && <MarketplaceComparison userId={userId} onNavigate={handleNavigate} />}
+      {mainTab === 0 && subTab === 5 && <CategoryExplorer userId={userId} onNavigate={handleNavigate} />}
+      {mainTab === 0 && subTab === 6 && <NicheComparison userId={userId} onNavigate={handleNavigate} />}
 
       {/* Section 1: Takip */}
-      {mainTab === 1 && subTab === 0 && <ProductTracker userId={userId} userListings={userListings} />}
-      {mainTab === 1 && subTab === 1 && <SellerTracker userId={userId} userListings={userListings} />}
+      {mainTab === 1 && subTab === 0 && <ProductTracker userId={userId} userListings={userListings} onNavigate={handleNavigate} />}
+      {mainTab === 1 && subTab === 1 && <SellerTracker userId={userId} userListings={userListings} onNavigate={handleNavigate} />}
       {mainTab === 1 && subTab === 2 && <CompetitiveIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} onNavigate={handleNavigate} />}
 
       {/* Section 2: Optimizasyon */}

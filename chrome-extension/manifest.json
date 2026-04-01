@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Kolayxport Etsy Sipariş Senkronizasyonu",
-  "version": "5.3.0",
-  "description": "Etsy Shop Manager siparişlerini Kolayxport ile otomatik senkronlayarak kargo etiketi oluşturmayı kolaylaştırır",
+  "name": "KolayXport — Etsy & eBay Araştırma & Sipariş Senkron",
+  "version": "7.0.0",
+  "description": "Etsy ve eBay araştırma verileri (fiyat, rekabet, satış tahmini) doğrudan marketplace üzerinde + otomatik sipariş senkronizasyonu",
   "author": "Kolayxport",
   "icons": {
     "16": "icons/icon-16.png",
@@ -22,9 +22,26 @@
   "host_permissions": [
     "https://kolayxport.com/*",
     "https://www.kolayxport.com/*",
-    "https://www.etsy.com/*"
+    "https://www.etsy.com/*",
+    "https://www.ebay.com/*",
+    "https://www.ebay.co.uk/*",
+    "https://www.ebay.de/*",
+    "https://www.ebay.fr/*",
+    "https://www.ebay.it/*",
+    "https://www.ebay.es/*",
+    "https://www.ebay.com.au/*"
   ],
   "content_scripts": [
+    {
+      "matches": ["https://www.etsy.com/*"],
+      "js": ["src/cache.js", "src/content-shared.js", "src/content-search.js", "src/content-listing.js", "src/content-shop.js"],
+      "run_at": "document_idle",
+      "all_frames": false,
+      "exclude_matches": [
+        "https://www.etsy.com/your/*",
+        "https://www.etsy.com/shop-manager/*"
+      ]
+    },
     {
       "matches": [
         "https://www.etsy.com/your/orders/*",
@@ -45,6 +62,20 @@
       "js": ["src/kolayxport.js"],
       "run_at": "document_idle",
       "all_frames": false
+    },
+    {
+      "matches": [
+        "https://www.ebay.com/*",
+        "https://www.ebay.co.uk/*",
+        "https://www.ebay.de/*",
+        "https://www.ebay.fr/*",
+        "https://www.ebay.it/*",
+        "https://www.ebay.es/*",
+        "https://www.ebay.com.au/*"
+      ],
+      "js": ["src/cache.js", "src/content-ebay-shared.js", "src/content-ebay-search.js", "src/content-ebay-listing.js"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "background": {
@@ -52,7 +83,7 @@
   },
   "action": {
     "default_popup": "src/popup.html",
-    "default_title": "Kolayxport Etsy Senkron Durumu",
+    "default_title": "KolayXport Etsy & eBay Senkron Durumu",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"

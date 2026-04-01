@@ -3,87 +3,243 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kolayxport Etsy Senkron</title>
+  <title>KolayXport</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <img src="../icons/icon-32.png" alt="Kolayxport" class="logo">
-      <h1>Kolayxport Etsy Senkron</h1>
+      <img src="../icons/icon-32.png" alt="KolayXport" class="logo">
+      <h1>KolayXport</h1>
+      <span id="authBadge" class="auth-badge checking">●</span>
     </header>
 
-    <main>
-      <!-- Authentication Status -->
-      <div class="status-card">
-        <div class="status-header">
-          <h2>Bağlantı Durumu</h2>
-          <span id="authStatus" class="status-badge">Kontrol ediliyor...</span>
+    <!-- Marketplace Toggle -->
+    <div class="marketplace-toggle">
+      <button class="mp-chip active" data-mp="etsy">Etsy</button>
+      <button class="mp-chip" data-mp="ebay">eBay</button>
+    </div>
+
+    <!-- Tab Navigation -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="research">🔍 Araştır</button>
+      <button class="tab" data-tab="tracker">📊 Takip</button>
+      <button class="tab" data-tab="orders">📦 Siparişler</button>
+      <button class="tab" data-tab="settings">⚙️ Ayarlar</button>
+    </nav>
+
+    <!-- Tab: Research (Etsy) -->
+    <div class="tab-content active" id="tab-research">
+      <!-- Etsy Research Panel -->
+      <div id="etsy-research-panel">
+        <div class="card">
+          <div class="search-box">
+            <input type="text" id="researchQuery" placeholder="Anahtar kelime girin..." class="input">
+            <button id="researchBtn" class="btn btn-primary btn-compact">Ara</button>
+          </div>
         </div>
-        <p id="authMessage" class="status-message"></p>
-        <button id="refreshAuthBtn" class="btn btn-small">🔄 Yenile</button>
+
+        <div id="researchResults" class="hidden">
+          <div class="card">
+            <h3 id="researchQueryLabel" class="card-title"></h3>
+            <div class="stats-grid-2">
+              <div class="stat-mini"><span class="stat-mini-label">Sonuç</span><span class="stat-mini-value" id="rTotalResults">-</span></div>
+              <div class="stat-mini"><span class="stat-mini-label">Ort. Fiyat</span><span class="stat-mini-value" id="rAvgPrice">-</span></div>
+              <div class="stat-mini"><span class="stat-mini-label">Fiyat Aralığı</span><span class="stat-mini-value" id="rPriceRange">-</span></div>
+              <div class="stat-mini"><span class="stat-mini-label">Ort. Favori</span><span class="stat-mini-value" id="rAvgFav">-</span></div>
+              <div class="stat-mini"><span class="stat-mini-label">Mağaza</span><span class="stat-mini-value" id="rShops">-</span></div>
+              <div class="stat-mini"><span class="stat-mini-label">Rekabet</span><span class="stat-mini-value" id="rCompetition">-</span></div>
+            </div>
+          </div>
+          <a href="https://kolayxport.com/app/etsy-research" target="_blank" class="btn btn-secondary btn-compact full-width">
+            Tam Araştırma Sayfası →
+          </a>
+        </div>
+
+        <div id="researchLoading" class="hidden">
+          <div class="loading-bar"></div>
+        </div>
+
+        <div class="card quick-links">
+          <h3 class="card-title">Hızlı Erişim</h3>
+          <a href="https://kolayxport.com/app/etsy-research" target="_blank" class="quick-link">🔬 Niş Analizi</a>
+          <a href="https://kolayxport.com/app/etsy-research" target="_blank" class="quick-link">🏷️ Kelime Keşif</a>
+          <a href="https://kolayxport.com/app/etsy-research" target="_blank" class="quick-link">📈 Trendler</a>
+        </div>
       </div>
 
-      <!-- Sync Statistics -->
-      <div class="stats-card">
-        <h2>Senkron İstatistikleri</h2>
-        <div class="stats-grid">
+      <!-- eBay Research Panel -->
+      <div id="ebay-research-panel" class="hidden">
+        <div class="card">
+          <div class="status-header">
+            <h3 class="card-title">eBay Bağlantısı</h3>
+            <span id="ebayAuthStatus" class="status-badge checking">Kontrol...</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="search-box">
+            <input type="text" id="ebayResearchQuery" placeholder="eBay anahtar kelime girin..." class="input">
+            <button id="ebayResearchBtn" class="btn btn-primary btn-compact">Ara</button>
+          </div>
+        </div>
+
+        <div id="ebayResearchResults" class="hidden">
+          <div class="card">
+            <h3 id="ebayResearchQueryLabel" class="card-title"></h3>
+            <div class="stats-grid-2">
+              <div class="stat-mini"><span class="stat-mini-label">Sonuç</span><span class="stat-mini-value" id="erTotalResults">-</span></div>
+              <div class="stat-mini"><span class="stat-mini-label">Ort. Fiyat</span><span class="stat-mini-value" id="erAvgPrice">-</span></div>
+              <div class="stat-mini"><span class="stat-mini-label">Fiyat Aralığı</span><span class="stat-mini-value" id="erPriceRange">-</span></div>
+              <div class="stat-mini"><span class="stat-mini-label">Satıcı</span><span class="stat-mini-value" id="erSellers">-</span></div>
+              <div class="stat-mini"><span class="stat-mini-label">Rekabet</span><span class="stat-mini-value" id="erCompetition">-</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="ebayResearchLoading" class="hidden">
+          <div class="loading-bar"></div>
+        </div>
+
+        <!-- eBay current page info -->
+        <div id="ebayCurrentPage" class="hidden">
+          <div class="card">
+            <h3 class="card-title">Mevcut Sayfa</h3>
+            <div id="ebayPageTitle" class="text-muted" style="margin-bottom:6px;font-weight:600;color:#333;"></div>
+            <div id="ebayPagePrice" class="text-muted" style="margin-bottom:8px;"></div>
+            <div id="ebayPageSeo" style="margin-bottom:8px;"></div>
+            <button id="ebayTrackBtn" class="btn btn-secondary btn-compact full-width hidden">Ürünü Takip Et</button>
+          </div>
+        </div>
+
+        <div class="actions" style="margin-top:8px;">
+          <a href="https://kolayxport.com/app/ebay-research" target="_blank" class="btn btn-primary">
+            eBay Araştırma Aç →
+          </a>
+        </div>
+
+        <div class="card quick-links">
+          <h3 class="card-title">Hızlı Erişim</h3>
+          <a href="https://kolayxport.com/app/ebay-research" target="_blank" class="quick-link">🔬 Ürün Veritabanı</a>
+          <a href="https://kolayxport.com/app/ebay-research" target="_blank" class="quick-link">🤖 AI Hub</a>
+          <a href="https://kolayxport.com/app/ebay-research" target="_blank" class="quick-link">📊 SEO Analyzer</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Tracker -->
+    <div class="tab-content" id="tab-tracker">
+      <div class="card">
+        <h3 class="card-title">Kelime Takibi</h3>
+        <p class="text-muted">Takip ettiğiniz anahtar kelimeler ve sıralama değişimleri.</p>
+        <div id="trackedKeywords" class="tracked-list">
+          <div class="empty-state">
+            <span class="empty-icon">📊</span>
+            <span>Henüz takip edilen kelime yok</span>
+            <a href="https://kolayxport.com/app/etsy-research" target="_blank" class="btn btn-secondary btn-compact">
+              Araştırma Sayfasından Ekle →
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Orders -->
+    <div class="tab-content" id="tab-orders">
+      <div class="card">
+        <div class="status-header">
+          <h3 class="card-title">Sipariş Senkron</h3>
+          <span id="authStatus" class="status-badge checking">Kontrol...</span>
+        </div>
+        <p id="authMessage" class="text-muted"></p>
+      </div>
+
+      <div class="card">
+        <div class="stats-grid-3">
           <div class="stat-item">
             <span class="stat-value" id="totalSynced">0</span>
-            <span class="stat-label">Senkron Edilen Siparişler</span>
+            <span class="stat-label">Senkron</span>
           </div>
           <div class="stat-item">
             <span class="stat-value" id="pendingSync">0</span>
-            <span class="stat-label">Bekleyen Senkron</span>
+            <span class="stat-label">Bekleyen</span>
           </div>
           <div class="stat-item">
-            <span class="stat-value" id="lastSync">Hiçbir zaman</span>
+            <span class="stat-value" id="lastSync">—</span>
             <span class="stat-label">Son Senkron</span>
           </div>
         </div>
       </div>
 
-      <!-- Action Buttons -->
       <div class="actions">
-        <button id="syncNowBtn" class="btn btn-primary" disabled>
-          <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97-.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-          </svg>
-          Şimdi Senkronla
-        </button>
-        
-        <button id="openEtsyBtn" class="btn btn-secondary">
-          <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z"/>
-          </svg>
-          Etsy Siparişlerini Aç
-        </button>
-        
-        <button id="fullImportBtn" class="btn btn-secondary" disabled>
-          <svg class="btn-icon" viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M9,16V10H5L12,3L19,10H15V16H9M5,20V18H19V20H5Z"/>
-          </svg>
-          Tüm Siparişleri İçe Aktar
-        </button>
+        <button id="syncNowBtn" class="btn btn-primary" disabled>🔄 Şimdi Senkronla</button>
+        <button id="openEtsyBtn" class="btn btn-secondary">↗️ Etsy Siparişleri</button>
+        <button id="fullImportBtn" class="btn btn-secondary" disabled>📥 Tüm İçe Aktar</button>
+      </div>
+    </div>
+
+    <!-- Tab: Settings -->
+    <div class="tab-content" id="tab-settings">
+      <div class="card">
+        <h3 class="card-title">Hesap</h3>
+        <div class="setting-row">
+          <span>Durum</span>
+          <span id="settingsAuthStatus" class="status-badge checking">Kontrol...</span>
+        </div>
+        <div class="setting-row">
+          <span>Plan</span>
+          <span id="settingsPlan" class="text-muted">—</span>
+        </div>
+        <button id="refreshAuthBtn" class="btn btn-secondary btn-compact full-width" style="margin-top:8px;">🔄 Bağlantıyı Yenile</button>
       </div>
 
-      <!-- Help Section -->
-      <div class="help-section">
-        <details>
-          <summary>Nasıl kullanılır</summary>
-          <ol>
-            <li>Kolayxport hesabınıza giriş yapın</li>
-            <li>Etsy Shop Manager Siparişler sayfasına gidin</li>
-            <li>Eklenti yeni siparişleri otomatik olarak senkronlar</li>
-            <li>Geçmiş veriler için "Tüm Siparişleri İçe Aktar" kullanın</li>
-          </ol>
-        </details>
+      <div class="card">
+        <h3 class="card-title">Etsy Overlay Ayarları</h3>
+        <div class="setting-row">
+          <span>Arama Overlay</span>
+          <label class="toggle"><input type="checkbox" id="toggleSearch" checked><span class="slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <span>Listing Paneli</span>
+          <label class="toggle"><input type="checkbox" id="toggleListing" checked><span class="slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <span>Mağaza Barı</span>
+          <label class="toggle"><input type="checkbox" id="toggleShop" checked><span class="slider"></span></label>
+        </div>
       </div>
-    </main>
+
+      <div class="card">
+        <h3 class="card-title">eBay Overlay Ayarları</h3>
+        <div class="setting-row">
+          <span>Arama Overlay</span>
+          <label class="toggle"><input type="checkbox" id="toggleEbaySearch" checked><span class="slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <span>Listing Paneli</span>
+          <label class="toggle"><input type="checkbox" id="toggleEbayListing" checked><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Önbellek</h3>
+        <div class="setting-row">
+          <span>Araştırma önbelleği</span>
+          <button id="clearCacheBtn" class="btn btn-secondary btn-compact">Temizle</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="setting-row">
+          <span>Versiyon</span>
+          <span class="text-muted">v7.0.0</span>
+        </div>
+      </div>
+    </div>
 
     <footer>
-      <a href="https://kolayxport.com/app" target="_blank">Kolayxport'u Aç</a>
-      <span class="separator">|</span>
+      <a href="https://kolayxport.com/app" target="_blank">KolayXport</a>
+      <span class="sep">·</span>
       <a href="https://kolayxport.com/help/chrome-extension" target="_blank">Yardım</a>
     </footer>
   </div>

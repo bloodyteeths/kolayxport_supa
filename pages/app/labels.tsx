@@ -2332,14 +2332,14 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   };
 
   return (
-    <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px - 48px)' }, display: 'flex', flexDirection: 'column', p: { xs: 0.5, sm: 2 }, overflow: 'hidden', maxWidth: '100%' }}>
+    <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px - 48px)' }, display: 'flex', flexDirection: 'column', p: { xs: 0.5, sm: 2 }, overflow: 'auto', maxWidth: '100%' }}>
       <Toaster position="top-right" reverseOrder={false} />
       <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: { xs: 1, sm: 2 }, fontSize: { xs: '1.1rem', sm: '1.5rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {t('labelManagement')}
       </Typography>
-      <Box sx={{ display:'flex', flexDirection:'column', gap: 1, mb: 1, maxWidth: '100%', overflow: 'hidden' }}>
+      <Box sx={{ display:'flex', flexDirection:'column', gap: 1, mb: 1, maxWidth: '100%', flexShrink: 0 }}>
         {/* Row 1: Actions + Search (always visible) */}
-        <Paper elevation={1} sx={{ p: { xs: 0.75, sm: 1.5 }, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', overflow: 'hidden', maxWidth: '100%' }}>
+        <Paper elevation={1} sx={{ p: { xs: 0.75, sm: 1.5 }, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%' }}>
           <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.8rem' }, px: { xs: 1, sm: 2 }, minWidth: 0, whiteSpace: 'nowrap' }}>
             {syncingOrders ? t('syncing') : t('syncButton')}
           </Button>

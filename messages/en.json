@@ -402,6 +402,7 @@
     "product": "Product"
   },
   "labels": {
+    "reset": "Reset",
     "addressLine1": "Address Line 1",
     "addressLine2": "Address Line 2",
     "recipientFirstName": "Recipient First Name",

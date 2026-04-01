@@ -362,6 +362,7 @@
     "product": "Ürün"
   },
   "labels": {
+    "reset": "Sıfırla",
     "addressLine1": "Adres Satırı 1",
     "addressLine2": "Adres Satırı 2",
     "recipientFirstName": "Alıcı Adı",

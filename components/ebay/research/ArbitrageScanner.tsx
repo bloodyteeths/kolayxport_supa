@@ -216,7 +216,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
       saveScan(saveLabel.trim());
       setSaveDialogOpen(false);
       setSaveLabel('');
-      toast.success('Tarama kaydedildi');
+      toast.success(ta('scanSaved'));
     }
   };
 
@@ -234,14 +234,14 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700, fontSize: isMobile ? '1rem' : '1.2rem' }}>
-              Trendyol → eBay Arbitraj Pro
+              {ta('headerTitle')}
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.8 }}>
               {TRENDYOL_CATEGORIES.length} {ta('categoriesLabel')} | {exchangeRate ? `1 TRY = $${exchangeRate.toFixed(4)}` : ta('loadingRate')}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Ayarlar">
+            <Tooltip title={ta('settingsTooltip')}>
               <IconButton size="small" sx={{ color: '#fff' }} onClick={() => setShowSettings(!showSettings)}>
                 <SlidersHorizontal size={18} />
               </IconButton>
@@ -262,34 +262,34 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
         <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 2 }}>
             <TextField
-              size="small" label="Kargo Maliyeti ($)"
+              size="small" label={ta('shippingCostLabel')}
               type="number" value={shippingCost}
               onChange={(e) => store.setShippingCost(Number(e.target.value))}
               InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
             />
             <TextField
-              size="small" label="Min. Kâr ($)"
+              size="small" label={ta('minProfitLabel')}
               type="number" value={minProfit}
               onChange={(e) => store.setMinProfit(Number(e.target.value))}
               InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
             />
             <TextField
-              size="small" label="Min. ROI (%)"
+              size="small" label={ta('minRoiLabel')}
               type="number" value={minRoi}
               onChange={(e) => store.setMinRoi(Number(e.target.value))}
               InputProps={{ startAdornment: <InputAdornment position="start">%</InputAdornment> }}
             />
             <TextField
-              size="small" label="Komisyon Override (%)"
+              size="small" label={ta('feeOverrideLabel')}
               value={feeOverride}
               onChange={(e) => store.setFeeOverride(e.target.value)}
-              placeholder="Otomatik"
+              placeholder={ta('autoPlaceholder')}
             />
             <TextField
-              size="small" label="Kur Override"
+              size="small" label={ta('exchangeRateOverrideLabel')}
               value={exchangeRateOverride}
               onChange={(e) => store.setExchangeRateOverride(e.target.value)}
-              placeholder="Otomatik"
+              placeholder={ta('autoPlaceholder')}
             />
             <TextField
               size="small" label={ta('maxResults')}
@@ -349,7 +349,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
             disabled={loading}
             sx={{ fontSize: '0.75rem', textTransform: 'none', fontWeight: 700 }}
           >
-            Hepsini Tara ({TRENDYOL_CATEGORIES.length})
+            {ta('scanAll', { count: TRENDYOL_CATEGORIES.length })}
           </Button>
         </Tooltip>
       </Box>
@@ -384,7 +384,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
             sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
           >
             <Tab label={`${ta('resultsTab')} (${filteredResults.length})`} sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
-            <Tab label="Grafikler" sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
+            <Tab label={ta('chartsTab')} sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
             <Tab label={ta('historyTab')} sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
           </Tabs>
 
@@ -418,7 +418,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
             {ta('scannerHint')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {TRENDYOL_CATEGORIES.length} {ta('categoriesReady')} | Tiered matching: GTIN → AI → Fallback
+            {TRENDYOL_CATEGORIES.length} {ta('categoriesReady')} | {ta('tieredMatchingLabel')}
           </Typography>
         </Paper>
       )}
@@ -455,7 +455,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setSaveDialogOpen(false)}>{ta('cancel')}</Button>
-          <Button variant="contained" onClick={handleSaveScan} disabled={!saveLabel.trim()}>Kaydet</Button>
+          <Button variant="contained" onClick={handleSaveScan} disabled={!saveLabel.trim()}>{ta('saveButton')}</Button>
         </DialogActions>
       </Dialog>
     </Box>

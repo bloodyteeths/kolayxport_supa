@@ -110,15 +110,15 @@ interface MetricDef {
 }
 
 const METRICS: MetricDef[] = [
-  { key: 'totalResults', label: 'Toplam Sonuc', format: v => v.toLocaleString(), higherIsBetter: true, isScore: false },
-  { key: 'avgPrice', label: 'Ort. Fiyat', format: v => `$${v.toFixed(2)}`, higherIsBetter: true, isScore: false },
-  { key: 'medianPrice', label: 'Medyan Fiyat', format: v => `$${v.toFixed(2)}`, higherIsBetter: true, isScore: false },
-  { key: 'demandScore', label: 'Talep Skoru', format: v => String(v), higherIsBetter: true, isScore: true },
-  { key: 'competitionScore', label: 'Rekabet Skoru', format: v => String(v), higherIsBetter: false, isScore: true },
-  { key: 'opportunityScore', label: 'opportunityScore', format: v => String(v), higherIsBetter: true, isScore: true },
-  { key: 'uniqueSellers', label: 'Benzersiz Satici', format: v => v.toLocaleString(), higherIsBetter: false, isScore: false },
-  { key: 'freeShippingPct', label: 'Ucretsiz Kargo %', format: v => `%${v.toFixed(1)}`, higherIsBetter: true, isScore: false },
-  { key: 'sellerConcentration', label: 'Satici Yogunlugu', format: v => `%${v.toFixed(1)}`, higherIsBetter: false, isScore: false },
+  { key: 'totalResults', label: 'metricTotalResults', format: v => v.toLocaleString(), higherIsBetter: true, isScore: false },
+  { key: 'avgPrice', label: 'metricAvgPrice', format: v => `$${v.toFixed(2)}`, higherIsBetter: true, isScore: false },
+  { key: 'medianPrice', label: 'metricMedianPrice', format: v => `$${v.toFixed(2)}`, higherIsBetter: true, isScore: false },
+  { key: 'demandScore', label: 'metricDemandScore', format: v => String(v), higherIsBetter: true, isScore: true },
+  { key: 'competitionScore', label: 'metricCompetitionScore', format: v => String(v), higherIsBetter: false, isScore: true },
+  { key: 'opportunityScore', label: 'metricOpportunityScore', format: v => String(v), higherIsBetter: true, isScore: true },
+  { key: 'uniqueSellers', label: 'metricUniqueSellers', format: v => v.toLocaleString(), higherIsBetter: false, isScore: false },
+  { key: 'freeShippingPct', label: 'metricFreeShippingPct', format: v => `%${v.toFixed(1)}`, higherIsBetter: true, isScore: false },
+  { key: 'sellerConcentration', label: 'metricSellerConcentration', format: v => `%${v.toFixed(1)}`, higherIsBetter: false, isScore: false },
 ];
 
 function getWinnerIndex(values: (number | undefined)[], higherIsBetter: boolean): number {
@@ -173,7 +173,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
         setSavedNiches(niches);
       })
       .catch(() => {
-        toast.error('Kaydedilmis nisler yuklenemedi');
+        toast.error(t('loadSavedNichesError'));
       })
       .finally(() => setLoadingSaved(false));
   }, [userId]);
@@ -220,7 +220,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
       const slot = prev[index];
       const q = (keyword || slot.keyword).trim();
       if (!q) {
-        toast.error('Anahtar kelime girin');
+        toast.error(t('enterKeyword'));
         return prev;
       }
       return prev.map((s, i) => i === index ? { ...s, loading: true, keyword: keyword || s.keyword } : s);
@@ -235,7 +235,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
       updateSlot(index, { data, loading: false });
     } catch (err: any) {
       updateSlot(index, { loading: false });
-      toast.error(`Analiz hatasi: ${err.message}`);
+      toast.error(t('analyzeError', { message: err.message }));
     }
   }, [userId, slots, updateSlot]);
 
@@ -274,7 +274,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
         borderRadius: 3,
       }}>
         <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, color: '#1e1b4b', fontWeight: 700 }}>
-          <BarChart3 size={20} color="#6366f1" /> Nis Karsilastirma
+          <BarChart3 size={20} color="#6366f1" /> {t('title')}
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -292,7 +292,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e1b4b' }}>
-                  Nis {index + 1}
+                  {t('nicheSlot', { index: index + 1 })}
                 </Typography>
                 {slot.data && (
                   <ScoreBadge score={slot.data.opportunityScore} label={t('opportunityScore')} />
@@ -373,7 +373,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                     '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
                   }}
                 >
-                  {slot.loading ? 'Analiz...' : 'Analiz Et'}
+                  {slot.loading ? t('analyzing') : t('analyze')}
                 </Button>
               </Box>
             </Paper>
@@ -387,7 +387,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
             onClick={addSlot}
             sx={{ mt: 1.5, color: '#6366f1', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }}
           >
-            Nis Ekle
+            {t('addNiche')}
           </Button>
         )}
       </Paper>
@@ -407,7 +407,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                      <TableCell sx={{ fontWeight: 700, minWidth: 150, color: '#1e1b4b' }}>Metrik</TableCell>
+                      <TableCell sx={{ fontWeight: 700, minWidth: 150, color: '#1e1b4b' }}>{t('metricHeader')}</TableCell>
                       {slots.map((slot, i) => slot.data && (
                         <TableCell key={i} sx={{ fontWeight: 700, textAlign: 'center', color: '#1e1b4b' }}>
                           {slot.data.query}
@@ -424,7 +424,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                       return (
                         <TableRow key={metric.key} sx={{ bgcolor: metricIdx % 2 === 0 ? '#f8faff' : '#fff' }}>
                           <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap', color: '#1e1b4b' }}>
-                            {metric.label}
+                            {t(metric.label)}
                           </TableCell>
                           {slots.map((slot, i) => {
                             if (!slot.data) return null;
@@ -476,7 +476,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                     borderRadius: 2.5,
                   }}>
                     <Typography variant="caption" sx={{ fontWeight: 700, color: '#1e1b4b', mb: 0.5, display: 'block' }}>
-                      {metric.label}
+                      {t(metric.label)}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       {slots.map((slot, i) => {
@@ -530,7 +530,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
                 <Crown size={22} color="#f59e0b" />
                 <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e1b4b' }}>
-                  En Iyi Nis: {bestNiche.data.query}
+                  {t('bestNiche', { query: bestNiche.data.query })}
                 </Typography>
                 <ScoreBadge score={bestNiche.data.opportunityScore} label={t('opportunityScore')} />
               </Box>
@@ -560,7 +560,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                         onClick={() => onNavigate('product_database', { keyword: slot.data!.query })}
                         sx={{ color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' } }}
                       >
-                        Urunleri Gor
+                        {t('viewProducts')}
                       </Button>
                       <Button
                         size="small"
@@ -569,7 +569,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                         onClick={() => onNavigate('seo_analyzer', { keyword: slot.data!.query })}
                         sx={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: '#8b5cf6', color: '#fff', borderColor: '#8b5cf6' } }}
                       >
-                        SEO Kontrol
+                        {t('seoCheck')}
                       </Button>
                     </Box>
                   ))}

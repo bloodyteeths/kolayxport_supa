@@ -33,18 +33,18 @@ interface BestsellerItem {
 }
 
 const POPULAR_CATEGORIES = [
-  { id: '293', name: 'Elektronik', icon: '⚡' },
-  { id: '11450', name: 'Giyim', icon: '👕' },
-  { id: '1', name: 'Koleksiyon', icon: '🏆' },
-  { id: '11700', name: 'homeGarden', icon: '🏠' },
-  { id: '888', name: 'Spor', icon: '⚽' },
-  { id: '220', name: 'Oyuncak', icon: '🧸' },
-  { id: '267', name: 'Kitap', icon: '📚' },
-  { id: '281', name: 'jewelry', icon: '💎' },
-  { id: '6000', name: 'autoParts', icon: '🚗' },
-  { id: '26395', name: 'healthBeauty', icon: '💄' },
-  { id: '15032', name: 'Cep Telefonu', icon: '📱' },
-  { id: '58058', name: 'Bilgisayar', icon: '💻' },
+  { id: '293', name: 'cat_Elektronik', icon: '⚡' },
+  { id: '11450', name: 'cat_Giyim', icon: '👕' },
+  { id: '1', name: 'cat_Koleksiyon', icon: '🏆' },
+  { id: '11700', name: 'cat_homeGarden', icon: '🏠' },
+  { id: '888', name: 'cat_Spor', icon: '⚽' },
+  { id: '220', name: 'cat_Oyuncak', icon: '🧸' },
+  { id: '267', name: 'cat_Kitap', icon: '📚' },
+  { id: '281', name: 'cat_jewelry', icon: '💎' },
+  { id: '6000', name: 'cat_autoParts', icon: '🚗' },
+  { id: '26395', name: 'cat_healthBeauty', icon: '💄' },
+  { id: '15032', name: 'cat_cellPhone', icon: '📱' },
+  { id: '58058', name: 'cat_computer', icon: '💻' },
 ];
 
 async function ebayApiCall(action: string, userId: string, params: Record<string, any> = {}) {
@@ -292,7 +292,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                   color: selectedCategory?.id === cat.id ? '#6366f1' : 'text.primary',
                 }}
               >
-                {cat.name}
+                {t(cat.name)}
               </Typography>
             </Paper>
           ))}
@@ -354,7 +354,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
             <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1e1b4b' }}>
               <Package size={16} color="#6366f1" />
-              {t(selectedCategory.name)} — {t('bestsellers')}
+              {selectedCategory.name.startsWith('cat_') ? t(selectedCategory.name) : selectedCategory.name} — {t('bestsellers')}
             </Typography>
             {onNavigate && (
               <Stack direction="row" spacing={1}>
@@ -365,7 +365,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                   onClick={() => onNavigate('product_database', { categoryId: selectedCategory.id })}
                   sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', fontWeight: 600, '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' } }}
                 >
-                  Bu kategoride ara
+                  {t('searchInCategory')}
                 </Button>
                 <Button
                   size="small"
@@ -404,7 +404,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, color: '#6366f1' }}>
                   <DollarSign size={18} />
                 </Box>
-                <Typography variant="caption" color="text.secondary">Ort. Fiyat</Typography>
+                <Typography variant="caption" color="text.secondary">{t('avgPrice')}</Typography>
                 <Typography variant="h6" fontWeight={700} sx={{ color: '#6366f1' }}>${stats.avgPrice.toFixed(2)}</Typography>
               </Paper>
             </Stack>
@@ -418,8 +418,8 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                   <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
                     <TableCell sx={{ fontWeight: 700, width: 56, color: '#1e1b4b' }}>{t('image')}</TableCell>
                     <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('titleCol')}</TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">Fiyat</TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Durum</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">{t('price')}</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('condition')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>

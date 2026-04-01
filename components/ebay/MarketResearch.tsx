@@ -903,18 +903,18 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
 
               {/* Title length comparison */}
               <Paper sx={{ p: 2, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Baslik Uzunlugu</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('titleLength')}</Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-                    <Typography variant="caption" color="text.secondary">Benim Basligim</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>{myTitle.length} karakter</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('myTitle')}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('myTitleHelper', { count: myTitle.length })}</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-                    <Typography variant="caption" color="text.secondary">Rakip Ortalamasi</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>{seoResult.avgLen} karakter</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('competitorAvg')}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('myTitleHelper', { count: seoResult.avgLen })}</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-                    <Typography variant="caption" color="text.secondary">Optimal Aralik</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('optimalRange')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: '#4caf50' }}>60-80</Typography>
                   </Paper>
                 </Box>
@@ -937,7 +937,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
               {/* Recommendations */}
               {seoResult.recommendations.length > 0 && (
                 <Alert severity={seoResult.score >= 70 ? 'success' : 'warning'} sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>Oneriler</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>{t('recommendations')}</Typography>
                   {seoResult.recommendations.map((rec, i) => (
                     <Typography key={i} variant="body2">• {rec}</Typography>
                   ))}
@@ -950,10 +950,10 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Anahtar Kelime</TableCell>
-                        <TableCell align="center">Kullanim %</TableCell>
-                        <TableCell align="center">Basligimda</TableCell>
-                        <TableCell align="center">Islem</TableCell>
+                        <TableCell>{t('keyword')}</TableCell>
+                        <TableCell align="center">{t('usagePct')}</TableCell>
+                        <TableCell align="center">{t('inMyTitle')}</TableCell>
+                        <TableCell align="center">{t('action')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -977,10 +977,10 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                           </TableCell>
                           <TableCell align="center">
                             {!kw.inMyTitle && (
-                              <Tooltip title="Kelimeyi kopyala">
+                              <Tooltip title={t('copyKeyword')}>
                                 <IconButton size="small" onClick={() => {
                                   navigator.clipboard.writeText(kw.keyword);
-                                  toast.success(`"${kw.keyword}" panoya kopyalandi`);
+                                  toast.success(t('keywordCopied', { keyword: kw.keyword }));
                                 }}>
                                   <Copy size={14} />
                                 </IconButton>
@@ -998,7 +998,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
               {aspectDistributions.length > 0 && (
                 <Paper sx={{ p: 2 }}>
                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
-                    Populer Urun Ozellikleri
+                    {t('popularProductAttributes')}
                   </Typography>
                   {aspectDistributions.slice(0, 8).map((aspect) => (
                     <Box key={aspect.localizedAspectName} sx={{ mb: 1.5 }}>
@@ -1021,8 +1021,8 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
           ) : !loading && (
             <Alert severity="info">
               {myTitle
-                ? 'Oncelikle bir arama yapin, ardindan SEO skorunuz otomatik hesaplanacak.'
-                : 'SEO analizi icin yukaridaki "Benim Basligim" alanini doldurun ve arama yapin.'}
+                ? t('seoNoDataWithTitle')
+                : t('seoNoDataNoTitle')}
             </Alert>
           )}
         </Box>
@@ -1036,7 +1036,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
           {hasData ? (
             <>
               <Alert severity="info" sx={{ mb: 2 }}>
-                Rakiplerin basliklarindan cikarilan en populer anahtar kelimeler. Tiklayin ve kopyalayin.
+                {t('keywordsInfo')}
               </Alert>
 
               {/* Filter toggle */}
@@ -1048,13 +1048,13 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                     onClick={() => setKwShowMissing(!kwShowMissing)}
                     sx={{ mr: 1 }}
                   >
-                    {kwShowMissing ? 'Tum Kelimeler' : 'Basligimda Olmayanlar'}
+                    {kwShowMissing ? t('allKeywords') : t('missingFromTitle')}
                   </Button>
                 </Box>
               )}
 
               {/* Single keywords */}
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Tek Kelimeler</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('singleKeywords')}</Typography>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
                 {(kwShowMissing ? enrichedKeywords.filter((k) => !k.inMyTitle) : enrichedKeywords).map((kw) => (
                   <Chip
@@ -1065,7 +1065,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                     variant={kw.inMyTitle ? 'filled' : 'outlined'}
                     onClick={() => {
                       navigator.clipboard.writeText(kw.keyword);
-                      toast.success(`"${kw.keyword}" kopyalandi`);
+                      toast.success(t('keywordCopiedShort', { keyword: kw.keyword }));
                     }}
                     sx={{ cursor: 'pointer' }}
                   />
@@ -1075,7 +1075,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
               {/* Bigrams */}
               {bigrams.length > 0 && (
                 <>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>2 Kelimelik Ifadeler (Bigrams)</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('bigrams')}</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
                     {bigrams.slice(0, 25).map((b) => (
                       <Chip
@@ -1086,7 +1086,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                         variant="outlined"
                         onClick={() => {
                           navigator.clipboard.writeText(b.phrase);
-                          toast.success(`"${b.phrase}" kopyalandi`);
+                          toast.success(t('keywordCopiedShort', { keyword: b.phrase }));
                         }}
                         sx={{ cursor: 'pointer' }}
                       />
@@ -1098,18 +1098,18 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
               {/* Trigrams / Long-tail */}
               {trigrams.length > 0 && (
                 <>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Uzun Kuyruk Anahtar Kelimeler (3+ kelime)</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('longtailKeywords')}</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
-                    {trigrams.slice(0, 20).map((t) => (
+                    {trigrams.slice(0, 20).map((tri) => (
                       <Chip
-                        key={t.phrase}
-                        label={`${t.phrase} (${t.count})`}
+                        key={tri.phrase}
+                        label={`${tri.phrase} (${tri.count})`}
                         size="small"
                         color="secondary"
                         variant="outlined"
                         onClick={() => {
-                          navigator.clipboard.writeText(t.phrase);
-                          toast.success(`"${t.phrase}" kopyalandi`);
+                          navigator.clipboard.writeText(tri.phrase);
+                          toast.success(t('keywordCopiedShort', { keyword: tri.phrase }));
                         }}
                         sx={{ cursor: 'pointer' }}
                       />
@@ -1120,7 +1120,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
 
               {/* Keyword density visualization */}
               <Paper sx={{ p: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Anahtar Kelime Yogunlugu</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('keywordDensity')}</Typography>
                 {enrichedKeywords.slice(0, 15).map((kw) => (
                   <Box key={kw.keyword} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                     <Typography variant="body2" sx={{ minWidth: 100, fontWeight: kw.inMyTitle ? 600 : 400 }}>
@@ -1151,12 +1151,12 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
             <>
               {/* Sort controls */}
               <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">{items.length} urun listeleniyor</Typography>
+                <Typography variant="body2" color="text.secondary">{t('listingProducts', { count: items.length })}</Typography>
                 <Box sx={{ flex: 1 }} />
                 {(['none', 'price_asc', 'price_desc', 'feedback'] as const).map((s) => (
                   <Chip
                     key={s}
-                    label={{ none: 'Varsayilan', price_asc: 'Fiyat ↑', price_desc: 'Fiyat ↓', feedback: 'Puan' }[s]}
+                    label={{ none: t('sortDefault'), price_asc: t('sortPriceAsc'), price_desc: t('sortPriceDesc'), feedback: t('sortFeedback') }[s]}
                     size="small"
                     variant={compSort === s ? 'filled' : 'outlined'}
                     color={compSort === s ? 'primary' : 'default'}
@@ -1171,12 +1171,12 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ width: 50 }} />
-                      <TableCell>Baslik</TableCell>
-                      <TableCell align="right">Fiyat</TableCell>
-                      <TableCell>Durum</TableCell>
-                      <TableCell>Satici</TableCell>
-                      <TableCell align="center">Puan</TableCell>
-                      <TableCell>Kargo</TableCell>
+                      <TableCell>{t('title')}</TableCell>
+                      <TableCell align="right">{t('price')}</TableCell>
+                      <TableCell>{t('condition')}</TableCell>
+                      <TableCell>{t('seller')}</TableCell>
+                      <TableCell align="center">{t('rating')}</TableCell>
+                      <TableCell>{t('shipping')}</TableCell>
                       <TableCell sx={{ width: 40 }} />
                     </TableRow>
                   </TableHead>
@@ -1195,7 +1195,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               {item.topRatedBuyingExperience && (
-                                <Tooltip title="Top Rated">
+                                <Tooltip title={t('topRated')}>
                                   <Star size={14} color="#ff9800" fill="#ff9800" />
                                 </Tooltip>
                               )}
@@ -1221,13 +1221,13 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                             <Typography variant="caption">{item.seller?.username || '-'}</Typography>
                           </TableCell>
                           <TableCell align="center">
-                            <Tooltip title={`${item.seller?.feedbackPercentage || '0'}% olumlu`}>
+                            <Tooltip title={t('positivePercent', { pct: item.seller?.feedbackPercentage || '0' })}>
                               <Typography variant="caption">{item.seller?.feedbackScore ?? '-'}</Typography>
                             </Tooltip>
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={isFreeShipping ? 'Ucretsiz' : (item.shippingOptions?.[0]?.shippingCost ? `$${parseFloat(item.shippingOptions[0].shippingCost.value).toFixed(2)}` : '-')}
+                              label={isFreeShipping ? t('freeShipping') : (item.shippingOptions?.[0]?.shippingCost ? `$${parseFloat(item.shippingOptions[0].shippingCost.value).toFixed(2)}` : '-')}
                               size="small"
                               color={isFreeShipping ? 'success' : 'default'}
                               variant="outlined"
@@ -1248,7 +1248,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
               {visibleCount < items.length && (
                 <Box sx={{ textAlign: 'center', mt: 2 }}>
                   <Button variant="outlined" onClick={() => setVisibleCount((c) => c + 20)}>
-                    Daha Fazla Goster ({items.length - visibleCount} kalan)
+                    {t('showMore', { count: items.length - visibleCount })}
                   </Button>
                 </Box>
               )}
@@ -1266,20 +1266,20 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
             <>
               {/* Seller concentration */}
               <Paper sx={{ p: 2, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Satici Yogunlugu</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('sellerConcentration')}</Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1.5 }}>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-                    <Typography variant="caption" color="text.secondary">Toplam Satici</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('totalSellers')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>{sellerStats.length}</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-                    <Typography variant="caption" color="text.secondary">Urun / Satici</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('productsPerSeller')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
                       {(items.length / Math.max(sellerStats.length, 1)).toFixed(1)}
                     </Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120 }}>
-                    <Typography variant="caption" color="text.secondary">Top Rated Satici</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('topRatedSeller')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: '#ff9800' }}>
                       {sellerStats.filter((s) => s.topRated).length}
                     </Typography>
@@ -1287,19 +1287,19 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                 </Box>
                 {/* Concentration bar */}
                 <Typography variant="body2" sx={{ mb: 0.5 }}>
-                  Ilk 5 satici: {sellerConcentration.top5} urun ({sellerConcentration.total > 0 ? pct((sellerConcentration.top5 / sellerConcentration.total) * 100) : '0%'})
+                  {t('top5Sellers', { count: sellerConcentration.top5, pct: sellerConcentration.total > 0 ? pct((sellerConcentration.top5 / sellerConcentration.total) * 100) : '0%' })}
                 </Typography>
                 <Box sx={{ display: 'flex', height: 20, borderRadius: 2, overflow: 'hidden' }}>
                   <Box sx={{
                     width: `${sellerConcentration.total ? (sellerConcentration.top5 / sellerConcentration.total) * 100 : 0}%`,
                     bgcolor: '#1976d2', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem' }}>Top 5</Typography>
+                    <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem' }}>{t('top5')}</Typography>
                   </Box>
                   <Box sx={{
                     flex: 1, bgcolor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>Diger</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>{t('others')}</Typography>
                   </Box>
                 </Box>
               </Paper>
@@ -1310,12 +1310,12 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                   <TableHead>
                     <TableRow>
                       <TableCell>#</TableCell>
-                      <TableCell>Satici</TableCell>
-                      <TableCell align="center">Geri Bildirim</TableCell>
-                      <TableCell align="center">Olumlu %</TableCell>
-                      <TableCell align="center">Listeleme</TableCell>
-                      <TableCell align="right">Ort. Fiyat</TableCell>
-                      <TableCell align="center">Top Rated</TableCell>
+                      <TableCell>{t('seller')}</TableCell>
+                      <TableCell align="center">{t('feedback')}</TableCell>
+                      <TableCell align="center">{t('positivePct')}</TableCell>
+                      <TableCell align="center">{t('listings')}</TableCell>
+                      <TableCell align="right">{t('avgPrice')}</TableCell>
+                      <TableCell align="center">{t('topRated')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1356,18 +1356,18 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
           {categoryStats.length > 0 ? (
             <>
               <Alert severity="info" sx={{ mb: 2 }}>
-                Arama sonuclarindaki kategori dagilimi. Bir kategoriye tikladiginizda filtre uygulanir.
+                {t('categoryDistributionInfo')}
               </Alert>
 
               <TableContainer component={Paper} sx={{ maxHeight: 500 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Kategori</TableCell>
-                      <TableCell align="center">ID</TableCell>
-                      <TableCell align="center">Urun Sayisi</TableCell>
-                      <TableCell sx={{ width: '30%' }}>Dagilim</TableCell>
-                      <TableCell align="center">Filtrele</TableCell>
+                      <TableCell>{t('category')}</TableCell>
+                      <TableCell align="center">{t('id')}</TableCell>
+                      <TableCell align="center">{t('productCount')}</TableCell>
+                      <TableCell sx={{ width: '30%' }}>{t('distribution')}</TableCell>
+                      <TableCell align="center">{t('filter')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1391,9 +1391,9 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                         <TableCell align="center">
                           <Button size="small" variant="outlined" onClick={() => {
                             setCategoryFilter(cat.id);
-                            toast.success(`Kategori filtresi: ${cat.name}`);
+                            toast.success(t('categoryFilterApplied', { name: cat.name }));
                           }}>
-                            Sec
+                            {t('select')}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -1405,7 +1405,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
               {/* Aspect-based subcategory breakdown */}
               {aspectDistributions.length > 0 && (
                 <Paper sx={{ p: 2, mt: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Alt Kategori / Ozellik Dagilimi</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('subcategoryDistribution')}</Typography>
                   {aspectDistributions.slice(0, 6).map((aspect) => (
                     <Box key={aspect.localizedAspectName} sx={{ mb: 2 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>{aspect.localizedAspectName}</Typography>
@@ -1445,7 +1445,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                 }}>
                   {demandScore.score}/100
                 </Typography>
-                <Typography variant="body1" color="text.secondary">Firsat Skoru</Typography>
+                <Typography variant="body1" color="text.secondary">{t('opportunityScore')}</Typography>
                 <LinearProgress
                   variant="determinate"
                   value={demandScore.score}
@@ -1457,21 +1457,21 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                   }}
                 />
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  {demandScore.score >= 70 ? 'Bu nis iyi bir firsat! Rekabet makul ve pazar buyuklugu uygun.' :
-                    demandScore.score >= 40 ? 'Orta seviye firsat. Rekabet analizi yaparak stratejinizi belirleyin.' :
-                      'Bu pazar cok rekabetci veya doygun olabilir. Nis bir alt kategori bulmaya calisin.'}
+                  {demandScore.score >= 70 ? t('opportunityHigh') :
+                    demandScore.score >= 40 ? t('opportunityMedium') :
+                      t('opportunityLow')}
                 </Typography>
               </Paper>
 
               {/* Breakdown */}
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
                 {[
-                  { label: 'Toplam Sonuc', value: demandScore.totalResults.toLocaleString(), desc: 'Arz miktari' },
-                  { label: 'Benzersiz Satici', value: demandScore.uniqueSellers.toString(), desc: 'Rekabet' },
-                  { label: 'Urun/Satici', value: demandScore.itemsPerSeller.toString(), desc: 'Yogunluk' },
-                  { label: 'Fiyat Yayilimi', value: `${demandScore.priceSpread}x`, desc: 'Cesitlilik' },
-                  { label: 'Ucretsiz Kargo', value: `${demandScore.freeShippingPct}%`, desc: 'Musteri beklentisi' },
-                  { label: 'Ort. Geri Bildirim', value: demandScore.avgFeedback.toLocaleString(), desc: 'Pazar olgunlugu' },
+                  { label: t('totalResults'), value: demandScore.totalResults.toLocaleString(), desc: t('supplyAmount') },
+                  { label: t('uniqueSellers'), value: demandScore.uniqueSellers.toString(), desc: t('competition') },
+                  { label: t('productsPerSellerLabel'), value: demandScore.itemsPerSeller.toString(), desc: t('concentration') },
+                  { label: t('priceSpread'), value: `${demandScore.priceSpread}x`, desc: t('diversity') },
+                  { label: t('freeShippingPct'), value: `${demandScore.freeShippingPct}%`, desc: t('customerExpectation') },
+                  { label: t('avgFeedback'), value: demandScore.avgFeedback.toLocaleString(), desc: t('marketMaturity') },
                 ].map((m) => (
                   <Paper key={m.label} sx={{ p: 1.5, flex: 1, minWidth: 130 }}>
                     <Typography variant="caption" color="text.secondary">{m.label}</Typography>
@@ -1483,13 +1483,13 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
 
               {/* Score breakdown */}
               <Paper sx={{ p: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Skor Aciklamasi</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('scoreBreakdown')}</Typography>
                 {[
-                  { label: 'Arz Skoru', score: demandScore.breakdown.supplyScore, max: 25, desc: 'Dusuk arz = yuksek firsat' },
-                  { label: 'Rekabet Skoru', score: demandScore.breakdown.compScore, max: 25, desc: 'Az satici = daha kolay giris' },
-                  { label: 'Fiyat Yayilim Skoru', score: demandScore.breakdown.spreadScore, max: 20, desc: 'Genis aralik = nis firsat' },
-                  { label: 'Kargo Skoru', score: demandScore.breakdown.shippingScore, max: 15, desc: 'Daha az ucretsiz = daha az baski' },
-                  { label: 'Pazar Olgunluk Skoru', score: demandScore.breakdown.estScore, max: 15, desc: 'Yeni pazar = kolay giris' },
+                  { label: t('supplyScore'), score: demandScore.breakdown.supplyScore, max: 25, desc: t('supplyScoreDesc') },
+                  { label: t('competitionScore'), score: demandScore.breakdown.compScore, max: 25, desc: t('competitionScoreDesc') },
+                  { label: t('priceSpreadScore'), score: demandScore.breakdown.spreadScore, max: 20, desc: t('priceSpreadScoreDesc') },
+                  { label: t('shippingScore'), score: demandScore.breakdown.shippingScore, max: 15, desc: t('shippingScoreDesc') },
+                  { label: t('marketMaturityScore'), score: demandScore.breakdown.estScore, max: 15, desc: t('marketMaturityScoreDesc') },
                 ].map((b) => (
                   <Box key={b.label} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                     <Typography variant="body2" sx={{ minWidth: 150 }}>{b.label}</Typography>
@@ -1518,10 +1518,10 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
       {tab === 7 && (
         <Box>
           <Paper sx={{ p: 2, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>Kar Hesaplayici</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>{t('profitCalculatorTitle')}</Typography>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
               <TextField
-                label="Alis Maliyeti ($)"
+                label={t('purchaseCost')}
                 value={purchaseCost}
                 onChange={(e) => setPurchaseCost(e.target.value)}
                 size="small"
@@ -1530,17 +1530,17 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
               />
               <TextField
-                label="Satis Fiyati ($)"
+                label={t('sellingPrice')}
                 value={sellingPrice || (priceStats?.avg.toFixed(2) || '')}
                 onChange={(e) => setSellingPrice(e.target.value)}
                 size="small"
                 type="number"
                 sx={{ flex: 1, minWidth: 140 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-                helperText={priceStats ? `Pazar ortalamasi: ${fmt(priceStats.avg)}` : ''}
+                helperText={priceStats ? t('marketAverage', { price: fmt(priceStats.avg) }) : ''}
               />
               <TextField
-                label="Kargo Maliyeti ($)"
+                label={t('shippingCost')}
                 value={shippingCost}
                 onChange={(e) => setShippingCost(e.target.value)}
                 size="small"
@@ -1553,19 +1553,19 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
 
           {/* Fee breakdown */}
           <Paper sx={{ p: 2, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Ucret Detaylari</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('feeDetails')}</Typography>
             <TableContainer>
               <Table size="small">
                 <TableBody>
                   <TableRow>
-                    <TableCell>Satis Fiyati</TableCell>
+                    <TableCell>{t('sellingPriceLabel')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>{fmt(profitCalc.sell)}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        eBay Komisyonu (13.25%)
-                        <Tooltip title="Cogu kategori icin son deger ucreti"><Info size={14} color="#999" /></Tooltip>
+                        {t('ebayCommission')}
+                        <Tooltip title={t('ebayCommissionTooltip')}><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.ebayFee)}</TableCell>
@@ -1573,29 +1573,29 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        Odeme Isleme (2.9% + $0.30)
-                        <Tooltip title="Managed Payments / PayPal ucreti"><Info size={14} color="#999" /></Tooltip>
+                        {t('paymentProcessing')}
+                        <Tooltip title={t('paymentProcessingTooltip')}><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.paymentFee)}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell>Alis Maliyeti</TableCell>
+                    <TableCell>{t('purchaseCostLabel')}</TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.cost)}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell>Kargo Maliyeti</TableCell>
+                    <TableCell>{t('shippingCostLabel')}</TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.ship)}</TableCell>
                   </TableRow>
                   <Divider component="tr" />
                   <TableRow sx={{ bgcolor: profitCalc.profit >= 0 ? '#e8f5e9' : '#ffebee' }}>
-                    <TableCell sx={{ fontWeight: 700 }}>Net Kar</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>{t('netProfit')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, color: profitCalc.profit >= 0 ? 'success.main' : 'error.main' }}>
                       {fmt(profitCalc.profit)}
                     </TableCell>
                   </TableRow>
                   <TableRow sx={{ bgcolor: profitCalc.profit >= 0 ? '#e8f5e9' : '#ffebee' }}>
-                    <TableCell sx={{ fontWeight: 700 }}>Kar Marji</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>{t('profitMargin')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, color: profitCalc.profit >= 0 ? 'success.main' : 'error.main' }}>
                       {pct(profitCalc.margin)}
                     </TableCell>
@@ -1607,15 +1607,15 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
 
           {/* Price comparison table */}
           <Paper sx={{ p: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Farkli Fiyat Noktalari Karsilastirmasi</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('priceComparisonTitle')}</Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Senaryo</TableCell>
-                    <TableCell align="right">Fiyat</TableCell>
-                    <TableCell align="right">Kar</TableCell>
-                    <TableCell align="right">Marj</TableCell>
+                    <TableCell>{t('scenario')}</TableCell>
+                    <TableCell align="right">{t('price')}</TableCell>
+                    <TableCell align="right">{t('profit')}</TableCell>
+                    <TableCell align="right">{t('margin')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1644,19 +1644,19 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
       {tab === 8 && (
         <Box>
           <Paper sx={{ p: 2, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Satici Arastirmasi</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('sellerResearch')}</Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               <TextField
-                label="Satici Kullanici Adi"
+                label={t('sellerUsername')}
                 value={sellerUsername}
                 onChange={(e) => setSellerUsername(e.target.value)}
                 size="small"
                 sx={{ flex: 1, minWidth: 200 }}
-                placeholder="ornek: bestdeals2024"
+                placeholder={t('sellerUsernamePlaceholder')}
                 onKeyDown={(e) => e.key === 'Enter' && searchSeller()}
               />
               <TextField
-                label="Urun Filtresi (opsiyonel)"
+                label={t('productFilter')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 size="small"
@@ -1669,11 +1669,11 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                 disabled={sellerLoading || !sellerUsername.trim()}
                 startIcon={sellerLoading ? <CircularProgress size={16} /> : <Search size={16} />}
               >
-                Arastir
+                {t('searchButton')}
               </Button>
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Rakip listeleri gosterilir — tahmini satislari dahil. Rakip analizi tabindan satici adina tiklayarak da gelebilirsiniz.
+              {t('sellerResearchHelp')}
             </Typography>
           </Paper>
 
@@ -1682,9 +1682,9 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
           {sellerItems.length > 0 && (
             <>
               <Alert severity="info" sx={{ mb: 2 }}>
-                <strong>{sellerUsername}</strong> saticisinin {sellerTotal} urunundan {sellerItems.length} tanesi gosteriliyor.
+                <span dangerouslySetInnerHTML={{ __html: t('sellerResultsInfo', { seller: sellerUsername, total: sellerTotal, shown: sellerItems.length }) }} />
                 {sellerItems.filter((i: any) => i.estimatedSoldQuantity > 0).length > 0 && (
-                  <> Tahmini toplam satis: <strong>{sellerItems.reduce((s: number, i: any) => s + (i.estimatedSoldQuantity || 0), 0)}</strong> adet</>
+                  <span dangerouslySetInnerHTML={{ __html: t('sellerEstimatedSales', { count: sellerItems.reduce((s: number, i: any) => s + (i.estimatedSoldQuantity || 0), 0) }) }} />
                 )}
               </Alert>
 
@@ -1693,11 +1693,11 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ width: 50 }} />
-                      <TableCell>Baslik</TableCell>
-                      <TableCell align="right">Fiyat</TableCell>
-                      <TableCell align="center">Durum</TableCell>
-                      <TableCell align="center">Tahmini Satis</TableCell>
-                      <TableCell>Kargo</TableCell>
+                      <TableCell>{t('title')}</TableCell>
+                      <TableCell align="right">{t('price')}</TableCell>
+                      <TableCell align="center">{t('condition')}</TableCell>
+                      <TableCell align="center">{t('estimatedSales')}</TableCell>
+                      <TableCell>{t('shipping')}</TableCell>
                       <TableCell sx={{ width: 40 }} />
                     </TableRow>
                   </TableHead>
@@ -1736,7 +1736,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={isFreeShipping ? 'Ucretsiz' : (item.shippingOptions?.[0]?.shippingCost ? `$${parseFloat(item.shippingOptions[0].shippingCost.value).toFixed(2)}` : '-')}
+                              label={isFreeShipping ? t('freeShipping') : (item.shippingOptions?.[0]?.shippingCost ? `$${parseFloat(item.shippingOptions[0].shippingCost.value).toFixed(2)}` : '-')}
                               size="small"
                               color={isFreeShipping ? 'success' : 'default'}
                               variant="outlined"
@@ -1760,10 +1760,10 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
             <Paper sx={{ p: 4, textAlign: 'center' }}>
               <Users size={48} color="#ccc" />
               <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-                Rakip satici adi girin ve analiz edin
+                {t('enterSellerName')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Bir saticinin urunlerini, fiyatlarini ve tahmini satislarini gorun
+                {t('sellerDeepDiveDesc')}
               </Typography>
             </Paper>
           )}
@@ -1776,9 +1776,9 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
       {tab === 9 && (
         <Box>
           <Paper sx={{ p: 2, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Kategori Arastirmasi</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>{t('categoryResearchTitle')}</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              eBay ana kategorilerini kesfet, herhangi bir kategoriye tiklayarak en cok satan urunleri gor.
+              {t('categoryResearchDesc')}
             </Typography>
             <Button
               variant="contained"
@@ -1786,7 +1786,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
               disabled={catLoading}
               startIcon={catLoading ? <CircularProgress size={16} /> : <FolderTree size={16} />}
             >
-              {topCategories.length > 0 ? 'Yenile' : 'Kategorileri Yukle'}
+              {topCategories.length > 0 ? t('refreshCategories') : t('loadCategories')}
             </Button>
           </Paper>
 
@@ -1797,10 +1797,10 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
             <Paper sx={{ p: 2, mb: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  En Cok Satanlar: {catBestsellerName}
+                  {t('bestsellerTitle', { name: catBestsellerName })}
                 </Typography>
                 <Button size="small" onClick={() => { setCatBestsellerName(''); setCatBestsellers([]); }}>
-                  Kapat
+                  {t('closeButton')}
                 </Button>
               </Box>
 
@@ -1809,10 +1809,10 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
               {catPriceStats && (
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
                   {[
-                    { label: 'Min', value: `$${catPriceStats.min?.toFixed(2)}`, color: '#4caf50' },
-                    { label: 'Ort', value: `$${catPriceStats.avg?.toFixed(2)}`, color: '#2196f3' },
-                    { label: 'Medyan', value: `$${catPriceStats.median?.toFixed(2)}`, color: '#ff9800' },
-                    { label: 'Max', value: `$${catPriceStats.max?.toFixed(2)}`, color: '#f44336' },
+                    { label: t('min'), value: `$${catPriceStats.min?.toFixed(2)}`, color: '#4caf50' },
+                    { label: t('avgShort'), value: `$${catPriceStats.avg?.toFixed(2)}`, color: '#2196f3' },
+                    { label: t('median'), value: `$${catPriceStats.median?.toFixed(2)}`, color: '#ff9800' },
+                    { label: t('max'), value: `$${catPriceStats.max?.toFixed(2)}`, color: '#f44336' },
                   ].map((s) => (
                     <Paper key={s.label} variant="outlined" sx={{ p: 1, flex: 1, minWidth: 80, textAlign: 'center' }}>
                       <Typography variant="caption" color="text.secondary">{s.label}</Typography>
@@ -1829,10 +1829,10 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                       <TableRow>
                         <TableCell sx={{ width: 30 }}>#</TableCell>
                         <TableCell sx={{ width: 50 }} />
-                        <TableCell>Baslik</TableCell>
-                        <TableCell align="right">Fiyat</TableCell>
-                        <TableCell align="center">Tahmini Satis</TableCell>
-                        <TableCell>Satici</TableCell>
+                        <TableCell>{t('title')}</TableCell>
+                        <TableCell align="right">{t('price')}</TableCell>
+                        <TableCell align="center">{t('estimatedSales')}</TableCell>
+                        <TableCell>{t('seller')}</TableCell>
                         <TableCell sx={{ width: 40 }} />
                       </TableRow>
                     </TableHead>
@@ -1908,7 +1908,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                       onClick={() => searchCategoryBestsellers(cat.categoryId, cat.categoryName)}
                       sx={{ fontSize: '0.7rem', py: 0.3, minWidth: 0 }}
                     >
-                      Bestseller
+                      {t('bestsellers')}
                     </Button>
                   </Box>
                   {cat.children?.length > 0 && (
@@ -1924,7 +1924,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                         />
                       ))}
                       {cat.children.length > 8 && (
-                        <Chip label={`+${cat.children.length - 8} daha`} size="small" color="default" sx={{ fontSize: '0.7rem' }} />
+                        <Chip label={t('andMore', { count: cat.children.length - 8 })} size="small" color="default" sx={{ fontSize: '0.7rem' }} />
                       )}
                     </Box>
                   )}
@@ -1937,10 +1937,10 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
             <Paper sx={{ p: 4, textAlign: 'center' }}>
               <FolderTree size={48} color="#ccc" />
               <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-                Kategorileri yukleyerek baslayln
+                {t('startWithCategories')}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Her kategorinin en cok satan urunlerini kesfet, tahmini satislari gor
+                {t('categoryResearchEmpty')}
               </Typography>
             </Paper>
           )}
@@ -1958,7 +1958,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
           onClick={exportCSV}
           disabled={items.length === 0}
         >
-          CSV Indir
+          {t('downloadCsv')}
         </Button>
         <Button
           variant="outlined"
@@ -1967,7 +1967,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
           onClick={saveSearch}
           disabled={!query.trim()}
         >
-          Aramayi Kaydet
+          {t('saveSearch')}
         </Button>
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
         {savedSearches.map((s, i) => (
@@ -1983,7 +1983,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
           />
         ))}
         {savedSearches.length === 0 && (
-          <Typography variant="caption" color="text.secondary">Kayitli arama yok</Typography>
+          <Typography variant="caption" color="text.secondary">{t('noSavedSearches')}</Typography>
         )}
       </Paper>
     </Box>
@@ -1995,14 +1995,15 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
 // ---------------------------------------------------------------------------
 
 function EmptyState() {
+  const t = useTranslations('ebay.research.market');
   return (
     <Paper sx={{ p: 4, textAlign: 'center' }}>
       <Search size={48} color="#ccc" />
       <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-        Urun adi girin ve arastirmaya baslayin
+        {t('emptyStateTitle')}
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Fiyat analizi, SEO anahtar kelime arastirmasi, rakip ve satici analizi, talep skoru ve kar hesaplama yapabilirsiniz
+        {t('emptyStateDesc')}
       </Typography>
     </Paper>
   );

@@ -1161,7 +1161,7 @@ export default function ListingCreatorDialog({
       <Typography variant="subtitle2" color="text.secondary">{t('processingTime')}</Typography>
       <Box sx={{ display: 'flex', gap: 2 }}>
         <TextField
-          label="Min"
+          label={t('minLabel')}
           type="number"
           value={processingMin}
           onChange={(e) => setProcessingMin(e.target.value)}
@@ -1170,7 +1170,7 @@ export default function ListingCreatorDialog({
           size="small"
         />
         <TextField
-          label="Max"
+          label={t('maxLabel')}
           type="number"
           value={processingMax}
           onChange={(e) => setProcessingMax(e.target.value)}
@@ -1351,7 +1351,7 @@ export default function ListingCreatorDialog({
         </Box>
 
         <TextField
-          label="Prompt"
+          label={t('promptLabel')}
           placeholder={t('aiImagePromptPlaceholder')}
           fullWidth
           multiline

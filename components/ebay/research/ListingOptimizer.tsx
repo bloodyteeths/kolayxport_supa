@@ -383,7 +383,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
       const scored = items.map(scoreListing).sort((a, b) => a.health.total - b.health.total);
       setListings(scored);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      const msg = err instanceof Error ? err.message : t('unknownError');
       setError(msg);
       toast.error(msg);
     } finally {
@@ -633,9 +633,9 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
 
       const scored = scoreListing(listing);
       setManualListing(scored);
-      toast.success('Listeleme analiz edildi');
+      toast.success(t('listingAnalyzed'));
     } catch (err: any) {
-      toast.error(err.message || 'Analiz basarisiz');
+      toast.error(err.message || t('analysisFailed'));
     } finally {
       setManualLoading(false);
     }
@@ -995,7 +995,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   {selectedListing.title}
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#666' }}>
-                  Mevcut Skor: {selectedListing.health.total}/100 ({getHealthLabel(selectedListing.health.total)})
+                  {t('currentScore')}: {selectedListing.health.total}/100 ({getHealthLabel(selectedListing.health.total)})
                 </Typography>
               </Box>
               <Button
@@ -1005,7 +1005,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 disabled={optimizing}
                 sx={{ textTransform: 'none', fontSize: 12, whiteSpace: 'nowrap' }}
               >
-                {optimizing ? 'Analiz Ediliyor...' : 'Analiz Et'}
+                {optimizing ? t('analyzingBtn') : t('analyzeBtn')}
               </Button>
             </Box>
           )}
@@ -1015,14 +1015,14 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         {selectedListing && !optimizing && !suggestedTitle && (
           <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <Typography variant="body2" sx={{ fontWeight: 700, mb: 1, fontSize: 13 }}>
-              Mevcut Durum
+              {t('currentStatus')}
             </Typography>
             <ScoreBar label={t('titleLabel')} score={selectedListing.health.title} max={25} icon={<FileText size={14} />} />
             <ScoreBar label={t('descriptionLabel')} score={selectedListing.health.description} max={25} icon={<FileText size={14} />} />
             <ScoreBar label={t('imagesLabel')} score={selectedListing.health.images} max={25} icon={<ImageIcon size={14} />} />
             <ScoreBar label={t('aspectsLabel')} score={selectedListing.health.aspects} max={25} icon={<Tag size={14} />} />
             <Alert severity="info" sx={{ mt: 1, fontSize: 12 }}>
-              &quot;Analiz Et&quot; 
+              {t('clickAnalyze')} 
             </Alert>
           </Paper>
         )}
@@ -1052,11 +1052,11 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   </Box>
                   <ArrowRight size={24} color="#666" />
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, fontSize: 11, color: '#999' }}>SONRA</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, fontSize: 11, color: '#999' }}>{t('after')}</Typography>
                     <ScoreBadge score={optimizedScore.total} size={72} />
                   </Box>
                   <Chip
-                    label={`+${optimizedScore.total - selectedListing.health.total} puan`}
+                    label={`+${optimizedScore.total - selectedListing.health.total} ${t('points')}`}
                     size="small"
                     sx={{
                       bgcolor: optimizedScore.total > selectedListing.health.total ? '#e8f5e9' : '#f5f5f5',
@@ -1241,14 +1241,14 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   <Typography variant="h5" sx={{ fontWeight: 700, color: selectedListing.imageCount >= 8 ? '#4caf50' : '#ff9800' }}>
                     {selectedListing.imageCount}
                   </Typography>
-                  <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>Mevcut</Typography>
+                  <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>{t('currentLabel')}</Typography>
                 </Box>
                 <ArrowRight size={20} color="#999" />
                 <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', minWidth: 80 }}>
                   <Typography variant="h5" sx={{ fontWeight: 700, color: '#6366f1' }}>
                     {marketAvgImages || '-'}
                   </Typography>
-                  <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>Rakip Ort.</Typography>
+                  <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>{t('competitorAvgLabel')}</Typography>
                 </Box>
               </Box>
 

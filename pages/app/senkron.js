@@ -349,7 +349,7 @@ function SenkronPage() {
       renderCell: ({ row }) => (
         !row.orderNumber || row.orderNumber === 'null' ? (
           <span style={{ color: 'red', fontWeight: 'bold' }}>
-            Eksik <span style={{ background: '#ffe0e0', color: '#b71c1c', borderRadius: 4, padding: '2px 6px', marginLeft: 4, fontSize: 11 }}>Order No</span>
+            {t('missing')} <span style={{ background: '#ffe0e0', color: '#b71c1c', borderRadius: 4, padding: '2px 6px', marginLeft: 4, fontSize: 11 }}>{t('orderNumber')}</span>
           </span>
         ) : row.orderNumber
       ),
@@ -395,13 +395,13 @@ function SenkronPage() {
     },
     {
       field: 'shipBy',
-      headerName: 'Ship-by',
+      headerName: t('shipByDate'),
       width: 120,
       valueGetter: ({ row }) => row.shipBy || '—',
     },
     {
       field: 'marketplace',
-      headerName: 'Marketplace',
+      headerName: t('marketplace'),
       renderCell: ({ row }) => row.marketplace || '—',
       width: 120,
     },

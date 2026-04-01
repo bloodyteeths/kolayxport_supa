@@ -123,7 +123,8 @@ interface BackupManagerProps {
 }
 
 export default function BackupManager({ listings, userId }: BackupManagerProps) {
-  const t = useTranslations('common');
+  const t = useTranslations('ebay.backup');
+  const tc = useTranslations('common');
   const [backups, setBackups] = useState<EbayBackupEntry[]>([]);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
@@ -140,7 +141,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
   // --- Create backup (export to localStorage + download) ---
   const handleCreateBackup = () => {
     if (listings.length === 0) {
-      toast.error('Yedeklenecek ilan yok');
+      toast.error(t('noListingsToBackup'));
       return;
     }
 
@@ -173,14 +174,14 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
     saveBackupIndex(index);
 
     refresh();
-    toast.success(`${backupListings.length} ilan yedeklendi`);
+    toast.success(t('listingsBackedUp', { count: backupListings.length }));
   };
 
   // --- Download backup as JSON file ---
   const handleDownload = (backup: EbayBackupEntry) => {
     const data = loadBackupData(backup.id);
     if (data.length === 0) {
-      toast.error('Yedek verisi bulunamadi');
+      toast.error(t('backupDataNotFound'));
       return;
     }
 
@@ -205,13 +206,13 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    toast.success('Yedek dosyasi indirildi');
+    toast.success(t('backupDownloaded'));
   };
 
   // --- Download all listings directly ---
   const handleExportAll = () => {
     if (listings.length === 0) {
-      toast.error('Indirilecek ilan yok');
+      toast.error(t('noListingsToDownload'));
       return;
     }
 
@@ -247,7 +248,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    toast.success(`${listings.length} ilan JSON olarak indirildi`);
+    toast.success(t('listingsDownloadedAsJson', { count: listings.length }));
   };
 
   // --- Import from JSON file ---
@@ -267,12 +268,12 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
       const data = JSON.parse(text);
 
       if (!data.listings || !Array.isArray(data.listings)) {
-        toast.error('Gecersiz yedek dosyasi: listings alani bulunamadi');
+        toast.error(t('invalidBackupFile'));
         return;
       }
 
       if (data.platform && data.platform !== 'ebay') {
-        toast.error(`Bu bir ${data.platform} yedegi, eBay yedegi degil`);
+        toast.error(t('wrongPlatformBackup', { platform: data.platform }));
         return;
       }
 
@@ -305,9 +306,9 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
       saveBackupIndex(index);
 
       refresh();
-      toast.success(`${importedListings.length} ilan ice aktarildi ve yedeklendi`);
+      toast.success(t('listingsImported', { count: importedListings.length }));
     } catch (err: any) {
-      toast.error(`Dosya okunamadi: ${err.message}`);
+      toast.error(t('fileReadError', { message: err.message }));
     }
   };
 
@@ -317,7 +318,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
     const index = loadBackupIndex().filter((b) => b.id !== id);
     saveBackupIndex(index);
     refresh();
-    toast.success('Yedek silindi');
+    toast.success(t('backupDeleted'));
   };
 
   // --- Clear all backups ---
@@ -328,7 +329,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
     }
     localStorage.removeItem(STORAGE_KEY);
     setBackups([]);
-    toast.success('Tum yedekler temizlendi');
+    toast.success(t('allBackupsCleared'));
   };
 
   return (
@@ -336,15 +337,15 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <BackupIcon sx={{ color: 'info.main' }} />
         <Typography variant="subtitle1" fontWeight={600}>
-          Yedek Yonetimi
+          {t('title')}
         </Typography>
         {backups.length > 0 && (
-          <Chip label={`${backups.length} yedek`} size="small" color="info" sx={{ ml: 1 }} />
+          <Chip label={t('count', { count: backups.length })} size="small" color="info" sx={{ ml: 1 }} />
         )}
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Ilanlarinizi JSON olarak yedekleyin, indirin veya daha once olusturulmus yedekten geri yukleyin.
+        {t('description')}
       </Typography>
 
       {/* Action buttons */}
@@ -356,7 +357,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
           onClick={handleCreateBackup}
           disabled={listings.length === 0}
         >
-          Yedek Olustur ({listings.length} ilan)
+          {t('createBackup', { count: listings.length })}
         </Button>
         <Button
           variant="outlined"
@@ -365,7 +366,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
           onClick={handleExportAll}
           disabled={listings.length === 0}
         >
-          JSON Indir
+          {t('downloadJson')}
         </Button>
         <Button
           variant="outlined"
@@ -373,7 +374,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
           startIcon={<FileUploadIcon />}
           onClick={handleImportClick}
         >
-          JSON Ice Aktar
+          {t('importJson')}
         </Button>
         <input
           ref={fileInputRef}
@@ -388,11 +389,11 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
       {importing && (
         <Box sx={{ mb: 2 }}>
           <Typography variant="caption" color="text.secondary">
-            Ice aktarma devam ediyor...
+            {t('importInProgress')}
           </Typography>
           <LinearProgress variant="determinate" value={importProgress} sx={{ mt: 0.5 }} />
           <Typography variant="caption" color="text.secondary">
-            %{Math.round(importProgress)} tamamlandi
+            {t('percentComplete', { percent: Math.round(importProgress) })}
           </Typography>
         </Box>
       )}
@@ -400,21 +401,21 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
       {/* Backup history */}
       {backups.length === 0 ? (
         <Alert severity="info">
-          Henuz yedek bulunmuyor. Ilanlarinizi yedeklemek icin yukardaki butonu kullanin.
+          {t('noBackupsYet')}
         </Alert>
       ) : (
         <>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Yedek Gecmisi
+            {t('backupHistory')}
           </Typography>
           <TableContainer component={Paper} variant="outlined">
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Tarih</TableCell>
-                  <TableCell>Ilan Sayisi</TableCell>
-                  <TableCell>Surum</TableCell>
-                  <TableCell align="right">Islem</TableCell>
+                  <TableCell>{t('dateHeader')}</TableCell>
+                  <TableCell>{t('listingCountHeader')}</TableCell>
+                  <TableCell>{t('versionHeader')}</TableCell>
+                  <TableCell align="right">{t('actionsHeader')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -425,7 +426,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={`${backup.listing_count} ilan`}
+                        label={t('listingsLabel', { count: backup.listing_count })}
                         size="small"
                         variant="outlined"
                       />
@@ -437,7 +438,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
                     </TableCell>
                     <TableCell align="right">
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                        <Tooltip title="JSON Indir">
+                        <Tooltip title={t('downloadTooltip')}>
                           <IconButton
                             size="small"
                             color="primary"
@@ -446,7 +447,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
                             <FileDownloadIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title={t('delete')}>
+                        <Tooltip title={tc('delete')}>
                           <IconButton
                             size="small"
                             color="error"
@@ -471,7 +472,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
               onClick={handleClearAll}
               startIcon={<DeleteSweepIcon />}
             >
-              Tum Yedekleri Temizle
+              {t('clearAll')}
             </Button>
           </Box>
         </>

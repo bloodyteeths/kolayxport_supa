@@ -310,9 +310,9 @@ export default function BulkOperationsBar({
     }
 
     if (failed === 0) {
-      toast.success(`${actionLabel}: ${succeeded} listings updated`);
+      toast.success(t('toastBulkSuccess', { action: actionLabel, count: succeeded }));
     } else {
-      toast.error(`${actionLabel}: ${succeeded} ok, ${failed} failed`);
+      toast.error(t('toastBulkPartial', { action: actionLabel, succeeded, failed }));
     }
 
     setProcessing(false);
@@ -348,7 +348,7 @@ export default function BulkOperationsBar({
     if (tagsToAdd.length === 0) { toast.error(t('toastEnterAtLeastOneTag')); return; }
     const violations = selectedListings.filter((l) => l.tags.length + tagsToAdd.length > 13);
     if (violations.length > 0) {
-      toast.error(`${violations.length} listings would exceed 13-tag limit`);
+      toast.error(t('toastTagLimitExceeded', { count: violations.length }));
       return;
     }
     setAddTagDialogOpen(false);
@@ -425,8 +425,8 @@ export default function BulkOperationsBar({
         if (i < optimized.length - 1) await delay(100);
       }
       setAiResult({ success, failed });
-      if (failed === 0) toast.success(`AI Optimize: ${success} listings updated`);
-      else toast.error(`AI Optimize: ${success} ok, ${failed} failed`);
+      if (failed === 0) toast.success(t('toastAiSuccess', { count: success }));
+      else toast.error(t('toastAiPartial', { succeeded: success, failed }));
       onCompleted();
     } catch { toast.error(t('toastAiOptimizationFailed')); }
     finally { setAiProcessing(false); setAiProgress(0); }
@@ -455,8 +455,8 @@ export default function BulkOperationsBar({
     setCopyProcessing(false);
     setCopyProgress(0);
     setTargetShopId('');
-    if (failed === 0) toast.success(`Copy: ${success} listings copied`);
-    else toast.error(`Copy: ${success} ok, ${failed} failed`);
+    if (failed === 0) toast.success(t('toastCopySuccess', { count: success }));
+    else toast.error(t('toastCopyPartial', { succeeded: success, failed }));
     onCompleted();
   };
 
@@ -498,8 +498,8 @@ export default function BulkOperationsBar({
     }
     setAltTextProcessing(false);
     setAltTextProgress(0);
-    if (failed === 0) toast.success(`Alt Text: ${success} listings updated`);
-    else toast.error(`Alt Text: ${success} ok, ${failed} failed`);
+    if (failed === 0) toast.success(t('toastAltTextSuccess', { count: success }));
+    else toast.error(t('toastAltTextPartial', { succeeded: success, failed }));
     onCompleted();
   };
 
@@ -519,8 +519,8 @@ export default function BulkOperationsBar({
     }
     setRenewProcessing(false);
     setRenewProgress(0);
-    if (failed === 0) toast.success(`Renew: ${success} listings renewed`);
-    else toast.error(`Renew: ${success} ok, ${failed} failed`);
+    if (failed === 0) toast.success(t('toastRenewSuccess', { count: success }));
+    else toast.error(t('toastRenewPartial', { succeeded: success, failed }));
     onCompleted();
   };
 
@@ -539,7 +539,7 @@ export default function BulkOperationsBar({
     if (seasonTagMode === 'add') {
       const violations = selectedListings.filter((l) => l.tags.length + seasonTags.length > 13);
       if (violations.length > 0) {
-        toast.error(`${violations.length} listings would exceed 13-tag limit`);
+        toast.error(t('toastTagLimitExceeded', { count: violations.length }));
         return;
       }
     }
@@ -606,7 +606,7 @@ export default function BulkOperationsBar({
     }
     setVariationProcessing(false);
     setVariationProgress(0);
-    const msg = `Variation price: ${success} ok${failed > 0 ? `, ${failed} failed` : ''}${skipped > 0 ? `, ${skipped} no match` : ''}`;
+    const msg = t('toastVariationSuccess', { action: 'Variation price', succeeded: success, failed });
     if (failed === 0) toast.success(msg); else toast.error(msg);
     setVariationPropertyName('');
     setVariationPropertyValue('');
@@ -638,7 +638,7 @@ export default function BulkOperationsBar({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${selectedListings.length} listings`);
+    toast.success(t('toastExported', { count: selectedListings.length }));
   };
 
   const isProcessing = processing || aiProcessing || copyProcessing || altTextProcessing || renewProcessing || variationProcessing;

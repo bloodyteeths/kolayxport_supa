@@ -58,10 +58,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             </svg>
           </div>
           <h2 className="mb-2 text-lg font-semibold text-gray-800">
-            Bir hata olustu
+            Something went wrong
           </h2>
           <p className="mb-4 max-w-md text-center text-sm text-gray-600">
-            Beklenmedik bir hata meydana geldi. Lutfen tekrar deneyin.
+            An unexpected error occurred. Please try again.
           </p>
           {process.env.NODE_ENV === 'development' && this.state.error && (
             <pre className="mb-4 max-w-lg overflow-auto rounded bg-gray-100 p-3 text-xs text-red-700">
@@ -72,7 +72,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             onClick={this.handleReset}
             className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
           >
-            Tekrar Dene
+            Try Again
           </button>
         </div>
       );

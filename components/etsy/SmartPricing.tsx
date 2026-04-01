@@ -530,7 +530,7 @@ export default function SmartPricing({ open, onClose, listings = [] }: SmartPric
                   }
                   sx={{ flex: 1 }}
                   inputProps={{ min: 0, step: 0.01 }}
-                  placeholder="Opsiyonel"
+                  placeholder={t('optionalPlaceholder')}
                 />
                 <TextField
                   label={t('priceCeiling')}
@@ -545,7 +545,7 @@ export default function SmartPricing({ open, onClose, listings = [] }: SmartPric
                   }
                   sx={{ flex: 1 }}
                   inputProps={{ min: 0, step: 0.01 }}
-                  placeholder="Opsiyonel"
+                  placeholder={t('optionalPlaceholder')}
                 />
               </Box>
             </>

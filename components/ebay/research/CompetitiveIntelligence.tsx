@@ -168,10 +168,11 @@ function PieChart({ data }: { data: { label: string; value: number; color: strin
 
 // CSS-based histogram
 function Histogram({ values, bins = 8 }: { values: number[]; bins?: number }) {
+  const t = useTranslations('ebay.research.competitive');
   if (!values.length) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
-  if (min === max) return <Typography variant="body2">t('allPricesSame') + ':' {fmt(min)}</Typography>;
+  if (min === max) return <Typography variant="body2">{t('allPricesSame')}: {fmt(min)}</Typography>;
   const step = (max - min) / bins;
   const buckets = Array(bins).fill(0);
   values.forEach(v => {
@@ -183,7 +184,7 @@ function Histogram({ values, bins = 8 }: { values: number[]; bins?: number }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.5, height: 100 }}>
       {buckets.map((count, i) => (
-        <Tooltip key={i} title={`${fmt(min + i * step)} - ${fmt(min + (i + 1) * step)}: ${count} t('product')`}>
+        <Tooltip key={i} title={`${fmt(min + i * step)} - ${fmt(min + (i + 1) * step)}: ${count} ${t('product')}`}>
           <Box sx={{
             flex: 1, background: 'linear-gradient(180deg, #6366f1, #8b5cf6)', borderRadius: '4px 4px 0 0',
             height: maxCount ? `${(count / maxCount) * 100}%` : 0,
@@ -512,7 +513,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '1px solid rgba(99,102,241,0.12)' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#6366f1' }}>
             <Users size={20} />
-            <span>{deepDiveSeller} — Satici Detaylari</span>
+            <span>{deepDiveSeller} — {t('sellerDetailsTitle')}</span>
           </Box>
           <IconButton size="small" onClick={() => setDeepDiveOpen(false)}>
             <X size={18} />
@@ -521,7 +522,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         <DialogContent dividers>
           {deepDiveLoading && <LinearProgress sx={{ mb: 2 }} />}
           {!deepDiveLoading && deepDiveItems.length === 0 && (
-            <Alert severity="info">Bu satici icin urun bulunamadi.</Alert>
+            <Alert severity="info">{t('noProductsForSeller')}</Alert>
           )}
           {deepDiveItems.length > 0 && (
             <>
@@ -530,24 +531,24 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
                   startIcon={<ShoppingBag size={14} />}
                   onClick={() => { onNavigate?.('product_database', { keyword: deepDiveSeller }); setDeepDiveOpen(false); }}
                   sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}>
-                  Urunleri Gor
+                  {t('viewProductsBtn')}
                 </Button>
                 <Button size="small" variant="outlined"
                   startIcon={<FileSearch size={14} />}
                   onClick={() => { onNavigate?.('seo_analyzer', { keyword: deepDiveSeller }); setDeepDiveOpen(false); }}
                   sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#5558e6', bgcolor: 'rgba(99,102,241,0.04)' } }}>
-                  SEO Kontrol
+                  {t('seoCheckBtn')}
                 </Button>
               </Box>
               <TableContainer sx={{ maxHeight: 400 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Urun</TableCell>
+                      <TableCell>{t('productCol')}</TableCell>
                       <TableCell align="right">{t('price')}</TableCell>
-                      <TableCell align="right">Tah. Satis</TableCell>
+                      <TableCell align="right">{t('estSalesShort')}</TableCell>
                       <TableCell>{t('condition')}</TableCell>
-                      <TableCell align="center">Link</TableCell>
+                      <TableCell align="center">{t('linkCol')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -626,7 +627,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
           <Button variant="contained" onClick={searchSeller} disabled={loading || !sellerInput.trim()}
             startIcon={loading ? <CircularProgress size={16} /> : <Search size={16} />}
             sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}>
-            Ara
+            {t('searchBtn')}
           </Button>
         </Box>
       </Paper>
@@ -643,12 +644,12 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
                 <Users size={20} />
                 {profile.username}
                 {profile.topRated && (
-                  <Chip label="Top Rated" size="small" color="success" icon={<Star size={14} />} />
+                  <Chip label={t('topRated')} size="small" color="success" icon={<Star size={14} />} />
                 )}
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
-                <Chip label={`Puan: ${profile.feedbackScore}`} size="small" variant="outlined" />
-                <Chip label={`Olumlu: ${profile.feedbackPercentage}%`} size="small" variant="outlined"
+                <Chip label={`${t('scoreLabel')}: ${profile.feedbackScore}`} size="small" variant="outlined" />
+                <Chip label={`${t('positiveLabel')}: ${profile.feedbackPercentage}%`} size="small" variant="outlined"
                   color={parseFloat(profile.feedbackPercentage) >= 98 ? 'success' : 'default'} />
               </Box>
             </Box>
@@ -704,11 +705,11 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
               <TableHead>
                 <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                   <TableCell>{t('product')}</TableCell>
-                  <TableCell align="right">Fiyat</TableCell>
+                  <TableCell align="right">{t('priceCol')}</TableCell>
                   <TableCell align="right">{t("estSales")}</TableCell>
-                  <TableCell>Durum</TableCell>
+                  <TableCell>{t('conditionCol')}</TableCell>
                   <TableCell>{t('shipping')}</TableCell>
-                  <TableCell align="center">Link</TableCell>
+                  <TableCell align="center">{t('linkCol')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -803,7 +804,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
   const [error, setError] = useState('');
 
   const addInput = () => {
-    if (inputs.length >= 5) { toast.error('Maksimum 5 listeleme eklenebilir'); return; }
+    if (inputs.length >= 5) { toast.error(t('maxListingsError')); return; }
     setInputs(prev => [...prev, '']);
   };
 
@@ -925,7 +926,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
           ))}
           {inputs.length < 5 && (
             <Button size="small" startIcon={<Plus size={14} />} onClick={addInput} sx={{ alignSelf: 'flex-start' }}>
-              Alan {t('add')}
+              {t('addFieldBtn')}
             </Button>
           )}
         </Box>
@@ -937,8 +938,8 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
       {metrics && metrics.winnerIdx >= 0 && (
         <Alert severity="success" icon={<Star size={20} />}>
           <Typography variant="body2" fontWeight={600}>
-            Kazanan: {validListings[metrics.winnerIdx]?.title?.slice(0, 60)}...
-            {' '}(Skor: {metrics.scores[metrics.winnerIdx]}/7)
+            {t('winnerText')}: {validListings[metrics.winnerIdx]?.title?.slice(0, 60)}...
+            {' '}({t('scoreText')}: {metrics.scores[metrics.winnerIdx]}/7)
           </Typography>
         </Alert>
       )}
@@ -950,15 +951,15 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600, minWidth: 140 }}>Metrik</TableCell>
+                  <TableCell sx={{ fontWeight: 600, minWidth: 140 }}>{t('metricCol')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center" sx={{
                       fontWeight: 600, minWidth: 180,
                       bgcolor: metrics && i === metrics.winnerIdx ? '#e8f5e9' : undefined,
                     }}>
-                      Listeleme {i + 1}
+                      {t('listingNum')} {i + 1}
                       {metrics && i === metrics.winnerIdx && (
-                        <Chip label="Kazanan" size="small" color="success" sx={{ ml: 0.5 }} />
+                        <Chip label={t('winnerText')} size="small" color="success" sx={{ ml: 0.5 }} />
                       )}
                     </TableCell>
                   ))}
@@ -983,13 +984,13 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                   {validListings.map((l, i) => (
                     <TableCell key={i}>
                       <Typography variant="body2" sx={{ fontSize: 12 }}>{l.title}</Typography>
-                      <Typography variant="caption" color="text.secondary">({l.title?.length || 0} karakter)</Typography>
+                      <Typography variant="caption" color="text.secondary">({l.title?.length || 0} {t('characters')})</Typography>
                     </TableCell>
                   ))}
                 </TableRow>
                 {/* Price */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Fiyat</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('priceCol')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center"
                       sx={{ bgcolor: metrics ? cellColor(metrics.prices, i, false) : undefined }}>
@@ -999,7 +1000,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Shipping */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Kargo</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('shippingCol')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center"
                       sx={{ bgcolor: metrics ? cellColor(metrics.shippings, i, false) : undefined }}>
@@ -1009,7 +1010,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Total Cost */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Toplam Maliyet</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('totalCostCol')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center" sx={{
                       fontWeight: 600,
@@ -1021,7 +1022,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Condition */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Durum</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('conditionCol')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center">
                       <Chip label={l.condition || 'N/A'} size="small" variant="outlined" />
@@ -1070,7 +1071,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Category */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Kategori</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('categoryCol')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center">
                       <Typography variant="body2" sx={{ fontSize: 12 }}>
@@ -1090,7 +1091,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Link */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Link</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('linkCol')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center">
                       {l.itemWebUrl && (
@@ -1143,10 +1144,10 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Satici bilgileri alinamadi');
+      if (!res.ok) throw new Error(data.error || t('sellerInfoError'));
       setTrendDeepDiveItems(data.items || data.itemSummaries || []);
     } catch (err: any) {
-      toast.error(err.message || 'Satici arama hatasi');
+      toast.error(err.message || t('sellerSearchErr'));
     } finally {
       setTrendDeepDiveLoading(false);
     }
@@ -1242,7 +1243,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
   const trendArrow = (current: number, previous: number, higherBetter: boolean) => {
     if (!previous) return null;
     const change = ((current - previous) / previous) * 100;
-    if (Math.abs(change) < 0.5) return <Chip label="Sabit" size="small" variant="outlined" />;
+    if (Math.abs(change) < 0.5) return <Chip label={t('stableChip')} size="small" variant="outlined" />;
     const up = change > 0;
     const good = (up && higherBetter) || (!up && !higherBetter);
     return (
@@ -1277,7 +1278,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
           />
           <Button variant="contained" onClick={searchMarket} disabled={loading || !keyword.trim()}
             startIcon={loading ? <CircularProgress size={16} /> : <Search size={16} />}>
-            Analiz Et
+            {t('analyzeBtn')}
           </Button>
         </Box>
       </Paper>
@@ -1307,14 +1308,14 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                 </Box>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary">Ortalama Fiyat</Typography>
+                <Typography variant="caption" color="text.secondary">{t('avgPriceLabel2')}</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="h6">{fmt(currentSnapshot.avgPrice)}</Typography>
                   {latestPrevious && trendArrow(currentSnapshot.avgPrice, latestPrevious.avgPrice, false)}
                 </Box>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary">Medyan Fiyat</Typography>
+                <Typography variant="caption" color="text.secondary">{t('medianPriceLabel2')}</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="h6">{fmt(currentSnapshot.medianPrice)}</Typography>
                   {latestPrevious && trendArrow(currentSnapshot.medianPrice, latestPrevious.medianPrice, false)}
@@ -1339,17 +1340,17 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
             <Typography variant="subtitle2" fontWeight={600} gutterBottom>{t('conditionBreakdown')}</Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2, mb: 2 }}>
               <Paper variant="outlined" sx={{ p: 1.5 }}>
-                <Typography variant="body2" fontWeight={600} color="success.main">Yeni</Typography>
-                <Typography variant="h6">{currentSnapshot.newCount} listeleme</Typography>
+                <Typography variant="body2" fontWeight={600} color="success.main">{t('newConditionLabel')}</Typography>
+                <Typography variant="h6">{currentSnapshot.newCount} {t('listingCountLabel')}</Typography>
                 {currentSnapshot.newAvgPrice > 0 && (
-                  <Typography variant="caption" color="text.secondary">Ort: {fmt(currentSnapshot.newAvgPrice)}</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('avgLabel')}: {fmt(currentSnapshot.newAvgPrice)}</Typography>
                 )}
               </Paper>
               <Paper variant="outlined" sx={{ p: 1.5 }}>
                 <Typography variant="body2" fontWeight={600} color="warning.main">{t('usedCondition')}</Typography>
-                <Typography variant="h6">{currentSnapshot.usedCount} listeleme</Typography>
+                <Typography variant="h6">{currentSnapshot.usedCount} {t('listingCountLabel')}</Typography>
                 {currentSnapshot.usedAvgPrice > 0 && (
-                  <Typography variant="caption" color="text.secondary">Ort: {fmt(currentSnapshot.usedAvgPrice)}</Typography>
+                  <Typography variant="caption" color="text.secondary">{t('avgLabel')}: {fmt(currentSnapshot.usedAvgPrice)}</Typography>
                 )}
               </Paper>
             </Box>
@@ -1364,10 +1365,10 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                   <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                     <TableCell>#</TableCell>
                     <TableCell>{t('sellerCol')}</TableCell>
-                    <TableCell align="right">Listeleme</TableCell>
+                    <TableCell align="right">{t('listingsTableCol')}</TableCell>
                     <TableCell align="right">{t('marketShare')}</TableCell>
-                    <TableCell>Pay</TableCell>
-                    <TableCell align="center">Islemler</TableCell>
+                    <TableCell>{t('shareCol')}</TableCell>
+                    <TableCell align="center">{t('actionsTableCol')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1395,18 +1396,18 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                       </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
-                          <Tooltip title="Urunleri Gor">
+                          <Tooltip title={t('viewProductsBtn')}>
                             <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 1, fontSize: 11 }}
                               startIcon={<ShoppingBag size={12} />}
                               onClick={() => onNavigate?.('product_database', { keyword: s.username })}>
-                              Urunleri Gor
+                              {t('viewProductsBtn')}
                             </Button>
                           </Tooltip>
-                          <Tooltip title="SEO Kontrol">
+                          <Tooltip title={t('seoCheckBtn')}>
                             <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 1, fontSize: 11 }}
                               startIcon={<FileSearch size={12} />}
                               onClick={() => onNavigate?.('seo_analyzer', { keyword: keyword.trim() })}>
-                              SEO Kontrol
+                              {t('seoCheckBtn')}
                             </Button>
                           </Tooltip>
                         </Box>
@@ -1424,7 +1425,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '1px solid rgba(99,102,241,0.12)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#6366f1' }}>
                 <Users size={20} />
-                <span>{trendDeepDiveSeller} — Satici Detaylari</span>
+                <span>{trendDeepDiveSeller} — {t('sellerDetailsTitle')}</span>
               </Box>
               <IconButton size="small" onClick={() => setTrendDeepDiveOpen(false)}>
                 <X size={18} />
@@ -1433,7 +1434,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
             <DialogContent dividers>
               {trendDeepDiveLoading && <LinearProgress sx={{ mb: 2 }} />}
               {!trendDeepDiveLoading && trendDeepDiveItems.length === 0 && (
-                <Alert severity="info">Bu satici icin urun bulunamadi.</Alert>
+                <Alert severity="info">{t('noProductsForSeller')}</Alert>
               )}
               {trendDeepDiveItems.length > 0 && (
                 <>
@@ -1441,23 +1442,23 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                     <Button size="small" variant="contained"
                       startIcon={<ShoppingBag size={14} />}
                       onClick={() => { onNavigate?.('product_database', { keyword: trendDeepDiveSeller }); setTrendDeepDiveOpen(false); }}>
-                      Urunleri Gor
+                      {t('viewProductsBtn')}
                     </Button>
                     <Button size="small" variant="outlined"
                       startIcon={<FileSearch size={14} />}
                       onClick={() => { onNavigate?.('seo_analyzer', { keyword: trendDeepDiveSeller }); setTrendDeepDiveOpen(false); }}>
-                      SEO Kontrol
+                      {t('seoCheckBtn')}
                     </Button>
                   </Box>
                   <TableContainer sx={{ maxHeight: 400 }}>
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell>Urun</TableCell>
-                          <TableCell align="right">Fiyat</TableCell>
-                          <TableCell align="right">Tah. Satis</TableCell>
-                          <TableCell>Durum</TableCell>
-                          <TableCell align="center">Link</TableCell>
+                          <TableCell>{t('productCol')}</TableCell>
+                          <TableCell align="right">{t('priceCol')}</TableCell>
+                          <TableCell align="right">{t('estSalesShort')}</TableCell>
+                          <TableCell>{t('conditionCol')}</TableCell>
+                          <TableCell align="center">{t('linkCol')}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1508,7 +1509,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
               {latestPrevious && (
                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2, my: 2 }}>
                   <Paper variant="outlined" sx={{ p: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary">Fiyat Trendi</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('priceTrend')}</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {currentSnapshot.avgPrice > latestPrevious.avgPrice
                         ? <TrendingUp size={18} color="#d32f2f" />
@@ -1519,15 +1520,15 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                     </Box>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary">Listeleme Trendi</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('listingTrend')}</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {currentSnapshot.totalListings > latestPrevious.totalListings
                         ? <><TrendingUp size={18} color="#2e7d32" /> <Typography variant="body2">{t('growingMarket')}</Typography></>
-                        : <><TrendingDown size={18} color="#d32f2f" /> <Typography variant="body2">Daralan pazar</Typography></>}
+                        : <><TrendingDown size={18} color="#d32f2f" /> <Typography variant="body2">{t('shrinkingMarket')}</Typography></>}
                     </Box>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary">Rekabet Trendi</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('competitionTrend')}</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {currentSnapshot.uniqueSellers > latestPrevious.uniqueSellers
                         ? <><TrendingUp size={18} color="#d32f2f" /> <Typography variant="body2">{t('moreSellers')}</Typography></>
@@ -1543,12 +1544,12 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                   <TableHead>
                     <TableRow>
                       <TableCell>{t('date')}</TableCell>
-                      <TableCell align="right">Listeleme</TableCell>
+                      <TableCell align="right">{t('listingsTableCol')}</TableCell>
                       <TableCell align="right">{t('avgPrice')}</TableCell>
-                      <TableCell align="right">Medyan Fiyat</TableCell>
+                      <TableCell align="right">{t('medianPriceCol')}</TableCell>
                       <TableCell align="right">{t('uniqueSellers')}</TableCell>
                       <TableCell align="right">{t('freeShippingPct')}</TableCell>
-                      <TableCell align="center">Sil</TableCell>
+                      <TableCell align="center">{t('deleteCol')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1594,11 +1595,11 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
               <TableHead>
                 <TableRow>
                   <TableCell>{t('keyword')}</TableCell>
-                  <TableCell>Pazar</TableCell>
-                  <TableCell>Tarih</TableCell>
-                  <TableCell align="right">Listeleme</TableCell>
-                  <TableCell align="right">Ort. Fiyat</TableCell>
-                  <TableCell align="center">Sil</TableCell>
+                  <TableCell>{t('marketplaceCol')}</TableCell>
+                  <TableCell>{t('dateCol')}</TableCell>
+                  <TableCell align="right">{t('listingsTableCol')}</TableCell>
+                  <TableCell align="right">{t('avgPriceCol')}</TableCell>
+                  <TableCell align="center">{t('deleteCol')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

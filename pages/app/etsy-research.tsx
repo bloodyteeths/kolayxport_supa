@@ -286,17 +286,17 @@ function SearchBar() {
             label={t('whatAreYouSelling')}
             value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
             size="small" sx={{ flex: 2, minWidth: 200 }}
-            placeholder="flower girl dress, baby blanket..."
+            placeholder={t('searchExamplePlaceholder')}
             onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && searchMarket()}
             InputProps={{
               startAdornment: <InputAdornment position="start"><Search size={16} color="#667eea" /></InputAdornment>,
             }}
           />
-          <TextField label="Min $" value={minPrice} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMinPrice(e.target.value)}
+          <TextField label={t('minPriceLabel')} value={minPrice} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMinPrice(e.target.value)}
             size="small" type="number" sx={{ width: 80 }}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
           />
-          <TextField label="Max $" value={maxPrice} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMaxPrice(e.target.value)}
+          <TextField label={t('maxPriceLabel')} value={maxPrice} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMaxPrice(e.target.value)}
             size="small" type="number" sx={{ width: 80 }}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
           />

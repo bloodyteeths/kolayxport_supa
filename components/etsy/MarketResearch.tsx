@@ -1447,7 +1447,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 label={t('whatAreYouSelling')}
                 value={query} onChange={e => setQuery(e.target.value)}
                 size="small" sx={{ flex: 2, minWidth: 200 }}
-                placeholder="flower girl dress, personalized gift, baby blanket..."
+                placeholder={t('searchExamplePlaceholder')}
                 onKeyDown={handleKeyDown}
                 InputProps={{
                   startAdornment: <InputAdornment position="start"><Search size={16} color="#667eea" /></InputAdornment>,
@@ -1526,7 +1526,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   />
                   <TextField label={t('myTagsComma')} value={myTags}
                     onChange={e => setMyTags(e.target.value)} size="small"
-                    sx={{ flex: 2, minWidth: 200 }} placeholder="personalized gift, baby shower..."
+                    sx={{ flex: 2, minWidth: 200 }} placeholder={t('tagsExamplePlaceholder')}
                     helperText={t('tagCount', { count: myTags.split(',').filter(t => t.trim()).length, max: 13 })}
                   />
                 </Box>
@@ -1563,7 +1563,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               <TextField
                 value={kwExplorerQuery} onChange={e => setKwExplorerQuery(e.target.value)}
                 size="small" sx={{ flex: 2, minWidth: 200 }}
-                placeholder={query || 'personalized gift, baby blanket...'}
+                placeholder={query || t('kwExplorerPlaceholder')}
                 onKeyDown={e => e.key === 'Enter' && searchKeywords()}
                 InputProps={{
                   startAdornment: <InputAdornment position="start"><Search size={16} /></InputAdornment>,
@@ -2576,7 +2576,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               />
             </Box>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 1 }}>
-              <TextField label="Etsy Ads ROAS" value={etsyAdsRoas}
+              <TextField label={tr('etsyAdsRoas')} value={etsyAdsRoas}
                 onChange={e => setEtsyAdsRoas(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
                 placeholder={tr('roasExample')}
@@ -2776,7 +2776,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <Typography variant="h6" sx={{ fontWeight: 800 }}>{seoResult.avgLen} {t('chars')}</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120, borderRadius: '12px' }}>
-                    <Typography variant="caption" color="text.secondary">Optimal</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('optimal')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 800, color: '#11998e' }}>100-140</Typography>
                   </Paper>
                 </Box>
@@ -2893,7 +2893,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               <TextField
                 size="small"
                 label={t('keyword')}
-                placeholder="baby blanket, crochet dress..."
+                placeholder={t('rankKeywordPlaceholder')}
                 value={rankKeywordInput}
                 onChange={(e) => setRankKeywordInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') addTrackedKeyword(); }}

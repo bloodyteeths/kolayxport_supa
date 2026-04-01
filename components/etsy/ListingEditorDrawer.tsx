@@ -1347,7 +1347,7 @@ export default function ListingEditorDrawer({
               </span>
             </Tooltip>
             {fields && (
-              <Tooltip title="Profil Uygula">
+              <Tooltip title={t('editor.applyProfile')}>
                 <IconButton size="small" onClick={() => setLoadTemplateOpen(true)}>
                   <FolderOpenIcon fontSize="small" />
                 </IconButton>
@@ -1522,7 +1522,7 @@ export default function ListingEditorDrawer({
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                     <TextField
                       size="small"
-                      placeholder="Anahtar kelime girin..."
+                      placeholder={t('editor.enterKeyword')}
                       value={rankKeyword}
                       onChange={(e) => setRankKeyword(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleRankCheck(); }}
@@ -1535,7 +1535,7 @@ export default function ListingEditorDrawer({
                       disabled={rankLoading || !rankKeyword.trim()}
                       sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', minWidth: 80, minHeight: 44 }}
                     >
-                      {rankLoading ? <CircularProgress size={16} /> : 'Kontrol'}
+                      {rankLoading ? <CircularProgress size={16} /> : t('editor.checkRank')}
                     </Button>
                   </Box>
 
@@ -1938,10 +1938,10 @@ export default function ListingEditorDrawer({
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Malzemeler"
+                        label={t('editor.materialsLabel')}
                         size="small"
-                        placeholder={fields.materials.length < 13 ? 'Malzeme ekle...' : ''}
-                        helperText={`${fields.materials.length}/13 malzeme`}
+                        placeholder={fields.materials.length < 13 ? t('editor.materialsPlaceholder') : ''}
+                        helperText={t('editor.materialsHelperText', { count: fields.materials.length })}
                       />
                     )}
                   />
@@ -1976,7 +1976,7 @@ export default function ListingEditorDrawer({
                     }}
                   />
                   <TextField
-                    label="Stok"
+                    label={t('editor.stockLabel')}
                     type="number"
                     value={fields.quantity}
                     onChange={(e) => updateField('quantity', Math.max(0, parseInt(e.target.value) || 0))}
@@ -2111,7 +2111,7 @@ export default function ListingEditorDrawer({
                         onChange={(e) => updateField('is_supply', e.target.checked)}
                       />
                     }
-                    label="Bu bir malzeme veya araci mi?"
+                    label={t('editor.isSupplyLabel')}
                   />
 
                   <Divider sx={{ my: 0.5 }} />
@@ -2119,16 +2119,16 @@ export default function ListingEditorDrawer({
                   {/* Shop section */}
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                     <FormControl size="small" fullWidth>
-                      <InputLabel>Magaza bolumu</InputLabel>
+                      <InputLabel>{t('editor.shopSection')}</InputLabel>
                       <Select
                         value={String(fields.shop_section_id)}
-                        label="Magaza bolumu"
+                        label={t('editor.shopSection')}
                         onChange={(e: SelectChangeEvent) =>
                           updateField('shop_section_id', e.target.value ? Number(e.target.value) : '')
                         }
                       >
                         <MenuItem value="">
-                          <em>Secilmedi</em>
+                          <em>{t('editor.notSelected')}</em>
                         </MenuItem>
                         {shopSections.map((sec) => (
                           <MenuItem key={sec.shop_section_id} value={String(sec.shop_section_id)}>
@@ -2137,7 +2137,7 @@ export default function ListingEditorDrawer({
                         ))}
                       </Select>
                     </FormControl>
-                    <Tooltip title="Yeni bolum ekle">
+                    <Tooltip title={t('editor.addNewSection')}>
                       <IconButton onClick={() => setCreateSectionOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
                         <AddIcon />
                       </IconButton>
@@ -2145,23 +2145,23 @@ export default function ListingEditorDrawer({
                   </Box>
                   {shopSections.length === 0 && (
                     <Typography variant="caption" color="warning.main">
-                      Yuklenemedi — sayfayi yenileyin
+                      {t('editor.couldNotLoad')}
                     </Typography>
                   )}
 
                   {/* Shipping profile */}
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                     <FormControl size="small" fullWidth>
-                      <InputLabel>Kargo profili</InputLabel>
+                      <InputLabel>{t('editor.shippingProfile')}</InputLabel>
                       <Select
                         value={String(fields.shipping_profile_id)}
-                        label="Kargo profili"
+                        label={t('editor.shippingProfile')}
                         onChange={(e: SelectChangeEvent) =>
                           updateField('shipping_profile_id', e.target.value ? Number(e.target.value) : '')
                         }
                       >
                         <MenuItem value="">
-                          <em>Secilmedi</em>
+                          <em>{t('editor.notSelected')}</em>
                         </MenuItem>
                         {shippingProfiles.map((sp) => (
                           <MenuItem key={sp.shipping_profile_id} value={String(sp.shipping_profile_id)}>
@@ -2170,7 +2170,7 @@ export default function ListingEditorDrawer({
                         ))}
                       </Select>
                     </FormControl>
-                    <Tooltip title="Yeni kargo profili ekle">
+                    <Tooltip title={t('editor.addNewShippingProfile')}>
                       <IconButton onClick={() => setCreateShippingOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
                         <AddIcon />
                       </IconButton>
@@ -2178,23 +2178,23 @@ export default function ListingEditorDrawer({
                   </Box>
                   {shippingProfiles.length === 0 && (
                     <Typography variant="caption" color="warning.main">
-                      Yuklenemedi — sayfayi yenileyin
+                      {t('editor.couldNotLoad')}
                     </Typography>
                   )}
 
                   {/* Return policy */}
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                     <FormControl size="small" fullWidth>
-                      <InputLabel>Iade politikasi</InputLabel>
+                      <InputLabel>{t('editor.returnPolicy')}</InputLabel>
                       <Select
                         value={String(fields.return_policy_id)}
-                        label="Iade politikasi"
+                        label={t('editor.returnPolicy')}
                         onChange={(e: SelectChangeEvent) =>
                           updateField('return_policy_id', e.target.value ? Number(e.target.value) : '')
                         }
                       >
                         <MenuItem value="">
-                          <em>Secilmedi</em>
+                          <em>{t('editor.notSelected')}</em>
                         </MenuItem>
                         {returnPolicies.map((rp) => {
                           const label = rp.description
@@ -2211,7 +2211,7 @@ export default function ListingEditorDrawer({
                         })}
                       </Select>
                     </FormControl>
-                    <Tooltip title="Yeni iade politikasi ekle">
+                    <Tooltip title={t('editor.addNewReturnPolicy')}>
                       <IconButton onClick={() => setCreateReturnOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
                         <AddIcon />
                       </IconButton>
@@ -2219,7 +2219,7 @@ export default function ListingEditorDrawer({
                   </Box>
                   {returnPolicies.length === 0 && (
                     <Typography variant="caption" color="warning.main">
-                      Yuklenemedi — sayfayi yenileyin
+                      {t('editor.couldNotLoad')}
                     </Typography>
                   )}
 
@@ -2227,11 +2227,11 @@ export default function ListingEditorDrawer({
 
                   {/* Processing time */}
                   <Typography variant="body2" fontWeight={500}>
-                    Hazirlama suresi (gun)
+                    {t('editor.processingTimeDays')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <TextField
-                      label="Min"
+                      label={t('editor.minLabel')}
                       type="number"
                       value={fields.processing_min}
                       onChange={(e) =>
@@ -2242,7 +2242,7 @@ export default function ListingEditorDrawer({
                       inputProps={{ min: 1 }}
                     />
                     <TextField
-                      label="Max"
+                      label={t('editor.maxLabel')}
                       type="number"
                       value={fields.processing_max}
                       onChange={(e) =>
@@ -2258,11 +2258,11 @@ export default function ListingEditorDrawer({
 
                   {/* Weight */}
                   <Typography variant="body2" fontWeight={500}>
-                    Agirlik
+                    {t('editor.weightTitle')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <TextField
-                      label="Agirlik"
+                      label={t('editor.weightLabel')}
                       type="number"
                       value={fields.item_weight}
                       onChange={(e) =>
@@ -2273,10 +2273,10 @@ export default function ListingEditorDrawer({
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <FormControl size="small" sx={{ minWidth: 80 }}>
-                      <InputLabel>Birim</InputLabel>
+                      <InputLabel>{t('editor.unitLabel')}</InputLabel>
                       <Select
                         value={fields.item_weight_unit}
-                        label="Birim"
+                        label={t('editor.unitLabel')}
                         onChange={(e: SelectChangeEvent) => updateField('item_weight_unit', e.target.value)}
                       >
                         {WEIGHT_UNITS.map((u) => (
@@ -2290,11 +2290,11 @@ export default function ListingEditorDrawer({
 
                   {/* Dimensions */}
                   <Typography variant="body2" fontWeight={500}>
-                    Boyutlar
+                    {t('editor.dimensionsTitle')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     <TextField
-                      label="Uzunluk"
+                      label={t('editor.lengthLabel')}
                       type="number"
                       value={fields.item_length}
                       onChange={(e) =>
@@ -2305,7 +2305,7 @@ export default function ListingEditorDrawer({
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <TextField
-                      label="Genislik"
+                      label={t('editor.widthLabel')}
                       type="number"
                       value={fields.item_width}
                       onChange={(e) =>
@@ -2316,7 +2316,7 @@ export default function ListingEditorDrawer({
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <TextField
-                      label="Yukseklik"
+                      label={t('editor.heightLabel')}
                       type="number"
                       value={fields.item_height}
                       onChange={(e) =>
@@ -2327,10 +2327,10 @@ export default function ListingEditorDrawer({
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <FormControl size="small" sx={{ minWidth: 70 }}>
-                      <InputLabel>Birim</InputLabel>
+                      <InputLabel>{t('editor.unitLabel')}</InputLabel>
                       <Select
                         value={fields.item_dimensions_unit}
-                        label="Birim"
+                        label={t('editor.unitLabel')}
                         onChange={(e: SelectChangeEvent) =>
                           updateField('item_dimensions_unit', e.target.value)
                         }

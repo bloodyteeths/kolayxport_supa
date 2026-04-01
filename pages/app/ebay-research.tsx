@@ -1023,7 +1023,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                       {product.title}
                     </Typography>
                     {product.topRated && (
-                      <Chip icon={<Star size={12} />} label="Top Rated" size="small" color="warning" sx={{ mt: 0.5, height: 20, fontSize: '0.65rem' }} />
+                      <Chip icon={<Star size={12} />} label={t('topRated')} size="small" color="warning" sx={{ mt: 0.5, height: 20, fontSize: '0.65rem' }} />
                     )}
                   </TableCell>
                   <TableCell align="right">
@@ -1612,17 +1612,17 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
           <TextField
             fullWidth
             size="small"
-            label="eBay URL veya Item ID"
+            label={t('ebayUrlOrItemId')}
             value={addItemId}
             onChange={e => setAddItemId(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAddByUrl()}
-            placeholder="https://www.ebay.com/itm/123456789 veya 123456789"
+            placeholder={t('ebayUrlPlaceholder')}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setAddDialogOpen(false)}>{t('addDialogCancel')}</Button>
           <Button variant="contained" onClick={handleAddByUrl} disabled={addLoading || !addItemId.trim()}>
-            {addLoading ? <CircularProgress size={18} /> : 'Ekle'}
+            {addLoading ? <CircularProgress size={18} /> : t('addDialogAdd')}
           </Button>
         </DialogActions>
       </Dialog>

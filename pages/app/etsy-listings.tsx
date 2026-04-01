@@ -227,22 +227,22 @@ function calculateHealth(listing: EtsyListingRow): HealthBreakdown {
   const tagCount = listing.tags?.length || 0;
   const tagsScore = tagCount >= 13 ? 25 : tagCount >= 10 ? 15 : 5;
   const tagsColor = tagCount >= 13 ? '#4caf50' : tagCount >= 10 ? '#ff9800' : '#f44336';
-  const tagsLabel = `${tagCount}/13 etiket`;
+  const tagsLabel = `${tagCount}/13`;
 
   const imgCount = listing.image_count || 0;
   const imagesScore = imgCount >= 10 ? 25 : imgCount >= 5 ? 15 : 5;
   const imagesColor = imgCount >= 10 ? '#4caf50' : imgCount >= 5 ? '#ff9800' : '#f44336';
-  const imagesLabel = `${imgCount} resim`;
+  const imagesLabel = `${imgCount}`;
 
   const titleLen = listing.title?.length || 0;
   const titleScore = titleLen >= 100 ? 25 : titleLen >= 60 ? 15 : 5;
   const titleColor = titleLen >= 100 ? '#4caf50' : titleLen >= 60 ? '#ff9800' : '#f44336';
-  const titleLabel = `${titleLen} karakter baslik`;
+  const titleLabel = `${titleLen}`;
 
   const descLen = listing.description?.length || 0;
   const descScore = descLen >= 500 ? 25 : descLen >= 200 ? 15 : 5;
   const descColor = descLen >= 500 ? '#4caf50' : descLen >= 200 ? '#ff9800' : '#f44336';
-  const descLabel = `${descLen} karakter aciklama`;
+  const descLabel = `${descLen}`;
 
   const overall = tagsScore + imagesScore + titleScore + descScore;
   const color = overall >= 80 ? '#4caf50' : overall >= 60 ? '#ff9800' : '#f44336';
@@ -296,6 +296,7 @@ function MobileEtsyListingCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const health = calculateHealth(listing);
+  const t = useTranslations('etsyListings');
 
   return (
     <Paper sx={{ mb: 1, overflow: 'hidden', borderRadius: 2, maxWidth: '100%', width: '100%', border: selected ? '2px solid' : '1px solid', borderColor: selected ? 'primary.main' : 'divider' }}>
@@ -373,10 +374,10 @@ function MobileEtsyListingCard({
               {formatPrice(listing.price)}
             </Typography>
             <Typography variant="caption" color="text.secondary" fontSize="0.72rem">
-              Stok: {listing.quantity}
+              {t('stockLabel')}: {listing.quantity}
             </Typography>
             <Chip
-              label={STATE_LABELS[listing.state] || listing.state}
+              label={listing.state === 'active' ? t('stateActive') : listing.state === 'draft' ? t('stateDraft') : listing.state === 'inactive' ? t('stateInactive') : listing.state === 'expired' ? t('stateExpired') : listing.state}
               size="small"
               color={STATE_COLORS[listing.state] || 'default'}
               variant="outlined"
@@ -412,7 +413,7 @@ function MobileEtsyListingCard({
           {listing.tags && listing.tags.length > 0 && (
             <Box sx={{ mt: 1.5 }}>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                Etiketler ({listing.tags.length}/13)
+                {t('tagsCount', { count: listing.tags.length })}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {listing.tags.map((tag, i) => (
@@ -425,30 +426,30 @@ function MobileEtsyListingCard({
           {/* Stats row */}
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
             <Box sx={{ flex: '1 1 45%' }}>
-              <Typography variant="caption" color="text.secondary">Goruntulenme</Typography>
+              <Typography variant="caption" color="text.secondary">{t('viewsLabel')}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <VisibilityIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                 <Typography variant="body2">{listing.views.toLocaleString()}</Typography>
               </Box>
             </Box>
             <Box sx={{ flex: '1 1 45%' }}>
-              <Typography variant="caption" color="text.secondary">Favori</Typography>
+              <Typography variant="caption" color="text.secondary">{t('favoritesLabel')}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <FavoriteBorderIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                 <Typography variant="body2">{listing.num_favorers.toLocaleString()}</Typography>
               </Box>
             </Box>
             <Box sx={{ flex: '1 1 45%' }}>
-              <Typography variant="caption" color="text.secondary">Gorseller</Typography>
-              <Typography variant="body2">{listing.image_count} resim{listing.has_video ? ' + video' : ''}</Typography>
+              <Typography variant="caption" color="text.secondary">{t('imagesLabel')}</Typography>
+              <Typography variant="body2">{listing.has_video ? t('imagesWithVideo', { count: listing.image_count }) : t('imagesCount', { count: listing.image_count })}</Typography>
             </Box>
             <Box sx={{ flex: '1 1 45%' }}>
-              <Typography variant="caption" color="text.secondary">Son Guncelleme</Typography>
+              <Typography variant="caption" color="text.secondary">{t('lastUpdate')}</Typography>
               <Typography variant="body2">{formatTimestamp(listing.updated_timestamp)}</Typography>
             </Box>
             {sectionName && (
               <Box sx={{ flex: '1 1 45%' }}>
-                <Typography variant="caption" color="text.secondary">Bolum</Typography>
+                <Typography variant="caption" color="text.secondary">{t('sectionLabel')}</Typography>
                 <Typography variant="body2">{sectionName}</Typography>
               </Box>
             )}
@@ -456,7 +457,12 @@ function MobileEtsyListingCard({
 
           {/* Health breakdown chips */}
           <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-            {[health.tags, health.images, health.title, health.description].map((item, i) => (
+            {([
+              { ...health.tags, label: t('tagsCount', { count: health.tags.label }) },
+              { ...health.images, label: t('imagesCount', { count: health.images.label }) },
+              { ...health.title, label: t('titleChars', { count: health.title.label }) },
+              { ...health.description, label: t('descChars', { count: health.description.label }) },
+            ]).map((item, i) => (
               <Chip
                 key={i}
                 label={item.label}
@@ -486,7 +492,7 @@ function MobileEtsyListingCard({
                 '&:hover': { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
               }}
             >
-              Duzenle
+              {t('edit')}
             </Button>
             <Button
               size="small"
@@ -499,7 +505,7 @@ function MobileEtsyListingCard({
                 '&:hover': { background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' },
               }}
             >
-              Kopyala
+              {t('copy')}
             </Button>
             <Button
               size="small"
@@ -512,7 +518,7 @@ function MobileEtsyListingCard({
                 '&:hover': { background: 'linear-gradient(135deg, #dc2626, #b91c1c)' },
               }}
             >
-              Sil
+              {t('delete')}
             </Button>
           </Box>
 
@@ -525,7 +531,7 @@ function MobileEtsyListingCard({
               rel="noopener noreferrer"
               sx={{ mt: 0.5, fontSize: 11 }}
             >
-              Etsy&apos;de Gor
+              {t('viewOnEtsy')}
             </Button>
           )}
         </Box>
@@ -570,6 +576,7 @@ function LeftSidebar({
   onExcludeTermChange: (t: string) => void;
 }) {
   const [sectionsExpanded, setSectionsExpanded] = useState(true);
+  const t = useTranslations('etsyListings');
 
   return (
     <Box
@@ -593,7 +600,7 @@ function LeftSidebar({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
             <StoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
             <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10 }}>
-              Magaza
+              {t('shopLabel')}
             </Typography>
           </Box>
           {shops.map((s) => (
@@ -651,7 +658,7 @@ function LeftSidebar({
                   fontSize: 8,
                   color: state === 'active' ? '#4caf50' : state === 'draft' ? '#9e9e9e' : state === 'inactive' ? '#f44336' : '#ff9800',
                 }} />
-                <span>{STATE_LABELS[state]}</span>
+                <span>{state === 'active' ? t('stateActive') : state === 'draft' ? t('stateDraft') : state === 'inactive' ? t('stateInactive') : t('stateExpired')}</span>
               </Box>
               <Typography variant="caption" sx={{ color: isSelected ? 'primary.main' : 'text.secondary', fontWeight: isSelected ? 700 : 400 }}>
                 {count}
@@ -664,7 +671,7 @@ function LeftSidebar({
       {/* Score Filter */}
       <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
         <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10, mb: 1, display: 'block' }}>
-          Listing Skor
+          {t('listingScore')}
         </Typography>
         <FormControl size="small" fullWidth>
           <Select
@@ -673,14 +680,14 @@ function LeftSidebar({
             displayEmpty
             sx={{ fontSize: '0.82rem', '& .MuiSelect-select': { py: 0.75 } }}
           >
-            <MenuItem value="">Tumu</MenuItem>
-            <MenuItem value="issues">Sorunlu (&lt;70)</MenuItem>
-            <MenuItem value="missing_images">Resim Eksik (&lt;10)</MenuItem>
-            <MenuItem value="missing_tags">Etiket Eksik (&lt;13)</MenuItem>
-            <MenuItem value="short_title">Kisa Baslik (&lt;100)</MenuItem>
-            <MenuItem value="no_description">Aciklama Yok</MenuItem>
-            <MenuItem value="no_video">Video Yok</MenuItem>
-            <MenuItem value="no_stock">Stok Yok</MenuItem>
+            <MenuItem value="">{t('healthAll')}</MenuItem>
+            <MenuItem value="issues">{t('healthIssues')}</MenuItem>
+            <MenuItem value="missing_images">{t('healthMissingImages')}</MenuItem>
+            <MenuItem value="missing_tags">{t('healthMissingTags')}</MenuItem>
+            <MenuItem value="short_title">{t('healthShortTitle')}</MenuItem>
+            <MenuItem value="no_description">{t('healthNoDescription')}</MenuItem>
+            <MenuItem value="no_video">{t('healthNoVideo')}</MenuItem>
+            <MenuItem value="no_stock">{t('healthNoStock')}</MenuItem>
           </Select>
         </FormControl>
       </Paper>
@@ -693,7 +700,7 @@ function LeftSidebar({
             onClick={() => setSectionsExpanded(!sectionsExpanded)}
           >
             <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10 }}>
-              Bolum
+              {t('sectionLabel')}
             </Typography>
             {sectionsExpanded ? <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
           </Box>
@@ -716,7 +723,7 @@ function LeftSidebar({
                 '&:hover': { bgcolor: !sectionFilter ? 'primary.50' : 'action.hover' },
               }}
             >
-              <span>Tum Bolumler</span>
+              <span>{t('allSections')}</span>
             </Box>
             {shopSections.map((sec) => {
               const count = sectionCounts[sec.shop_section_id] || 0;
@@ -757,12 +764,12 @@ function LeftSidebar({
       {/* Exclude term */}
       <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
         <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10, mb: 1, display: 'block' }}>
-          Haric Tut
+          {t('excludeLabel')}
         </Typography>
         <TextField
           size="small"
           fullWidth
-          placeholder="Kelime..."
+          placeholder={t('excludePlaceholder')}
           value={excludeTerm}
           onChange={(e) => onExcludeTermChange(e.target.value)}
           sx={{ '& .MuiInputBase-input': { fontSize: '0.82rem', py: 0.75 } }}
@@ -986,7 +993,7 @@ function EtsyListingsPage() {
       }
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
-      toast.error(`Listing'lar yuklenemedi: ${err.message}`);
+      toast.error(t('loadFailed', { error: err.message }));
       setLoading(false);
       setLoadingMore(false);
     }
@@ -1136,14 +1143,14 @@ function EtsyListingsPage() {
             throw new Error(errMsg);
           }
         }
-        toast.success('Listing silindi');
+        toast.success(t('listingDeleted'));
         setDeleteConfirmId(null);
         setListings((prev) => prev.filter((l) => l.listing_id !== listingId));
         setTotalCount((prev) => Math.max(0, prev - 1));
         const cacheKey = `${selectedShopId}:${statusFilter}`;
         delete listingsCacheRef.current[cacheKey];
       } catch (err: any) {
-        toast.error(`Silinemedi: ${err.message}`);
+        toast.error(t('deleteFailed', { error: err.message }));
       }
     },
     [selectedShopId, statusFilter]
@@ -1152,7 +1159,7 @@ function EtsyListingsPage() {
   // --- CSV Export ---
   const handleExportCSV = () => {
     if (filteredListings.length === 0) {
-      toast.error('Disa aktarilacak listing yok');
+      toast.error(t('noListingsToExport'));
       return;
     }
     const rows = filteredListings.map((l) => ({
@@ -1245,12 +1252,12 @@ function EtsyListingsPage() {
         const text = ev.target?.result as string;
         const rows = parseCSV(text);
         if (rows.length === 0) {
-          toast.error('CSV dosyasi bos veya gecersiz format');
+          toast.error(t('csvEmptyOrInvalid'));
           return;
         }
         const validRows = rows.filter((r) => r.listing_id && r.listing_id.trim() !== '');
         if (validRows.length === 0) {
-          toast.error('CSV dosyasinda listing_id sutunu bulunamadi');
+          toast.error(t('csvNoListingIdColumn'));
           return;
         }
         setCsvImportRows(validRows);
@@ -1319,9 +1326,9 @@ function EtsyListingsPage() {
     setCsvImportRows([]);
 
     if (failed === 0) {
-      toast.success(`CSV import tamamlandi: ${succeeded} listing guncellendi`);
+      toast.success(t('csvImportComplete', { count: succeeded }));
     } else {
-      toast.error(`CSV import: ${succeeded} basarili, ${failed} basarisiz`);
+      toast.error(t('csvImportPartial', { succeeded, failed }));
     }
 
     fetchListings();
@@ -1347,13 +1354,13 @@ function EtsyListingsPage() {
           const err = await res.json().catch(() => ({}));
           throw new Error(err.error || `HTTP ${res.status}`);
         }
-        toast.success('Guncellendi');
+        toast.success(t('updated'));
         setListings((prev) => prev.map((l) => (l.listing_id === newRow.listing_id ? { ...l, ...body } : l)));
         const cacheKey = `${selectedShopId}:${statusFilter}`;
         delete listingsCacheRef.current[cacheKey];
         return newRow;
       } catch (err: any) {
-        toast.error(`Guncelleme basarisiz: ${err.message}`);
+        toast.error(t('updateFailed', { error: err.message }));
         return oldRow;
       }
     },
@@ -1370,7 +1377,7 @@ function EtsyListingsPage() {
   const handleCopyListing = async (listingId: number) => {
     const shopId = selectedShopIdRef.current;
     if (!shopId) return;
-    const toastId = toast.loading('Kopya olusturuluyor...');
+    const toastId = toast.loading(t('copyCreating'));
     try {
       const res = await fetch(
         `/api/clawd/etsy?action=copy_listing&shop_id=${shopId}`,
@@ -1390,7 +1397,7 @@ function EtsyListingsPage() {
 
       const sourceImages: Array<{ url_fullxfull: string; rank: number }> = data.source_images || [];
       if (sourceImages.length > 0) {
-        toast.loading(`Gorseller kopyalaniyor (0/${sourceImages.length})...`, { id: toastId });
+        toast.loading(t('copyingImages', { copied: 0, total: sourceImages.length }), { id: toastId });
         let copied = 0;
         for (const img of sourceImages.sort((a, b) => (a.rank || 1) - (b.rank || 1))) {
           if (!img.url_fullxfull) continue;
@@ -1409,16 +1416,16 @@ function EtsyListingsPage() {
               continue;
             }
             copied++;
-            toast.loading(`Gorseller kopyalaniyor (${copied}/${sourceImages.length})...`, { id: toastId });
+            toast.loading(t('copyingImages', { copied, total: sourceImages.length }), { id: toastId });
           } catch { /* skip failed image */ }
         }
         setDrawerRefreshKey((k) => k + 1);
-        toast.success(`Kopya tamamlandi - ${copied} gorsel kopyalandi`, { id: toastId });
+        toast.success(t('copyCompleteWithImages', { copied }), { id: toastId });
       } else {
-        toast.success('Kopya olusturuldu', { id: toastId });
+        toast.success(t('copyCreated'), { id: toastId });
       }
     } catch (err: any) {
-      toast.error(err.message || 'Kopyalama basarisiz', { id: toastId });
+      toast.error(err.message || t('copyFailed'), { id: toastId });
     }
   };
 
@@ -1481,7 +1488,7 @@ function EtsyListingsPage() {
       },
       {
         field: 'title',
-        headerName: 'Baslik',
+        headerName: t('titleCol'),
         flex: 1,
         minWidth: 280,
         editable: true,
@@ -1529,12 +1536,12 @@ function EtsyListingsPage() {
               </Typography>
             </Tooltip>
             <Box className="row-actions">
-              <Tooltip title="Duzenle" arrow>
+              <Tooltip title={t('edit')} arrow>
                 <IconButton size="small" onClick={() => handleOpenEditor(params.row.listing_id)} sx={{ p: 0.5 }}>
                   <EditIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Kopyala" arrow>
+              <Tooltip title={t('copy')} arrow>
                 <IconButton size="small" onClick={() => handleCopyListing(params.row.listing_id)} sx={{ p: 0.5 }}>
                   <ContentCopyIcon sx={{ fontSize: 16 }} />
                 </IconButton>
@@ -1550,7 +1557,7 @@ function EtsyListingsPage() {
       },
       {
         field: 'quantity',
-        headerName: 'Stok',
+        headerName: t('stockCol'),
         width: 80,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
           const qty = params.row.quantity;
@@ -1563,7 +1570,7 @@ function EtsyListingsPage() {
       },
       {
         field: 'price',
-        headerName: 'Fiyat',
+        headerName: t('priceCol'),
         width: 110,
         editable: true,
         valueGetter: (value: any, row: EtsyListingRow) => {
@@ -1590,7 +1597,7 @@ function EtsyListingsPage() {
       },
       {
         field: 'expires',
-        headerName: 'Bitis',
+        headerName: t('expiresCol'),
         width: 95,
         sortable: true,
         filterable: false,
@@ -1607,7 +1614,7 @@ function EtsyListingsPage() {
       },
       {
         field: 'section',
-        headerName: 'Bolum',
+        headerName: t('sectionCol'),
         width: 130,
         sortable: true,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
@@ -1628,7 +1635,7 @@ function EtsyListingsPage() {
       },
       {
         field: 'skor',
-        headerName: 'Skor',
+        headerName: t('scoreCol'),
         width: 70,
         sortable: true,
         filterable: false,
@@ -1640,22 +1647,22 @@ function EtsyListingsPage() {
               arrow
               title={
                 <Box sx={{ fontSize: 12 }}>
-                  <Box sx={{ fontWeight: 700, mb: 0.5 }}>Skor: {h.overall}/100</Box>
+                  <Box sx={{ fontWeight: 700, mb: 0.5 }}>{t('scoreLabel', { score: h.overall })}</Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.tags.color }} />
-                    {h.tags.label}
+                    {t('tagsCount', { count: h.tags.label })}
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.images.color }} />
-                    {h.images.label}
+                    {t('imagesCount', { count: h.images.label })}
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.title.color }} />
-                    {h.title.label}
+                    {t('titleChars', { count: h.title.label })}
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.description.color }} />
-                    {h.description.label}
+                    {t('descChars', { count: h.description.label })}
                   </Box>
                 </Box>
               }
@@ -1684,7 +1691,7 @@ function EtsyListingsPage() {
         },
       },
     ],
-    [sectionNameMap] // eslint-disable-line react-hooks/exhaustive-deps
+    [sectionNameMap, t] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // --- Column visibility for mobile ---
@@ -1723,13 +1730,13 @@ function EtsyListingsPage() {
       {shops.length === 0 && !(loading) && (
         <Paper sx={{ p: 3, mb: 2, textAlign: 'center' }}>
           <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-            Henuz bagli bir Etsy magazaniz yok.
+            {t('noShopConnected')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Etsy magazanizi baglamak icin Ayarlar sayfasina gidin.
+            {t('noShopConnectedDesc')}
           </Typography>
           <Button variant="contained" size="small" href="/ayarlar">
-            Ayarlar Sayfasina Git
+            {t('goToSettings')}
           </Button>
         </Paper>
       )}
@@ -1768,7 +1775,7 @@ function EtsyListingsPage() {
           {listings.length > 0 && (
             <Paper sx={{ px: 1.5, py: 0.75, mb: 1, display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2 }, flexWrap: 'wrap', minHeight: 36 }}>
               <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
-                {totalCount} listing
+                {t('listingCount', { count: totalCount })}
               </Typography>
               {!isMobile && (
                 <>
@@ -1786,7 +1793,7 @@ function EtsyListingsPage() {
                   sx={{ fontSize: '0.78rem', color: 'error.main', fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
                   onClick={() => setHealthFilter('no_stock')}
                 >
-                  ·&nbsp;&nbsp;{quickStats.outOfStock} stoksuz
+                  ·&nbsp;&nbsp;{t('outOfStockCount', { count: quickStats.outOfStock })}
                 </Typography>
               )}
               {quickStats.withIssues > 0 && (
@@ -1795,7 +1802,7 @@ function EtsyListingsPage() {
                   sx={{ fontSize: '0.78rem', color: 'warning.main', fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
                   onClick={() => setHealthFilter('issues')}
                 >
-                  ·&nbsp;&nbsp;{quickStats.withIssues} sorunlu
+                  ·&nbsp;&nbsp;{t('issuesCount', { count: quickStats.withIssues })}
                 </Typography>
               )}
             </Paper>
@@ -1823,7 +1830,7 @@ function EtsyListingsPage() {
 
               {/* Page title */}
               <Typography variant="subtitle1" fontWeight={700} sx={{ display: { xs: 'none', sm: 'block' } }}>
-                {STATE_LABELS[statusFilter] || statusFilter}
+                {statusFilter === 'active' ? t('stateActive') : statusFilter === 'draft' ? t('stateDraft') : statusFilter === 'inactive' ? t('stateInactive') : t('stateExpired')}
               </Typography>
 
               {/* Mobile: status filter */}
@@ -1841,8 +1848,8 @@ function EtsyListingsPage() {
                   >
                     <MenuItem value="active">{t('stateActive')}</MenuItem>
                     <MenuItem value="draft">{t('stateDraft')}</MenuItem>
-                    <MenuItem value="inactive">Deaktif</MenuItem>
-                    <MenuItem value="expired">Sur. Dolmus</MenuItem>
+                    <MenuItem value="inactive">{t('stateInactive')}</MenuItem>
+                    <MenuItem value="expired">{t('stateExpired')}</MenuItem>
                   </Select>
                 </FormControl>
               )}
@@ -1870,7 +1877,7 @@ function EtsyListingsPage() {
               {/* Search */}
               <TextField
                 size="small"
-                placeholder="Ara..."
+                placeholder={t('searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 sx={{ minWidth: { xs: 80, sm: 160 }, maxWidth: 240 }}
@@ -1908,7 +1915,7 @@ function EtsyListingsPage() {
                 }}
               >
                 <MoreVertIcon sx={{ mr: { xs: 0, sm: 0.5 }, fontSize: 18 }} />
-                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Araclar</Box>
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>{t('tools')}</Box>
               </Button>
 
               {/* + New Listing */}
@@ -1939,28 +1946,28 @@ function EtsyListingsPage() {
           >
             <MenuItem onClick={() => { setToolsMenuAnchor(null); setFindReplaceOpen(true); }}>
               <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Bul &amp; Degistir</ListItemText>
+              <ListItemText>{t('findReplace')}</ListItemText>
             </MenuItem>
             <MenuItem onClick={() => { setToolsMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
               <ListItemIcon><ContentPasteSearchIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Tekrar Tespit</ListItemText>
+              <ListItemText>{t('duplicateDetection')}</ListItemText>
             </MenuItem>
             <MenuItem onClick={() => { setToolsMenuAnchor(null); setSmartPricingOpen(true); }}>
               <ListItemIcon><PriceChangeIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Akilli Fiyat</ListItemText>
+              <ListItemText>{t('smartPricing')}</ListItemText>
             </MenuItem>
             <Divider />
             <MenuItem onClick={() => { setToolsMenuAnchor(null); handleExportCSV(); }}>
               <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>CSV Indir</ListItemText>
+              <ListItemText>{t('csvDownload')}</ListItemText>
             </MenuItem>
             <MenuItem onClick={() => { setToolsMenuAnchor(null); handleCSVFileSelect(); }}>
               <ListItemIcon><FileUploadIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>CSV Yukle</ListItemText>
+              <ListItemText>{t('csvUpload')}</ListItemText>
             </MenuItem>
             <MenuItem onClick={() => { setToolsMenuAnchor(null); setBackupManagerOpen(true); }}>
               <ListItemIcon><InventoryIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>Yedekler</ListItemText>
+              <ListItemText>{t('backups')}</ListItemText>
             </MenuItem>
           </Menu>
 
@@ -1976,7 +1983,7 @@ function EtsyListingsPage() {
               }}
             >
               <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main', mr: 0.5, whiteSpace: 'nowrap' }}>
-                {selectedCount} selected
+                {t('selected', { count: selectedCount })}
               </Typography>
               <BulkOperationsBar
                 selectedCount={selectedCount}
@@ -2003,7 +2010,7 @@ function EtsyListingsPage() {
                   '&:hover': { background: 'linear-gradient(135deg, #1d4ed8, #4338ca)' },
                 }}
               >
-                {isMobile ? 'Edit' : 'Bulk Edit'}
+                {isMobile ? t('editShort') : t('bulkEdit')}
               </Button>
             </Paper>
           )}
@@ -2013,7 +2020,7 @@ function EtsyListingsPage() {
             <Box sx={{ display: 'flex', gap: 0.5, mb: 1, flexWrap: 'wrap', alignItems: 'center' }}>
               {sectionFilter && (
                 <Chip
-                  label={`Bolum: ${shopSections.find(s => String(s.shop_section_id) === sectionFilter)?.title || sectionFilter}`}
+                  label={t('sectionChip', { name: shopSections.find(s => String(s.shop_section_id) === sectionFilter)?.title || sectionFilter })}
                   size="small"
                   onDelete={() => setSectionFilter('')}
                   sx={{ height: 28 }}
@@ -2021,7 +2028,7 @@ function EtsyListingsPage() {
               )}
               {healthFilter && (
                 <Chip
-                  label={`Saglik: ${healthFilter === 'issues' ? 'Sorunlu' : healthFilter === 'missing_images' ? 'Resim Eksik' : healthFilter === 'missing_tags' ? 'Etiket Eksik' : healthFilter === 'short_title' ? 'Kisa Baslik' : healthFilter === 'no_description' ? 'Aciklama Yok' : healthFilter === 'no_video' ? 'Video Yok' : 'Stok Yok'}`}
+                  label={t('healthChip', { filter: healthFilter === 'issues' ? t('healthChipIssues') : healthFilter === 'missing_images' ? t('healthChipMissingImages') : healthFilter === 'missing_tags' ? t('healthChipMissingTags') : healthFilter === 'short_title' ? t('healthChipShortTitle') : healthFilter === 'no_description' ? t('healthChipNoDescription') : healthFilter === 'no_video' ? t('healthChipNoVideo') : t('healthChipNoStock') })}
                   size="small"
                   onDelete={() => setHealthFilter('')}
                   color="warning"
@@ -2030,7 +2037,7 @@ function EtsyListingsPage() {
               )}
               {excludeTerm.trim() && (
                 <Chip
-                  label={`Haric: ${excludeTerm}`}
+                  label={t('excludeChip', { term: excludeTerm })}
                   size="small"
                   onDelete={() => setExcludeTerm('')}
                   color="error"
@@ -2039,7 +2046,7 @@ function EtsyListingsPage() {
                 />
               )}
               <Chip
-                label="Tumunu Temizle"
+                label={t('clearAll')}
                 size="small"
                 variant="outlined"
                 onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); }}
@@ -2053,7 +2060,7 @@ function EtsyListingsPage() {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, px: 1 }}>
               <LinearProgress sx={{ flex: 1, height: 4, borderRadius: 2 }} />
               <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                {listings.length}/{totalCount} yukleniyor...
+                {t('loadingProgress', { loaded: listings.length, total: totalCount })}
               </Typography>
             </Box>
           )}
@@ -2067,13 +2074,13 @@ function EtsyListingsPage() {
             ) : filteredListings.length === 0 ? (
               <Paper sx={{ p: 3, textAlign: 'center' }}>
                 <Typography color="text.secondary">
-                  {selectedShopId ? 'Listing bulunamadi' : 'Lutfen bir magaza secin'}
+                  {selectedShopId ? t('noListingsFound') : t('selectShop')}
                 </Typography>
               </Paper>
             ) : (
               <>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, px: 0.5 }}>
-                  {filteredListings.length} sonuc{filteredListings.length !== totalCount ? ` (toplam ${totalCount})` : ''}
+                  {filteredListings.length !== totalCount ? t('resultCountWithTotal', { count: filteredListings.length, total: totalCount }) : t('resultCount', { count: filteredListings.length })}
                 </Typography>
                 {filteredListings.slice(0, mobileVisibleCount).map((listing) => (
                   <MobileEtsyListingCard
@@ -2094,7 +2101,7 @@ function EtsyListingsPage() {
                     onClick={() => setMobileVisibleCount((prev) => prev + 25)}
                     sx={{ mt: 1, mb: 2, minHeight: 44 }}
                   >
-                    Daha Fazla Yukle ({Math.min(25, filteredListings.length - mobileVisibleCount)} daha)
+                    {t('loadMore', { count: Math.min(25, filteredListings.length - mobileVisibleCount) })}
                   </Button>
                 )}
               </>
@@ -2104,11 +2111,11 @@ function EtsyListingsPage() {
           {/* Column Preset Toggle + DataGrid (desktop only) */}
           <Paper sx={{ width: '100%', display: { xs: 'none', md: 'block' } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1.5, pt: 1, gap: 0.5 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>Gorunum:</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>{t('viewPreset')}</Typography>
               {([
-                { label: 'Kompakt', model: { expires: false, section: false } as Record<string, boolean> },
-                { label: 'Detayli', model: { expires: false } as Record<string, boolean> },
-                { label: 'Tumu', model: {} as Record<string, boolean> },
+                { label: t('compact'), model: { expires: false, section: false } as Record<string, boolean> },
+                { label: t('detailed'), model: { expires: false } as Record<string, boolean> },
+                { label: t('all'), model: {} as Record<string, boolean> },
               ]).map((preset) => {
                 const isActive = JSON.stringify(columnVisibilityModel) === JSON.stringify(preset.model);
                 return (
@@ -2138,7 +2145,7 @@ function EtsyListingsPage() {
               checkboxSelection
               disableRowSelectionOnClick
               processRowUpdate={handleProcessRowUpdate}
-              onProcessRowUpdateError={(error) => toast.error(`Guncelleme hatasi: ${error.message}`)}
+              onProcessRowUpdateError={(error) => toast.error(t('updateError', { error: error.message }))}
               rowHeight={64}
               rowSelectionModel={selectedIds}
               onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}
@@ -2175,7 +2182,7 @@ function EtsyListingsPage() {
                     }}
                   >
                     <Typography color="text.secondary">
-                      {selectedShopId ? 'Listing bulunamadi' : 'Lutfen bir magaza secin'}
+                      {selectedShopId ? t('noListingsFound') : t('selectShop')}
                     </Typography>
                   </Box>
                 ),
@@ -2216,14 +2223,14 @@ function EtsyListingsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <Typography variant="h6" gutterBottom>
-              Listing Sil
+              {t('deleteListingTitle')}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Bu listing&apos;i silmek istediginizden emin misiniz? Bu islem geri alinamaz.
+              {t('deleteListingConfirm')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
               <Button size="small" onClick={() => setDeleteConfirmId(null)}>
-                Iptal
+                {t('cancel')}
               </Button>
               <Button
                 size="small"
@@ -2231,7 +2238,7 @@ function EtsyListingsPage() {
                 color="error"
                 onClick={() => handleDeleteListing(deleteConfirmId)}
               >
-                Sil
+                {t('delete')}
               </Button>
             </Box>
           </Paper>
@@ -2248,39 +2255,39 @@ function EtsyListingsPage() {
           PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, px: 2, pb: 3, pt: 1 } }}
         >
           <Box sx={{ width: 40, height: 4, bgcolor: 'divider', borderRadius: 2, mx: 'auto', mb: 2 }} />
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>Filtreler</Typography>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2 }}>{t('filters')}</Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <FormControl size="small" fullWidth>
-              <InputLabel>Bolum</InputLabel>
-              <Select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)} label="Bolum">
-                <MenuItem value="">Tum Bolumler</MenuItem>
+              <InputLabel>{t('sectionLabel')}</InputLabel>
+              <Select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)} label={t('sectionLabel')}>
+                <MenuItem value="">{t('allSections')}</MenuItem>
                 {shopSections.map((s) => <MenuItem key={s.shop_section_id} value={String(s.shop_section_id)}>{s.title}</MenuItem>)}
               </Select>
             </FormControl>
             <FormControl size="small" fullWidth>
-              <InputLabel>Saglik</InputLabel>
-              <Select value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)} label="Saglik">
-                <MenuItem value="">Tum Saglik</MenuItem>
-                <MenuItem value="issues">Sorunlu</MenuItem>
-                <MenuItem value="missing_images">Resim Eksik (&lt;10)</MenuItem>
-                <MenuItem value="missing_tags">Etiket Eksik (&lt;13)</MenuItem>
-                <MenuItem value="short_title">Kisa Baslik (&lt;100)</MenuItem>
-                <MenuItem value="no_description">Aciklama Yok</MenuItem>
-                <MenuItem value="no_video">Video Yok</MenuItem>
-                <MenuItem value="no_stock">Stok Yok</MenuItem>
+              <InputLabel>{t('healthLabel')}</InputLabel>
+              <Select value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)} label={t('healthLabel')}>
+                <MenuItem value="">{t('allHealth')}</MenuItem>
+                <MenuItem value="issues">{t('healthChipIssues')}</MenuItem>
+                <MenuItem value="missing_images">{t('healthMissingImages')}</MenuItem>
+                <MenuItem value="missing_tags">{t('healthMissingTags')}</MenuItem>
+                <MenuItem value="short_title">{t('healthShortTitle')}</MenuItem>
+                <MenuItem value="no_description">{t('healthNoDescription')}</MenuItem>
+                <MenuItem value="no_video">{t('healthNoVideo')}</MenuItem>
+                <MenuItem value="no_stock">{t('healthNoStock')}</MenuItem>
               </Select>
             </FormControl>
             <TextField
               size="small"
               fullWidth
-              label="Icermez"
-              placeholder="Haric tutulacak kelime..."
+              label={t('excludeLabel')}
+              placeholder={t('excludeWordPlaceholder')}
               value={excludeTerm}
               onChange={(e) => setExcludeTerm(e.target.value)}
             />
             {activeFilterCount > 0 && (
               <Button size="small" color="error" onClick={() => { setSectionFilter(''); setHealthFilter(''); setExcludeTerm(''); }}>
-                Filtreleri Temizle
+                {t('clearFilters')}
               </Button>
             )}
           </Box>
@@ -2321,7 +2328,7 @@ function EtsyListingsPage() {
         marketResearchData={null}
         onCreated={(listingId) => {
           setCreateDialogOpen(false);
-          toast.success(`Listing #${listingId} olusturuldu`);
+          toast.success(t('listingCreated', { id: listingId }));
           fetchListings();
         }}
       />
@@ -2422,33 +2429,33 @@ function EtsyListingsPage() {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>CSV Import Onizleme</DialogTitle>
+        <DialogTitle>{t('csvImportPreview')}</DialogTitle>
         <DialogContent>
           {csvImporting ? (
             <Box sx={{ py: 3 }}>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                Import devam ediyor...
+                {t('csvImportInProgress')}
               </Typography>
               <LinearProgress variant="determinate" value={csvImportProgress} />
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                %{Math.round(csvImportProgress)} tamamlandi
+                {t('csvImportPercent', { percent: Math.round(csvImportProgress) })}
               </Typography>
             </Box>
           ) : (
             <>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {csvImportRows.length} listing guncellenecek. Asagida degisiklikler listelenmistir.
+                {t('csvImportWillUpdate', { count: csvImportRows.length })}
               </Typography>
               <TableContainer sx={{ maxHeight: 400 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Listing ID</TableCell>
-                      <TableCell>Baslik</TableCell>
-                      <TableCell>Fiyat</TableCell>
-                      <TableCell>Stok</TableCell>
-                      <TableCell>Etiketler</TableCell>
-                      <TableCell>Durum</TableCell>
+                      <TableCell>{t('csvListingId')}</TableCell>
+                      <TableCell>{t('csvTitle')}</TableCell>
+                      <TableCell>{t('csvPrice')}</TableCell>
+                      <TableCell>{t('csvStock')}</TableCell>
+                      <TableCell>{t('csvTags')}</TableCell>
+                      <TableCell>{t('csvStatus')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -2471,7 +2478,7 @@ function EtsyListingsPage() {
               </TableContainer>
               {csvImportRows.length > 50 && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  ... ve {csvImportRows.length - 50} satir daha
+                  {t('csvAndMoreRows', { count: csvImportRows.length - 50 })}
                 </Typography>
               )}
             </>
@@ -2479,10 +2486,10 @@ function EtsyListingsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setCsvImportDialogOpen(false); setCsvImportRows([]); }} disabled={csvImporting}>
-            Iptal
+            {t('cancel')}
           </Button>
           <Button variant="contained" onClick={handleCSVImportConfirm} disabled={csvImporting || csvImportRows.length === 0}>
-            {csvImporting ? 'Import ediliyor...' : `${csvImportRows.length} Listing Guncelle`}
+            {csvImporting ? t('csvImporting') : t('csvUpdateListings', { count: csvImportRows.length })}
           </Button>
         </DialogActions>
       </Dialog>

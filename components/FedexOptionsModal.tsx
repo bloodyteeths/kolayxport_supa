@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FedExOptions, FedExOption } from '@/lib/fedex/fedex.config';
+import { useTranslations } from 'next-intl';
 
 interface FedexOptionsModalProps {
   orderId: string;
@@ -25,6 +26,7 @@ const FedexOptionsModal: React.FC<FedexOptionsModalProps> = ({
   onSaveSuccessAndGenerateLabel,
   onOrderUpdate
 }) => {
+  const t = useTranslations('fedex');
   const [fedexApiOptions, setFedexApiOptions] = useState<FedExOptions | null>(null);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -135,19 +137,19 @@ const FedexOptionsModal: React.FC<FedexOptionsModalProps> = ({
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center">
       <div className="relative p-8 border w-full max-w-lg shadow-lg rounded-md bg-white">
-        <h3 className="text-xl font-semibold mb-6 text-gray-900">Configure FedEx Options for Order #{orderId.substring(0,8)}...</h3>
+        <h3 className="text-xl font-semibold mb-6 text-gray-900">{t('configureTitle', { orderId: orderId.substring(0,8) })}</h3>
         
-        {isLoadingOptions && <p>Loading options...</p>}
-        {!isLoadingOptions && !fedexApiOptions && !error && <p>Could not load options.</p>}
+        {isLoadingOptions && <p>{t('loadingOptions')}</p>}
+        {!isLoadingOptions && !fedexApiOptions && !error && <p>{t('couldNotLoadOptions')}</p>}
 
         {error && <p className="text-red-500 mb-4">Error: {error}</p>}
 
         {fedexApiOptions && (
           <>
-            {renderSelect("Service Type", selectedServiceType, (e) => setSelectedServiceType(e.target.value), fedexApiOptions.serviceTypes)}
-            {renderSelect("Packaging Type", selectedPackagingType, (e) => setSelectedPackagingType(e.target.value), fedexApiOptions.packagingTypes)}
-            {renderSelect("Pickup Type", selectedPickupType, (e) => setSelectedPickupType(e.target.value), fedexApiOptions.pickupTypes)}
-            {renderSelect("Duties/Taxes Payment Type", selectedDutiesPaymentType, (e) => setSelectedDutiesPaymentType(e.target.value), fedexApiOptions.dutiesPaymentTypes)}
+            {renderSelect(t('serviceType'), selectedServiceType, (e) => setSelectedServiceType(e.target.value), fedexApiOptions.serviceTypes)}
+            {renderSelect(t('packagingType'), selectedPackagingType, (e) => setSelectedPackagingType(e.target.value), fedexApiOptions.packagingTypes)}
+            {renderSelect(t('pickupType'), selectedPickupType, (e) => setSelectedPickupType(e.target.value), fedexApiOptions.pickupTypes)}
+            {renderSelect(t('dutiesPaymentType'), selectedDutiesPaymentType, (e) => setSelectedDutiesPaymentType(e.target.value), fedexApiOptions.dutiesPaymentTypes)}
             
             <div className="mt-8 flex justify-end space-x-3">
               <button
@@ -156,7 +158,7 @@ const FedexOptionsModal: React.FC<FedexOptionsModalProps> = ({
                 disabled={isSaving}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 type="button"
@@ -164,7 +166,7 @@ const FedexOptionsModal: React.FC<FedexOptionsModalProps> = ({
                 disabled={isSaving || isLoadingOptions || !fedexApiOptions}
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:bg-indigo-300"
               >
-                {isSaving ? 'Saving...' : 'Save & Generate Label'}
+                {isSaving ? t('saving') : t('saveAndGenerateLabel')}
               </button>
             </div>
           </>

@@ -157,6 +157,11 @@ interface PendingChange {
   return_policy_id?: number;
   processing_min?: number;
   processing_max?: number;
+  is_personalizable?: boolean;
+  personalization_is_required?: boolean;
+  personalization_instructions?: string;
+  personalization_char_count_max?: number;
+  taxonomy_id?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,12 +181,19 @@ const FIELD_DEFS: FieldDef[] = [
   {
     key: 'photos', label: 'fields.photos', group: 'groups.media',
     icon: <ImageIcon fontSize="small" />,
-    operations: [{ value: 'ai_optimize', label: 'operations.aiAltText' }],
+    operations: [
+      { value: 'add', label: 'operations.addPhotos' },
+      { value: 'delete', label: 'operations.deleteAllPhotos' },
+      { value: 'ai_optimize', label: 'operations.aiAltText' },
+    ],
   },
   {
     key: 'videos', label: 'fields.videos', group: 'groups.media',
     icon: <VideoIcon fontSize="small" />,
-    operations: [{ value: 'ai_optimize', label: 'operations.aiAltText' }],
+    operations: [
+      { value: 'add', label: 'operations.addVideo' },
+      { value: 'delete', label: 'operations.deleteAllVideos' },
+    ],
   },
   // Listings
   {
@@ -532,6 +544,32 @@ export default function BulkEditor({
   const [processingMin, setProcessingMin] = useState('');
   const [processingMax, setProcessingMax] = useState('');
 
+  // Personalization fields
+  const [isPersonalizable, setIsPersonalizable] = useState(false);
+  const [personalizationRequired, setPersonalizationRequired] = useState(false);
+  const [personalizationInstructions, setPersonalizationInstructions] = useState('');
+  const [personalizationCharMax, setPersonalizationCharMax] = useState('');
+
+  // Photo bulk upload
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState(0);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Video bulk
+  const [videoUrl, setVideoUrl] = useState('');
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+
+  // Create section
+  const [newSectionName, setNewSectionName] = useState('');
+  const [creatingSec, setCreatingSec] = useState(false);
+  const [localSections, setLocalSections] = useState<ShopSection[]>([]);
+  const allSections = useMemo(() => {
+    const ids = new Set(shopSections.map(s => s.shop_section_id));
+    return [...shopSections, ...localSections.filter(s => !ids.has(s.shop_section_id))];
+  }, [shopSections, localSections]);
+
   // Shipping/return
   const [selectedShippingProfileId, setSelectedShippingProfileId] = useState<number | ''>('');
   const [selectedReturnPolicyId, setSelectedReturnPolicyId] = useState<number | ''>('');
@@ -781,6 +819,22 @@ export default function BulkEditor({
           updatePending(listing.listing_id, { state: operation === 'activate' ? 'active' : 'inactive' });
           break;
         }
+        case 'personalization': {
+          updatePending(listing.listing_id, {
+            is_personalizable: isPersonalizable,
+            personalization_is_required: personalizationRequired,
+            personalization_instructions: personalizationInstructions || undefined,
+            personalization_char_count_max: personalizationCharMax ? parseInt(personalizationCharMax) : undefined,
+          });
+          break;
+        }
+        case 'category': {
+          const tid = parseInt(inputValue);
+          if (!isNaN(tid) && tid > 0) {
+            updatePending(listing.listing_id, { taxonomy_id: tid });
+          }
+          break;
+        }
       }
     });
 
@@ -788,7 +842,8 @@ export default function BulkEditor({
   }, [filteredListings, checkedIds, activeField, operation, inputValue, findValue, replaceValue, tagsInput,
       targetSectionId, getFieldValue, updatePending, whoMade, whenMade, isSupply,
       weightValue, weightUnit, lengthValue, widthValue, heightValue, dimensionUnit,
-      processingMin, processingMax, selectedShippingProfileId, selectedReturnPolicyId]);
+      processingMin, processingMax, selectedShippingProfileId, selectedReturnPolicyId,
+      isPersonalizable, personalizationRequired, personalizationInstructions, personalizationCharMax]);
 
   // AI optimize / rewrite
   const handleAIAction = useCallback(async () => {
@@ -896,6 +951,184 @@ export default function BulkEditor({
     else toast.error(t('toast.altTextPartial', { success, failed }));
   }, [filteredListings, checkedIds, shopId]);
 
+  // Bulk photo upload to all checked listings
+  const handleBulkPhotoUpload = useCallback(async () => {
+    if (photoFiles.length === 0) return;
+    const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
+    if (checked.length === 0) return;
+
+    setPhotoUploading(true);
+    setPhotoProgress(0);
+    let success = 0, failed = 0;
+    const total = checked.length * photoFiles.length;
+    let done = 0;
+
+    for (const listing of checked) {
+      for (const file of photoFiles) {
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          const res = await fetch(
+            `/api/clawd/etsy?action=upload_image&listing_id=${listing.listing_id}&shop_id=${shopId}`,
+            { method: 'POST', body: formData }
+          );
+          if (res.ok) success++; else failed++;
+        } catch { failed++; }
+        done++;
+        setPhotoProgress(Math.round((done / total) * 100));
+        if (done < total) await new Promise(r => setTimeout(r, 150));
+      }
+    }
+
+    setPhotoUploading(false);
+    setPhotoFiles([]);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+
+    if (failed === 0) toast.success(t('toast.photoUploadSuccess', { count: success, listings: checked.length }));
+    else toast.error(t('toast.photoUploadPartial', { success, failed }));
+    onCompleted();
+  }, [photoFiles, filteredListings, checkedIds, shopId, onCompleted]);
+
+  // Bulk delete all photos from checked listings
+  const handleBulkPhotoDelete = useCallback(async () => {
+    const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
+    if (checked.length === 0) return;
+    if (!confirm(t('confirm.deleteAllPhotos', { count: checked.length }))) return;
+
+    setPhotoUploading(true);
+    setPhotoProgress(0);
+    let success = 0, failed = 0;
+
+    for (let i = 0; i < checked.length; i++) {
+      const listing = checked[i];
+      try {
+        const imagesRes = await fetch(
+          `/api/clawd/etsy?action=get_listing_images&listing_id=${listing.listing_id}&shop_id=${shopId}`
+        );
+        if (!imagesRes.ok) { failed++; continue; }
+        const imagesData = await imagesRes.json();
+        const images = imagesData.images || imagesData.results || [];
+
+        let ok = true;
+        for (const img of images) {
+          try {
+            const r = await fetch(
+              `/api/clawd/etsy?action=delete_image&listing_id=${listing.listing_id}&image_id=${img.listing_image_id}&shop_id=${shopId}`,
+              { method: 'DELETE' }
+            );
+            if (!r.ok) ok = false;
+          } catch { ok = false; }
+        }
+        if (ok) success++; else failed++;
+      } catch { failed++; }
+      setPhotoProgress(Math.round(((i + 1) / checked.length) * 100));
+      if (i < checked.length - 1) await new Promise(r => setTimeout(r, 100));
+    }
+
+    setPhotoUploading(false);
+    if (failed === 0) toast.success(t('toast.photoDeleteSuccess', { count: success }));
+    else toast.error(t('toast.photoDeletePartial', { success, failed }));
+    onCompleted();
+  }, [filteredListings, checkedIds, shopId, onCompleted]);
+
+  // Bulk video upload (by URL) to all checked listings
+  const handleBulkVideoUpload = useCallback(async () => {
+    if (!videoUrl.trim()) return;
+    const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
+    if (checked.length === 0) return;
+
+    setVideoUploading(true);
+    setVideoProgress(0);
+    let success = 0, failed = 0;
+
+    for (let i = 0; i < checked.length; i++) {
+      const listing = checked[i];
+      try {
+        const res = await fetch(
+          `/api/clawd/etsy?action=upload_video&listing_id=${listing.listing_id}&shop_id=${shopId}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl.trim() }) }
+        );
+        if (res.ok) success++; else failed++;
+      } catch { failed++; }
+      setVideoProgress(Math.round(((i + 1) / checked.length) * 100));
+      if (i < checked.length - 1) await new Promise(r => setTimeout(r, 200));
+    }
+
+    setVideoUploading(false);
+    setVideoUrl('');
+    if (failed === 0) toast.success(t('toast.videoUploadSuccess', { count: success }));
+    else toast.error(t('toast.videoUploadPartial', { success, failed }));
+    onCompleted();
+  }, [videoUrl, filteredListings, checkedIds, shopId, onCompleted]);
+
+  // Bulk delete all videos from checked listings
+  const handleBulkVideoDelete = useCallback(async () => {
+    const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
+    if (checked.length === 0) return;
+    if (!confirm(t('confirm.deleteAllVideos', { count: checked.length }))) return;
+
+    setVideoUploading(true);
+    setVideoProgress(0);
+    let success = 0, failed = 0;
+
+    for (let i = 0; i < checked.length; i++) {
+      const listing = checked[i];
+      try {
+        const videosRes = await fetch(
+          `/api/clawd/etsy?action=get_listing_videos&listing_id=${listing.listing_id}&shop_id=${shopId}`
+        );
+        if (!videosRes.ok) { failed++; continue; }
+        const videosData = await videosRes.json();
+        const videos = videosData.videos || [];
+
+        let ok = true;
+        for (const vid of videos) {
+          try {
+            const r = await fetch(
+              `/api/clawd/etsy?action=delete_video&listing_id=${listing.listing_id}&video_id=${vid.video_id}&shop_id=${shopId}`,
+              { method: 'DELETE' }
+            );
+            if (!r.ok) ok = false;
+          } catch { ok = false; }
+        }
+        if (ok) success++; else failed++;
+      } catch { failed++; }
+      setVideoProgress(Math.round(((i + 1) / checked.length) * 100));
+      if (i < checked.length - 1) await new Promise(r => setTimeout(r, 100));
+    }
+
+    setVideoUploading(false);
+    if (failed === 0) toast.success(t('toast.videoDeleteSuccess', { count: success }));
+    else toast.error(t('toast.videoDeletePartial', { success, failed }));
+    onCompleted();
+  }, [filteredListings, checkedIds, shopId, onCompleted]);
+
+  // Create a new shop section
+  const handleCreateSection = useCallback(async () => {
+    if (!newSectionName.trim()) return;
+    setCreatingSec(true);
+    try {
+      const res = await fetch(
+        `/api/clawd/etsy?action=create_shop_section&shop_id=${shopId}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newSectionName.trim() }) }
+      );
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      const newSection: ShopSection = {
+        shop_section_id: data.shop_section_id || data.section?.shop_section_id,
+        title: newSectionName.trim(),
+      };
+      setLocalSections(prev => [...prev, newSection]);
+      setTargetSectionId(newSection.shop_section_id);
+      setNewSectionName('');
+      toast.success(t('toast.sectionCreated', { name: newSection.title }));
+    } catch {
+      toast.error(t('toast.sectionCreateFailed'));
+    } finally {
+      setCreatingSec(false);
+    }
+  }, [newSectionName, shopId]);
+
   // Save all pending changes to Etsy
   const handleSave = useCallback(async () => {
     if (pendingChanges.size === 0) {
@@ -935,6 +1168,11 @@ export default function BulkEditor({
         if (changes.return_policy_id !== undefined) body.return_policy_id = changes.return_policy_id;
         if (changes.processing_min !== undefined) body.processing_min = changes.processing_min;
         if (changes.processing_max !== undefined) body.processing_max = changes.processing_max;
+        if (changes.is_personalizable !== undefined) body.is_personalizable = changes.is_personalizable;
+        if (changes.personalization_is_required !== undefined) body.personalization_is_required = changes.personalization_is_required;
+        if (changes.personalization_instructions !== undefined) body.personalization_instructions = changes.personalization_instructions;
+        if (changes.personalization_char_count_max !== undefined) body.personalization_char_count_max = changes.personalization_char_count_max;
+        if (changes.taxonomy_id !== undefined) body.taxonomy_id = changes.taxonomy_id;
 
         const res = await callUpdateListing(shopId, listingId, body);
         if (res.ok) success++;
@@ -1039,6 +1277,8 @@ export default function BulkEditor({
                   else if (key === 'shipping_profile' && change.shipping_profile_id !== undefined) fieldChangeCount++;
                   else if (key === 'return_policy' && change.return_policy_id !== undefined) fieldChangeCount++;
                   else if (key === 'processing_time' && change.processing_min !== undefined) fieldChangeCount++;
+                  else if (key === 'personalization' && change.is_personalizable !== undefined) fieldChangeCount++;
+                  else if (key === 'category' && change.taxonomy_id !== undefined) fieldChangeCount++;
                 });
 
                 return (
@@ -1169,19 +1409,40 @@ export default function BulkEditor({
             sx={{ flex: 1, minWidth: 150 }}
           />
         ) : activeField === 'section' ? (
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <Select
-              value={targetSectionId}
-              onChange={(e) => setTargetSectionId(e.target.value as number)}
-              displayEmpty
-              sx={{ fontSize: '0.85rem' }}
+          <>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <Select
+                value={targetSectionId}
+                onChange={(e) => setTargetSectionId(e.target.value as number)}
+                displayEmpty
+                sx={{ fontSize: '0.85rem' }}
+              >
+                <MenuItem value="" disabled>{t("actionBar.selectSection")}</MenuItem>
+                {allSections.map(s => (
+                  <MenuItem key={s.shop_section_id} value={s.shop_section_id}>{s.title}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Divider orientation="vertical" flexItem />
+            <TextField
+              size="small"
+              placeholder={t("section.newSectionPlaceholder")}
+              value={newSectionName}
+              onChange={(e) => setNewSectionName(e.target.value)}
+              sx={{ minWidth: 140 }}
+              disabled={creatingSec}
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={creatingSec ? <CircularProgress size={14} /> : <AddIcon />}
+              onClick={handleCreateSection}
+              disabled={creatingSec || !newSectionName.trim()}
+              sx={{ minHeight: 40, textTransform: 'none', fontWeight: 600, borderRadius: '8px', whiteSpace: 'nowrap' }}
             >
-              <MenuItem value="" disabled>{t("actionBar.selectSection")}</MenuItem>
-              {shopSections.map(s => (
-                <MenuItem key={s.shop_section_id} value={s.shop_section_id}>{s.title}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              {t("section.createBtn")}
+            </Button>
+          </>
         ) : activeField === 'price' ? (
           <TextField
             size="small"
@@ -1243,23 +1504,81 @@ export default function BulkEditor({
       case 'photos':
         return (
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<AIIcon />}
-                onClick={handleBulkAltText}
-                disabled={aiProcessing}
-                sx={{
-                  minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-                }}
-              >
-                {aiProcessing ? t('photos.aiAltTextProgress', { progress: aiProgress }) : t('photos.aiGenerateAltText')}
-              </Button>
-              <Typography variant="caption" color="text.secondary">
-                {t("photos.altTextHelper")}
-              </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {/* Photo upload */}
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => setPhotoFiles(Array.from(e.target.files || []))}
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={photoUploading || aiProcessing}
+                  sx={{ minHeight: 40, textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}
+                >
+                  {t('photos.selectFiles')}
+                </Button>
+                {photoFiles.length > 0 && (
+                  <>
+                    <Chip
+                      label={t('photos.filesSelected', { count: photoFiles.length })}
+                      size="small"
+                      onDelete={() => { setPhotoFiles([]); if (photoInputRef.current) photoInputRef.current.value = ''; }}
+                    />
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={photoUploading ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <ImageIcon />}
+                      onClick={handleBulkPhotoUpload}
+                      disabled={photoUploading}
+                      sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
+                    >
+                      {photoUploading ? `${photoProgress}%` : t('photos.uploadToAll')}
+                    </Button>
+                  </>
+                )}
+                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleBulkPhotoDelete}
+                  disabled={photoUploading || aiProcessing}
+                  sx={{ minHeight: 40, textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}
+                >
+                  {t('photos.deleteAll')}
+                </Button>
+              </Box>
+              {/* AI alt text */}
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<AIIcon />}
+                  onClick={handleBulkAltText}
+                  disabled={aiProcessing || photoUploading}
+                  sx={{
+                    minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                  }}
+                >
+                  {aiProcessing ? t('photos.aiAltTextProgress', { progress: aiProgress }) : t('photos.aiGenerateAltText')}
+                </Button>
+                <Typography variant="caption" color="text.secondary">
+                  {t("photos.altTextHelper")}
+                </Typography>
+              </Box>
+              {photoUploading && (
+                <LinearProgress variant="determinate" value={photoProgress} sx={{ borderRadius: 1 }} />
+              )}
             </Box>
           </Paper>
         );
@@ -1267,9 +1586,46 @@ export default function BulkEditor({
       case 'videos':
         return (
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-            <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
-              {t("videos.videoAlert")}
-            </Alert>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                <TextField
+                  size="small"
+                  placeholder={t('videos.urlPlaceholder')}
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  disabled={videoUploading}
+                  sx={{ flex: 1, minWidth: 200 }}
+                />
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={videoUploading ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <VideoIcon />}
+                  onClick={handleBulkVideoUpload}
+                  disabled={videoUploading || !videoUrl.trim()}
+                  sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
+                >
+                  {videoUploading ? `${videoProgress}%` : t('videos.uploadToAll')}
+                </Button>
+                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleBulkVideoDelete}
+                  disabled={videoUploading}
+                  sx={{ minHeight: 40, textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}
+                >
+                  {t('videos.deleteAll')}
+                </Button>
+              </Box>
+              <Typography variant="caption" color="text.secondary">
+                {t("videos.videoHelper")}
+              </Typography>
+              {videoUploading && (
+                <LinearProgress variant="determinate" value={videoProgress} sx={{ borderRadius: 1 }} />
+              )}
+            </Box>
           </Paper>
         );
 
@@ -1435,14 +1791,75 @@ export default function BulkEditor({
         );
 
       case 'category':
+        return (
+          <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+              <TextField
+                size="small"
+                type="number"
+                label={t('categorySection.taxonomyIdLabel')}
+                placeholder={t('categorySection.taxonomyIdPlaceholder')}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                sx={{ minWidth: 200 }}
+              />
+              <Button
+                variant="contained" size="small" onClick={handleApply} disabled={saving || !inputValue}
+                sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
+              >
+                {t("actionBar.apply")}
+              </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+                {t('categorySection.taxonomyIdHelper')}
+              </Typography>
+            </Box>
+          </Paper>
+        );
+
       case 'personalization':
         return (
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-            <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
-              {activeField === 'category'
-                ? t('categoryNote.singleEditorRequired')
-                : t('personalizationNote.singleEditorRequired')}
-            </Alert>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <FormControlLabel
+                  control={<Switch checked={isPersonalizable} onChange={e => setIsPersonalizable(e.target.checked)} size="small" />}
+                  label={<Typography variant="body2" sx={{ fontSize: '0.82rem', fontWeight: 600 }}>{t('personalizationSection.enableLabel')}</Typography>}
+                />
+                <FormControlLabel
+                  control={<Switch checked={personalizationRequired} onChange={e => setPersonalizationRequired(e.target.checked)} size="small" disabled={!isPersonalizable} />}
+                  label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>{t('personalizationSection.requiredLabel')}</Typography>}
+                />
+                <TextField
+                  size="small"
+                  type="number"
+                  label={t('personalizationSection.charMaxLabel')}
+                  value={personalizationCharMax}
+                  onChange={e => setPersonalizationCharMax(e.target.value)}
+                  disabled={!isPersonalizable}
+                  sx={{ width: 120 }}
+                />
+              </Box>
+              <TextField
+                size="small"
+                multiline
+                minRows={2}
+                maxRows={4}
+                label={t('personalizationSection.instructionsLabel')}
+                placeholder={t('personalizationSection.instructionsPlaceholder')}
+                value={personalizationInstructions}
+                onChange={e => setPersonalizationInstructions(e.target.value)}
+                disabled={!isPersonalizable}
+                fullWidth
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="contained" size="small" onClick={handleApply} disabled={saving}
+                  sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
+                >
+                  {t("actionBar.apply")}
+                </Button>
+              </Box>
+            </Box>
           </Paper>
         );
 
@@ -1663,6 +2080,12 @@ export default function BulkEditor({
               </Typography>
             )}
 
+            {activeField === 'photos' && listing.thumbnail?.url_170x135 && (
+              <Box sx={{ mt: 0.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                <img src={listing.thumbnail.url_170x135} alt="" style={{ width: 48, height: 48, borderRadius: 4, objectFit: 'cover' }} />
+              </Box>
+            )}
+
             {activeField === 'item_weight' && (
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
                 {listing.item_weight ? `${listing.item_weight} ${listing.item_weight_unit || 'g'}` : t('inlineEditor.notSet')}
@@ -1699,17 +2122,48 @@ export default function BulkEditor({
               </Typography>
             )}
 
-            {activeField === 'category' && (
-              <Typography variant="caption" color="text.secondary">
-                {t('categoryNote.singleEditorHelper')}
-              </Typography>
-            )}
+            {activeField === 'category' && (() => {
+              const pending = pendingChanges.get(listing.listing_id);
+              if (pending?.taxonomy_id) {
+                return (
+                  <Chip label={t('categorySection.taxonomySet', { id: pending.taxonomy_id })} size="small" color="primary" variant="outlined" />
+                );
+              }
+              return (
+                <Typography variant="caption" color="text.secondary">
+                  {t('categorySection.notSet')}
+                </Typography>
+              );
+            })()}
 
-            {activeField === 'personalization' && (
-              <Typography variant="caption" color="text.secondary">
-                {t('personalizationNote.singleEditorHelper')}
-              </Typography>
-            )}
+            {activeField === 'personalization' && (() => {
+              const pending = pendingChanges.get(listing.listing_id);
+              const enabled = pending?.is_personalizable;
+              if (enabled !== undefined) {
+                return (
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Chip
+                      label={enabled ? t('personalizationSection.enabled') : t('personalizationSection.disabled')}
+                      size="small"
+                      color={enabled ? 'success' : 'default'}
+                    />
+                    {enabled && pending?.personalization_is_required && (
+                      <Chip label={t('personalizationSection.required')} size="small" color="warning" variant="outlined" />
+                    )}
+                    {enabled && pending?.personalization_instructions && (
+                      <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {pending.personalization_instructions}
+                      </Typography>
+                    )}
+                  </Box>
+                );
+              }
+              return (
+                <Typography variant="caption" color="text.secondary">
+                  {t('personalizationSection.notConfigured')}
+                </Typography>
+              );
+            })()}
           </Box>
 
           {/* SEO score indicator for title */}

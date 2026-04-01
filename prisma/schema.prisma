@@ -12,24 +12,24 @@ datasource db {
 }
 
 model User {
-  id                  String              @id
+  id                  String                  @id
   name                String?
-  email               String?             @unique
+  email               String?                 @unique
   emailVerified       DateTime?
   image               String?
-  googleAccountId     String?             @unique
-  googleSheetId       String?             @unique
+  googleAccountId     String?                 @unique
+  googleSheetId       String?                 @unique
   driveFolderId       String?
-  userAppsScriptId    String?             @unique
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  userAppsScriptId    String?                 @unique
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
   lastSyncedAt        DateTime?
-  onboardingStep      Int?                @default(0)
+  onboardingStep      Int?                    @default(0)
   shippingSettings    Json?
   billingInterval     String?
-  labelCount          Int                 @default(0)
-  orderSyncCount      Int                 @default(0)
-  stripeCustomerId    String?             @unique
+  labelCount          Int                     @default(0)
+  orderSyncCount      Int                     @default(0)
+  stripeCustomerId    String?                 @unique
   subscriptionPlan    String?
   subscriptionStatus  String?
   trialExpiresAt      DateTime?
@@ -44,9 +44,9 @@ model User {
   syncOperations      SyncOperation[]
   integrationSettings Credential?
   etsyAddresses       EtsyAddress[]
-  trackingSubmissions TrackingSubmission[] @relation("UserTrackingSubmissions")
-  senkronOrderData    SenkronOrderData[] @relation("UserSenkronData")
-  etsyShops           EtsyShop[] @relation("UserEtsyShops")
+  trackingSubmissions TrackingSubmission[]    @relation("UserTrackingSubmissions")
+  senkronOrderData    SenkronOrderData[]      @relation("UserSenkronData")
+  etsyShops           EtsyShop[]              @relation("UserEtsyShops")
   ebayTrackedProducts EbayTrackedProduct[]
   ebayTrackedSellers  EbayTrackedSeller[]
   ebayNicheResearch   EbayNicheResearch[]
@@ -101,7 +101,7 @@ model MarketplaceConfig {
 }
 
 model Order {
-  id                          String         @id @default(cuid())
+  id                          String               @id @default(cuid())
   userId                      String
   marketplace                 String
   marketplaceKey              String
@@ -109,8 +109,8 @@ model Order {
   status                      String?
   currency                    String?
   totalPrice                  Float?
-  createdAt                   DateTime       @default(now())
-  updatedAt                   DateTime       @updatedAt
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
   orderNumber                 String
   shippingAddress             Json?
   rawData                     Json?
@@ -127,23 +127,23 @@ model Order {
   packageHeight               Float?
   packageLength               Float?
   packageWidth                Float?
-  sendCommercialInvoiceViaEtd Boolean?       @default(true)
+  sendCommercialInvoiceViaEtd Boolean?             @default(true)
   shipmentStatus              String?
   shippedAt                   DateTime?
   shippingChargesPaymentType  String?
   shippingLabelUrl            String?
   signatureType               String?
-  termsOfSale                 String?        @default("DDU")
+  termsOfSale                 String?              @default("DDU")
   trackingNumber              String?
-  weightKg                    Float?         @default(0.5)
+  weightKg                    Float?               @default(0.5)
   externalStatus              String?
   uiOrderDate                 DateTime?
-  items                       OrderItem[]    @relation("OrderToOrderItem")
-  user                        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shipments                   Shipment[]     @relation("OrderToShipment")
-  shipping                    OrderShipping? @relation("OrderToOrderShipping")
+  items                       OrderItem[]          @relation("OrderToOrderItem")
+  user                        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shipments                   Shipment[]           @relation("OrderToShipment")
+  shipping                    OrderShipping?       @relation("OrderToOrderShipping")
   trackingSubmissions         TrackingSubmission[] @relation("OrderTrackingSubmissions")
-  senkronData                 SenkronOrderData? @relation("OrderSenkronData")
+  senkronData                 SenkronOrderData?    @relation("OrderSenkronData")
 
   @@unique([userId, marketplace, marketplaceKey])
   @@index([userId])
@@ -238,15 +238,15 @@ model MarketplaceProduct {
 }
 
 model Credential {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
+  id                    String    @id @default(cuid())
+  userId                String    @unique
   veeqoApiKey           String?
   shippoToken           String?
   fedexApiKey           String?
   fedexApiSecret        String?
   fedexAccountNumber    String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
   fedexMeterNumber      String?
   hepsiburadaApiKey     String?
   hepsiburadaMerchantId String?
@@ -268,7 +268,7 @@ model Credential {
   ebayAccessToken       String?
   ebayRefreshToken      String?
   ebayTokenExpiresAt    DateTime?
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ShipperProfile {
@@ -317,15 +317,15 @@ model LabelJob {
 }
 
 model SenkronOrderData {
-  id             String   @id @default(cuid())
-  orderId        String   @unique
-  userId         String
-  internalNote   String?  // User's internal notes for the order
-  customStatus   String?  // User's custom status (İptal, Üretimde, etc.)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  order          Order    @relation("OrderSenkronData", fields: [orderId], references: [id], onDelete: Cascade)
-  user           User     @relation("UserSenkronData", fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  orderId      String   @unique
+  userId       String
+  internalNote String? // User's internal notes for the order
+  customStatus String? // User's custom status (İptal, Üretimde, etc.)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  order        Order    @relation("OrderSenkronData", fields: [orderId], references: [id], onDelete: Cascade)
+  user         User     @relation("UserSenkronData", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([userId])
@@ -410,12 +410,12 @@ model EtsyAddress {
   id              String   @id @default(cuid())
   userId          String
   orderNumber     String
-  etsyStoreId     String?  // Etsy shop ID for multi-store support
-  etsyStoreName   String?  // Human-readable store name
+  etsyStoreId     String? // Etsy shop ID for multi-store support
+  etsyStoreName   String? // Human-readable store name
   shippingAddress Json
   notes           String?
-  shipByDate      String?  // Ship by date from Etsy (e.g. "Ship by tomorrow")
-  orderDate       String?  // Order date from Etsy
+  shipByDate      String? // Ship by date from Etsy (e.g. "Ship by tomorrow")
+  orderDate       String? // Order date from Etsy
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -428,21 +428,21 @@ model EtsyAddress {
 }
 
 model TrackingSubmission {
-  id              String   @id @default(cuid())
-  orderId         String
-  trackingNumber  String
-  carrierId       Int
-  carrierName     String
-  notifyCustomer  Boolean  @default(true)
-  updateRemoteOrder Boolean @default(true)
-  submittedAt     DateTime @default(now())
-  submittedBy     String
-  status          String   @default("submitted")
-  errorMessage    String?
-  veeqoResponse   Json?
-  
-  order           Order    @relation("OrderTrackingSubmissions", fields: [orderId], references: [id], onDelete: Cascade)
-  user            User     @relation("UserTrackingSubmissions", fields: [submittedBy], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  orderId           String
+  trackingNumber    String
+  carrierId         Int
+  carrierName       String
+  notifyCustomer    Boolean  @default(true)
+  updateRemoteOrder Boolean  @default(true)
+  submittedAt       DateTime @default(now())
+  submittedBy       String
+  status            String   @default("submitted")
+  errorMessage      String?
+  veeqoResponse     Json?
+
+  order Order @relation("OrderTrackingSubmissions", fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation("UserTrackingSubmissions", fields: [submittedBy], references: [id], onDelete: Cascade)
 
   @@unique([orderId, trackingNumber])
   @@index([orderId])
@@ -452,23 +452,101 @@ model TrackingSubmission {
 }
 
 model EtsyShop {
-  id              String    @id @default(cuid())
-  userId          String
-  shopId          String    // Etsy shop ID
-  shopName        String?   // Human readable shop name
-  accessToken     String
-  refreshToken    String?
-  tokenExpiresAt  DateTime?
-  isDefault       Boolean   @default(false)  // Default shop for this user
-  isActive        Boolean   @default(true)   // Can be disabled without deleting
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
-  user            User      @relation("UserEtsyShops", fields: [userId], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  userId            String
+  shopId            String    @unique // Etsy shop ID
+  shopName          String? // Human readable shop name
+  accessToken       String
+  refreshToken      String?
+  tokenExpiresAt    DateTime?
+  isDefault         Boolean   @default(false) // Default shop for this user
+  isActive          Boolean   @default(true) // Can be disabled without deleting
+  lastListingSyncAt DateTime? // When listings were last synced from Etsy
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  @@unique([userId, shopId])  // One record per user-shop combination
+  user     User          @relation("UserEtsyShops", fields: [userId], references: [id], onDelete: Cascade)
+  listings EtsyListing[] @relation("EtsyShopListings")
+
+  @@unique([userId, shopId]) // One record per user-shop combination
   @@index([userId])
   @@index([shopId])
+}
+
+model EtsyListing {
+  id            String @id @default(cuid())
+  etsyShopId    String // Etsy shop ID
+  etsyListingId Int // Etsy's listing_id
+
+  // Core
+  title       String
+  description String   @db.Text
+  tags        String[]
+  materials   String[]
+
+  // Price
+  priceAmount       Int    @default(0)
+  priceDivisor      Int    @default(100)
+  priceCurrencyCode String @default("USD")
+
+  // Metrics
+  views       Int @default(0)
+  numFavorers Int @default(0)
+  quantity    Int @default(0)
+
+  // State
+  state String  @default("draft")
+  url   String?
+
+  // Classification
+  taxonomyId    Int?
+  shopSectionId Int?
+  whoMade       String?
+  whenMade      String?
+  isSupply      Boolean @default(false)
+
+  // Processing
+  processingMin Int?
+  processingMax Int?
+
+  // Shipping
+  shippingProfileId Int?
+  returnPolicyId    Int?
+
+  // Dimensions
+  itemWeight         Float?
+  itemWeightUnit     String?
+  itemLength         Float?
+  itemWidth          Float?
+  itemHeight         Float?
+  itemDimensionsUnit String?
+
+  // Personalization
+  isPersonalizable            Boolean @default(false)
+  personalizationIsRequired   Boolean @default(false)
+  personalizationInstructions String?
+  personalizationCharCountMax Int?
+
+  // Images
+  thumbnailUrl75x75   String?
+  thumbnailUrl170x135 String?
+  thumbnailUrl570xN   String?
+  imageCount          Int     @default(0)
+  hasVideo            Boolean @default(false)
+
+  // Etsy timestamps
+  etsyCreatedTimestamp Int @default(0)
+  etsyUpdatedTimestamp Int @default(0)
+
+  // Cache control
+  syncedAt DateTime @default(now())
+
+  etsyShop EtsyShop @relation("EtsyShopListings", fields: [etsyShopId], references: [shopId], onDelete: Cascade)
+
+  @@unique([etsyShopId, etsyListingId])
+  @@index([etsyShopId])
+  @@index([etsyShopId, state])
+  @@index([etsyShopId, etsyCreatedTimestamp])
 }
 
 model WebhookEvent {
@@ -481,29 +559,29 @@ model WebhookEvent {
 // ---------------------------------------------------------------------------
 
 model EbayTrackedProduct {
-  id                String   @id @default(cuid())
-  userId            String
-  legacyItemId      String
-  itemId            String?
-  title             String
-  imageUrl          String?
-  categoryId        String?
-  categoryPath      String?
-  seller            String?
-  condition         String?
-  currentPrice      Float?
-  currency          String   @default("USD")
-  currentQuantity   Int?
-  totalSold         Int?
-  itemWebUrl        String?
-  notes             String?
-  tags              String[]
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  lastCheckedAt     DateTime?
-  snapshots         EbayPriceSnapshot[]
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String              @id @default(cuid())
+  userId          String
+  legacyItemId    String
+  itemId          String?
+  title           String
+  imageUrl        String?
+  categoryId      String?
+  categoryPath    String?
+  seller          String?
+  condition       String?
+  currentPrice    Float?
+  currency        String              @default("USD")
+  currentQuantity Int?
+  totalSold       Int?
+  itemWebUrl      String?
+  notes           String?
+  tags            String[]
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  lastCheckedAt   DateTime?
+  snapshots       EbayPriceSnapshot[]
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, legacyItemId])
   @@index([userId])
@@ -511,13 +589,13 @@ model EbayTrackedProduct {
 }
 
 model EbayPriceSnapshot {
-  id               String   @id @default(cuid())
+  id               String             @id @default(cuid())
   trackedProductId String
   price            Float
-  currency         String   @default("USD")
+  currency         String             @default("USD")
   quantity         Int?
   soldQuantity     Int?
-  timestamp        DateTime @default(now())
+  timestamp        DateTime           @default(now())
   trackedProduct   EbayTrackedProduct @relation(fields: [trackedProductId], references: [id], onDelete: Cascade)
 
   @@index([trackedProductId])
@@ -525,39 +603,39 @@ model EbayPriceSnapshot {
 }
 
 model EbayTrackedSeller {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   userId         String
   sellerUsername String
   feedbackScore  Int?
   feedbackPct    String?
   notes          String?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   lastCheckedAt  DateTime?
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, sellerUsername])
   @@index([userId])
 }
 
 model EbayNicheResearch {
-  id             String   @id @default(cuid())
-  userId         String
-  query          String
-  categoryId     String?
-  categoryName   String?
-  marketplace    String   @default("EBAY_US")
-  totalResults   Int?
-  avgPrice       Float?
-  medianPrice    Float?
-  uniqueSellers  Int?
-  demandScore    Int?
+  id               String   @id @default(cuid())
+  userId           String
+  query            String
+  categoryId       String?
+  categoryName     String?
+  marketplace      String   @default("EBAY_US")
+  totalResults     Int?
+  avgPrice         Float?
+  medianPrice      Float?
+  uniqueSellers    Int?
+  demandScore      Int?
   competitionScore Int?
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, createdAt])
@@ -568,17 +646,17 @@ model EbayNicheResearch {
 // ---------------------------------------------------------------------------
 
 model RankTrackedKeyword {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  etsyShopId      String
-  etsyListingId   String
-  listingTitle    String   @default("")
-  keyword         String
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  snapshots       RankSnapshot[]
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  etsyShopId    String
+  etsyListingId String
+  listingTitle  String         @default("")
+  keyword       String
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  snapshots     RankSnapshot[]
 
   @@unique([userId, etsyListingId, keyword])
   @@index([userId, isActive])
@@ -586,13 +664,13 @@ model RankTrackedKeyword {
 }
 
 model RankSnapshot {
-  id           String   @id @default(cuid())
+  id           String             @id @default(cuid())
   keywordId    String
   keyword      RankTrackedKeyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
   rank         Int?
   page         Int?
-  totalResults Int      @default(0)
-  checkedAt    DateTime @default(now())
+  totalResults Int                @default(0)
+  checkedAt    DateTime           @default(now())
 
   @@index([keywordId, checkedAt])
 }
@@ -611,30 +689,30 @@ model ArbitrageCache {
 }
 
 model ArbitrageScanJob {
-  id             String   @id @default(cuid())
+  id             String                  @id @default(cuid())
   userId         String
-  status         String   @default("pending") // pending | processing | completed | failed | cancelled
+  status         String                  @default("pending") // pending | processing | completed | failed | cancelled
   categorySlugs  String[]
-  params         Json     // scan parameters
-  progress       Int      @default(0)
-  totalProducts  Int      @default(0)
-  resultsCount   Int      @default(0)
+  params         Json // scan parameters
+  progress       Int                     @default(0)
+  totalProducts  Int                     @default(0)
+  resultsCount   Int                     @default(0)
   processedSlugs String[] // tracks which categories have been processed
   exchangeRate   Float?
   error          String?
   startedAt      DateTime?
   completedAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
   results        ArbitrageResultRecord[]
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, status])
   @@index([userId, createdAt])
 }
 
 model ArbitrageResultRecord {
-  id                String   @id @default(cuid())
+  id                String                @id @default(cuid())
   scanJobId         String?
   userId            String
   trendyolProductId Int
@@ -652,21 +730,21 @@ model ArbitrageResultRecord {
   ebayCategoryName  String?
   ebayTopItems      Json
   translatedQuery   String?
-  matchTier         String?  // gtin | gemini | fallback
+  matchTier         String? // gtin | gemini | fallback
   profitUsd         Float
   roiPercent        Float
   marginPercent     Float
   totalCostUsd      Float
   score             Int
-  verdict           String   // excellent | good | marginal | skip
+  verdict           String // excellent | good | marginal | skip
   financials        Json
   exchangeRate      Float
-  isTracked         Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  scanJob           ArbitrageScanJob? @relation(fields: [scanJobId], references: [id], onDelete: SetNull)
+  isTracked         Boolean               @default(false)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  scanJob           ArbitrageScanJob?     @relation(fields: [scanJobId], references: [id], onDelete: SetNull)
   priceHistory      ArbitragePricePoint[]
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trendyolProductId])
   @@index([userId, score])
@@ -676,7 +754,7 @@ model ArbitrageResultRecord {
 }
 
 model ArbitragePricePoint {
-  id                String   @id @default(cuid())
+  id                String                @id @default(cuid())
   arbitrageResultId String
   trendyolPriceTry  Float
   ebayMedianPrice   Float
@@ -684,7 +762,7 @@ model ArbitragePricePoint {
   profitUsd         Float
   roiPercent        Float
   score             Int
-  checkedAt         DateTime @default(now())
+  checkedAt         DateTime              @default(now())
   result            ArbitrageResultRecord @relation(fields: [arbitrageResultId], references: [id], onDelete: Cascade)
 
   @@index([arbitrageResultId, checkedAt])

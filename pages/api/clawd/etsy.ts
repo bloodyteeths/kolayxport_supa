@@ -2743,6 +2743,20 @@ export default async function handler(
                     who_made: listing.who_made,
                     when_made: listing.when_made,
                     is_supply: listing.is_supply,
+                    processing_min: listing.processing_min,
+                    processing_max: listing.processing_max,
+                    shipping_profile_id: listing.shipping_profile_id,
+                    return_policy_id: listing.return_policy_id,
+                    item_weight: listing.item_weight,
+                    item_weight_unit: listing.item_weight_unit,
+                    item_length: listing.item_length,
+                    item_width: listing.item_width,
+                    item_height: listing.item_height,
+                    item_dimensions_unit: listing.item_dimensions_unit,
+                    is_personalizable: listing.is_personalizable,
+                    personalization_is_required: listing.personalization_is_required,
+                    personalization_instructions: listing.personalization_instructions,
+                    personalization_char_count_max: listing.personalization_char_count_max,
                     created_timestamp: listing.created_timestamp,
                     updated_timestamp: listing.updated_timestamp,
                     thumbnail: firstImage ? {
@@ -3392,6 +3406,233 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
                     missingKeywords: missingKeywords.slice(0, 8).map(k => k.keyword),
                     missingTags: missingTags.slice(0, 8).map(t => t.tag),
                 },
+            });
+        }
+
+        // -----------------------------------------------------------------------
+        // DB-CACHED LISTINGS — Vela-style instant load + manual sync
+        // -----------------------------------------------------------------------
+
+        // GET /api/clawd/etsy?action=cached_listings — Read listings from DB (instant)
+        if (req.method === 'GET' && action === 'cached_listings') {
+            const stateFilter = (req.query.state as string) || '';
+
+            const where: any = { etsyShopId: shopId };
+            if (stateFilter) where.state = stateFilter;
+
+            const [dbListings, shop] = await Promise.all([
+                prisma.etsyListing.findMany({
+                    where,
+                    orderBy: { etsyCreatedTimestamp: 'desc' },
+                }),
+                prisma.etsyShop.findFirst({ where: { shopId }, select: { lastListingSyncAt: true } }),
+            ]);
+
+            // Map DB rows to the same shape the frontend expects
+            const listings = dbListings.map((l: any) => ({
+                listing_id: l.etsyListingId,
+                title: l.title,
+                description: l.description,
+                tags: l.tags,
+                materials: l.materials,
+                price: { amount: l.priceAmount, divisor: l.priceDivisor, currency_code: l.priceCurrencyCode },
+                views: l.views,
+                num_favorers: l.numFavorers,
+                quantity: l.quantity,
+                state: l.state,
+                url: l.url,
+                taxonomy_id: l.taxonomyId,
+                shop_section_id: l.shopSectionId,
+                who_made: l.whoMade,
+                when_made: l.whenMade,
+                is_supply: l.isSupply,
+                processing_min: l.processingMin,
+                processing_max: l.processingMax,
+                shipping_profile_id: l.shippingProfileId,
+                return_policy_id: l.returnPolicyId,
+                item_weight: l.itemWeight,
+                item_weight_unit: l.itemWeightUnit,
+                item_length: l.itemLength,
+                item_width: l.itemWidth,
+                item_height: l.itemHeight,
+                item_dimensions_unit: l.itemDimensionsUnit,
+                is_personalizable: l.isPersonalizable,
+                created_timestamp: l.etsyCreatedTimestamp,
+                updated_timestamp: l.etsyUpdatedTimestamp,
+                thumbnail: l.thumbnailUrl75x75 ? {
+                    url_75x75: l.thumbnailUrl75x75,
+                    url_170x135: l.thumbnailUrl170x135,
+                    url_570xN: l.thumbnailUrl570xN,
+                } : null,
+                image_count: l.imageCount,
+                has_video: l.hasVideo,
+            }));
+
+            // Count by state
+            const stateCounts: Record<string, number> = {};
+            const allDbListings = stateFilter
+                ? await prisma.etsyListing.findMany({ where: { etsyShopId: shopId }, select: { state: true } })
+                : dbListings;
+            for (const l of allDbListings) stateCounts[l.state] = (stateCounts[l.state] || 0) + 1;
+
+            return res.status(200).json({
+                count: listings.length,
+                listings,
+                stateCounts,
+                lastSyncAt: shop?.lastListingSyncAt?.toISOString() || null,
+                source: 'db',
+            });
+        }
+
+        // POST /api/clawd/etsy?action=sync_listings — Fetch from Etsy API → upsert to DB
+        if (req.method === 'POST' && action === 'sync_listings') {
+            const states = ['active', 'draft', 'inactive'];
+            let totalUpserted = 0;
+            const syncedAt = new Date();
+
+            for (const state of states) {
+                let offset = 0;
+                const limit = 100;
+
+                while (true) {
+                    const endpoint = `/shops/${shopId}/listings?state=${state}&limit=${limit}&offset=${offset}&includes=images`;
+                    let data: any;
+                    try {
+                        data = await callEtsyAPI(endpoint, accessToken);
+                    } catch (err: any) {
+                        logger.error(`Sync listings fetch failed for state=${state} offset=${offset}`, err);
+                        break;
+                    }
+
+                    const results = (data.results || []).filter((l: any) => l.state === state);
+                    if (results.length === 0) break;
+
+                    // Upsert each listing
+                    for (const listing of results) {
+                        const firstImage = listing.images?.[0] || null;
+                        try {
+                            await prisma.etsyListing.upsert({
+                                where: {
+                                    etsyShopId_etsyListingId: {
+                                        etsyShopId: shopId,
+                                        etsyListingId: listing.listing_id,
+                                    },
+                                },
+                                create: {
+                                    etsyShopId: shopId,
+                                    etsyListingId: listing.listing_id,
+                                    title: listing.title || '',
+                                    description: listing.description || '',
+                                    tags: listing.tags || [],
+                                    materials: listing.materials || [],
+                                    priceAmount: listing.price?.amount || 0,
+                                    priceDivisor: listing.price?.divisor || 100,
+                                    priceCurrencyCode: listing.price?.currency_code || 'USD',
+                                    views: listing.views || 0,
+                                    numFavorers: listing.num_favorers || 0,
+                                    quantity: listing.quantity || 0,
+                                    state: listing.state || 'draft',
+                                    url: listing.url || null,
+                                    taxonomyId: listing.taxonomy_id || null,
+                                    shopSectionId: listing.shop_section_id || null,
+                                    whoMade: listing.who_made || null,
+                                    whenMade: listing.when_made || null,
+                                    isSupply: listing.is_supply || false,
+                                    processingMin: listing.processing_min || null,
+                                    processingMax: listing.processing_max || null,
+                                    shippingProfileId: listing.shipping_profile_id || null,
+                                    returnPolicyId: listing.return_policy_id || null,
+                                    itemWeight: listing.item_weight || null,
+                                    itemWeightUnit: listing.item_weight_unit || null,
+                                    itemLength: listing.item_length || null,
+                                    itemWidth: listing.item_width || null,
+                                    itemHeight: listing.item_height || null,
+                                    itemDimensionsUnit: listing.item_dimensions_unit || null,
+                                    isPersonalizable: listing.is_personalizable || false,
+                                    personalizationIsRequired: listing.personalization_is_required || false,
+                                    personalizationInstructions: listing.personalization_instructions || null,
+                                    personalizationCharCountMax: listing.personalization_char_count_max || null,
+                                    thumbnailUrl75x75: firstImage?.url_75x75 || null,
+                                    thumbnailUrl170x135: firstImage?.url_170x135 || null,
+                                    thumbnailUrl570xN: firstImage?.url_570xN || null,
+                                    imageCount: listing.images?.length || 0,
+                                    hasVideo: listing.has_videos || false,
+                                    etsyCreatedTimestamp: listing.created_timestamp || 0,
+                                    etsyUpdatedTimestamp: listing.updated_timestamp || 0,
+                                    syncedAt,
+                                },
+                                update: {
+                                    title: listing.title || '',
+                                    description: listing.description || '',
+                                    tags: listing.tags || [],
+                                    materials: listing.materials || [],
+                                    priceAmount: listing.price?.amount || 0,
+                                    priceDivisor: listing.price?.divisor || 100,
+                                    priceCurrencyCode: listing.price?.currency_code || 'USD',
+                                    views: listing.views || 0,
+                                    numFavorers: listing.num_favorers || 0,
+                                    quantity: listing.quantity || 0,
+                                    state: listing.state || 'draft',
+                                    url: listing.url || null,
+                                    taxonomyId: listing.taxonomy_id || null,
+                                    shopSectionId: listing.shop_section_id || null,
+                                    whoMade: listing.who_made || null,
+                                    whenMade: listing.when_made || null,
+                                    isSupply: listing.is_supply || false,
+                                    processingMin: listing.processing_min || null,
+                                    processingMax: listing.processing_max || null,
+                                    shippingProfileId: listing.shipping_profile_id || null,
+                                    returnPolicyId: listing.return_policy_id || null,
+                                    itemWeight: listing.item_weight || null,
+                                    itemWeightUnit: listing.item_weight_unit || null,
+                                    itemLength: listing.item_length || null,
+                                    itemWidth: listing.item_width || null,
+                                    itemHeight: listing.item_height || null,
+                                    itemDimensionsUnit: listing.item_dimensions_unit || null,
+                                    isPersonalizable: listing.is_personalizable || false,
+                                    personalizationIsRequired: listing.personalization_is_required || false,
+                                    personalizationInstructions: listing.personalization_instructions || null,
+                                    personalizationCharCountMax: listing.personalization_char_count_max || null,
+                                    thumbnailUrl75x75: firstImage?.url_75x75 || null,
+                                    thumbnailUrl170x135: firstImage?.url_170x135 || null,
+                                    thumbnailUrl570xN: firstImage?.url_570xN || null,
+                                    imageCount: listing.images?.length || 0,
+                                    hasVideo: listing.has_videos || false,
+                                    etsyCreatedTimestamp: listing.created_timestamp || 0,
+                                    etsyUpdatedTimestamp: listing.updated_timestamp || 0,
+                                    syncedAt,
+                                },
+                            });
+                            totalUpserted++;
+                        } catch (err: any) {
+                            logger.error(`Upsert failed for listing ${listing.listing_id}`, err);
+                        }
+                    }
+
+                    offset += limit;
+                    if (results.length < limit) break;
+                }
+            }
+
+            // Remove listings that no longer exist on Etsy (stale)
+            const deleted = await prisma.etsyListing.deleteMany({
+                where: {
+                    etsyShopId: shopId,
+                    syncedAt: { lt: syncedAt },
+                },
+            });
+
+            // Update shop's last sync timestamp
+            await prisma.etsyShop.updateMany({
+                where: { shopId },
+                data: { lastListingSyncAt: syncedAt },
+            });
+
+            return res.status(200).json({
+                success: true,
+                synced: totalUpserted,
+                removed: deleted.count,
+                lastSyncAt: syncedAt.toISOString(),
             });
         }
 

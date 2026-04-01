@@ -1702,6 +1702,10 @@
         "shipping": "Shipping"
       },
       "operations": {
+        "addPhotos": "Add Photos",
+        "deleteAllPhotos": "Delete All Photos",
+        "addVideo": "Add Video",
+        "deleteAllVideos": "Delete All Videos",
         "aiAltText": "AI Alt Text",
         "aiRewrite": "AI Rewrite",
         "aiOptimize": "AI Optimize",
@@ -1765,14 +1769,20 @@
         "quantityPlaceholder": "Quantity..."
       },
       "photos": {
+        "selectFiles": "Select Photos",
+        "filesSelected": "{count} files selected",
+        "uploadToAll": "Upload to All",
+        "deleteAll": "Delete All Photos",
         "aiGenerateAltText": "AI Generate Alt Text",
         "aiAltTextProgress": "AI Alt Text... {progress}%",
         "altTextHelper": "Automatically generate SEO-optimized alt text for all images",
         "photosHelper": "Photos are displayed in the listing. Alt text will be applied to all images."
       },
       "videos": {
-        "videoAlert": "Video management is available in the single listing editor.",
-        "videoHelper": "Video management available in single listing editor."
+        "urlPlaceholder": "Video URL (MP4, MOV — max 100MB, 5-60 seconds)...",
+        "uploadToAll": "Upload to All",
+        "deleteAll": "Delete All Videos",
+        "videoHelper": "Enter a video URL to upload to all selected listings. Etsy will process and strip audio automatically."
       },
       "aboutSection": {
         "whoMadeLabel": "Who Made",
@@ -1813,13 +1823,27 @@
         "inactive": "Inactive",
         "draft": "Draft"
       },
-      "categoryNote": {
-        "singleEditorRequired": "Category changes require the single listing editor.",
-        "singleEditorHelper": "Category can be set in single listing editor."
+      "section": {
+        "newSectionPlaceholder": "New section name...",
+        "createBtn": "Create"
       },
-      "personalizationNote": {
-        "singleEditorRequired": "Personalization settings require the single listing editor.",
-        "singleEditorHelper": "Personalization can be configured in single listing editor."
+      "categorySection": {
+        "taxonomyIdLabel": "Taxonomy ID",
+        "taxonomyIdPlaceholder": "e.g. 2078",
+        "taxonomyIdHelper": "Enter the Etsy taxonomy ID for the category. Find IDs in Etsy's taxonomy reference.",
+        "taxonomySet": "Taxonomy: {id}",
+        "notSet": "Category not set"
+      },
+      "personalizationSection": {
+        "enableLabel": "Enable Personalization",
+        "requiredLabel": "Required",
+        "charMaxLabel": "Max Chars",
+        "instructionsLabel": "Personalization Instructions",
+        "instructionsPlaceholder": "e.g. Please enter the name you'd like engraved...",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "required": "Required",
+        "notConfigured": "Not configured"
       },
       "inlineEditor": {
         "tagsPlaceholder": "Tags (comma separated)",
@@ -1850,10 +1874,22 @@
         "noChangesToSave": "No changes to save",
         "saveSuccess": "{count} listings updated successfully",
         "savePartial": "{success} ok, {failed} failed",
-        "allChangesDiscarded": "All changes discarded"
+        "allChangesDiscarded": "All changes discarded",
+        "photoUploadSuccess": "{count} photos uploaded to {listings} listings",
+        "photoUploadPartial": "Photos: {success} uploaded, {failed} failed",
+        "photoDeleteSuccess": "Photos deleted from {count} listings",
+        "photoDeletePartial": "Photo delete: {success} ok, {failed} failed",
+        "videoUploadSuccess": "Video uploaded to {count} listings",
+        "videoUploadPartial": "Video: {success} uploaded, {failed} failed",
+        "videoDeleteSuccess": "Videos deleted from {count} listings",
+        "videoDeletePartial": "Video delete: {success} ok, {failed} failed",
+        "sectionCreated": "Section \"{name}\" created",
+        "sectionCreateFailed": "Failed to create section"
       },
       "confirm": {
-        "unsavedChanges": "{count} unsaved changes. Are you sure you want to exit?"
+        "unsavedChanges": "{count} unsaved changes. Are you sure you want to exit?",
+        "deleteAllPhotos": "Delete ALL photos from {count} listings? This cannot be undone.",
+        "deleteAllVideos": "Delete ALL videos from {count} listings? This cannot be undone."
       },
       "shopLabel": "Etsy"
     },
@@ -5567,7 +5603,19 @@
     "csvStatus": "Status",
     "csvAndMoreRows": "... and {count} more rows",
     "csvImporting": "Importing...",
-    "csvUpdateListings": "Update {count} Listings"
+    "csvUpdateListings": "Update {count} Listings",
+    "syncBtn": "Sync",
+    "syncing": "Syncing...",
+    "syncInProgress": "Syncing listings from Etsy...",
+    "syncSuccess": "{count} listings synced from Etsy",
+    "syncFailed": "Sync failed: {error}",
+    "lastSync": "Last sync",
+    "lastSyncAt": "Last synced: {time}",
+    "neverSynced": "Never synced — click to sync from Etsy",
+    "justNow": "just now",
+    "minutesAgo": "{count}m ago",
+    "hoursAgo": "{count}h ago",
+    "daysAgo": "{count}d ago"
   },
   "ebayListings": {
     "stock": "Stock",

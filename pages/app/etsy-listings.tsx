@@ -106,6 +106,17 @@ interface EtsyListingRow {
   who_made: string;
   when_made: string;
   is_supply: boolean;
+  processing_min?: number;
+  processing_max?: number;
+  shipping_profile_id?: number;
+  return_policy_id?: number;
+  item_weight?: number;
+  item_weight_unit?: string;
+  item_length?: number;
+  item_width?: number;
+  item_height?: number;
+  item_dimensions_unit?: string;
+  is_personalizable?: boolean;
   created_timestamp: number;
   updated_timestamp: number;
   thumbnail: {
@@ -919,6 +930,17 @@ function EtsyListingsPage() {
       who_made: l.who_made || '',
       when_made: l.when_made || '',
       is_supply: l.is_supply || false,
+      processing_min: l.processing_min,
+      processing_max: l.processing_max,
+      shipping_profile_id: l.shipping_profile_id,
+      return_policy_id: l.return_policy_id,
+      item_weight: l.item_weight,
+      item_weight_unit: l.item_weight_unit,
+      item_length: l.item_length,
+      item_width: l.item_width,
+      item_height: l.item_height,
+      item_dimensions_unit: l.item_dimensions_unit,
+      is_personalizable: l.is_personalizable,
       created_timestamp: l.created_timestamp || 0,
       updated_timestamp: l.updated_timestamp || 0,
       thumbnail: thumb,
@@ -927,6 +949,7 @@ function EtsyListingsPage() {
     };
   };
 
+  // Load listings from DB cache (instant)
   const fetchListings = useCallback(async () => {
     if (!selectedShopId) return;
 
@@ -941,63 +964,71 @@ function EtsyListingsPage() {
 
     setLoading(true);
     try {
-      const limit = 100;
-      const cacheBust = Date.now();
-      const buildUrl = (offset: number) =>
-        `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&limit=${limit}&offset=${offset}&state=${statusFilter}&_t=${cacheBust}`;
+      const res = await fetch(
+        `/api/clawd/etsy?action=cached_listings&shop_id=${selectedShopId}&state=${statusFilter}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rows: EtsyListingRow[] = (data.listings || []).map(mapListing);
 
-      // First page - show immediately
-      const firstRes = await fetch(buildUrl(0));
-      if (!firstRes.ok) {
-        const errData = await firstRes.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${firstRes.status}`);
+      setListings(rows);
+      setTotalCount(data.count || rows.length);
+      setLastSyncAt(data.lastSyncAt || null);
+
+      // Update in-memory cache
+      listingsCacheRef.current[cacheKey] = { listings: rows, total: data.count || rows.length, ts: Date.now() };
+
+      // Update status counts from DB response
+      if (data.stateCounts) {
+        statusCountsCacheRef.current[selectedShopId] = data.stateCounts;
       }
-      const firstData = await firstRes.json();
-      const total = firstData.count || 0;
-      const firstResults: any[] = firstData.listings || firstData.results || [];
-      const firstRows: EtsyListingRow[] = firstResults.map(mapListing);
 
-      // Show first page immediately so user sees data fast
-      setListings(firstRows);
-      setTotalCount(total || firstRows.length);
-      setLoading(false);
-
-      // Update status counts cache
-      statusCountsCacheRef.current[selectedShopId] = {
-        ...statusCountsCacheRef.current[selectedShopId],
-        [statusFilter]: total || firstRows.length,
-      };
-
-      // Fetch remaining pages in background
-      if (total > limit) {
-        setLoadingMore(true);
-        const remainingPages = Math.ceil((total - limit) / limit);
-        const allRows = [...firstRows];
-        for (let batch = 0; batch < remainingPages; batch += 5) {
-          const batchSize = Math.min(5, remainingPages - batch);
-          const fetches = Array.from({ length: batchSize }, (_, i) =>
-            fetch(buildUrl((batch + i + 1) * limit)).then(async (res) => {
-              if (!res.ok) return [];
-              const data = await res.json();
-              return (data.listings || data.results || []).map(mapListing);
-            })
-          );
-          const pages = await Promise.all(fetches);
-          pages.forEach((rows) => allRows.push(...rows));
-          setListings([...allRows]);
-        }
-        setLoadingMore(false);
-        listingsCacheRef.current[cacheKey] = { listings: allRows, total, ts: Date.now() };
-      } else {
-        listingsCacheRef.current[cacheKey] = { listings: firstRows, total, ts: Date.now() };
+      // If no data and no previous sync, auto-trigger first sync
+      if (rows.length === 0 && !data.lastSyncAt) {
+        setLoading(false);
+        syncListings();
+        return;
       }
     } catch (err: any) {
-      console.error('Failed to fetch listings:', err);
+      console.error('Failed to fetch cached listings:', err);
       toast.error(t('loadFailed', { error: err.message }));
-      setLoading(false);
-      setLoadingMore(false);
     }
+    setLoading(false);
   }, [selectedShopId, statusFilter]);
+
+  // Sync listings from Etsy API → DB (manual, like Vela)
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+
+  const syncListings = useCallback(async () => {
+    if (!selectedShopId || syncing) return;
+    setSyncing(true);
+    const toastId = toast.loading(t('syncInProgress'));
+    try {
+      const res = await fetch(
+        `/api/clawd/etsy?action=sync_listings&shop_id=${selectedShopId}`,
+        { method: 'POST' }
+      );
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setLastSyncAt(data.lastSyncAt);
+      toast.success(t('syncSuccess', { count: data.synced }), { id: toastId });
+
+      // Clear in-memory cache and refetch from DB
+      Object.keys(listingsCacheRef.current).forEach(key => {
+        if (key.startsWith(selectedShopId)) delete listingsCacheRef.current[key];
+      });
+      statusCountsCacheRef.current[selectedShopId] = {};
+      await fetchListings();
+    } catch (err: any) {
+      console.error('Sync failed:', err);
+      toast.error(t('syncFailed', { error: err.message }), { id: toastId });
+    }
+    setSyncing(false);
+  }, [selectedShopId, syncing, fetchListings]);
 
   // --- Fetch shop metadata (sections, shipping profiles, return policies) ---
   const fetchShopMeta = useCallback(async () => {
@@ -1440,9 +1471,24 @@ function EtsyListingsPage() {
         description: l.description,
         price: l.price,
         tags: l.tags,
+        materials: l.materials,
         state: l.state,
         shop_section_id: l.shop_section_id,
         thumbnail: l.thumbnail,
+        quantity: l.quantity,
+        who_made: l.who_made,
+        when_made: l.when_made,
+        is_supply: l.is_supply,
+        processing_min: l.processing_min,
+        processing_max: l.processing_max,
+        shipping_profile_id: l.shipping_profile_id,
+        return_policy_id: l.return_policy_id,
+        item_weight: l.item_weight,
+        item_weight_unit: l.item_weight_unit,
+        item_length: l.item_length,
+        item_width: l.item_width,
+        item_height: l.item_height,
+        item_dimensions_unit: l.item_dimensions_unit,
       }));
   }, [selectedIds, filteredListings]);
 
@@ -1854,22 +1900,35 @@ function EtsyListingsPage() {
                 </FormControl>
               )}
 
-              {/* Refresh */}
-              <IconButton
-                size="small"
-                onClick={() => {
-                  const cacheKey = `${selectedShopId}:${statusFilter}`;
-                  delete listingsCacheRef.current[cacheKey];
-                  fetchListings();
-                }}
-                disabled={loading}
-                sx={{
-                  minWidth: 36, minHeight: 36, borderRadius: '8px', border: '1px solid #e2e8f0',
-                  color: '#475569', '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
-                }}
-              >
-                <RefreshIcon fontSize="small" />
-              </IconButton>
+              {/* Sync from Etsy */}
+              <Tooltip title={lastSyncAt ? t('lastSyncAt', { time: new Date(lastSyncAt).toLocaleString() }) : t('neverSynced')}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={syncing ? <CircularProgress size={14} /> : <RefreshIcon fontSize="small" />}
+                  onClick={syncListings}
+                  disabled={syncing || loading}
+                  sx={{
+                    minHeight: 36, px: 1.5, borderRadius: '8px', textTransform: 'none',
+                    fontWeight: 600, fontSize: '0.8rem', whiteSpace: 'nowrap',
+                    border: '1px solid #e2e8f0', color: '#475569',
+                    '&:hover': { bgcolor: '#f8fafc', borderColor: '#cbd5e1' },
+                  }}
+                >
+                  {syncing ? t('syncing') : t('syncBtn')}
+                </Button>
+              </Tooltip>
+              {lastSyncAt && !isMobile && (
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
+                  {t('lastSync')}: {(() => {
+                    const diff = Math.round((Date.now() - new Date(lastSyncAt).getTime()) / 60000);
+                    if (diff < 1) return t('justNow');
+                    if (diff < 60) return t('minutesAgo', { count: diff });
+                    if (diff < 1440) return t('hoursAgo', { count: Math.round(diff / 60) });
+                    return t('daysAgo', { count: Math.round(diff / 1440) });
+                  })()}
+                </Typography>
+              )}
 
               {/* Spacer */}
               <Box sx={{ flex: '1 0 0' }} />
@@ -1994,9 +2053,7 @@ function EtsyListingsPage() {
                 onOpenBulkEditor={() => setBulkEditorOpen(true)}
                 onCompleted={() => {
                   setSelectedIds({ type: 'include' as const, ids: new Set<GridRowId>() });
-                  const cacheKey = `${selectedShopId}:${statusFilter}`;
-                  delete listingsCacheRef.current[cacheKey];
-                  fetchListings();
+                  syncListings();
                 }}
               />
               <Button
@@ -2308,6 +2365,10 @@ function EtsyListingsPage() {
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}
         onSaved={() => {
+          // After single listing save, re-sync to update DB cache
+          Object.keys(listingsCacheRef.current).forEach(key => {
+            if (key.startsWith(selectedShopId)) delete listingsCacheRef.current[key];
+          });
           fetchListings();
         }}
         onOpenListing={(newId) => {
@@ -2347,7 +2408,7 @@ function EtsyListingsPage() {
         shopId={selectedShopId}
         onCompleted={() => {
           setFindReplaceOpen(false);
-          fetchListings();
+          syncListings();
         }}
       />
 
@@ -2394,7 +2455,7 @@ function EtsyListingsPage() {
         shopId={selectedShopId}
         onRestored={() => {
           setBackupManagerOpen(false);
-          fetchListings();
+          syncListings();
         }}
       />
 
@@ -2411,9 +2472,8 @@ function EtsyListingsPage() {
         onCompleted={() => {
           setBulkEditorOpen(false);
           setSelectedIds({ type: 'include' as const, ids: new Set<GridRowId>() });
-          const cacheKey = `${selectedShopId}:${statusFilter}`;
-          delete listingsCacheRef.current[cacheKey];
-          fetchListings();
+          // Re-sync from Etsy to update DB cache with latest changes
+          syncListings();
         }}
       />
 

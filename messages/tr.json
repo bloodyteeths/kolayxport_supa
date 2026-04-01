@@ -1702,6 +1702,10 @@
         "shipping": "Kargo"
       },
       "operations": {
+        "addPhotos": "Fotoğraf Ekle",
+        "deleteAllPhotos": "Tüm Fotoğrafları Sil",
+        "addVideo": "Video Ekle",
+        "deleteAllVideos": "Tüm Videoları Sil",
         "aiAltText": "AI Alt Metin",
         "aiRewrite": "AI Yeniden Yaz",
         "aiOptimize": "AI Optimize Et",
@@ -1765,14 +1769,20 @@
         "quantityPlaceholder": "Adet..."
       },
       "photos": {
+        "selectFiles": "Fotoğraf Seç",
+        "filesSelected": "{count} dosya seçildi",
+        "uploadToAll": "Tümüne Yükle",
+        "deleteAll": "Tüm Fotoğrafları Sil",
         "aiGenerateAltText": "AI Alt Metin Oluştur",
         "aiAltTextProgress": "AI Alt Metin... %{progress}",
         "altTextHelper": "Seçili listelerin tüm görselleri için SEO odaklı alt metin oluşturulur",
         "photosHelper": "Fotoğraflar listede görünür. Alt metin tüm görsellere uygulanır."
       },
       "videos": {
-        "videoAlert": "Video yönetimi tek liste düzenleyicisinde yapılabilir.",
-        "videoHelper": "Video yönetimi tek liste düzenleyicisinde yapılabilir."
+        "urlPlaceholder": "Video URL (MP4, MOV — maks 100MB, 5-60 saniye)...",
+        "uploadToAll": "Tümüne Yükle",
+        "deleteAll": "Tüm Videoları Sil",
+        "videoHelper": "Seçili listelere yüklemek için video URL'si girin. Etsy videoyu işleyecek ve sesi otomatik kaldıracaktır."
       },
       "aboutSection": {
         "whoMadeLabel": "Yapan Kişi",
@@ -1813,13 +1823,27 @@
         "inactive": "Pasif",
         "draft": "Taslak"
       },
-      "categoryNote": {
-        "singleEditorRequired": "Kategori değişikliği tek liste düzenleyicisi gerektirir.",
-        "singleEditorHelper": "Kategori tek liste düzenleyicisinde ayarlanabilir."
+      "section": {
+        "newSectionPlaceholder": "Yeni bölüm adı...",
+        "createBtn": "Oluştur"
       },
-      "personalizationNote": {
-        "singleEditorRequired": "Kişiselleştirme ayarları tek liste düzenleyicisi gerektirir.",
-        "singleEditorHelper": "Kişiselleştirme tek liste düzenleyicisinde yapılandırılabilir."
+      "categorySection": {
+        "taxonomyIdLabel": "Taksonomi ID",
+        "taxonomyIdPlaceholder": "ör. 2078",
+        "taxonomyIdHelper": "Kategori için Etsy taksonomi ID'sini girin. ID'leri Etsy taksonomi referansından bulabilirsiniz.",
+        "taxonomySet": "Taksonomi: {id}",
+        "notSet": "Kategori ayarlanmamış"
+      },
+      "personalizationSection": {
+        "enableLabel": "Kişiselleştirmeyi Aç",
+        "requiredLabel": "Zorunlu",
+        "charMaxLabel": "Maks Karakter",
+        "instructionsLabel": "Kişiselleştirme Talimatları",
+        "instructionsPlaceholder": "ör. Kazınmasını istediğiniz ismi girin...",
+        "enabled": "Açık",
+        "disabled": "Kapalı",
+        "required": "Zorunlu",
+        "notConfigured": "Yapılandırılmamış"
       },
       "inlineEditor": {
         "tagsPlaceholder": "Etiketler (virgül ile ayırın)",
@@ -1850,10 +1874,22 @@
         "noChangesToSave": "Kaydedilecek değişiklik yok",
         "saveSuccess": "{count} liste başarıyla güncellendi",
         "savePartial": "{success} başarılı, {failed} başarısız",
-        "allChangesDiscarded": "Tüm değişiklikler iptal edildi"
+        "allChangesDiscarded": "Tüm değişiklikler iptal edildi",
+        "photoUploadSuccess": "{count} fotoğraf {listings} listeye yüklendi",
+        "photoUploadPartial": "Fotoğraf: {success} yüklendi, {failed} başarısız",
+        "photoDeleteSuccess": "{count} listeden fotoğraflar silindi",
+        "photoDeletePartial": "Fotoğraf silme: {success} başarılı, {failed} başarısız",
+        "videoUploadSuccess": "{count} listeye video yüklendi",
+        "videoUploadPartial": "Video: {success} yüklendi, {failed} başarısız",
+        "videoDeleteSuccess": "{count} listeden videolar silindi",
+        "videoDeletePartial": "Video silme: {success} başarılı, {failed} başarısız",
+        "sectionCreated": "\"{name}\" bölümü oluşturuldu",
+        "sectionCreateFailed": "Bölüm oluşturulamadı"
       },
       "confirm": {
-        "unsavedChanges": "{count} kaydedilmemiş değişiklik var. Çıkmak istediğinizden emin misiniz?"
+        "unsavedChanges": "{count} kaydedilmemiş değişiklik var. Çıkmak istediğinizden emin misiniz?",
+        "deleteAllPhotos": "{count} listeden TÜM fotoğraflar silinecek. Bu işlem geri alınamaz.",
+        "deleteAllVideos": "{count} listeden TÜM videolar silinecek. Bu işlem geri alınamaz."
       },
       "shopLabel": "Etsy"
     },
@@ -5567,7 +5603,19 @@
     "csvStatus": "Durum",
     "csvAndMoreRows": "... ve {count} satır daha",
     "csvImporting": "Import ediliyor...",
-    "csvUpdateListings": "{count} Listing Güncelle"
+    "csvUpdateListings": "{count} Listing Güncelle",
+    "syncBtn": "Senkronize Et",
+    "syncing": "Senkronize ediliyor...",
+    "syncInProgress": "Etsy'den listeler senkronize ediliyor...",
+    "syncSuccess": "{count} liste Etsy'den senkronize edildi",
+    "syncFailed": "Senkronizasyon başarısız: {error}",
+    "lastSync": "Son senkronizasyon",
+    "lastSyncAt": "Son senkronizasyon: {time}",
+    "neverSynced": "Henüz senkronize edilmedi — Etsy'den çekmek için tıklayın",
+    "justNow": "az önce",
+    "minutesAgo": "{count}dk önce",
+    "hoursAgo": "{count}sa önce",
+    "daysAgo": "{count}g önce"
   },
   "ebayListings": {
     "stock": "Stok",

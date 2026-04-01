@@ -174,144 +174,144 @@ interface FieldDef {
 const FIELD_DEFS: FieldDef[] = [
   // Media
   {
-    key: 'photos', label: 'Photos', group: 'Media',
+    key: 'photos', label: 'fields.photos', group: 'groups.media',
     icon: <ImageIcon fontSize="small" />,
-    operations: [{ value: 'ai_optimize', label: 'AI Alt Text' }],
+    operations: [{ value: 'ai_optimize', label: 'operations.aiAltText' }],
   },
   {
-    key: 'videos', label: 'Videos', group: 'Media',
+    key: 'videos', label: 'fields.videos', group: 'groups.media',
     icon: <VideoIcon fontSize="small" />,
-    operations: [{ value: 'ai_optimize', label: 'AI Alt Text' }],
+    operations: [{ value: 'ai_optimize', label: 'operations.aiAltText' }],
   },
   // Listings
   {
-    key: 'title', label: 'Title', group: 'Listings',
+    key: 'title', label: 'fields.title', group: 'groups.listings',
     icon: <TitleIcon fontSize="small" />,
     operations: [
-      { value: 'ai_rewrite', label: 'AI Rewrite' },
-      { value: 'add_before', label: 'Add Before' },
-      { value: 'add_after', label: 'Add After' },
-      { value: 'find_replace', label: 'Find & Replace' },
-      { value: 'delete', label: 'Delete' },
-      { value: 'change_to', label: 'Change To' },
+      { value: 'ai_rewrite', label: 'operations.aiRewrite' },
+      { value: 'add_before', label: 'operations.addBefore' },
+      { value: 'add_after', label: 'operations.addAfter' },
+      { value: 'find_replace', label: 'operations.findReplace' },
+      { value: 'delete', label: 'operations.delete' },
+      { value: 'change_to', label: 'operations.changeTo' },
     ],
   },
   {
-    key: 'description', label: 'Description', group: 'Listings',
+    key: 'description', label: 'fields.description', group: 'groups.listings',
     icon: <DescriptionIcon fontSize="small" />,
     operations: [
-      { value: 'ai_rewrite', label: 'AI Rewrite' },
-      { value: 'add_before', label: 'Add Before' },
-      { value: 'add_after', label: 'Add After' },
-      { value: 'find_replace', label: 'Find & Replace' },
-      { value: 'delete', label: 'Delete' },
-      { value: 'change_to', label: 'Change To' },
+      { value: 'ai_rewrite', label: 'operations.aiRewrite' },
+      { value: 'add_before', label: 'operations.addBefore' },
+      { value: 'add_after', label: 'operations.addAfter' },
+      { value: 'find_replace', label: 'operations.findReplace' },
+      { value: 'delete', label: 'operations.delete' },
+      { value: 'change_to', label: 'operations.changeTo' },
     ],
   },
   {
-    key: 'tags', label: 'Tags', group: 'Listings',
+    key: 'tags', label: 'fields.tags', group: 'groups.listings',
     icon: <TagIcon fontSize="small" />,
     operations: [
-      { value: 'ai_rewrite', label: 'AI Optimize' },
-      { value: 'add', label: 'Add' },
-      { value: 'remove', label: 'Remove' },
-      { value: 'remove_all', label: 'Remove All' },
-      { value: 'change_to', label: 'Change To' },
+      { value: 'ai_rewrite', label: 'operations.aiOptimize' },
+      { value: 'add', label: 'operations.add' },
+      { value: 'remove', label: 'operations.remove' },
+      { value: 'remove_all', label: 'operations.removeAll' },
+      { value: 'change_to', label: 'operations.changeTo' },
     ],
   },
   {
-    key: 'materials', label: 'Materials', group: 'Listings',
+    key: 'materials', label: 'fields.materials', group: 'groups.listings',
     icon: <MaterialIcon fontSize="small" />,
     operations: [
-      { value: 'add', label: 'Add' },
-      { value: 'remove', label: 'Remove' },
-      { value: 'remove_all', label: 'Remove All' },
-      { value: 'change_to', label: 'Change To' },
+      { value: 'add', label: 'operations.add' },
+      { value: 'remove', label: 'operations.remove' },
+      { value: 'remove_all', label: 'operations.removeAll' },
+      { value: 'change_to', label: 'operations.changeTo' },
     ],
   },
   {
-    key: 'about', label: 'About', group: 'Listings',
+    key: 'about', label: 'fields.about', group: 'groups.listings',
     icon: <PersonIcon fontSize="small" />,
-    operations: [{ value: 'set_value', label: 'Set Value' }],
+    operations: [{ value: 'set_value', label: 'operations.setValue' }],
   },
   {
-    key: 'category', label: 'Category', group: 'Listings',
+    key: 'category', label: 'fields.category', group: 'groups.listings',
     icon: <CategoryIcon fontSize="small" />,
-    operations: [{ value: 'set_value', label: 'Set Category' }],
+    operations: [{ value: 'set_value', label: 'operations.setCategory' }],
   },
   {
-    key: 'section', label: 'Section', group: 'Listings',
+    key: 'section', label: 'fields.section', group: 'groups.listings',
     icon: <FolderIcon fontSize="small" />,
-    operations: [{ value: 'set_section', label: 'Set Section' }],
+    operations: [{ value: 'set_section', label: 'operations.setSection' }],
   },
   {
-    key: 'personalization', label: 'Personalization', group: 'Listings',
+    key: 'personalization', label: 'fields.personalization', group: 'groups.listings',
     icon: <TextFieldsIcon fontSize="small" />,
-    operations: [{ value: 'set_value', label: 'Configure' }],
+    operations: [{ value: 'set_value', label: 'operations.configure' }],
   },
   // Inventory
   {
-    key: 'price', label: 'Price', group: 'Inventory',
+    key: 'price', label: 'fields.price', group: 'groups.inventory',
     icon: <PriceIcon fontSize="small" />,
     operations: [
-      { value: 'increase_pct', label: '% Increase' },
-      { value: 'decrease_pct', label: '% Decrease' },
-      { value: 'increase_fixed', label: '+ Fixed' },
-      { value: 'decrease_fixed', label: '- Fixed' },
-      { value: 'set_price', label: 'Set Price' },
+      { value: 'increase_pct', label: 'operations.pctIncrease' },
+      { value: 'decrease_pct', label: 'operations.pctDecrease' },
+      { value: 'increase_fixed', label: 'operations.fixedIncrease' },
+      { value: 'decrease_fixed', label: 'operations.fixedDecrease' },
+      { value: 'set_price', label: 'operations.setPrice' },
     ],
   },
   {
-    key: 'quantity', label: 'Quantity', group: 'Inventory',
+    key: 'quantity', label: 'fields.quantity', group: 'groups.inventory',
     icon: <InventoryIcon fontSize="small" />,
     operations: [
-      { value: 'set_quantity', label: 'Set Quantity' },
-      { value: 'increase_fixed', label: 'Increase' },
-      { value: 'decrease_fixed', label: 'Decrease' },
+      { value: 'set_quantity', label: 'operations.setQuantity' },
+      { value: 'increase_fixed', label: 'operations.increase' },
+      { value: 'decrease_fixed', label: 'operations.decrease' },
     ],
   },
   // Shipping
   {
-    key: 'processing_time', label: 'Processing Time', group: 'Shipping',
+    key: 'processing_time', label: 'fields.processingTime', group: 'groups.shipping',
     icon: <ScheduleIcon fontSize="small" />,
-    operations: [{ value: 'set_value', label: 'Set Time' }],
+    operations: [{ value: 'set_value', label: 'operations.setTime' }],
   },
   {
-    key: 'shipping_profile', label: 'Shipping Profile', group: 'Shipping',
+    key: 'shipping_profile', label: 'fields.shippingProfile', group: 'groups.shipping',
     icon: <ShippingIcon fontSize="small" />,
-    operations: [{ value: 'set_value', label: 'Set Profile' }],
+    operations: [{ value: 'set_value', label: 'operations.setProfile' }],
   },
   {
-    key: 'item_weight', label: 'Item Weight', group: 'Shipping',
+    key: 'item_weight', label: 'fields.itemWeight', group: 'groups.shipping',
     icon: <WeightIcon fontSize="small" />,
-    operations: [{ value: 'set_value', label: 'Set Weight' }],
+    operations: [{ value: 'set_value', label: 'operations.setWeight' }],
   },
   {
-    key: 'item_size', label: 'Item Size', group: 'Shipping',
+    key: 'item_size', label: 'fields.itemSize', group: 'groups.shipping',
     icon: <SizeIcon fontSize="small" />,
-    operations: [{ value: 'set_value', label: 'Set Size' }],
+    operations: [{ value: 'set_value', label: 'operations.setSize' }],
   },
   {
-    key: 'return_policy', label: 'Return Policy', group: 'Shipping',
+    key: 'return_policy', label: 'fields.returnPolicy', group: 'groups.shipping',
     icon: <ReturnIcon fontSize="small" />,
-    operations: [{ value: 'set_value', label: 'Set Policy' }],
+    operations: [{ value: 'set_value', label: 'operations.setPolicy' }],
   },
 ];
 
-const GROUPS = ['Media', 'Listings', 'Inventory', 'Shipping'];
+const GROUPS = ['groups.media', 'groups.listings', 'groups.inventory', 'groups.shipping'];
 
 const WHO_MADE_OPTIONS = [
-  { value: 'i_did', label: 'I did' },
-  { value: 'collective', label: 'A member of my shop' },
-  { value: 'someone_else', label: 'Another company or person' },
+  { value: 'i_did', label: 'whoMade.iDid' },
+  { value: 'collective', label: 'whoMade.collective' },
+  { value: 'someone_else', label: 'whoMade.someoneElse' },
 ];
 
 const WHEN_MADE_OPTIONS = [
-  { value: 'made_to_order', label: 'Made to order' },
-  { value: '2020_2025', label: '2020-2025' },
-  { value: '2010_2019', label: '2010-2019' },
-  { value: '2004_2009', label: '2004-2009' },
-  { value: 'before_2004', label: 'Before 2004' },
+  { value: 'made_to_order', label: 'whenMade.madeToOrder' },
+  { value: '2020_2025', label: 'whenMade.2020_2025' },
+  { value: '2010_2019', label: 'whenMade.2010_2019' },
+  { value: '2004_2009', label: 'whenMade.2004_2009' },
+  { value: 'before_2004', label: 'whenMade.before2004' },
 ];
 
 const WEIGHT_UNITS = ['oz', 'lb', 'g', 'kg'];
@@ -344,6 +344,7 @@ function InlineTagEditor({
   maxTags?: number;
   maxCharsPerTag?: number;
 }) {
+  const t = useTranslations('etsy.bulkEditor');
   const [inputVal, setInputVal] = useState('');
   const remaining = maxTags - tags.length;
 
@@ -370,7 +371,7 @@ function InlineTagEditor({
       <TextField
         size="small"
         fullWidth
-        placeholder="Tags (comma separated)"
+        placeholder={t("inlineEditor.tagsPlaceholder")}
         value={inputVal}
         onChange={(e) => setInputVal(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -384,7 +385,7 @@ function InlineTagEditor({
           fontWeight: remaining <= 3 ? 700 : 400,
         }}
       >
-        {remaining} remaining
+        {t('inlineEditor.remaining', { count: remaining })}
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
         {tags.map((tag, i) => {
@@ -429,6 +430,7 @@ function InlineMaterialEditor({
   onChange: (materials: string[]) => void;
   maxMaterials?: number;
 }) {
+  const t = useTranslations('etsy.bulkEditor');
   const [inputVal, setInputVal] = useState('');
   const remaining = maxMaterials - materials.length;
 
@@ -454,7 +456,7 @@ function InlineMaterialEditor({
       <TextField
         size="small"
         fullWidth
-        placeholder="Materials (comma separated)"
+        placeholder={t("inlineEditor.materialsPlaceholder")}
         value={inputVal}
         onChange={(e) => setInputVal(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -462,7 +464,7 @@ function InlineMaterialEditor({
         sx={{ mb: 0.5, '& .MuiInputBase-input': { fontSize: '0.82rem' } }}
       />
       <Typography variant="caption" color={remaining <= 0 ? 'error' : 'text.secondary'}>
-        {remaining} remaining
+        {t('inlineEditor.remaining', { count: remaining })}
       </Typography>
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
         {materials.map((mat, i) => (
@@ -496,6 +498,7 @@ export default function BulkEditor({
 }: BulkEditorProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const t = useTranslations('etsy.bulkEditor');
 
   // Navigation
   const [activeField, setActiveField] = useState<FieldCategory>('title');
@@ -622,7 +625,7 @@ export default function BulkEditor({
   const handleApply = useCallback(() => {
     const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
     if (checked.length === 0) {
-      toast.error('No listings selected');
+      toast.error(t('toast.noListingsSelected'));
       return;
     }
 
@@ -781,7 +784,7 @@ export default function BulkEditor({
       }
     });
 
-    toast.success(`Applied to ${checked.length} listings (not saved yet)`);
+    toast.success(t('toast.appliedToListings', { count: checked.length }));
   }, [filteredListings, checkedIds, activeField, operation, inputValue, findValue, replaceValue, tagsInput,
       targetSectionId, getFieldValue, updatePending, whoMade, whenMade, isSupply,
       weightValue, weightUnit, lengthValue, widthValue, heightValue, dimensionUnit,
@@ -834,9 +837,9 @@ export default function BulkEditor({
         }
       });
 
-      toast.success(`AI optimized ${optimized.length} listings`);
+      toast.success(t('toast.aiOptimized', { count: optimized.length }));
     } catch (err: any) {
-      toast.error(err.message || 'AI optimization failed');
+      toast.error(err.message || t('toast.aiOptimizeFailed'));
     } finally {
       setAiProcessing(false);
       setAiProgress(0);
@@ -889,14 +892,14 @@ export default function BulkEditor({
     }
 
     setAiProcessing(false);
-    if (failed === 0) toast.success(`Alt text: ${success} listings updated`);
-    else toast.error(`Alt text: ${success} ok, ${failed} failed`);
+    if (failed === 0) toast.success(t('toast.altTextSuccess', { count: success }));
+    else toast.error(t('toast.altTextPartial', { success, failed }));
   }, [filteredListings, checkedIds, shopId]);
 
   // Save all pending changes to Etsy
   const handleSave = useCallback(async () => {
     if (pendingChanges.size === 0) {
-      toast('No changes to save');
+      toast(t('toast.noChangesToSave'));
       return;
     }
 
@@ -946,11 +949,11 @@ export default function BulkEditor({
     setSaving(false);
 
     if (failed === 0) {
-      toast.success(`${success} listings updated successfully`);
+      toast.success(t('toast.saveSuccess', { count: success }));
       setPendingChanges(new Map());
       onCompleted();
     } else {
-      toast.error(`${success} ok, ${failed} failed`);
+      toast.error(t('toast.savePartial', { success, failed }));
     }
   }, [pendingChanges, shopId, onCompleted]);
 
@@ -968,7 +971,7 @@ export default function BulkEditor({
   // Close handler with unsaved warning
   const handleClose = useCallback(() => {
     if (pendingChanges.size > 0) {
-      if (!confirm(`${pendingChanges.size} unsaved changes. Are you sure you want to exit?`)) return;
+      if (!confirm(t('confirm.unsavedChanges', { count: pendingChanges.size }))) return;
     }
     setPendingChanges(new Map());
     onClose();
@@ -977,7 +980,7 @@ export default function BulkEditor({
   // Discard all pending changes
   const handleDiscard = useCallback(() => {
     setPendingChanges(new Map());
-    toast.success('All changes discarded');
+    toast.success(t('toast.allChangesDiscarded'));
   }, []);
 
   if (!open) return null;
@@ -1011,7 +1014,7 @@ export default function BulkEditor({
                 variant="caption"
                 sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.65rem' }}
               >
-                {group}
+                {t(group)}
               </Typography>
               {isCollapsed ? <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandLessIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
             </Box>
@@ -1057,7 +1060,7 @@ export default function BulkEditor({
                       {field.icon}
                     </Box>
                     <ListItemText
-                      primary={field.label}
+                      primary={t(field.label)}
                       primaryTypographyProps={{
                         fontSize: '0.82rem',
                         fontWeight: isActive ? 700 : 500,
@@ -1122,7 +1125,7 @@ export default function BulkEditor({
                   {(op.value === 'ai_rewrite' || op.value === 'ai_optimize') && (
                     <AIIcon sx={{ fontSize: 16, color: '#8b5cf6' }} />
                   )}
-                  <span>{op.label}</span>
+                  <span>{t(op.label)}</span>
                 </Box>
               </MenuItem>
             ))}
@@ -1133,7 +1136,7 @@ export default function BulkEditor({
         {isAI ? (
           <TextField
             size="small"
-            placeholder="Additional instructions (optional)..."
+            placeholder={t("actionBar.additionalInstructions")}
             value={aiInstructions}
             onChange={(e) => setAiInstructions(e.target.value)}
             sx={{ flex: 1, minWidth: 150 }}
@@ -1142,7 +1145,7 @@ export default function BulkEditor({
           <>
             <TextField
               size="small"
-              placeholder="Find..."
+              placeholder={t("actionBar.find")}
               value={findValue}
               onChange={(e) => setFindValue(e.target.value)}
               sx={{ flex: 1, minWidth: 100 }}
@@ -1151,7 +1154,7 @@ export default function BulkEditor({
             <SwapIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
             <TextField
               size="small"
-              placeholder="Replace with..."
+              placeholder={t("actionBar.replaceWith")}
               value={replaceValue}
               onChange={(e) => setReplaceValue(e.target.value)}
               sx={{ flex: 1, minWidth: 100 }}
@@ -1160,7 +1163,7 @@ export default function BulkEditor({
         ) : (activeField === 'tags' || activeField === 'materials') ? (
           <TextField
             size="small"
-            placeholder={`${fieldDef.label} (comma separated)...`}
+            placeholder={t("actionBar.commaSeparated", { field: t(fieldDef.label) })}
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}
             sx={{ flex: 1, minWidth: 150 }}
@@ -1173,7 +1176,7 @@ export default function BulkEditor({
               displayEmpty
               sx={{ fontSize: '0.85rem' }}
             >
-              <MenuItem value="" disabled>Select section...</MenuItem>
+              <MenuItem value="" disabled>{t("actionBar.selectSection")}</MenuItem>
               {shopSections.map(s => (
                 <MenuItem key={s.shop_section_id} value={s.shop_section_id}>{s.title}</MenuItem>
               ))}
@@ -1182,7 +1185,7 @@ export default function BulkEditor({
         ) : activeField === 'price' ? (
           <TextField
             size="small"
-            placeholder="Amount..."
+            placeholder={t("actionBar.amount")}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             sx={{ flex: 1, minWidth: 120, maxWidth: 200 }}
@@ -1194,7 +1197,7 @@ export default function BulkEditor({
         ) : activeField === 'quantity' ? (
           <TextField
             size="small"
-            placeholder="Quantity..."
+            placeholder={t("actionBar.quantityPlaceholder")}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             sx={{ flex: 1, minWidth: 100, maxWidth: 160 }}
@@ -1203,7 +1206,7 @@ export default function BulkEditor({
         ) : operation !== 'delete' ? (
           <TextField
             size="small"
-            placeholder={`${fieldDef.label}...`}
+            placeholder={`${t(fieldDef.label)}...`}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             sx={{ flex: 1, minWidth: 150 }}
@@ -1228,7 +1231,7 @@ export default function BulkEditor({
             },
           }}
         >
-          {aiProcessing ? <CircularProgress size={18} sx={{ color: 'white' }} /> : 'Apply'}
+          {aiProcessing ? <CircularProgress size={18} sx={{ color: 'white' }} /> : t('actionBar.apply')}
         </Button>
       </Paper>
     );
@@ -1252,10 +1255,10 @@ export default function BulkEditor({
                   background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
                 }}
               >
-                {aiProcessing ? `AI Alt Text... ${aiProgress}%` : 'AI Generate Alt Text'}
+                {aiProcessing ? t('photos.aiAltTextProgress', { progress: aiProgress }) : t('photos.aiGenerateAltText')}
               </Button>
               <Typography variant="caption" color="text.secondary">
-                Automatically generate SEO-optimized alt text for all images of selected listings
+                {t("photos.altTextHelper")}
               </Typography>
             </Box>
           </Paper>
@@ -1265,7 +1268,7 @@ export default function BulkEditor({
         return (
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
-              Video management is available in the single listing editor. Select a listing below to manage videos.
+              {t("videos.videoAlert")}
             </Alert>
           </Paper>
         );
@@ -1275,26 +1278,26 @@ export default function BulkEditor({
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
               <FormControl size="small" sx={{ minWidth: 180 }}>
-                <InputLabel sx={{ fontSize: '0.82rem' }}>Who Made</InputLabel>
-                <Select value={whoMade} onChange={e => setWhoMade(e.target.value)} label="Who Made" sx={{ fontSize: '0.85rem' }}>
-                  {WHO_MADE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                <InputLabel sx={{ fontSize: '0.82rem' }}>{t('aboutSection.whoMadeLabel')}</InputLabel>
+                <Select value={whoMade} onChange={e => setWhoMade(e.target.value)} label={t("aboutSection.whoMadeLabel")} sx={{ fontSize: '0.85rem' }}>
+                  {WHO_MADE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{t(o.label)}</MenuItem>)}
                 </Select>
               </FormControl>
               <FormControl size="small" sx={{ minWidth: 160 }}>
-                <InputLabel sx={{ fontSize: '0.82rem' }}>When Made</InputLabel>
-                <Select value={whenMade} onChange={e => setWhenMade(e.target.value)} label="When Made" sx={{ fontSize: '0.85rem' }}>
-                  {WHEN_MADE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+                <InputLabel sx={{ fontSize: '0.82rem' }}>{t('aboutSection.whenMadeLabel')}</InputLabel>
+                <Select value={whenMade} onChange={e => setWhenMade(e.target.value)} label={t("aboutSection.whenMadeLabel")} sx={{ fontSize: '0.85rem' }}>
+                  {WHEN_MADE_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{t(o.label)}</MenuItem>)}
                 </Select>
               </FormControl>
               <FormControlLabel
                 control={<Switch checked={isSupply} onChange={e => setIsSupply(e.target.checked)} size="small" />}
-                label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>Is Supply</Typography>}
+                label={<Typography variant="body2" sx={{ fontSize: '0.82rem' }}>{t('aboutSection.isSupply')}</Typography>}
               />
               <Button
                 variant="contained" size="small" onClick={handleApply} disabled={saving}
                 sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
               >
-                Apply
+                {t("actionBar.apply")}
               </Button>
             </Box>
           </Paper>
@@ -1304,12 +1307,12 @@ export default function BulkEditor({
         return (
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-              <TextField size="small" type="number" label="Min Days" value={processingMin} onChange={e => setProcessingMin(e.target.value)} sx={{ width: 100 }} />
-              <Typography variant="body2" color="text.secondary">to</Typography>
-              <TextField size="small" type="number" label="Max Days" value={processingMax} onChange={e => setProcessingMax(e.target.value)} sx={{ width: 100 }} />
+              <TextField size="small" type="number" label={t("processingTime.minDays")} value={processingMin} onChange={e => setProcessingMin(e.target.value)} sx={{ width: 100 }} />
+              <Typography variant="body2" color="text.secondary">{t("processingTime.to")}</Typography>
+              <TextField size="small" type="number" label={t("processingTime.maxDays")} value={processingMax} onChange={e => setProcessingMax(e.target.value)} sx={{ width: 100 }} />
               <Button variant="contained" size="small" onClick={handleApply} disabled={saving}
                 sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}>
-                Apply
+                {t("actionBar.apply")}
               </Button>
             </Box>
           </Paper>
@@ -1320,11 +1323,11 @@ export default function BulkEditor({
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
               <FormControl size="small" sx={{ minWidth: 250 }}>
-                <InputLabel sx={{ fontSize: '0.82rem' }}>Shipping Profile</InputLabel>
+                <InputLabel sx={{ fontSize: '0.82rem' }}>{t('shippingProfile.label')}</InputLabel>
                 <Select
                   value={selectedShippingProfileId}
                   onChange={e => setSelectedShippingProfileId(e.target.value as number)}
-                  label="Shipping Profile"
+                  label={t("shippingProfile.label")}
                   sx={{ fontSize: '0.85rem' }}
                 >
                   {shippingProfiles.map(sp => (
@@ -1334,7 +1337,7 @@ export default function BulkEditor({
               </FormControl>
               <Button variant="contained" size="small" onClick={handleApply} disabled={saving}
                 sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}>
-                Apply
+                {t("actionBar.apply")}
               </Button>
             </Box>
           </Paper>
@@ -1344,7 +1347,7 @@ export default function BulkEditor({
         return (
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-              <TextField size="small" type="number" label="Weight" value={weightValue} onChange={e => setWeightValue(e.target.value)} sx={{ width: 120 }} />
+              <TextField size="small" type="number" label={t("itemWeight.weightLabel")} value={weightValue} onChange={e => setWeightValue(e.target.value)} sx={{ width: 120 }} />
               <FormControl size="small" sx={{ minWidth: 80 }}>
                 <Select value={weightUnit} onChange={e => setWeightUnit(e.target.value)} sx={{ fontSize: '0.85rem' }}>
                   {WEIGHT_UNITS.map(u => <MenuItem key={u} value={u}>{u}</MenuItem>)}
@@ -1352,7 +1355,7 @@ export default function BulkEditor({
               </FormControl>
               <Button variant="contained" size="small" onClick={handleApply} disabled={saving}
                 sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}>
-                Apply
+                {t("actionBar.apply")}
               </Button>
             </Box>
           </Paper>
@@ -1362,11 +1365,11 @@ export default function BulkEditor({
         return (
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-              <TextField size="small" type="number" label="Length" value={lengthValue} onChange={e => setLengthValue(e.target.value)} sx={{ width: 90 }} />
-              <Typography variant="body2" color="text.secondary">x</Typography>
-              <TextField size="small" type="number" label="Width" value={widthValue} onChange={e => setWidthValue(e.target.value)} sx={{ width: 90 }} />
-              <Typography variant="body2" color="text.secondary">x</Typography>
-              <TextField size="small" type="number" label="Height" value={heightValue} onChange={e => setHeightValue(e.target.value)} sx={{ width: 90 }} />
+              <TextField size="small" type="number" label={t("itemSize.lengthLabel")} value={lengthValue} onChange={e => setLengthValue(e.target.value)} sx={{ width: 90 }} />
+              <Typography variant="body2" color="text.secondary">{t("itemSize.dimensionSeparator")}</Typography>
+              <TextField size="small" type="number" label={t("itemSize.widthLabel")} value={widthValue} onChange={e => setWidthValue(e.target.value)} sx={{ width: 90 }} />
+              <Typography variant="body2" color="text.secondary">{t("itemSize.dimensionSeparator")}</Typography>
+              <TextField size="small" type="number" label={t("itemSize.heightLabel")} value={heightValue} onChange={e => setHeightValue(e.target.value)} sx={{ width: 90 }} />
               <FormControl size="small" sx={{ minWidth: 70 }}>
                 <Select value={dimensionUnit} onChange={e => setDimensionUnit(e.target.value)} sx={{ fontSize: '0.85rem' }}>
                   {DIMENSION_UNITS.map(u => <MenuItem key={u} value={u}>{u}</MenuItem>)}
@@ -1374,7 +1377,7 @@ export default function BulkEditor({
               </FormControl>
               <Button variant="contained" size="small" onClick={handleApply} disabled={saving}
                 sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}>
-                Apply
+                {t("actionBar.apply")}
               </Button>
             </Box>
           </Paper>
@@ -1385,23 +1388,23 @@ export default function BulkEditor({
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
               <FormControl size="small" sx={{ minWidth: 250 }}>
-                <InputLabel sx={{ fontSize: '0.82rem' }}>Return Policy</InputLabel>
+                <InputLabel sx={{ fontSize: '0.82rem' }}>{t('returnPolicy.label')}</InputLabel>
                 <Select
                   value={selectedReturnPolicyId}
                   onChange={e => setSelectedReturnPolicyId(e.target.value as number)}
-                  label="Return Policy"
+                  label={t("returnPolicy.label")}
                   sx={{ fontSize: '0.85rem' }}
                 >
                   {returnPolicies.map(rp => (
                     <MenuItem key={rp.return_policy_id} value={rp.return_policy_id}>
-                      {rp.description || `Policy #${rp.return_policy_id}`}
+                      {rp.description || t('returnPolicy.policyFallback', { id: rp.return_policy_id })}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
               <Button variant="contained" size="small" onClick={handleApply} disabled={saving}
                 sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}>
-                Apply
+                {t("actionBar.apply")}
               </Button>
             </Box>
           </Paper>
@@ -1417,7 +1420,7 @@ export default function BulkEditor({
                 disabled={saving}
                 sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
               >
-                Activate All
+                {t("listingState.activateAll")}
               </Button>
               <Button
                 variant="outlined" size="small" color="warning"
@@ -1425,7 +1428,7 @@ export default function BulkEditor({
                 disabled={saving}
                 sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
               >
-                Deactivate All
+                {t("listingState.deactivateAll")}
               </Button>
             </Box>
           </Paper>
@@ -1437,8 +1440,8 @@ export default function BulkEditor({
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Alert severity="info" sx={{ fontSize: '0.82rem' }}>
               {activeField === 'category'
-                ? 'Category changes require the single listing editor. Select a listing below.'
-                : 'Personalization settings require the single listing editor. Select a listing below.'}
+                ? t('categoryNote.singleEditorRequired')
+                : t('personalizationNote.singleEditorRequired')}
             </Alert>
           </Paper>
         );
@@ -1536,10 +1539,10 @@ export default function BulkEditor({
                       fontWeight: 600,
                     }}
                   >
-                    {140 - (value as string).length} characters remaining
+                    {t('inlineEditor.charactersRemaining', { count: 140 - (value as string).length })}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {(value as string).length}/140
+                    {t('inlineEditor.charsCount', { count: (value as string).length })}
                   </Typography>
                 </Box>
               </Box>
@@ -1558,7 +1561,7 @@ export default function BulkEditor({
                   sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem' } }}
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25 }}>
-                  {(value as string).length} characters
+                  {t('inlineEditor.characters', { count: (value as string).length })}
                 </Typography>
               </Box>
             )}
@@ -1593,7 +1596,7 @@ export default function BulkEditor({
                 />
                 {listing.price && (
                   <Typography variant="caption" color="text.secondary">
-                    (was: {(listing.price.amount / (listing.price.divisor || 100)).toFixed(2)})
+                    {t('inlineEditor.was', { value: (listing.price.amount / (listing.price.divisor || 100)).toFixed(2) })}
                   </Typography>
                 )}
               </Box>
@@ -1610,7 +1613,7 @@ export default function BulkEditor({
                 />
                 {listing.quantity !== undefined && (
                   <Typography variant="caption" color="text.secondary">
-                    (was: {listing.quantity})
+                    {t('inlineEditor.was', { value: listing.quantity })}
                   </Typography>
                 )}
               </Box>
@@ -1624,7 +1627,7 @@ export default function BulkEditor({
                   displayEmpty
                   sx={{ fontSize: '0.85rem' }}
                 >
-                  <MenuItem value="">No section</MenuItem>
+                  <MenuItem value="">{t('inlineEditor.noSection')}</MenuItem>
                   {shopSections.map(s => (
                     <MenuItem key={s.shop_section_id} value={s.shop_section_id}>{s.title}</MenuItem>
                   ))}
@@ -1634,7 +1637,7 @@ export default function BulkEditor({
 
             {activeField === 'state' && (
               <Chip
-                label={value === 'active' ? 'Active' : value === 'inactive' ? 'Inactive' : value === 'draft' ? 'Draft' : String(value)}
+                label={value === 'active' ? t('listingState.active') : value === 'inactive' ? t('listingState.inactive') : value === 'draft' ? t('listingState.draft') : String(value)}
                 size="small"
                 color={value === 'active' ? 'success' : value === 'inactive' ? 'default' : 'warning'}
               />
@@ -1642,27 +1645,27 @@ export default function BulkEditor({
 
             {activeField === 'about' && (
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip label={`Who: ${listing.who_made || 'i_did'}`} size="small" variant="outlined" />
-                <Chip label={`When: ${listing.when_made || 'made_to_order'}`} size="small" variant="outlined" />
-                <Chip label={listing.is_supply ? 'Supply' : 'Not supply'} size="small" variant="outlined" />
+                <Chip label={t('aboutSection.whoPrefix', { value: listing.who_made || 'i_did' })} size="small" variant="outlined" />
+                <Chip label={t('aboutSection.whenPrefix', { value: listing.when_made || 'made_to_order' })} size="small" variant="outlined" />
+                <Chip label={listing.is_supply ? t('aboutSection.supply') : t('aboutSection.notSupply')} size="small" variant="outlined" />
               </Box>
             )}
 
             {activeField === 'photos' && (
               <Typography variant="caption" color="text.secondary">
-                Photos are displayed in the listing. Alt text will be applied to all images.
+                {t('photos.photosHelper')}
               </Typography>
             )}
 
             {activeField === 'videos' && (
               <Typography variant="caption" color="text.secondary">
-                Video management available in single listing editor.
+                {t('videos.videoHelper')}
               </Typography>
             )}
 
             {activeField === 'item_weight' && (
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
-                {listing.item_weight ? `${listing.item_weight} ${listing.item_weight_unit || 'g'}` : 'Not set'}
+                {listing.item_weight ? `${listing.item_weight} ${listing.item_weight_unit || 'g'}` : t('inlineEditor.notSet')}
               </Typography>
             )}
 
@@ -1670,41 +1673,41 @@ export default function BulkEditor({
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
                 {listing.item_length
                   ? `${listing.item_length} x ${listing.item_width || '?'} x ${listing.item_height || '?'} ${listing.item_dimensions_unit || 'cm'}`
-                  : 'Not set'}
+                  : t('inlineEditor.notSet')}
               </Typography>
             )}
 
             {activeField === 'processing_time' && (
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
-                {listing.processing_min ? `${listing.processing_min}-${listing.processing_max} days` : 'Not set'}
+                {listing.processing_min ? t('processingTime.daysRange', { min: listing.processing_min, max: listing.processing_max ?? 0 }) : t('inlineEditor.notSet')}
               </Typography>
             )}
 
             {activeField === 'shipping_profile' && (
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
                 {listing.shipping_profile_id
-                  ? (shippingProfiles.find(sp => sp.shipping_profile_id === listing.shipping_profile_id)?.title || `Profile #${listing.shipping_profile_id}`)
-                  : 'Not set'}
+                  ? (shippingProfiles.find(sp => sp.shipping_profile_id === listing.shipping_profile_id)?.title || t('shippingProfile.profileFallback', { id: listing.shipping_profile_id }))
+                  : t('inlineEditor.notSet')}
               </Typography>
             )}
 
             {activeField === 'return_policy' && (
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
                 {listing.return_policy_id
-                  ? (returnPolicies.find(rp => rp.return_policy_id === listing.return_policy_id)?.description || `Policy #${listing.return_policy_id}`)
-                  : 'Not set'}
+                  ? (returnPolicies.find(rp => rp.return_policy_id === listing.return_policy_id)?.description || t('returnPolicy.policyFallback', { id: listing.return_policy_id }))
+                  : t('inlineEditor.notSet')}
               </Typography>
             )}
 
             {activeField === 'category' && (
               <Typography variant="caption" color="text.secondary">
-                Category can be set in single listing editor.
+                {t('categoryNote.singleEditorHelper')}
               </Typography>
             )}
 
             {activeField === 'personalization' && (
               <Typography variant="caption" color="text.secondary">
-                Personalization can be configured in single listing editor.
+                {t('personalizationNote.singleEditorHelper')}
               </Typography>
             )}
           </Box>
@@ -1712,7 +1715,7 @@ export default function BulkEditor({
           {/* SEO score indicator for title */}
           {activeField === 'title' && (
             <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-              <Tooltip title={`${(value as string).length}/140 chars`}>
+              <Tooltip title={t('inlineEditor.charsTooltip', { count: (value as string).length })}>
                 <Typography
                   variant="caption"
                   sx={{
@@ -1733,7 +1736,7 @@ export default function BulkEditor({
           {/* Tag score indicator */}
           {activeField === 'tags' && (
             <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-              <Tooltip title={`${(value as string[]).length}/13 tags`}>
+              <Tooltip title={t('inlineEditor.tagsCount', { count: (value as string[]).length })}>
                 <Typography
                   variant="caption"
                   sx={{
@@ -1784,17 +1787,17 @@ export default function BulkEditor({
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {shopName && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2, fontSize: '0.7rem' }}>
-              Etsy &middot; {shopName}
+              {t('shopLabel')} &middot; {shopName}
             </Typography>
           )}
           <Typography variant="subtitle1" fontWeight={700} sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}>
-            Editing {listings.length} listings
+            {t('header.editingListings', { count: listings.length })}
           </Typography>
         </Box>
 
         {pendingCount > 0 && (
           <Chip
-            label={`${pendingCount} changes`}
+            label={t('header.changes', { count: pendingCount })}
             color="primary"
             size="small"
             sx={{ fontWeight: 700, mr: 0.5 }}
@@ -1808,8 +1811,7 @@ export default function BulkEditor({
             color="error"
             onClick={handleDiscard}
             sx={{ minHeight: 36, textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
-          >
-            Discard
+          >{t('header.discard')}
           </Button>
         )}
 
@@ -1818,8 +1820,7 @@ export default function BulkEditor({
           size="small"
           onClick={handleClose}
           sx={{ minHeight: 36, textTransform: 'none', fontWeight: 600, borderRadius: '8px', display: { xs: 'none', sm: 'flex' } }}
-        >
-          Cancel
+        >{t('header.cancel')}
         </Button>
 
         <IconButton onClick={handleClose} size="small" sx={{ display: { xs: 'flex', sm: 'none' } }}>
@@ -1840,7 +1841,7 @@ export default function BulkEditor({
             '&.Mui-disabled': { bgcolor: '#e0e0e0' },
           }}
         >
-          {saving ? `${saveProgress}%` : isMobile ? 'Sync' : 'Sync Updates'}
+          {saving ? `${saveProgress}%` : isMobile ? t('header.sync') : t('header.syncUpdates')}
         </Button>
       </Box>
 
@@ -1887,8 +1888,7 @@ export default function BulkEditor({
           >
             <Box sx={{ pt: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, pb: 1 }}>
-                <Typography variant="subtitle2" fontWeight={700}>
-                  Select Field
+                <Typography variant="subtitle2" fontWeight={700}>{t('sidebar.selectField')}
                 </Typography>
                 <IconButton size="small" onClick={() => setSidebarOpen(false)}>
                   <CloseIcon fontSize="small" />
@@ -1914,7 +1914,7 @@ export default function BulkEditor({
             />
             <TextField
               size="small"
-              placeholder="Search listings..."
+              placeholder={t("search.placeholder")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               sx={{ flex: 1, minWidth: 120, maxWidth: 400 }}
@@ -1930,12 +1930,12 @@ export default function BulkEditor({
               }}
             />
             <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-              {filteredListings.filter(l => checkedIds.has(l.listing_id)).length}/{filteredListings.length} selected
+              {t('search.selected', { selected: filteredListings.filter(l => checkedIds.has(l.listing_id)).length, total: filteredListings.length })}
             </Typography>
 
             {/* Quick field name display */}
             <Chip
-              label={fieldDef.label}
+              label={t(fieldDef.label)}
               size="small"
               icon={fieldDef.icon as React.ReactElement}
               sx={{
@@ -1950,7 +1950,7 @@ export default function BulkEditor({
           {filteredListings.length === 0 ? (
             <Paper sx={{ p: 4, textAlign: 'center' }}>
               <Typography color="text.secondary">
-                {searchTerm ? 'No listings match your search' : 'No listings to edit'}
+                {searchTerm ? t('search.noMatch') : t('search.noListings')}
               </Typography>
             </Paper>
           ) : (

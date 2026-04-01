@@ -60,6 +60,7 @@ import {
   CheckBoxOutlineBlank as CheckBoxBlankIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 interface ListingPrice {
   amount: number;
@@ -109,13 +110,13 @@ interface SeasonPreset {
 }
 
 const SEASON_PRESETS: SeasonPreset[] = [
-  { label: 'Christmas', tags: ['christmas gift', 'holiday gift', 'stocking stuffer', 'xmas present', 'holiday decor'] },
-  { label: 'Valentines', tags: ['valentines gift', 'valentine day', 'romantic gift', 'gift for her', 'love gift'] },
-  { label: 'Mothers Day', tags: ['mothers day gift', 'gift for mom', 'mom birthday', 'mama gift'] },
-  { label: 'Fathers Day', tags: ['fathers day gift', 'gift for dad', 'dad birthday', 'papa gift'] },
-  { label: 'Halloween', tags: ['halloween decor', 'spooky gift', 'trick or treat', 'halloween costume'] },
-  { label: 'Summer', tags: ['summer decor', 'beach gift', 'outdoor', 'summer vibes'] },
-  { label: 'Winter', tags: ['winter decor', 'cozy gift', 'holiday season', 'winter vibes'] },
+  { label: 'seasonChristmas', tags: ['christmas gift', 'holiday gift', 'stocking stuffer', 'xmas present', 'holiday decor'] },
+  { label: 'seasonValentines', tags: ['valentines gift', 'valentine day', 'romantic gift', 'gift for her', 'love gift'] },
+  { label: 'seasonMothersDay', tags: ['mothers day gift', 'gift for mom', 'mom birthday', 'mama gift'] },
+  { label: 'seasonFathersDay', tags: ['fathers day gift', 'gift for dad', 'dad birthday', 'papa gift'] },
+  { label: 'seasonHalloween', tags: ['halloween decor', 'spooky gift', 'trick or treat', 'halloween costume'] },
+  { label: 'seasonSummer', tags: ['summer decor', 'beach gift', 'outdoor', 'summer vibes'] },
+  { label: 'seasonWinter', tags: ['winter decor', 'cozy gift', 'holiday season', 'winter vibes'] },
 ];
 
 type VariationPriceMode = 'percent_increase' | 'percent_decrease' | 'fixed_add' | 'fixed_subtract';
@@ -223,6 +224,7 @@ export default function BulkOperationsBar({
   // Menu anchors
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const t = useTranslations('etsy.bulkOps');
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
@@ -308,7 +310,7 @@ export default function BulkOperationsBar({
     }
 
     if (failed === 0) {
-      toast.success(`${actionLabel}: ${succeeded} listings updated successfully`);
+      toast.success(`${actionLabel}: ${succeeded} listings updated`);
     } else {
       toast.error(`${actionLabel}: ${succeeded} ok, ${failed} failed`);
     }
@@ -322,7 +324,7 @@ export default function BulkOperationsBar({
 
   const handlePriceSubmit = async () => {
     const amt = parseFloat(priceAmount);
-    if (isNaN(amt) || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    if (isNaN(amt) || amt <= 0) { toast.error(t('toastEnterValidAmount')); return; }
     const listingsWithPrice = selectedListings.filter((l) => l.price);
     setPriceDialogOpen(false);
     await executeBulk(listingsWithPrice, (listing) => {
@@ -343,10 +345,10 @@ export default function BulkOperationsBar({
 
   const handleAddTagsSubmit = async () => {
     const tagsToAdd = newTags.split(',').map((t) => t.trim()).filter((t) => t.length > 0);
-    if (tagsToAdd.length === 0) { toast.error('Enter at least one tag'); return; }
+    if (tagsToAdd.length === 0) { toast.error(t('toastEnterAtLeastOneTag')); return; }
     const violations = selectedListings.filter((l) => l.tags.length + tagsToAdd.length > 13);
     if (violations.length > 0) {
-      toast.error(`${violations.length} listings would exceed 13-tag limit. Add fewer tags.`);
+      toast.error(`${violations.length} listings would exceed 13-tag limit`);
       return;
     }
     setAddTagDialogOpen(false);
@@ -358,7 +360,7 @@ export default function BulkOperationsBar({
   };
 
   const handleRemoveTagsSubmit = async () => {
-    if (tagsToRemove.size === 0) { toast.error('Select at least one tag to remove'); return; }
+    if (tagsToRemove.size === 0) { toast.error(t('toastSelectTagToRemove')); return; }
     setRemoveTagDialogOpen(false);
     await executeBulk(selectedListings, (listing) => {
       const filtered = listing.tags.filter((t) => !tagsToRemove.has(t));
@@ -368,7 +370,7 @@ export default function BulkOperationsBar({
   };
 
   const handleSectionSubmit = async () => {
-    if (targetSectionId === '') { toast.error('Select a target section'); return; }
+    if (targetSectionId === '') { toast.error(t('toastSelectTargetSection')); return; }
     setSectionDialogOpen(false);
     await executeBulk(selectedListings, (listing) =>
       callUpdateListing(shopId, listing.listing_id, { shop_section_id: targetSectionId }),
@@ -382,7 +384,7 @@ export default function BulkOperationsBar({
   };
 
   const handleToggleState = async (targetState: 'active' | 'inactive') => {
-    const label = targetState === 'active' ? 'Publish' : 'Deactivate';
+    const label = targetState === 'active' ? t('publish') : t('deactivate');
     await executeBulk(selectedListings, (listing) =>
       callUpdateListing(shopId, listing.listing_id, { state: targetState }), label);
   };
@@ -401,7 +403,7 @@ export default function BulkOperationsBar({
       });
       if (!aiRes.ok) {
         const errData = await aiRes.json().catch(() => ({}));
-        toast.error(errData.error || 'AI optimization failed');
+        toast.error(errData.error || t('toastAiOptimizationFailed'));
         setAiProcessing(false);
         return;
       }
@@ -426,14 +428,14 @@ export default function BulkOperationsBar({
       if (failed === 0) toast.success(`AI Optimize: ${success} listings updated`);
       else toast.error(`AI Optimize: ${success} ok, ${failed} failed`);
       onCompleted();
-    } catch { toast.error('AI optimization error'); }
+    } catch { toast.error(t('toastAiOptimizationFailed')); }
     finally { setAiProcessing(false); setAiProgress(0); }
   };
 
   const otherShops = useMemo(() => (allShops || []).filter((s) => s.shopId !== shopId), [allShops, shopId]);
 
   const handleCopySubmit = async () => {
-    if (!targetShopId) { toast.error('Select target shop'); return; }
+    if (!targetShopId) { toast.error(t('toastSelectTargetShop')); return; }
     setCopyDialogOpen(false);
     setCopyProcessing(true);
     setCopyProgress(0);
@@ -532,12 +534,12 @@ export default function BulkOperationsBar({
   };
 
   const handleSeasonTagsSubmit = async () => {
-    if (!selectedSeason) { toast.error('Select a season'); return; }
+    if (!selectedSeason) { toast.error(t('toastSelectSeason')); return; }
     const seasonTags = selectedSeason.tags;
     if (seasonTagMode === 'add') {
       const violations = selectedListings.filter((l) => l.tags.length + seasonTags.length > 13);
       if (violations.length > 0) {
-        toast.error(`${violations.length} listings would exceed 13-tag limit. Use "Replace" mode or pick a smaller preset.`);
+        toast.error(`${violations.length} listings would exceed 13-tag limit`);
         return;
       }
     }
@@ -556,8 +558,8 @@ export default function BulkOperationsBar({
     const propName = variationPropertyName.trim();
     const propValue = variationPropertyValue.trim();
     const amt = parseFloat(variationPriceAmount);
-    if (!propName || !propValue) { toast.error('Enter variation property name and value'); return; }
-    if (isNaN(amt) || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    if (!propName || !propValue) { toast.error(t('toastEnterVariationFields')); return; }
+    if (isNaN(amt) || amt <= 0) { toast.error(t('toastEnterValidAmount')); return; }
     setVariationPriceDialogOpen(false);
     setVariationProcessing(true);
     setVariationProgress(0);
@@ -642,8 +644,8 @@ export default function BulkOperationsBar({
   const isProcessing = processing || aiProcessing || copyProcessing || altTextProcessing || renewProcessing || variationProcessing;
   const currentProgress = processing ? progress : aiProcessing ? aiProgress : copyProcessing ? copyProgress :
     altTextProcessing ? altTextProgress : renewProcessing ? renewProgress : variationProgress;
-  const processingLabel = processing ? 'Processing...' : aiProcessing ? 'AI optimizing...' : copyProcessing ? 'Copying...' :
-    altTextProcessing ? 'Generating alt text...' : renewProcessing ? 'Renewing...' : 'Updating variations...';
+  const processingLabel = processing ? t('processing') : aiProcessing ? t('aiOptimizing') : copyProcessing ? t('copying') :
+    altTextProcessing ? t('generatingAltText') : renewProcessing ? t('renewing') : t('updatingVariations');
 
   return (
     <>
@@ -661,7 +663,7 @@ export default function BulkOperationsBar({
           </Typography>
           <LinearProgress variant="determinate" value={currentProgress} sx={{ height: 6, borderRadius: 3 }} />
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-            {Math.round(currentProgress)}% complete
+            {Math.round(currentProgress)}%
           </Typography>
         </Paper>
       )}
@@ -669,7 +671,7 @@ export default function BulkOperationsBar({
       {/* Vela-style toolbar buttons — rendered inline in the parent's selection bar */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
         {/* Delete */}
-        <Tooltip title="Delete selected">
+        <Tooltip title={t("deleteSelected")}>
           <Button
             size="small"
             variant="outlined"
@@ -682,12 +684,12 @@ export default function BulkOperationsBar({
               fontSize: '0.82rem', px: isMobile ? 1 : 2,
             }}
           >
-            {isMobile ? <DeleteOutline /> : 'Delete'}
+            {isMobile ? <DeleteOutline /> : t('deleteBtn')}
           </Button>
         </Tooltip>
 
         {/* Export */}
-        <Tooltip title="Export as CSV">
+        <Tooltip title={t("exportCsv")}>
           <Button
             size="small"
             variant="outlined"
@@ -699,13 +701,13 @@ export default function BulkOperationsBar({
               fontSize: '0.82rem', px: isMobile ? 1 : 2,
             }}
           >
-            {isMobile ? <FileDownloadIcon /> : 'Export'}
+            {isMobile ? <FileDownloadIcon /> : t('exportBtn')}
           </Button>
         </Tooltip>
 
         {/* Copy to shop */}
         {otherShops.length > 0 && (
-          <Tooltip title="Copy to another shop">
+          <Tooltip title={t("copyToShop")}>
             <Button
               size="small"
               variant="outlined"
@@ -717,13 +719,13 @@ export default function BulkOperationsBar({
                 fontSize: '0.82rem', px: isMobile ? 1 : 2,
               }}
             >
-              {isMobile ? <ContentCopyIcon /> : 'Copy'}
+              {isMobile ? <ContentCopyIcon /> : t('copyBtn')}
             </Button>
           </Tooltip>
         )}
 
         {/* More actions */}
-        <Tooltip title="More actions">
+        <Tooltip title={t("moreActions")}>
           <IconButton
             size="small"
             disabled={!hasSelection || isProcessing}
@@ -745,50 +747,50 @@ export default function BulkOperationsBar({
         >
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setAddTagDialogOpen(true); }}>
             <ListItemIcon><LocalOfferOutlined fontSize="small" /></ListItemIcon>
-            <ListItemText>Add Tags</ListItemText>
+            <ListItemText>{t("addTags")}</ListItemText>
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setTagsToRemove(new Set()); setRemoveTagDialogOpen(true); }}>
             <ListItemIcon><RemoveCircleOutline fontSize="small" /></ListItemIcon>
-            <ListItemText>Remove Tags</ListItemText>
+            <ListItemText>{t("removeTags")}</ListItemText>
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setSelectedSeason(null); setSeasonTagMode('add'); setSeasonDialogOpen(true); }}>
             <ListItemIcon><CelebrationIcon fontSize="small" /></ListItemIcon>
-            <ListItemText>Season Tags</ListItemText>
+            <ListItemText>{t("seasonTags")}</ListItemText>
           </MenuItem>
           <Divider />
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setPriceDialogOpen(true); }}>
             <ListItemIcon><AttachMoneyOutlined fontSize="small" /></ListItemIcon>
-            <ListItemText>Bulk Price Change</ListItemText>
+            <ListItemText>{t("bulkPriceChange")}</ListItemText>
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setVariationPriceDialogOpen(true); }}>
             <ListItemIcon><TuneOutlined fontSize="small" /></ListItemIcon>
-            <ListItemText>Variation Price</ListItemText>
+            <ListItemText>{t("variationPrice")}</ListItemText>
           </MenuItem>
           <Divider />
           <MenuItem onClick={() => { setMoreMenuAnchor(null); handleToggleState('active'); }}>
             <ListItemIcon><PublishOutlined fontSize="small" color="success" /></ListItemIcon>
-            <ListItemText>Publish</ListItemText>
+            <ListItemText>{t("publish")}</ListItemText>
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); handleToggleState('inactive'); }}>
             <ListItemIcon><RemoveCircleOutline fontSize="small" color="warning" /></ListItemIcon>
-            <ListItemText>Deactivate</ListItemText>
+            <ListItemText>{t("deactivate")}</ListItemText>
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setSectionDialogOpen(true); }}>
             <ListItemIcon><DriveFileMoveOutlined fontSize="small" /></ListItemIcon>
-            <ListItemText>Move Section</ListItemText>
+            <ListItemText>{t("moveSection")}</ListItemText>
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setRenewDialogOpen(true); }}>
             <ListItemIcon><RefreshOutlined fontSize="small" /></ListItemIcon>
-            <ListItemText>Renew</ListItemText>
+            <ListItemText>{t("renew")}</ListItemText>
           </MenuItem>
           <Divider />
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setAiResult(null); setAiOptimizeDialogOpen(true); }}>
             <ListItemIcon><AutoFixHigh fontSize="small" color="secondary" /></ListItemIcon>
-            <ListItemText>AI Optimize</ListItemText>
+            <ListItemText>{t("aiOptimize")}</ListItemText>
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setAltTextDialogOpen(true); }}>
             <ListItemIcon><ImageOutlined fontSize="small" /></ListItemIcon>
-            <ListItemText>AI Alt Text</ListItemText>
+            <ListItemText>{t("aiAltText")}</ListItemText>
           </MenuItem>
         </Menu>
       </Box>
@@ -803,77 +805,76 @@ export default function BulkOperationsBar({
         PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, pb: 2, maxHeight: '70vh' } }}
       >
         <Box sx={{ width: 40, height: 4, bgcolor: 'grey.400', borderRadius: 2, mx: 'auto', mt: 1.5, mb: 1 }} />
-        <Typography variant="subtitle2" sx={{ px: 2, pb: 1, fontWeight: 700 }}>
-          Quick Actions
+        <Typography variant="subtitle2" sx={{ px: 2, pb: 1, fontWeight: 700 }}>{t("quickActions")}
         </Typography>
         <List>
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); setAddTagDialogOpen(true); }}>
               <ListItemIcon><LocalOfferOutlined /></ListItemIcon>
-              <ListItemText primary="Add Tags" />
+              <ListItemText primary={t("addTags")} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); setTagsToRemove(new Set()); setRemoveTagDialogOpen(true); }}>
               <ListItemIcon><RemoveCircleOutline /></ListItemIcon>
-              <ListItemText primary="Remove Tags" />
+              <ListItemText primary={t("removeTags")} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); setSelectedSeason(null); setSeasonDialogOpen(true); }}>
               <ListItemIcon><CelebrationIcon /></ListItemIcon>
-              <ListItemText primary="Season Tags" />
+              <ListItemText primary={t("seasonTags")} />
             </ListItemButton>
           </ListItem>
           <Divider sx={{ my: 0.5 }} />
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); setPriceDialogOpen(true); }}>
               <ListItemIcon><AttachMoneyOutlined /></ListItemIcon>
-              <ListItemText primary="Bulk Price Change" />
+              <ListItemText primary={t("bulkPriceChange")} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); setVariationPriceDialogOpen(true); }}>
               <ListItemIcon><TuneOutlined /></ListItemIcon>
-              <ListItemText primary="Variation Price" />
+              <ListItemText primary={t("variationPrice")} />
             </ListItemButton>
           </ListItem>
           <Divider sx={{ my: 0.5 }} />
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); handleToggleState('active'); }}>
               <ListItemIcon><PublishOutlined color="success" /></ListItemIcon>
-              <ListItemText primary="Publish" />
+              <ListItemText primary={t("publish")} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); handleToggleState('inactive'); }}>
               <ListItemIcon><RemoveCircleOutline color="warning" /></ListItemIcon>
-              <ListItemText primary="Deactivate" />
+              <ListItemText primary={t("deactivate")} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); setSectionDialogOpen(true); }}>
               <ListItemIcon><DriveFileMoveOutlined /></ListItemIcon>
-              <ListItemText primary="Move Section" />
+              <ListItemText primary={t("moveSection")} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); setRenewDialogOpen(true); }}>
               <ListItemIcon><RefreshOutlined /></ListItemIcon>
-              <ListItemText primary="Renew" />
+              <ListItemText primary={t("renew")} />
             </ListItemButton>
           </ListItem>
           <Divider sx={{ my: 0.5 }} />
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); setAiResult(null); setAiOptimizeDialogOpen(true); }}>
               <ListItemIcon><AutoFixHigh color="secondary" /></ListItemIcon>
-              <ListItemText primary="AI Optimize" />
+              <ListItemText primary={t("aiOptimize")} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
             <ListItemButton onClick={() => { setMobileDrawerOpen(false); setAltTextDialogOpen(true); }}>
               <ListItemIcon><ImageOutlined /></ListItemIcon>
-              <ListItemText primary="AI Alt Text" />
+              <ListItemText primary={t("aiAltText")} />
             </ListItemButton>
           </ListItem>
         </List>
@@ -883,29 +884,29 @@ export default function BulkOperationsBar({
 
       {/* Price Dialog */}
       <Dialog open={priceDialogOpen} onClose={() => setPriceDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Bulk Price Change</DialogTitle>
+        <DialogTitle>{t("bulkPriceChange")}</DialogTitle>
         <DialogContent>
           <RadioGroup value={priceMode} onChange={(e) => setPriceMode(e.target.value as PriceMode)}>
-            <FormControlLabel value="percent_increase" control={<Radio />} label="% Increase" />
-            <FormControlLabel value="percent_decrease" control={<Radio />} label="% Decrease" />
-            <FormControlLabel value="fixed_add" control={<Radio />} label="Add fixed amount" />
-            <FormControlLabel value="fixed_subtract" control={<Radio />} label="Subtract fixed amount" />
+            <FormControlLabel value="percent_increase" control={<Radio />} label={t("pricePercentIncrease")} />
+            <FormControlLabel value="percent_decrease" control={<Radio />} label={t("pricePercentDecrease")} />
+            <FormControlLabel value="fixed_add" control={<Radio />} label={t("priceFixedAdd")} />
+            <FormControlLabel value="fixed_subtract" control={<Radio />} label={t("priceFixedSubtract")} />
           </RadioGroup>
           <TextField
-            label={priceMode.startsWith('percent') ? 'Percentage (%)' : 'Amount'}
+            label={priceMode.startsWith('percent') ? t('pricePercentageLabel') : t('priceAmountLabel')}
             type="number" value={priceAmount} onChange={(e) => setPriceAmount(e.target.value)}
             fullWidth sx={{ mt: 2 }} inputProps={{ min: 0, step: 0.01 }}
           />
           {pricePreview.length > 0 && (
             <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>Preview (first {pricePreview.length})</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("bulkPriceChange")} ({pricePreview.length})</Typography>
               <TableContainer>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Listing</TableCell>
-                      <TableCell align="right">Current</TableCell>
-                      <TableCell align="right">New</TableCell>
+                      <TableCell>{t("tableListing")}</TableCell>
+                      <TableCell align="right">{t("tableCurrent")}</TableCell>
+                      <TableCell align="right">{t("tableNew")}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -923,40 +924,40 @@ export default function BulkOperationsBar({
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPriceDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handlePriceSubmit} disabled={!priceAmount || parseFloat(priceAmount) <= 0}>Apply</Button>
+          <Button onClick={() => setPriceDialogOpen(false)}>{t("cancel")}</Button>
+          <Button variant="contained" onClick={handlePriceSubmit} disabled={!priceAmount || parseFloat(priceAmount) <= 0}>{t("apply")}</Button>
         </DialogActions>
       </Dialog>
 
       {/* Add Tag Dialog */}
       <Dialog open={addTagDialogOpen} onClose={() => setAddTagDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Tags</DialogTitle>
+        <DialogTitle>{t("addTags")}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Add multiple tags separated by commas. Max 13 tags per listing.
+            {t("addTagsHelperText")}
           </Typography>
           <TextField
-            label="Tags" placeholder="tag1, tag2, tag3"
+            label={t("tagsLabel")} placeholder={t("tagsPlaceholder")}
             value={newTags} onChange={(e) => setNewTags(e.target.value)} fullWidth
-            helperText={`${newTags.split(',').map((t) => t.trim()).filter((t) => t).length} tags entered`}
+            helperText={`${newTags.split(',').map((x) => x.trim()).filter((x) => x).length} tags`}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddTagDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddTagsSubmit}>Add</Button>
+          <Button onClick={() => setAddTagDialogOpen(false)}>{t("cancel")}</Button>
+          <Button variant="contained" onClick={handleAddTagsSubmit}>{t("add")}</Button>
         </DialogActions>
       </Dialog>
 
       {/* Remove Tag Dialog */}
       <Dialog open={removeTagDialogOpen} onClose={() => setRemoveTagDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Remove Tags</DialogTitle>
+        <DialogTitle>{t("removeTags")}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Click on tags to select them for removal.
+            {t("removeTagsHelperText")}
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {allUniqueTags.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">No tags found in selected listings.</Typography>
+              <Typography variant="body2" color="text.secondary">{t("noTagsFound")}</Typography>
             ) : (
               allUniqueTags.map((tag) => (
                 <Chip key={tag} label={tag}
@@ -969,23 +970,23 @@ export default function BulkOperationsBar({
           </Box>
           {tagsToRemove.size > 0 && (
             <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-              {tagsToRemove.size} tags will be removed
+              {tagsToRemove.size} tags
             </Typography>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRemoveTagDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleRemoveTagsSubmit} disabled={tagsToRemove.size === 0}>Remove</Button>
+          <Button onClick={() => setRemoveTagDialogOpen(false)}>{t("cancel")}</Button>
+          <Button variant="contained" color="error" onClick={handleRemoveTagsSubmit} disabled={tagsToRemove.size === 0}>{t("remove")}</Button>
         </DialogActions>
       </Dialog>
 
       {/* Section Move Dialog */}
       <Dialog open={sectionDialogOpen} onClose={() => setSectionDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Move to Section</DialogTitle>
+        <DialogTitle>{t("moveSection")}</DialogTitle>
         <DialogContent>
           <FormControl fullWidth sx={{ mt: 1 }}>
-            <InputLabel>Target Section</InputLabel>
-            <Select value={targetSectionId} label="Target Section" onChange={(e) => setTargetSectionId(Number(e.target.value))}>
+            <InputLabel>{t("targetSection")}</InputLabel>
+            <Select value={targetSectionId} label={t("targetSection")} onChange={(e) => setTargetSectionId(Number(e.target.value))}>
               {shopSections.map((section) => (
                 <MenuItem key={section.shop_section_id} value={section.shop_section_id}>{section.title}</MenuItem>
               ))}
@@ -993,22 +994,22 @@ export default function BulkOperationsBar({
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSectionDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSectionSubmit} disabled={targetSectionId === ''}>Move</Button>
+          <Button onClick={() => setSectionDialogOpen(false)}>{t("cancel")}</Button>
+          <Button variant="contained" onClick={handleSectionSubmit} disabled={targetSectionId === ''}>{t("move")}</Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete Confirmation */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogTitle>{t("confirmDelete")}</DialogTitle>
         <DialogContent>
           <Typography>
-            Are you sure you want to delete <strong>{selectedCount}</strong> listings? This cannot be undone.
+            {t("confirmDeleteText", { count: selectedCount })}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleDeleteSubmit}>Delete</Button>
+          <Button onClick={() => setDeleteDialogOpen(false)}>{t("cancel")}</Button>
+          <Button variant="contained" color="error" onClick={handleDeleteSubmit}>{t("deleteBtn")}</Button>
         </DialogActions>
       </Dialog>
 
@@ -1016,11 +1017,11 @@ export default function BulkOperationsBar({
       <Dialog open={aiOptimizeDialogOpen} onClose={() => setAiOptimizeDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <AutoFixHigh color="secondary" />
-          AI Bulk Optimize
+          {t("aiBulkOptimize")}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 2 }}>
-            <strong>{selectedCount}</strong> listings selected. AI will optimize titles, tags, and descriptions for SEO.
+            {t("aiBulkOptimize")}: {selectedCount} listings
           </Typography>
           <Box sx={{ pl: 2, mb: 2 }}>
             <Typography variant="body2" color="text.secondary">- Titles restructured for SEO</Typography>
@@ -1028,13 +1029,12 @@ export default function BulkOperationsBar({
             <Typography variant="body2" color="text.secondary">- Descriptions generated by AI</Typography>
           </Box>
           <Typography variant="caption" color="warning.main">
-            This will overwrite existing titles, tags, and descriptions.
+            {t("aiOptimizeWarning")}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAiOptimizeDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="secondary" startIcon={<AutoFixHigh />} onClick={handleAiOptimizeSubmit}>
-            Optimize
+          <Button onClick={() => setAiOptimizeDialogOpen(false)}>{t("cancel")}</Button>
+          <Button variant="contained" color="secondary" startIcon={<AutoFixHigh />} onClick={handleAiOptimizeSubmit}>{t("optimize")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1042,15 +1042,15 @@ export default function BulkOperationsBar({
       {/* Copy to Shop Dialog */}
       <Dialog open={copyDialogOpen} onClose={() => setCopyDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <ContentCopyIcon /> Copy to Another Shop
+          <ContentCopyIcon /> {t("copyToAnotherShop")}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            <strong>{selectedCount}</strong> listings selected. Choose target shop.
+            {selectedCount} listings → {t("targetShop")}
           </Typography>
           <FormControl fullWidth sx={{ mt: 1 }}>
-            <InputLabel>Target Shop</InputLabel>
-            <Select value={targetShopId} label="Target Shop" onChange={(e) => setTargetShopId(e.target.value as string)}>
+            <InputLabel>{t("targetShop")}</InputLabel>
+            <Select value={targetShopId} label={t("targetShop")} onChange={(e) => setTargetShopId(e.target.value as string)}>
               {otherShops.map((s) => (
                 <MenuItem key={s.shopId} value={s.shopId}>{s.shopName}</MenuItem>
               ))}
@@ -1058,69 +1058,68 @@ export default function BulkOperationsBar({
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCopyDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleCopySubmit} disabled={!targetShopId} startIcon={<ContentCopyIcon />}>Copy</Button>
+          <Button onClick={() => setCopyDialogOpen(false)}>{t("cancel")}</Button>
+          <Button variant="contained" onClick={handleCopySubmit} disabled={!targetShopId} startIcon={<ContentCopyIcon />}>{t("copyBtn")}</Button>
         </DialogActions>
       </Dialog>
 
       {/* Alt Text Dialog */}
       <Dialog open={altTextDialogOpen} onClose={() => setAltTextDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <ImageOutlined color="info" /> AI Generate Alt Text
+          <ImageOutlined color="info" /> {t("aiGenerateAltText")}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 2 }}>
-            Generate AI alt text for all images in <strong>{selectedCount}</strong> listings?
+            {t("aiGenerateAltText")}: {selectedCount} listings
           </Typography>
           <Box sx={{ pl: 2, mb: 2 }}>
-            <Typography variant="body2" color="text.secondary">- Alt text generated from listing title</Typography>
-            <Typography variant="body2" color="text.secondary">- Applied to all images per listing</Typography>
+            <Typography variant="body2" color="text.secondary">- Alt text from listing title</Typography>
+            <Typography variant="body2" color="text.secondary">- Applied to all images</Typography>
           </Box>
-          <Typography variant="caption" color="warning.main">This will overwrite existing alt text.</Typography>
+          <Typography variant="caption" color="warning.main">{t("altTextWarning")}</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAltTextDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="info" startIcon={<ImageOutlined />} onClick={handleAltTextSubmit}>Generate</Button>
+          <Button onClick={() => setAltTextDialogOpen(false)}>{t("cancel")}</Button>
+          <Button variant="contained" color="info" startIcon={<ImageOutlined />} onClick={handleAltTextSubmit}>{t("generate")}</Button>
         </DialogActions>
       </Dialog>
 
       {/* Renew Dialog */}
       <Dialog open={renewDialogOpen} onClose={() => setRenewDialogOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <RefreshOutlined color="success" /> Bulk Renew
+          <RefreshOutlined color="success" /> {t("bulkRenew")}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1">
-            Renew <strong>{selectedCount}</strong> listings?
+            {t("renew")} {selectedCount} listings
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Reactivates expired listings.
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{t("renewHelperText")}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRenewDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" color="success" startIcon={<RefreshOutlined />} onClick={handleRenewSubmit}>Renew</Button>
+          <Button onClick={() => setRenewDialogOpen(false)}>{t("cancel")}</Button>
+          <Button variant="contained" color="success" startIcon={<RefreshOutlined />} onClick={handleRenewSubmit}>{t("renew")}</Button>
         </DialogActions>
       </Dialog>
 
       {/* Season Tags Dialog */}
       <Dialog open={seasonDialogOpen} onClose={() => setSeasonDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CelebrationIcon color="secondary" /> Season Tags
+          <CelebrationIcon color="secondary" /> {t("seasonTags")}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Pick a season and apply tags to <strong>{selectedCount}</strong> listings.
+            {t("seasonTags")}: {selectedCount} listings
           </Typography>
           <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>Mode</Typography>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("mode")}</Typography>
             <ToggleButtonGroup value={seasonTagMode} exclusive
               onChange={(_, val) => { if (val) setSeasonTagMode(val); }} size="small" fullWidth>
-              <ToggleButton value="add">Add (append)</ToggleButton>
-              <ToggleButton value="replace">Replace (overwrite)</ToggleButton>
+              <ToggleButton value="add">{t("addAppend")}</ToggleButton>
+              <ToggleButton value="replace">{t("replaceOverwrite")}</ToggleButton>
             </ToggleButtonGroup>
           </Box>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>Select Season</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("selectSeason")}</Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {SEASON_PRESETS.map((preset) => (
               <Paper key={preset.label} variant="outlined"
@@ -1132,7 +1131,7 @@ export default function BulkOperationsBar({
                   bgcolor: selectedSeason?.label === preset.label ? 'action.selected' : 'transparent',
                   '&:hover': { bgcolor: 'action.hover' },
                 }}>
-                <Typography variant="subtitle2">{preset.label}</Typography>
+                <Typography variant="subtitle2">{t(preset.label)}</Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                   {preset.tags.map((tag) => <Chip key={tag} label={tag} size="small" variant="outlined" />)}
                 </Box>
@@ -1141,10 +1140,10 @@ export default function BulkOperationsBar({
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSeasonDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setSeasonDialogOpen(false)}>{t("cancel")}</Button>
           <Button variant="contained" color="secondary" onClick={handleSeasonTagsSubmit} disabled={!selectedSeason}
             startIcon={<CelebrationIcon />}>
-            {seasonTagMode === 'add' ? 'Add' : 'Replace'}
+            {seasonTagMode === 'add' ? t('add') : t('replace')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1152,32 +1151,31 @@ export default function BulkOperationsBar({
       {/* Variation Price Dialog */}
       <Dialog open={variationPriceDialogOpen} onClose={() => setVariationPriceDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <TuneOutlined /> Variation Price Change
+          <TuneOutlined /> {t("variationPriceChange")}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Change price for a specific variation value across selected listings. E.g., increase price for all "Small" items.
+            {t("variationPriceChange")}
           </Typography>
-          <TextField label="Variation Property Name" placeholder="e.g. Size, Color, Material"
+          <TextField label={t("variationPropertyName")} placeholder="Size, Color, Material"
             value={variationPropertyName} onChange={(e) => setVariationPropertyName(e.target.value)} fullWidth sx={{ mb: 2 }} />
-          <TextField label="Variation Value" placeholder="e.g. Small, Red, Cotton"
+          <TextField label={t("variationValue")} placeholder="Small, Red, Cotton"
             value={variationPropertyValue} onChange={(e) => setVariationPropertyValue(e.target.value)} fullWidth sx={{ mb: 2 }} />
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>Price Adjustment</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>{t("priceAdjustment")}</Typography>
           <RadioGroup value={variationPriceMode} onChange={(e) => setVariationPriceMode(e.target.value as VariationPriceMode)}>
-            <FormControlLabel value="percent_increase" control={<Radio />} label="% Increase" />
-            <FormControlLabel value="percent_decrease" control={<Radio />} label="% Decrease" />
-            <FormControlLabel value="fixed_add" control={<Radio />} label="Add fixed amount" />
-            <FormControlLabel value="fixed_subtract" control={<Radio />} label="Subtract fixed amount" />
+            <FormControlLabel value="percent_increase" control={<Radio />} label={t("pricePercentIncrease")} />
+            <FormControlLabel value="percent_decrease" control={<Radio />} label={t("pricePercentDecrease")} />
+            <FormControlLabel value="fixed_add" control={<Radio />} label={t("priceFixedAdd")} />
+            <FormControlLabel value="fixed_subtract" control={<Radio />} label={t("priceFixedSubtract")} />
           </RadioGroup>
-          <TextField label={variationPriceMode.startsWith('percent') ? 'Percentage (%)' : 'Amount'}
+          <TextField label={variationPriceMode.startsWith('percent') ? t('pricePercentageLabel') : t('priceAmountLabel')}
             type="number" value={variationPriceAmount} onChange={(e) => setVariationPriceAmount(e.target.value)}
             fullWidth sx={{ mt: 1 }} inputProps={{ min: 0, step: 0.01 }} />
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-            Non-matching listings will be skipped.
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>{t("nonMatchingSkipped")}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setVariationPriceDialogOpen(false)}>Cancel</Button>
+          <Button onClick={() => setVariationPriceDialogOpen(false)}>{t("cancel")}</Button>
           <Button variant="contained" onClick={handleVariationPriceSubmit}
             disabled={!variationPropertyName.trim() || !variationPropertyValue.trim() || !variationPriceAmount || parseFloat(variationPriceAmount) <= 0}
             startIcon={<TuneOutlined />}>

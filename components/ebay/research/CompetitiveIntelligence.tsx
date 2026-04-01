@@ -12,6 +12,7 @@ import {
   FileSearch, X,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -170,7 +171,7 @@ function Histogram({ values, bins = 8 }: { values: number[]; bins?: number }) {
   if (!values.length) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
-  if (min === max) return <Typography variant="body2">Tüm fiyatlar aynı: {fmt(min)}</Typography>;
+  if (min === max) return <Typography variant="body2">t('allPricesSame') + ':' {fmt(min)}</Typography>;
   const step = (max - min) / bins;
   const buckets = Array(bins).fill(0);
   values.forEach(v => {
@@ -182,7 +183,7 @@ function Histogram({ values, bins = 8 }: { values: number[]; bins?: number }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.5, height: 100 }}>
       {buckets.map((count, i) => (
-        <Tooltip key={i} title={`${fmt(min + i * step)} - ${fmt(min + (i + 1) * step)}: ${count} ürün`}>
+        <Tooltip key={i} title={`${fmt(min + i * step)} - ${fmt(min + (i + 1) * step)}: ${count} t('product')`}>
           <Box sx={{
             flex: 1, background: 'linear-gradient(180deg, #6366f1, #8b5cf6)', borderRadius: '4px 4px 0 0',
             height: maxCount ? `${(count / maxCount) * 100}%` : 0,
@@ -202,6 +203,7 @@ const PIE_COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4
 // ---------------------------------------------------------------------------
 
 function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: string; marketplace: string; userListings?: any[]; onNavigate?: (tool: string, data?: any) => void }) {
+  const t = useTranslations('ebay.research.competitive');
   const suggestedSellers = useMemo(() => {
     if (!userListings?.length) return [];
     const sellers = new Map<string, { username: string; feedback: number }>();
@@ -249,7 +251,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Satıcı bulunamadı');
+      if (!res.ok) throw new Error(data.error || t('sellerNotFound'));
       const resultItems: SellerItem[] = data.items || data.itemSummaries || [];
       setItems(resultItems);
       if (resultItems.length > 0 && resultItems[0].seller) {
@@ -262,7 +264,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         });
       }
     } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu');
+      setError(err.message || t('error'));
     } finally {
       setLoading(false);
     }
@@ -277,10 +279,10 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, seller: profile.username, marketplace }),
       });
-      if (!res.ok) throw new Error('Takip eklenemedi');
-      toast.success(`${profile.username} takip listesine eklendi`);
+      if (!res.ok) throw new Error(t('trackFailed'));
+      toast.success(`${profile.username} ${t('addedToTracking')}`);
     } catch (err: any) {
-      toast.error(err.message || 'Takip hatası');
+      toast.error(err.message || t('trackError'));
     } finally {
       setTracking(false);
     }
@@ -301,13 +303,13 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Arama basarisiz');
+      if (!res.ok) throw new Error(data.error || t('searchFailed'));
       const resultItems: SellerItem[] = data.items || data.itemSummaries || [];
-      if (!resultItems.length) { setKwError('Sonuc bulunamadi'); return; }
+      if (!resultItems.length) { setKwError(t('noResults')); return; }
       setKwItems(resultItems);
-      toast.success(`${resultItems.length} urun bulundu`);
+      toast.success(`${resultItems.length} ${t('productsFound')}`);
     } catch (err: any) {
-      setKwError(err.message || 'Bir hata olustu');
+      setKwError(err.message || t('error'));
     } finally {
       setKwLoading(false);
     }
@@ -328,11 +330,11 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Satici bilgileri alinamadi');
+      if (!res.ok) throw new Error(data.error || t('sellerInfoFailed'));
       const resultItems: SellerItem[] = data.items || data.itemSummaries || [];
       setDeepDiveItems(resultItems);
     } catch (err: any) {
-      toast.error(err.message || 'Satici arama hatasi');
+      toast.error(err.message || t('sellerSearchError'));
     } finally {
       setDeepDiveLoading(false);
     }
@@ -374,7 +376,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
   const categoryBreakdown = useMemo(() => {
     const map: Record<string, number> = {};
     items.forEach(item => {
-      const cat = item.categories?.[0]?.categoryName || 'Diğer';
+      const cat = item.categories?.[0]?.categoryName || t('other');
       map[cat] = (map[cat] || 0) + 1;
     });
     return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([label, value], i) => ({
@@ -401,16 +403,16 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
       <Paper sx={{ p: 2, border: '1px solid rgba(99,102,241,0.15)', borderRadius: 3, bgcolor: '#f8faff', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
         <Typography variant="subtitle1" fontWeight={600} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#6366f1' }}>
           <Search size={18} />
-          Pazar Arastirmasi ile Rakip Bul
+          {t('findCompetitors')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Anahtar kelime ile arama yapin, rakip saticilarini kesfet ve analiz edin.
+          {t('findCompetitorsDesc')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            placeholder="ör: bluetooth speaker, baby monitor"
-            helperText="Rakip analizi yapmak istediğiniz ürün kelimesini girin"
+            placeholder={t("searchPlaceholder")}
+            helperText={t('competitorSearchHelper')}
             value={kwInput}
             onChange={e => setKwInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && searchByKeyword()}
@@ -424,7 +426,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
           <Button variant="contained" onClick={searchByKeyword} disabled={kwLoading || !kwInput.trim()}
             startIcon={kwLoading ? <CircularProgress size={16} /> : <Search size={16} />}
             sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}>
-            Ara
+            {t('search')}
           </Button>
         </Box>
         {kwLoading && <LinearProgress sx={{ mt: 1 }} />}
@@ -433,13 +435,13 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         {/* Tips — show when no results */}
         {!kwLoading && kwSellers.length === 0 && !kwError && (
           <Paper sx={{ p: 2, mt: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Rakip Analizi Nasil Kullanilir?</Typography>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>{t('howToUseTitle')}</Typography>
             <Typography variant="body2" color="text.secondary" component="div">
               <ul style={{ margin: 0, paddingLeft: 16 }}>
-                <li>Bir anahtar kelime arayarak pazardaki rakipleri gorun</li>
-                <li>Satici adina tiklayarak magaza detaylarini inceleyin</li>
-                <li>Anlik goruntuyu kaydederek fiyat degisimlerini takip edin</li>
-                <li>Pazar trendleri sekmesinde zaman icindeki degisimleri izleyin</li>
+                <li>{t('tip1')}</li>
+                <li>{t('tip2')}</li>
+                <li>{t('tip3')}</li>
+                <li>{t('tip4')}</li>
               </ul>
             </Typography>
           </Paper>
@@ -449,17 +451,17 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         {kwSellers.length > 0 && (
           <Box sx={{ mt: 2 }}>
             <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-              Bulunan Saticilar ({kwSellers.length})
+              {t('foundSellers')} ({kwSellers.length})
             </Typography>
             <TableContainer sx={{ maxHeight: 400 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
-                    <TableCell>Satici</TableCell>
-                    <TableCell align="right">Listeleme</TableCell>
-                    <TableCell align="right">Puan</TableCell>
-                    <TableCell align="right">Olumlu %</TableCell>
-                    <TableCell align="center">Islemler</TableCell>
+                    <TableCell>{t('seller')}</TableCell>
+                    <TableCell align="right">{t('listings')}</TableCell>
+                    <TableCell align="right">{t('score')}</TableCell>
+                    <TableCell align="right">{t('positivePct')}</TableCell>
+                    <TableCell align="center">{t('actions')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -480,18 +482,18 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
                       <TableCell align="right">{s.feedbackPercentage}%</TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
-                          <Tooltip title="Urunleri Gor">
+                          <Tooltip title={t('viewProducts')}>
                             <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 1, fontSize: 11 }}
                               startIcon={<ShoppingBag size={12} />}
                               onClick={() => onNavigate?.('product_database', { keyword: s.username })}>
-                              Urunleri Gor
+                              {t('viewProducts')}
                             </Button>
                           </Tooltip>
-                          <Tooltip title="SEO Kontrol">
+                          <Tooltip title={t('seoCheck')}>
                             <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 1, fontSize: 11 }}
                               startIcon={<FileSearch size={12} />}
                               onClick={() => onNavigate?.('seo_analyzer', { keyword: kwInput.trim() })}>
-                              SEO Kontrol
+                              {t('seoCheck')}
                             </Button>
                           </Tooltip>
                         </Box>
@@ -542,9 +544,9 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
                   <TableHead>
                     <TableRow>
                       <TableCell>Urun</TableCell>
-                      <TableCell align="right">Fiyat</TableCell>
+                      <TableCell align="right">{t('price')}</TableCell>
                       <TableCell align="right">Tah. Satis</TableCell>
-                      <TableCell>Durum</TableCell>
+                      <TableCell>{t('condition')}</TableCell>
                       <TableCell align="center">Link</TableCell>
                     </TableRow>
                   </TableHead>
@@ -587,7 +589,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         <Paper sx={{ p: 2, bgcolor: '#f8faff', border: '1px solid rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
           <Typography variant="subtitle2" sx={{ mb: 1, color: '#6366f1' }}>
             <Users size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-            Senin satıcı hesabın:
+            {t("yourSellerAccount")}:
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             {suggestedSellers.map(({ username, feedback }) => (
@@ -609,8 +611,8 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            placeholder="ör: top_electronics_store"
-            helperText="eBay satıcı adını girin — mağaza analizi ve ürün listesi görüntülenir"
+            placeholder={t("sellerPlaceholder")}
+            helperText={t("sellerHelper")}
             value={sellerInput}
             onChange={e => setSellerInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && searchSeller()}
@@ -652,7 +654,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
             </Box>
             <Button variant="outlined" size="small" onClick={trackSeller} disabled={tracking}
               startIcon={tracking ? <CircularProgress size={14} /> : <Eye size={14} />}>
-              Takip Et
+              {t('track')}
             </Button>
           </Box>
         </Paper>
@@ -661,22 +663,22 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
       {/* Inventory Summary */}
       {inventoryStats && (
         <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-          <Typography variant="subtitle1" fontWeight={600} gutterBottom>Envanter Özeti</Typography>
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom>{t('inventorySummary')}</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 2 }}>
             <Box>
-              <Typography variant="caption" color="text.secondary">Toplam Listeleme</Typography>
+              <Typography variant="caption" color="text.secondary">{t('totalListings')}</Typography>
               <Typography variant="h6">{inventoryStats.total}</Typography>
             </Box>
             <Box>
-              <Typography variant="caption" color="text.secondary">Ort. Fiyat</Typography>
+              <Typography variant="caption" color="text.secondary">{t('avgPrice')}</Typography>
               <Typography variant="h6">{fmt(inventoryStats.avgPrice)}</Typography>
             </Box>
             <Box>
-              <Typography variant="caption" color="text.secondary">Fiyat Aralığı</Typography>
+              <Typography variant="caption" color="text.secondary">{t("priceRange")}</Typography>
               <Typography variant="h6">{fmt(inventoryStats.minPrice)} - {fmt(inventoryStats.maxPrice)}</Typography>
             </Box>
             <Box>
-              <Typography variant="caption" color="text.secondary">Tahmini Satış</Typography>
+              <Typography variant="caption" color="text.secondary">{t('estimatedSales')}</Typography>
               <Typography variant="h6">{inventoryStats.estSold}</Typography>
             </Box>
           </Box>
@@ -687,13 +689,13 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
       {items.length > 0 && (
         <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-            <Typography variant="subtitle1" fontWeight={600}>Ürünler ({items.length})</Typography>
+            <Typography variant="subtitle1" fontWeight={600}>{t("products", { count: items.length })}</Typography>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <ArrowUpDown size={14} />
               <Select size="small" value={sortBy} onChange={e => setSortBy(e.target.value as any)}>
-                <MenuItem value="sold">Satışa Göre</MenuItem>
-                <MenuItem value="price">Fiyata Göre</MenuItem>
-                <MenuItem value="newest">Yeniye Göre</MenuItem>
+                <MenuItem value="sold">{t('bySales')}</MenuItem>
+                <MenuItem value="price">{t('byPrice')}</MenuItem>
+                <MenuItem value="newest">{t("newest")}</MenuItem>
               </Select>
             </Box>
           </Box>
@@ -701,11 +703,11 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
-                  <TableCell>Ürün</TableCell>
+                  <TableCell>{t('product')}</TableCell>
                   <TableCell align="right">Fiyat</TableCell>
-                  <TableCell align="right">Tah. Satış</TableCell>
+                  <TableCell align="right">{t("estSales")}</TableCell>
                   <TableCell>Durum</TableCell>
-                  <TableCell>Kargo</TableCell>
+                  <TableCell>{t('shipping')}</TableCell>
                   <TableCell align="center">Link</TableCell>
                 </TableRow>
               </TableHead>
@@ -731,7 +733,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
                       </TableCell>
                       <TableCell>
                         {free ? (
-                          <Chip label="Ücretsiz" size="small" color="success" />
+                          <Chip label={t("free")} size="small" color="success" />
                         ) : (
                           <Typography variant="body2">{fmt(ship)}</Typography>
                         )}
@@ -757,13 +759,13 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
           {/* Category Breakdown */}
           <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>Kategori Dağılımı</Typography>
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>{t('categoryDistribution')}</Typography>
             <PieChart data={categoryBreakdown} />
           </Paper>
 
           {/* Price Distribution */}
           <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>Fiyat Dağılımı</Typography>
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>{t('priceDistribution')}</Typography>
             <Histogram values={prices} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
               <Typography variant="caption" color="text.secondary">{fmt(Math.min(...prices))}</Typography>
@@ -773,12 +775,12 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
 
           {/* Top Keywords */}
           <Paper sx={{ p: 2, gridColumn: { md: '1 / -1' }, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>En Çok Kullanılan Anahtar Kelimeler</Typography>
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>{t("topKeywords")}</Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {topKeywords.slice(0, 30).map((kw, i) => (
                 <Chip key={i} label={`${kw.word} (${kw.count})`} size="small" variant="outlined"
                   color={i < 5 ? 'primary' : 'default'}
-                  onClick={() => { navigator.clipboard.writeText(kw.word); toast.success('Kopyalandı'); }}
+                  onClick={() => { navigator.clipboard.writeText(kw.word); toast.success(t('copied')); }}
                   icon={<Copy size={12} />} />
               ))}
             </Box>
@@ -794,6 +796,7 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
 // ---------------------------------------------------------------------------
 
 function ListingComparison({ marketplace }: { marketplace: string }) {
+  const t = useTranslations('ebay.research.competitive');
   const [inputs, setInputs] = useState<string[]>(['']);
   const [listings, setListings] = useState<(ItemDetails | null)[]>([]);
   const [loading, setLoading] = useState<boolean[]>([]);
@@ -828,7 +831,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
 
   const fetchItem = useCallback(async (idx: number) => {
     const itemId = extractItemId(inputs[idx]);
-    if (!itemId) { toast.error('Geçerli bir eBay listeleme ID veya URL girin'); return; }
+    if (!itemId) { toast.error(t('validListing')); return; }
 
     setLoading(prev => { const n = [...prev]; n[idx] = true; return n; });
     setError('');
@@ -839,7 +842,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Listeleme bulunamadı');
+      if (!res.ok) throw new Error(data.error || t('listingNotFound'));
       setListings(prev => {
         const n = [...prev];
         n[idx] = {
@@ -849,7 +852,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
         return n;
       });
     } catch (err: any) {
-      toast.error(err.message || 'Listeleme yüklenemedi');
+      toast.error(err.message || t('listingLoadFailed'));
     } finally {
       setLoading(prev => { const n = [...prev]; n[idx] = false; return n; });
     }
@@ -896,22 +899,22 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-          Listeleme Karşılaştırması (maks. 5)
+          {t('listingComparisonTitle')}
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {inputs.map((val, idx) => (
             <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <TextField
                 size="small" fullWidth
-                placeholder="ör: https://www.ebay.com/itm/123456789"
-                helperText={idx === 0 ? "Karşılaştırmak istediğiniz eBay listing URL veya ID'lerini girin" : undefined}
+                placeholder={t('listingComparisonHelper')}
+                helperText={idx === 0 ? t('listingComparisonHelperText') : undefined}
                 value={val}
                 onChange={e => updateInput(idx, e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && fetchItem(idx)}
               />
               <Button variant="contained" size="small" onClick={() => fetchItem(idx)}
                 disabled={loading[idx] || !val.trim()}>
-                {loading[idx] ? <CircularProgress size={16} /> : 'Ekle'}
+                {loading[idx] ? <CircularProgress size={16} /> : t('add')}
               </Button>
               {inputs.length > 1 && (
                 <IconButton size="small" onClick={() => removeInput(idx)} color="error">
@@ -922,7 +925,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
           ))}
           {inputs.length < 5 && (
             <Button size="small" startIcon={<Plus size={14} />} onClick={addInput} sx={{ alignSelf: 'flex-start' }}>
-              Alan Ekle
+              Alan {t('add')}
             </Button>
           )}
         </Box>
@@ -964,7 +967,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
               <TableBody>
                 {/* Thumbnail */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Görsel</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('image')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center">
                       {l.image?.imageUrl ? (
@@ -976,7 +979,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Title */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Başlık</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('title')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i}>
                       <Typography variant="body2" sx={{ fontSize: 12 }}>{l.title}</Typography>
@@ -1000,7 +1003,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center"
                       sx={{ bgcolor: metrics ? cellColor(metrics.shippings, i, false) : undefined }}>
-                      {isFreeShipping(l) ? <Chip label="Ücretsiz" size="small" color="success" /> : fmt(getShippingCost(l))}
+                      {isFreeShipping(l) ? <Chip label={t("free")} size="small" color="success" /> : fmt(getShippingCost(l))}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -1027,7 +1030,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Estimated Sold */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Tah. Satış</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t("estSales")}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center"
                       sx={{ bgcolor: metrics ? cellColor(metrics.solds, i, true) : undefined }}>
@@ -1037,7 +1040,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Image Count */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Görsel Sayısı</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('imageCount')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center"
                       sx={{ bgcolor: metrics ? cellColor(metrics.imageCounts, i, true) : undefined }}>
@@ -1047,7 +1050,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Item Specifics Count */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Özellik Sayısı</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('specificsCount')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center"
                       sx={{ bgcolor: metrics ? cellColor(metrics.specificsCounts, i, true) : undefined }}>
@@ -1057,7 +1060,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Seller Feedback */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Satıcı Puanı</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('sellerRating')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center"
                       sx={{ bgcolor: metrics ? cellColor(metrics.feedbacks, i, true) : undefined }}>
@@ -1078,7 +1081,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
                 </TableRow>
                 {/* Creation Date */}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Oluşturma Tarihi</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('createdDate')}</TableCell>
                   {validListings.map((l, i) => (
                     <TableCell key={i} align="center">
                       {l.itemCreationDate ? new Date(l.itemCreationDate).toLocaleDateString('tr-TR') : '-'}
@@ -1112,6 +1115,7 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
 // ---------------------------------------------------------------------------
 
 function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string; onNavigate?: (tool: string, data?: any) => void; userId?: string }) {
+  const t = useTranslations('ebay.research.competitive');
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -1162,10 +1166,10 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
       });
       const res = await fetch(`/api/clawd/ebay?${params}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Arama başarısız');
+      if (!res.ok) throw new Error(data.error || t('searchFailed2'));
 
       const items: any[] = data.items || data.itemSummaries || [];
-      if (!items.length) { setError('Sonuç bulunamadı'); setLoading(false); return; }
+      if (!items.length) { setError(t('noResultsFound')); setLoading(false); return; }
 
       const prices = items.map(i => parseFloat(i.price?.value || '0')).filter(p => p > 0);
       const sellers = new Set(items.map(i => i.seller?.username).filter(Boolean));
@@ -1204,7 +1208,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
       };
       setCurrentSnapshot(snapshot);
     } catch (err: any) {
-      setError(err.message || 'Bir hata oluştu');
+      setError(err.message || t('error'));
     } finally {
       setLoading(false);
     }
@@ -1215,14 +1219,14 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
     const updated = [...savedSnapshots, currentSnapshot];
     setSavedSnapshots(updated);
     saveSnapshots(updated);
-    toast.success('Anlık görüntü kaydedildi');
+    toast.success(t('snapshotSaved'));
   }, [currentSnapshot, savedSnapshots]);
 
   const deleteSnapshot = useCallback((idx: number) => {
     const updated = savedSnapshots.filter((_, i) => i !== idx);
     setSavedSnapshots(updated);
     saveSnapshots(updated);
-    toast.success('Anlık görüntü silindi');
+    toast.success(t('snapshotDeleted'));
   }, [savedSnapshots]);
 
   // Previous snapshots for current keyword
@@ -1259,8 +1263,8 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            placeholder="ör: wireless earbuds, phone case"
-            helperText="Pazar trendlerini takip etmek istediğiniz ürün kelimesini girin"
+            placeholder={t('marketTrendHelper')}
+            helperText={t('marketTrendHelperText')}
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && searchMarket()}
@@ -1287,16 +1291,16 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
           <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Typography variant="subtitle1" fontWeight={600}>
-                Pazar Anlık Görüntüsü: &quot;{currentSnapshot.keyword}&quot;
+                {t('marketSnapshot')}: &quot;{currentSnapshot.keyword}&quot;
               </Typography>
               <Button variant="outlined" size="small" startIcon={<Download size={14} />} onClick={saveSnapshot}>
-                Anlık Görüntü Kaydet
+                {t('saveSnapshot')}
               </Button>
             </Box>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 2, mb: 2 }}>
               <Box>
-                <Typography variant="caption" color="text.secondary">Toplam Listeleme</Typography>
+                <Typography variant="caption" color="text.secondary">{t("totalListings")}</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="h6">{currentSnapshot.totalListings}</Typography>
                   {latestPrevious && trendArrow(currentSnapshot.totalListings, latestPrevious.totalListings, true)}
@@ -1317,14 +1321,14 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                 </Box>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary">Benzersiz Satıcılar</Typography>
+                <Typography variant="caption" color="text.secondary">{t('uniqueSellers')}</Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography variant="h6">{currentSnapshot.uniqueSellers}</Typography>
                   {latestPrevious && trendArrow(currentSnapshot.uniqueSellers, latestPrevious.uniqueSellers, false)}
                 </Box>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary">Ücretsiz Kargo</Typography>
+                <Typography variant="caption" color="text.secondary">{t('freeShippingPct')}</Typography>
                 <Typography variant="h6">{pct(currentSnapshot.freeShippingPct)}</Typography>
               </Box>
             </Box>
@@ -1332,7 +1336,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
             <Divider sx={{ my: 2 }} />
 
             {/* Condition Breakdown */}
-            <Typography variant="subtitle2" fontWeight={600} gutterBottom>Durum Dağılımı</Typography>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>{t('conditionBreakdown')}</Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2, mb: 2 }}>
               <Paper variant="outlined" sx={{ p: 1.5 }}>
                 <Typography variant="body2" fontWeight={600} color="success.main">Yeni</Typography>
@@ -1342,7 +1346,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                 )}
               </Paper>
               <Paper variant="outlined" sx={{ p: 1.5 }}>
-                <Typography variant="body2" fontWeight={600} color="warning.main">Kullanılmış</Typography>
+                <Typography variant="body2" fontWeight={600} color="warning.main">{t('usedCondition')}</Typography>
                 <Typography variant="h6">{currentSnapshot.usedCount} listeleme</Typography>
                 {currentSnapshot.usedAvgPrice > 0 && (
                   <Typography variant="caption" color="text.secondary">Ort: {fmt(currentSnapshot.usedAvgPrice)}</Typography>
@@ -1353,15 +1357,15 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
             <Divider sx={{ my: 2 }} />
 
             {/* Top Sellers */}
-            <Typography variant="subtitle2" fontWeight={600} gutterBottom>En Aktif Satıcılar</Typography>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>{t('topSellers')}</Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                     <TableCell>#</TableCell>
-                    <TableCell>Satıcı</TableCell>
+                    <TableCell>{t('sellerCol')}</TableCell>
                     <TableCell align="right">Listeleme</TableCell>
-                    <TableCell align="right">Pazar Payı</TableCell>
+                    <TableCell align="right">{t('marketShare')}</TableCell>
                     <TableCell>Pay</TableCell>
                     <TableCell align="center">Islemler</TableCell>
                   </TableRow>
@@ -1494,10 +1498,10 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
           {previousSnapshots.length > 0 && (
             <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-                Trend Geçmişi: &quot;{currentSnapshot.keyword}&quot;
+                {t('trendHistory')}: &quot;{currentSnapshot.keyword}&quot;
               </Typography>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Bu anahtar kelime için {previousSnapshots.length} kayıtlı anlık görüntü mevcut.
+                {t('snapshotsFor')} {previousSnapshots.length} {t('snapshotsAvailable')}
               </Typography>
 
               {/* Trend Summary */}
@@ -1518,7 +1522,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                     <Typography variant="caption" color="text.secondary">Listeleme Trendi</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {currentSnapshot.totalListings > latestPrevious.totalListings
-                        ? <><TrendingUp size={18} color="#2e7d32" /> <Typography variant="body2">Büyüyen pazar</Typography></>
+                        ? <><TrendingUp size={18} color="#2e7d32" /> <Typography variant="body2">{t('growingMarket')}</Typography></>
                         : <><TrendingDown size={18} color="#d32f2f" /> <Typography variant="body2">Daralan pazar</Typography></>}
                     </Box>
                   </Paper>
@@ -1526,8 +1530,8 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                     <Typography variant="caption" color="text.secondary">Rekabet Trendi</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {currentSnapshot.uniqueSellers > latestPrevious.uniqueSellers
-                        ? <><TrendingUp size={18} color="#d32f2f" /> <Typography variant="body2">Daha fazla satıcı</Typography></>
-                        : <><TrendingDown size={18} color="#2e7d32" /> <Typography variant="body2">Daha az satıcı</Typography></>}
+                        ? <><TrendingUp size={18} color="#d32f2f" /> <Typography variant="body2">{t('moreSellers')}</Typography></>
+                        : <><TrendingDown size={18} color="#2e7d32" /> <Typography variant="body2">{t('fewerSellers')}</Typography></>}
                     </Box>
                   </Paper>
                 </Box>
@@ -1538,12 +1542,12 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Tarih</TableCell>
+                      <TableCell>{t('date')}</TableCell>
                       <TableCell align="right">Listeleme</TableCell>
-                      <TableCell align="right">Ort. Fiyat</TableCell>
+                      <TableCell align="right">{t('avgPrice')}</TableCell>
                       <TableCell align="right">Medyan Fiyat</TableCell>
-                      <TableCell align="right">Satıcılar</TableCell>
-                      <TableCell align="right">Ücretsiz Kargo</TableCell>
+                      <TableCell align="right">{t('uniqueSellers')}</TableCell>
+                      <TableCell align="right">{t('freeShippingPct')}</TableCell>
                       <TableCell align="center">Sil</TableCell>
                     </TableRow>
                   </TableHead>
@@ -1581,15 +1585,15 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
       {/* All Saved Snapshots Summary */}
       {!currentSnapshot && savedSnapshots.length > 0 && (
         <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-          <Typography variant="subtitle1" fontWeight={600} gutterBottom>Kayıtlı Anlık Görüntüler</Typography>
+          <Typography variant="subtitle1" fontWeight={600} gutterBottom>{t('savedSnapshots')}</Typography>
           <Typography variant="body2" color="text.secondary" gutterBottom>
-            Trend analizi için bir anahtar kelime arayın. Önceki anlık görüntülerle karşılaştırma yapılacaktır.
+            {t('noSavedSnapshotsHint')}
           </Typography>
           <TableContainer>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Anahtar Kelime</TableCell>
+                  <TableCell>{t('keyword')}</TableCell>
                   <TableCell>Pazar</TableCell>
                   <TableCell>Tarih</TableCell>
                   <TableCell align="right">Listeleme</TableCell>
@@ -1633,6 +1637,7 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
 // ---------------------------------------------------------------------------
 
 export default function CompetitiveIntelligence({ userId, marketplace, userListings, onNavigate }: CompetitiveIntelligenceProps) {
+  const t = useTranslations('ebay.research.competitive');
   const [activeTab, setActiveTab] = useState(0);
 
   return (
@@ -1640,9 +1645,9 @@ export default function CompetitiveIntelligence({ userId, marketplace, userListi
       <Paper sx={{ px: 1, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto"
           sx={{ '& .Mui-selected': { color: '#6366f1' }, '& .MuiTabs-indicator': { bgcolor: '#6366f1' } }}>
-          <Tab icon={<Eye size={16} />} iconPosition="start" label="Satıcı İstihbaratı" sx={{ textTransform: 'none', minHeight: 48 }} />
-          <Tab icon={<ArrowUpDown size={16} />} iconPosition="start" label="Listeleme Karşılaştırması" sx={{ textTransform: 'none', minHeight: 48 }} />
-          <Tab icon={<TrendingUp size={16} />} iconPosition="start" label="Pazar Trendleri" sx={{ textTransform: 'none', minHeight: 48 }} />
+          <Tab icon={<Eye size={16} />} iconPosition="start" label={t('tabSellerSpy')} sx={{ textTransform: 'none', minHeight: 48 }} />
+          <Tab icon={<ArrowUpDown size={16} />} iconPosition="start" label={t('tabListingComparison')} sx={{ textTransform: 'none', minHeight: 48 }} />
+          <Tab icon={<TrendingUp size={16} />} iconPosition="start" label="{t('marketTrends')}" sx={{ textTransform: 'none', minHeight: 48 }} />
         </Tabs>
       </Paper>
 

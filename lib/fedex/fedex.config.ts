@@ -116,59 +116,26 @@ export const ALLOWED_LABEL_STOCK_TYPES = [
   { value: 'PAPER_LETTER',                 label: 'Letter \u2013 full page' },
 ] as const;
 
-// FedEx Currency Codes
-export const FEDEX_CURRENCY_CODES: FedExOption[] = [
-  { value: 'USD', label: 'ABD Dolar\u0131 (USD)' },
-  { value: 'EUR', label: 'Euro (EUR)' },
-  { value: 'GBP', label: '\u0130ngiliz Sterlini (GBP)' },
-  { value: 'TRY', label: 'T\u00FCrk Liras\u0131 (TRY)' },
-  { value: 'CAD', label: 'Kanada Dolar\u0131 (CAD)' },
-  { value: 'AUD', label: 'Avustralya Dolar\u0131 (AUD)' },
-  { value: 'JPY', label: 'Japon Yeni (JPY)' },
-  { value: 'CHF', label: '\u0130svi\u00E7re Frang\u0131 (CHF)' },
-  { value: 'CNY', label: '\u00C7in Yuan\u0131 (CNY)' },
-  { value: 'SEK', label: '\u0130sve\u00E7 Kronu (SEK)' },
-  { value: 'NOK', label: 'Norve\u00E7 Kronu (NOK)' },
-  { value: 'DKK', label: 'Danimarka Kronu (DKK)' },
-  { value: 'NZD', label: 'Yeni Zelanda Dolar\u0131 (NZD)' },
-  { value: 'SGD', label: 'Singapur Dolar\u0131 (SGD)' },
-  { value: 'HKD', label: 'Hong Kong Dolar\u0131 (HKD)' },
-  { value: 'KRW', label: 'G\u00FCney Kore Wonu (KRW)' },
-  { value: 'MXN', label: 'Meksika Pesosu (MXN)' },
-  { value: 'BRL', label: 'Brezilya Reali (BRL)' },
-  { value: 'INR', label: 'Hindistan Rupisi (INR)' },
-  { value: 'ZAR', label: 'G\u00FCney Afrika Rand\u0131 (ZAR)' },
-  { value: 'AED', label: 'BAE Dirhemi (AED)' },
-  { value: 'SAR', label: 'Suudi Arabistan Riyali (SAR)' },
-  { value: 'PLN', label: 'Polonya Zlotisi (PLN)' },
-  { value: 'CZK', label: '\u00C7ek Korunas\u0131 (CZK)' },
-  { value: 'HUF', label: 'Macar Forinti (HUF)' },
-  { value: 'RON', label: 'Romen Leyi (RON)' },
-  { value: 'BGN', label: 'Bulgar Levas\u0131 (BGN)' },
-  { value: 'HRK', label: 'H\u0131rvat Kunas\u0131 (HRK)' },
-  { value: 'RUB', label: 'Rus Rublesi (RUB)' },
-  { value: 'THB', label: 'Tayland Baht\u0131 (THB)' },
-  { value: 'MYR', label: 'Malezya Ringgiti (MYR)' },
-  { value: 'IDR', label: 'Endonezya Rupisi (IDR)' },
-  { value: 'PHP', label: 'Filipin Pesosu (PHP)' },
-  { value: 'ILS', label: '\u0130srail \u015Eekeli (ILS)' },
-  { value: 'TWD', label: 'Tayvan Dolar\u0131 (TWD)' },
-  { value: 'VND', label: 'Vietnam Dongu (VND)' },
-  { value: 'CLP', label: '\u015Eili Pesosu (CLP)' },
-  { value: 'ARS', label: 'Arjantin Pesosu (ARS)' },
-  { value: 'COP', label: 'Kolombiya Pesosu (COP)' },
-  { value: 'PEN', label: 'Peru Solu (PEN)' },
-  { value: 'UAH', label: 'Ukrayna Grivnas\u0131 (UAH)' },
-  { value: 'KZT', label: 'Kazakistan Tengesi (KZT)' },
-  { value: 'EGP', label: 'M\u0131s\u0131r Liras\u0131 (EGP)' },
-  { value: 'MAD', label: 'Fas Dirhemi (MAD)' },
-  { value: 'QAR', label: 'Katar Riyali (QAR)' },
-  { value: 'KWD', label: 'Kuveyt Dinar\u0131 (KWD)' },
-  { value: 'OMR', label: 'Umman Riyali (OMR)' },
-  { value: 'BHD', label: 'Bahreyn Dinar\u0131 (BHD)' },
-  { value: 'JOD', label: '\u00DCrd\u00FCn Dinar\u0131 (JOD)' },
-  { value: 'LBP', label: 'L\u00FCbnan Liras\u0131 (LBP)' },
-  { value: 'PKR', label: 'Pakistan Rupisi (PKR)' },
-  { value: 'BDT', label: 'Banglade\u015F Takas\u0131 (BDT)' },
-  { value: 'LKR', label: 'Sri Lanka Rupisi (LKR)' },
-].sort((a, b) => a.label.localeCompare(b.label, 'tr'));
+// FedEx Currency Codes — call with t from useTranslations('fedex')
+export const FEDEX_CURRENCY_CODE_LIST = [
+  'USD', 'EUR', 'GBP', 'TRY', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY',
+  'SEK', 'NOK', 'DKK', 'NZD', 'SGD', 'HKD', 'KRW', 'MXN', 'BRL',
+  'INR', 'ZAR', 'AED', 'SAR', 'PLN', 'CZK', 'HUF', 'RON', 'BGN',
+  'HRK', 'RUB', 'THB', 'MYR', 'IDR', 'PHP', 'ILS', 'TWD', 'VND',
+  'CLP', 'ARS', 'COP', 'PEN', 'UAH', 'KZT', 'EGP', 'MAD', 'QAR',
+  'KWD', 'OMR', 'BHD', 'JOD', 'LBP', 'PKR', 'BDT', 'LKR'
+] as const;
+
+/** Build translated currency options. Pass t from useTranslations('fedex'). */
+export function getFedexCurrencyCodes(t: (key: string) => string): FedExOption[] {
+  return FEDEX_CURRENCY_CODE_LIST.map(code => ({
+    value: code,
+    label: t(`currencies.${code}`)
+  })).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/** @deprecated Use getFedexCurrencyCodes(t) for i18n support */
+export const FEDEX_CURRENCY_CODES: FedExOption[] = FEDEX_CURRENCY_CODE_LIST.map(code => ({
+  value: code,
+  label: `${code}`
+}));

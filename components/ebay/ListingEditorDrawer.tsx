@@ -41,6 +41,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 import SEOIndicator from './SEOIndicator';
 import ImageManager from './ImageManager';
@@ -244,6 +245,7 @@ export default function ListingEditorDrawer({
   paymentPolicies,
   onSaved,
 }: ListingEditorDrawerProps) {
+  const t = useTranslations('ebay.listing');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -316,8 +318,8 @@ export default function ListingEditorDrawer({
         fetchItemAspects(categoryId);
       }
     } catch (err: any) {
-      setFetchError(err.message || 'Liste detayları yüklenemedi');
-      toast.error('Liste detayları yüklenemedi');
+      setFetchError(err.message || t('listingLoadFailed'));
+      toast.error(t('listingLoadFailed'));
     } finally {
       setLoading(false);
     }
@@ -469,10 +471,10 @@ export default function ListingEditorDrawer({
       });
       if (data.optimizedTitle) {
         updateField('title', data.optimizedTitle);
-        toast.success(`Başlık optimize edildi (${data.score?.before || '?'} → ${data.score?.after || '?'})`);
+        toast.success(t('titleOptimized', { before: data.score?.before || '?', after: data.score?.after || '?' }));
       }
     } catch (err: any) {
-      toast.error(err.message || 'Başlık optimizasyonu başarısız');
+      toast.error(err.message || t('titleOptimizeFailed'));
     } finally {
       setAiLoading(null);
     }
@@ -492,10 +494,10 @@ export default function ListingEditorDrawer({
       });
       if (data.description) {
         updateField('description', data.description);
-        toast.success('Açıklama oluşturuldu');
+        toast.success(t('descriptionGenerated'));
       }
     } catch (err: any) {
-      toast.error(err.message || 'Açıklama oluşturma başarısız');
+      toast.error(err.message || t('descriptionGenerateFailed'));
     } finally {
       setAiLoading(null);
     }
@@ -513,10 +515,10 @@ export default function ListingEditorDrawer({
       });
       if (data.suggestedPrice) {
         updateField('price', String(data.suggestedPrice));
-        toast.success(`Önerilen: ${data.suggestedPrice} (${data.priceRange?.min}-${data.priceRange?.max})`);
+        toast.success(t('suggestedPrice', { price: data.suggestedPrice, min: data.priceRange?.min, max: data.priceRange?.max }));
       }
     } catch (err: any) {
-      toast.error(err.message || 'Fiyat önerisi başarısız');
+      toast.error(err.message || t('priceSuggestFailed'));
     } finally {
       setAiLoading(null);
     }
@@ -539,7 +541,7 @@ export default function ListingEditorDrawer({
       setAiAnalysis(data);
       setExpanded('ai');
     } catch (err: any) {
-      toast.error(err.message || 'Analiz başarısız');
+      toast.error(err.message || t('analysisFailed'));
     } finally {
       setAiLoading(null);
     }
@@ -568,7 +570,7 @@ export default function ListingEditorDrawer({
 
     const changed = getChangedFields(originalFieldsRef.current, fields);
     if (Object.keys(changed).length === 0) {
-      toast('Değişiklik yok');
+      toast(t('noChanges'));
       return;
     }
 
@@ -637,7 +639,7 @@ export default function ListingEditorDrawer({
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Envanter öğesi güncellenemedi');
+          throw new Error(err.error || t('inventoryUpdateFailed'));
         }
       }
 
@@ -681,16 +683,16 @@ export default function ListingEditorDrawer({
 
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Teklif güncellenemedi');
+            throw new Error(err.error || t('offerUpdateFailed'));
           }
         }
       }
 
-      toast.success('Liste güncellendi');
+      toast.success(t('listingUpdated'));
       await fetchListing();
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Güncelleme başarısız');
+      toast.error(err.message || t('updateFailed'));
     } finally {
       setSaving(false);
     }
@@ -702,7 +704,7 @@ export default function ListingEditorDrawer({
   const handlePublish = async () => {
     const offer = listing?.offers?.[0];
     if (!offer?.offerId) {
-      toast.error('Yayınlanacak teklif bulunamadı');
+      toast.error(t('noOfferToPublish'));
       return;
     }
 
@@ -717,14 +719,14 @@ export default function ListingEditorDrawer({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Yayınlama başarısız');
+        throw new Error(err.error || t('publishFailed'));
       }
 
-      toast.success('Liste yayınlandı');
+      toast.success(t('listingPublished'));
       await fetchListing();
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Yayınlama başarısız');
+      toast.error(err.message || t('publishFailed'));
     } finally {
       setPublishing(false);
     }
@@ -748,14 +750,14 @@ export default function ListingEditorDrawer({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Geri çekme başarısız');
+        throw new Error(err.error || t('withdrawFailed'));
       }
 
-      toast.success('Liste geri çekildi');
+      toast.success(t('listingWithdrawn'));
       await fetchListing();
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Geri çekme başarısız');
+      toast.error(err.message || t('withdrawFailed'));
     } finally {
       setWithdrawing(false);
     }
@@ -774,7 +776,7 @@ export default function ListingEditorDrawer({
       // Create inventory item copy
       const inventoryPayload: Record<string, any> = {
         product: {
-          title: fields.title + ' (Kopya)',
+          title: fields.title + ` (${t('copy')})`,
           description: fields.description,
           aspects: fields.aspects,
           imageUrls: fields.images,
@@ -799,13 +801,13 @@ export default function ListingEditorDrawer({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Kopyalama başarısız');
+        throw new Error(err.error || t('copyFailed'));
       }
 
-      toast.success('Liste kopyalandı (taslak olarak)');
+      toast.success(t('listingCopied'));
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Kopyalama başarısız');
+      toast.error(err.message || t('copyFailed'));
     } finally {
       setCopying(false);
     }
@@ -828,15 +830,15 @@ export default function ListingEditorDrawer({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Silme başarısız');
+        throw new Error(err.error || t('deleteFailed'));
       }
 
-      toast.success('Liste silindi');
+      toast.success(t('listingDeleted'));
       setDeleteDialogOpen(false);
       onSaved();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || 'Silme başarısız');
+      toast.error(err.message || t('deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -854,7 +856,7 @@ export default function ListingEditorDrawer({
       ? fields.title.length > 45
         ? fields.title.substring(0, 45) + '...'
         : fields.title
-      : 'Liste Düzenle';
+      : t('editListing');
 
     return (
       <Box
@@ -882,10 +884,10 @@ export default function ListingEditorDrawer({
               <Chip
                 label={
                   offerStatus === 'PUBLISHED'
-                    ? 'Yayında'
+                    ? t('statusPublished')
                     : offerStatus === 'UNPUBLISHED'
-                    ? 'Yayında Değil'
-                    : offerStatus || 'Taslak'
+                    ? t('statusUnpublished')
+                    : offerStatus || t('statusDraft')
                 }
                 size="small"
                 color={
@@ -906,7 +908,7 @@ export default function ListingEditorDrawer({
 
         <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
           {(listing?.itemWebUrl || listing?.legacyItemId || (listing?.offers?.[0]?.offerId && offerStatus === 'PUBLISHED')) && (
-            <Tooltip title="eBay'de Görüntüle">
+            <Tooltip title={t('viewOnEbay')}>
               <IconButton
                 size="small"
                 component="a"
@@ -918,7 +920,7 @@ export default function ListingEditorDrawer({
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title="Kopyala">
+          <Tooltip title={t('copyListing')}>
             <IconButton size="small" onClick={handleCopy} disabled={copying}>
               {copying ? <CircularProgress size={18} /> : <ContentCopyIcon fontSize="small" />}
             </IconButton>
@@ -943,7 +945,7 @@ export default function ListingEditorDrawer({
         {fetchError}
       </Typography>
       <Button variant="outlined" onClick={fetchListing}>
-        Tekrar Dene
+        {t('retry')}
       </Button>
     </Box>
   );
@@ -977,10 +979,10 @@ export default function ListingEditorDrawer({
                 <BlockIcon sx={{ color: 'warning.dark', fontSize: 20 }} />
                 <Box>
                   <Typography variant="body2" fontWeight={600} sx={{ color: 'warning.dark' }}>
-                    Eski Liste (Salt Okunur)
+                    {t('legacyListingReadOnly')}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'warning.dark' }}>
-                    Bu liste eBay Envanter API'si dışında oluşturulmuş. Düzenlemek için eBay Seller Hub'ı kullanın.
+                    {t('legacyListingDescription')}
                   </Typography>
                 </Box>
                 {listing.itemWebUrl && (
@@ -1007,7 +1009,7 @@ export default function ListingEditorDrawer({
               sx={{ '&:before': { display: 'none' } }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Temel Bilgiler</Typography>
+                <Typography fontWeight={600}>{t('basicInfo')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1016,13 +1018,13 @@ export default function ListingEditorDrawer({
                     <Paper variant="outlined" sx={{ p: 1, bgcolor: 'action.hover', borderRadius: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
                         <TrendingUpIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                        <Typography variant="caption" fontWeight={600} sx={{ mr: 0.5 }}>Pazar:</Typography>
+                        <Typography variant="caption" fontWeight={600} sx={{ mr: 0.5 }}>{t('market')}:</Typography>
                         {marketLoading && <CircularProgress size={12} />}
                         {marketResearch && (
                           <>
-                            <Chip label={`Ort. ${marketResearch.avgPrice?.toFixed(0) || '?'} ${fields.currency}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                            <Chip label={`Talep ${marketResearch.demandScore || '?'}`} size="small" color={marketResearch.demandScore > 60 ? 'success' : 'warning'} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                            <Chip label={`Rekabet ${marketResearch.competitionScore || '?'}`} size="small" color={marketResearch.competitionScore < 50 ? 'success' : 'error'} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            <Chip label={`${t('avg')} ${marketResearch.avgPrice?.toFixed(0) || '?'} ${fields.currency}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            <Chip label={`${t('demand')} ${marketResearch.demandScore || '?'}`} size="small" color={marketResearch.demandScore > 60 ? 'success' : 'warning'} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            <Chip label={`${t('competition')} ${marketResearch.competitionScore || '?'}`} size="small" color={marketResearch.competitionScore < 50 ? 'success' : 'error'} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
                           </>
                         )}
                       </Box>
@@ -1031,7 +1033,7 @@ export default function ListingEditorDrawer({
 
                   <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end' }}>
                     <TextField
-                      label="Başlık"
+                      label={t('title')}
                       value={fields.title}
                       onChange={(e) => {
                         if (e.target.value.length <= 80) {
@@ -1040,11 +1042,11 @@ export default function ListingEditorDrawer({
                       }}
                       fullWidth
                       size="small"
-                      helperText={`${fields.title.length}/80 karakter`}
+                      helperText={t('charCount', { current: fields.title.length, max: 80 })}
                       inputProps={{ maxLength: 80 }}
                     />
                     {!listing?.isLegacy && (
-                      <Tooltip title="AI ile başlığı optimize et">
+                      <Tooltip title={t('aiOptimizeTitle')}>
                         <span>
                           <IconButton
                             size="small"
@@ -1061,17 +1063,17 @@ export default function ListingEditorDrawer({
 
                   <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start' }}>
                     <TextField
-                      label="Açıklama"
+                      label={t('description')}
                       value={fields.description}
                       onChange={(e) => updateField('description', e.target.value)}
                       fullWidth
                       multiline
                       rows={4}
                       size="small"
-                      helperText={`${fields.description.length} karakter`}
+                      helperText={t('charLength', { count: fields.description.length })}
                     />
                     {!listing?.isLegacy && (
-                      <Tooltip title="AI ile açıklama oluştur">
+                      <Tooltip title={t('aiGenerateDescription')}>
                         <span>
                           <IconButton
                             size="small"
@@ -1087,7 +1089,7 @@ export default function ListingEditorDrawer({
                   </Box>
 
                   <TextField
-                    label="Alt Başlık (İsteğe Bağlı)"
+                    label={t('subtitleOptional')}
                     value={fields.subtitle}
                     onChange={(e) => {
                       if (e.target.value.length <= 55) {
@@ -1096,7 +1098,7 @@ export default function ListingEditorDrawer({
                     }}
                     fullWidth
                     size="small"
-                    helperText={`${fields.subtitle.length}/55 karakter`}
+                    helperText={t('charCount', { current: fields.subtitle.length, max: 55 })}
                     inputProps={{ maxLength: 55 }}
                   />
                 </Box>
@@ -1112,7 +1114,7 @@ export default function ListingEditorDrawer({
               sx={{ '&:before': { display: 'none' } }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>SEO Analizi</Typography>
+                <Typography fontWeight={600}>{t('seoAnalysis')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <SEOIndicator
@@ -1125,7 +1127,7 @@ export default function ListingEditorDrawer({
               </AccordionDetails>
             </Accordion>
 
-            {/* 3. Görseller */}
+            {/* 3. Images */}
             <Accordion
               expanded={expanded === 'images'}
               onChange={handleAccordionChange('images')}
@@ -1135,7 +1137,7 @@ export default function ListingEditorDrawer({
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography fontWeight={600}>Görseller</Typography>
+                  <Typography fontWeight={600}>{t('images')}</Typography>
                   <Chip label={fields.images.length} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
                 </Box>
               </AccordionSummary>
@@ -1149,7 +1151,7 @@ export default function ListingEditorDrawer({
               </AccordionDetails>
             </Accordion>
 
-            {/* 4. Ürün Özellikleri */}
+            {/* 4. Item Specifics */}
             <Accordion
               expanded={expanded === 'aspects'}
               onChange={handleAccordionChange('aspects')}
@@ -1159,7 +1161,7 @@ export default function ListingEditorDrawer({
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography fontWeight={600}>Ürün Özellikleri</Typography>
+                  <Typography fontWeight={600}>{t('itemSpecifics')}</Typography>
                   <Chip
                     label={Object.keys(fields.aspects).length}
                     size="small"
@@ -1185,12 +1187,12 @@ export default function ListingEditorDrawer({
                         marketResearch: research,
                       });
                       if (data.aspects) {
-                        toast.success('Özellikler AI ile dolduruldu');
+                        toast.success(t('aspectsAIFilled'));
                         return data.aspects;
                       }
                       return null;
                     } catch (err: any) {
-                      toast.error(err.message || 'AI özellik önerisi başarısız');
+                      toast.error(err.message || t('aspectsAIFailed'));
                       return null;
                     } finally {
                       setAiLoading(null);
@@ -1209,7 +1211,7 @@ export default function ListingEditorDrawer({
               sx={{ '&:before': { display: 'none' } }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Durum</Typography>
+                <Typography fontWeight={600}>{t('condition')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <ConditionSelector
@@ -1232,12 +1234,12 @@ export default function ListingEditorDrawer({
               sx={{ '&:before': { display: 'none' } }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Fiyat ve Stok</Typography>
+                <Typography fontWeight={600}>{t('priceAndStock')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-end', flexDirection: { xs: 'column', sm: 'row' } }}>
                   <TextField
-                    label="Fiyat"
+                    label={t('price')}
                     value={fields.price}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -1247,10 +1249,10 @@ export default function ListingEditorDrawer({
                     }}
                     size="small"
                     sx={{ flex: 1, minWidth: 100 }}
-                    helperText={marketResearch?.avgPrice ? `Pazar ort: ${marketResearch.avgPrice.toFixed(2)}` : undefined}
+                    helperText={marketResearch?.avgPrice ? t('marketAvg', { price: marketResearch.avgPrice.toFixed(2) }) : undefined}
                   />
                   {!listing?.isLegacy && (
-                    <Tooltip title="AI fiyat önerisi">
+                    <Tooltip title={t('aiPriceSuggestion')}>
                       <span>
                         <IconButton
                           size="small"
@@ -1264,10 +1266,10 @@ export default function ListingEditorDrawer({
                     </Tooltip>
                   )}
                   <FormControl size="small" sx={{ minWidth: 90, width: { xs: '100%', sm: 'auto' } }}>
-                    <InputLabel>Para Birimi</InputLabel>
+                    <InputLabel>{t('currency')}</InputLabel>
                     <Select
                       value={fields.currency}
-                      label="Para Birimi"
+                      label={t('currency')}
                       onChange={(e: SelectChangeEvent) => updateField('currency', e.target.value)}
                     >
                       {CURRENCY_OPTIONS.map((c) => (
@@ -1276,7 +1278,7 @@ export default function ListingEditorDrawer({
                     </Select>
                   </FormControl>
                   <TextField
-                    label="Stok"
+                    label={t('stock')}
                     type="number"
                     value={fields.quantity}
                     onChange={(e) => updateField('quantity', Math.max(0, parseInt(e.target.value) || 0))}
@@ -1297,7 +1299,7 @@ export default function ListingEditorDrawer({
               sx={{ '&:before': { display: 'none' } }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Varyasyonlar</Typography>
+                <Typography fontWeight={600}>{t('variations')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <VariationEditor
@@ -1317,13 +1319,13 @@ export default function ListingEditorDrawer({
               sx={{ '&:before': { display: 'none' } }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Kategori</Typography>
+                <Typography fontWeight={600}>{t('category')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {fields.categoryId && (
                     <Chip
-                      label={`Kategori ID: ${fields.categoryId}`}
+                      label={t('categoryId', { id: fields.categoryId })}
                       variant="outlined"
                       size="small"
                     />
@@ -1348,9 +1350,9 @@ export default function ListingEditorDrawer({
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Kategori Ara"
+                        label={t('searchCategory')}
                         size="small"
-                        placeholder="Kategori adı yazın..."
+                        placeholder={t('typeCategoryName')}
                       />
                     )}
                     size="small"
@@ -1359,7 +1361,7 @@ export default function ListingEditorDrawer({
               </AccordionDetails>
             </Accordion>
 
-            {/* 9. Liste Politikaları */}
+            {/* 9. Listing Policies */}
             <Accordion
               expanded={expanded === 'policies'}
               onChange={handleAccordionChange('policies')}
@@ -1368,18 +1370,18 @@ export default function ListingEditorDrawer({
               sx={{ '&:before': { display: 'none' } }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Liste Politikaları</Typography>
+                <Typography fontWeight={600}>{t('listingPolicies')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <FormControl size="small" fullWidth>
-                    <InputLabel>Teslimat Politikası</InputLabel>
+                    <InputLabel>{t('fulfillmentPolicy')}</InputLabel>
                     <Select
                       value={fields.fulfillmentPolicyId}
-                      label="Teslimat Politikası"
+                      label={t('fulfillmentPolicy')}
                       onChange={(e: SelectChangeEvent) => updateField('fulfillmentPolicyId', e.target.value)}
                     >
-                      <MenuItem value=""><em>Seçilmedi</em></MenuItem>
+                      <MenuItem value=""><em>{t('notSelected')}</em></MenuItem>
                       {fulfillmentPolicies.map((p) => (
                         <MenuItem key={p.policyId} value={p.policyId}>{p.name}</MenuItem>
                       ))}
@@ -1387,13 +1389,13 @@ export default function ListingEditorDrawer({
                   </FormControl>
 
                   <FormControl size="small" fullWidth>
-                    <InputLabel>İade Politikası</InputLabel>
+                    <InputLabel>{t('returnPolicy')}</InputLabel>
                     <Select
                       value={fields.returnPolicyId}
-                      label="İade Politikası"
+                      label={t('returnPolicy')}
                       onChange={(e: SelectChangeEvent) => updateField('returnPolicyId', e.target.value)}
                     >
-                      <MenuItem value=""><em>Seçilmedi</em></MenuItem>
+                      <MenuItem value=""><em>{t('notSelected')}</em></MenuItem>
                       {returnPolicies.map((p) => (
                         <MenuItem key={p.policyId} value={p.policyId}>{p.name}</MenuItem>
                       ))}
@@ -1401,13 +1403,13 @@ export default function ListingEditorDrawer({
                   </FormControl>
 
                   <FormControl size="small" fullWidth>
-                    <InputLabel>Ödeme Politikası</InputLabel>
+                    <InputLabel>{t('paymentPolicy')}</InputLabel>
                     <Select
                       value={fields.paymentPolicyId}
-                      label="Ödeme Politikası"
+                      label={t('paymentPolicy')}
                       onChange={(e: SelectChangeEvent) => updateField('paymentPolicyId', e.target.value)}
                     >
-                      <MenuItem value=""><em>Seçilmedi</em></MenuItem>
+                      <MenuItem value=""><em>{t('notSelected')}</em></MenuItem>
                       {paymentPolicies.map((p) => (
                         <MenuItem key={p.policyId} value={p.policyId}>{p.name}</MenuItem>
                       ))}
@@ -1417,7 +1419,7 @@ export default function ListingEditorDrawer({
               </AccordionDetails>
             </Accordion>
 
-            {/* 10. Boyutlar ve Ağırlık */}
+            {/* 10. Dimensions & Weight */}
             <Accordion
               expanded={expanded === 'dimensions'}
               onChange={handleAccordionChange('dimensions')}
@@ -1426,14 +1428,14 @@ export default function ListingEditorDrawer({
               sx={{ '&:before': { display: 'none' } }}
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography fontWeight={600}>Boyutlar ve Ağırlık</Typography>
+                <Typography fontWeight={600}>{t('dimensionsAndWeight')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Typography variant="body2" fontWeight={500}>Ağırlık</Typography>
+                  <Typography variant="body2" fontWeight={500}>{t('weight')}</Typography>
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <TextField
-                      label="Ağırlık"
+                      label={t('weight')}
                       type="number"
                       value={fields.weight}
                       onChange={(e) =>
@@ -1444,10 +1446,10 @@ export default function ListingEditorDrawer({
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <FormControl size="small" sx={{ minWidth: 80 }}>
-                      <InputLabel>Birim</InputLabel>
+                      <InputLabel>{t('unit')}</InputLabel>
                       <Select
                         value={fields.weightUnit}
-                        label="Birim"
+                        label={t('unit')}
                         onChange={(e: SelectChangeEvent) => updateField('weightUnit', e.target.value)}
                       >
                         {WEIGHT_UNITS.map((u) => (
@@ -1458,10 +1460,10 @@ export default function ListingEditorDrawer({
                   </Box>
 
                   <Divider sx={{ my: 0.5 }} />
-                  <Typography variant="body2" fontWeight={500}>Boyutlar</Typography>
+                  <Typography variant="body2" fontWeight={500}>{t('dimensions')}</Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     <TextField
-                      label="Uzunluk"
+                      label={t('length')}
                       type="number"
                       value={fields.length}
                       onChange={(e) =>
@@ -1472,7 +1474,7 @@ export default function ListingEditorDrawer({
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <TextField
-                      label="Genişlik"
+                      label={t('width')}
                       type="number"
                       value={fields.width}
                       onChange={(e) =>
@@ -1483,7 +1485,7 @@ export default function ListingEditorDrawer({
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <TextField
-                      label="Yükseklik"
+                      label={t('height')}
                       type="number"
                       value={fields.height}
                       onChange={(e) =>
@@ -1494,10 +1496,10 @@ export default function ListingEditorDrawer({
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <FormControl size="small" sx={{ minWidth: 70 }}>
-                      <InputLabel>Birim</InputLabel>
+                      <InputLabel>{t('unit')}</InputLabel>
                       <Select
                         value={fields.dimensionUnit}
-                        label="Birim"
+                        label={t('unit')}
                         onChange={(e: SelectChangeEvent) => updateField('dimensionUnit', e.target.value)}
                       >
                         {DIMENSION_UNITS.map((u) => (
@@ -1520,7 +1522,7 @@ export default function ListingEditorDrawer({
             >
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography fontWeight={600}>AI Analiz</Typography>
+                  <Typography fontWeight={600}>{t('aiAnalysis')}</Typography>
                   {aiAnalysis && (
                     <Chip
                       label={`${aiAnalysis.score}/100`}
@@ -1541,7 +1543,7 @@ export default function ListingEditorDrawer({
                     disabled={!!aiLoading || !fields?.title?.trim()}
                     fullWidth
                   >
-                    {aiLoading === 'analyze' ? 'Analiz ediliyor...' : aiAnalysis ? 'Tekrar Analiz Et' : 'Listeyi Analiz Et'}
+                    {aiLoading === 'analyze' ? t('analyzing') : aiAnalysis ? t('reanalyze') : t('analyzeListing')}
                   </Button>
 
                   {aiAnalysis && (
@@ -1557,9 +1559,9 @@ export default function ListingEditorDrawer({
                           <Typography variant="h6" fontWeight={700}>{aiAnalysis.score}</Typography>
                         </Box>
                         <Box>
-                          <Typography variant="subtitle2" fontWeight={600}>Kalite Skoru</Typography>
+                          <Typography variant="subtitle2" fontWeight={600}>{t('qualityScore')}</Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {aiAnalysis.score >= 80 ? 'Harika!' : aiAnalysis.score >= 50 ? 'İyileştirme önerileri var' : 'Önemli sorunlar'}
+                            {aiAnalysis.score >= 80 ? t('scoreGreat') : aiAnalysis.score >= 50 ? t('scoreImprovements') : t('scoreCritical')}
                           </Typography>
                         </Box>
                       </Box>
@@ -1580,7 +1582,7 @@ export default function ListingEditorDrawer({
 
                       {(aiAnalysis.tips || []).length > 0 && (
                         <Box>
-                          <Typography variant="caption" fontWeight={600}>İpuçları:</Typography>
+                          <Typography variant="caption" fontWeight={600}>{t('tips')}:</Typography>
                           {aiAnalysis.tips.map((tip: string, i: number) => (
                             <Typography key={i} variant="caption" display="block" sx={{ ml: 1 }}>• {tip}</Typography>
                           ))}
@@ -1592,7 +1594,7 @@ export default function ListingEditorDrawer({
               </AccordionDetails>
             </Accordion>
 
-            {/* İşlemler — hidden for legacy listings */}
+            {/* Actions — hidden for legacy listings */}
             {!listing?.isLegacy && (
               <Accordion
                 expanded={expanded === 'actions'}
@@ -1602,7 +1604,7 @@ export default function ListingEditorDrawer({
                 sx={{ '&:before': { display: 'none' } }}
               >
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography fontWeight={600}>İşlemler</Typography>
+                  <Typography fontWeight={600}>{t('actions')}</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -1615,7 +1617,7 @@ export default function ListingEditorDrawer({
                         disabled={publishing}
                         fullWidth
                       >
-                        {publishing ? 'Yayınlanıyor...' : 'Yayınla'}
+                        {publishing ? t('publishing') : t('publish')}
                       </Button>
                     )}
 
@@ -1628,7 +1630,7 @@ export default function ListingEditorDrawer({
                         disabled={withdrawing}
                         fullWidth
                       >
-                        {withdrawing ? 'Geri çekiliyor...' : 'Geri Çek'}
+                        {withdrawing ? t('withdrawing') : t('withdraw')}
                       </Button>
                     )}
 
@@ -1639,7 +1641,7 @@ export default function ListingEditorDrawer({
                       disabled={copying}
                       fullWidth
                     >
-                      {copying ? 'Kopyalanıyor...' : 'Kopyala'}
+                      {copying ? t('copying') : t('copyAction')}
                     </Button>
 
                     <Button
@@ -1649,7 +1651,7 @@ export default function ListingEditorDrawer({
                       onClick={() => setDeleteDialogOpen(true)}
                       fullWidth
                     >
-                      Sil
+                      {t('delete')}
                     </Button>
                   </Box>
                 </AccordionDetails>
@@ -1679,7 +1681,7 @@ export default function ListingEditorDrawer({
               onClick={handleSave}
               disabled={saving || !hasChanges()}
             >
-              {saving ? 'Kaydediliyor...' : 'Kaydet'}
+              {saving ? t('saving') : t('save')}
             </Button>
           </Box>
         )}
@@ -1687,10 +1689,10 @@ export default function ListingEditorDrawer({
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Listeyi Sil</DialogTitle>
+        <DialogTitle>{t('deleteListing')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Bu listeyi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            {t('deleteConfirmation')}
           </Typography>
           {fields?.title && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -1700,7 +1702,7 @@ export default function ListingEditorDrawer({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
-            İptal
+            {t('cancel')}
           </Button>
           <Button
             onClick={handleDelete}
@@ -1709,7 +1711,7 @@ export default function ListingEditorDrawer({
             disabled={deleting}
             startIcon={deleting ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon />}
           >
-            {deleting ? 'Siliniyor...' : 'Sil'}
+            {deleting ? t('deleting') : t('delete')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -2,12 +2,14 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/lib/auth-context';
 import { Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import AppLayout from './AppLayout';
 
 export default function withAuth(Component: React.ComponentType<any>) {
   return function AuthenticatedComponent(props: any) {
     const { user, isLoading: authLoading } = useAuth();
     const router = useRouter();
+    const t = useTranslations('auth');
 
     useEffect(() => {
       // If not loading and user is not authenticated, redirect to login
@@ -21,10 +23,10 @@ export default function withAuth(Component: React.ComponentType<any>) {
     // Show loading state while checking authentication
     if (authLoading) {
       return (
-        <AppLayout title="Yükleniyor...">
+        <AppLayout title={t('loading')}>
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
             <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-            <p className="text-slate-500 text-lg">Hesap durumu kontrol ediliyor...</p>
+            <p className="text-slate-500 text-lg">{t('checkingAccount')}</p>
           </div>
         </AppLayout>
       );
@@ -33,10 +35,10 @@ export default function withAuth(Component: React.ComponentType<any>) {
     // If user is not authenticated, show redirecting message
     if (!user) {
       return (
-        <AppLayout title="Yönlendiriliyor...">
+        <AppLayout title={t('redirecting')}>
           <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
             <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-            <p className="text-slate-500 text-lg">Giriş sayfasına yönlendiriliyor...</p>
+            <p className="text-slate-500 text-lg">{t('redirectingToLogin')}</p>
           </div>
         </AppLayout>
       );

@@ -3,7 +3,7 @@ import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
 import axios from 'axios';
 import { Grid } from '@mui/material';
 import {
-  Container, TextField, Button, Typography, Paper, CircularProgress, Select, MenuItem, FormControl, InputLabel, FormHelperText, Box, Snackbar, Alert, AlertColor, SelectChangeEvent, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Chip
+  Container, TextField, Button, Typography, Paper, CircularProgress, Select, MenuItem, FormControl, InputLabel, FormHelperText, Box, Snackbar, Alert, AlertColor, SelectChangeEvent, Tooltip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Chip, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import { fedexOptionsData, FedExOption } from '../lib/fedex/fedex.config'; // For dutiesPaymentTypes
 import AppLayout from '../components/AppLayout'; // Use AppLayout for consistent sidebar
@@ -14,6 +14,8 @@ import SubscriptionDashboard from '../components/SubscriptionDashboard';
 import ImporterFormCollapsible from '../components/ImporterFormCollapsible';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabase';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 // Mirrored from API route
 interface UserSettingsResponse {
@@ -118,26 +120,20 @@ const initialFormData: UserSettingsResponse = {
   },
 };
 
-// Basic lists for dropdowns - expand as needed
-const countryCodes = [
-  { value: 'TR', label: 'Türkiye' },
-  { value: 'US', label: 'United States' },
-  { value: 'DE', label: 'Germany' },
-  { value: 'GB', label: 'United Kingdom' },
-];
+// Basic lists for dropdowns - keys only, labels come from t()
+const COUNTRY_CODE_KEYS = ['TR', 'US', 'DE', 'GB'] as const;
 
 const tinTypes = [
   "VAT", "EORI", "IOSS", "OSS", "PAN", "GST", "TIN", "EIN", "SSN", "NIE", "DNI", "CNPJ", "CPF", "DUNS", "FEDERAL_TAX_ID", "STATE_TAX_ID", "BUSINESS_NATIONAL", "PERSONAL_NATIONAL", "BUSINESS_UNION", "PERSONAL_UNION"
 ].map(type => ({ value: type, label: type.replace(/_/g, ' ') }));
 
-const currencyCodes = [
-  { value: 'TRY', label: 'Turkish Lira (TRY)' },
-  { value: 'USD', label: 'US Dollar (USD)' },
-  { value: 'EUR', label: 'Euro (EUR)' },
-];
+const CURRENCY_CODE_KEYS = ['TRY', 'USD', 'EUR'] as const;
 
 const AyarlarPage = () => {
   const router = useRouter();
+  const t = useTranslations('settings');
+  const tc = useTranslations('common');
+  const { locale, config, formatDateTime } = useLocale();
 
   // --- Full Sync State ---
   const [isFullSyncLoading, setIsFullSyncLoading] = useState(false);
@@ -156,16 +152,16 @@ const AyarlarPage = () => {
 
   // --- Full Sync Handler ---
   const handleFullSync = async () => {
-    if (!window.confirm('Tüm siparişleri tekrar senkronize etmek istediğinize emin misiniz? Bu işlem uzun sürebilir.')) return;
+    if (!window.confirm(t('fullSyncConfirm'))) return;
     setIsFullSyncLoading(true);
     try {
       const res = await fetch('/api/orders/fullSync', { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Tam senkronizasyon başlatılamadı');
-      setSnackbar({ open: true, message: 'Tam senkronizasyon başlatıldı. Senkron geçmişinden ilerlemeyi takip edebilirsiniz.', severity: 'success' });
+      if (!res.ok) throw new Error(data.error || t('fullSyncFailed'));
+      setSnackbar({ open: true, message: t('fullSyncStarted'), severity: 'success' });
       fetchSyncHistory();
     } catch (err: any) {
-      setSnackbar({ open: true, message: err.message || 'Tam senkronizasyon başlatılamadı', severity: 'error' });
+      setSnackbar({ open: true, message: err.message || t('fullSyncFailed'), severity: 'error' });
     } finally {
       setIsFullSyncLoading(false);
     }
@@ -203,7 +199,7 @@ const AyarlarPage = () => {
 
 
   const handleDisconnectEtsyShop = async (shopId: string) => {
-    if (!window.confirm('Bu Etsy shop bağlantısını kesmek istediğinize emin misiniz?')) return;
+    if (!window.confirm(t('disconnectEtsyConfirm'))) return;
     
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -215,19 +211,19 @@ const AyarlarPage = () => {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
       });
       
-      setSnackbar({ 
-        open: true, 
-        message: 'Etsy shop bağlantısı başarıyla kesildi!', 
-        severity: 'success' 
+      setSnackbar({
+        open: true,
+        message: t('etsyShopDisconnected'),
+        severity: 'success'
       });
       
       // Refresh shops list
       await fetchEtsyShops();
     } catch (error: any) {
-      setSnackbar({ 
-        open: true, 
-        message: 'Shop bağlantısı kesilemedi. Lütfen tekrar deneyin.', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: t('shopDisconnectFailed'),
+        severity: 'error'
       });
       console.error('Failed to disconnect shop:', error);
     }
@@ -252,7 +248,7 @@ const AyarlarPage = () => {
   };
 
   const handleDisconnectEbay = async () => {
-    if (!window.confirm('eBay hesap bağlantısını kesmek istediğinize emin misiniz?')) return;
+    if (!window.confirm(t('disconnectEbayConfirm'))) return;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const accessToken = session?.access_token;
@@ -261,9 +257,9 @@ const AyarlarPage = () => {
       });
       setEbayConnected(false);
       setEbayTokenExpires(null);
-      setSnackbar({ open: true, message: 'eBay hesap bağlantısı kesildi.', severity: 'success' });
+      setSnackbar({ open: true, message: t('ebayDisconnected'), severity: 'success' });
     } catch {
-      setSnackbar({ open: true, message: 'eBay bağlantısı kesilemedi.', severity: 'error' });
+      setSnackbar({ open: true, message: t('ebayDisconnectFailed'), severity: 'error' });
     }
   };
 
@@ -290,10 +286,10 @@ const AyarlarPage = () => {
         setSyncHistoryCursor(data.nextCursor);
         setSyncHistoryEnd(!data.nextCursor || data.syncs.length === 0);
       } else {
-        setSyncHistoryError(data.error || 'Senkron geçmişi alınamadı.');
+        setSyncHistoryError(data.error || t('syncHistoryFailed'));
       }
     } catch (err: any) {
-      setSyncHistoryError(err.message || 'Senkron geçmişi alınamadı.');
+      setSyncHistoryError(err.message || t('syncHistoryFailed'));
     } finally {
       setSyncHistoryLoading(false);
     }
@@ -307,18 +303,18 @@ const AyarlarPage = () => {
     // Show Etsy OAuth callback result from query params
     const { success, error, details } = router.query;
     if (success === 'etsy_connected') {
-      setSnackbar({ open: true, message: 'Etsy shop başarıyla bağlandı!', severity: 'success' });
+      setSnackbar({ open: true, message: t('etsyShopConnected'), severity: 'success' });
       router.replace('/ayarlar', undefined, { shallow: true });
     } else if (success === 'ebay_connected') {
-      setSnackbar({ open: true, message: 'eBay hesabı başarıyla bağlandı!', severity: 'success' });
+      setSnackbar({ open: true, message: t('ebayConnectedSuccess'), severity: 'success' });
       router.replace('/ayarlar', undefined, { shallow: true });
     } else if (error === 'ebay_auth_failed' || error === 'ebay_token_failed' || error === 'ebay_callback_failed') {
-      const detailMsg = details ? ` Detay: ${decodeURIComponent(details as string)}` : '';
-      setSnackbar({ open: true, message: `eBay bağlantısı başarısız oldu.${detailMsg}`, severity: 'error' });
+      const detailMsg = details ? ` ${decodeURIComponent(details as string)}` : '';
+      setSnackbar({ open: true, message: `${t('ebayConnectionFailed')}${detailMsg}`, severity: 'error' });
       router.replace('/ayarlar', undefined, { shallow: true });
     } else if (error === 'etsy_callback_failed' || error === 'etsy_auth_failed' || error === 'etsy_token_failed') {
-      const detailMsg = details ? ` Detay: ${decodeURIComponent(details as string)}` : '';
-      setSnackbar({ open: true, message: `Etsy bağlantısı başarısız oldu.${detailMsg}`, severity: 'error' });
+      const detailMsg = details ? ` ${decodeURIComponent(details as string)}` : '';
+      setSnackbar({ open: true, message: `${t('etsyConnectionFailed')}${detailMsg}`, severity: 'error' });
       router.replace('/ayarlar', undefined, { shallow: true });
     }
     // eslint-disable-next-line
@@ -343,8 +339,8 @@ const AyarlarPage = () => {
         setSubscriptionData(response.data.subscription || null);
         setInitialDataLoaded(true);
       } catch (error: any) {
-        console.error('Ayarlar alınırken hata:', error);
-        setFetchError('Ayarlar yüklenirken hata oluştu. Lütfen sayfayı yenileyin.');
+        console.error(t('fetchError'), error);
+        setFetchError(t('settingsLoadError'));
       } finally {
         setIsLoading(false);
       }
@@ -376,14 +372,14 @@ const AyarlarPage = () => {
     setIsSubmitting(true);
     try {
       await axios.patch('/api/user/settings', formData, { withCredentials: true });
-      setSnackbar({ open: true, message: 'Ayarlar başarıyla kaydedildi!', severity: 'success' });
+      setSnackbar({ open: true, message: t('settingsSaved'), severity: 'success' });
     } catch (error: any) {
-      console.error('Ayarlar kaydedilirken hata:', error);
-      let errorMessage = 'Ayarlar kaydedilemedi.';
+      console.error(t('settingsSaveFailed'), error);
+      let errorMessage = t('settingsSaveFailed');
       if (axios.isAxiosError(error) && error.response?.data?.error) {
-        errorMessage += ` Hata: ${error.response.data.error}`;
+        errorMessage += ` ${error.response.data.error}`;
       } else if (error.message) {
-        errorMessage += ` Hata: ${error.message}`;
+        errorMessage += ` ${error.message}`;
       }
       setSnackbar({ open: true, message: errorMessage, severity: 'error' });
     } finally {
@@ -392,15 +388,15 @@ const AyarlarPage = () => {
   };
 
   const handleRetrySync = async (syncId: string) => {
-    if (!window.confirm('Bu senkronizasyonu yeniden başlatmak istediğinize emin misiniz?')) return;
+    if (!window.confirm(t('retrySyncConfirm'))) return;
     setRetryingSyncId(syncId);
     try {
       const res = await fetch(`/api/sync/retry?id=${encodeURIComponent(syncId)}`, { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Tekrar başlatılamadı');
+      if (!res.ok) throw new Error(data.error || t('retryFailed'));
       fetchSyncHistory();
     } catch (err: any) {
-      alert(err.message || 'Tekrar başlatılamadı');
+      alert(err.message || t('retryFailed'));
     } finally {
       setRetryingSyncId(null);
     }
@@ -409,10 +405,10 @@ const AyarlarPage = () => {
   if (isLoading && !initialDataLoaded) {
     console.log('Showing loading screen - isLoading:', isLoading, 'initialDataLoaded:', initialDataLoaded);
     return (
-      <AppLayout title="Ayarlar - Yükleniyor">
+      <AppLayout title={t('loadingTitle')}>
         <Container sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
           <CircularProgress />
-          <Typography sx={{ mt: 2 }}>Yükleniyor...</Typography>
+          <Typography sx={{ mt: 2 }}>{tc('loading')}</Typography>
         </Container>
       </AppLayout>
     );
@@ -432,10 +428,10 @@ const AyarlarPage = () => {
       }
     } catch (error: any) {
       console.error('Failed to open billing portal:', error);
-      setSnackbar({ 
-        open: true, 
-        message: error.response?.data?.error || 'Abonelik yönetimi açılamadı.', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || t('subscriptionManageFailed'),
+        severity: 'error'
       });
     }
   };
@@ -446,7 +442,7 @@ const AyarlarPage = () => {
 
   try {
     return (
-      <AppLayout title="Ayarlar">
+      <AppLayout title={t('pageTitle')}>
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4, overflowX: 'hidden', maxWidth: '100%', px: { xs: 1.5, sm: 3 } }}>
           {fetchError && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -467,7 +463,7 @@ const AyarlarPage = () => {
           <form onSubmit={handleSubmit}>
             <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
               <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-                API Entegrasyonları
+                {t('apiIntegrations')}
               </Typography>
               <Grid container spacing={3}>
                 <Grid item xs={12} sm={6} md={4}>
@@ -510,42 +506,42 @@ const AyarlarPage = () => {
 
                 {/* Paraşüt Integration */}
                 <Grid item xs={12}>
-                  <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>Paraşüt Entegrasyonu</Typography>
+                  <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>{t('parasutIntegration')}</Typography>
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <TextField fullWidth label="Paraşüt Client ID" name="parasutClientId" value={formData.integrationSettings?.parasutClientId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={t('parasutClientId')} name="parasutClientId" value={formData.integrationSettings?.parasutClientId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <TextField fullWidth label="Paraşüt Client Secret" name="parasutClientSecret" type="password" value={formData.integrationSettings?.parasutClientSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={t('parasutClientSecret')} name="parasutClientSecret" type="password" value={formData.integrationSettings?.parasutClientSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <TextField fullWidth label="Paraşüt Username" name="parasutUsername" value={formData.integrationSettings?.parasutUsername || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={t('parasutUsername')} name="parasutUsername" value={formData.integrationSettings?.parasutUsername || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <TextField fullWidth label="Paraşüt Password" name="parasutPassword" type="password" value={formData.integrationSettings?.parasutPassword || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={t('parasutPassword')} name="parasutPassword" type="password" value={formData.integrationSettings?.parasutPassword || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <TextField fullWidth label="Paraşüt Company ID" name="parasutCompanyId" value={formData.integrationSettings?.parasutCompanyId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={t('parasutCompanyId')} name="parasutCompanyId" value={formData.integrationSettings?.parasutCompanyId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12} sm={6} md={6}>
-                  <TextField fullWidth label="Paraşüt Base URL (opsiyonel)" name="parasutBaseUrl" placeholder="https://api.parasut.com veya https://api.heroku-staging.parasut.com" value={formData.integrationSettings?.parasutBaseUrl || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={`Parasut Base URL (${tc('optional')})`} name="parasutBaseUrl" placeholder={t('parasutBaseUrlPlaceholder')} value={formData.integrationSettings?.parasutBaseUrl || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12} sm={6} md={6}>
-                  <TextField fullWidth label="Paraşüt Redirect URI (opsiyonel)" name="parasutRedirectUri" placeholder="urn:ietf:wg:oauth:2.0:oob" value={formData.integrationSettings?.parasutRedirectUri || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={`Parasut Redirect URI (${tc('optional')})`} name="parasutRedirectUri" placeholder={t('parasutRedirectUriPlaceholder')} value={formData.integrationSettings?.parasutRedirectUri || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
                 </Grid>
               </Grid>
             </Paper>
 
             <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
               <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-                Marketplace Bağlantıları
+                {t('marketplaceConnections')}
               </Typography>
               
               {/* Etsy Connection */}
               <Box sx={{ mb: 3 }}>
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 2, gap: 1 }}>
                   <Typography variant="h6" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    Etsy Shop Bağlantıları
+                    {t('etsyShopConnections')}
                   </Typography>
                   <Button
                     variant="contained"
@@ -553,30 +549,30 @@ const AyarlarPage = () => {
                     href="/api/integrations/etsy/connect"
                     sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap', flexShrink: 0 }}
                   >
-                    Yeni Shop Bağla
+                    {t('connectNewShop')}
                   </Button>
                 </Box>
 
                 <Box sx={{ mb: 2, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
                   <Typography variant="body2" color="warning.dark" fontWeight="bold">
-                    ⚠️ Etsy Tracking API Geçici Olarak Devre Dışı
+                    {t('etsyTrackingDisabled')}
                   </Typography>
                   <Typography variant="caption" color="warning.dark">
-                    Etsy'den ticari API erişimi onayı beklenirken, takip numaraları manuel olarak Etsy seller dashboard'ından girilmelidir.
+                    {t('etsyTrackingDisabledDesc')}
                   </Typography>
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Birden fazla Etsy shop'ınızı bağlayabilirsiniz. Takip numarası otomasyonu Etsy onayı sonrası aktif olacaktır.
+                  {t('multiShopDesc')}
                 </Typography>
 
                 {etsyShopsLoading ? (
-                  <Typography>Etsy shop'ları yükleniyor...</Typography>
+                  <Typography>{t('loadingEtsyShops')}</Typography>
                 ) : etsyShopsError ? (
-                  <Typography color="error">Hata: {etsyShopsError}</Typography>
+                  <Typography color="error">{tc('error')}: {etsyShopsError}</Typography>
                 ) : etsyShops.length === 0 ? (
                   <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 1 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Henüz bağlı Etsy shop'ınız yok.
+                      {t('noEtsyShops')}
                     </Typography>
                     <Button
                       variant="outlined"
@@ -584,7 +580,7 @@ const AyarlarPage = () => {
                       href="/api/integrations/etsy/connect"
                       sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}
                     >
-                      🔗 İlk Shop'ınızı Bağlayın
+                      {t('connectFirstShop')}
                     </Button>
                   </Box>
                 ) : (
@@ -601,7 +597,7 @@ const AyarlarPage = () => {
                             </Typography>
                             {shop.tokenExpiresAt && (
                               <Typography variant="caption" color="text.secondary">
-                                Token geçerlilik: {new Date(shop.tokenExpiresAt).toLocaleString('tr-TR')}
+                                {t('tokenValidity')}: {formatDateTime(shop.tokenExpiresAt)}
                               </Typography>
                             )}
                           </Box>
@@ -612,7 +608,7 @@ const AyarlarPage = () => {
                               color="error"
                               onClick={() => handleDisconnectEtsyShop(shop.id)}
                             >
-                              Bağlantıyı Kes
+                              {t('disconnect')}
                             </Button>
                           </Box>
                         </Box>
@@ -626,7 +622,7 @@ const AyarlarPage = () => {
               <Box sx={{ mb: 3, mt: 4, pt: 3, borderTop: '1px solid #e0e0e0' }}>
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 2, gap: 1 }}>
                   <Typography variant="h6" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    eBay Hesap Bağlantısı
+                    {t('ebayAccountConnection')}
                   </Typography>
                   {!ebayConnected && (
                     <Button
@@ -635,26 +631,26 @@ const AyarlarPage = () => {
                       href="/api/integrations/ebay/connect"
                       sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
-                      eBay Hesabını Bağla
+                      {t('connectEbay')}
                     </Button>
                   )}
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  eBay hesabınızı bağlayarak ürünlerinizi yönetebilir, fiyat araştırması yapabilir ve SEO analizi gerçekleştirebilirsiniz.
+                  {t('ebayDesc')}
                 </Typography>
 
                 {ebayLoading ? (
-                  <Typography>eBay bağlantı durumu kontrol ediliyor...</Typography>
+                  <Typography>{t('checkingEbayStatus')}</Typography>
                 ) : ebayConnected ? (
                   <Paper elevation={1} sx={{ p: 2, border: '1px solid #e0e0e0', overflow: 'hidden' }}>
                     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5 }}>
                       <Box sx={{ minWidth: 0 }}>
                         <Typography variant="subtitle1" fontWeight="bold" color="success.main" sx={{ mb: 0.5 }}>
-                          eBay Hesabı Bağlı
+                          {t('ebayConnected')}
                         </Typography>
                         {ebayTokenExpires && (
                           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            Token geçerlilik: {new Date(ebayTokenExpires).toLocaleString('tr-TR')}
+                            {t('tokenValidity')}: {formatDateTime(ebayTokenExpires)}
                           </Typography>
                         )}
                       </Box>
@@ -664,7 +660,7 @@ const AyarlarPage = () => {
                           variant="outlined"
                           href="/api/integrations/ebay/connect"
                         >
-                          Yeniden Bağla
+                          {t('reconnect')}
                         </Button>
                         <Button
                           size="small"
@@ -672,7 +668,7 @@ const AyarlarPage = () => {
                           color="error"
                           onClick={handleDisconnectEbay}
                         >
-                          Bağlantıyı Kes
+                          {t('disconnect')}
                         </Button>
                       </Box>
                     </Box>
@@ -680,123 +676,149 @@ const AyarlarPage = () => {
                 ) : (
                   <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 1 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Henüz eBay hesabınız bağlı değil.
+                      {t('noEbayConnected')}
                     </Typography>
                     <Button
                       variant="outlined"
                       color="primary"
                       href="/api/integrations/ebay/connect"
                     >
-                      eBay Hesabınızı Bağlayın
+                      {t('connectYourEbay')}
                     </Button>
                   </Box>
                 )}
               </Box>
             </Paper>
 
-            <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
-              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-                ETGB Ayarları
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Türkiye'ye gönderilecek siparişler için ETGB belgesi oluşturma ayarları
-              </Typography>
-              
-              <Grid container spacing={3}>
-                <Grid item xs={12} sm={6} md={6}>
-                  <TextField
-                    fullWidth
-                    label="ETGB Alıcı E-posta Adresi"
-                    name="etgbRecipientEmail"
-                    type="email"
-                    value={formData.shippingSettings?.etgbRecipientEmail || ''}
-                    onChange={(e) => handleInputChange('shippingSettings', e.target.name, e.target.value)}
-                    helperText="ETGB Excel dosyaları bu adrese gönderilecektir"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={6}>
-                  <FormControl fullWidth>
-                    <InputLabel id="etgb-enabled-label">ETGB Özelliği</InputLabel>
-                    <Select
-                      labelId="etgb-enabled-label"
-                      name="etgbEnabled"
-                      label="ETGB Özelliği"
-                      value={formData.shippingSettings?.etgbEnabled ? 'true' : 'false'}
-                      onChange={(e: SelectChangeEvent<string>) => 
-                        handleInputChange('shippingSettings', 'etgbEnabled', e.target.value === 'true')
-                      }
-                    >
-                      <MenuItem value="true">Aktif</MenuItem>
-                      <MenuItem value="false">Pasif</MenuItem>
-                    </Select>
-                    <FormHelperText>ETGB özelliği aktif olduğunda sipariş listesinde seçim yapabilirsiniz</FormHelperText>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="body2" color="text.secondary">
-                    Not: ETGB işlemi için siparişleri, sipariş listesinde seçip "ETGB İşle" butonuna tıklamanız gerekmektedir.
+            {(() => {
+              const etgbContent = (
+                <>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    {t('etgbDesc')}
                   </Typography>
-                </Grid>
-              </Grid>
-            </Paper>
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6} md={6}>
+                      <TextField
+                        fullWidth
+                        label={t('etgbRecipientEmail')}
+                        name="etgbRecipientEmail"
+                        type="email"
+                        value={formData.shippingSettings?.etgbRecipientEmail || ''}
+                        onChange={(e) => handleInputChange('shippingSettings', e.target.name, e.target.value)}
+                        helperText={t('etgbRecipientEmailHelper')}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={6}>
+                      <FormControl fullWidth>
+                        <InputLabel id="etgb-enabled-label">{t('etgbFeature')}</InputLabel>
+                        <Select
+                          labelId="etgb-enabled-label"
+                          name="etgbEnabled"
+                          label={t('etgbFeature')}
+                          value={formData.shippingSettings?.etgbEnabled ? 'true' : 'false'}
+                          onChange={(e: SelectChangeEvent<string>) =>
+                            handleInputChange('shippingSettings', 'etgbEnabled', e.target.value === 'true')
+                          }
+                        >
+                          <MenuItem value="true">{tc('active')}</MenuItem>
+                          <MenuItem value="false">{tc('passive')}</MenuItem>
+                        </Select>
+                        <FormHelperText>{t('etgbFeatureHelper')}</FormHelperText>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">
+                        {t('etgbNote')}
+                      </Typography>
+                    </Grid>
+                  </Grid>
+                </>
+              );
+
+              if (config.etgbProminence === 'collapsed') {
+                return (
+                  <Paper elevation={3} sx={{ p: 0, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
+                    <Accordion>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="h5" component="h2" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+                          {t('etgbSettings')}
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ p: { xs: 2, sm: 3 } }}>
+                        {etgbContent}
+                      </AccordionDetails>
+                    </Accordion>
+                  </Paper>
+                );
+              }
+
+              return (
+                <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
+                  <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+                    {t('etgbSettings')}
+                  </Typography>
+                  {etgbContent}
+                </Paper>
+              );
+            })()}
 
             <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
               <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
-                Gönderici Profili
+                {t('senderProfile')}
               </Typography>
               <Grid container spacing={3}>
                 <Grid item xs={12} sm={6} md={6}>
-                  <TextField fullWidth label="Şirket Adı" name="shipperName" value={formData.shipperProfile?.shipperName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
+                  <TextField fullWidth label={t('companyName')} name="shipperName" value={formData.shipperProfile?.shipperName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
                 <Grid item xs={12} sm={6} md={6}>
-                  <TextField fullWidth label="Yetkili Kişi" name="shipperPersonName" value={formData.shipperProfile?.shipperPersonName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
+                  <TextField fullWidth label={t('authorizedPerson')} name="shipperPersonName" value={formData.shipperProfile?.shipperPersonName || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
                 <Grid item xs={12} sm={6} md={6}>
-                  <TextField fullWidth label="Telefon" name="shipperPhoneNumber" value={formData.shipperProfile?.shipperPhoneNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
+                  <TextField fullWidth label={t('phone')} name="shipperPhoneNumber" value={formData.shipperProfile?.shipperPhoneNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
                 <Grid item xs={12} sm={6} md={6}>
-                  <TextField fullWidth label="FedEx Klasör ID" name="fedexFolderId" value={formData.shipperProfile?.fedexFolderId || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={t('fedexFolderId')} name="fedexFolderId" value={formData.shipperProfile?.fedexFolderId || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12}>
-                  <TextField fullWidth label="Adres 1" name="shipperStreet1" value={formData.shipperProfile?.shipperStreet1 || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
+                  <TextField fullWidth label={t('address1')} name="shipperStreet1" value={formData.shipperProfile?.shipperStreet1 || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
                 <Grid item xs={12}>
-                  <TextField fullWidth label="Adres 2" name="shipperStreet2" value={formData.shipperProfile?.shipperStreet2 || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={t('address2')} name="shipperStreet2" value={formData.shipperProfile?.shipperStreet2 || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <TextField fullWidth label="Şehir" name="shipperCity" value={formData.shipperProfile?.shipperCity || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
+                  <TextField fullWidth label={t('city')} name="shipperCity" value={formData.shipperProfile?.shipperCity || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <TextField fullWidth label="Eyalet/Bölge Kodu" name="shipperStateCode" value={formData.shipperProfile?.shipperStateCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
+                  <TextField fullWidth label={t('stateRegionCode')} name="shipperStateCode" value={formData.shipperProfile?.shipperStateCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <TextField fullWidth label="Posta Kodu" name="shipperPostalCode" value={formData.shipperProfile?.shipperPostalCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
+                  <TextField fullWidth label={t('postalCode')} name="shipperPostalCode" value={formData.shipperProfile?.shipperPostalCode || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
 
                 <Grid item xs={12} sm={6} md={4}>
                   <FormControl fullWidth required>
-                    <InputLabel id="shipperCountryCode-label">Ülke Kodu</InputLabel>
+                    <InputLabel id="shipperCountryCode-label">{t('countryCode')}</InputLabel>
                     <Select
                       labelId="shipperCountryCode-label"
                       name="shipperCountryCode"
-                      label="Ülke Kodu"
+                      label={t('countryCode')}
                       value={formData.shipperProfile?.shipperCountryCode || ''}
                       onChange={(e: SelectChangeEvent<string>) => handleInputChange('shipperProfile', e.target.name as string, e.target.value as string)}
                     >
-                      {countryCodes.map(c => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
+                      {COUNTRY_CODE_KEYS.map(code => <MenuItem key={code} value={code}>{t(`countryCodes.${code}`)}</MenuItem>)}
                     </Select>
                   </FormControl>
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
-                  <TextField fullWidth label="Vergi No" name="shipperTinNumber" value={formData.shipperProfile?.shipperTinNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
+                  <TextField fullWidth label={t('taxNumber')} name="shipperTinNumber" value={formData.shipperProfile?.shipperTinNumber || ''} onChange={(e) => handleInputChange('shipperProfile', e.target.name, e.target.value)} required />
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
                   <FormControl fullWidth required>
-                    <InputLabel id="shipperTinType-label">Vergi Tipi</InputLabel>
+                    <InputLabel id="shipperTinType-label">{t('taxType')}</InputLabel>
                     <Select
                       labelId="shipperTinType-label"
                       name="shipperTinType"
-                      label="Vergi Tipi"
+                      label={t('taxType')}
                       value={formData.shipperProfile?.shipperTinType || ''}
                       onChange={(e: SelectChangeEvent<string>) => handleInputChange('shipperProfile', e.target.name as string, e.target.value as string)}
                     >
@@ -807,25 +829,25 @@ const AyarlarPage = () => {
 
                 <Grid item xs={12} sm={6} md={4}>
                   <FormControl fullWidth required>
-                    <InputLabel id="defaultCurrencyCode-label">Varsayılan Para Birimi</InputLabel>
+                    <InputLabel id="defaultCurrencyCode-label">{t('defaultCurrency')}</InputLabel>
                     <Select
                       labelId="defaultCurrencyCode-label"
                       name="defaultCurrencyCode"
-                      label="Varsayılan Para Birimi"
+                      label={t('defaultCurrency')}
                       value={formData.shipperProfile?.defaultCurrencyCode || 'USD'}
                       onChange={(e: SelectChangeEvent<string>) => handleInputChange('shipperProfile', e.target.name as string, e.target.value as string)}
                     >
-                      {currencyCodes.map(c => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
+                      {CURRENCY_CODE_KEYS.map(code => <MenuItem key={code} value={code}>{t(`currencyCodes.${code}`)}</MenuItem>)}
                     </Select>
                   </FormControl>
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
                   <FormControl fullWidth required>
-                    <InputLabel id="dutiesPaymentType-label">Gümrük Ödeme Tipi</InputLabel>
+                    <InputLabel id="dutiesPaymentType-label">{t('customsDutyPayment')}</InputLabel>
                     <Select
                       labelId="dutiesPaymentType-label"
                       name="dutiesPaymentType"
-                      label="Gümrük Ödeme Tipi"
+                      label={t('customsDutyPayment')}
                       value={formData.shipperProfile?.dutiesPaymentType || 'SENDER'}
                       onChange={(e: SelectChangeEvent<string>) => handleInputChange('shipperProfile', e.target.name as string, e.target.value as string)}
                     >
@@ -865,7 +887,7 @@ const AyarlarPage = () => {
             <Paper elevation={3} sx={{ p: { xs: 2, sm: 3 }, mb: 4, overflow: 'hidden', maxWidth: '100%' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold', flex: 1, fontSize: { xs: '1.2rem', sm: '1.5rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  Senkron Geçmişi
+                  {t('syncHistory')}
                 </Typography>
                 <IconButton onClick={() => { setSyncHistoryCursor(null); setSyncHistoryEnd(false); fetchSyncHistory(); }} disabled={syncHistoryLoading}>
                   <RefreshIcon />
@@ -875,14 +897,14 @@ const AyarlarPage = () => {
                 <Table size="small" sx={{ minWidth: { xs: 500, sm: 700 } }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Eşitleme Türü</TableCell>
-                      <TableCell>Durum</TableCell>
-                      <TableCell>Başlangıç</TableCell>
-                      <TableCell>Bitiş</TableCell>
-                      <TableCell>İşlenen</TableCell>
-                      <TableCell>Başarılı</TableCell>
-                      <TableCell>Başarısız</TableCell>
-                      <TableCell>Hatalar</TableCell>
+                      <TableCell>{t('syncTableHeaders.syncType')}</TableCell>
+                      <TableCell>{t('syncTableHeaders.status')}</TableCell>
+                      <TableCell>{t('syncTableHeaders.start')}</TableCell>
+                      <TableCell>{t('syncTableHeaders.end')}</TableCell>
+                      <TableCell>{t('syncTableHeaders.processed')}</TableCell>
+                      <TableCell>{t('syncTableHeaders.successful')}</TableCell>
+                      <TableCell>{t('syncTableHeaders.failed')}</TableCell>
+                      <TableCell>{t('syncTableHeaders.errors')}</TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                   </TableHead>
@@ -890,28 +912,28 @@ const AyarlarPage = () => {
                     {syncHistory.length === 0 && !syncHistoryLoading && (
                       <TableRow>
                         <TableCell colSpan={9} align="center">
-                          Henüz senkron geçmişi bulunmamaktadır.
+                          {t('noSyncHistory')}
                         </TableCell>
                       </TableRow>
                     )}
                     {syncHistory.map((row, idx) => {
                       let statusColor = 'text.primary';
                       let statusLabel = row.status;
-                      if (row.status === 'completed') { statusColor = 'success.main'; statusLabel = 'Tamamlandı'; }
-                      else if (row.status === 'failed') { statusColor = 'error.main'; statusLabel = 'Başarısız'; }
-                      else if (row.status === 'in_progress') { statusColor = 'info.main'; statusLabel = 'Devam Ediyor'; }
+                      if (row.status === 'completed') { statusColor = 'success.main'; statusLabel = t('syncStatusCompleted'); }
+                      else if (row.status === 'failed') { statusColor = 'error.main'; statusLabel = t('syncStatusFailed'); }
+                      else if (row.status === 'in_progress') { statusColor = 'info.main'; statusLabel = t('syncStatusInProgress'); }
                       return (
                         <TableRow key={row.id}>
                           <TableCell>{row.type}</TableCell>
                           <TableCell sx={{ color: statusColor, fontWeight: 'bold' }}>{statusLabel}</TableCell>
-                          <TableCell>{row.startedAt ? new Date(row.startedAt).toLocaleString('tr-TR') : '-'}</TableCell>
-                          <TableCell>{row.endedAt ? new Date(row.endedAt).toLocaleString('tr-TR') : '-'}</TableCell>
+                          <TableCell>{row.startedAt ? formatDateTime(row.startedAt) : '-'}</TableCell>
+                          <TableCell>{row.endedAt ? formatDateTime(row.endedAt) : '-'}</TableCell>
                           <TableCell>{row.processedOrders}</TableCell>
                           <TableCell>{row.successfulOrders}</TableCell>
                           <TableCell>{row.failedOrders}</TableCell>
                           <TableCell>
                             {row.errors && row.errors.length > 0 ? (
-                              <Tooltip title="Hata detaylarını görmek için tıklayın">
+                              <Tooltip title={t('clickToSeeErrors')}>
                                 <Button size="small" color="error" onClick={() => alert(JSON.stringify(row.errors, null, 2))}>
                                   {row.errors.length}
                                 </Button>
@@ -920,7 +942,7 @@ const AyarlarPage = () => {
                           </TableCell>
                           <TableCell>
                             {row.status === 'failed' && (
-                              <Tooltip title="Tekrar Dene">
+                              <Tooltip title={t('retrySync')}>
                                 <span>
                                   <IconButton
                                     color="primary"
@@ -943,12 +965,12 @@ const AyarlarPage = () => {
                 {syncHistoryLoading && <CircularProgress size={24} />}
                 {!syncHistoryLoading && syncHistory.length > 0 && !syncHistoryEnd && (
                   <Button variant="outlined" onClick={() => fetchSyncHistory({ append: true })} startIcon={<ExpandMoreIcon />}>
-                    Daha Fazla Yükle
+                    {t('loadMore')}
                   </Button>
                 )}
                 {!syncHistoryLoading && syncHistoryEnd && syncHistory.length > 0 && (
                   <Typography sx={{ color: 'text.secondary', ml: 2 }}>
-                    Daha fazla kayıt bulunamadı.
+                    {t('noMoreRecords')}
                   </Typography>
                 )}
               </Box>
@@ -965,13 +987,13 @@ const AyarlarPage = () => {
                 fullWidth
                 sx={{ maxWidth: { sm: 'fit-content' }, whiteSpace: 'nowrap', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
               >
-                {isFullSyncLoading ? 'Senkronizasyon...' : 'Tam Senkronizasyon'}
+                {isFullSyncLoading ? t('syncing') : t('fullSync')}
               </Button>
             </Box>
 
             <Box sx={{ display: 'flex', justifyContent: { xs: 'stretch', sm: 'flex-end' }, mt: 3 }}>
               <Button type="submit" variant="contained" color="primary" disabled={isSubmitting || isLoading} size="large" fullWidth sx={{ maxWidth: { sm: 'fit-content' } }}>
-                {isSubmitting ? <CircularProgress size={24} color="inherit" /> : 'Ayarları Kaydet'}
+                {isSubmitting ? <CircularProgress size={24} color="inherit" /> : t('saveSettings')}
               </Button>
             </Box>
           </form>
@@ -987,13 +1009,13 @@ const AyarlarPage = () => {
   } catch (error) {
     console.error('Error rendering ayarlar page:', error);
     return (
-      <AppLayout title="Ayarlar - Hata">
+      <AppLayout title={t('errorPageTitle')}>
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
           <Typography variant="h4" component="h1" gutterBottom>
-            Hata
+            {tc('error')}
           </Typography>
           <Typography>
-            Sayfa yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.
+            {tc('errorOccurred')}
           </Typography>
         </Container>
       </AppLayout>

@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import FindReplaceIcon from '@mui/icons-material/FindReplace';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,11 +45,6 @@ interface AffectedListing {
     description?: string;
   };
 }
-
-const SCOPE_LABELS: Record<Scope, string> = {
-  title: 'Başlık',
-  description: 'Açıklama',
-};
 
 const RATE_LIMIT_DELAY = 100;
 const MAX_PREVIEW = 10;
@@ -107,6 +103,13 @@ export default function FindReplaceDialog({
   userId,
   onCompleted,
 }: FindReplaceDialogProps) {
+  const t = useTranslations('ebay.findReplace');
+
+  const SCOPE_LABELS: Record<Scope, string> = {
+    title: t('title'),
+    description: t('description'),
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
   const [replaceTerm, setReplaceTerm] = useState('');
   const [scopes, setScopes] = useState<Record<Scope, boolean>>({
@@ -196,7 +199,7 @@ export default function FindReplaceDialog({
         success++;
       } catch (err) {
         errors++;
-        console.error(`Liste ${listing.sku} güncellenemedi:`, err);
+        console.error(`${t('updateFailed', { sku: listing.sku })}:`, err);
       }
 
       setProgress(((i + 1) / total) * 100);
@@ -210,9 +213,9 @@ export default function FindReplaceDialog({
     setResult({ success, errors });
 
     if (errors === 0) {
-      toast.success(`${success} listede değişiklik yapıldı`);
+      toast.success(t('successMessage', { count: success }));
     } else {
-      toast.error(`${success} başarılı, ${errors} hata`);
+      toast.error(t('partialSuccess', { success, errors }));
     }
 
     onCompleted();
@@ -236,7 +239,7 @@ export default function FindReplaceDialog({
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <FindReplaceIcon />
-        Bul ve Değiştir
+        {t('dialogTitle')}
       </DialogTitle>
 
       <DialogContent dividers>
@@ -244,7 +247,7 @@ export default function FindReplaceDialog({
           {/* Search and Replace inputs */}
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
-              label="Aranacak metin"
+              label={t('searchLabel')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               fullWidth
@@ -253,7 +256,7 @@ export default function FindReplaceDialog({
               autoFocus
             />
             <TextField
-              label="Yeni metin"
+              label={t('replaceLabel')}
               value={replaceTerm}
               onChange={(e) => setReplaceTerm(e.target.value)}
               fullWidth
@@ -288,13 +291,13 @@ export default function FindReplaceDialog({
                     disabled={isProcessing}
                   />
                 }
-                label="Büyük/küçük harf duyarlı"
+                label={t('caseSensitive')}
               />
             </Box>
           </Box>
 
           {!hasActiveScope && (
-            <Alert severity="warning">En az bir alan seçmelisiniz.</Alert>
+            <Alert severity="warning">{t('selectAtLeastOneScope')}</Alert>
           )}
 
           {/* Progress */}
@@ -302,7 +305,7 @@ export default function FindReplaceDialog({
             <Box>
               <LinearProgress variant="determinate" value={progress} />
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                {Math.round(progress)}% tamamlandı
+                {t('progressPercent', { percent: Math.round(progress) })}
               </Typography>
             </Box>
           )}
@@ -310,8 +313,8 @@ export default function FindReplaceDialog({
           {/* Result summary */}
           {result && (
             <Alert severity={result.errors === 0 ? 'success' : 'warning'}>
-              {result.success} listede değişiklik yapıldı
-              {result.errors > 0 && `, ${result.errors} hata oluştu`}
+              {t('successMessage', { count: result.success })}
+              {result.errors > 0 && `, ${t('errorsOccurred', { count: result.errors })}`}
             </Alert>
           )}
 
@@ -320,8 +323,8 @@ export default function FindReplaceDialog({
             <Box>
               <Typography variant="subtitle2" gutterBottom>
                 {affectedListings.length === 0
-                  ? 'Eşleşme bulunamadı'
-                  : `${affectedListings.length} liste etkilenecek`}
+                  ? t('noMatchFound')
+                  : t('listingsAffected', { count: affectedListings.length })}
               </Typography>
 
               {previewListings.map(({ listing, changes }) => (
@@ -342,7 +345,7 @@ export default function FindReplaceDialog({
 
                   {changes.title !== undefined && (
                     <Box sx={{ mt: 0.5 }}>
-                      <Typography variant="caption" fontWeight={600}>Başlık:</Typography>
+                      <Typography variant="caption" fontWeight={600}>{t('title')}:</Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, ml: 1 }}>
                         <Typography variant="body2" sx={{ textDecoration: 'line-through', color: 'text.secondary' }}>
                           {highlightMatches(listing.title, searchTerm, caseSensitive)}
@@ -354,7 +357,7 @@ export default function FindReplaceDialog({
 
                   {changes.description !== undefined && (
                     <Box sx={{ mt: 0.5 }}>
-                      <Typography variant="caption" fontWeight={600}>Açıklama:</Typography>
+                      <Typography variant="caption" fontWeight={600}>{t('description')}:</Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, ml: 1 }}>
                         <Typography
                           variant="body2"
@@ -389,7 +392,7 @@ export default function FindReplaceDialog({
 
               {remaining > 0 && (
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  ve {remaining} daha...
+                  {t('andMore', { count: remaining })}
                 </Typography>
               )}
             </Box>
@@ -399,7 +402,7 @@ export default function FindReplaceDialog({
 
       <DialogActions>
         <Button onClick={handleClose} disabled={isProcessing}>
-          Kapat
+          {t('close')}
         </Button>
         <Button
           variant="contained"
@@ -407,7 +410,7 @@ export default function FindReplaceDialog({
           disabled={isProcessing || affectedListings.length === 0 || !hasActiveScope}
           startIcon={<FindReplaceIcon />}
         >
-          {isProcessing ? 'İşleniyor...' : `Tümünü Değiştir (${affectedListings.length})`}
+          {isProcessing ? t('processing') : `${t('replaceAll')} (${affectedListings.length})`}
         </Button>
       </DialogActions>
     </Dialog>

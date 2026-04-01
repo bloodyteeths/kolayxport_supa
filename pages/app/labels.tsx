@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 import {
   Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, Fade, List, ListItem, ListItemIcon, ListItemText, ToggleButton, ToggleButtonGroup, Grid, SelectChangeEvent
 } from '@mui/material';
@@ -23,7 +25,7 @@ import {
   FEDEX_SERVICE_TYPES,
   FEDEX_PACKAGING_TYPES,
   ALLOWED_LABEL_STOCK_TYPES,
-  FEDEX_CURRENCY_CODES,
+  getFedexCurrencyCodes,
 } from '@/lib/fedex/fedex.config';
 
 // Minimal UIOrder type for UPS drawer
@@ -50,10 +52,11 @@ interface UIOrder {
 }
 
 // Veeqo Carrier IDs for tracking submission
-const VEEQO_CARRIERS = [
+// Label for carrier 3 ('Other'/'Diğer') is set dynamically via t() in the component
+const VEEQO_CARRIERS_BASE = [
   { value: 1, label: 'Royal Mail' },
   { value: 2, label: 'FedEx' },
-  { value: 3, label: 'Diğer' },
+  { value: 3, label: '__OTHER__' },
   { value: 4, label: 'DPD' },
   { value: 5, label: 'UPS' },
   { value: 7, label: 'USPS' },
@@ -74,7 +77,7 @@ function formatDate(iso?: string): string {
 }
 
 // Turkish date formatter: dd/MM/yy
-function formatDateTr(iso?: string): string {
+function fmtDateTr(iso?: string): string {
   if (!iso) return '—';
   try {
     const d = new Date(iso);
@@ -259,62 +262,52 @@ const statusColors: Record<string, {bg: string, text: string}> = {
   FAILED: {bg: '#DC143C', text: '#fff'}, // Crimson for general failure
 };
 
-const labelStatusOptions = [
-  { value: '', label: 'Tümü (Etiket)' },
-  { value: 'created', label: 'Oluşturuldu' },
-  { value: 'not_created', label: 'Oluşturulmadı' },
-  { value: 'failed', label: 'Hata Alındı' },
-];
+// These option arrays are built inside the component using t() for i18n.
+// Static value-key mappings used to construct them:
+const LABEL_STATUS_KEYS = [
+  { value: '', key: 'all' },
+  { value: 'created', key: 'created' },
+  { value: 'not_created', key: 'notCreated' },
+  { value: 'failed', key: 'failed' },
+] as const;
 
-const integrationOptions = [
-  { value: '', label: 'Tümü (Market)' },
-  { value: 'Veeqo', label: 'Veeqo' },
-  { value: 'Shippo', label: 'Shippo' },
-  { value: 'Trendyol', label: 'Trendyol' },
-  { value: 'Hepsiburada', label: 'Hepsiburada' },
-  { value: 'Etsy', label: 'Etsy' },
-  { value: 'Etsy Store 4', label: 'Etsy Store 4' },
-];
+const ORDER_STATUS_KEYS = [
+  { value: '', key: 'all' },
+  { value: 'UNSHIPPED', key: 'unshipped' },
+  { value: 'AWAITING_FULFILLMENT', key: 'awaitingFulfillment' },
+  { value: 'PAID', key: 'paid' },
+  { value: 'CREATED', key: 'created' },
+  { value: 'PARTIALLY_SHIPPED', key: 'partiallyShipped' },
+  { value: 'SHIPPED', key: 'shipped' },
+  { value: 'DELIVERED', key: 'delivered' },
+  { value: 'CANCELLED', key: 'cancelled' },
+  { value: 'REFUNDED', key: 'refunded' },
+  { value: 'ON_HOLD', key: 'onHold' },
+  { value: 'COMPLETED', key: 'completed' },
+  { value: 'FAILED', key: 'failed' },
+  { value: 'Synced', key: 'synced' },
+] as const;
 
-const orderStatusOptions = [
-  { value: '', label: 'Tümü (Sipariş)' },
-  { value: 'UNSHIPPED', label: 'Hazırlanıyor' },
-  { value: 'AWAITING_FULFILLMENT', label: 'Onaylandı' },
-  { value: 'PAID', label: 'Onaylandı' },
-  { value: 'CREATED', label: 'Onaylandı' },
-  { value: 'PARTIALLY_SHIPPED', label: 'Kısmen Kargolandı' },
-  { value: 'SHIPPED', label: 'Kargolandı' },
-  { value: 'DELIVERED', label: 'Teslim Edildi' },
-  { value: 'CANCELLED', label: 'İptal Edildi' },
-  { value: 'REFUNDED', label: 'İade Edildi' },
-  { value: 'ON_HOLD', label: 'Askıya Alındı' },
-  { value: 'COMPLETED', label: 'Tamamlandı' },
-  { value: 'FAILED', label: 'Başarısız Oldu' },
-  { value: 'Synced', label: 'Senkronize' },
-];
+const ORDER_STATUS_FILTER_KEYS = [
+  { value: '', key: 'all' },
+  { value: 'onaylandi', key: 'approved', statuses: ['PAID', 'Created'] },
+  { value: 'kargolandi', key: 'shipped', statuses: ['shipped', 'Shipped'] },
+  { value: 'iptal', key: 'cancelled', statuses: ['cancelled', 'Cancelled'] },
+  { value: 'Delivered', key: 'delivered', statuses: ['Delivered'] },
+] as const;
 
-// Filter options - unified for better UX
-const orderStatusFilterOptions = [
-  { value: '', label: 'Tümü (Sipariş)' },
-  { value: 'onaylandi', label: 'Onaylandı', statuses: ['PAID', 'Created'] },
-  { value: 'kargolandi', label: 'Kargolandı', statuses: ['shipped', 'Shipped'] },
-  { value: 'iptal', label: 'İptal Edildi', statuses: ['cancelled', 'Cancelled'] },
-  { value: 'Delivered', label: 'Teslim Edildi', statuses: ['Delivered'] },
-];
-
-// Search type options
-const searchTypeOptions = [
-  { value: 'all', label: 'Tümünde Ara' },
-  { value: 'customer', label: 'Müşteri' },
-  { value: 'order', label: 'Sipariş No' },
-  { value: 'tracking', label: 'Takip No' },
-  { value: 'product', label: 'Ürün Adı' },
-  { value: 'sku', label: 'Stok Kodu' },
-  { value: 'marketplace', label: 'Mağaza' },
-  { value: 'city', label: 'Şehir' },
-  { value: 'phone', label: 'Telefon' },
-  { value: 'note', label: 'Müşteri Notu' },
-];
+const SEARCH_TYPE_KEYS = [
+  { value: 'all', key: 'all' },
+  { value: 'customer', key: 'customer' },
+  { value: 'order', key: 'order' },
+  { value: 'tracking', key: 'tracking' },
+  { value: 'product', key: 'product' },
+  { value: 'sku', key: 'sku' },
+  { value: 'marketplace', key: 'marketplace' },
+  { value: 'city', key: 'city' },
+  { value: 'phone', key: 'phone' },
+  { value: 'note', key: 'note' },
+] as const;
 
 // --- Debounce utility ---
 function useDebouncedValue<T>(value: T, delay: number): T {
@@ -919,7 +912,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
 
 // --- Utility Functions Updated for LabelRow ---
 /** default values for the "Create Label" form */
-export function getDefaultValues(row: LabelRow) {
+export function getDefaultValues(row: LabelRow, defaultCountryOfOrigin = 'TR') {
   // Access properties directly from LabelRow
   const effectiveCustomsValue = row.customsValue ?? row.orderTotalPrice ?? 0;
   const effectiveQuantity = (row.quantity && row.quantity > 0) ? row.quantity : 1;
@@ -929,7 +922,7 @@ export function getDefaultValues(row: LabelRow) {
   return {
     weightKg: row.weight || row.originalOrder?.weightKg || 0.5, // Use row.weight (item weight) first
     hsCode: row.hsCode === '—' ? (row.originalOrder?.harmonizedCode || '') : row.hsCode, // HS Code can be optional, default to empty
-    countryOfOrigin: row.countryOfOrigin || row.originalOrder?.countryOfMfg || 'TR',
+    countryOfOrigin: row.countryOfOrigin || row.originalOrder?.countryOfMfg || defaultCountryOfOrigin,
     serviceType: row.fedexServiceType || row.originalOrder?.fedexServiceType || 'FEDEX_INTERNATIONAL_PRIORITY', // Ensure default
     packagingType: row.fedexPackagingType || row.originalOrder?.fedexPackagingType || 'FEDEX_PAK', // Ensure default
     recipientFirstName: row.recipientFirstName === '—' ? '' : row.recipientFirstName,
@@ -1108,10 +1101,35 @@ function getLabelStatus(row: LabelRow): 'labeled' | 'pending' | 'failed' | 'unla
   return 'unlabeled';
 }
 
-function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ 
-    page: 0, 
-    pageSize: 15 
+function LabelsPage(props: { source?: string; channel?: string }) {
+  const t = useTranslations('labels');
+  const tc = useTranslations('common');
+  const tf = useTranslations('fedex');
+  const { config, formatCurrency, formatDate, formatDateTime, formatNumber } = useLocale();
+  const fedexCurrencyCodes = useMemo(() => getFedexCurrencyCodes(tf), [tf]);
+
+  // Build i18n option arrays from keys
+  const labelStatusOptions = useMemo(() => LABEL_STATUS_KEYS.map(o => ({ value: o.value, label: t(`labelStatusOptions.${o.key}`) })), [t]);
+  const orderStatusOptions = useMemo(() => ORDER_STATUS_KEYS.map(o => ({ value: o.value, label: t(`orderStatusOptions.${o.key}`) })), [t]);
+  const orderStatusFilterOptions = useMemo(() => ORDER_STATUS_FILTER_KEYS.map(o => ({ value: o.value, label: t(`orderStatusFilterOptions.${o.key}`), ...('statuses' in o ? { statuses: o.statuses } : {}) })), [t]);
+  const searchTypeOptions = useMemo(() => SEARCH_TYPE_KEYS.map(o => ({ value: o.value, label: t(`searchTypeOptions.${o.key}`) })), [t]);
+  const VEEQO_CARRIERS = useMemo(() => VEEQO_CARRIERS_BASE.map(c => ({ ...c, label: c.label === '__OTHER__' ? t('veeqoCarriers.other') : c.label })), [t]);
+
+  // Format date using locale
+  const fmtDateTr = useCallback((iso?: string): string => {
+    if (!iso) return '\u2014';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '\u2014';
+      return formatDate(d, { day: '2-digit', month: '2-digit', year: '2-digit' });
+    } catch {
+      return '\u2014';
+    }
+  }, [formatDate]);
+
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 15
   });
   // --- UPS Drawer State ---
   const [upsDrawerOpen, setUpsDrawerOpen] = useState(false);
@@ -1196,11 +1214,11 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
   const marketplaceOptions = useMemo(() => {
     if (!fetchedOrders || !Array.isArray(fetchedOrders)) {
-      return [{ value: '', label: 'Tümü (Market)' }];
+      return [{ value: '', label: t('integrationOptions.all') }];
     }
     const marketplaces = new Set(fetchedOrders.map((order: any) => order.marketplace).filter(Boolean));
     const options = Array.from(marketplaces).sort().map(m => ({ value: m, label: m }));
-    return [{ value: '', label: 'Tümü (Market)' }, ...options];
+    return [{ value: '', label: t('integrationOptions.all') }, ...options];
   }, [fetchedOrders]);
 
   const [labelRows, setLabelRows] = useState<LabelRow[]>([]);
@@ -1294,7 +1312,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
   const openDrawer = (row: LabelRow) => {
     let currentDrawerData = { ...row }; 
-    const defaultsFromRow = getDefaultValues(row);
+    const defaultsFromRow = getDefaultValues(row, config.defaultCountryOfOrigin || 'TR');
 
     currentDrawerData = {
       ...currentDrawerData,
@@ -1373,7 +1391,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   const columns: GridColDef<LabelRow>[] = [
     {
       field: 'labelStatus',
-      headerName: 'Etiket',
+      headerName: t('columnLabel'),
       width: 30,
       sortable: false,
       valueGetter: (_value, row) => {
@@ -1393,22 +1411,22 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                         hasShipment;
         
         if (hasLabel) {
-          return 'Alındı';
+          return t('statusReceived');
         }
-        
+
         if (row.labelJobStatus === 'failed') {
-          return 'Hata';
+          return t('statusError');
         }
-        
+
         if (row.labelJobStatus === 'pending') {
-          return 'Bekliyor';
+          return t('statusPending');
         }
-        
-        return 'Etiketsiz';
+
+        return t('statusNoLabel');
       },
       renderCell: (params: GridRenderCellParams<LabelRow, string>) => {
         const status = params.value;
-        if (status === 'Alındı') {
+        if (status === t('statusReceived')) {
           // First try to get tracking number from row, then from shipments array
           let trackingNumber = params.row.trackingNumber;
           
@@ -1426,14 +1444,14 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Tooltip title="Etiket Alındı - Takip numarasını kopyala">
+              <Tooltip title={t('tooltipLabelReceived')}>
                 <span
                   style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
                   onClick={async (e) => {
                     e.stopPropagation();
                     if (trackingNumber && trackingNumber !== 'Tracking number not available') {
                       await navigator.clipboard.writeText(trackingNumber);
-                      toast.success('takip numarası kopyalandı.', { duration: 1500 });
+                      toast.success(t('trackingCopied'), { duration: 1500 });
                     }
                   }}
                 >
@@ -1441,7 +1459,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                 </span>
               </Tooltip>
               {latestShipment?.id && (
-                <Tooltip title="Etiketi sil">
+                <Tooltip title={t('deleteLabel')}>
                   <IconButton
                     size="small"
                     onClick={(e) => {
@@ -1457,14 +1475,14 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             </Box>
           );
         }
-        if (status === 'Hata')     return <Tooltip title="Etiketleme Hatası"><CancelIcon color="error" /></Tooltip>;
-        if (status === 'Bekliyor') return <Tooltip title="Etiket İşleniyor/Bekliyor"><HourglassEmptyIcon color="warning" /></Tooltip>;
-        return <Tooltip title="Etiket Oluşturulmadı"><CircleIcon color="disabled" /></Tooltip>;
+        if (status === t('statusError'))   return <Tooltip title={t('tooltipLabelError')}><CancelIcon color="error" /></Tooltip>;
+        if (status === t('statusPending')) return <Tooltip title={t('tooltipLabelPending')}><HourglassEmptyIcon color="warning" /></Tooltip>;
+        return <Tooltip title={t('tooltipLabelNotCreated')}><CircleIcon color="disabled" /></Tooltip>;
       },
     },
     {
       field: 'tracking',
-      headerName: 'Kargo',
+      headerName: t('columnShipping'),
       width: 30,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
@@ -1516,7 +1534,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                 }
               }}
             >
-              <Tooltip title={hasTracking ? 'Takip numarası mevcut' : 'Takip numarası ekle'}>
+              <Tooltip title={hasTracking ? t('trackingExists') : t('addTracking')}>
                 {hasTracking ? <FlightTakeoffIcon /> : <FlightIcon />}
               </Tooltip>
             </IconButton>
@@ -1526,7 +1544,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     },
     {
       field: 'itemImageUrl',
-      headerName: 'Ürün Görseli',
+      headerName: t('columnProductImage'),
       width: 140,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
@@ -1546,7 +1564,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         >
           <img
             src={params.value as string || '/placeholder.png'} 
-            alt="Ürün Görseli"
+            alt={t('columnProductImage')}
             style={{ 
               width: 65, 
               height: 65, 
@@ -1565,10 +1583,10 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         </Box>
       )
     },
-    { field: 'marketplace', headerName: 'Mağaza', width: 110 },
+    { field: 'marketplace', headerName: t('columnStore'), width: 110 },
     {
       field: 'status',
-      headerName: 'Durum',
+      headerName: tc('status'),
       width: 120,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         const status = params.value?.toUpperCase() || 'UNKNOWN';
@@ -1592,22 +1610,22 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     },
     {
       field: 'orderDate', 
-      headerName: 'Sipariş Tarihi', 
+      headerName: t('columnOrderDate'), 
       width: 130,
-      valueFormatter: (value: string | undefined) => formatDateTr(value), // Turkish style
+      valueFormatter: (value: string | undefined) => fmtDateTr(value), // Turkish style
       sortable: true,
       sortComparator: (v1, v2) => new Date(v1).getTime() - new Date(v2).getTime(), // newest to oldest
     },
-    { field: 'orderNumber', headerName: 'Sipariş No', width: 110 },
+    { field: 'orderNumber', headerName: t('columnOrderNo'), width: 110 },
     {
       field: 'customerSevk',
-      headerName: 'Müşteri Sevk',
+      headerName: t('columnCustomerShip'),
       width: 150,
       valueGetter: (_value, row) => `${row.recipientFirstName || ''} ${row.recipientLastName || ''}`.trim() || row.originalOrder?.customerName || '—'
     },
     { 
       field: 'orderTotalPrice', 
-      headerName: 'Toplam', 
+      headerName: t('columnTotal'), 
       width: 120, 
       type: 'number',
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
@@ -1620,7 +1638,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     },
     { 
       field: 'title',
-      headerName: 'Ürün Adı',
+      headerName: t('columnProductName'),
       minWidth: 180,
       flex: 2,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
@@ -1638,7 +1656,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             onClick={() => {
               if (params.value) {
                 navigator.clipboard.writeText(params.value as string);
-                toast.success('Ürün adı kopyalandı!');
+                toast.success(t('productNameCopied'));
               }
             }}
           >
@@ -1651,7 +1669,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     },
     { 
       field: 'variantInfo',
-      headerName: 'Varyasyon',
+      headerName: t('columnVariant'),
       width: 140,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
         <Tooltip title={params.value || ''} placement="bottom-start">
@@ -1668,7 +1686,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             onClick={() => {
               if (params.value) {
                 navigator.clipboard.writeText(params.value as string);
-                toast.success('Varyasyon bilgisi kopyalandı!');
+                toast.success(t('variationCopied'));
               }
             }}
           >
@@ -1679,16 +1697,16 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         </Tooltip>
       )
     },
-    { field: 'quantity', headerName: 'Adet', width: 60, type: 'number' },
-    { 
-      field: 'shipByDate', 
-      headerName: 'Son Kargo Tarihi',
+    { field: 'quantity', headerName: t('quantity'), width: 60, type: 'number' },
+    {
+      field: 'shipByDate',
+      headerName: t('shipByDate'),
       width: 130,
       valueFormatter: (value: string | undefined) => value ? formatDate(value) : '—',
     },
-    { 
+    {
       field: 'customerNote',
-      headerName: 'Müşteri Notu',
+      headerName: t('customerNote'),
       width: 150,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         const note = params.row.customerNote;
@@ -1707,10 +1725,10 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         const handleCopyClick = async () => {
           try {
             await navigator.clipboard.writeText(note);
-            toast.success('Müşteri notu kopyalandı');
+            toast.success(t('noteCopied'));
           } catch (err) {
             console.error('Failed to copy note:', err);
-            toast.error('Kopyalama başarısız');
+            toast.error(t('copyFailed'));
           }
         };
 
@@ -1736,16 +1754,16 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
           }}
-          title={`Kopyalamak için tıklayın: ${note}`}
+          title={t('clickToCopy', { context: note })}
           >
             {note}
           </div>
         );
       }
     },
-    { 
-      field: 'lastCarrier', 
-      headerName: 'Kargo Firması', 
+    {
+      field: 'lastCarrier',
+      headerName: t('carrier'), 
       width: 140, 
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         // Try to get the latest label job's carrier
@@ -1765,7 +1783,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ display: 'inline-block' }}
-                title="Etiketi aç"
+                title={t('openLabel')}
               >
                 <img src="/images/FedEx-Logo-PNG-Transparent.png" alt="FedEx" style={{ height: 16, marginLeft: 2, cursor: 'pointer' }} />
               </a>
@@ -1781,7 +1799,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ display: 'inline-block' }}
-                title="Etiketi aç"
+                title={t('openLabel')}
               >
                 <img src="/images/United_Parcel_Service_logo.png" alt="UPS" style={{ height: 16, marginLeft: 2, cursor: 'pointer' }} />
               </a>
@@ -1794,7 +1812,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     },
     {
       field: 'actions',
-      headerName: 'Detaylar',
+      headerName: t('details'),
       width: 140,
       minWidth: 120,
       sortable: false,
@@ -1837,7 +1855,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     },
     {
       field: 'delete',
-      headerName: 'Sil',
+      headerName: tc('delete'),
       width: 80,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
@@ -1860,7 +1878,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         if (isConfirming) {
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Tooltip title="Sil">
+              <Tooltip title={tc('delete')}>
                 <IconButton
                   size="small"
                   onClick={() => handleDeleteOrder(orderId)}
@@ -1869,7 +1887,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                   <CheckIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="İptal">
+              <Tooltip title={tc('cancel')}>
                 <IconButton
                   size="small"
                   onClick={() => setDeleteConfirmation(null)}
@@ -1883,7 +1901,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         }
 
         return (
-          <Tooltip title={`Sipariş ${orderNumber} sil`}>
+          <Tooltip title={t('deleteOrder', { orderNumber })}>
             <IconButton
               size="small"
               onClick={() => setDeleteConfirmation(orderId)}
@@ -1899,7 +1917,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
   const handleSync = async () => {
     setSyncingOrders(true);
-    const toastId = toast.loading('Siparişler senkronize ediliyor...');
+    const toastId = toast.loading(t('syncingOrders'));
     try {
       // Fast sync: only first page from Shippo and Veeqo
       const { fetchWithLimit } = await import('../../lib/fetchWithLimit');
@@ -1910,13 +1928,13 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Bilinmeyen hata');
+        throw new Error(data.error || t('unknownError'));
       }
-      toast.success('Siparişler başarıyla senkronize edildi!', { id: toastId });
+      toast.success(t('ordersSyncSuccess'), { id: toastId });
       // Optionally refresh data after sync
       mutate && mutate();
     } catch (e: any) {
-      toast.error(`Senkronizasyon hatası: ${e.message}`, { id: toastId });
+      toast.error(t('syncError', { error: e.message }), { id: toastId });
     } finally {
       setSyncingOrders(false);
     }
@@ -1928,7 +1946,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     }
 
     setSubmittingTracking(true);
-    const toastId = toast.loading('Takip numarası gönderiliyor...');
+    const toastId = toast.loading(t('sendingTracking'));
     
     try {
       const { fetchWithLimit } = await import('../../lib/fetchWithLimit');
@@ -1945,10 +1963,10 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || 'Takip numarası gönderilemedi');
+        throw new Error(data.error || t('trackingFailed'));
       }
 
-      toast.success('Takip numarası başarıyla kaydedildi!', { id: toastId });
+      toast.success(t('trackingSuccess'), { id: toastId });
       setTrackingDialogOpen(false);
       
       // Reset form
@@ -1963,29 +1981,29 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       mutate && mutate();
       
     } catch (e: any) {
-      toast.error(`Hata: ${e.message}`, { id: toastId });
+      toast.error(`${tc('error')}: ${e.message}`, { id: toastId });
     } finally {
       setSubmittingTracking(false);
     }
   };
 
   const handleRefresh = () => {
-    const toastId = toast.loading('Siparişler yenileniyor...');
+    const toastId = toast.loading(t('refreshingOrders'));
     mutate().then(() => {
-      toast.success('Siparişler yenilendi.', { id: toastId });
+      toast.success(t('refreshSuccess'), { id: toastId });
     }).catch(() => {
-      toast.error('Siparişler yenilenirken hata oluştu.', { id: toastId });
+      toast.error(t('refreshError'), { id: toastId });
     });
   };
   
   const handleProcessEtgb = async () => {
     if (etgbSelectedRows.length === 0) {
-      toast.error('Lütfen işlem için en az bir sipariş seçin.');
+      toast.error(t('selectOrders'));
       return;
     }
     
     setProcessingEtgb(true);
-    const toastId = toast.loading(`${etgbSelectedRows.length} sipariş için ETGB işlemi başlatılıyor...`);
+    const toastId = toast.loading(t('etgbStarting', { count: etgbSelectedRows.length }));
     
     try {
       // Get user settings for ETGB recipient email (send auth header and safe JSON parse)
@@ -2003,7 +2021,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       const recipientEmail = settings.shippingSettings?.etgbRecipientEmail;
       
       if (!recipientEmail) {
-        toast.error('ETGB alıcı e-posta adresi ayarlanmamış. Lütfen ayarlar sayfasından düzenleyin.', { id: toastId });
+        toast.error(t('etgbEmailNotConfigured'), { id: toastId });
         return;
       }
       
@@ -2025,19 +2043,19 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         result = await response.json();
       } catch (_) {
         // If backend crashed and returned non-JSON, create a fallback error
-        throw new Error('Sunucu beklenmeyen bir cevap döndü');
+        throw new Error(t('serverUnexpectedResponse'));
       }
       
       if (response.ok && result.success) {
-        toast.success(`ETGB dosyası ${recipientEmail} adresine gönderildi!`, { id: toastId });
+        toast.success(t('etgbSentTo', { email: recipientEmail }), { id: toastId });
         // Clear selection after successful processing
         setEtgbSelectedRows([]);
       } else {
-        throw new Error(result.error || result.message || 'ETGB işlemi başarısız oldu');
+        throw new Error(result.error || result.message || t('etgbFailed'));
       }
       
     } catch (error: any) {
-      toast.error(`ETGB Hatası: ${error.message}`, { id: toastId });
+      toast.error(`${t('etgbError')}: ${error.message}`, { id: toastId });
     } finally {
       setProcessingEtgb(false);
     }
@@ -2045,19 +2063,19 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
   
   const handleGenerateLabel = async (rowForLabel: LabelRow) => {
     if (!hasFedexCredentials) {
-      toast.error('Etiket oluşturmak için FedEx ayarlarınızı tamamlamanız gerekmektedir.');
+      toast.error(t('fedexIncomplete'));
       return;
     }
     const currentFormValues = drawerOpen && drawerOrder ? drawerOrder : rowForLabel;
     
     const validationErrors = validateRowForLabel(currentFormValues);
     if (validationErrors.length > 0) {
-      toast.error(`Lütfen eksik alanları doldurun: ${validationErrors.join(', ')}`);
+      toast.error(`${t('fillMissingFields')}: ${validationErrors.join(', ')}`);
       return;
     }
 
     setGeneratingLabelId(currentFormValues.itemId);
-    const toastLabelId = toast.loading(`'${currentFormValues.orderNumber}' için etiket ve DB güncelleme işlemi başlatılıyor...`);
+    const toastLabelId = toast.loading(t('savingLabel', { orderNumber: currentFormValues.orderNumber }));
     
     try {
       // Step 1: Update order details in DB via /api/orders/update
@@ -2113,16 +2131,16 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       });
 
       if (!dbUpdateResponse.ok) {
-        const errorData = await dbUpdateResponse.json().catch(() => ({ error: 'Veritabanı güncelleme sırasında bir hata oluştu.' }));
-        toast.error(errorData.error || errorData.details || `Veritabanı güncellemesi başarısız: ${dbUpdateResponse.statusText || dbUpdateResponse.status}`, { id: toastLabelId });
+        const errorData = await dbUpdateResponse.json().catch(() => ({ error: t('dbUpdateError') }));
+        toast.error(errorData.error || errorData.details || `${t('dbUpdateFailed')}: ${dbUpdateResponse.statusText || dbUpdateResponse.status}`, { id: toastLabelId });
         setGeneratingLabelId(null);
         return; // Stop if DB update fails
       }
-      toast.success('Sipariş detayları kaydedildi.', { id: toastLabelId, duration: 2000 });
-      toast.loading(`'${currentFormValues.orderNumber}' için etiket oluşturuluyor...`, { id: toastLabelId }); // Update toast message
+      toast.success(t('dbUpdateSuccess'), { id: toastLabelId, duration: 2000 });
+      toast.loading(t('generatingLabel', { orderNumber: currentFormValues.orderNumber }), { id: toastLabelId });
 
       // Step 2: Prepare payload for /update-options (FedEx specific options)
-      const defaultsForFedexPayload = getDefaultValues(currentFormValues);
+      const defaultsForFedexPayload = getDefaultValues(currentFormValues, config.defaultCountryOfOrigin || 'TR');
       const fedexOptionsPayload = {
         orderId: currentFormValues.orderId, // Not strictly needed in body if in URL, but good for consistency
         shippingAddress: {
@@ -2165,9 +2183,9 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       });
 
       if (!saveOptionsResponse.ok) {
-        const errData = await saveOptionsResponse.json().catch(() => ({ error: 'FedEx seçenekleri kaydedilemedi.'}));
+        const errData = await saveOptionsResponse.json().catch(() => ({ error: t('fedexOptionsError') }));
         // Surface the error message from the API if it's a 400 (validation error)
-        throw new Error(errData.error || `FedEx seçenekleri kaydedilemedi: ${saveOptionsResponse.status}`);
+        throw new Error(errData.error || `${t('fedexOptionsError')}: ${saveOptionsResponse.status}`);
       }
       // toast.success('FedEx seçenekleri kaydedildi.', { id: toastLabelId, duration: 2000 }); // Optional success toast
 
@@ -2221,18 +2239,18 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       });
 
       if (!labelResponse.ok) {
-        let errorMsg = `Etiket oluşturma hatası (HTTP ${labelResponse.status})`;
+        let errorMsg = `${t('labelGenerationError')} (HTTP ${labelResponse.status})`;
         try {
           const errorData = await labelResponse.json();
           errorMsg = errorData.error || errorData.message || errorMsg;
         } catch (jsonError) {
           const textError = await labelResponse.text();
-            errorMsg = textError.substring(0,200) || 'Etiket oluşturulurken bilinmeyen bir sunucu hatası oluştu.'; 
+            errorMsg = textError.substring(0,200) || t('unknownServerError');
         }
         throw new Error(errorMsg);
       }
       const labelData = await labelResponse.json();
-      toast.success(`'${currentFormValues.orderNumber}' için etiket oluşturuldu! Takip No: ${labelData.trackingNumber}`, { id: toastLabelId, duration: 6000 });
+      toast.success(t('labelCreatedWithTracking', { orderNumber: currentFormValues.orderNumber, trackingNumber: labelData.trackingNumber }), { id: toastLabelId, duration: 6000 });
       if (labelData.labelUrl) window.open(labelData.labelUrl, '_blank', 'noopener,noreferrer');
       if (labelData.alerts && labelData.alerts.length > 0) {
         labelData.alerts.forEach((alert: any) => {
@@ -2248,7 +2266,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
       if (drawerOpen) closeDrawer();
     } catch (error: any) {
       console.error('Error in handleGenerateLabel process:', error);
-      toast.error(error.message || 'İşlem sırasında bilinmeyen bir hata oluştu.', { id: toastLabelId, duration: 8000 });
+      toast.error(error.message || t('unknownError'), { id: toastLabelId, duration: 8000 });
     } finally {
       setGeneratingLabelId(null);
     }
@@ -2270,12 +2288,12 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         throw new Error(errorData.error || 'Failed to delete order');
       }
 
-      toast.success('Sipariş başarıyla silindi!');
+      toast.success(t('deleteSuccess'));
       setDeleteConfirmation(null);
       await mutate(); // Refresh the orders list
     } catch (error: any) {
       console.error('Error deleting order:', error);
-      toast.error(error.message || 'Sipariş silinirken bir hata oluştu.');
+      toast.error(error.message || t('deleteError'));
     } finally {
       setDeletingOrderId(null);
     }
@@ -2297,12 +2315,12 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         throw new Error(errorData.error || 'Failed to delete shipment');
       }
 
-      toast.success('Etiket başarıyla silindi! Artık yeni etiket oluşturabilirsiniz.');
+      toast.success(t('labelDeletedSuccess'));
       setShipmentDeleteConfirmation(null);
       await mutate(); // Refresh the orders list
     } catch (error: any) {
       console.error('Error deleting shipment:', error);
-      toast.error(error.message || 'Etiket silinirken bir hata oluştu.');
+      toast.error(error.message || t('labelDeleteError'));
     } finally {
       setDeletingShipmentId(null);
     }
@@ -2317,18 +2335,18 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
     <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px - 48px)' }, display: 'flex', flexDirection: 'column', p: { xs: 0.5, sm: 2 }, overflow: 'hidden', maxWidth: '100%' }}>
       <Toaster position="top-right" reverseOrder={false} />
       <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: { xs: 1, sm: 2 }, fontSize: { xs: '1.1rem', sm: '1.5rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        Etiket Yonetimi
+        {t('labelManagement')}
       </Typography>
       <Box sx={{ display:'flex', flexDirection:'column', gap: 1, mb: 1, maxWidth: '100%', overflow: 'hidden' }}>
         {/* Row 1: Actions + Search (always visible) */}
         <Paper elevation={1} sx={{ p: { xs: 0.75, sm: 1.5 }, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', overflow: 'hidden', maxWidth: '100%' }}>
           <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.8rem' }, px: { xs: 1, sm: 2 }, minWidth: 0, whiteSpace: 'nowrap' }}>
-            {syncingOrders ? 'Senkronize...' : 'Senkron Et'}
+            {syncingOrders ? t('syncing') : t('syncButton')}
           </Button>
-          <ManualOrderButton onOrderCreated={() => { mutate(); toast.success('Sipariş listesi yenilendi'); }} />
+          <ManualOrderButton onOrderCreated={() => { mutate(); toast.success(t('orderListRefreshed')); }} />
           {etgbEnabled && (
             <Button variant="contained" color="secondary" onClick={handleProcessEtgb} disabled={processingEtgb || etgbSelectedRows.length === 0} size="small" sx={{ textTransform: 'none' }}>
-              {processingEtgb ? 'İşleniyor...' : `ETGB (${etgbSelectedRows.length})`}
+              {processingEtgb ? t('processing') : `ETGB (${etgbSelectedRows.length})`}
             </Button>
           )}
           <Box sx={{ display: 'flex', gap: 0.5, flex: 1, minWidth: { xs: '100%', sm: 200 } }}>
@@ -2339,7 +2357,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             </FormControl>
             <TextField size="small" placeholder="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /> }} sx={{ flex: 1, '& .MuiInputBase-root': { height: 36, fontSize: '0.8rem' } }} />
           </Box>
-          <Tooltip title="Yenile">
+          <Tooltip title={t('refresh')}>
             <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" size="small"><RefreshIcon fontSize="small" /></IconButton></span>
           </Tooltip>
         </Paper>
@@ -2347,47 +2365,47 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         {/* Row 2: Filters (hidden on mobile) */}
         <Paper elevation={0} sx={{ p: { xs: 0.5, sm: 1 }, display: { xs: 'none', sm: 'flex' }, gap: 1, alignItems: 'center', flexWrap: 'wrap', bgcolor: 'grey.50' }}>
           <FormControl size="small" variant="outlined" sx={{ minWidth: 120 }}>
-            <InputLabel shrink>Sipariş Durumu</InputLabel>
-            <Select value={statusFilter} label="Sipariş Durumu" onChange={e => setStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.8rem', height: 34 }}>
+            <InputLabel shrink>{t('orderStatus')}</InputLabel>
+            <Select value={statusFilter} label={t('orderStatus')} onChange={e => setStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.8rem', height: 34 }}>
               {orderStatusFilterOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" variant="outlined" sx={{ minWidth: 120 }}>
-            <InputLabel shrink>Etiket Durumu</InputLabel>
-            <Select value={labelStatusFilter} label="Etiket Durumu" onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.8rem', height: 34 }}>
+            <InputLabel shrink>{t('labelStatus')}</InputLabel>
+            <Select value={labelStatusFilter} label={t('labelStatus')} onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.8rem', height: 34 }}>
               {labelStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl size="small" variant="outlined" sx={{ minWidth: 120, display: { xs: 'none', md: 'inline-flex' } }}>
-            <InputLabel shrink>Mağaza</InputLabel>
+            <InputLabel shrink>{t('store')}</InputLabel>
             <Select
               multiple
               value={marketplaceFilter}
-              label="Mağaza"
+              label={t('store')}
               onChange={(e) => setMarketplaceFilter(typeof e.target.value === 'string' ? [e.target.value] : e.target.value)}
               displayEmpty
-              renderValue={(selected) => selected.length === 0 ? <em>Tümü</em> : selected.length === 1 ? selected[0] : `${selected.length} mağaza`}
+              renderValue={(selected) => selected.length === 0 ? <em>{t('all')}</em> : selected.length === 1 ? selected[0] : t('storesCount', { count: selected.length })}
               disabled={isLoadingMarketplaces}
               sx={{ fontSize: '0.8rem', height: 34 }}
               MenuProps={{ PaperProps: { style: { maxHeight: 7 * 48 + 8, width: 250 } } }}
             >
-              <MenuItem value=""><em>Tümü</em></MenuItem>
+              <MenuItem value=""><em>{t('all')}</em></MenuItem>
               {dbMarketplaceOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label} ({opt.count})</MenuItem>)}
             </Select>
           </FormControl>
-          <TextField label="Başlangıç" type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 140, '& .MuiInputBase-root': { height: 34, fontSize: '0.8rem' } }} />
-          <TextField label="Bitiş" type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 140, '& .MuiInputBase-root': { height: 34, fontSize: '0.8rem' } }} />
-          <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="text" size="small" sx={{ fontSize: '0.75rem', textTransform: 'none' }}>Sıfırla</Button>
+          <TextField label={t('startDate')} type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 140, '& .MuiInputBase-root': { height: 34, fontSize: '0.8rem' } }} />
+          <TextField label={t('endDate')} type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 140, '& .MuiInputBase-root': { height: 34, fontSize: '0.8rem' } }} />
+          <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="text" size="small" sx={{ fontSize: '0.75rem', textTransform: 'none' }}>{t('reset')}</Button>
         </Paper>
 
         {/* Row 3: Label toggle tabs */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <ToggleButtonGroup exclusive size="small" value={labelFilter} onChange={handleLabelFilter} aria-label="Etiket filtresi" sx={{ '& .MuiToggleButton-root': { fontSize: '0.75rem', px: { xs: 1, sm: 2 }, py: 0.3 } }}>
-            <ToggleButton value="all">Tümü</ToggleButton>
-            <ToggleButton value="unlabeled">Etiketsiz</ToggleButton>
-            <ToggleButton value="labeled">Alındı</ToggleButton>
+          <ToggleButtonGroup exclusive size="small" value={labelFilter} onChange={handleLabelFilter} aria-label={t('labelFilter')} sx={{ '& .MuiToggleButton-root': { fontSize: '0.75rem', px: { xs: 1, sm: 2 }, py: 0.3 } }}>
+            <ToggleButton value="all">{t('all')}</ToggleButton>
+            <ToggleButton value="unlabeled">{t('unlabeled')}</ToggleButton>
+            <ToggleButton value="labeled">{t('received')}</ToggleButton>
           </ToggleButtonGroup>
-          <Typography variant="caption" color="text.secondary">{total} sipariş</Typography>
+          <Typography variant="caption" color="text.secondary">{t('ordersCount', { count: total })}</Typography>
         </Box>
       </Box>
 
@@ -2399,7 +2417,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           </Box>
         ) : filteredAndPaginatedItems.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-            <Typography variant="body2">Sipariş bulunamadı</Typography>
+            <Typography variant="body2">{t('noOrdersFound')}</Typography>
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, pb: 1 }}>
@@ -2435,7 +2453,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                           {row.recipientFirstName} {row.recipientLastName}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
-                          <Chip label={labelSt === 'labeled' ? 'Alındı' : labelSt === 'pending' ? 'Bekliyor' : labelSt === 'failed' ? 'Hata' : 'Etiketsiz'}
+                          <Chip label={labelSt === 'labeled' ? t('received') : labelSt === 'pending' ? t('pending') : labelSt === 'failed' ? t('failed') : t('unlabeled')}
                             size="small"
                             sx={{
                               height: 18, fontSize: '0.6rem', fontWeight: 600,
@@ -2447,7 +2465,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                         </Box>
                       </Box>
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.7rem' }}>
-                        #{row.orderNumber} · {row.marketplace || '-'} · {row.orderDate ? new Date(row.orderDate).toLocaleDateString('tr-TR') : '-'}
+                        #{row.orderNumber} · {row.marketplace || '-'} · {row.orderDate ? formatDate(new Date(row.orderDate)) : '-'}
                         {row.orderTotalPrice > 0 && ` · ${currSymbol}${row.orderTotalPrice.toFixed(2)}`}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.65rem' }}>
@@ -2462,29 +2480,29 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                       {/* Customer note / Personalization */}
                       {row.customerNote && row.customerNote.trim() !== '' && (
                         <Box sx={{ py: 0.75 }}>
-                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>Müşteri Notu</Typography>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>{t('customerNote')}</Typography>
                           <Typography variant="body2" sx={{ fontSize: '0.78rem', mt: 0.25, bgcolor: '#fffde7', p: 0.75, borderRadius: 1, whiteSpace: 'pre-wrap' }}>{row.customerNote}</Typography>
                         </Box>
                       )}
 
                       {/* Address */}
                       <Box sx={{ py: 0.75, borderTop: '1px dashed', borderColor: 'divider' }}>
-                        <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>Teslimat Adresi</Typography>
+                        <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>{t('deliveryAddress')}</Typography>
                         <Box sx={{ mt: 0.25 }}>
                           <Typography variant="body2" sx={{ fontSize: '0.78rem' }}>{row.recipientFirstName} {row.recipientLastName}</Typography>
                           <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{row.recipientStreet1}{row.recipientStreet2 ? `, ${row.recipientStreet2}` : ''}</Typography>
                           <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{row.recipientCity}{row.recipientState ? `, ${row.recipientState}` : ''} {row.recipientPostal}</Typography>
                           <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{row.recipientCountry}</Typography>
-                          {row.recipientPhone && <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>Tel: {row.recipientPhone}</Typography>}
-                          {row.recipientEmail && <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>E-posta: {row.recipientEmail}</Typography>}
+                          {row.recipientPhone && <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{t('phone')}: {row.recipientPhone}</Typography>}
+                          {row.recipientEmail && <Typography variant="body2" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{t('email')}: {row.recipientEmail}</Typography>}
                         </Box>
                       </Box>
 
                       {/* Order status & shipping info */}
                       <Box sx={{ py: 0.75, borderTop: '1px dashed', borderColor: 'divider', display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
                         <Chip label={statusLabel} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: statusConfig.bg, color: statusConfig.text }} />
-                        {row.shipByDate && <Typography variant="caption" color="text.secondary">Son Kargo: {formatDateTr(row.shipByDate)}</Typography>}
-                        {row.trackingNumber && <Typography variant="caption" color="text.secondary">Takip: {row.lastCarrier} {row.trackingNumber}</Typography>}
+                        {row.shipByDate && <Typography variant="caption" color="text.secondary">{t('shipBy')}: {fmtDateTr(row.shipByDate)}</Typography>}
+                        {row.trackingNumber && <Typography variant="caption" color="text.secondary">{t('tracking')}: {row.lastCarrier} {row.trackingNumber}</Typography>}
                       </Box>
 
                       {/* Action buttons */}
@@ -2496,7 +2514,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                           onClick={() => openDrawer(row)}
                           sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
                         >
-                          FedEx Etiket
+                          {t('fedexLabel')}
                         </Button>
                         <Button
                           variant="outlined"
@@ -2530,7 +2548,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                           }}
                           sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
                         >
-                          UPS Etiket
+                          {t('upsLabel')}
                         </Button>
                       </Box>
                     </Box>
@@ -2540,9 +2558,9 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             })}
             {/* Mobile pagination */}
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, py: 1 }}>
-              <Button size="small" disabled={paginationModel.page === 0} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page - 1 }))}>Önceki</Button>
+              <Button size="small" disabled={paginationModel.page === 0} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page - 1 }))}>{t('previous')}</Button>
               <Typography variant="caption">{paginationModel.page + 1} / {Math.ceil(total / paginationModel.pageSize) || 1}</Typography>
-              <Button size="small" disabled={(paginationModel.page + 1) * paginationModel.pageSize >= total} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page + 1 }))}>Sonraki</Button>
+              <Button size="small" disabled={(paginationModel.page + 1) * paginationModel.pageSize >= total} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page + 1 }))}>{t('next')}</Button>
             </Box>
           </Box>
         )}
@@ -2637,30 +2655,30 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer}>
           <Box sx={{ width: { xs: '100%', sm: 500, md: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column', height: '100%' }}>
             <Box sx={{ p: { xs: 1.5, sm: 2 }, borderBottom: '1px solid', borderColor: 'divider' }}>
-              <Typography variant="h6">Etiket Oluştur</Typography>
-              <Typography variant="body2" color="text.secondary">Sipariş No: {drawerOrder.orderNumber}</Typography>
+              <Typography variant="h6">{t('createLabel')}</Typography>
+              <Typography variant="body2" color="text.secondary">{t('orderNo', { number: drawerOrder.orderNumber })}</Typography>
             </Box>
 
             <Box sx={{ flexGrow: 1, overflowY: 'auto', p: { xs: 1.5, sm: 2 } }}>
               {/* Shipping Details Accordion */}
               <Accordion defaultExpanded>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>Kargo Detayları</Typography>
+                  <Typography>{t('shippingDetails')}</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
-                  <TextField name="recipientFirstName" label="Alıcı Adı" value={drawerOrder.recipientFirstName || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('First Name'))} />
-                  <TextField name="recipientLastName" label="Alıcı Soyadı" value={drawerOrder.recipientLastName || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Last Name'))} />
-                  <TextField name="recipientStreet1" label="Adres Satırı 1" value={drawerOrder.recipientStreet1 || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Street address'))} />
-                  <TextField name="recipientStreet2" label="Adres Satırı 2" value={drawerOrder.recipientStreet2 || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
-                  <TextField name="recipientCity" label="Şehir" value={drawerOrder.recipientCity || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('City'))} />
-                  <TextField name="recipientState" label="Eyalet/Bölge" value={drawerOrder.recipientState || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
-                  <TextField name="recipientPostal" label="Posta Kodu" value={drawerOrder.recipientPostal || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Postal code'))} />
-                  <TextField name="recipientCountry" label="Ülke" value={drawerOrder.recipientCountry || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Country'))} />
-                  <TextField name="recipientPhone" label="Telefon" value={drawerOrder.recipientPhone || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
-                  <TextField name="recipientEmail" label="E-posta (Opsiyonel)" value={drawerOrder.recipientEmail || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" type="email" />
+                  <TextField name="recipientFirstName" label={t('recipientFirstName')} value={drawerOrder.recipientFirstName || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('First Name'))} />
+                  <TextField name="recipientLastName" label={t('recipientLastName')} value={drawerOrder.recipientLastName || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Last Name'))} />
+                  <TextField name="recipientStreet1" label={t('addressLine1')} value={drawerOrder.recipientStreet1 || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Street address'))} />
+                  <TextField name="recipientStreet2" label={t('addressLine2')} value={drawerOrder.recipientStreet2 || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
+                  <TextField name="recipientCity" label={t('city')} value={drawerOrder.recipientCity || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('City'))} />
+                  <TextField name="recipientState" label={t('stateRegion')} value={drawerOrder.recipientState || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
+                  <TextField name="recipientPostal" label={t('postalCode')} value={drawerOrder.recipientPostal || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Postal code'))} />
+                  <TextField name="recipientCountry" label={t('country')} value={drawerOrder.recipientCountry || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Country'))} />
+                  <TextField name="recipientPhone" label={t('phone')} value={drawerOrder.recipientPhone || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" />
+                  <TextField name="recipientEmail" label={t('emailOptional')} value={drawerOrder.recipientEmail || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" type="email" />
                   <TextField 
                     name="title" 
-                    label="Ürün Açıklaması" 
+                    label={t('productDescription')}
                     value={drawerOrder.title || ''} 
                     onChange={handleDrawerChange} 
                     fullWidth 
@@ -2668,17 +2686,17 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                     size="small" 
                   />
                   <Grid container spacing={2}>
-                    <Grid item xs={4}><TextField name="weight" label="Ağırlık (kg)" value={drawerOrder.weight || 0.5} inputProps={{ step: "0.1", style: { MozAppearance: 'textfield' } }} sx={{ '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 } }} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Weight'))} /></Grid>
-                    <Grid item xs={4}><TextField name="packageLength" label="Uzunluk (cm)" value={drawerOrder.originalOrder?.packageLength || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
-                    <Grid item xs={4}><TextField name="packageWidth" label="Genişlik (cm)" value={drawerOrder.originalOrder?.packageWidth || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
-                    <Grid item xs={4}><TextField name="packageHeight" label="Yükseklik (cm)" value={drawerOrder.originalOrder?.packageHeight || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
-                    <Grid item xs={8}><TextField name="hsCode" label="HS Kodu" value={drawerOrder.hsCode || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" /></Grid>
+                    <Grid item xs={4}><TextField name="weight" label={t('weight')} value={drawerOrder.weight || 0.5} inputProps={{ step: "0.1", style: { MozAppearance: 'textfield' } }} sx={{ '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 } }} onChange={handleDrawerChange} fullWidth margin="dense" size="small" error={drawerErrors.some(e => e.includes('Weight'))} /></Grid>
+                    <Grid item xs={4}><TextField name="packageLength" label={t('length')} value={drawerOrder.originalOrder?.packageLength || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
+                    <Grid item xs={4}><TextField name="packageWidth" label={t('width')} value={drawerOrder.originalOrder?.packageWidth || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
+                    <Grid item xs={4}><TextField name="packageHeight" label={t('height')} value={drawerOrder.originalOrder?.packageHeight || ''} type="number" onChange={handleOriginalOrderChange} fullWidth margin="dense" size="small" /></Grid>
+                    <Grid item xs={8}><TextField name="hsCode" label={t('hsCode')} value={drawerOrder.hsCode || ''} onChange={handleDrawerChange} fullWidth margin="dense" size="small" /></Grid>
                   </Grid>
                   <Grid container spacing={2} sx={{ mt: 0.5 }}>
                     <Grid item xs={6}>
                       <TextField 
                         name="orderTotalPrice" 
-                        label="Değer" 
+                        label={t('value')}
                         value={drawerOrder.orderTotalPrice || 0} 
                         type="number"
                         inputProps={{ step: "0.01", min: "0", style: { MozAppearance: 'textfield' } }} 
@@ -2691,14 +2709,14 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                     </Grid>
                     <Grid item xs={6}>
                       <FormControl fullWidth margin="dense" size="small">
-                        <InputLabel>Para Birimi</InputLabel>
+                        <InputLabel>{t('currency')}</InputLabel>
                         <Select
                           name="currency"
                           value={drawerOrder.currency || 'USD'}
                           onChange={handleDrawerChange}
-                          label="Para Birimi"
+                          label={t('currency')}
                         >
-                          {FEDEX_CURRENCY_CODES.map(curr => (
+                          {fedexCurrencyCodes.map(curr => (
                             <MenuItem key={curr.value} value={curr.value}>{curr.label}</MenuItem>
                           ))}
                         </Select>
@@ -2711,38 +2729,38 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
               {/* FedEx Options Accordion */}
               <Accordion>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>FedEx Seçenekleri</Typography>
+                  <Typography>{t('fedexOptions')}</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Servis Tipi</InputLabel>
+                    <InputLabel>{t('serviceType')}</InputLabel>
                     <Select
                       name="fedexServiceType"
                       value={drawerOrder.fedexServiceType || ''}
                       onChange={handleDrawerChange}
-                      label="Servis Tipi"
+                      label={t('serviceType')}
                     >
                       {FEDEX_SERVICE_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
                     </Select>
                   </FormControl>
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Paket Tipi</InputLabel>
+                    <InputLabel>{t('packageType')}</InputLabel>
                     <Select
                       name="fedexPackagingType"
                       value={drawerOrder.fedexPackagingType || ''}
                       onChange={handleDrawerChange}
-                      label="Paket Tipi"
+                      label={t('packageType')}
                     >
                       {FEDEX_PACKAGING_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
                     </Select>
                   </FormControl>
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Etiket Boyutu</InputLabel>
+                    <InputLabel>{t('labelSize')}</InputLabel>
                     <Select
                       name="labelStockType"
                       value={drawerOrder.labelStockType || 'PAPER_4X6'}
                       onChange={handleDrawerChange}
-                      label="Etiket Boyutu"
+                      label={t('labelSize')}
                     >
                       {ALLOWED_LABEL_STOCK_TYPES.map(opt => (
                         <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
@@ -2758,9 +2776,9 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                 onClick={() => drawerOrder && handleGenerateLabel(drawerOrder)} 
                 disabled={drawerErrors.length > 0 || generatingLabelId === drawerOrder?.itemId || checkingFedexCredentials || !hasFedexCredentials || (drawerOrder?.originalOrder && hasExistingLabel(drawerOrder.originalOrder))}
               >
-                {generatingLabelId === drawerOrder?.itemId ? <CircularProgress size={24} color="inherit" /> : (checkingFedexCredentials ? 'Ayarlar Kontrol Ediliyor...': (!hasFedexCredentials ? 'FedEx Ayarları Eksik' : (drawerOrder?.originalOrder && hasExistingLabel(drawerOrder.originalOrder) ? 'Mevcut Etiketi Silin' : 'ETİKET OLUŞTUR')))}
+                {generatingLabelId === drawerOrder?.itemId ? <CircularProgress size={24} color="inherit" /> : (checkingFedexCredentials ? t('checkingSettings') : (!hasFedexCredentials ? t('fedexSettingsMissing') : (drawerOrder?.originalOrder && hasExistingLabel(drawerOrder.originalOrder) ? t('deleteExistingLabel') : t('createLabel'))))}
               </Button>
-              <Button fullWidth variant="text" onClick={closeDrawer} sx={{mt:1}}>İptal</Button>
+              <Button fullWidth variant="text" onClick={closeDrawer} sx={{mt:1}}>{t('cancel')}</Button>
             </Box>
           </Box>
         </Drawer>
@@ -2789,7 +2807,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         fullWidth
       >
         <DialogTitle>
-          Ürün Görseli
+          {t('productImage')}
           <IconButton
             aria-label="close"
             onClick={() => setImageModalOpen(false)}
@@ -2814,7 +2832,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
           >
             <img
               src={selectedImageUrl}
-              alt="Ürün Görseli"
+              alt={t('columnProductImage')}
               style={{
                 maxWidth: '100%',
                 maxHeight: '600px',
@@ -2834,7 +2852,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         fullWidth
       >
         <DialogTitle>
-          Takip Numarası Ekle
+          {t('addTrackingNumber')}
           <IconButton
             aria-label="close"
             onClick={() => setTrackingDialogOpen(false)}
@@ -2853,7 +2871,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             {selectedOrderForTracking && (
               <Box sx={{ mb: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
                 <Typography variant="subtitle2" color="text.secondary">
-                  Sipariş: {selectedOrderForTracking.orderNumber}
+                  {t('orderLabel')}: {selectedOrderForTracking.orderNumber}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Market: {selectedOrderForTracking.marketplace}
@@ -2863,7 +2881,7 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             
             <TextField
               fullWidth
-              label="Takip Numarası"
+              label={t('trackingNumber')}
               value={trackingFormData.trackingNumber}
               onChange={(e) => setTrackingFormData(prev => ({...prev, trackingNumber: e.target.value}))}
               placeholder="1Z999AA10123456784"
@@ -2871,10 +2889,10 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             />
 
             <FormControl fullWidth>
-              <InputLabel>Kargo Firması</InputLabel>
+              <InputLabel>{t('shippingCarrier')}</InputLabel>
               <Select
                 value={trackingFormData.carrierId}
-                label="Kargo Firması"
+                label={t('shippingCarrier')}
                 onChange={(e) => setTrackingFormData(prev => ({...prev, carrierId: Number(e.target.value)}))}
               >
                 {VEEQO_CARRIERS.map((carrier) => (
@@ -2890,15 +2908,15 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
                 onClick={() => setTrackingDialogOpen(false)}
                 disabled={submittingTracking}
               >
-                İptal
+                {t('cancel')}
               </Button>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 onClick={handleTrackingSubmit}
                 disabled={submittingTracking || !trackingFormData.trackingNumber.trim()}
                 startIcon={submittingTracking ? <CircularProgress size={16} /> : null}
               >
-                {submittingTracking ? 'Gönderiliyor...' : 'Kaydet'}
+                {submittingTracking ? t('sending') : t('save')}
               </Button>
             </Box>
           </Box>
@@ -2913,14 +2931,14 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
         fullWidth
       >
         <DialogTitle>
-          Etiketi Sil
+          {t('deleteLabel')}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 2 }}>
-            Bu etiket silinecek ve yeni etiket oluşturabilir hale geleceksiniz. Bu işlem geri alınamaz.
+            {t('deleteLabelConfirmation')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Emin misiniz?
+            {t('areYouSure')}
           </Typography>
         </DialogContent>
         <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', p: 2 }}>
@@ -2928,16 +2946,16 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
             onClick={() => setShipmentDeleteConfirmation(null)}
             disabled={!!deletingShipmentId}
           >
-            İptal
+            {t('cancel')}
           </Button>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             color="error"
             onClick={() => shipmentDeleteConfirmation && handleDeleteShipment(shipmentDeleteConfirmation)}
             disabled={!!deletingShipmentId}
             startIcon={deletingShipmentId ? <CircularProgress size={16} /> : null}
           >
-            {deletingShipmentId ? 'Siliniyor...' : 'Sil'}
+            {deletingShipmentId ? t('deleting') : t('delete')}
           </Button>
         </Box>
       </Dialog>
@@ -2946,8 +2964,9 @@ function LabelsPage(props: { source?: string; channel?: string }): JSX.Element {
 }
 
 function LabelsPageWithLayout(props: any): JSX.Element {
+  const t = useTranslations('labels');
   return (
-    <AppLayout title="Etiket Yönetimi">
+    <AppLayout title={t('labelManagement')}>
       <LabelsPage {...props} />
     </AppLayout>
   );

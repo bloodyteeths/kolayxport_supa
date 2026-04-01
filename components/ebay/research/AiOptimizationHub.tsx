@@ -10,6 +10,7 @@ import {
   CheckCircle, AlertTriangle, Info, X, Code,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 interface AiOptimizationHubProps {
   userId: string;
@@ -30,13 +31,13 @@ interface MarketContext {
 
 type TabKey = 'title' | 'description' | 'price' | 'analyze' | 'aspects' | 'bulk';
 
-const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-  { key: 'title', label: 'Başlık Optimize', icon: <Type size={16} /> },
-  { key: 'description', label: 'Açıklama Yaz', icon: <Edit3 size={16} /> },
-  { key: 'price', label: 'Fiyat Öner', icon: <DollarSign size={16} /> },
-  { key: 'analyze', label: 'Liste Analiz', icon: <BarChart2 size={16} /> },
-  { key: 'aspects', label: 'Özellik Öner', icon: <Tag size={16} /> },
-  { key: 'bulk', label: 'Toplu Optimize', icon: <Zap size={16} /> },
+const TAB_KEYS: { key: TabKey; labelKey: string; icon: React.ReactNode }[] = [
+  { key: 'title', labelKey: 'tabTitleOptimize', icon: <Type size={16} /> },
+  { key: 'description', labelKey: 'tabDescriptionWrite', icon: <Edit3 size={16} /> },
+  { key: 'price', labelKey: 'tabPriceSuggest', icon: <DollarSign size={16} /> },
+  { key: 'analyze', labelKey: 'tabListingAnalyze', icon: <BarChart2 size={16} /> },
+  { key: 'aspects', labelKey: 'tabAspectSuggest', icon: <Tag size={16} /> },
+  { key: 'bulk', labelKey: 'tabBulkOptimize', icon: <Zap size={16} /> },
 ];
 
 async function fetchMarketContext(keyword: string, userId: string, marketplace: string): Promise<MarketContext | null> {
@@ -74,15 +75,15 @@ async function callAi(action: string, body: Record<string, any>, userId: string)
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'AI isteği başarısız oldu');
+    throw new Error(err.error || `AI request failed: ${res.status}`);
   }
   return res.json();
 }
 
-function copyToClipboard(text: string) {
+function copyToClipboard(text: string, t: any) {
   navigator.clipboard.writeText(text).then(
-    () => toast.success('Kopyalandı!'),
-    () => toast.error('Kopyalama başarısız'),
+    () => toast.success(t('copied')),
+    () => toast.error(t('copyFailed')),
   );
 }
 
@@ -112,6 +113,7 @@ function severityToMui(severity: string): 'error' | 'warning' | 'info' {
 // Tab 1: Title Optimizer
 // ---------------------------------------------------------------------------
 function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: string }) {
+  const t = useTranslations('ebay.research.ai');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(false);
@@ -119,13 +121,13 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
   const [result, setResult] = useState<any>(null);
 
   const run = useCallback(async () => {
-    if (!title.trim()) { toast.error('Başlık giriniz'); return; }
+    if (!title.trim()) { toast.error(t('enterTitle')); return; }
     setLoading(true);
     setResult(null);
     try {
-      setStatus('Pazar verisi alınıyor...');
+      setStatus(t('fetchingMarketData'));
       const market = await fetchMarketContext(title, userId, marketplace);
-      setStatus('AI çalışıyor...');
+      setStatus(t('aiWorking'));
       const res = await callAi('optimize_title', {
         title,
         categoryName: category || undefined,
@@ -142,8 +144,8 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Mevcut Başlık" placeholder="ör: Wireless Earbuds Bluetooth 5.0 Headphones" helperText="Optimize etmek istediğiniz mevcut başlığı yapıştırın" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
-      <TextField label="Kategori (opsiyonel)" value={category} onChange={e => setCategory(e.target.value)} fullWidth />
+      <TextField label={t("currentTitle")} placeholder="Example: Wireless Earbuds Bluetooth 5.0 Headphones" helperText={t('titleHelper')} value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label={t('categoryOptional')} value={category} onChange={e => setCategory(e.target.value)} fullWidth />
       <Button
         variant="contained"
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Sparkles size={18} />}
@@ -158,19 +160,19 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
           '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)', boxShadow: '0 4px 12px rgba(99,102,241,0.4)' },
         }}
       >
-        {loading ? status : 'AI ile Optimize Et'}
+        {loading ? status : t('optimizeWithAi')}
       </Button>
 
       {result && (
         <Paper sx={{ p: 2, mt: 1, bgcolor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, color: '#1e1b4b', fontWeight: 700 }}>Karşılaştırma</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 1, color: '#1e1b4b', fontWeight: 700 }}>{t('comparison')}</Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Box sx={{ p: 1.5, bgcolor: '#fff5f5', borderRadius: 2, border: '1px solid rgba(239,68,68,0.15)' }}>
-              <Typography variant="caption" color="error">Önceki</Typography>
+              <Typography variant="caption" color="error">{t('beforeTitle')}</Typography>
               <Typography>{title}</Typography>
             </Box>
             <Box sx={{ p: 1.5, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid rgba(16,185,129,0.2)', boxShadow: '0 0 8px rgba(16,185,129,0.08)' }}>
-              <Typography variant="caption" sx={{ color: '#10b981' }}>Sonra</Typography>
+              <Typography variant="caption" sx={{ color: '#10b981' }}>{t('afterTitle')}</Typography>
               <Typography fontWeight={600}>{result.optimizedTitle}</Typography>
             </Box>
           </Box>
@@ -178,7 +180,7 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
           {result.score && (
             <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
               <Typography variant="body2" fontWeight={600}>
-                Skor: <span style={{ color: scoreColor(result.score.before), fontSize: '1.1rem', fontWeight: 700 }}>{result.score.before}</span>
+                {t('score')}: <span style={{ color: scoreColor(result.score.before), fontSize: '1.1rem', fontWeight: 700 }}>{result.score.before}</span>
                 {' → '}
                 <span style={{ color: scoreColor(result.score.after), fontSize: '1.1rem', fontWeight: 700 }}>{result.score.after}</span>
               </Typography>
@@ -187,7 +189,7 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
 
           {result.suggestions?.length > 0 && (
             <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Öneriler</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{t('suggestions')}</Typography>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {result.suggestions.map((s: string, i: number) => (
                   <li key={i}><Typography variant="body2">{s}</Typography></li>
@@ -196,11 +198,11 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
             </Box>
           )}
 
-          <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(result.optimizedTitle)} sx={{
+          <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(result.optimizedTitle, t)} sx={{
             mt: 1.5, color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', textTransform: 'none', fontWeight: 600,
             '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' },
           }}>
-            Kopyala
+            {t('copy')}
           </Button>
         </Paper>
       )}
@@ -212,6 +214,7 @@ function TitleOptimizer({ userId, marketplace }: { userId: string; marketplace: 
 // Tab 2: Description Generator
 // ---------------------------------------------------------------------------
 function DescriptionGenerator({ userId, marketplace }: { userId: string; marketplace: string }) {
+  const t = useTranslations('ebay.research.ai');
   const [title, setTitle] = useState('');
   const [condition, setCondition] = useState('NEW');
   const [price, setPrice] = useState('');
@@ -235,13 +238,13 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
   }, [aspectsText]);
 
   const run = useCallback(async () => {
-    if (!title.trim()) { toast.error('Ürün başlığı giriniz'); return; }
+    if (!title.trim()) { toast.error(t('enterProductTitle')); return; }
     setLoading(true);
     setResult(null);
     try {
-      setStatus('Pazar verisi alınıyor...');
+      setStatus(t('fetchingMarketData'));
       const market = await fetchMarketContext(title, userId, marketplace);
-      setStatus('AI çalışıyor...');
+      setStatus(t('aiWorking'));
       const res = await callAi('generate_description', {
         title,
         condition,
@@ -260,25 +263,25 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Ürün Başlığı" placeholder="ör: LED Strip Lights 50ft RGB Color Changing" helperText="Ürün başlığını girin — AI profesyonel HTML açıklama oluşturacak" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label={t("productTitle")} placeholder="Example: LED Strip Lights 50ft RGB Color Changing" helperText={t('descHelper')} value={title} onChange={e => setTitle(e.target.value)} fullWidth />
       <FormControl fullWidth>
-        <InputLabel>Durum</InputLabel>
-        <Select value={condition} label="Durum" onChange={e => setCondition(e.target.value)}>
-          <MenuItem value="NEW">Yeni</MenuItem>
-          <MenuItem value="USED">Kullanılmış</MenuItem>
-          <MenuItem value="REFURBISHED">Yenilenmiş</MenuItem>
+        <InputLabel>{t("condition")}</InputLabel>
+        <Select value={condition} label={t("condition")} onChange={e => setCondition(e.target.value)}>
+          <MenuItem value="NEW">{t('new')}</MenuItem>
+          <MenuItem value="USED">{t('used')}</MenuItem>
+          <MenuItem value="REFURBISHED">{t('refurbished')}</MenuItem>
         </Select>
       </FormControl>
-      <TextField label="Fiyat" type="number" value={price} onChange={e => setPrice(e.target.value)} fullWidth />
+      <TextField label={t("price")} type="number" value={price} onChange={e => setPrice(e.target.value)} fullWidth />
       <TextField
-        label="Özellikler (opsiyonel)"
+        label={t("aspectsOptional")}
         placeholder={"Brand: Nike\nSize: 10\nColor: Black\nMaterial: Leather"}
         value={aspectsText}
         onChange={e => setAspectsText(e.target.value)}
         fullWidth
         multiline
         rows={3}
-        helperText="Her satıra bir özellik: Anahtar: Değer"
+        helperText={t('aspectsHelper')}
       />
       <Button
         variant="contained"
@@ -292,31 +295,31 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
           '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
         }}
       >
-        {loading ? status : 'Açıklama Oluştur'}
+        {loading ? status : t('generateDescription')}
       </Button>
 
       {result?.description && (
         <Paper sx={{ p: 2, mt: 1, bgcolor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, color: '#1e1b4b', fontWeight: 700 }}>Oluşturulan Açıklama</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 1, color: '#1e1b4b', fontWeight: 700 }}>{t('generatedDescription')}</Typography>
           <Box
             sx={{ p: 2, border: '1px solid rgba(99,102,241,0.08)', borderRadius: 2, bgcolor: '#f8faff', maxHeight: 400, overflow: 'auto' }}
             dangerouslySetInnerHTML={{ __html: result.description }}
           />
           <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
-            <Tooltip title="HTML etiketleri olmadan düz metin kopyalar">
-              <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(stripHtml(result.description))} sx={{
+            <Tooltip title={t('copyPlainText')}>
+              <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(stripHtml(result.description), t)} sx={{
                 color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', textTransform: 'none', fontWeight: 600,
                 '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' },
               }}>
-                Metin Kopyala
+                {t('copyText')}
               </Button>
             </Tooltip>
-            <Tooltip title="HTML etiketleriyle birlikte kopyalar">
-              <Button size="small" variant="outlined" startIcon={<Code size={14} />} onClick={() => copyToClipboard(result.description)} sx={{
+            <Tooltip title={t('copyHtmlTooltip')}>
+              <Button size="small" variant="outlined" startIcon={<Code size={14} />} onClick={() => copyToClipboard(result.description, t)} sx={{
                 color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)', textTransform: 'none', fontWeight: 600,
                 '&:hover': { bgcolor: '#8b5cf6', color: '#fff', borderColor: '#8b5cf6' },
               }}>
-                HTML Kopyala
+                {t('copyHtml')}
               </Button>
             </Tooltip>
           </Stack>
@@ -330,6 +333,7 @@ function DescriptionGenerator({ userId, marketplace }: { userId: string; marketp
 // Tab 3: Price Advisor
 // ---------------------------------------------------------------------------
 function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: string }) {
+  const t = useTranslations('ebay.research.ai');
   const [title, setTitle] = useState('');
   const [condition, setCondition] = useState('NEW');
   const [category, setCategory] = useState('');
@@ -339,15 +343,15 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
   const [marketCtx, setMarketCtx] = useState<MarketContext | null>(null);
 
   const run = useCallback(async () => {
-    if (!title.trim()) { toast.error('Ürün başlığı giriniz'); return; }
+    if (!title.trim()) { toast.error(t('enterProductTitle')); return; }
     setLoading(true);
     setResult(null);
     setMarketCtx(null);
     try {
-      setStatus('Pazar verisi alınıyor...');
+      setStatus(t('fetchingMarketData'));
       const market = await fetchMarketContext(title, userId, marketplace);
       setMarketCtx(market);
-      setStatus('AI çalışıyor...');
+      setStatus(t('aiWorking'));
       const res = await callAi('suggest_price', {
         title,
         condition,
@@ -366,16 +370,16 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Ürün Başlığı" placeholder="ör: Apple AirPods Pro 2nd Generation" helperText="Fiyat önerisi almak istediğiniz ürünün başlığını girin" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label={t('productTitle')} placeholder="Example: Apple AirPods Pro 2nd Generation" helperText={t('priceHelper')} value={title} onChange={e => setTitle(e.target.value)} fullWidth />
       <FormControl fullWidth>
-        <InputLabel>Durum</InputLabel>
-        <Select value={condition} label="Durum" onChange={e => setCondition(e.target.value)}>
-          <MenuItem value="NEW">Yeni</MenuItem>
-          <MenuItem value="USED">Kullanılmış</MenuItem>
-          <MenuItem value="REFURBISHED">Yenilenmiş</MenuItem>
+        <InputLabel>{t("condition")}</InputLabel>
+        <Select value={condition} label={t("condition")} onChange={e => setCondition(e.target.value)}>
+          <MenuItem value="NEW">{t('new')}</MenuItem>
+          <MenuItem value="USED">{t('used')}</MenuItem>
+          <MenuItem value="REFURBISHED">{t('refurbished')}</MenuItem>
         </Select>
       </FormControl>
-      <TextField label="Kategori (opsiyonel)" value={category} onChange={e => setCategory(e.target.value)} fullWidth />
+      <TextField label={t("categoryOptional")} value={category} onChange={e => setCategory(e.target.value)} fullWidth />
       <Button
         variant="contained"
         startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <DollarSign size={18} />}
@@ -388,7 +392,7 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
           '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
         }}
       >
-        {loading ? status : 'Fiyat Önerisi Al'}
+        {loading ? status : t('getPriceSuggestion')}
       </Button>
 
       {result && (
@@ -397,7 +401,7 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
             <Typography variant="h3" fontWeight={700} sx={{ color: '#6366f1' }}>
               ${typeof result.suggestedPrice === 'number' ? result.suggestedPrice.toFixed(2) : result.suggestedPrice}
             </Typography>
-            <Typography variant="body2" color="text.secondary">Önerilen Fiyat</Typography>
+            <Typography variant="body2" color="text.secondary">{t('suggestedPrice')}</Typography>
           </Box>
 
           {result.priceRange && (
@@ -436,33 +440,33 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
 
           {result.reasoning && (
             <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Gerekçe</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{t('reasoning')}</Typography>
               <Typography variant="body2" color="text.secondary">{result.reasoning}</Typography>
             </Box>
           )}
 
           {marketCtx && (marketCtx.avgPrice || marketCtx.medianPrice) && (
             <Box sx={{ p: 1.5, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)' }}>
-              <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 700, color: '#1e1b4b' }}>Pazar Verileri</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 700, color: '#1e1b4b' }}>{t('marketData')}</Typography>
               <Stack direction="row" spacing={3}>
                 {marketCtx.avgPrice != null && (
-                  <Typography variant="body2">Ortalama: <b>${marketCtx.avgPrice.toFixed(2)}</b></Typography>
+                  <Typography variant="body2">{t('average')}: <b>${marketCtx.avgPrice.toFixed(2)}</b></Typography>
                 )}
                 {marketCtx.medianPrice != null && (
-                  <Typography variant="body2">Medyan: <b>${marketCtx.medianPrice.toFixed(2)}</b></Typography>
+                  <Typography variant="body2">{t('median')}: <b>${marketCtx.medianPrice.toFixed(2)}</b></Typography>
                 )}
                 {marketCtx.totalResults != null && (
-                  <Typography variant="body2">Sonuç: <b>{marketCtx.totalResults}</b></Typography>
+                  <Typography variant="body2">{t('results')}: <b>{marketCtx.totalResults}</b></Typography>
                 )}
               </Stack>
             </Box>
           )}
 
-          <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(String(result.suggestedPrice))} sx={{
+          <Button size="small" variant="outlined" startIcon={<Copy size={14} />} onClick={() => copyToClipboard(String(result.suggestedPrice), t)} sx={{
             mt: 1.5, color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', textTransform: 'none', fontWeight: 600,
             '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' },
           }}>
-            Kopyala
+            {t('copy')}
           </Button>
         </Paper>
       )}
@@ -474,6 +478,7 @@ function PriceAdvisor({ userId, marketplace }: { userId: string; marketplace: st
 // Tab 4: Listing Analyzer
 // ---------------------------------------------------------------------------
 function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace: string }) {
+  const t = useTranslations('ebay.research.ai');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -484,13 +489,13 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
   const [result, setResult] = useState<any>(null);
 
   const run = useCallback(async () => {
-    if (!title.trim()) { toast.error('Ürün başlığı giriniz'); return; }
+    if (!title.trim()) { toast.error(t('enterProductTitle')); return; }
     setLoading(true);
     setResult(null);
     try {
-      setStatus('Pazar verisi alınıyor...');
+      setStatus(t('fetchingMarketData'));
       const market = await fetchMarketContext(title, userId, marketplace);
-      setStatus('AI çalışıyor...');
+      setStatus(t('aiWorking'));
       const res = await callAi('analyze_listing', {
         title,
         description: description || undefined,
@@ -510,12 +515,12 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Ürün Başlığı" placeholder="ör: https://www.ebay.com/itm/123456789" helperText="eBay listing URL'si veya ürün başlığı girin — AI detaylı analiz yapacak" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
-      <TextField label="Kategori (opsiyonel)" value={category} onChange={e => setCategory(e.target.value)} fullWidth />
-      <TextField label="Açıklama (opsiyonel)" value={description} onChange={e => setDescription(e.target.value)} fullWidth multiline rows={3} />
+      <TextField label={t("productTitle")} placeholder="e.g. https://www.ebay.com/itm/123456789" helperText={t('categoryAnalyzeHelperText')} value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label={t('categoryOptional')} value={category} onChange={e => setCategory(e.target.value)} fullWidth />
+      <TextField label={t('descriptionOptional')} value={description} onChange={e => setDescription(e.target.value)} fullWidth multiline rows={3} />
       <Stack direction="row" spacing={2}>
-        <TextField label="Fiyat (opsiyonel)" type="number" value={price} onChange={e => setPrice(e.target.value)} fullWidth />
-        <TextField label="Resim Sayısı (opsiyonel)" type="number" value={imageCount} onChange={e => setImageCount(e.target.value)} fullWidth />
+        <TextField label={t('priceOptional')} type="number" value={price} onChange={e => setPrice(e.target.value)} fullWidth />
+        <TextField label={t('imagecountOptional')} type="number" value={imageCount} onChange={e => setImageCount(e.target.value)} fullWidth />
       </Stack>
       <Button
         variant="contained"
@@ -529,7 +534,7 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
           '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
         }}
       >
-        {loading ? status : 'Analiz Et'}
+        {loading ? status : t('analyzeIt')}
       </Button>
 
       {result && (
@@ -552,12 +557,12 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
                 {result.score}
               </Typography>
             </Box>
-            <Typography variant="body2" color="text.secondary">Liste Skoru</Typography>
+            <Typography variant="body2" color="text.secondary">{t('listingScore')}</Typography>
           </Box>
 
           {result.issues?.length > 0 && (
             <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Typography variant="subtitle2">Sorunlar</Typography>
+              <Typography variant="subtitle2">{t('issues')}</Typography>
               {result.issues.map((issue: any, i: number) => (
                 <Alert key={i} severity={severityToMui(issue.severity)} icon={
                   issue.severity === 'critical' ? <AlertTriangle size={18} /> :
@@ -572,7 +577,7 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
 
           {result.tips?.length > 0 && (
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>İpuçları</Typography>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{t('tips')}</Typography>
               <ul style={{ margin: 0, paddingLeft: 20 }}>
                 {result.tips.map((tip: string, i: number) => (
                   <li key={i}><Typography variant="body2">{tip}</Typography></li>
@@ -590,6 +595,7 @@ function ListingAnalyzer({ userId, marketplace }: { userId: string; marketplace:
 // Tab 5: Aspect Suggester
 // ---------------------------------------------------------------------------
 function AspectSuggester({ userId, marketplace }: { userId: string; marketplace: string }) {
+  const t = useTranslations('ebay.research.ai');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [aspectNames, setAspectNames] = useState<string[]>([...DEFAULT_ASPECT_NAMES]);
@@ -610,14 +616,14 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
   }, []);
 
   const run = useCallback(async () => {
-    if (!title.trim()) { toast.error('Ürün başlığı giriniz'); return; }
-    if (aspectNames.length === 0) { toast.error('En az bir özellik adı ekleyin'); return; }
+    if (!title.trim()) { toast.error(t('enterProductTitle')); return; }
+    if (aspectNames.length === 0) { toast.error(t('enterAtLeastOneAspect')); return; }
     setLoading(true);
     setResult(null);
     try {
-      setStatus('Pazar verisi alınıyor...');
+      setStatus(t('fetchingMarketData'));
       const market = await fetchMarketContext(title, userId, marketplace);
-      setStatus('AI çalışıyor...');
+      setStatus(t('aiWorking'));
       const res = await callAi('suggest_aspects', {
         title,
         categoryName: category || undefined,
@@ -638,11 +644,11 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Ürün Başlığı" placeholder="ör: Samsung Galaxy S24 Ultra 256GB Unlocked" helperText="Ürün başlığını girin — AI en uygun özellikleri önerecek" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
-      <TextField label="Kategori" value={category} onChange={e => setCategory(e.target.value)} fullWidth />
+      <TextField label={t("productTitle")} placeholder="e.g. Samsung Galaxy S24 Ultra 256GB Unlocked" helperText={t('aspectSuggesterHelper')} value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+      <TextField label={t('category')} value={category} onChange={e => setCategory(e.target.value)} fullWidth />
 
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Özellik Adları</Typography>
+        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{t('aspectNames')}</Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
           {aspectNames.map(name => (
             <Chip
@@ -657,15 +663,15 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
         <Stack direction="row" spacing={1}>
           <TextField
             size="small"
-            label="Yeni özellik ekle"
-            placeholder="Virgülle ayırarak birden fazla ekleyin"
+            label={t('addAspect')}
+            placeholder={t('addAspectPlaceholder')}
             value={newAspect}
             onChange={e => setNewAspect(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAspect(); } }}
             fullWidth
           />
           <Button size="small" variant="outlined" onClick={addAspect} sx={{ flexShrink: 0 }}>
-            Ekle
+            {t('add')}
           </Button>
         </Stack>
       </Box>
@@ -682,7 +688,7 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
           '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
         }}
       >
-        {loading ? status : 'Özellik Öner'}
+        {loading ? status : t('suggestAspects')}
       </Button>
 
       {aspectEntries.length > 0 && (
@@ -690,8 +696,8 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
           <Table size="small">
             <TableHead>
               <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Özellik</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Önerilen Değerler</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('aspect')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('suggestedValues')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -708,7 +714,7 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
                           label={v}
                           size="small"
                           variant="outlined"
-                          onClick={() => copyToClipboard(v)}
+                          onClick={() => copyToClipboard(v, t)}
                           sx={{ cursor: 'pointer' }}
                         />
                       ))}
@@ -728,14 +734,15 @@ function AspectSuggester({ userId, marketplace }: { userId: string; marketplace:
 // Tab 6: Bulk Title Optimizer
 // ---------------------------------------------------------------------------
 function BulkTitleOptimizer({ userId }: { userId: string }) {
+  const t = useTranslations('ebay.research.ai');
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
   const run = useCallback(async () => {
     const lines = input.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) { toast.error('En az bir başlık giriniz'); return; }
-    if (lines.length > 10) { toast.error('Maksimum 10 başlık girilebilir'); return; }
+    if (lines.length === 0) { toast.error(t('enterAtLeastOneTitle')); return; }
+    if (lines.length > 10) { toast.error(t('maxTenTitles')); return; }
     setLoading(true);
     setResult(null);
     try {
@@ -752,9 +759,9 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <TextField
-        label="Her satıra bir başlık girin (max 10)"
-        placeholder={"Her satıra bir başlık yazın:\nWireless Earbuds Bluetooth\nPhone Case iPhone 15\nYoga Mat Non Slip"}
-        helperText="Her satıra bir başlık girin (maks 10). AI hepsini tek seferde optimize edecek."
+        label={t('bulkTitle')}
+        placeholder={t('bulkPlaceholder')}
+        helperText={t('bulkHelper')}
         value={input}
         onChange={e => setInput(e.target.value)}
         fullWidth
@@ -773,7 +780,7 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
           '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
         }}
       >
-        {loading ? 'AI çalışıyor...' : 'Toplu Optimize Et'}
+        {loading ? t('bulkRunning') : t('bulkOptimize')}
       </Button>
 
       {result?.results?.length > 0 && (
@@ -781,8 +788,8 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
           <Table size="small">
             <TableHead>
               <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Orijinal</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Optimize Edilmiş</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('original')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('optimized')}</TableCell>
                 <TableCell sx={{ fontWeight: 700, width: 60 }} />
               </TableRow>
             </TableHead>
@@ -796,7 +803,7 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
                     <Typography variant="body2" fontWeight={500} sx={{ color: '#10b981' }}>{r.optimized}</Typography>
                   </TableCell>
                   <TableCell>
-                    <IconButton size="small" onClick={() => copyToClipboard(r.optimized)}>
+                    <IconButton size="small" onClick={() => copyToClipboard(r.optimized, t)}>
                       <Copy size={14} />
                     </IconButton>
                   </TableCell>
@@ -814,6 +821,7 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
 // Main Hub
 // ---------------------------------------------------------------------------
 export default function AiOptimizationHub({ userId, marketplace = 'EBAY_US', onNavigate, navigateData, onConsumeNavigateData }: AiOptimizationHubProps) {
+  const t = useTranslations('ebay.research.ai');
   const [activeTab, setActiveTab] = useState<TabKey>('title');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -830,15 +838,15 @@ export default function AiOptimizationHub({ userId, marketplace = 'EBAY_US', onN
   return (
     <Box>
       <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: '#1e1b4b' }}>
-        AI Optimizasyon Merkezi
+        {t('hubTitle')}
       </Typography>
 
       <Box sx={{ display: 'flex', gap: 1, mb: 3, overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { height: 4 } }}>
-        {TABS.map(tab => (
+        {TAB_KEYS.map(tab => (
           <Chip
             key={tab.key}
             icon={<>{tab.icon}</>}
-            label={isMobile ? undefined : tab.label}
+            label={isMobile ? undefined : t(tab.labelKey)}
             onClick={() => setActiveTab(tab.key)}
             variant="filled"
             sx={{
@@ -865,16 +873,16 @@ export default function AiOptimizationHub({ userId, marketplace = 'EBAY_US', onN
 
       <Paper sx={{ p: 2, mb: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
         <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
-          AI Araçları Rehberi
+          {t('guideTitle')}
         </Typography>
         <Typography variant="body2" color="text.secondary" component="div">
           <ul style={{ margin: 0, paddingLeft: 16 }}>
-            <li><strong>Başlık Optimize:</strong> Mevcut başlığınızı AI ile optimize edin — pazar araştırması otomatik yapılır</li>
-            <li><strong>Açıklama Yaz:</strong> Profesyonel HTML ürün açıklaması oluşturun</li>
-            <li><strong>Fiyat Öner:</strong> Pazar verilerine dayalı rekabetçi fiyat önerisi alın</li>
-            <li><strong>Liste Analiz:</strong> Herhangi bir eBay listesini 0-100 arasında puanlayın</li>
-            <li><strong>Özellik Öner:</strong> Eksik ürün özelliklerini AI ile tamamlayın</li>
-            <li><strong>Toplu Optimize:</strong> 10 başlığa kadar tek seferde optimize edin</li>
+            <li><strong>{t('guideTitleOptimize')}:</strong> {t('guideTitleOptimizeDesc')}</li>
+            <li><strong>{t('guideDescWrite')}:</strong> {t('guideDescWriteDesc')}</li>
+            <li><strong>{t('guidePriceSuggest')}:</strong> {t('guidePriceSuggestDesc')}</li>
+            <li><strong>{t('guideListingAnalyze')}:</strong> {t('guideListingAnalyzeDesc')}</li>
+            <li><strong>{t('guideAspectSuggest')}:</strong> {t('guideAspectSuggestDesc')}</li>
+            <li><strong>{t('guideBulkOptimize')}:</strong> {t('guideBulkOptimizeDesc')}</li>
           </ul>
         </Typography>
       </Paper>

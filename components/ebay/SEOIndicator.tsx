@@ -1,5 +1,6 @@
 import React from 'react';
 import { Tooltip, Box, Typography, LinearProgress } from '@mui/material';
+import { useTranslations } from 'next-intl';
 
 interface SEOIndicatorProps {
   title: string;
@@ -10,6 +11,8 @@ interface SEOIndicatorProps {
 }
 
 export default function SEOIndicator({ title, description, aspects, imageCount, compact = false }: SEOIndicatorProps) {
+  const t = useTranslations('ebay.seo');
+
   const titleLength = title?.length || 0;
   const descLength = description?.length || 0;
   const aspectCount = Object.keys(aspects || {}).length;
@@ -22,11 +25,11 @@ export default function SEOIndicator({ title, description, aspects, imageCount, 
   const totalScore = titleScore + descScore + aspectScore + imageScore;
 
   const color = totalScore >= 80 ? '#22c55e' : totalScore >= 50 ? '#eab308' : '#ef4444';
-  const label = totalScore >= 80 ? 'İyi' : totalScore >= 50 ? 'Orta' : 'Zayıf';
+  const label = totalScore >= 80 ? t('good') : totalScore >= 50 ? t('medium') : t('weak');
 
   if (compact) {
     return (
-      <Tooltip title={`SEO Skoru: ${totalScore}/100 — Başlık: ${titleLength} kar., Açıklama: ${descLength} kar., Özellik: ${aspectCount}, Görsel: ${imageCount}`}>
+      <Tooltip title={t('seoTooltip', { score: totalScore, titleLen: titleLength, descLen: descLength, aspectCount, imageCount })}>
         <Box
           sx={{
             width: 12,
@@ -44,7 +47,7 @@ export default function SEOIndicator({ title, description, aspects, imageCount, 
   return (
     <Box sx={{ p: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-        <Typography variant="body2" fontWeight={600}>SEO Skoru</Typography>
+        <Typography variant="body2" fontWeight={600}>{t('seoScore')}</Typography>
         <Typography variant="body2" sx={{ color, fontWeight: 700 }}>{totalScore}/100 — {label}</Typography>
       </Box>
       <LinearProgress
@@ -61,25 +64,25 @@ export default function SEOIndicator({ title, description, aspects, imageCount, 
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" color="text.secondary">Başlık uzunluğu</Typography>
+          <Typography variant="caption" color="text.secondary">{t('titleLength')}</Typography>
           <Typography variant="caption" sx={{ color: titleLength >= 80 ? '#22c55e' : titleLength >= 40 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
             {titleLength}/80
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" color="text.secondary">Açıklama uzunluğu</Typography>
+          <Typography variant="caption" color="text.secondary">{t('descriptionLength')}</Typography>
           <Typography variant="caption" sx={{ color: descLength >= 500 ? '#22c55e' : descLength >= 200 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
-            {descLength} karakter
+            {descLength} {t('characters')}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" color="text.secondary">Ürün özellikleri</Typography>
+          <Typography variant="caption" color="text.secondary">{t('productAttributes')}</Typography>
           <Typography variant="caption" sx={{ color: aspectCount >= 10 ? '#22c55e' : aspectCount >= 5 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
-            {aspectCount} özellik
+            {aspectCount} {t('attribute')}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" color="text.secondary">Görsel sayısı</Typography>
+          <Typography variant="caption" color="text.secondary">{t('imageCount')}</Typography>
           <Typography variant="caption" sx={{ color: imageCount >= 5 ? '#22c55e' : imageCount >= 3 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
             {imageCount}/24
           </Typography>

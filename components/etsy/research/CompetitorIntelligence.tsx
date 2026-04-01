@@ -13,12 +13,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
+import { useTranslations } from 'next-intl';
 import { useEtsyResearchStore, useComputedShopStats, useComputedDeepDive } from '@/lib/stores/useEtsyResearchStore';
 import { StatCard, ScoreRing, GradientBar, PremiumEmptyState, GRADIENTS, glassCard } from './shared/ui';
 import { fmt, pct, sortArray } from './shared/utils';
 import type { SortDir } from './shared/types';
 
 export default function CompetitorIntelligence() {
+  const t = useTranslations('etsy.competitor');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [expandedShopIdx, setExpandedShopIdx] = useState<number | null>(null);
@@ -87,11 +89,11 @@ export default function CompetitorIntelligence() {
       {shopStats && shopStats.shops.length > 0 ? (
         <>
           <Paper sx={{ ...glassCard, p: isMobile ? 1.5 : 2.5, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Magaza Yogunlugu</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>{t('shopConcentration')}</Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 1.5, mb: 2 }}>
-              <StatCard label="Toplam Magaza" value={String(shopStats.shops.length)} color="#667eea" icon={<Store size={18} />} />
-              <StatCard label="Ort. Puan" value={`${shopStats.avgRating}`} color="#ff9800" icon={<Star size={18} />} />
-              <StatCard label="Top 5 Payi" value={shopStats.totalListings > 0 ? pct((shopStats.top5Sales / shopStats.totalListings) * 100) : '0%'} color="#9c27b0" icon={<Users size={18} />} />
+              <StatCard label={t('totalShops')} value={String(shopStats.shops.length)} color="#667eea" icon={<Store size={18} />} />
+              <StatCard label={t('avgRating')} value={`${shopStats.avgRating}`} color="#ff9800" icon={<Star size={18} />} />
+              <StatCard label={t('top5Share')} value={shopStats.totalListings > 0 ? pct((shopStats.top5Sales / shopStats.totalListings) * 100) : '0%'} color="#9c27b0" icon={<Users size={18} />} />
             </Box>
 
             {/* Concentration bar */}
@@ -103,7 +105,7 @@ export default function CompetitorIntelligence() {
                 <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem', fontWeight: 600 }}>Top 5</Typography>
               </Box>
               <Box sx={{ flex: 1, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>Diger</Typography>
+                <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>{t('other')}</Typography>
               </Box>
             </Box>
           </Paper>
@@ -121,7 +123,7 @@ export default function CompetitorIntelligence() {
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 700 }}>{s.shop_name}</Typography>
                         <Box sx={{ display: 'flex', gap: 1, mt: 0.3, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <Typography variant="caption" sx={{ fontWeight: 600 }}>{s.num_sales.toLocaleString()} satis</Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 600 }}>{s.num_sales.toLocaleString()} {t('salesLabel')}</Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
                             <Star size={10} color="#ff9800" fill="#ff9800" />
                             <Typography variant="caption">{s.review_average.toFixed(1)}</Typography>
@@ -134,12 +136,12 @@ export default function CompetitorIntelligence() {
                     <Collapse in={isExpanded}>
                       <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Box sx={{ display: 'flex', gap: 1.5 }}>
-                          <Typography variant="caption" color="text.secondary">Yorum: {s.review_count.toLocaleString()}</Typography>
-                          <Typography variant="caption" color="text.secondary">Urun: {s.listing_active_count}</Typography>
+                          <Typography variant="caption" color="text.secondary">{t('reviews')}: {s.review_count.toLocaleString()}</Typography>
+                          <Typography variant="caption" color="text.secondary">{t('products')}: {s.listing_active_count}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDeepDiveShopId(String(s.shop_id)); }}
-                            sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Analiz</Button>
+                            sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('analyze')}</Button>
                           <IconButton size="small" onClick={(e) => { e.stopPropagation(); window.open(s.url, '_blank'); }}>
                             <ExternalLink size={14} />
                           </IconButton>
@@ -157,12 +159,12 @@ export default function CompetitorIntelligence() {
                 <TableHead>
                   <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                     <TableCell>#</TableCell>
-                    <TableCell>Magaza</TableCell>
-                    <TableCell align="center"><TableSortLabel active={shopSortKey==='num_sales'} direction={shopSortKey==='num_sales'?shopSortDir:'desc'} onClick={()=>toggleSort('num_sales',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Satis</TableSortLabel></TableCell>
-                    <TableCell align="center"><TableSortLabel active={shopSortKey==='review_average'} direction={shopSortKey==='review_average'?shopSortDir:'desc'} onClick={()=>toggleSort('review_average',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Puan</TableSortLabel></TableCell>
-                    <TableCell align="center"><TableSortLabel active={shopSortKey==='review_count'} direction={shopSortKey==='review_count'?shopSortDir:'desc'} onClick={()=>toggleSort('review_count',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Yorum</TableSortLabel></TableCell>
-                    <TableCell align="center"><TableSortLabel active={shopSortKey==='listingCount'} direction={shopSortKey==='listingCount'?shopSortDir:'desc'} onClick={()=>toggleSort('listingCount',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Urun</TableSortLabel></TableCell>
-                    <TableCell align="center"><TableSortLabel active={shopSortKey==='avgPrice'} direction={shopSortKey==='avgPrice'?shopSortDir:'desc'} onClick={()=>toggleSort('avgPrice',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Ort. Fiyat</TableSortLabel></TableCell>
+                    <TableCell>{t('shop')}</TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='num_sales'} direction={shopSortKey==='num_sales'?shopSortDir:'desc'} onClick={()=>toggleSort('num_sales',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('sales')}</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='review_average'} direction={shopSortKey==='review_average'?shopSortDir:'desc'} onClick={()=>toggleSort('review_average',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('rating')}</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='review_count'} direction={shopSortKey==='review_count'?shopSortDir:'desc'} onClick={()=>toggleSort('review_count',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('reviews')}</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='listingCount'} direction={shopSortKey==='listingCount'?shopSortDir:'desc'} onClick={()=>toggleSort('listingCount',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('products')}</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={shopSortKey==='avgPrice'} direction={shopSortKey==='avgPrice'?shopSortDir:'desc'} onClick={()=>toggleSort('avgPrice',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('avgPrice')}</TableSortLabel></TableCell>
                     <TableCell sx={{ width: 40 }} />
                   </TableRow>
                 </TableHead>
@@ -210,12 +212,12 @@ export default function CompetitorIntelligence() {
       ) : !shopsLoading && (
         shopDiscoveryFailed && serverShopIds.length > 0
           ? <Alert severity="error" sx={{ borderRadius: '12px', mb: 2 }}
-              action={<Button color="inherit" size="small" onClick={() => discoverShops(serverShopIds)}>Tekrar Dene</Button>}
+              action={<Button color="inherit" size="small" onClick={() => discoverShops(serverShopIds)}>{t('retry')}</Button>}
             >
-              Mağaza bilgileri alınamadı. Tekrar deneyin.
+              {t('shopInfoFailed')}
             </Alert>
           : hasData
-            ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Mağaza bilgileri yükleniyor...</Alert>
+            ? <Alert severity="info" sx={{ borderRadius: '12px' }}>{t('shopInfoLoading')}</Alert>
             : (
               <>
                 {/* Discovery: top items from trending niches as competitor preview */}
@@ -230,10 +232,10 @@ export default function CompetitorIntelligence() {
                 {discoveryData?.trendingNiches?.length > 0 ? (
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Flame size={18} color="#f44336" /> Top Listings from Trending Niches
+                      <Flame size={18} color="#f44336" /> {t('topListingsTrending')}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                      Click a niche to search and discover competitor shops
+                      {t('clickNicheCompetitor')}
                     </Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
                       {discoveryData.trendingNiches.map((niche: any) => (
@@ -247,8 +249,8 @@ export default function CompetitorIntelligence() {
                               {niche.query}
                             </Typography>
                             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 1 }}>
-                              <Chip label={`${niche.totalResults?.toLocaleString()} results`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
-                              <Chip label={`$${niche.priceStats?.avg?.toFixed(2)} avg`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                              <Chip label={`${niche.totalResults?.toLocaleString()} ${t('resultsLabel')}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                              <Chip label={`$${niche.priceStats?.avg?.toFixed(2)} ${t('avgLabel')}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
                             </Box>
                             {niche.topItems?.slice(0, 3).map((item: any) => (
                               <Box key={item.listing_id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -267,9 +269,9 @@ export default function CompetitorIntelligence() {
                     </Box>
                   </Box>
                 ) : !discoveryLoading && (
-                  <PremiumEmptyState icon={<Users size={48} />} title="Mağaza Analizi"
-                    desc="Aynı nişte satan mağazaları keşfedin."
-                    steps={['Bir anahtar kelime araması yapın', 'Aramanızla ilgili mağazalar otomatik bulunur', 'Satış sayısı, puan ve ortalama fiyatlarını karşılaştırın']}
+                  <PremiumEmptyState icon={<Users size={48} />} title={t('shopAnalysis')}
+                    desc={t('shopAnalysisDesc')}
+                    steps={[t('shopStep1'), t('shopStep2'), t('shopStep3')]}
                   />
                 )}
               </>
@@ -281,11 +283,11 @@ export default function CompetitorIntelligence() {
       {/* ================================================================ */}
       <Divider sx={{ my: 3 }} />
       <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Mağaza Derinlemesine Analiz</Typography>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('shopDeepAnalysis')}</Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <TextField label="Magaza ID" value={deepDiveShopId}
+          <TextField label={t('shopId')} value={deepDiveShopId}
             onChange={e => setDeepDiveShopId(e.target.value)} size="small"
-            sx={{ flex: 1, minWidth: isMobile ? 0 : 200 }} placeholder="Magaza ID girin..."
+            sx={{ flex: 1, minWidth: isMobile ? 0 : 200 }} placeholder={t('shopIdPlaceholder')}
             onKeyDown={e => e.key === 'Enter' && searchShopDeepDive()}
           />
           <Button variant="contained" onClick={searchShopDeepDive}
@@ -293,11 +295,11 @@ export default function CompetitorIntelligence() {
             startIcon={deepDiveLoading ? <CircularProgress size={16} /> : <Search size={16} />}
             sx={{ background: GRADIENTS.primary, borderRadius: '10px', ...(isMobile && { width: '100%' }) }}
           >
-            Analiz Et
+            {t('analyze')}
           </Button>
         </Box>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-          Magaza Analizi tabindan magaza adina tiklayarak da gelebilirsiniz.
+          {t('shopIdHint')}
         </Typography>
       </Paper>
 
@@ -307,10 +309,10 @@ export default function CompetitorIntelligence() {
         <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>{deepDiveShop.shop_name}</Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 1.5 }}>
-            <StatCard label="Toplam Satis" value={deepDiveShop.num_sales.toLocaleString()} color="#11998e" icon={<ShoppingCart size={18} />} />
-            <StatCard label="Puan" value={`${deepDiveShop.review_average.toFixed(1)}`} color="#ff9800" icon={<Star size={18} />} />
-            <StatCard label="Yorum" value={deepDiveShop.review_count.toLocaleString()} color="#2196F3" icon={<Eye size={18} />} />
-            <StatCard label="Aktif Urun" value={String(deepDiveShop.listing_active_count)} color="#9c27b0" icon={<ShoppingBag size={18} />} />
+            <StatCard label={t('totalSales')} value={deepDiveShop.num_sales.toLocaleString()} color="#11998e" icon={<ShoppingCart size={18} />} />
+            <StatCard label={t('rating')} value={`${deepDiveShop.review_average.toFixed(1)}`} color="#ff9800" icon={<Star size={18} />} />
+            <StatCard label={t('reviews')} value={deepDiveShop.review_count.toLocaleString()} color="#2196F3" icon={<Eye size={18} />} />
+            <StatCard label={t('activeProducts')} value={String(deepDiveShop.listing_active_count)} color="#9c27b0" icon={<ShoppingBag size={18} />} />
           </Box>
         </Paper>
       )}
@@ -318,19 +320,19 @@ export default function CompetitorIntelligence() {
       {deepDiveStats && (
         <>
           <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 1.5, mb: 2 }}>
-            <StatCard label="Min Fiyat" value={fmt(deepDiveStats.priceMin)} color="#11998e" />
-            <StatCard label="Ort. Fiyat" value={fmt(deepDiveStats.priceAvg)} color="#2196F3" />
-            <StatCard label="Max Fiyat" value={fmt(deepDiveStats.priceMax)} color="#f44336" />
-            <StatCard label="Ort. Favori" value={String(deepDiveStats.avgFav)} color="#e91e63" icon={<Heart size={18} />} />
-            <StatCard label="Ort. Grnm" value={String(deepDiveStats.avgViews)} color="#ff9800" icon={<Eye size={18} />} />
+            <StatCard label={t('minPrice')} value={fmt(deepDiveStats.priceMin)} color="#11998e" />
+            <StatCard label={t('avgPriceLabel')} value={fmt(deepDiveStats.priceAvg)} color="#2196F3" />
+            <StatCard label={t('maxPrice')} value={fmt(deepDiveStats.priceMax)} color="#f44336" />
+            <StatCard label={t('avgFavorites')} value={String(deepDiveStats.avgFav)} color="#e91e63" icon={<Heart size={18} />} />
+            <StatCard label={t('avgViews')} value={String(deepDiveStats.avgViews)} color="#ff9800" icon={<Eye size={18} />} />
           </Box>
 
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>En Cok Kullanilan Tagler</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('topUsedTags')}</Typography>
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-              {deepDiveStats.topTags.map(t => (
-                <Chip key={t.tag} label={`${t.tag} (%${t.pct})`} size="small" variant="outlined"
-                  onClick={() => { navigator.clipboard.writeText(t.tag); toast.success('Kopyalandi'); }}
+              {deepDiveStats.topTags.map(tg => (
+                <Chip key={tg.tag} label={`${tg.tag} (%${tg.pct})`} size="small" variant="outlined"
+                  onClick={() => { navigator.clipboard.writeText(tg.tag); toast.success(t('copied')); }}
                   sx={{ cursor: 'pointer', borderRadius: '8px' }}
                 />
               ))}
@@ -339,7 +341,7 @@ export default function CompetitorIntelligence() {
 
           {isMobile ? (
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>En Populer Urunler</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('topProducts')}</Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {sortedBestListings.map((l, i) => {
                   const isExpanded = expandedListingIdx === i;
@@ -365,7 +367,7 @@ export default function CompetitorIntelligence() {
                       </Box>
                       <Collapse in={isExpanded}>
                         <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Typography variant="caption" color="text.secondary">Goruntuleme: {l.views.toLocaleString()}</Typography>
+                          <Typography variant="caption" color="text.secondary">{t('viewsLabel')}: {l.views.toLocaleString()}</Typography>
                           <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); window.open(l.url, '_blank'); }}
                             startIcon={<ExternalLink size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Etsy</Button>
                         </Box>
@@ -378,17 +380,17 @@ export default function CompetitorIntelligence() {
           ) : (
           <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
             <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>En Populer Urunler</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('topProducts')}</Typography>
             </Box>
             <TableContainer sx={{ maxHeight: 400 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                     <TableCell>#</TableCell>
-                    <TableCell>Baslik</TableCell>
-                    <TableCell align="right"><TableSortLabel active={bestListingSortKey==='price'} direction={bestListingSortKey==='price'?bestListingSortDir:'desc'} onClick={()=>toggleSort('price',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Fiyat</TableSortLabel></TableCell>
-                    <TableCell align="center"><TableSortLabel active={bestListingSortKey==='num_favorers'} direction={bestListingSortKey==='num_favorers'?bestListingSortDir:'desc'} onClick={()=>toggleSort('num_favorers',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Favori</TableSortLabel></TableCell>
-                    <TableCell align="center"><TableSortLabel active={bestListingSortKey==='views'} direction={bestListingSortKey==='views'?bestListingSortDir:'desc'} onClick={()=>toggleSort('views',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Grnm</TableSortLabel></TableCell>
+                    <TableCell>{t('titleCol')}</TableCell>
+                    <TableCell align="right"><TableSortLabel active={bestListingSortKey==='price'} direction={bestListingSortKey==='price'?bestListingSortDir:'desc'} onClick={()=>toggleSort('price',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('priceCol')}</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={bestListingSortKey==='num_favorers'} direction={bestListingSortKey==='num_favorers'?bestListingSortDir:'desc'} onClick={()=>toggleSort('num_favorers',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('favoriteCol')}</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={bestListingSortKey==='views'} direction={bestListingSortKey==='views'?bestListingSortDir:'desc'} onClick={()=>toggleSort('views',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('viewsCol')}</TableSortLabel></TableCell>
                     <TableCell sx={{ width: 40 }} />
                   </TableRow>
                 </TableHead>
@@ -432,20 +434,20 @@ export default function CompetitorIntelligence() {
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: shopSpyReport ? 2 : 0, flexWrap: 'wrap', gap: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Zap size={16} color="#ff9800" /> AI Magaza Raporu
+                <Zap size={16} color="#ff9800" />{t('aiShopReport')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, ...(isMobile && { width: '100%' }) }}>
                 <Button size="small" variant="outlined" onClick={fetchShopReviews}
                   disabled={shopReviewsLoading}
                   startIcon={shopReviewsLoading ? <CircularProgress size={14} /> : <MessageSquare size={14} />}
                   sx={{ borderRadius: '10px', ...(isMobile && { flex: 1 }) }}>
-                  Yorumlari Yukle
+                  {t('loadReviews')}
                 </Button>
                 <Button size="small" variant="contained" onClick={fetchShopSpyReport}
                   disabled={shopSpyReportLoading || !deepDiveStats}
                   startIcon={shopSpyReportLoading ? <CircularProgress size={14} /> : <Zap size={14} />}
                   sx={{ background: GRADIENTS.primary, borderRadius: '10px', ...(isMobile && { flex: 1 }) }}>
-                  AI Raporu
+                  {t('aiReport')}
                 </Button>
               </Box>
             </Box>
@@ -459,12 +461,12 @@ export default function CompetitorIntelligence() {
                     <Typography variant="h3" sx={{ fontWeight: 900, color: (shopSpyReport.shop_score ?? 0) >= 70 ? '#4caf50' : (shopSpyReport.shop_score ?? 0) >= 50 ? '#2196F3' : '#ff9800' }}>
                       {shopSpyReport.shop_score}
                     </Typography>
-                    <Typography variant="caption">Mağaza Skoru</Typography>
+                    <Typography variant="caption">{t('shopScore')}</Typography>
                   </Box>
                   <Divider orientation="vertical" flexItem />
                   <Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      Tahmini Aylık Gelir: ${shopSpyReport.estimated_monthly_revenue?.toLocaleString()}
+                      {t('estMonthlyRevenue')}: ${shopSpyReport.estimated_monthly_revenue?.toLocaleString()}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">{shopSpyReport.revenue_reasoning}</Typography>
                   </Box>
@@ -474,8 +476,8 @@ export default function CompetitorIntelligence() {
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 1.5, mb: 2 }}>
                   {[
-                    { title: 'Guclu Yanlar', items: shopSpyReport.strengths, color: '#4caf50', icon: <ThumbsUp size={14} /> },
-                    { title: 'Zayif Yanlar', items: shopSpyReport.weaknesses, color: '#f44336', icon: <ThumbsDown size={14} /> },
+                    { title: t('strengths'), items: shopSpyReport.strengths, color: '#4caf50', icon: <ThumbsUp size={14} /> },
+                    { title: t('weaknesses'), items: shopSpyReport.weaknesses, color: '#f44336', icon: <ThumbsDown size={14} /> },
                   ].map(section => (
                     <Paper key={section.title} sx={{ ...glassCard, p: 1.5 }}>
                       <Typography variant="caption" sx={{ fontWeight: 700, color: section.color, display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
@@ -490,7 +492,7 @@ export default function CompetitorIntelligence() {
 
                 {shopSpyReport.what_to_learn?.length > 0 && (
                   <Alert severity="success" sx={{ mb: 1.5, borderRadius: '12px' }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Öğrenilecekler</Typography>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('whatToLearn')}</Typography>
                     {shopSpyReport.what_to_learn.map((item: string, i: number) => (
                       <Typography key={i} variant="body2" sx={{ fontSize: '0.8rem' }}>• {item}</Typography>
                     ))}
@@ -498,7 +500,7 @@ export default function CompetitorIntelligence() {
                 )}
                 {shopSpyReport.what_to_avoid?.length > 0 && (
                   <Alert severity="warning" sx={{ borderRadius: '12px' }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Kaçınılacaklar</Typography>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('whatToAvoid')}</Typography>
                     {shopSpyReport.what_to_avoid.map((item: string, i: number) => (
                       <Typography key={i} variant="body2" sx={{ fontSize: '0.8rem' }}>• {item}</Typography>
                     ))}
@@ -513,13 +515,13 @@ export default function CompetitorIntelligence() {
             <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <MessageSquare size={16} color="#2196F3" /> Müşteri Yorumları ({shopReviews.reviews?.length || 0})
+                  <MessageSquare size={16} color="#2196F3" />{t('customerReviews')} ({shopReviews.reviews?.length || 0})
                 </Typography>
                 <Button size="small" variant="contained" onClick={fetchReviewSentiment}
                   disabled={reviewSentimentLoading || !shopReviews.reviews?.length}
                   startIcon={reviewSentimentLoading ? <CircularProgress size={14} /> : <Zap size={14} />}
                   sx={{ background: GRADIENTS.primary, borderRadius: '10px' }}>
-                  Duygu Analizi
+                  {t('sentimentAnalysis')}
                 </Button>
               </Box>
 
@@ -550,14 +552,14 @@ export default function CompetitorIntelligence() {
                   <Alert severity={reviewSentiment.sentiment_score > 70 ? 'success' : reviewSentiment.sentiment_score > 40 ? 'warning' : 'error'}
                     sx={{ mb: 2, borderRadius: '12px' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      {reviewSentiment.overall_sentiment} (Skor: {reviewSentiment.sentiment_score}/100)
+                      {reviewSentiment.overall_sentiment} ({t('score')}: {reviewSentiment.sentiment_score}/100)
                     </Typography>
                   </Alert>
 
                   <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 1.5, mb: 2 }}>
                     <Paper sx={{ ...glassCard, p: 1.5 }}>
                       <Typography variant="caption" sx={{ fontWeight: 700, color: '#4caf50', mb: 0.5, display: 'block' }}>
-                        <ThumbsUp size={12} /> Musteriler Seviyor
+                        <ThumbsUp size={12} />{t('buyersLove')}
                       </Typography>
                       {(reviewSentiment.buyer_loves || []).map((item: string, i: number) => (
                         <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {item}</Typography>
@@ -565,7 +567,7 @@ export default function CompetitorIntelligence() {
                     </Paper>
                     <Paper sx={{ ...glassCard, p: 1.5 }}>
                       <Typography variant="caption" sx={{ fontWeight: 700, color: '#f44336', mb: 0.5, display: 'block' }}>
-                        <ThumbsDown size={12} /> Sikayetler
+                        <ThumbsDown size={12} />{t('complaints')}
                       </Typography>
                       {(reviewSentiment.buyer_complaints || []).map((item: string, i: number) => (
                         <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {item}</Typography>
@@ -575,7 +577,7 @@ export default function CompetitorIntelligence() {
 
                   {reviewSentiment.product_insights?.length > 0 && (
                     <Alert severity="info" sx={{ borderRadius: '12px' }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Ürün Geliştirme Fırsatları</Typography>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('productOpportunities')}</Typography>
                       {reviewSentiment.product_insights.map((item: string, i: number) => (
                         <Typography key={i} variant="body2" sx={{ fontSize: '0.8rem' }}>• {item}</Typography>
                       ))}
@@ -589,9 +591,9 @@ export default function CompetitorIntelligence() {
       )}
 
       {!deepDiveLoading && !deepDiveShop && !discoveredShops.length && !shopsLoading && (
-        <PremiumEmptyState icon={<Store size={48} />} title="Mağaza & AI Analizi"
-          desc="Rakip mağazaları keşfedin ve AI ile pazar analizi alın."
-          steps={['Önce bir anahtar kelime araması yapın', 'Rakip mağazalar otomatik keşfedilir', 'Bir mağazayı derinlemesine analiz edin veya AI özeti alın']} />
+        <PremiumEmptyState icon={<Store size={48} />} title={t('shopAiTitle')}
+          desc={t('shopAiDesc')}
+          steps={[t('shopAiStep1'), t('shopAiStep2'), t('shopAiStep3')]} />
       )}
 
       {/* ================================================================ */}
@@ -600,11 +602,11 @@ export default function CompetitorIntelligence() {
       <Box sx={{ mt: 3 }}>
         <Divider sx={{ mb: 2 }} />
         <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Sparkles size={18} color="#9c27b0" /> AI Pazar Analizi
+          <Sparkles size={18} color="#9c27b0" />{t('aiMarketAnalysis')}
         </Typography>
         <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Gemini AI ile pazar verilerinizi analiz edin
+            {t('aiMarketDesc')}
           </Typography>
           <Button variant="contained" onClick={generateAiInsights}
             disabled={aiLoading || items.length === 0} size="large"
@@ -614,11 +616,11 @@ export default function CompetitorIntelligence() {
               boxShadow: '0 4px 12px rgba(123,31,162,0.3)',
             }}
           >
-            {aiLoading ? 'Analiz ediliyor...' : 'AI Analizi Baslat'}
+            {aiLoading ? t('analyzing') : t('startAiAnalysis')}
           </Button>
           {items.length === 0 && (
             <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-              Oncelikle bir arama yapin
+              {t('doSearchFirst')}
             </Typography>
           )}
         </Paper>
@@ -628,23 +630,23 @@ export default function CompetitorIntelligence() {
         {aiAnalysis && (
           <>
             <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
-              <ScoreRing score={aiAnalysis.opportunity_score} size={140} label="Firsat" />
+              <ScoreRing score={aiAnalysis.opportunity_score} size={140} label={t('opportunity')} />
               <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-                Seviye: <strong>{aiAnalysis.opportunity_level}</strong>
+                {t('level')}: <strong>{aiAnalysis.opportunity_level}</strong>
               </Typography>
             </Paper>
 
             <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Pazar Ozeti</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('marketSummary')}</Typography>
               <Typography variant="body2">{aiAnalysis.market_summary}</Typography>
             </Paper>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
               {[
-                { title: 'Fiyatlandirma Stratejisi', text: aiAnalysis.pricing_strategy, color: '#2196F3', icon: <DollarSign size={16} /> },
-                { title: 'Nis Pozisyonlama', text: aiAnalysis.niche_positioning, color: '#9c27b0', icon: <Target size={16} /> },
-                { title: 'Rekabet Analizi', text: aiAnalysis.competition_analysis, color: '#eb3349', icon: <Users size={16} /> },
-                { title: 'Mevsimsel Tavsiyeler', text: aiAnalysis.seasonal_advice, color: '#ff9800', icon: <Calendar size={16} /> },
+                { title: t('pricingStrategy'), text: aiAnalysis.pricing_strategy, color: '#2196F3', icon: <DollarSign size={16} /> },
+                { title: t('nichePositioning'), text: aiAnalysis.niche_positioning, color: '#9c27b0', icon: <Target size={16} /> },
+                { title: t('competitionAnalysis'), text: aiAnalysis.competition_analysis, color: '#eb3349', icon: <Users size={16} /> },
+                { title: t('seasonalAdvice'), text: aiAnalysis.seasonal_advice, color: '#ff9800', icon: <Calendar size={16} /> },
               ].map(card => (
                 <Paper key={card.title} sx={{ ...glassCard, p: 2.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -660,17 +662,17 @@ export default function CompetitorIntelligence() {
             </Box>
 
             <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Baslik Optimizasyonu</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('titleOptimization')}</Typography>
               <Typography variant="body2">{aiAnalysis.title_recommendations}</Typography>
             </Paper>
 
             {aiAnalysis.tag_recommendations?.length > 0 && (
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Onerilen Tagler</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('suggestedTags')}</Typography>
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                   {aiAnalysis.tag_recommendations.map((tag: string, i: number) => (
                     <Chip key={i} label={tag} size="small" variant="outlined"
-                      onClick={() => { navigator.clipboard.writeText(tag); toast.success('Kopyalandi'); }}
+                      onClick={() => { navigator.clipboard.writeText(tag); toast.success(t('copied')); }}
                       sx={{ cursor: 'pointer', borderRadius: '8px', borderColor: '#9c27b0', color: '#9c27b0' }}
                     />
                   ))}
@@ -681,7 +683,7 @@ export default function CompetitorIntelligence() {
             {aiAnalysis.action_items?.length > 0 && (
               <Paper sx={{ ...glassCard, p: 2.5 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#11998e' }}>
-                  Yapilacaklar Listesi
+                  {t('todoList')}
                 </Typography>
                 {aiAnalysis.action_items.map((item: string, i: number) => (
                   <Box key={i} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>

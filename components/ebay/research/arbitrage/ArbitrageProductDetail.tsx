@@ -5,7 +5,9 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { useTranslations } from 'next-intl';
 import type { ArbitrageResult } from '../../../../lib/arbitrage/types';
+import useLocaleStore from '../../../../lib/stores/useLocaleStore';
 import { formatCurrency, formatPercent, getVerdictConfig } from './arbitrageConstants';
 
 interface Props {
@@ -15,6 +17,8 @@ interface Props {
 }
 
 export default function ArbitrageProductDetail({ result, open, onClose }: Props) {
+  const ta = useTranslations('ebay.research.arbitrage');
+  const locale = useLocaleStore(s => s.locale);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -36,13 +40,13 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Chip
-            label={`${vc.label} — ${score}`}
+            label={`${ta(vc.label)} — ${score}`}
             size="small"
             sx={{ bgcolor: vc.bg, color: vc.color, fontWeight: 700 }}
           />
           {matchTier && (
             <Chip
-              label={matchTier === 'gtin' ? 'GTIN' : matchTier === 'gemini' ? 'AI Eşleşme' : 'Fallback'}
+              label={matchTier === 'gtin' ? 'GTIN' : matchTier === 'gemini' ? ta('aiMatch') : ta('fallback')}
               size="small"
               variant="outlined"
               sx={{ fontSize: '0.65rem' }}
@@ -55,7 +59,7 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
       {/* Trendyol Product */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-          Trendyol Ürün
+          {ta('trendyolProduct')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
           <Avatar
@@ -68,10 +72,10 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
               {trendyol.brand && `${trendyol.brand} — `}{trendyol.name}
             </Typography>
             <Typography variant="h6" sx={{ color: '#e65100', fontWeight: 700, mt: 0.5 }}>
-              {formatCurrency(trendyol.priceTry, 'TRY')}
+              {formatCurrency(trendyol.priceTry, 'TRY', locale)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              = {formatCurrency(trendyol.priceTry * exchangeRate)} | {trendyol.categoryName}
+              = {formatCurrency(trendyol.priceTry * exchangeRate, 'USD', locale)} | {trendyol.categoryName}
             </Typography>
           </Box>
         </Box>
@@ -83,33 +87,33 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
           startIcon={<OpenInNewIcon />}
           sx={{ mt: 1, fontSize: '0.7rem' }}
         >
-          Trendyol'da Aç
+          {ta('openOnTrendyol')}
         </Button>
       </Paper>
 
       {/* eBay Comparables */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-          eBay Karşılaştırma ({ebay.totalListings} listing)
+          {ta('ebayComparison', { count: ebay.totalListings })}
         </Typography>
         {translatedQuery && (
           <Typography variant="caption" display="block" sx={{ mb: 1, color: '#666' }}>
-            Arama: "{translatedQuery}"
+            {ta('search')}: "{translatedQuery}"
           </Typography>
         )}
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, mb: 1.5 }}>
           <Box sx={{ textAlign: 'center' }}>
             <Typography variant="caption" color="text.secondary">Min</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatCurrency(ebay.minPrice)}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatCurrency(ebay.minPrice, 'USD', locale)}</Typography>
           </Box>
           <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary">Medyan</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: '#1565c0' }}>{formatCurrency(ebay.medianPrice)}</Typography>
+            <Typography variant="caption" color="text.secondary">{ta('median')}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700, color: '#1565c0' }}>{formatCurrency(ebay.medianPrice, 'USD', locale)}</Typography>
           </Box>
           <Box sx={{ textAlign: 'center' }}>
             <Typography variant="caption" color="text.secondary">Max</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatCurrency(ebay.maxPrice)}</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatCurrency(ebay.maxPrice, 'USD', locale)}</Typography>
           </Box>
         </Box>
 
@@ -120,9 +124,9 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="caption" noWrap>{item.title}</Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Typography variant="caption" sx={{ fontWeight: 700 }}>{formatCurrency(item.price)}</Typography>
+                <Typography variant="caption" sx={{ fontWeight: 700 }}>{formatCurrency(item.price, 'USD', locale)}</Typography>
                 {item.soldQuantity > 0 && (
-                  <Typography variant="caption" color="text.secondary">{item.soldQuantity} satıldı</Typography>
+                  <Typography variant="caption" color="text.secondary">{item.soldQuantity} {ta('sold')}</Typography>
                 )}
               </Box>
             </Box>
@@ -133,16 +137,16 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
       {/* Financial Breakdown */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-          Finansal Analiz
+          {ta('financialAnalysis')}
         </Typography>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75, mt: 1 }}>
           {[
-            ['Ürün Maliyeti', formatCurrency(financials.costUsd)],
-            ['Kargo', formatCurrency(financials.shippingUsd)],
-            ['eBay Komisyon', `${formatCurrency(financials.ebayFeeUsd)} (${financials.ebayFeePercent}%)`],
-            ['Ödeme İşleme', formatCurrency(financials.paymentFeeUsd)],
-            ['Uluslararası', formatCurrency(financials.internationalFeeUsd)],
+            [ta('productCost'), formatCurrency(financials.costUsd, 'USD', locale)],
+            [ta('shipping'), formatCurrency(financials.shippingUsd, 'USD', locale)],
+            [ta('ebayCommission'), `${formatCurrency(financials.ebayFeeUsd, 'USD', locale)} (${financials.ebayFeePercent}%)`],
+            [ta('paymentProcessing'), formatCurrency(financials.paymentFeeUsd, 'USD', locale)],
+            [ta('international'), formatCurrency(financials.internationalFeeUsd, 'USD', locale)],
           ].map(([label, val]) => (
             <React.Fragment key={label}>
               <Typography variant="caption" color="text.secondary">{label}</Typography>
@@ -154,11 +158,11 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
         <Divider sx={{ my: 1 }} />
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>Toplam Maliyet</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>{ta('totalCost')}</Typography>
           <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right' }}>
-            {formatCurrency(financials.totalCostUsd)}
+            {formatCurrency(financials.totalCostUsd, 'USD', locale)}
           </Typography>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>Satış Fiyatı</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>{ta('sellingPrice')}</Typography>
           <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right', color: '#1565c0' }}>
             {formatCurrency(financials.suggestedPriceUsd)}
           </Typography>
@@ -168,7 +172,7 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, textAlign: 'center' }}>
           <Box>
-            <Typography variant="caption" color="text.secondary">Kâr</Typography>
+            <Typography variant="caption" color="text.secondary">{ta('profit')}</Typography>
             <Typography variant="h6" sx={{
               fontWeight: 700,
               color: financials.profitUsd > 0 ? '#2e7d32' : '#c62828',
@@ -183,7 +187,7 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
             </Typography>
           </Box>
           <Box>
-            <Typography variant="caption" color="text.secondary">Marj</Typography>
+            <Typography variant="caption" color="text.secondary">{ta('margin')}</Typography>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               {formatPercent(financials.marginPercent)}
             </Typography>

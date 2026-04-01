@@ -1,20 +1,21 @@
 import React from 'react';
 import Link from 'next/link';
 import { Twitter, Linkedin, Youtube } from 'lucide-react'; // Using lucide-react for icons
+import { useTranslations } from 'next-intl';
 
-const productLinks = [
-  { name: 'Gönderim', href: '/features/shipping' },
-  { name: 'Otomasyon', href: '/features/automation' },
+const getProductLinks = (t) => [
+  { name: t('shipping'), href: '/features/shipping' },
+  { name: t('automation'), href: '/features/automation' },
 ];
 
-const resourceLinks = [
-  { name: 'Blog', href: '/blog' },
-  { name: 'Destek', href: '/iletisim' },
+const getResourceLinks = (t) => [
+  { name: t('blog'), href: '/blog' },
+  { name: t('support'), href: '/iletisim' },
   // Legal Links
-  { name: 'Privacy Policy', href: '/privacy' },
-  { name: 'Terms of Service', href: '/terms' },
-  { name: 'Gizlilik Politikası', href: '/privacy-tr' },
-  { name: 'Kullanım Şartları', href: '/terms-tr' },
+  { name: t('privacyPolicyEN'), href: '/privacy' },
+  { name: t('termsOfServiceEN'), href: '/terms' },
+  { name: t('privacyPolicy'), href: '/privacy-tr' },
+  { name: t('termsOfService'), href: '/terms-tr' },
 ];
 
 const socialLinks = [
@@ -35,6 +36,9 @@ const ListItem = ({ href, children }) => (
 
 const PublicFooter = () => {
   const brandName = 'KolayXport'; // Defined once
+  const t = useTranslations('public');
+  const productLinks = getProductLinks(t);
+  const resourceLinks = getResourceLinks(t);
 
   return (
     <footer className="bg-gradient-to-br from-[#111111] to-[#1f2937] text-slate-300 py-12 md:py-16">
@@ -48,7 +52,7 @@ const PublicFooter = () => {
                 {brandName}
             </Link>
             <p className="text-sm text-slate-400">
-              Tek panelde e-ticaret entegrasyonu
+              {t('tagline')}
             </p>
             <p className="text-sm text-slate-400">
               <a href="mailto:destek@kolayxport.com" className="text-slate-300 hover:text-white transition-colors">destek@kolayxport.com</a>
@@ -72,7 +76,7 @@ const PublicFooter = () => {
 
           {/* Column 2: Çözümlerimiz */}
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Çözümlerimiz</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">{t('ourSolutions')}</h3>
             <ul className="space-y-2.5">
               {productLinks.map((link) => (
                 <ListItem key={link.name} href={link.href}>
@@ -84,7 +88,7 @@ const PublicFooter = () => {
 
           {/* Column 3: Kaynaklar */}
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Kaynaklar</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">{t('resources')}</h3>
             <ul className="space-y-2.5">
               {resourceLinks.map((link) => (
                 <ListItem key={link.name} href={link.href}>
@@ -97,7 +101,7 @@ const PublicFooter = () => {
 
         <div className="border-t border-slate-700 pt-8 text-center text-sm">
           <p>
-            &copy; {new Date().getFullYear()} {brandName}. Tüm hakları saklıdır.
+            &copy; {new Date().getFullYear()} {brandName}. {t('allRightsReserved')}
           </p>
           <p className="mt-2 text-xs text-slate-500">
             The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy.

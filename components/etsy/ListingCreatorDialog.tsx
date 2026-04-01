@@ -772,17 +772,17 @@ export default function ListingCreatorDialog({
             {t('marketData')}: &quot;{marketResearchData.query}&quot;
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-            {marketResearchData.topTags.slice(0, 8).map((t) => (
+            {marketResearchData.topTags.slice(0, 8).map((tagItem) => (
               <Chip
-                key={t.tag}
-                label={`${t.tag} (${t.pct}%)`}
+                key={tagItem.tag}
+                label={`${tagItem.tag} (${tagItem.pct}%)`}
                 size="small"
                 variant="outlined"
                 sx={{ fontSize: '0.65rem', height: 22, cursor: 'pointer' }}
                 onClick={() => {
-                  if (tags.length < 13 && !tags.includes(t.tag)) {
-                    setTags((prev) => [...prev, t.tag]);
-                    toast.success(t('tagAdded', { tag: t.tag }));
+                  if (tags.length < 13 && !tags.includes(tagItem.tag)) {
+                    setTags((prev) => [...prev, tagItem.tag]);
+                    toast.success(t('tagAdded', { tag: tagItem.tag }));
                   }
                 }}
               />
@@ -927,16 +927,16 @@ export default function ListingCreatorDialog({
               <Button
                 size="small"
                 onClick={() => {
-                  const newTags = aiTagSuggestions.filter((t) => !tags.includes(t));
+                  const newTags = aiTagSuggestions.filter((tag) => !tags.includes(tag));
                   const merged = [...tags, ...newTags].slice(0, 13);
                   setTags(merged);
                   setAiTagSuggestions([]);
                   toast.success(t('tagsAdded', { count: merged.length - tags.length }));
                 }}
-                disabled={aiTagSuggestions.every((t) => tags.includes(t))}
+                disabled={aiTagSuggestions.every((tag) => tags.includes(tag))}
                 sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
-  >
-                {t('addAll')}
+              >
+                {t('addAllTags')}
               </Button>
             </Box>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -1083,7 +1083,7 @@ export default function ListingCreatorDialog({
         />
         {marketResearchData?.priceStats && !price && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-            {t('marketAverage')}: ${marketResearchData.priceStats.avg} (${marketResearchData.priceStats.min} - ${marketResearchData.priceStats.max})
+            {t('marketAvgPrice', { avg: marketResearchData.priceStats.avg, min: marketResearchData.priceStats.min, max: marketResearchData.priceStats.max })}
           </Typography>
         )}
       </Box>

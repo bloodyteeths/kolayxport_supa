@@ -13,6 +13,7 @@ import {
   KeyboardArrowDown as DownIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // --- Types ---
 
@@ -51,18 +52,18 @@ interface VariationEditorProps {
 
 // --- Etsy known property types ---
 const ETSY_PROPERTIES = [
-  { id: 200, name: 'Color', label: 'Renk' },
-  { id: 100, name: 'Size', label: 'Beden' },
-  { id: 504, name: 'Length', label: 'Uzunluk' },
-  { id: 501, name: 'Width', label: 'Genislik' },
-  { id: 502, name: 'Height', label: 'Yükseklik' },
-  { id: 503, name: 'Weight', label: 'Agirlik' },
-  { id: 505, name: 'Diameter', label: 'Cap' },
-  { id: 506, name: 'Dimensions', label: 'Boyutlar' },
-  { id: 507, name: 'Fabric', label: 'Kumas' },
-  { id: 508, name: 'Style', label: 'Stil' },
-  { id: 509, name: 'Material', label: 'Malzeme' },
-  { id: 510, name: 'Pattern', label: 'Desen' },
+  { id: 200, name: 'Color', tKey: 'color' },
+  { id: 100, name: 'Size', tKey: 'size' },
+  { id: 504, name: 'Length', tKey: 'length' },
+  { id: 501, name: 'Width', tKey: 'width' },
+  { id: 502, name: 'Height', tKey: 'height' },
+  { id: 503, name: 'Weight', tKey: 'weight' },
+  { id: 505, name: 'Diameter', tKey: 'diameter' },
+  { id: 506, name: 'Dimensions', tKey: 'dimensions' },
+  { id: 507, name: 'Fabric', tKey: 'fabric' },
+  { id: 508, name: 'Style', tKey: 'style' },
+  { id: 509, name: 'Material', tKey: 'material' },
+  { id: 510, name: 'Pattern', tKey: 'pattern' },
 ];
 
 // --- Currency helpers ---
@@ -102,6 +103,7 @@ const sectionHeaderSx = {
 // --- Component ---
 
 export default function VariationEditor({ listingId, shopId, onSaved }: VariationEditorProps) {
+  const t = useTranslations('etsy.variation');
   const [products, setProducts] = useState<Product[]>([]);
   const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,7 +197,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       const res = await fetch(
         `/api/clawd/etsy?action=get_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`
       );
-      if (!res.ok) throw new Error('Envanter verileri alinamadi');
+      if (!res.ok) throw new Error(t('inventoryFetchFailed'));
       const data = await res.json();
       const fetched = data.products || [];
       setProducts(fetched);
@@ -245,7 +247,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
   const removeProduct = (idx: number) => {
     setProducts(prev => prev.filter((_, i) => i !== idx));
     setDeleteIndex(null);
-    toast.success('Varyasyon silindi');
+    toast.success(t('variationDeleted'));
   };
 
   const duplicateProduct = (idx: number) => {
@@ -254,7 +256,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       clone.product_id = 0;
       clone.sku = '';
       if (clone.property_values[0]?.values[0]) {
-        clone.property_values[0].values[0] += ' (kopya)';
+        clone.property_values[0].values[0] += ` (${t('copy')})`;
       }
       const arr = [...prev];
       arr.splice(idx + 1, 0, clone);
@@ -287,7 +289,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       o.price = { ...o.price, amount: Math.round(newPrice * o.price.divisor) };
       return { ...p, offerings: [o, ...p.offerings.slice(1)] };
     }));
-    toast.success('Fiyatlar güncellendi');
+    toast.success(t('pricesUpdated'));
   };
 
   const applyBulkQuantity = () => {
@@ -303,17 +305,17 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       o.quantity = newQty;
       return { ...p, offerings: [o, ...p.offerings.slice(1)] };
     }));
-    toast.success('Stoklar güncellendi');
+    toast.success(t('stockUpdated'));
   };
 
   // Batch add variations
   const addVariations = () => {
     const values = addValues.split(',').map(v => v.trim()).filter(v => v.length > 0);
-    if (!values.length) { toast.error('En az bir deger girin'); return; }
+    if (!values.length) { toast.error(t('enterAtLeastOneValue')); return; }
     const priceNum = parseFloat(addPrice);
     const qtyNum = parseInt(addQuantity, 10);
-    if (isNaN(priceNum) || priceNum < 0) { toast.error('Gecerli fiyat girin'); return; }
-    if (isNaN(qtyNum) || qtyNum < 0) { toast.error('Gecerli stok girin'); return; }
+    if (isNaN(priceNum) || priceNum < 0) { toast.error(t('enterValidPrice')); return; }
+    if (isNaN(qtyNum) || qtyNum < 0) { toast.error(t('enterValidStock')); return; }
 
     const propName = existingProperties.find(p => p.id === addPropertyId)?.name
       || ETSY_PROPERTIES.find(p => p.id === addPropertyId)?.name || 'Variation';
@@ -340,7 +342,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
     setAddValues('');
     setAddPrice('');
     setAddQuantity('1');
-    toast.success(`${values.length} varyasyon eklendi`);
+    toast.success(t('variationsAdded', { count: values.length }));
   };
 
   // --- Save ---
@@ -354,9 +356,9 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Envanter güncellenemedi');
+        throw new Error(err.error || t('inventoryUpdateFailed'));
       }
-      toast.success('Varyasyonlar Etsy\'ye kaydedildi');
+      toast.success(t('variationsSavedToEtsy'));
       setOriginalProducts(JSON.parse(JSON.stringify(products)));
       onSaved();
     } catch (err: any) {
@@ -373,7 +375,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       <Box display="flex" justifyContent="center" alignItems="center" py={4}>
         <CircularProgress size={28} />
         <Typography sx={{ ml: 1.5 }} variant="body2" color="text.secondary">
-          Varyasyonlar yukleniyor...
+          {t('variationsLoading')}
         </Typography>
       </Box>
     );
@@ -401,18 +403,18 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
           '& .MuiTabs-indicator': { bgcolor: '#667eea', height: 2.5 },
         }}
       >
-        <Tab label="Varyasyonlar" />
-        <Tab label="Fiyat" />
-        <Tab label="Stok" />
+        <Tab label={t('tabVariations')} />
+        <Tab label={t('tabPrice')} />
+        <Tab label={t('tabStock')} />
         <Tab label="SKU" />
-        <Tab label="Görünürlük" />
+        <Tab label={t('tabVisibility')} />
       </Tabs>
 
       {/* Summary chips */}
       {products.length > 0 && (
         <Box sx={{ display: 'flex', gap: 1, py: 1, px: 0.5, flexWrap: 'wrap' }}>
-          <Chip label={`${products.length} varyasyon`} size="small" variant="outlined" />
-          <Chip label={`Toplam stok: ${totalStock}`} size="small" variant="outlined" />
+          <Chip label={`${products.length} ${t('tabVariations').toLowerCase()}`} size="small" variant="outlined" />
+          <Chip label={`${t('totalStock')}: ${totalStock}`} size="small" variant="outlined" />
           {existingProperties.map(p => (
             <Chip key={p.id} label={p.name} size="small"
               sx={{ bgcolor: 'rgba(102,126,234,0.1)', fontWeight: 600 }} />
@@ -423,7 +425,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       {/* Unsaved warning */}
       {hasChanges && (
         <Alert severity="warning" sx={{ py: 0.3, my: 0.5, borderRadius: '8px', fontSize: '0.8rem' }}>
-          Kaydedilmemis degisiklikler var
+          {t('unsavedChanges')}
         </Alert>
       )}
 
@@ -440,20 +442,20 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
               onClick={() => setAddDialogOpen(true)}
               sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}
             >
-              Varyasyon Ekle
+              {t('addVariation')}
             </Button>
             <Typography variant="caption" color="text.secondary">
-              İlk varyasyon = varsayılan
+              {t('firstVariationDefault')}
             </Typography>
           </Box>
 
           {products.length === 0 ? (
             <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#fafafa', borderRadius: '10px' }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                Henüz varyasyon yok
+                {t('noVariationsYet')}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Virgülle ayirarak toplu ekleyebilirsiniz: <strong>S, M, L, XL</strong>
+                {t('bulkAddHint')}
               </Typography>
             </Paper>
           ) : (
@@ -500,7 +502,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                           {sym}{getPrice(o)}
                         </Typography>
                         <Chip
-                          label={o.quantity === 0 ? 'Stok yok' : `${o.quantity} adet`}
+                          label={o.quantity === 0 ? t('outOfStock') : `${o.quantity} ${t('pieces')}`}
                           size="small"
                           color={o.quantity === 0 ? 'error' : 'default'}
                           variant="outlined"
@@ -509,10 +511,10 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
 
                         {/* Actions */}
                         <Box sx={{ display: 'flex', gap: 0 }}>
-                          <Tooltip title="Kopyala">
+                          <Tooltip title={t('copy')}>
                             <IconButton size="small" onClick={() => duplicateProduct(globalIdx)}><DuplicateIcon sx={{ fontSize: 16 }} /></IconButton>
                           </Tooltip>
-                          <Tooltip title="Sil">
+                          <Tooltip title={t('deleteTooltip')}>
                             <IconButton size="small" color="error" onClick={() => setDeleteIndex(globalIdx)}><DeleteIcon sx={{ fontSize: 16 }} /></IconButton>
                           </Tooltip>
                         </Box>
@@ -535,15 +537,15 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap', flexDirection: { xs: 'column', sm: 'row' } }}>
             <FormControlLabel
               control={<Checkbox checked={individualPrice} onChange={(e) => setIndividualPrice(e.target.checked)} sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' }, '& .MuiSvgIcon-root': { fontSize: 24 } }} />}
-              label={<Typography variant="body2" fontWeight={600}>Bireysel fiyat</Typography>}
+              label={<Typography variant="body2" fontWeight={600}>{t('individualPrice')}</Typography>}
             />
             {!individualPrice && (
               <>
                 <Select size="small" value={priceAction} onChange={(e) => setPriceAction(e.target.value as any)}
                   sx={{ minWidth: { xs: '100%', sm: 130 }, height: 36 }}>
-                  <MenuItem value="set">Ayarla</MenuItem>
-                  <MenuItem value="increase">Artır</MenuItem>
-                  <MenuItem value="decrease">Azalt</MenuItem>
+                  <MenuItem value="set">{t('set')}</MenuItem>
+                  <MenuItem value="increase">{t('increase')}</MenuItem>
+                  <MenuItem value="decrease">{t('decrease')}</MenuItem>
                 </Select>
                 <TextField
                   size="small" type="number" value={priceValue}
@@ -555,7 +557,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                 />
                 <Button size="small" variant="contained" onClick={applyBulkPrice} disabled={!priceValue}
                   sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36, width: { xs: '100%', sm: 'auto' } }}>
-                  Uygula
+                  {t('apply')}
                 </Button>
               </>
             )}
@@ -609,15 +611,15 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap', flexDirection: { xs: 'column', sm: 'row' } }}>
             <FormControlLabel
               control={<Checkbox checked={individualQuantity} onChange={(e) => setIndividualQuantity(e.target.checked)} sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' }, '& .MuiSvgIcon-root': { fontSize: 24 } }} />}
-              label={<Typography variant="body2" fontWeight={600}>Bireysel stok</Typography>}
+              label={<Typography variant="body2" fontWeight={600}>{t('individualStock')}</Typography>}
             />
             {!individualQuantity && (
               <>
                 <Select size="small" value={quantityAction} onChange={(e) => setQuantityAction(e.target.value as any)}
                   sx={{ minWidth: { xs: '100%', sm: 130 }, height: 36 }}>
-                  <MenuItem value="set">Ayarla</MenuItem>
-                  <MenuItem value="increase">Artır</MenuItem>
-                  <MenuItem value="decrease">Azalt</MenuItem>
+                  <MenuItem value="set">{t('set')}</MenuItem>
+                  <MenuItem value="increase">{t('increase')}</MenuItem>
+                  <MenuItem value="decrease">{t('decrease')}</MenuItem>
                 </Select>
                 <TextField
                   size="small" type="number" value={quantityValue}
@@ -628,7 +630,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                 />
                 <Button size="small" variant="contained" onClick={applyBulkQuantity} disabled={!quantityValue}
                   sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36, width: { xs: '100%', sm: 'auto' } }}>
-                  Uygula
+                  {t('apply')}
                 </Button>
               </>
             )}
@@ -660,7 +662,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                         />
                       ) : (
                         <Chip
-                          label={o.quantity === 0 ? 'Stok yok' : o.quantity}
+                          label={o.quantity === 0 ? t('outOfStock') : o.quantity}
                           size="small"
                           color={o.quantity === 0 ? 'error' : 'default'}
                           variant="outlined"
@@ -698,7 +700,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                       size="small"
                       value={product.sku}
                       onChange={(e) => updateField(globalIdx, 'sku', e.target.value)}
-                      placeholder="SKU girin"
+                      placeholder={t('enterSku')}
                       sx={{ width: { xs: '100%', sm: 150 } }}
                     />
                   </Box>
@@ -721,7 +723,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                 return { ...p, offerings: [{ ...p.offerings[0], is_enabled: true }, ...p.offerings.slice(1)] };
               }));
             }} sx={{ textTransform: 'none', borderRadius: '6px' }}>
-              Tümünü Aktif Yap
+              {t('enableAll')}
             </Button>
             <Button size="small" variant="outlined" onClick={() => {
               setProducts(prev => prev.map(p => {
@@ -729,7 +731,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                 return { ...p, offerings: [{ ...p.offerings[0], is_enabled: false }, ...p.offerings.slice(1)] };
               }));
             }} sx={{ textTransform: 'none', borderRadius: '6px' }}>
-              Tümünü Pasif Yap
+              {t('disableAll')}
             </Button>
           </Box>
           <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
@@ -765,7 +767,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
       {/* Empty state for non-variation tabs */}
       {activeTab > 0 && products.length === 0 && (
         <Box sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary">Önce varyasyon ekleyin</Typography>
+          <Typography variant="body2" color="text.secondary">{t('addVariationsFirst')}</Typography>
         </Box>
       )}
 
@@ -775,11 +777,11 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
         {hasChanges && (
           <>
             <Typography variant="caption" color="text.secondary" sx={{ mr: 'auto' }}>
-              Degisiklikler henüz Etsy&apos;ye gönderilmedi
+              {t('changesNotSentToEtsy')}
             </Typography>
             <Button variant="text" onClick={() => setProducts(JSON.parse(JSON.stringify(originalProducts)))}
               disabled={saving} sx={{ textTransform: 'none' }}>
-              Vazgec
+              {t('cancel')}
             </Button>
           </>
         )}
@@ -790,27 +792,27 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
           startIcon={saving ? <CircularProgress size={16} /> : undefined}
           sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}
         >
-          {saving ? 'Kaydediliyor...' : 'Etsy\'ye Kaydet'}
+          {saving ? t('saving') : t('saveToEtsy')}
         </Button>
       </Box>
 
       {/* --- Add Variations Dialog --- */}
       <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} maxWidth="sm" fullWidth sx={{ zIndex: 1600 }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Varyasyon Ekle</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>{t('addVariation')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: '16px !important' }}>
           <Alert severity="info" sx={{ py: 0.5, borderRadius: '8px' }}>
-            Birden fazla deger icin virgülle ayirin: <strong>S, M, L, XL, XXL</strong>
+            {t('bulkAddHint')}
           </Alert>
 
           {/* Property type chips */}
           <Box>
             <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block', color: 'text.secondary', textTransform: 'uppercase' }}>
-              Özellik Tipi
+              {t('propertyType')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
               {existingProperties.map(prop => (
                 <Chip key={prop.id}
-                  label={`${ETSY_PROPERTIES.find(p => p.id === prop.id)?.label || prop.name} (mevcut)`}
+                  label={`${(() => { const ep = ETSY_PROPERTIES.find(p => p.id === prop.id); return ep ? t(ep.tKey) : prop.name; })()} (${t('existing')})`}
                   onClick={() => setAddPropertyId(prop.id)}
                   color={addPropertyId === prop.id ? 'primary' : 'default'}
                   variant={addPropertyId === prop.id ? 'filled' : 'outlined'}
@@ -818,7 +820,7 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
                 />
               ))}
               {ETSY_PROPERTIES.filter(p => !existingProperties.some(ep => ep.id === p.id)).slice(0, 8).map(prop => (
-                <Chip key={prop.id} label={prop.label}
+                <Chip key={prop.id} label={t(prop.tKey)}
                   onClick={() => setAddPropertyId(prop.id)}
                   color={addPropertyId === prop.id ? 'primary' : 'default'}
                   variant={addPropertyId === prop.id ? 'filled' : 'outlined'}
@@ -828,17 +830,17 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
             </Box>
           </Box>
 
-          <TextField label="Degerler (virgülle ayirin)" size="small" fullWidth multiline minRows={2}
+          <TextField label={t('valuesLabel')} size="small" fullWidth multiline minRows={2}
             value={addValues} onChange={(e) => setAddValues(e.target.value)}
-            placeholder="Kirmizi, Mavi, Yesil, Sari, Beyaz" autoFocus
-            helperText={addValues ? `${addValues.split(',').filter(v => v.trim()).length} varyasyon eklenecek` : 'Her deger bir varyasyon olusturur'}
+            placeholder={t('valuesPlaceholder')} autoFocus
+            helperText={addValues ? t('variationsWillBeAdded', { count: addValues.split(',').filter(v => v.trim()).length }) : t('eachValueCreatesVariation')}
           />
 
           <Box display="flex" gap={2}>
             <TextField label={`Fiyat (${sym})`} size="small" type="number"
               value={addPrice} onChange={(e) => setAddPrice(e.target.value)}
               inputProps={{ min: 0, step: '0.01' }} sx={{ flex: 1 }}
-              helperText="Tümüne uygulanır"
+              helperText={t('appliedToAll')}
             />
             <TextField label="Stok" size="small" type="number"
               value={addQuantity} onChange={(e) => setAddQuantity(e.target.value)}
@@ -847,29 +849,29 @@ export default function VariationEditor({ listingId, shopId, onSaved }: Variatio
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setAddDialogOpen(false)} sx={{ textTransform: 'none' }}>İptal</Button>
+          <Button onClick={() => setAddDialogOpen(false)} sx={{ textTransform: 'none' }}>{t('cancel')}</Button>
           <Button variant="contained" onClick={addVariations} disabled={!addValues.trim() || !addPrice}
             sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}>
-            {addValues.split(',').filter(v => v.trim()).length || 0} Varyasyon Ekle
+            {t('variationsAdded', { count: addValues.split(',').filter(v => v.trim()).length || 0 })}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* --- Delete Confirmation --- */}
       <Dialog open={deleteIndex !== null} onClose={() => setDeleteIndex(null)} maxWidth="xs" sx={{ zIndex: 1600 }}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Varyasyonu Sil</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>{t('deleteVariation')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
             {deleteIndex !== null && products[deleteIndex]
-              ? `"${getLabel(products[deleteIndex])}" silinsin mi?`
-              : 'Bu varyasyonu silmek istediginize emin misiniz?'}
+              ? t('deleteConfirmNamed', { name: getLabel(products[deleteIndex]) })
+              : t('deleteConfirm')}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            &quot;Etsy&apos;ye Kaydet&quot; butonuna basana kadar Etsy&apos;de silinmez.
+            {t('deleteNote')}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteIndex(null)} sx={{ textTransform: 'none' }}>Vazgec</Button>
+          <Button onClick={() => setDeleteIndex(null)} sx={{ textTransform: 'none' }}>{t('cancel')}</Button>
           <Button variant="contained" color="error" onClick={() => deleteIndex !== null && removeProduct(deleteIndex)}
             sx={{ textTransform: 'none' }}>
             Sil

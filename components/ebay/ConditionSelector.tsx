@@ -8,6 +8,7 @@ import {
   TextField,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
+import { useTranslations } from 'next-intl';
 
 interface ConditionOption {
   conditionId: string;
@@ -21,19 +22,14 @@ interface ConditionSelectorProps {
   onChange: (condition: string, description: string) => void;
 }
 
-const DEFAULT_CONDITIONS: { value: string; label: string }[] = [
-  { value: 'NEW', label: 'Yeni' },
-  { value: 'LIKE_NEW', label: 'Yeni Gibi' },
-  { value: 'VERY_GOOD', label: 'Çok İyi' },
-  { value: 'GOOD', label: 'İyi' },
-  { value: 'ACCEPTABLE', label: 'Kabul Edilebilir' },
-  { value: 'FOR_PARTS_OR_NOT_WORKING', label: 'Parça/Çalışmıyor' },
-];
-
-function getConditionLabel(value: string): string {
-  const found = DEFAULT_CONDITIONS.find((c) => c.value === value);
-  return found ? found.label : value;
-}
+const CONDITION_KEYS: Record<string, string> = {
+  NEW: 'conditionNew',
+  LIKE_NEW: 'conditionLikeNew',
+  VERY_GOOD: 'conditionVeryGood',
+  GOOD: 'conditionGood',
+  ACCEPTABLE: 'conditionAcceptable',
+  FOR_PARTS_OR_NOT_WORKING: 'conditionForParts',
+};
 
 export default function ConditionSelector({
   condition,
@@ -41,6 +37,18 @@ export default function ConditionSelector({
   categoryConditions,
   onChange,
 }: ConditionSelectorProps) {
+  const t = useTranslations('ebay.listing');
+
+  function getConditionLabel(value: string): string {
+    const key = CONDITION_KEYS[value];
+    return key ? t(key) : value;
+  }
+
+  const DEFAULT_CONDITIONS = Object.entries(CONDITION_KEYS).map(([value, key]) => ({
+    value,
+    label: t(key),
+  }));
+
   // Use category-specific conditions if provided, otherwise defaults
   const conditions = categoryConditions && categoryConditions.length > 0
     ? categoryConditions.map((cc) => ({
@@ -63,10 +71,10 @@ export default function ConditionSelector({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <FormControl size="small" fullWidth>
-        <InputLabel>Ürün Durumu</InputLabel>
+        <InputLabel>{t('productCondition')}</InputLabel>
         <Select
           value={condition}
-          label="Ürün Durumu"
+          label={t('productCondition')}
           onChange={handleConditionChange}
           MenuProps={{ sx: { zIndex: 1600 } }}
         >
@@ -80,15 +88,15 @@ export default function ConditionSelector({
 
       {condition && condition !== 'NEW' && (
         <TextField
-          label="Durum Açıklaması"
+          label={t('conditionDescription')}
           value={conditionDescription}
           onChange={handleDescriptionChange}
           size="small"
           fullWidth
           multiline
           rows={2}
-          placeholder="Ürünün durumunu detaylı açıklayın..."
-          helperText="Alıcıların ürünün durumunu anlamasına yardımcı olur"
+          placeholder={t('conditionDescriptionPlaceholder')}
+          helperText={t('conditionDescriptionHelper')}
         />
       )}
     </Box>

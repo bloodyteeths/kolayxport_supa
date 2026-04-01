@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
+import { useTranslations } from 'next-intl';
 import ManualOrderForm from './ManualOrderForm';
 
 interface ManualOrderButtonProps {
@@ -9,6 +10,7 @@ interface ManualOrderButtonProps {
 
 export default function ManualOrderButton({ onOrderCreated }: ManualOrderButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const t = useTranslations('manualOrder');
 
   const handleOpenDialog = () => {
     setDialogOpen(true);
@@ -40,7 +42,7 @@ export default function ManualOrderButton({ onOrderCreated }: ManualOrderButtonP
           borderRadius: 1
         }}
       >
-        Manuel Sipariş Ekle
+        {t('addManualOrder')}
       </Button>
 
       <ManualOrderForm

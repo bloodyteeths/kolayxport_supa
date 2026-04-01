@@ -11,6 +11,7 @@ import {
   Copy, TrendingUp, Users, DollarSign, Type, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 interface SeoAnalyzerProps {
   userId: string;
@@ -62,7 +63,7 @@ async function ebayApiCall(action: string, userId: string, params: Record<string
   const res = await fetch(`/api/clawd/ebay?${query.toString()}`);
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `API hatası: ${res.status}`);
+    throw new Error(errBody.error || `API error: ${res.status}`);
   }
   return res.json();
 }
@@ -75,7 +76,7 @@ async function ebayAiCall(action: string, userId: string, body: Record<string, a
   });
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `API hatası: ${res.status}`);
+    throw new Error(errBody.error || `API error: ${res.status}`);
   }
   return res.json();
 }
@@ -106,6 +107,7 @@ function StatCard({ icon, label, value, subtitle }: { icon: React.ReactNode; lab
 }
 
 function KeywordCard({ kw, expanded, onToggle }: { kw: KeywordCoverage; expanded: boolean; onToggle: () => void }) {
+  const t = useTranslations('ebay.research.seoAnalyzer');
   return (
     <Paper
       variant="outlined"
@@ -121,7 +123,7 @@ function KeywordCard({ kw, expanded, onToggle }: { kw: KeywordCoverage; expanded
       <Box sx={{ display: 'flex', alignItems: 'center', p: 1.5, cursor: 'pointer' }} onClick={onToggle}>
         <Box sx={{ flex: 1 }}>
           <Typography variant="body2" fontWeight={600}>{kw.keyword}</Typography>
-          <Typography variant="caption" color="text.secondary">Kullanım: %{kw.percentage.toFixed(1)}</Typography>
+          <Typography variant="caption" color="text.secondary">{t('usage')}: %{kw.percentage.toFixed(1)}</Typography>
         </Box>
         {kw.inMyTitle
           ? <CheckCircle size={18} color="#10b981" />
@@ -131,7 +133,7 @@ function KeywordCard({ kw, expanded, onToggle }: { kw: KeywordCoverage; expanded
       </Box>
       <Collapse in={expanded}>
         <Box sx={{ px: 1.5, pb: 1.5 }}>
-          <Typography variant="caption">Rakip kullanım sayısı: {kw.count}</Typography>
+          <Typography variant="caption">{t('competitorUsage')}: {kw.count}</Typography>
         </Box>
       </Collapse>
     </Paper>
@@ -139,6 +141,7 @@ function KeywordCard({ kw, expanded, onToggle }: { kw: KeywordCoverage; expanded
 }
 
 export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, onNavigate, navigateData, onConsumeNavigateData }: SeoAnalyzerProps) {
+  const t = useTranslations('ebay.research.seoAnalyzer');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -163,7 +166,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
 
   const handleAnalyze = async () => {
     if (!keyword.trim()) {
-      toast.error('Anahtar kelime gerekli');
+      toast.error(t('keywordRequired'));
       return;
     }
     setLoading(true);
@@ -177,7 +180,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
       });
       setResult(data);
     } catch (err: any) {
-      toast.error(err.message || 'Analiz başarısız');
+      toast.error(err.message || t('analysisFailed'));
     } finally {
       setLoading(false);
     }
@@ -185,7 +188,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
 
   const handleOptimizeTitle = async () => {
     if (!result || !myTitle.trim()) {
-      toast.error('Önce başlığınızı girin ve analiz edin');
+      toast.error(t('enterTitleFirst'));
       return;
     }
     setOptimizing(true);
@@ -204,9 +207,9 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
         },
       });
       setOptimizedTitle(data.optimizedTitle || data.title || '');
-      toast.success('Başlık optimize edildi');
+      toast.success(t('titleOptimized'));
     } catch (err: any) {
-      toast.error(err.message || 'Optimizasyon başarısız');
+      toast.error(err.message || t('optimizationFailed'));
     } finally {
       setOptimizing(false);
     }
@@ -214,7 +217,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('Kopyalandı');
+    toast.success(t('copied'));
   };
 
   const toggleKeywordExpand = (idx: number) => {
@@ -246,23 +249,23 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
       }}>
         <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
           <DollarSign size={16} style={{ verticalAlign: 'middle', marginRight: 4, color: '#6366f1' }} />
-          Fiyat Konumlandırma
+          {t('pricePositioning')}
         </Typography>
         <Box sx={{ position: 'relative', height: 40, mt: 2, mb: 3 }}>
           <Box sx={{ position: 'absolute', top: 12, left: 0, right: 0, height: 8, background: 'linear-gradient(90deg, #e5e7eb, #f0edff)', borderRadius: 4 }} />
           <Tooltip title={`Min: $${min.toFixed(2)}`}>
             <Box sx={{ position: 'absolute', top: 8, left: 0, width: 16, height: 16, bgcolor: '#6366f1', borderRadius: '50%', boxShadow: '0 0 6px rgba(99,102,241,0.4)' }} />
           </Tooltip>
-          <Tooltip title={`Ort: $${avg.toFixed(2)}`}>
+          <Tooltip title={`${t('avg')}: $${avg.toFixed(2)}`}>
             <Box sx={{ position: 'absolute', top: 4, left: `${avgPos}%`, transform: 'translateX(-50%)', textAlign: 'center' }}>
               <Box sx={{ width: 20, height: 20, bgcolor: '#10b981', borderRadius: '50%', mx: 'auto', boxShadow: '0 0 6px rgba(16,185,129,0.4)' }} />
-              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', fontWeight: 600 }}>Ort</Typography>
+              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', fontWeight: 600 }}>{t('avg')}</Typography>
             </Box>
           </Tooltip>
           <Tooltip title={`Medyan: $${median.toFixed(2)}`}>
             <Box sx={{ position: 'absolute', top: 4, left: `${medianPos}%`, transform: 'translateX(-50%)', textAlign: 'center' }}>
               <Box sx={{ width: 20, height: 20, bgcolor: '#f59e0b', borderRadius: '50%', mx: 'auto', boxShadow: '0 0 6px rgba(245,158,11,0.4)' }} />
-              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', fontWeight: 600 }}>Med</Typography>
+              <Typography variant="caption" sx={{ mt: 0.5, display: 'block', fontWeight: 600 }}>{t('median')}</Typography>
             </Box>
           </Tooltip>
           <Tooltip title={`Max: $${max.toFixed(2)}`}>
@@ -288,14 +291,14 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
       }}>
         <Typography variant="h6" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
           <Target size={20} style={{ verticalAlign: 'middle', marginRight: 8, color: '#6366f1' }} />
-          SEO Analizi
+          {t('seoAnalysis')}
         </Typography>
 
         <Stack spacing={2} sx={{ mt: 2 }}>
           <TextField
-            label="Anahtar Kelime"
-            placeholder="ör: wireless bluetooth earbuds"
-            helperText="Analiz etmek istediğiniz ürün anahtar kelimesini girin"
+            label={t('keyword')}
+            placeholder={t('keywordPlaceholder')}
+            helperText={t('keywordHelper')}
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             fullWidth
@@ -310,9 +313,9 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
           />
 
           <TextField
-            label="Senin Başlığın"
-            placeholder="ör: Premium Wireless Bluetooth Earbuds with Noise Cancellation"
-            helperText="Kendi başlığınızı girerek rakiplerle karşılaştırın (opsiyonel)"
+            label={t('yourTitle')}
+            placeholder={t('titlePlaceholder')}
+            helperText={t('titleHelper')}
             value={myTitle}
             onChange={e => setMyTitle(e.target.value)}
             fullWidth
@@ -326,10 +329,10 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <FormControl size={isMobile ? 'small' : 'medium'} sx={{ minWidth: 180 }}>
-              <InputLabel>Pazar Yeri</InputLabel>
+              <InputLabel>{t('marketplace')}</InputLabel>
               <Select
                 value={selectedMarketplace}
-                label="Pazar Yeri"
+                label={t('marketplace')}
                 onChange={e => setSelectedMarketplace(e.target.value)}
               >
                 {MARKETPLACES.map(m => (
@@ -351,7 +354,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                 '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)', boxShadow: '0 4px 12px rgba(99,102,241,0.4)' },
               }}
             >
-              {loading ? 'Analiz ediliyor...' : 'Analiz Et'}
+              {loading ? t('analyzing') : t('analyze')}
             </Button>
           </Stack>
         </Stack>
@@ -362,18 +365,18 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
       {!result && !loading && (
         <Paper sx={{ p: 2, mb: 3, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
-            SEO Analizi Nedir?
+            {t('whatIsSeo')}
           </Typography>
           <Typography variant="body2" color="text.secondary" component="div">
             <ul style={{ margin: 0, paddingLeft: 16 }}>
-              <li>Başlığınızın anahtar kelime kapsama oranını ölçer</li>
-              <li>Rakip listelemelerdeki en popüler kelimeleri gösterir</li>
-              <li>Fiyat konumlandırmanızı pazar ortalamasıyla karşılaştırır</li>
-              <li>AI ile başlığınızı otomatik optimize edebilirsiniz</li>
+              <li>{t('seoTip1')}</li>
+              <li>{t('seoTip2')}</li>
+              <li>{t('seoTip3')}</li>
+              <li>{t('seoTip4')}</li>
             </ul>
           </Typography>
           <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic', color: '#6366f1' }}>
-            Örnek: "wireless bluetooth earbuds" yazıp analiz edin
+            {t('seoExample')}
           </Typography>
         </Paper>
       )}
@@ -406,7 +409,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                 />
               </svg>
               <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Tooltip title="0-100 arası SEO skoru. 80+ mükemmel, 60-80 iyi, 60 altı iyileştirme gerekli." arrow>
+                <Tooltip title={t('seoScoreTooltip')} arrow>
                   <Typography
                     variant="h2"
                     fontWeight={800}
@@ -418,32 +421,32 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
               </Box>
             </Box>
             <Typography variant="subtitle1" color="text.secondary" sx={{ mt: 1, fontWeight: 500 }}>
-              SEO Skoru / 100
+              {t('seoScoreLabel')}
             </Typography>
           </Paper>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} flexWrap="wrap">
             <StatCard
               icon={<Users size={20} />}
-              label="Toplam Rakip"
+              label={t('totalCompetitors')}
               value={result.totalCompetitors.toLocaleString()}
             />
             <StatCard
               icon={<Type size={20} />}
-              label="Ort. Başlık Uzunluğu"
+              label={t('avgTitleLength')}
               value={Math.round(result.avgTitleLength)}
-              subtitle={result.myTitleLength ? `Seninki: ${result.myTitleLength}` : undefined}
+              subtitle={result.myTitleLength ? `${t('yours')}: ${result.myTitleLength}` : undefined}
             />
             <StatCard
               icon={<DollarSign size={20} />}
-              label="Fiyat Aralığı"
+              label={t('priceRange')}
               value={`$${result.priceStats.min.toFixed(0)}-${result.priceStats.max.toFixed(0)}`}
-              subtitle={`Ort: $${result.priceStats.avg.toFixed(2)}`}
+              subtitle={`${t('avg')}: ${result.priceStats.avg.toFixed(2)}`}
             />
             <StatCard
               icon={<TrendingUp size={20} />}
-              label="Skor Durumu"
-              value={result.seoScore >= 70 ? 'İyi' : result.seoScore >= 40 ? 'Orta' : 'Zayıf'}
+              label={t('scoreStatus')}
+              value={result.seoScore >= 70 ? t('statusGood') : result.seoScore >= 40 ? t('statusMedium') : t('statusWeak')}
             />
           </Stack>
 
@@ -456,7 +459,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
           }}>
             <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
               <BarChart2 size={16} style={{ verticalAlign: 'middle', marginRight: 4, color: '#6366f1' }} />
-              Anahtar Kelime Kapsama Analizi
+              {t('keywordCoverageAnalysis')}
             </Typography>
 
             {isMobile ? (
@@ -475,10 +478,10 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Anahtar Kelime</TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">Kullanım %</TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="center">Başlığında?</TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">Sayı</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('keywordCol')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">{t('usagePct')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="center">{t('inYourTitle')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">{t('count')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -533,7 +536,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
             }}>
               <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
                 <BarChart2 size={16} style={{ verticalAlign: 'middle', marginRight: 4, color: '#6366f1' }} />
-                Özellik Analizi
+                {t('aspectAnalysis')}
               </Typography>
               <Stack spacing={2} sx={{ mt: 1 }}>
                 {result.aspectAnalysis.map((aspect, idx) => (
@@ -566,7 +569,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
             }}>
               <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ color: '#1e1b4b' }}>
                 <Sparkles size={16} style={{ verticalAlign: 'middle', marginRight: 4, color: '#8b5cf6' }} />
-                Öneriler
+                {t('recommendations')}
               </Typography>
               <Stack spacing={1} sx={{ mt: 1 }}>
                 {result.recommendations.map((rec, idx) => (
@@ -607,12 +610,12 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                   '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' },
                 }}
               >
-                {optimizing ? 'Optimize ediliyor...' : 'AI ile Başlığı Optimize Et'}
+                {optimizing ? t('optimizing') : t('optimizeWithAi')}
               </Button>
 
               {optimizedTitle && (
                 <Box sx={{ mt: 2 }}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600}>Mevcut Başlık:</Typography>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>{t('currentTitle')}:</Typography>
                   <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#fff5f5', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Typography variant="body2">{myTitle}</Typography>
@@ -622,7 +625,7 @@ export default function SeoAnalyzer({ userId, marketplace: defaultMarketplace, o
                     </Box>
                   </Paper>
 
-                  <Typography variant="caption" color="text.secondary" fontWeight={600}>Optimize Edilmiş Başlık:</Typography>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>{t('optimizedTitle')}:</Typography>
                   <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f0fdf4', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 2, boxShadow: '0 0 8px rgba(16,185,129,0.08)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Typography variant="body2" fontWeight={600}>{optimizedTitle}</Typography>

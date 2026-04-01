@@ -15,8 +15,11 @@ import {
 } from '@mui/icons-material';
 import { differenceInDays, format } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 import { useRouter } from 'next/router';
 import axios from 'axios';
+import { useTranslations } from 'next-intl';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
 
 interface TrialNotificationProps {
   userSubscription?: {
@@ -32,9 +35,12 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
   const router = useRouter();
   const [dismissed, setDismissed] = useState(false);
   const [showSnackbar, setShowSnackbar] = useState(false);
+  const t = useTranslations('trial');
+  const locale = useLocaleStore((s) => s.locale);
+  const dateFnsLocale = locale === 'tr' ? tr : enUS;
 
-  if (!userSubscription || 
-      userSubscription.subscriptionStatus !== 'trialing' || 
+  if (!userSubscription ||
+      userSubscription.subscriptionStatus !== 'trialing' ||
       !userSubscription.trialExpiresAt ||
       dismissed) {
     return null;
@@ -79,23 +85,23 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
 
   const getMessage = () => {
     if (hasExpired) {
-      return 'Deneme süreniz sona erdi! Hizmeti kullanmaya devam etmek için lütfen bir plan seçin.';
+      return t('expiredMessage');
     }
     if (daysUntilExpiry === 0) {
-      return 'Deneme süreniz bugün sona eriyor! Plan seçerek kesintisiz hizmet alın.';
+      return t('expiresToday');
     }
     if (daysUntilExpiry === 1) {
-      return 'Deneme süreniz yarın sona eriyor. Planınızı şimdi seçin.';
+      return t('expiresTomorrow');
     }
-    return `Deneme süreniz ${daysUntilExpiry} gün sonra sona erecek.`;
+    return t('expiresInDays', { days: daysUntilExpiry });
   };
 
   const getUsageWarning = () => {
     const orderSyncUsed = userSubscription.orderSyncCount;
     const labelUsed = userSubscription.labelCount;
-    
+
     if (orderSyncUsed >= 40 || labelUsed >= 8) {
-      return ' Deneme limitinize de yaklaşıyorsunuz.';
+      return ` ${t('nearingLimit')}`;
     }
     return '';
   };
@@ -113,7 +119,7 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
               startIcon={<UpgradeOutlined />}
               onClick={handleUpgrade}
             >
-              Plan Seç
+              {t('selectPlan')}
             </Button>
             {!hasExpired && (
               <IconButton
@@ -127,17 +133,17 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
           </Box>
         }
         icon={<Schedule />}
-        sx={{ 
+        sx={{
           mb: 2,
           boxShadow: 3,
-          '& .MuiAlert-message': { 
+          '& .MuiAlert-message': {
             flex: 1,
             alignSelf: 'center'
           }
         }}
       >
         <AlertTitle>
-          {hasExpired ? 'Deneme Süresi Sona Erdi' : 'Deneme Süresi Uyarısı'}
+          {hasExpired ? t('expired') : t('warning')}
         </AlertTitle>
         {getMessage()}{getUsageWarning()}
       </Alert>

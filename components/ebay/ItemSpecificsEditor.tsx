@@ -16,6 +16,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import { useTranslations } from 'next-intl';
 
 interface AspectMetadata {
   localizedAspectName: string;
@@ -44,6 +45,7 @@ export default function ItemSpecificsEditor({
   onAIFill,
   aiLoading,
 }: ItemSpecificsEditorProps) {
+  const t = useTranslations('ebay.listing');
   const [customKey, setCustomKey] = useState('');
   const [customValue, setCustomValue] = useState('');
 
@@ -166,7 +168,7 @@ export default function ItemSpecificsEditor({
                     </span>
                   }
                   size="small"
-                  placeholder="Değer girin veya seçin..."
+                  placeholder={t('enterOrSelectValue')}
                 />
               )}
               size="small"
@@ -211,7 +213,7 @@ export default function ItemSpecificsEditor({
       {/* Count display + AI fill */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="body2" fontWeight={600}>
-          Ürün Özellikleri
+          {t('itemSpecifics')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
           {onAIFill && (
@@ -232,11 +234,11 @@ export default function ItemSpecificsEditor({
               }}
               sx={{ fontSize: '0.7rem', py: 0.75 }}
             >
-              AI Doldur
+              {t('aiFill')}
             </Button>
           )}
           <Chip
-            label={`${filledAspects}/${totalAspects} dolduruldu`}
+            label={t('aspectsFilled', { filled: filledAspects, total: totalAspects })}
             size="small"
             color={filledAspects === totalAspects ? 'success' : filledAspects > 0 ? 'warning' : 'default'}
             sx={{ height: 22, fontSize: '0.75rem' }}
@@ -248,7 +250,7 @@ export default function ItemSpecificsEditor({
       {requiredAspects.length > 0 && (
         <>
           <Typography variant="caption" fontWeight={600} color="error.main" sx={{ mt: 0.5 }}>
-            Zorunlu Özellikler
+            {t('requiredAspects')}
           </Typography>
           {requiredAspects.map(renderAspectField)}
         </>
@@ -259,7 +261,7 @@ export default function ItemSpecificsEditor({
         <>
           <Divider sx={{ my: 0.5 }} />
           <Typography variant="caption" fontWeight={600} color="text.secondary">
-            Önerilen Özellikler
+            {t('recommendedAspects')}
           </Typography>
           {recommendedAspects.map(renderAspectField)}
         </>
@@ -270,7 +272,7 @@ export default function ItemSpecificsEditor({
         <>
           <Divider sx={{ my: 0.5 }} />
           <Typography variant="caption" fontWeight={600} color="text.secondary">
-            Özel Özellikler
+            {t('customAspects')}
           </Typography>
           {customAspectNames.map((name) => (
             <Box key={name} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -289,7 +291,7 @@ export default function ItemSpecificsEditor({
                 size="small"
                 fullWidth
               />
-              <Tooltip title="Özelliği sil">
+              <Tooltip title={t('deleteAspect')}>
                 <IconButton size="small" color="error" onClick={() => deleteAspect(name)}>
                   <DeleteIcon fontSize="small" />
                 </IconButton>
@@ -302,18 +304,18 @@ export default function ItemSpecificsEditor({
       {/* Add custom aspect */}
       <Divider sx={{ my: 0.5 }} />
       <Typography variant="caption" fontWeight={600} color="text.secondary">
-        Özel Özellik Ekle
+        {t('addCustomAspect')}
       </Typography>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexDirection: { xs: 'column', sm: 'row' } }}>
         <TextField
-          label="Özellik Adı"
+          label={t('aspectName')}
           value={customKey}
           onChange={(e) => setCustomKey(e.target.value)}
           size="small"
           sx={{ flex: 1, width: { xs: '100%', sm: 'auto' } }}
         />
         <TextField
-          label="Değer"
+          label={t('aspectValue')}
           value={customValue}
           onChange={(e) => setCustomValue(e.target.value)}
           size="small"
@@ -330,7 +332,7 @@ export default function ItemSpecificsEditor({
           disabled={!customKey.trim() || !customValue.trim()}
           sx={{ minWidth: 80, mt: 0.25, width: { xs: '100%', sm: 'auto' } }}
         >
-          Ekle
+          {t('add')}
         </Button>
       </Box>
     </Box>

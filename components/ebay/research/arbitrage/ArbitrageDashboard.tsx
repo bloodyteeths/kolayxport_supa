@@ -1,6 +1,8 @@
 import React from 'react';
 import { Box, Paper, Typography, Chip, useMediaQuery, useTheme } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import type { ArbitrageScanResponse } from '../../../../lib/arbitrage/types';
+import useLocaleStore from '../../../../lib/stores/useLocaleStore';
 import { VERDICT_CONFIG, formatCurrency, formatPercent } from './arbitrageConstants';
 import { useArbitrageStore } from './useArbitrageStore';
 
@@ -9,6 +11,8 @@ interface Props {
 }
 
 export default function ArbitrageDashboard({ response }: Props) {
+  const ta = useTranslations('ebay.research.arbitrage');
+  const locale = useLocaleStore(s => s.locale);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { filterVerdict, setFilterVerdict } = useArbitrageStore();
@@ -27,12 +31,12 @@ export default function ArbitrageDashboard({ response }: Props) {
     : 0;
 
   const kpis = [
-    { label: 'Taranan', value: String(totalScanned), color: '#666' },
-    { label: 'Eşleşen', value: String(results.length), color: '#1565c0' },
-    { label: 'Kârlı', value: String(profitable), color: '#2e7d32' },
-    { label: 'Ort. Kâr', value: formatCurrency(avgProfit), color: '#2e7d32' },
-    { label: 'En İyi ROI', value: formatPercent(bestRoi), color: '#e65100' },
-    { label: 'En İyi Kâr', value: formatCurrency(bestProfit), color: '#2e7d32' },
+    { label: ta('scanned'), value: String(totalScanned), color: '#666' },
+    { label: ta('matched'), value: String(results.length), color: '#1565c0' },
+    { label: ta('profitable'), value: String(profitable), color: '#2e7d32' },
+    { label: ta('avgProfitKpi'), value: formatCurrency(avgProfit, 'USD', locale), color: '#2e7d32' },
+    { label: ta('bestRoi'), value: formatPercent(bestRoi), color: '#e65100' },
+    { label: ta('bestProfitKpi'), value: formatCurrency(bestProfit, 'USD', locale), color: '#2e7d32' },
   ];
 
   // Count by verdict
@@ -70,7 +74,7 @@ export default function ArbitrageDashboard({ response }: Props) {
       {/* Verdict filter chips */}
       <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 2 }}>
         <Chip
-          label={`Tümü (${verdictCounts.all})`}
+          label={`${ta('all')} (${verdictCounts.all})`}
           size="small"
           variant={filterVerdict === 'all' ? 'filled' : 'outlined'}
           onClick={() => setFilterVerdict('all')}
@@ -79,7 +83,7 @@ export default function ArbitrageDashboard({ response }: Props) {
         {Object.entries(VERDICT_CONFIG).map(([key, cfg]) => (
           <Chip
             key={key}
-            label={`${cfg.label} (${verdictCounts[key as keyof typeof verdictCounts] || 0})`}
+            label={`${ta(cfg.label)} (${verdictCounts[key as keyof typeof verdictCounts] || 0})`}
             size="small"
             variant={filterVerdict === key ? 'filled' : 'outlined'}
             onClick={() => setFilterVerdict(key)}

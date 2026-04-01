@@ -29,6 +29,8 @@ import MergeIcon from '@mui/icons-material/CallMerge';
 import ApplyIcon from '@mui/icons-material/PlayArrow';
 import AddIcon from '@mui/icons-material/Add';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -133,18 +135,18 @@ function generateId(): string {
 // WHO_MADE / WHEN_MADE labels (for preview)
 // ---------------------------------------------------------------------------
 
-const WHO_MADE_LABELS: Record<string, string> = {
-  i_did: 'Ben yaptim',
-  collective: 'Ekibimiz yapti',
-  someone_else: 'Baskasi yapti',
+const WHO_MADE_KEYS: Record<string, string> = {
+  i_did: 'iDid',
+  collective: 'collective',
+  someone_else: 'someoneElse',
 };
 
-const WHEN_MADE_LABELS: Record<string, string> = {
-  made_to_order: 'Siparise ozel',
-  '2020_2025': '2020-2025',
-  '2010_2019': '2010-2019',
-  '2004_2009': '2004-2009',
-  before_2004: '2004 oncesi',
+const WHEN_MADE_KEYS: Record<string, string> = {
+  made_to_order: 'madeToOrder',
+  '2020_2025': '2020_2025',
+  '2010_2019': '2010_2019',
+  '2004_2009': '2004_2009',
+  before_2004: 'before_2004',
 };
 
 // ===================================================================
@@ -158,6 +160,7 @@ interface SaveTemplateDialogProps {
 }
 
 export function SaveTemplateDialog({ open, onClose, currentFields }: SaveTemplateDialogProps) {
+  const t = useTranslations('etsy.templates');
   const [name, setName] = useState('');
 
   useEffect(() => {
@@ -166,7 +169,7 @@ export function SaveTemplateDialog({ open, onClose, currentFields }: SaveTemplat
 
   const handleSave = () => {
     if (!name.trim()) {
-      toast.error('Profil adi giriniz');
+      toast.error(t('profileNameRequired'));
       return;
     }
 
@@ -190,18 +193,18 @@ export function SaveTemplateDialog({ open, onClose, currentFields }: SaveTemplat
 
     templates.push(newTemplate);
     saveTemplates(templates);
-    toast.success('Profil kaydedildi');
+    toast.success(t('profileSaved'));
     onClose();
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Profil Kaydet</DialogTitle>
+      <DialogTitle>{t('saveProfile')}</DialogTitle>
       <DialogContent>
         <TextField
           autoFocus
           fullWidth
-          label="Profil Adi"
+          label={t('profileNameLabel')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           size="small"
@@ -211,13 +214,13 @@ export function SaveTemplateDialog({ open, onClose, currentFields }: SaveTemplat
           }}
         />
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-          Kaydedilecek alanlar: Baslik, Aciklama, Etiketler, Malzemeler, Yapimci, Yapim zamani, Tedarik durumu, Kargo profili, Iade politikasi
+          {t('fieldsSaved')}
         </Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Iptal</Button>
+        <Button onClick={onClose}>{t('cancel')}</Button>
         <Button onClick={handleSave} variant="contained" startIcon={<SaveIcon />}>
-          Kaydet
+          {t('save')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -235,6 +238,10 @@ interface LoadTemplateDialogProps {
 }
 
 export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialogProps) {
+  const t = useTranslations('etsy.templates');
+  const tWho = useTranslations('etsy.whoMade');
+  const tWhen = useTranslations('etsy.whenMade');
+  const { formatDate } = useLocale();
   const [templates, setTemplates] = useState<ListingTemplate[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -247,21 +254,21 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
   }, [open]);
 
   const handleDelete = (id: string) => {
-    const updated = templates.filter((t) => t.id !== id);
+    const updated = templates.filter((tmpl) => tmpl.id !== id);
     setTemplates(updated);
     saveTemplates(updated);
-    toast.success('Profil silindi');
+    toast.success(t('profileDeleted'));
   };
 
   const handleRename = (id: string) => {
     if (!editName.trim()) return;
-    const updated = templates.map((t) =>
-      t.id === id ? { ...t, name: editName.trim() } : t,
+    const updated = templates.map((tmpl) =>
+      tmpl.id === id ? { ...tmpl, name: editName.trim() } : tmpl,
     );
     setTemplates(updated);
     saveTemplates(updated);
     setEditingId(null);
-    toast.success('Profil yeniden adlandirildi');
+    toast.success(t('profileRenamed'));
   };
 
   const startEditing = (template: ListingTemplate) => {
@@ -269,13 +276,23 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
     setEditName(template.name);
   };
 
+  const getWhoMadeLabel = (key: string) => {
+    const tKey = WHO_MADE_KEYS[key];
+    return tKey ? tWho(tKey) : key;
+  };
+
+  const getWhenMadeLabel = (key: string) => {
+    const tKey = WHEN_MADE_KEYS[key];
+    return tKey ? tWhen(tKey) : key;
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Profillerim</DialogTitle>
+      <DialogTitle>{t('myProfiles')}</DialogTitle>
       <DialogContent>
         {templates.length === 0 ? (
           <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-            Henuz kayitli profil yok. Bir listeyi duzenlerken &ldquo;Profil Kaydet&rdquo; butonunu kullanin.
+            {t('noProfilesYet')}
           </Typography>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
@@ -296,10 +313,10 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         sx={{ flex: 1 }}
                       />
                       <Button size="small" onClick={() => handleRename(template.id)}>
-                        Kaydet
+                        {t('save')}
                       </Button>
                       <Button size="small" onClick={() => setEditingId(null)}>
-                        Iptal
+                        {t('cancel')}
                       </Button>
                     </Box>
                   ) : (
@@ -312,7 +329,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                   <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {template.fields.title && (
                       <Chip
-                        label={`Baslik: ${template.fields.title.substring(0, 30)}${template.fields.title.length > 30 ? '...' : ''}`}
+                        label={`${t('titleChip')}: ${template.fields.title.substring(0, 30)}${template.fields.title.length > 30 ? '...' : ''}`}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -320,7 +337,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.tags && template.fields.tags.length > 0 && (
                       <Chip
-                        label={`${template.fields.tags.length} etiket`}
+                        label={`${template.fields.tags.length} ${t('tagsChip')}`}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -328,7 +345,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.materials && template.fields.materials.length > 0 && (
                       <Chip
-                        label={`${template.fields.materials.length} malzeme`}
+                        label={`${template.fields.materials.length} ${t('materialsChip')}`}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -336,7 +353,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.who_made && (
                       <Chip
-                        label={WHO_MADE_LABELS[template.fields.who_made] || template.fields.who_made}
+                        label={getWhoMadeLabel(template.fields.who_made)}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -344,7 +361,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.when_made && (
                       <Chip
-                        label={WHEN_MADE_LABELS[template.fields.when_made] || template.fields.when_made}
+                        label={getWhenMadeLabel(template.fields.when_made)}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -352,7 +369,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     )}
                     {template.fields.description && (
                       <Chip
-                        label="Aciklama var"
+                        label={t('descriptionChip')}
                         size="small"
                         variant="outlined"
                         sx={{ fontSize: '0.65rem', height: 20 }}
@@ -361,7 +378,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                   </Box>
 
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                    {new Date(template.createdAt).toLocaleDateString('tr-TR')}
+                    {formatDate(template.createdAt)}
                   </Typography>
                 </CardContent>
                 <CardActions sx={{ pt: 0, px: 2, pb: 1 }}>
@@ -375,14 +392,14 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                     }}
                     sx={{ textTransform: 'none', fontSize: '0.75rem' }}
                   >
-                    Uygula
+                    {t('apply')}
                   </Button>
-                  <Tooltip title="Yeniden Adlandir">
+                  <Tooltip title={t('renameTooltip')}>
                     <IconButton size="small" onClick={() => startEditing(template)}>
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Profili Sil">
+                  <Tooltip title={t('deleteTooltip')}>
                     <IconButton size="small" color="error" onClick={() => handleDelete(template.id)}>
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -394,7 +411,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Kapat</Button>
+        <Button onClick={onClose}>{t('close')}</Button>
       </DialogActions>
     </Dialog>
   );
@@ -410,6 +427,7 @@ interface TagProfileMenuProps {
 }
 
 export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps) {
+  const t = useTranslations('etsy.templates');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [profiles, setProfiles] = useState<TagProfile[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -430,7 +448,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
   // Apply: replace tags entirely
   const handleApply = (profile: TagProfile) => {
     onApplyTags(profile.tags.slice(0, 13));
-    toast.success(`"${profile.name}" etiketleri uygulandi`);
+    toast.success(t('tagsApplied', { name: profile.name }));
     handleClose();
   };
 
@@ -439,18 +457,18 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
     const newTags = profile.tags.filter((t) => !currentTags.includes(t));
     const merged = [...currentTags, ...newTags].slice(0, 13);
     onApplyTags(merged);
-    toast.success(`${newTags.length} etiket birlestirildi`);
+    toast.success(t('tagsMerged', { count: newTags.length }));
     handleClose();
   };
 
   // Save current tags as a profile
   const handleSaveProfile = () => {
     if (!newProfileName.trim()) {
-      toast.error('Profil adi giriniz');
+      toast.error(t('profileNameRequired'));
       return;
     }
     if (currentTags.length === 0) {
-      toast.error('Kaydedilecek etiket yok');
+      toast.error(t('noTagsToSave'));
       return;
     }
 
@@ -464,7 +482,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
 
     profiles.push(newProfile);
     saveTagProfiles(profiles);
-    toast.success('Etiket profili kaydedildi');
+    toast.success(t('tagProfileSaved'));
     setSaveDialogOpen(false);
     setNewProfileName('');
   };
@@ -478,7 +496,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
         onClick={handleOpenMenu}
         sx={{ textTransform: 'none', fontSize: '0.75rem' }}
       >
-        Etiket Profili
+        {t('tagProfile')}
       </Button>
 
       <Menu
@@ -498,7 +516,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
           <ListItemIcon>
             <AddIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Yeni Profil Olustur</ListItemText>
+          <ListItemText>{t('saveCurrentTags')}</ListItemText>
         </MenuItem>
 
         {/* Manage profiles */}
@@ -511,7 +529,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
           <ListItemIcon>
             <FolderOpenIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Profilleri Yonet</ListItemText>
+          <ListItemText>{t('manageProfiles')}</ListItemText>
         </MenuItem>
 
         {profiles.length > 0 && <Divider />}
@@ -547,7 +565,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
                   }}
                   sx={{ textTransform: 'none', fontSize: '0.65rem', py: 0, minHeight: 24, flex: 1 }}
                 >
-                  Uygula
+                  {t('applyLabel')}
                 </Button>
                 <Button
                   size="small"
@@ -559,7 +577,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
                   }}
                   sx={{ textTransform: 'none', fontSize: '0.65rem', py: 0, minHeight: 24, flex: 1 }}
                 >
-                  Birlestir
+                  {t('mergeLabel')}
                 </Button>
               </Box>
             </MenuItem>
@@ -569,12 +587,12 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
 
       {/* Save Tag Profile Dialog */}
       <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Etiket Profili Kaydet</DialogTitle>
+        <DialogTitle>{t('saveProfile')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             fullWidth
-            label="Profil Adi"
+            label={t('profileNameLabel')}
             value={newProfileName}
             onChange={(e) => setNewProfileName(e.target.value)}
             size="small"
@@ -590,19 +608,19 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
           </Box>
           {currentTags.length === 0 && (
             <Typography variant="caption" color="error" sx={{ mt: 1 }}>
-              Kaydedilecek etiket yok
+              {t('noTagsToSave')}
             </Typography>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSaveDialogOpen(false)}>Iptal</Button>
+          <Button onClick={() => setSaveDialogOpen(false)}>{t('cancel')}</Button>
           <Button
             onClick={handleSaveProfile}
             variant="contained"
             disabled={currentTags.length === 0}
             startIcon={<SaveIcon />}
           >
-            Kaydet
+            {t('save')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -626,6 +644,8 @@ interface ManageTagProfilesDialogProps {
 }
 
 function ManageTagProfilesDialog({ open, onClose }: ManageTagProfilesDialogProps) {
+  const t = useTranslations('etsy.templates');
+  const { formatDate } = useLocale();
   const [profiles, setProfiles] = useState<TagProfile[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -641,7 +661,7 @@ function ManageTagProfilesDialog({ open, onClose }: ManageTagProfilesDialogProps
     const updated = profiles.filter((p) => p.id !== id);
     setProfiles(updated);
     saveTagProfiles(updated);
-    toast.success('Etiket profili silindi');
+    toast.success(t('tagProfileDeleted'));
   };
 
   const handleRename = (id: string) => {
@@ -652,16 +672,16 @@ function ManageTagProfilesDialog({ open, onClose }: ManageTagProfilesDialogProps
     setProfiles(updated);
     saveTagProfiles(updated);
     setEditingId(null);
-    toast.success('Profil yeniden adlandirildi');
+    toast.success(t('profileRenamed'));
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Etiket Profillerini Yonet</DialogTitle>
+      <DialogTitle>{t('manageProfiles')}</DialogTitle>
       <DialogContent>
         {profiles.length === 0 ? (
           <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-            Henuz kayitli etiket profili yok.
+            {t('noTagProfiles')}
           </Typography>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
@@ -682,10 +702,10 @@ function ManageTagProfilesDialog({ open, onClose }: ManageTagProfilesDialogProps
                         sx={{ flex: 1 }}
                       />
                       <Button size="small" onClick={() => handleRename(profile.id)}>
-                        Kaydet
+                        {t('save')}
                       </Button>
                       <Button size="small" onClick={() => setEditingId(null)}>
-                        Iptal
+                        {t('cancel')}
                       </Button>
                     </Box>
                   ) : (
@@ -706,11 +726,11 @@ function ManageTagProfilesDialog({ open, onClose }: ManageTagProfilesDialogProps
                   </Box>
 
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                    {new Date(profile.createdAt).toLocaleDateString('tr-TR')} &middot; {profile.tags.length} etiket
+                    {formatDate(profile.createdAt)} &middot; {profile.tags.length} {t('tagsChip')}
                   </Typography>
                 </CardContent>
                 <CardActions sx={{ pt: 0, px: 2, pb: 1 }}>
-                  <Tooltip title="Yeniden Adlandir">
+                  <Tooltip title={t('renameTooltip')}>
                     <IconButton
                       size="small"
                       onClick={() => {
@@ -721,7 +741,7 @@ function ManageTagProfilesDialog({ open, onClose }: ManageTagProfilesDialogProps
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Profili Sil">
+                  <Tooltip title={t('deleteTooltip')}>
                     <IconButton size="small" color="error" onClick={() => handleDelete(profile.id)}>
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -733,7 +753,7 @@ function ManageTagProfilesDialog({ open, onClose }: ManageTagProfilesDialogProps
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Kapat</Button>
+        <Button onClick={onClose}>{t('close')}</Button>
       </DialogActions>
     </Dialog>
   );

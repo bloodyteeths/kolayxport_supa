@@ -19,6 +19,8 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 const QuickActionCard = ({ href, icon: Icon, label, description, color }) => (
   <Link
@@ -51,50 +53,55 @@ const TimelineItem = ({ text, done = true }) => (
 );
 
 const DashboardLandingContent = ({ user }) => {
-  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Kullanıcı';
-  const greeting = new Date().getHours() < 12 ? 'Günaydın' : new Date().getHours() < 18 ? 'İyi günler' : 'İyi akşamlar';
+  const t = useTranslations('dashboard');
+  const tAuth = useTranslations('auth');
+  const { formatDate } = useLocale();
+
+  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || t('defaultUser');
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? t('greetingMorning') : hour < 18 ? t('greetingAfternoon') : t('greetingEvening');
 
   const quickActions = [
     {
       href: '/app/etsy-listings',
       icon: Store,
       label: 'Etsy Listings',
-      description: 'AI ile optimize, araştırma, toplu düzenleme',
+      description: t('etsyListingsDesc'),
       color: { bg: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)', icon: '#ea580c' },
     },
     {
       href: '/app/ebay-listings',
       icon: ShoppingBag,
       label: 'eBay Listings',
-      description: 'Ürün yönetimi, SEO skor, AI açıklama',
+      description: t('ebayListingsDesc'),
       color: { bg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', icon: '#2563eb' },
     },
     {
       href: '/app/labels',
       icon: Truck,
-      label: 'Kargo Etiketi',
-      description: 'FedEx & UPS etiket oluştur',
+      label: t('shippingLabel'),
+      description: t('shippingLabelDesc'),
       color: { bg: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', icon: '#16a34a' },
     },
     {
       href: '/app/analytics',
       icon: BarChart3,
-      label: 'Analitik',
-      description: 'Gelir, sipariş, performans',
+      label: t('analytics'),
+      description: t('analyticsDesc'),
       color: { bg: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)', icon: '#7c3aed' },
     },
     {
       href: '/app/ebay-research',
       icon: Target,
-      label: 'Pazar Araştırma',
-      description: 'Rakip analizi, niş keşfi, arbitraj',
+      label: t('marketResearch'),
+      description: t('marketResearchDesc'),
       color: { bg: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)', icon: '#e11d48' },
     },
     {
       href: '/app/senkron',
       icon: ShoppingCart,
-      label: 'Senkronizasyon',
-      description: 'Siparişleri pazaryerlerinden çek',
+      label: t('sync'),
+      description: t('syncDesc'),
       color: { bg: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)', icon: '#059669' },
     },
   ];
@@ -107,7 +114,7 @@ const DashboardLandingContent = ({ user }) => {
           {greeting}, {firstName}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          {formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
 
@@ -127,15 +134,15 @@ const DashboardLandingContent = ({ user }) => {
             <Sparkles size={18} className="text-white" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Tüm Özellikler Ücretsiz</h2>
+            <h2 className="text-base font-semibold text-slate-900">{t('allFeaturesFree')}</h2>
             <p className="text-sm text-slate-600 mt-1 max-w-lg">
-              Lansmanımıza özel olarak tüm entegrasyonlar ve AI özellikleri ücretsiz. AI listing optimizasyonu, pazar araştırma ve daha fazlasını keşfedin.
+              {t('allFeaturesFreeDesc')}
             </p>
             <Link
               href="/ozellikler"
               className="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
             >
-              Özellikleri Keşfet <ArrowRight size={14} />
+              {t('discoverFeatures')} <ArrowRight size={14} />
             </Link>
           </div>
         </div>
@@ -143,7 +150,7 @@ const DashboardLandingContent = ({ user }) => {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Hızlı Erişim</h2>
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('quickAccess')}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {quickActions.map((action) => (
             <QuickActionCard key={action.href} {...action} />
@@ -154,15 +161,15 @@ const DashboardLandingContent = ({ user }) => {
       {/* Updates timeline */}
       <div className="card-premium p-5 sm:p-6">
         <h2 className="text-base font-semibold text-slate-900 mb-3" style={{ letterSpacing: '-0.01em' }}>
-          Son Güncellemeler
+          {t('recentUpdates')}
         </h2>
         <div className="divide-y divide-slate-100">
-          <TimelineItem text="AI Listing Optimizasyonu - Etsy & eBay için AI destekli başlık, etiket ve açıklama" />
-          <TimelineItem text="Pazar Araştırma - Rakip analizi, niş keşfi ve arbitraj tarayıcı" />
-          <TimelineItem text="Etsy & eBay tam entegrasyon - Listing yönetimi, SEO skor, toplu işlemler" />
-          <TimelineItem text="FedEx & UPS kargo etiket oluşturma aktif" />
-          <TimelineItem text="Supabase Auth ile güvenli giriş sistemi" />
-          <TimelineItem text="KolayXport platformu başarıyla yayına alındı" />
+          <TimelineItem text={t('update1')} />
+          <TimelineItem text={t('update2')} />
+          <TimelineItem text={t('update3')} />
+          <TimelineItem text={t('update4')} />
+          <TimelineItem text={t('update5')} />
+          <TimelineItem text={t('update6')} />
         </div>
       </div>
     </div>
@@ -172,15 +179,18 @@ const DashboardLandingContent = ({ user }) => {
 function AppIndexPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const t = useTranslations('dashboard');
+  const tAuth = useTranslations('auth');
+  const tc = useTranslations('common');
 
   const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
 
   if (status === 'loading') {
     return (
-      <AppLayout title="Yükleniyor..." simpleHeader>
+      <AppLayout title={tAuth('loading')} simpleHeader>
         <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-200px)]">
           <Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-4" />
-          <p className="text-slate-500 text-sm">Hesap durumu kontrol ediliyor...</p>
+          <p className="text-slate-500 text-sm">{tAuth('checkingAccount')}</p>
         </div>
       </AppLayout>
     );
@@ -196,10 +206,10 @@ function AppIndexPage() {
       });
     }
     return (
-      <AppLayout title="Yönlendiriliyor..." simpleHeader>
+      <AppLayout title={tAuth('redirecting')} simpleHeader>
         <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-200px)]">
           <Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-4" />
-          <p className="text-slate-500 text-sm">Giriş sayfasına yönlendiriliyor...</p>
+          <p className="text-slate-500 text-sm">{tAuth('redirectingToLogin')}</p>
         </div>
       </AppLayout>
     );
@@ -207,16 +217,16 @@ function AppIndexPage() {
 
   if (status === 'authenticated' && user) {
     return (
-      <AppLayout title="Genel Bakış - KolayXport Dashboard">
+      <AppLayout title={t('pageTitle')}>
         <DashboardLandingContent user={user} />
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout title="Durum Belirsiz" simpleHeader>
+    <AppLayout title={t('statusUnknown')} simpleHeader>
       <div className="flex flex-col items-center justify-center min-h-[calc(100dvh-200px)]">
-        <p className="text-slate-500 text-sm">Bir sorun oluştu, lütfen sayfayı yenileyin.</p>
+        <p className="text-slate-500 text-sm">{tc('errorOccurred')}</p>
       </div>
     </AppLayout>
   );

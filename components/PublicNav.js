@@ -5,13 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react'; // Using lucide-react for icons
 import { supabase } from '@/lib/supabase'; // ADDED
 import { useRouter } from 'next/router';
+import { useTranslations } from 'next-intl';
 
-const navLinks = [
-  { name: 'Kurumsal', href: '/kurumsal' },
-  { name: 'Özellikler', href: '/ozellikler' },
-  { name: 'Entegrasyonlar', href: '/entegrasyonlar' },
-  { name: 'Nasıl Kullanırım', href: '/nasil-kullanirim' },
-  { name: 'İletişim', href: '/iletisim' },
+const getNavLinks = (t) => [
+  { name: t('corporate'), href: '/kurumsal' },
+  { name: t('features'), href: '/ozellikler' },
+  { name: t('integrations'), href: '/entegrasyonlar' },
+  { name: t('howToUse'), href: '/nasil-kullanirim' },
+  { name: t('contact'), href: '/iletisim' },
 ];
 
 const navVariants = {
@@ -45,10 +46,13 @@ const defaultCtaAction = async () => { // ADDED helper for default action
   });
 };
 
-const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
+const PublicNav = ({ ctaLabel }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
+  const t = useTranslations('public');
+  const navLinks = getNavLinks(t);
+  const resolvedCtaLabel = ctaLabel || t('ctaSignIn');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -91,7 +95,7 @@ const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
             ))}
             <motion.div variants={linkVariants}>
               <Link href="/login" className="btn-primary">
-                  {ctaLabel}
+                  {resolvedCtaLabel}
               </Link>
             </motion.div>
             <motion.div variants={linkVariants}>
@@ -108,7 +112,7 @@ const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
             <motion.button
               onClick={toggleMenu}
               className="p-2 rounded-md text-gray-600 hover:text-blue-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
-              aria-label="Menüyü aç/kapat"
+              aria-label={t('toggleMenu')}
               aria-expanded={isOpen}
               variants={linkVariants}
             >
@@ -140,7 +144,7 @@ const PublicNav = ({ ctaLabel = "Giriş Yap / Ücretsiz Dene" }) => {
               ))}
               <motion.div variants={linkVariants} className="mt-8">
                 <Link href="/login" className="btn-primary text-center">
-                  {ctaLabel}
+                  {resolvedCtaLabel}
                 </Link>
               </motion.div>
             </nav>

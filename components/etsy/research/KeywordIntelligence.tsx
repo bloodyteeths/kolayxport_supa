@@ -8,6 +8,7 @@ import { useTheme } from '@mui/material/styles';
 import { CheckCircle, Hash, Tag, Heart, Copy, TrendingUp } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
+import { useTranslations } from 'next-intl';
 import {
   useEtsyResearchStore,
   useComputedKeywords,
@@ -22,6 +23,7 @@ interface KeywordIntelligenceProps {
 }
 
 export default function KeywordIntelligence({ userListings }: KeywordIntelligenceProps) {
+  const t = useTranslations('etsy.keywordIntel');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const items = useEtsyResearchStore(s => s.items);
@@ -52,15 +54,15 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
               border: '1px solid rgba(242,153,74,0.2)',
             }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                {tagGaps.length} Eksik Tag Tespit Edildi!
+                {t('missingTagsDetected', { count: tagGaps.length })}
               </Typography>
               <Typography variant="body2">
-                Rakiplerin kullandigi ama sizde olmayan tagler:
+                {t('missingTagsDesc')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
-                {tagGaps.slice(0, 10).map(t => (
-                  <Chip key={t.tag} label={`${t.tag} (%${t.pct})`} size="small" color="warning"
-                    onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(`"${t.tag}" kopyalandi`); }}
+                {tagGaps.slice(0, 10).map(tg => (
+                  <Chip key={tg.tag} label={`${tg.tag} (%${tg.pct})`} size="small" color="warning"
+                    onClick={() => { navigator.clipboard.writeText(tg.tag); toast.success(t('copied')); }}
                     sx={{ cursor: 'pointer', borderRadius: '8px' }}
                   />
                 ))}
@@ -70,29 +72,29 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
 
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-              En Cok Kullanilan Tagler ({enrichedTags.length} benzersiz)
+              {t('topUsedTags', { count: enrichedTags.length })}
             </Typography>
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2.5 }}>
-              {enrichedTags.slice(0, 40).map(t => (
-                <Chip key={t.tag}
-                  label={`${t.tag} (%${t.pct})`} size="small"
-                  color={t.inMyTags ? 'success' : t.pct >= 30 ? 'error' : t.pct >= 15 ? 'warning' : 'default'}
-                  variant={t.inMyTags ? 'filled' : 'outlined'}
-                  onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(`"${t.tag}" kopyalandi`); }}
+              {enrichedTags.slice(0, 40).map(tg => (
+                <Chip key={tg.tag}
+                  label={`${tg.tag} (%${tg.pct})`} size="small"
+                  color={tg.inMyTags ? 'success' : tg.pct >= 30 ? 'error' : tg.pct >= 15 ? 'warning' : 'default'}
+                  variant={tg.inMyTags ? 'filled' : 'outlined'}
+                  onClick={() => { navigator.clipboard.writeText(tg.tag); toast.success(t('copied')); }}
                   sx={{ cursor: 'pointer', borderRadius: '8px' }}
                 />
               ))}
             </Box>
 
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Tag Yogunlugu</Typography>
-            {enrichedTags.slice(0, 20).map(t => (
-              <Box key={t.tag} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Typography variant="body2" sx={{ minWidth: isMobile ? 90 : 140, fontSize: isMobile ? '0.75rem' : undefined, fontWeight: t.inMyTags ? 700 : 400 }}>
-                  {t.inMyTags && <CheckCircle size={12} color="#4caf50" style={{ marginRight: 4, verticalAlign: 'middle' }} />}
-                  {t.tag}
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('tagDensity')}</Typography>
+            {enrichedTags.slice(0, 20).map(tg => (
+              <Box key={tg.tag} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Typography variant="body2" sx={{ minWidth: isMobile ? 90 : 140, fontSize: isMobile ? '0.75rem' : undefined, fontWeight: tg.inMyTags ? 700 : 400 }}>
+                  {tg.inMyTags && <CheckCircle size={12} color="#4caf50" style={{ marginRight: 4, verticalAlign: 'middle' }} />}
+                  {tg.tag}
                 </Typography>
-                <Box sx={{ flex: 1 }}><GradientBar value={t.pct} max={100} /></Box>
-                <Typography variant="caption" sx={{ minWidth: 35, fontWeight: 600 }}>{t.pct}%</Typography>
+                <Box sx={{ flex: 1 }}><GradientBar value={tg.pct} max={100} /></Box>
+                <Typography variant="caption" sx={{ minWidth: 35, fontWeight: 600 }}>{tg.pct}%</Typography>
               </Box>
             ))}
           </Paper>
@@ -100,26 +102,26 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
           {/* Tag Effectiveness Scores */}
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-              Tag Etkinlik Skorları
+              {t('tagEffectivenessScores')}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-              Frekans x Etkileşim: Hangi tagler gerçekten dönüşüm sağlıyor?
+              {t('tagEffectivenessDesc')}
             </Typography>
-            {enrichedTags.slice(0, 25).map(t => {
-              const tagItems = items.filter(item => (item.tags || []).some((tag: string) => tag.toLowerCase() === t.tag));
+            {enrichedTags.slice(0, 25).map(tg => {
+              const tagItems = items.filter(item => (item.tags || []).some((tag: string) => tag.toLowerCase() === tg.tag));
               const avgFav = tagItems.length > 0 ? tagItems.reduce((s, i) => s + i.num_favorers, 0) / tagItems.length : 0;
               const avgViews = tagItems.length > 0 ? tagItems.reduce((s, i) => s + i.views, 0) / tagItems.length : 0;
               const engRate = avgViews > 0 ? (avgFav / avgViews) * 100 : 0;
-              const freqScore = Math.min(30, t.pct * 0.3);
+              const freqScore = Math.min(30, tg.pct * 0.3);
               const engScore = Math.min(30, engRate * 6);
               const compScore = Math.min(20, (1 - Math.min(tagItems.length / Math.max(items.length, 1), 1)) * 20);
               const effectiveness = Math.round(freqScore + engScore + compScore);
               const effectColor = effectiveness > 50 ? '#4caf50' : effectiveness > 30 ? '#ff9800' : '#f44336';
               return (
-                <Box key={t.tag} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Typography variant="body2" sx={{ minWidth: isMobile ? 80 : 140, fontWeight: t.inMyTags ? 700 : 400, fontSize: isMobile ? '0.7rem' : '0.8rem' }}>
-                    {t.inMyTags && <CheckCircle size={10} color="#4caf50" style={{ marginRight: 4, verticalAlign: 'middle' }} />}
-                    {t.tag}
+                <Box key={tg.tag} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Typography variant="body2" sx={{ minWidth: isMobile ? 80 : 140, fontWeight: tg.inMyTags ? 700 : 400, fontSize: isMobile ? '0.7rem' : '0.8rem' }}>
+                    {tg.inMyTags && <CheckCircle size={10} color="#4caf50" style={{ marginRight: 4, verticalAlign: 'middle' }} />}
+                    {tg.tag}
                   </Typography>
                   <Box sx={{ flex: 1, bgcolor: '#f0f0f0', borderRadius: 3, height: 8, overflow: 'hidden' }}>
                     <Box sx={{ width: `${Math.min(effectiveness, 100)}%`, height: 8, borderRadius: 3, bgcolor: effectColor, transition: 'width 0.5s' }} />
@@ -141,10 +143,10 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
             isMobile ? (
               <Paper sx={{ ...glassCard, p: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Populer Tag Kombinasyonlari
+                  {t('popularTagCombos')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                  Birlikte en cok kullanilan tag ciftleri
+                  {t('popularTagCombosDesc')}
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {sortedTagCombos.slice(0, 20).map(c => (
@@ -152,12 +154,12 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       p: 1, borderRadius: '8px', bgcolor: 'rgba(102,126,234,0.03)',
                     }}
-                      onClick={() => { navigator.clipboard.writeText(c.pair.replace(' + ', ', ')); toast.success('Kopyalandi'); }}
+                      onClick={() => { navigator.clipboard.writeText(c.pair.replace(' + ', ', ')); toast.success(t('copied')); }}
                     >
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{c.pair}</Typography>
                         <Box sx={{ display: 'flex', gap: 1, mt: 0.3 }}>
-                          <Typography variant="caption" color="text.secondary">Kullanim: {c.count}</Typography>
+                          <Typography variant="caption" color="text.secondary">{t('usage')}: {c.count}</Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
                             <Heart size={10} color="#e91e63" />
                             <Typography variant="caption">{c.avgFav}</Typography>
@@ -173,28 +175,28 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
             <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
               <Box sx={{ p: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  Populer Tag Kombinasyonlari
+                  {t('popularTagCombos')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Birlikte en cok kullanilan tag ciftleri ve ortalama favori sayilari
+                  {t('popularTagCombosDescFull')}
                 </Typography>
               </Box>
               <TableContainer sx={{ maxHeight: 400 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
-                      <TableCell>Tag Cifti</TableCell>
+                      <TableCell>{t('tagPair')}</TableCell>
                       <TableCell align="center">
                         <TableSortLabel active={tagComboSortKey === 'count'} direction={tagComboSortKey === 'count' ? tagComboSortDir : 'desc'} onClick={() => handleTagComboSort('count')}>
-                          Kullanim
+                          {t('usage')}
                         </TableSortLabel>
                       </TableCell>
                       <TableCell align="center">
                         <TableSortLabel active={tagComboSortKey === 'avgFav'} direction={tagComboSortKey === 'avgFav' ? tagComboSortDir : 'desc'} onClick={() => handleTagComboSort('avgFav')}>
-                          Ort. Favori
+                          {t('avgFavorite')}
                         </TableSortLabel>
                       </TableCell>
-                      <TableCell align="center">Kopyala</TableCell>
+                      <TableCell align="center">{t('copy')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -210,7 +212,7 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
                         <TableCell align="center">
                           <IconButton size="small" onClick={() => {
                             navigator.clipboard.writeText(c.pair.replace(' + ', ', '));
-                            toast.success('Kopyalandi');
+                            toast.success(t('copied'));
                           }}><Copy size={14} /></IconButton>
                         </TableCell>
                       </TableRow>
@@ -224,7 +226,7 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
         </>
       ) : !loading && (
         hasData
-          ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Aramanizda tag verisi bulunamadi. Farkli bir anahtar kelime deneyin.</Alert>
+          ? <Alert severity="info" sx={{ borderRadius: '12px' }}>{t('noTagData')}</Alert>
           : (
             <>
               {/* Discovery hot keywords with frequency bars */}
@@ -243,7 +245,7 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
               {discoveryData?.hotKeywords?.length > 0 ? (
                 <Paper sx={{ ...glassCard, p: 2.5 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <TrendingUp size={16} color="#667eea" /> Hot Keywords — Click to Research
+                    <TrendingUp size={16} color="#667eea" /> {t('hotKeywordsHeading')}
                   </Typography>
                   {(() => {
                     const maxCount = Math.max(...discoveryData.hotKeywords.map((kw: any) => kw.count), 1);
@@ -268,9 +270,9 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
                   })()}
                 </Paper>
               ) : !discoveryLoading && (
-                <PremiumEmptyState icon={<Hash size={48} />} title="Kelime & Tag Analizi"
-                  desc="Rakiplerin kullandigi taglari ve anahtar kelimeleri kesfedin."
-                  steps={['Once bir anahtar kelime aramasi yapin', 'Rakiplerin en cok kullandigi taglar ve kelimeler listelenir', 'Eksiklerinizi gorun — tiklayarak kopyalayin']}
+                <PremiumEmptyState icon={<Hash size={48} />} title={t('emptyTitle')}
+                  desc={t('emptyDesc')}
+                  steps={[t('emptyStep1'), t('emptyStep2'), t('emptyStep3')]}
                 />
               )}
             </>
@@ -282,29 +284,29 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
         <Box sx={{ mt: 3 }}>
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Tag size={18} color="#667eea" /> Anahtar Kelimeler
+            <Tag size={18} color="#667eea" /> {t('keywords')}
           </Typography>
           <Alert severity="info" sx={{ mb: 2, borderRadius: '12px' }}>
-            Rakiplerin basliklarindan cikarilan en populer anahtar kelimeler. Tiklayin ve kopyalayin.
+            {t('keywordsDesc')}
           </Alert>
 
           {myTitle && (
             <Box sx={{ mb: 1.5 }}>
               <Button size="small" variant={kwShowMissing ? 'contained' : 'outlined'}
                 onClick={() => setKwShowMissing(!kwShowMissing)} sx={{ mr: 1, borderRadius: '8px' }}>
-                {kwShowMissing ? 'Tum Kelimeler' : 'Basligimda Olmayanlar'}
+                {kwShowMissing ? t('allKeywords') : t('missingInMyTitle')}
               </Button>
             </Box>
           )}
 
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Tek Kelimeler</Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('singleWords')}</Typography>
           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
             {(kwShowMissing ? enrichedKeywords.filter(k => !k.inMyTitle) : enrichedKeywords).map(kw => (
               <Chip key={kw.keyword}
                 label={`${kw.keyword} (${kw.pct}%)`} size="small"
                 color={kw.pct >= 40 ? 'error' : kw.pct >= 20 ? 'warning' : 'default'}
                 variant={kw.inMyTitle ? 'filled' : 'outlined'}
-                onClick={() => { navigator.clipboard.writeText(kw.keyword); toast.success(`"${kw.keyword}" kopyalandi`); }}
+                onClick={() => { navigator.clipboard.writeText(kw.keyword); toast.success(t('copied')); }}
                 sx={{ cursor: 'pointer', borderRadius: '8px' }}
               />
             ))}
@@ -312,12 +314,12 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
 
           {bigrams.length > 0 && (
             <>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>2 Kelimelik Ifadeler</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('bigramPhrases')}</Typography>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
                 {bigrams.slice(0, 25).map(b => (
                   <Chip key={b.phrase} label={`${b.phrase} (${b.count})`} size="small"
                     color={b.percentage >= 30 ? 'primary' : 'default'} variant="outlined"
-                    onClick={() => { navigator.clipboard.writeText(b.phrase); toast.success(`"${b.phrase}" kopyalandi`); }}
+                    onClick={() => { navigator.clipboard.writeText(b.phrase); toast.success(t('copied')); }}
                     sx={{ cursor: 'pointer', borderRadius: '8px' }}
                   />
                 ))}
@@ -327,12 +329,12 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
 
           {trigrams.length > 0 && (
             <>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Uzun Kuyruk (3+ kelime)</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('longTail')}</Typography>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
-                {trigrams.slice(0, 20).map(t => (
-                  <Chip key={t.phrase} label={`${t.phrase} (${t.count})`} size="small"
+                {trigrams.slice(0, 20).map(tg => (
+                  <Chip key={tg.phrase} label={`${tg.phrase} (${tg.count})`} size="small"
                     color="secondary" variant="outlined"
-                    onClick={() => { navigator.clipboard.writeText(t.phrase); toast.success(`"${t.phrase}" kopyalandi`); }}
+                    onClick={() => { navigator.clipboard.writeText(tg.phrase); toast.success(t('copied')); }}
                     sx={{ cursor: 'pointer', borderRadius: '8px' }}
                   />
                 ))}
@@ -342,7 +344,7 @@ export default function KeywordIntelligence({ userListings }: KeywordIntelligenc
 
           {/* Keyword density */}
           <Paper sx={{ ...glassCard, p: isMobile ? 1.5 : 2.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Anahtar Kelime Yogunlugu</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>{t('keywordDensity')}</Typography>
             {enrichedKeywords.slice(0, 15).map(kw => (
               <Box key={kw.keyword} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <Typography variant="body2" sx={{ minWidth: isMobile ? 70 : 100, fontSize: isMobile ? '0.75rem' : undefined, fontWeight: kw.inMyTitle ? 700 : 400 }}>

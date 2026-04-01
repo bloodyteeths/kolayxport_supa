@@ -36,23 +36,17 @@ import ListItemText from '@mui/material/ListItemText';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
-const DURUM_OPTIONS = ['Çıkmadı', 'Çıktı', 'İptal', 'Üretimde', 'Sipariş Verildi', 'Hazırlanıyor', 'Kargoya Verildi', 'Teslim Edildi'];
+// Custom status values stored in DB — indices map to t('customStatuses.N') for display
+const DURUM_VALUES = ['Çıkmadı', 'Çıktı', 'İptal', 'Üretimde', 'Sipariş Verildi', 'Hazırlanıyor', 'Kargoya Verildi', 'Teslim Edildi'];
 
-// Status mapping from English to Turkish (matching labels page)
-const orderStatusOptions = [
-  { value: 'UNSHIPPED', label: 'Hazırlanıyor' },
-  { value: 'AWAITING_FULFILLMENT', label: 'Onaylandı' },
-  { value: 'PAID', label: 'Onaylandı' },
-  { value: 'CREATED', label: 'Onaylandı' },
-  { value: 'PARTIALLY_SHIPPED', label: 'Kısmen Kargolandı' },
-  { value: 'SHIPPED', label: 'Kargolandı' },
-  { value: 'DELIVERED', label: 'Teslim Edildi' },
-  { value: 'CANCELLED', label: 'İptal Edildi' },
-  { value: 'REFUNDED', label: 'İade Edildi' },
-  { value: 'ON_HOLD', label: 'Askıya Alındı' },
-  { value: 'COMPLETED', label: 'Tamamlandı' },
-  { value: 'FAILED', label: 'Başarısız Oldu' },
+// Status keys mapped to t('orderStatuses.KEY')
+const ORDER_STATUS_VALUES = [
+  'UNSHIPPED', 'AWAITING_FULFILLMENT', 'PAID', 'CREATED',
+  'PARTIALLY_SHIPPED', 'SHIPPED', 'DELIVERED', 'CANCELLED',
+  'REFUNDED', 'ON_HOLD', 'COMPLETED', 'FAILED',
 ];
 
 // Status colors for Kargo Durumu column (matching labels page)
@@ -98,6 +92,9 @@ const extractCustomerNote = (order) => {
 };
 
 function SenkronPage() {
+  const t = useTranslations('sync');
+  const tc = useTranslations('common');
+  const { formatDateTime } = useLocale();
   const [error, setError] = useState(null);
   const [editState, setEditState] = useState({}); // { [orderId]: { not, durum } }
   const [editingNotes, setEditingNotes] = useState({}); // { [orderId]: true/false }
@@ -251,10 +248,10 @@ function SenkronPage() {
         await mutate();
       }
       
-      alert(`Durum güncelleme tamamlandı: ${response.data.updatedOrders} sipariş güncellendi.`);
+      alert(t('statusUpdateComplete', { count: response.data.updatedOrders }));
     } catch (err) {
       console.error('Error syncing statuses:', err);
-      alert('Durum güncelleme hatası: ' + (err.response?.data?.error || err.message));
+      alert(t('statusUpdateError') + ': ' + (err.response?.data?.error || err.message));
     } finally {
       setUpdatingStatuses(false);
     }
@@ -347,7 +344,7 @@ function SenkronPage() {
   const columns = [
     {
       field: 'orderNumber',
-      headerName: 'Sipariş No',
+      headerName: t('orderNumber'),
       width: 120,
       renderCell: ({ row }) => (
         !row.orderNumber || row.orderNumber === 'null' ? (
@@ -359,7 +356,7 @@ function SenkronPage() {
     },
     {
       field: 'items',
-      headerName: 'Görsel',
+      headerName: t('visual'),
       renderCell: ({ row }) =>
         row.items[0]?.image
           ? <img src={row.items[0].image} width={240} height={240} style={{ objectFit:'cover', borderRadius: 12 }} />
@@ -367,17 +364,17 @@ function SenkronPage() {
     },
     {
       field: 'customerName',
-      headerName: 'Müşteri Adı',
+      headerName: t('customerName'),
       width: 200,
     },
     {
       field: 'variantInfo',
-      headerName: 'Varyant',
+      headerName: t('variant'),
       valueGetter: ({ row }) => row.items[0]?.variantInfo || '—',
     },
     {
       field: 'notes',
-      headerName: 'Not',
+      headerName: t('note'),
       renderCell: ({ row }) => (
         <TextField
           defaultValue={row.items[0]?.notes || ''}
@@ -388,7 +385,7 @@ function SenkronPage() {
     },
     {
       field: 'status',
-      headerName: 'Durum',
+      headerName: t('status'),
       width: 200,
       renderCell: ({ row }) => (
         <div style={{ minWidth: 180, minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -410,14 +407,14 @@ function SenkronPage() {
     },
     {
       field: 'id',
-      headerName: 'Sipariş No',
+      headerName: t('orderNumber'),
       width: 120,
     },
   ];
 
   return (
-    <AppLayout title="Senkron – Siparişler">
-      <NextSeo title="Senkron – KolayXport" />
+    <AppLayout title={t('pageTitle')}>
+      <NextSeo title={t('seoTitle')} />
       <motion.section
         className="py-4 sm:py-6 px-2 sm:px-4 w-full min-h-screen bg-slate-50"
         style={{ overflowX: 'hidden', maxWidth: '100%' }}
@@ -440,8 +437,8 @@ function SenkronPage() {
               >
                 <PrintIcon />
               </IconButton>
-              <Tooltip 
-                title="Durum Güncelle: Kargolandı → Çıktı, İptal Edildi → İptal"
+              <Tooltip
+                title={t('statusUpdateTooltip')}
                 placement="bottom"
               >
                 <IconButton
@@ -477,7 +474,7 @@ function SenkronPage() {
           {/* Filters */}
           <div className="flex flex-wrap gap-2 sm:gap-4 justify-between items-center mb-6 bg-white p-2 sm:p-4 rounded shadow overflow-hidden">
             <TextField
-              label="Sipariş No / Müşteri Ara"
+              label={t('searchOrderCustomer')}
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
               size="small"
@@ -491,14 +488,14 @@ function SenkronPage() {
               sx={{ minWidth: { xs: 180, sm: 220 } }}
             />
             <FormControl size="small" sx={{ minWidth: { xs: 160, sm: 200 } }}>
-              <InputLabel id="durum-multiple-checkbox-label">Tüm Durumlar</InputLabel>
+              <InputLabel id="durum-multiple-checkbox-label">{t('allStatuses')}</InputLabel>
               <Select
                 labelId="durum-multiple-checkbox-label"
                 multiple
                 value={filterDurum}
                 onChange={e => { setFilterDurum(e.target.value); setPage(1); }}
-                input={<OutlinedInput label="Tüm Durumlar" />}
-                renderValue={(selected) => selected.length === 0 ? 'Tüm Durumlar' : selected.join(', ')}
+                input={<OutlinedInput label={t('allStatuses')} />}
+                renderValue={(selected) => selected.length === 0 ? t('allStatuses') : selected.join(', ')}
                 MenuProps={{
                   PaperProps: {
                     style: {
@@ -508,10 +505,10 @@ function SenkronPage() {
                   },
                 }}
               >
-                {DURUM_OPTIONS.map(opt => (
-                  <MenuItem key={opt} value={opt}>
-                    <Checkbox checked={filterDurum.indexOf(opt) > -1} />
-                    <ListItemText primary={opt} />
+                {DURUM_VALUES.map((val, idx) => (
+                  <MenuItem key={val} value={val}>
+                    <Checkbox checked={filterDurum.indexOf(val) > -1} />
+                    <ListItemText primary={t(`customStatuses.${idx}`)} />
                   </MenuItem>
                 ))}
               </Select>
@@ -523,13 +520,13 @@ function SenkronPage() {
               size="small"
               sx={{ minWidth: { xs: 120, sm: 160 } }}
             >
-              <MenuItem value="">Tüm Mağazalar</MenuItem>
+              <MenuItem value="">{t('allStores')}</MenuItem>
               {marketplaceOptions.map(opt => (
                 <MenuItem key={opt} value={opt}>{opt}</MenuItem>
               ))}
             </Select>
             <TextField
-              label="Başlangıç Tarihi"
+              label={t('startDate')}
               type="date"
               value={filterStartDate}
               onChange={e => { setFilterStartDate(e.target.value); setPage(1); }}
@@ -538,7 +535,7 @@ function SenkronPage() {
               sx={{ minWidth: { xs: 140, sm: 180 } }}
             />
             <TextField
-              label="Bitiş Tarihi"
+              label={t('endDate')}
               type="date"
               value={filterEndDate}
               onChange={e => { setFilterEndDate(e.target.value); setPage(1); }}
@@ -552,8 +549,8 @@ function SenkronPage() {
               size="small"
               sx={{ minWidth: { xs: 120, sm: 160 } }}
             >
-              <MenuItem value="desc">Yeniden Eskiye</MenuItem>
-              <MenuItem value="asc">Eskiden Yeniye</MenuItem>
+              <MenuItem value="desc">{t('newestFirst')}</MenuItem>
+              <MenuItem value="asc">{t('oldestFirst')}</MenuItem>
             </Select>
             <Button
               variant="outlined"
@@ -571,17 +568,17 @@ function SenkronPage() {
               }}
               sx={{ minWidth: { xs: 100, sm: 120 }, fontWeight: 600 }}
             >
-              Filtreleri Sıfırla
+              {t('resetFilters')}
             </Button>
           </div>
           {/* Warning for missing order numbers */}
           {orders.some(o => !o.orderNumber) && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              {orders.filter(o => !o.orderNumber).length} adet siparişin <b>orderNumber</b> alanı eksik! Eksik olanlar tabloda kırmızı olarak işaretlenmiştir.
+              {t('missingOrderNumbers', { count: orders.filter(o => !o.orderNumber).length })}
             </Alert>
           )}
           <div className="flex flex-row items-center gap-4 mb-2">
-            <Typography sx={{ fontWeight: 600 }}>Sayfa Boyutu:</Typography>
+            <Typography sx={{ fontWeight: 600 }}>{t('pageSize')}:</Typography>
             <Select
               value={pageSize}
               onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
@@ -593,7 +590,7 @@ function SenkronPage() {
               ))}
             </Select>
             <Typography sx={{ ml: 2 }}>
-              Toplam: {total}
+              {t('total')}: {total}
             </Typography>
           </div>
           <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
@@ -601,24 +598,24 @@ function SenkronPage() {
               <Table sx={{ tableLayout: 'auto' }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ minWidth: { xs: 56, sm: 120 }, width: { xs: 56, sm: 120 }, p: { xs: 0.5, sm: 1 } }}>Görsel</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Müşteri Adı</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Sipariş Tarihi</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Varyant</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Müşteri Notu</TableCell>
-                    <TableCell sx={{ minWidth: { xs: 120, sm: 180 } }}>Not</TableCell>
-                    <TableCell>Durum</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Kargo Durumu</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Son Kargo Tarihi</TableCell>
-                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Mağaza</TableCell>
-                    <TableCell>Sipariş No</TableCell>
+                    <TableCell sx={{ minWidth: { xs: 56, sm: 120 }, width: { xs: 56, sm: 120 }, p: { xs: 0.5, sm: 1 } }}>{t('image')}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{t('customerName')}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('orderDate')}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t('variant')}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t('customerNote')}</TableCell>
+                    <TableCell sx={{ minWidth: { xs: 120, sm: 180 } }}>{t('note')}</TableCell>
+                    <TableCell>{t('status')}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>{t('shippingStatus')}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>{t('shipByDate')}</TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>{t('store')}</TableCell>
+                    <TableCell>{t('orderNo')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredOrders.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={11} align="center">
-                        <Typography>Sonuç bulunamadı.</Typography>
+                        <Typography>{tc('resultNotFound')}</Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -632,11 +629,11 @@ function SenkronPage() {
                       if (!item) {
                         console.log('[Senkron] No line items found for order:', order.id);
                         const orderDate = order.marketplaceOrderDate || order.createdAt;
-                        const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
-                        const shipByDateTR = order.shipByDate ? new Date(order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
-                        
+                        const orderDateTR = orderDate ? formatDateTime(orderDate, { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                        const shipByDateTR = order.shipByDate ? formatDateTime(order.shipByDate, { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+
                         const customerNote = extractCustomerNote(order);
-                        
+
                         return (
                           <TableRow key={row.rowKey} sx={{ height: 80 }}>
                             <TableCell sx={{ p: { xs: 0.5, sm: 1 }, minWidth: { xs: 56, sm: 120 }, width: { xs: 56, sm: 120 }, verticalAlign: 'middle' }}>—</TableCell>
@@ -691,7 +688,7 @@ function SenkronPage() {
                                           color: '#000',
                                         }
                                       }}
-                                      placeholder="Not ekleyin..."
+                                      placeholder={t('addNotePlaceholder')}
                                       inputProps={{
                                         style: {
                                           minHeight: '40px',
@@ -729,8 +726,8 @@ function SenkronPage() {
                                 onChange={e => handleSaveStatus(order.id, e.target.value)}
                                 size="small"
                               >
-                                {DURUM_OPTIONS.map(opt => (
-                                  <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                                {DURUM_VALUES.map((val, idx) => (
+                                  <MenuItem key={val} value={val}>{t(`customStatuses.${idx}`)}</MenuItem>
                                 ))}
                               </Select>
                             </TableCell>
@@ -738,8 +735,7 @@ function SenkronPage() {
                               {(() => {
                                 const status = (order.status || order.externalStatus || 'UNKNOWN').toUpperCase();
                                 const config = statusColors[status] || { bg: '#ccc', text: '#000' };
-                                const statusOption = orderStatusOptions.find(opt => opt.value === status);
-                                const label = statusOption?.label || status.replace(/_/g, ' ');
+                                const label = ORDER_STATUS_VALUES.includes(status) ? t(`orderStatuses.${status}`) : status.replace(/_/g, ' ');
 
                                 return (
                                   <Chip
@@ -761,7 +757,7 @@ function SenkronPage() {
                               {order.orderNumber
                                 ? order.orderNumber
                                 : <span style={{ color: 'red', fontWeight: 'bold' }}>
-                                    Eksik <span style={{ background: '#ffe0e0', color: '#b71c1c', borderRadius: 4, padding: '2px 6px', marginLeft: 4, fontSize: 11 }}>Order No</span>
+                                    {t('missing')} <span style={{ background: '#ffe0e0', color: '#b71c1c', borderRadius: 4, padding: '2px 6px', marginLeft: 4, fontSize: 11 }}>Order No</span>
                                   </span>
                               }
                             </TableCell>
@@ -771,9 +767,9 @@ function SenkronPage() {
 
                       // This is a line item row
                       const orderDate = order.marketplaceOrderDate || order.createdAt;
-                      const orderDateTR = orderDate ? new Date(orderDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                      const orderDateTR = orderDate ? formatDateTime(orderDate, { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
                       // Check item.shipBy first (for Trendyol), then fall back to order.shipByDate
-                      const shipByDateTR = (item.shipBy || order.shipByDate) ? new Date(item.shipBy || order.shipByDate).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
+                      const shipByDateTR = (item.shipBy || order.shipByDate) ? formatDateTime(item.shipBy || order.shipByDate, { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
                       const customerNote = extractCustomerNote(order);
                       
                       return (
@@ -845,7 +841,7 @@ function SenkronPage() {
                                           color: '#000',
                                         }
                                       }}
-                                      placeholder="Not ekleyin..."
+                                      placeholder={t('addNotePlaceholder')}
                                       inputProps={{
                                         style: {
                                           minHeight: '40px',
@@ -883,8 +879,8 @@ function SenkronPage() {
                                 onChange={e => handleSaveStatus(order.id, e.target.value)}
                                 size="small"
                               >
-                                {DURUM_OPTIONS.map(opt => (
-                                  <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                                {DURUM_VALUES.map((val, idx) => (
+                                  <MenuItem key={val} value={val}>{t(`customStatuses.${idx}`)}</MenuItem>
                                 ))}
                               </Select>
                             </TableCell>
@@ -892,8 +888,7 @@ function SenkronPage() {
                               {(() => {
                                 const status = (order.status || order.externalStatus || 'UNKNOWN').toUpperCase();
                                 const config = statusColors[status] || { bg: '#ccc', text: '#000' };
-                                const statusOption = orderStatusOptions.find(opt => opt.value === status);
-                                const label = statusOption?.label || status.replace(/_/g, ' ');
+                                const label = ORDER_STATUS_VALUES.includes(status) ? t(`orderStatuses.${status}`) : status.replace(/_/g, ' ');
 
                                 return (
                                   <Chip
@@ -915,7 +910,7 @@ function SenkronPage() {
                               {order.orderNumber
                                 ? order.orderNumber
                                 : <span style={{ color: 'red', fontWeight: 'bold' }}>
-                                    Eksik <span style={{ background: '#ffe0e0', color: '#b71c1c', borderRadius: 4, padding: '2px 6px', marginLeft: 4, fontSize: 11 }}>Order No</span>
+                                    {t('missing')} <span style={{ background: '#ffe0e0', color: '#b71c1c', borderRadius: 4, padding: '2px 6px', marginLeft: 4, fontSize: 11 }}>Order No</span>
                                   </span>
                               }
                             </TableCell>

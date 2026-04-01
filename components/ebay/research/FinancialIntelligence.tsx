@@ -12,6 +12,7 @@ import {
   List, FileSpreadsheet,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,15 +60,15 @@ type SortDir = 'asc' | 'desc';
 // ---------------------------------------------------------------------------
 
 const EBAY_CATEGORIES: EbayCategory[] = [
-  { label: 'Genel Kategoriler (Çoğu)', rate: 13.25 },
-  { label: 'Kitaplar, DVD, Müzik', rate: 14.95 },
-  { label: 'Madeni Paralar & Kağıt Para', rate: 6.35 },
+  { label: 'generalCategories', rate: 13.25 },
+  { label: 'booksDvdMusic', rate: 14.95 },
+  { label: 'coinsAndPaper', rate: 6.35 },
   { label: 'Gitarlar & Baslar', rate: 3.5 },
-  { label: 'Ağır Ekipman', rate: 2, cap: 300, note: 'Maks $300 sınırlı' },
-  { label: 'Mücevher & Saat (>$1000)', rate: 6.5 },
-  { label: 'Spor Ayakkabılar (Auth Guarantee)', rate: 8 },
-  { label: 'İş & Endüstriyel', rate: 4 },
-  { label: 'Müzik Aletleri (>$7500)', rate: 6.35 },
+  { label: 'heavyEquipment', rate: 2, cap: 300, note: 'maxCapped' },
+  { label: 'jewelryWatches', rate: 6.5 },
+  { label: 'sneakersAuth', rate: 8 },
+  { label: 'businessIndustrial', rate: 4 },
+  { label: 'musicalInstruments', rate: 6.35 },
 ];
 
 const STORAGE_KEY = 'kolayxport_roi_entries';
@@ -150,6 +151,7 @@ function TabPanel({ children, value, index }: { children: React.ReactNode; value
 // ---------------------------------------------------------------------------
 
 function RevenueCalculator({ userListings }: { userListings?: any[] }) {
+  const t = useTranslations('ebay.research.financial');
   const avgUserPrice = useMemo(() => {
     if (!userListings?.length) return 0;
     const prices = userListings
@@ -186,7 +188,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
     if (!listing) return;
     const price = parseFloat(listing.price?.value || listing.currentPrice || '0');
     if (price > 0) setSellingPrice(price.toFixed(2));
-    toast.success(`"${(listing.title || '').slice(0, 40)}..." yüklendi`);
+    toast.success(t('listingLoaded', { title: (listing.title || '').slice(0, 40) }));
   }, [userListings]);
 
   // Handle fee preset selection
@@ -198,7 +200,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
     // Find the closest matching EBAY_CATEGORIES entry or use "Genel" (index 0)
     const closestIdx = EBAY_CATEGORIES.findIndex((c) => Math.abs(c.rate - preset.rate) < 1);
     setCategoryIdx(closestIdx >= 0 ? closestIdx : 0);
-    toast.success(`${preset.label} - ${pct(preset.rate)} ücret oranı uygulandı`);
+    toast.success(t('feeApplied', { label: preset.label, rate: pct(preset.rate) }));
   }, []);
 
   const category = EBAY_CATEGORIES[categoryIdx];
@@ -245,35 +247,35 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
     a.download = `gelir-hesaplama-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('CSV indirildi');
+    toast.success(t('csvDownloaded'));
   }, [category, sp, sc, asc, pc, fees, netRevenue, profit, profitMargin, roi]);
 
   return (
     <Box>
       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Calculator size={20} /> Gelir Hesaplayıcı
+        <Calculator size={20} /> {t('revenueCalculator')}
       </Typography>
 
       {/* Listing Picker from userListings */}
       {userListings && userListings.length > 0 && (
         <Paper sx={{ p: 2, mb: 2, bgcolor: '#f8faff', border: '1px solid rgba(99,102,241,0.08)', borderRadius: 3 }}>
           <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <List size={16} /> Listelerimden Seç
+            <List size={16} /> {t('selectFromListings')}
           </Typography>
           <FormControl fullWidth size="small">
-            <InputLabel>Bir listeleme seçin</InputLabel>
+            <InputLabel>{t('selectListing')}</InputLabel>
             <Select
               value={selectedListingId}
-              label="Bir listeleme seçin"
+              label={t('selectListing')}
               onChange={(e) => handleListingSelect(e.target.value as string)}
               MenuProps={{ PaperProps: { sx: { maxHeight: 300 } } }}
             >
               <MenuItem value="">
-                <em>Seçim kaldır</em>
+                <em>{t('clearSelection')}</em>
               </MenuItem>
               {userListings.map((l, idx) => {
                 const id = l.itemId || l.listingId || l.id || `listing-${idx}`;
-                const title = (l.title || 'İsimsiz Ürün').slice(0, 60);
+                const title = (l.title || t('untitledProduct')).slice(0, 60);
                 const price = parseFloat(l.price?.value || l.currentPrice || '0');
                 return (
                   <MenuItem key={id} value={id}>
@@ -294,19 +296,19 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
       )}
 
       <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-        <Typography variant="subtitle2" sx={{ mb: 2 }}>Satış Bilgileri</Typography>
+        <Typography variant="subtitle2" sx={{ mb: 2 }}>{t('salesInfo')}</Typography>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2 }}>
           {/* Category Fee Presets */}
           <FormControl fullWidth size="small">
-            <InputLabel>Hızlı Kategori Ücreti</InputLabel>
+            <InputLabel>{t('quickCategoryFee')}</InputLabel>
             <Select
               value={feePreset}
-              label="Hızlı Kategori Ücreti"
+              label={t('quickCategoryFee')}
               onChange={(e) => handleFeePreset(e.target.value as string)}
             >
               <MenuItem value="">
-                <em>Manuel seç</em>
+                <em>{t('manual')}</em>
               </MenuItem>
               {COMMON_FEE_PRESETS.map((p) => (
                 <MenuItem key={p.label} value={p.label}>
@@ -325,7 +327,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
             >
               {EBAY_CATEGORIES.map((cat, i) => (
                 <MenuItem key={i} value={i}>
-                  {cat.label} ({pct(cat.rate)})
+                  {t(cat.label)} ({pct(cat.rate)})
                 </MenuItem>
               ))}
             </Select>
@@ -333,19 +335,19 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
 
           <Box>
             <TextField
-              label="Satış Fiyatı"
+              label={t('sellingPrice')}
               size="small"
               type="number"
               value={sellingPrice}
               onChange={(e) => setSellingPrice(e.target.value)}
               InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-              helperText="eBay'de listeleyeceğiniz satış fiyatı"
+              helperText={t('sellingPriceHelper')}
               fullWidth
             />
             {avgUserPrice > 0 && (
               <Chip
                 icon={<Info size={12} />}
-                label={`Ortalama liste fiyatın: $${avgUserPrice.toFixed(2)}`}
+                label={t('avgListPrice', { price: avgUserPrice.toFixed(2) })}
                 size="small"
                 variant="outlined"
                 color="info"
@@ -355,33 +357,33 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
           </Box>
 
           <TextField
-            label="Alıcıya Yansıtılan Kargo"
+            label={t('shippingCharged')}
             size="small"
             type="number"
             value={shippingCharged}
             onChange={(e) => setShippingCharged(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            helperText="Alıcının ödeyeceği kargo ücreti (ücretsiz kargo için 0)"
+            helperText={t('shippingChargedHelper')}
           />
 
           <TextField
-            label="Gerçek Kargo Maliyeti"
+            label={t('actualShipping')}
             size="small"
             type="number"
             value={actualShippingCost}
             onChange={(e) => setActualShippingCost(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            helperText="Sizin ödediğiniz gerçek kargo maliyeti"
+            helperText={t('actualShippingHelper')}
           />
 
           <TextField
-            label="Ürün Maliyeti"
+            label={t('productCost')}
             size="small"
             type="number"
             value={productCost}
             onChange={(e) => setProductCost(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            helperText="Ürünü tedarik etme maliyetiniz"
+            helperText={t('productCostHelper')}
           />
         </Box>
 
@@ -398,11 +400,11 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 2 }}>
           <FormControlLabel
             control={<Switch checked={isInternational} onChange={(e) => setIsInternational(e.target.checked)} />}
-            label="Uluslararası Satış (+1.65%)"
+            label={t('international')}
           />
           <FormControlLabel
             control={<Switch checked={!freeInsertions} onChange={(e) => setFreeInsertions(!e.target.checked)} />}
-            label="Ücretsiz listeleme hakkı bitti ($0.35)"
+            label={t('freeInsertions')}
           />
           <FormControlLabel
             control={<Switch checked={isPromoted} onChange={(e) => setIsPromoted(e.target.checked)} />}
@@ -413,7 +415,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
         {isPromoted && (
           <Box sx={{ px: 2, mb: 2 }}>
             <Typography variant="body2" gutterBottom>
-              Reklam Oranı: {pct(adRate)}
+              {t('adRate')}: {pct(adRate)}
             </Typography>
             <Slider
               value={adRate}
@@ -437,7 +439,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
       {/* Results */}
       <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="subtitle2">Hesaplama Sonuçları</Typography>
+          <Typography variant="subtitle2">{t('results')}</Typography>
           <Button
             size="small"
             variant="outlined"
@@ -445,7 +447,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
             onClick={handleExportCalc}
             sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#5558e6', bgcolor: 'rgba(99,102,241,0.04)' } }}
           >
-            CSV İndir
+            {t('downloadCsv')}
           </Button>
         </Box>
 
@@ -457,29 +459,29 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
                 <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(fees.finalValueFee)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 500 }}>Ödeme İşlem Ücreti (2.35% + $0.30)</TableCell>
+                <TableCell sx={{ fontWeight: 500 }}>{t('paymentProcessingFee')}</TableCell>
                 <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(fees.paymentFee)}</TableCell>
               </TableRow>
               {isInternational && (
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Uluslararası Ücret (1.65%)</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('internationalFee')}</TableCell>
                   <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(fees.internationalFee)}</TableCell>
                 </TableRow>
               )}
               {!freeInsertions && (
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Listeleme Ücreti</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('listingFee')}</TableCell>
                   <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(fees.insertionFee)}</TableCell>
                 </TableRow>
               )}
               {isPromoted && (
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Promoted Listing Ücreti ({pct(adRate)})</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('promotedFee')} ({pct(adRate)})</TableCell>
                   <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(fees.promotedFee)}</TableCell>
                 </TableRow>
               )}
               <TableRow sx={{ '& td': { borderTop: '2px solid', borderColor: 'divider' } }}>
-                <TableCell sx={{ fontWeight: 700 }}>Toplam Ücretler</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>{t('totalFees')}</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 700, color: 'error.main' }}>-{fmt(fees.totalFees)}</TableCell>
               </TableRow>
 
@@ -488,19 +490,19 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
               </TableRow>
 
               <TableRow>
-                <TableCell sx={{ fontWeight: 500 }}>Satış Fiyatı + Kargo</TableCell>
+                <TableCell sx={{ fontWeight: 500 }}>{t('totalRevenue')}</TableCell>
                 <TableCell align="right">{fmt(sp + sc)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 500 }}>Net Gelir (Ücretler Düşüldükten Sonra)</TableCell>
+                <TableCell sx={{ fontWeight: 500 }}>{t('netRevenue')}</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 600 }}>{fmt(netRevenue)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 500 }}>Gerçek Kargo Maliyeti</TableCell>
+                <TableCell sx={{ fontWeight: 500 }}>{t('actualShipping')}</TableCell>
                 <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(asc)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 500 }}>Ürün Maliyeti</TableCell>
+                <TableCell sx={{ fontWeight: 500 }}>{t('productCost')}</TableCell>
                 <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(pc)}</TableCell>
               </TableRow>
 
@@ -514,13 +516,13 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 500 }}>Kâr Marjı</TableCell>
+                <TableCell sx={{ fontWeight: 500 }}>{t('profitMargin')}</TableCell>
                 <TableCell align="right" sx={{ color: profitMargin >= 0 ? 'success.main' : 'error.main' }}>
                   {pct(profitMargin)}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 500 }}>ROI (Yatırım Getirisi)</TableCell>
+                <TableCell sx={{ fontWeight: 500 }}>{t('roi')}</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 700, fontSize: '1.1rem', color: '#6366f1' }}>
                   {pct(roi)}
                 </TableCell>
@@ -531,13 +533,13 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
 
         {profit < 0 && (
           <Alert severity="warning" sx={{ mt: 2 }}>
-            Bu satış kârsız! Minimum satış fiyatı {fmt(pc + asc + fees.totalFees - sc)} olmalıdır.
+            {t('unprofitableAlert')} {fmt(pc + asc + fees.totalFees - sc)} 
           </Alert>
         )}
 
         {profitMargin > 0 && profitMargin < 10 && (
           <Alert severity="info" sx={{ mt: 2 }}>
-            Kâr marjı %10 altında. Daha yüksek fiyat veya daha düşük maliyet değerlendirin.
+            {t('lowMarginAlert')}
           </Alert>
         )}
       </Paper>
@@ -550,6 +552,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
 // ---------------------------------------------------------------------------
 
 function SourcingCalculator({ marketplace }: { marketplace: string }) {
+  const t = useTranslations('ebay.research.financial');
   const [keyword, setKeyword] = useState('');
   const [loading, setLoading] = useState(false);
   const [marketData, setMarketData] = useState<{
@@ -574,11 +577,11 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
     setLoading(true);
     try {
       const res = await fetch(`/api/clawd/ebay?action=search_market&q=${encodeURIComponent(keyword)}&marketplace=${marketplace}&limit=50`);
-      if (!res.ok) throw new Error('Arama başarısız');
+      if (!res.ok) throw new Error(t('searchFailed'));
       const data = await res.json();
       const items = data.itemSummaries || [];
       if (items.length === 0) {
-        toast.error('Sonuç bulunamadı');
+        toast.error(t('noResults'));
         setMarketData(null);
         setLoading(false);
         return;
@@ -603,7 +606,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
         totalResults: data.total || items.length,
       });
     } catch (err: any) {
-      toast.error(err.message || 'Veri alınamadı');
+      toast.error(err.message || t('dataFetchFailed'));
       setMarketData(null);
     } finally {
       setLoading(false);
@@ -658,9 +661,9 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
   const scenarios: SourcingScenario[] = useMemo(() => {
     if (!marketData) return [];
     const prices = [
-      { label: 'Muhafazakar (25. Yüzdelik)', price: marketData.p25Price },
+      { label: 'conservative', price: marketData.p25Price },
       { label: 'Ortalama (Medyan)', price: marketData.medianPrice },
-      { label: 'Agresif (75. Yüzdelik)', price: marketData.p75Price },
+      { label: 'aggressive', price: marketData.p75Price },
     ];
     return prices.map(({ label, price }) => {
       const fees = calcFeesForPrice(price);
@@ -716,17 +719,17 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
   return (
     <Box>
       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <Package size={20} /> Tedarik Hesaplayıcı
+        <Package size={20} /> {t('sourcingCalculator')}
       </Typography>
 
       {/* Search */}
       <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-        <Typography variant="subtitle2" sx={{ mb: 2 }}>Pazar Araştırması</Typography>
+        <Typography variant="subtitle2" sx={{ mb: 2 }}>{t('marketResearch')}</Typography>
         <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
           <TextField
-            label="Ürün Anahtar Kelimesi"
-            placeholder="ör: wireless earbuds, phone case"
-            helperText="Pazar fiyatlarını araştırmak istediğiniz ürünü girin"
+            label={t('productKeyword')}
+            placeholder={t('keywordPlaceholder')}
+            helperText={t('keywordHelper')}
             size="small"
             fullWidth
             value={keyword}
@@ -739,7 +742,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
             disabled={loading || !keyword.trim()}
             sx={{ minWidth: 100 }}
           >
-            {loading ? 'Arıyor...' : 'Ara'}
+            {loading ? t('searching') : t('searchBtn')}
           </Button>
         </Box>
 
@@ -751,7 +754,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
             <Chip label={`Medyan: ${fmt(marketData.medianPrice)}`} color="primary" />
             <Chip label={`25p: ${fmt(marketData.p25Price)}`} variant="outlined" />
             <Chip label={`75p: ${fmt(marketData.p75Price)}`} variant="outlined" />
-            <Chip label={`Toplam: ${marketData.totalResults} sonuç`} variant="outlined" />
+            <Chip label={t('totalResultsCount', { count: marketData.totalResults })} variant="outlined" />
           </Box>
         )}
       </Paper>
@@ -768,7 +771,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
               onChange={(e) => setCategoryIdx(Number(e.target.value))}
             >
               {EBAY_CATEGORIES.map((cat, i) => (
-                <MenuItem key={i} value={i}>{cat.label} ({pct(cat.rate)})</MenuItem>
+                <MenuItem key={i} value={i}>{t(cat.label)} ({pct(cat.rate)})</MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -780,47 +783,47 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
             value={sourcingCost}
             onChange={(e) => setSourcingCost(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            helperText="Ürünü tedarikçiden satın alma maliyeti"
+            helperText={t('sourcingCostHelper')}
           />
 
           <TextField
-            label="Kargo (Alıcıya)"
+            label={t('shippingToBuyer')}
             size="small"
             type="number"
             value={shippingToBuyer}
             onChange={(e) => setShippingToBuyer(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            helperText="Alıcıya gönderim maliyetiniz"
+            helperText={t('shippingToBuyerHelper')}
           />
 
           <TextField
-            label="Kargo (Tedarikçiden Size)"
+            label={t('shippingFromSupplier')}
             size="small"
             type="number"
             value={shippingFromSupplier}
             onChange={(e) => setShippingFromSupplier(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            helperText="Tedarikçiden size gelen kargo ücreti"
+            helperText={t('shippingFromSupplierHelper')}
           />
 
           <TextField
-            label="Hedef Kâr Marjı (%)"
+            label="Hedef {t('profitMargin')} (%)"
             size="small"
             type="number"
             value={targetMargin}
             onChange={(e) => setTargetMargin(e.target.value)}
             InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
-            helperText="Hedeflediğiniz minimum kâr yüzdesi"
+            helperText={t('targetMarginHelper')}
           />
 
           <TextField
-            label="Hedef Aylık Gelir"
+            label={t('targetMonthlyRevenue')}
             size="small"
             type="number"
             value={targetMonthlyIncome}
             onChange={(e) => setTargetMonthlyIncome(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            helperText="Aylık ulaşmak istediğiniz net gelir"
+            helperText={t('targetMonthlyRevenueHelper')}
           />
         </Box>
       </Paper>
@@ -828,22 +831,22 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
       {/* Calculated Results */}
       {sc > 0 && (
         <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-          <Typography variant="subtitle2" sx={{ mb: 2 }}>Hesaplama Sonuçları</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 2 }}>{t('calculationResults')}</Typography>
           <TableContainer>
             <Table size="small">
               <TableBody>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Hedef Marj İçin Min. Satış Fiyatı</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('minPriceForMargin')}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 600 }}>{fmt(minSellingPrice)}</TableCell>
                 </TableRow>
                 {marketData && (
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 500 }}>Önerilen Satış Fiyatı (Medyan)</TableCell>
+                    <TableCell sx={{ fontWeight: 500 }}>{t('suggestedPriceMedian')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>{fmt(marketData.medianPrice)}</TableCell>
                   </TableRow>
                 )}
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 500 }}>Başa Baş Fiyatı</TableCell>
+                  <TableCell sx={{ fontWeight: 500 }}>{t('breakEvenPrice')}</TableCell>
                   <TableCell align="right">{fmt(breakEvenPrice)}</TableCell>
                 </TableRow>
                 {marketData && (
@@ -856,10 +859,10 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
                     </TableRow>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 500 }}>
-                        Hedef Aylık Gelir İçin Satılacak Adet
+                        {t('unitsForTarget')}
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        {unitsForTargetIncome === Infinity ? 'Kârsız' : `${unitsForTargetIncome} adet/ay`}
+                        {unitsForTargetIncome === Infinity ? t('unprofitable') : `${unitsForTargetIncome} t('unitsPerMonth')`}
                       </TableCell>
                     </TableRow>
                   </>
@@ -870,7 +873,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
 
           {marketData && minSellingPrice > marketData.p75Price && (
             <Alert severity="warning" sx={{ mt: 2 }}>
-              Hedef marjınız piyasa fiyatlarının üzerinde bir satış fiyatı gerektiriyor. Tedarik maliyetini düşürmeyi değerlendirin.
+              {t('marginTooHighAlert')}
             </Alert>
           )}
         </Paper>
@@ -880,7 +883,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
       {scenarios.length > 0 && sc > 0 && (
         <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Typography variant="subtitle2" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Target size={16} /> Senaryo Karşılaştırması
+            <Target size={16} /> {t('scenarioComparison')}
           </Typography>
           <TableContainer>
             <Table size="small">
@@ -888,7 +891,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
                 <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                   <TableCell sx={{ fontWeight: 700 }}>Senaryo</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Fiyat</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Ücretler</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>{t('fees')}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Kâr</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Marj</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>ROI</TableCell>
@@ -927,16 +930,16 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
             <BarChart2 size={16} /> Toplu Tedarik Analizi
           </Typography>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Her kademe için %5 hacim indirimi uygulanır. Medyan piyasa fiyatı baz alınır.
+            {t('volumeDiscountNote')}
           </Alert>
           <TableContainer>
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                   <TableCell sx={{ fontWeight: 700 }}>Adet</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>İndirim</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>{t('discount')}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Birim Maliyet</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Toplam Yatırım</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>{t('totalInvestment')}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Toplam Gelir</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Toplam Kâr</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>ROI</TableCell>
@@ -975,6 +978,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
 // ---------------------------------------------------------------------------
 
 function ROITracker({ userListings }: { userListings?: any[] }) {
+  const t = useTranslations('ebay.research.financial');
   const [entries, setEntries] = useState<ROIEntry[]>([]);
   const [productName, setProductName] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
@@ -1000,7 +1004,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
     const price = parseFloat(listing.price?.value || listing.currentPrice || '0');
     if (title) setProductName(title.slice(0, 80));
     if (price > 0) setSellingPrice(price.toFixed(2));
-    toast.success(`"${title.slice(0, 40)}..." yüklendi`);
+    toast.success(`"${title.slice(0, 40)}..." {t('listingLoaded')}`);
   }, [userListings]);
 
   // Load from localStorage
@@ -1029,7 +1033,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
     const oc = parseFloat(otherCosts) || 0;
 
     if (!productName.trim() || sp <= 0) {
-      toast.error('Ürün adı ve satış fiyatı gereklidir');
+      toast.error(t('nameAndPriceRequired'));
       return;
     }
 
@@ -1052,27 +1056,27 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
     setProductCost('');
     setShippingCost('');
     setOtherCosts('');
-    toast.success('Kayıt eklendi');
+    toast.success(t('entryAdded'));
   }, [productName, sellingPrice, productCost, shippingCost, otherCosts, category]);
 
   const handleDelete = useCallback((id: string) => {
     setEntries((prev) => prev.filter((e) => e.id !== id));
-    toast.success('Kayıt silindi');
+    toast.success(t('entryDeleted'));
   }, []);
 
   const handleClearAll = useCallback(() => {
-    if (window.confirm('Tüm kayıtları silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) {
+    if (window.confirm(t('confirmDeleteAll'))) {
       setEntries([]);
-      toast.success('Tüm kayıtlar silindi');
+      toast.success(t('allEntriesDeleted'));
     }
   }, []);
 
   const handleExportCSV = useCallback(() => {
     if (entries.length === 0) {
-      toast.error('Dışa aktarılacak kayıt yok');
+      toast.error(t('noEntriesToExport'));
       return;
     }
-    const headers = ['Ürün', 'Gelir', 'Maliyet', 'Kargo', 'Ücretler', 'Diğer', 'Kâr', 'Marj %', 'ROI %', 'Tarih'];
+    const headers = [t('productName'), t('revenue'), t('cost'), t('shipping'), t('fees'), t('other'), t('profit'), t('marginPct'), t('roiPct'), t('date')];
     const rows = entries.map((e) => {
       const totalCost = e.productCost + e.shippingCost + e.ebayFees + e.otherCosts;
       const profit = e.sellingPrice - totalCost;
@@ -1099,7 +1103,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
     a.download = `roi-tracker-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('CSV indirildi');
+    toast.success(t('csvDownloaded'));
   }, [entries]);
 
   // Computed summary
@@ -1232,7 +1236,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
   return (
     <Box>
       <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <TrendingUp size={20} /> Yatırım Getiri Takipçisi
+        <TrendingUp size={20} /> {t('roiTracker')}
       </Typography>
 
       {/* Quick Summary Stats */}
@@ -1288,26 +1292,26 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
 
       {/* Entry Form */}
       <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-        <Typography variant="subtitle2" sx={{ mb: 2 }}>Yeni Kayıt Ekle</Typography>
+        <Typography variant="subtitle2" sx={{ mb: 2 }}>{t('addEntry')}</Typography>
 
         {/* Listing Picker */}
         {userListings && userListings.length > 0 && (
           <Box sx={{ mb: 2 }}>
             <FormControl fullWidth size="small">
-              <InputLabel>Listelerimden Seç</InputLabel>
+              <InputLabel>{t('selectListing')}</InputLabel>
               <Select
                 value={selectedListingId}
-                label="Listelerimden Seç"
+                label={t('selectListing')}
                 onChange={(e) => handleListingSelect(e.target.value as string)}
                 startAdornment={<List size={16} style={{ marginRight: 8, opacity: 0.6 }} />}
                 MenuProps={{ PaperProps: { sx: { maxHeight: 300 } } }}
               >
                 <MenuItem value="">
-                  <em>Manuel giriş</em>
+                  <em>{t('manualEntry')}</em>
                 </MenuItem>
                 {userListings.map((l, idx) => {
                   const id = l.itemId || l.listingId || l.id || `listing-${idx}`;
-                  const title = (l.title || 'İsimsiz Ürün').slice(0, 60);
+                  const title = (l.title || t('untitledProduct')).slice(0, 60);
                   const price = parseFloat(l.price?.value || l.currentPrice || '0');
                   return (
                     <MenuItem key={id} value={id}>
@@ -1329,25 +1333,25 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2, mb: 2 }}>
           <TextField
-            label="Ürün Adı"
-            placeholder="ör: Wireless Earbuds"
-            helperText="Takip etmek istediğiniz ürünün adı"
+            label={t('productName')}
+            placeholder={t('productNamePlaceholder')}
+            helperText={t('productNameHelper')}
             size="small"
             fullWidth
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
           />
           <TextField
-            label="Satış Fiyatı"
+            label={t('sellingPrice')}
             size="small"
             type="number"
             value={sellingPrice}
             onChange={(e) => setSellingPrice(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-            helperText="eBay'deki satış fiyatınız"
+            helperText={t('sellingPriceHelper2')}
           />
           <TextField
-            label="Ürün Maliyeti"
+            label={t('productCost')}
             size="small"
             type="number"
             value={productCost}
@@ -1365,19 +1369,19 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
             helperText="Toplam kargo gideriniz"
           />
           <FormControl fullWidth size="small">
-            <InputLabel>Kategori (Ücret Hesabı)</InputLabel>
+            <InputLabel>{t('categoryFeePreset')}</InputLabel>
             <Select
               value={categoryIdx}
-              label="Kategori (Ücret Hesabı)"
+              label={t('categoryFeePreset')}
               onChange={(e) => setCategoryIdx(Number(e.target.value))}
             >
               {EBAY_CATEGORIES.map((cat, i) => (
-                <MenuItem key={i} value={i}>{cat.label} ({pct(cat.rate)})</MenuItem>
+                <MenuItem key={i} value={i}>{t(cat.label)} ({pct(cat.rate)})</MenuItem>
               ))}
             </Select>
           </FormControl>
           <TextField
-            label="Diğer Maliyetler"
+            label={t('otherCosts')}
             size="small"
             type="number"
             value={otherCosts}
@@ -1392,14 +1396,14 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
           onClick={handleAdd}
           sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', '&:hover': { background: 'linear-gradient(135deg, #5558e6 0%, #7c4feb 100%)' } }}
         >
-          Kayıt Ekle
+          {t('addEntry')}
         </Button>
       </Paper>
 
       {/* Summary Dashboard */}
       {summary && (
         <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-          <Typography variant="subtitle2" sx={{ mb: 2 }}>Özet Gösterge Paneli</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 2 }}>{t('summaryDashboard')}</Typography>
           <Box
             sx={{
               display: 'grid',
@@ -1449,7 +1453,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
             <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 200, borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <TrendingUp size={14} color="green" />
-                <Typography variant="caption" color="text.secondary">En İyi Ürün</Typography>
+                <Typography variant="caption" color="text.secondary">{t('bestProduct')}</Typography>
               </Box>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>{summary.bestProduct}</Typography>
               <Typography variant="body2" sx={{ color: 'success.main' }}>Kâr: {fmt(summary.bestProfit)}</Typography>
@@ -1457,7 +1461,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
             <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 200, borderColor: 'rgba(99,102,241,0.08)', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <TrendingDown size={14} color="red" />
-                <Typography variant="caption" color="text.secondary">En Kötü Ürün</Typography>
+                <Typography variant="caption" color="text.secondary">{t('worstProduct')}</Typography>
               </Box>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>{summary.worstProduct}</Typography>
               <Typography
@@ -1474,13 +1478,13 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
       {/* Monthly Summary */}
       {monthlySummary && monthlySummary.length > 0 && (
         <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
-          <Typography variant="subtitle2" sx={{ mb: 2 }}>Aylık Özet</Typography>
+          <Typography variant="subtitle2" sx={{ mb: 2 }}>{t('monthlySummary')}</Typography>
           <TableContainer>
             <Table size="small">
               <TableHead>
                 <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                   <TableCell sx={{ fontWeight: 700 }}>Ay</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Satış</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>{t('sales')}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Gelir</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Maliyet</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Kâr</TableCell>
@@ -1512,7 +1516,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
         <Paper sx={{ p: 2, mb: 3, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="subtitle2">
-              Tüm Kayıtlar ({entries.length})
+              {t('allEntries')} ({entries.length})
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
@@ -1522,7 +1526,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
                 onClick={handleExportCSV}
                 sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#5558e6', bgcolor: 'rgba(99,102,241,0.04)' } }}
               >
-                CSV İndir
+                {t('exportCsv')}
               </Button>
               <Button
                 size="small"
@@ -1531,7 +1535,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
                 startIcon={<Trash2 size={14} />}
                 onClick={handleClearAll}
               >
-                Tümünü Sil
+                {t('deleteAll')}
               </Button>
             </Box>
           </Box>
@@ -1540,10 +1544,10 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                  <SortHeader field="productName" label="Ürün" />
+                  <SortHeader field="productName" label={t('productName')} />
                   <SortHeader field="sellingPrice" label="Gelir" />
                   <SortHeader field="productCost" label="Maliyet" />
-                  <SortHeader field="ebayFees" label="Ücretler" />
+                  <SortHeader field="ebayFees" label="{t('fees')}" />
                   <SortHeader field="profit" label="Kâr" />
                   <SortHeader field="margin" label="Marj" />
                   <SortHeader field="roi" label="ROI" />
@@ -1594,7 +1598,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
 
       {entries.length === 0 && (
         <Alert severity="info">
-          Henüz kayıt eklenmedi. Yukarıdaki formu kullanarak satış kayıtlarınızı ekleyin.
+          {t('noEntries')}
         </Alert>
       )}
     </Box>
@@ -1606,6 +1610,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
 // ---------------------------------------------------------------------------
 
 export default function FinancialIntelligence({ userId, marketplace, userListings, onNavigate }: FinancialIntelligenceProps) {
+  const t = useTranslations('ebay.research.financial');
   const [activeTab, setActiveTab] = useState(0);
 
   return (
@@ -1637,19 +1642,19 @@ export default function FinancialIntelligence({ userId, marketplace, userListing
           sx={{ '& .Mui-selected': { color: '#6366f1' }, '& .MuiTabs-indicator': { bgcolor: '#6366f1' } }}
         >
           <Tab
-            label="Gelir Hesaplayıcı"
+            label={t('revenueCalculator')}
             icon={<Calculator size={16} />}
             iconPosition="start"
             sx={{ textTransform: 'none', minHeight: 48 }}
           />
           <Tab
-            label="Tedarik Hesaplayıcı"
+            label={t('sourcingCalculator')}
             icon={<Package size={16} />}
             iconPosition="start"
             sx={{ textTransform: 'none', minHeight: 48 }}
           />
           <Tab
-            label="Yatırım Getiri Takipçisi"
+            label={t('roiTracker')}
             icon={<TrendingUp size={16} />}
             iconPosition="start"
             sx={{ textTransform: 'none', minHeight: 48 }}

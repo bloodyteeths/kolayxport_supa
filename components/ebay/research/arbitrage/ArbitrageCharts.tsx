@@ -1,6 +1,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import { Box, Paper, Typography, useMediaQuery, useTheme } from '@mui/material';
+import { useTranslations } from 'next-intl';
 import type { ArbitrageResult } from '../../../../lib/arbitrage/types';
 import { getVerdictConfig } from './arbitrageConstants';
 
@@ -12,13 +13,14 @@ interface Props {
 }
 
 export default function ArbitrageCharts({ results, exchangeRate }: Props) {
+  const ta = useTranslations('ebay.research.arbitrage');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   if (results.length === 0) {
     return (
       <Paper sx={{ p: 3, textAlign: 'center' }} variant="outlined">
-        <Typography color="text.secondary">Grafik gösterilecek veri yok</Typography>
+        <Typography color="text.secondary">{ta('noChartData')}</Typography>
       </Paper>
     );
   }
@@ -42,16 +44,16 @@ export default function ArbitrageCharts({ results, exchangeRate }: Props) {
     plotOptions: { bar: { borderRadius: 4, columnWidth: '60%', distributed: true } },
     colors: profitRanges.map(r => r.color),
     xaxis: { categories: profitRanges.map(r => r.label) },
-    yaxis: { title: { text: 'Ürün Sayısı' } },
+    yaxis: { title: { text: ta('productCount') } },
     legend: { show: false },
     dataLabels: { enabled: true },
-    tooltip: { y: { formatter: (val: number) => `${val} ürün` } },
+    tooltip: { y: { formatter: (val: number) => `${val} ${ta('productUnit')}` } },
   };
 
   // 2. Category Performance (group by Trendyol category)
   const catMap = new Map<string, { profits: number[]; rois: number[]; count: number }>();
   results.forEach(r => {
-    const cat = r.trendyol.categoryName || 'Bilinmeyen';
+    const cat = r.trendyol.categoryName || ta('unknown');
     if (!catMap.has(cat)) catMap.set(cat, { profits: [], rois: [], count: 0 });
     const entry = catMap.get(cat)!;
     entry.profits.push(r.financials.profitUsd);
@@ -68,12 +70,12 @@ export default function ArbitrageCharts({ results, exchangeRate }: Props) {
 
   const bubbleOptions: any = {
     chart: { type: 'bubble', toolbar: { show: false }, fontFamily: 'inherit' },
-    xaxis: { title: { text: 'Ortalama ROI (%)' }, labels: { formatter: (v: number) => `${v.toFixed(0)}%` } },
-    yaxis: { title: { text: 'Ortalama Kâr ($)' }, labels: { formatter: (v: number) => `$${v.toFixed(1)}` } },
+    xaxis: { title: { text: ta('avgRoi') }, labels: { formatter: (v: number) => `${v.toFixed(0)}%` } },
+    yaxis: { title: { text: ta('avgProfit') }, labels: { formatter: (v: number) => `$${v.toFixed(1)}` } },
     tooltip: {
       custom: ({ seriesIndex, dataPointIndex, w }: any) => {
         const point = w.config.series[0].data[dataPointIndex];
-        return `<div style="padding:8px"><b>${point.name}</b><br/>ROI: ${point.x.toFixed(1)}%<br/>Kâr: $${point.y.toFixed(2)}<br/>${Math.round(point.z / 5)} ürün</div>`;
+        return `<div style="padding:8px"><b>${point.name}</b><br/>ROI: ${point.x.toFixed(1)}%<br/>${ta('profit')}: $${point.y.toFixed(2)}<br/>${Math.round(point.z / 5)} ${ta('productUnit')}</div>`;
       },
     },
     colors: ['#1565c0'],
@@ -91,8 +93,8 @@ export default function ArbitrageCharts({ results, exchangeRate }: Props) {
 
   const scatterOptions: any = {
     chart: { type: 'scatter', toolbar: { show: false }, fontFamily: 'inherit', zoom: { enabled: true } },
-    xaxis: { title: { text: 'Trendyol Fiyatı (USD)' }, labels: { formatter: (v: number) => `$${v.toFixed(0)}` } },
-    yaxis: { title: { text: 'eBay Medyan Fiyatı (USD)' }, labels: { formatter: (v: number) => `$${v.toFixed(0)}` } },
+    xaxis: { title: { text: ta('trendyolPriceUsd') }, labels: { formatter: (v: number) => `$${v.toFixed(0)}` } },
+    yaxis: { title: { text: ta('ebayMedianPriceUsd') }, labels: { formatter: (v: number) => `$${v.toFixed(0)}` } },
     colors: ['#1565c0'],
     markers: { size: 6, opacity: 0.7 },
     annotations: {
@@ -106,7 +108,7 @@ export default function ArbitrageCharts({ results, exchangeRate }: Props) {
       custom: ({ seriesIndex, dataPointIndex }: any) => {
         const r = results[dataPointIndex];
         if (!r) return '';
-        return `<div style="padding:8px"><b>${r.trendyol.name.substring(0, 40)}</b><br/>Trendyol: $${(r.trendyol.priceTry * exchangeRate).toFixed(2)}<br/>eBay: $${r.ebay.medianPrice.toFixed(2)}<br/>Kâr: $${r.financials.profitUsd.toFixed(2)}</div>`;
+        return `<div style="padding:8px"><b>${r.trendyol.name.substring(0, 40)}</b><br/>Trendyol: $${(r.trendyol.priceTry * exchangeRate).toFixed(2)}<br/>eBay: $${r.ebay.medianPrice.toFixed(2)}<br/>${ta('profit')}: $${r.financials.profitUsd.toFixed(2)}</div>`;
       },
     },
     dataLabels: { enabled: false },
@@ -122,7 +124,7 @@ export default function ArbitrageCharts({ results, exchangeRate }: Props) {
     }}>
       {/* Profit Distribution */}
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Kâr Dağılımı</Typography>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>{ta('profitDistribution')}</Typography>
         <Chart
           options={histogramOptions}
           series={[{ data: histogramData.map(d => d.y) }]}
@@ -133,10 +135,10 @@ export default function ArbitrageCharts({ results, exchangeRate }: Props) {
 
       {/* Category Performance */}
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>Kategori Performansı</Typography>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>{ta('categoryPerformance')}</Typography>
         <Chart
           options={bubbleOptions}
-          series={[{ name: 'Kategoriler', data: bubbleData }]}
+          series={[{ name: ta('categories'), data: bubbleData }]}
           type="bubble"
           height={chartHeight}
         />
@@ -145,14 +147,14 @@ export default function ArbitrageCharts({ results, exchangeRate }: Props) {
       {/* Price Comparison Scatter */}
       <Paper variant="outlined" sx={{ p: 2, gridColumn: isMobile ? '1' : '1 / -1' }}>
         <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
-          Fiyat Karşılaştırma (Trendyol vs eBay)
+          {ta('priceComparison')}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-          Çizginin üstündeki noktalar kârlı ürünleri gösterir
+          {ta('priceComparisonHint')}
         </Typography>
         <Chart
           options={scatterOptions}
-          series={[{ name: 'Ürünler', data: scatterData }]}
+          series={[{ name: ta('products'), data: scatterData }]}
           type="scatter"
           height={chartHeight}
         />

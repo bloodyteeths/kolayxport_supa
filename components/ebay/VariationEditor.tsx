@@ -15,6 +15,7 @@ import {
   Chip,
 } from '@mui/material';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 interface VariationItem {
   sku: string;
@@ -31,6 +32,7 @@ interface VariationEditorProps {
 }
 
 export default function VariationEditor({ sku, userId, onSaved }: VariationEditorProps) {
+  const t = useTranslations('ebay.listing');
   const [variations, setVariations] = useState<VariationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,7 +52,7 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
         return;
       }
 
-      if (!res.ok) throw new Error('Varyasyon verileri alınamadı');
+      if (!res.ok) throw new Error(t('variationsFetchFailed'));
 
       const data = await res.json();
       setHasGroup(true);
@@ -155,13 +157,13 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
       }
 
       if (errorCount === 0) {
-        toast.success('Varyasyonlar başarıyla güncellendi');
+        toast.success(t('variationsUpdated'));
       } else {
-        toast.error(`${successCount} başarılı, ${errorCount} başarısız`);
+        toast.error(t('variationsPartialSuccess', { success: successCount, errors: errorCount }));
       }
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Kaydetme sırasında hata oluştu');
+      toast.error(err.message || t('saveError'));
     } finally {
       setSaving(false);
     }
@@ -172,7 +174,7 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
       <Box display="flex" justifyContent="center" alignItems="center" py={4}>
         <CircularProgress size={28} />
         <Typography sx={{ ml: 1.5 }} variant="body2" color="text.secondary">
-          Varyasyonlar yükleniyor...
+          {t('variationsLoading')}
         </Typography>
       </Box>
     );
@@ -182,10 +184,10 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
     return (
       <Box sx={{ py: 2, textAlign: 'center' }}>
         <Typography variant="body2" color="text.secondary">
-          Bu ürünün varyasyonu yok
+          {t('noVariations')}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-          Varyasyon grupları eBay üzerinden yönetilebilir.
+          {t('variationsManageOnEbay')}
         </Typography>
       </Box>
     );
@@ -197,11 +199,11 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Varyasyon</TableCell>
-              <TableCell>Fiyat</TableCell>
-              <TableCell>Stok</TableCell>
+              <TableCell>{t('variation')}</TableCell>
+              <TableCell>{t('price')}</TableCell>
+              <TableCell>{t('stock')}</TableCell>
               <TableCell>SKU</TableCell>
-              <TableCell align="center">Durum</TableCell>
+              <TableCell align="center">{t('status')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -251,7 +253,7 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
                 <TableCell align="center">
                   {variation.status && (
                     <Chip
-                      label={variation.status === 'PUBLISHED' ? 'Yayında' : 'Yayında Değil'}
+                      label={variation.status === 'PUBLISHED' ? t('statusPublished') : t('statusUnpublished')}
                       size="small"
                       color={variation.status === 'PUBLISHED' ? 'success' : 'default'}
                       sx={{ height: 20, fontSize: '0.7rem' }}
@@ -270,7 +272,7 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
           disabled={saving}
           startIcon={saving ? <CircularProgress size={16} /> : undefined}
         >
-          {saving ? 'Kaydediliyor...' : 'Kaydet'}
+          {saving ? t('saving') : t('save')}
         </Button>
       </Box>
     </Box>

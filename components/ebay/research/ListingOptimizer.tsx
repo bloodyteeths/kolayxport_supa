@@ -13,6 +13,7 @@ import {
   RefreshCw, AlertTriangle, ThumbsUp, ThumbsDown, Minus, Eye,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -161,10 +162,10 @@ function getHealthColor(score: number): string {
   return '#f44336';
 }
 
-function getHealthLabel(score: number): string {
-  if (score >= 75) return 'İyi';
-  if (score >= 50) return 'Orta';
-  return 'Kritik';
+function getHealthLabel(score: number, t?: any): string {
+  if (score >= 75) return t ? t('good') : 'Good';
+  if (score >= 50) return t ? t('medium') : 'Medium';
+  return t ? t('critical') : 'Critical';
 }
 
 function getScoreBarColor(score: number, max: number): string {
@@ -254,6 +255,7 @@ function ScoreBar({ label, score, max, icon }: { label: string; score: number; m
 // ---------------------------------------------------------------------------
 
 function DistributionBar({ good, warning, critical, total }: { good: number; warning: number; critical: number; total: number }) {
+  const t = useTranslations('ebay.research.listing');
   if (total === 0) return null;
   const gPct = (good / total) * 100;
   const wPct = (warning / total) * 100;
@@ -262,17 +264,17 @@ function DistributionBar({ good, warning, critical, total }: { good: number; war
   return (
     <Box sx={{ display: 'flex', height: 12, borderRadius: 1, overflow: 'hidden', width: '100%' }}>
       {gPct > 0 && (
-        <Tooltip title={`İyi: ${good}`}>
+        <Tooltip title={`${t('good')}: ${good}`}>
           <Box sx={{ width: `${gPct}%`, bgcolor: '#4caf50', transition: 'width 0.4s' }} />
         </Tooltip>
       )}
       {wPct > 0 && (
-        <Tooltip title={`Orta: ${warning}`}>
+        <Tooltip title={`${t('medium')}: ${warning}`}>
           <Box sx={{ width: `${wPct}%`, bgcolor: '#ff9800', transition: 'width 0.4s' }} />
         </Tooltip>
       )}
       {cPct > 0 && (
-        <Tooltip title={`Kritik: ${critical}`}>
+        <Tooltip title={`${t('critical')}: ${critical}`}>
           <Box sx={{ width: `${cPct}%`, bgcolor: '#f44336', transition: 'width 0.4s' }} />
         </Tooltip>
       )}
@@ -287,6 +289,7 @@ function DistributionBar({ good, warning, critical, total }: { good: number; war
 function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }: {
   label: string; myValue: number; avgValue: number; unit?: string; higherIsBetter?: boolean;
 }) {
+  const t = useTranslations('ebay.research.listing');
   const max = Math.max(myValue, avgValue, 1);
   const myPct = (myValue / max) * 100;
   const avgPct = (avgValue / max) * 100;
@@ -304,12 +307,12 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
             <ThumbsDown size={14} color="#f44336" />
           )}
           <Typography variant="body2" sx={{ fontSize: 12, color: isWinning ? '#4caf50' : '#f44336', fontWeight: 600 }}>
-            {isWinning ? 'Kazanıyor' : 'Geride'}
+            {isWinning ? t('winning') : t('behind')}
           </Typography>
         </Box>
       </Box>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-        <Typography variant="caption" sx={{ width: 50, fontSize: 11, color: '#666' }}>Sizin</Typography>
+        <Typography variant="caption" sx={{ width: 50, fontSize: 11, color: '#666' }}>{t('yours')}</Typography>
         <Box sx={{ flex: 1, bgcolor: 'rgba(99,102,241,0.06)', borderRadius: 1, height: 10, overflow: 'hidden' }}>
           <Box sx={{ width: `${myPct}%`, height: '100%', bgcolor: isWinning ? '#4caf50' : '#ff9800', borderRadius: 1, transition: 'width 0.4s' }} />
         </Box>
@@ -318,7 +321,7 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
         </Typography>
       </Box>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.3 }}>
-        <Typography variant="caption" sx={{ width: 50, fontSize: 11, color: '#666' }}>Ort.</Typography>
+        <Typography variant="caption" sx={{ width: 50, fontSize: 11, color: '#666' }}>{t('avg')}</Typography>
         <Box sx={{ flex: 1, bgcolor: 'rgba(99,102,241,0.06)', borderRadius: 1, height: 10, overflow: 'hidden' }}>
           <Box sx={{ width: `${avgPct}%`, height: '100%', bgcolor: 'rgba(99,102,241,0.25)', borderRadius: 1, transition: 'width 0.4s' }} />
         </Box>
@@ -335,6 +338,7 @@ function ComparisonBar({ label, myValue, avgValue, unit, higherIsBetter = true }
 // ---------------------------------------------------------------------------
 
 export default function ListingOptimizer({ userId, marketplace, userListings, onNavigate }: ListingOptimizerProps) {
+  const t = useTranslations('ebay.research.listing');
   // ── State ──
   const [subTab, setSubTab] = useState(0);
   const [listings, setListings] = useState<ScoredListing[]>([]);
@@ -373,7 +377,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
       const res = await fetch(
         `/api/clawd/ebay?action=my_legacy_listings&marketplace_id=${marketplace}&userId=${userId}`
       );
-      if (!res.ok) throw new Error('Listeler yüklenemedi');
+      if (!res.ok) throw new Error(t('listingsLoadFailed'));
       const data = await res.json();
       const items: MyListing[] = data.listings || data.items || data.data || [];
       const scored = items.map(scoreListing).sort((a, b) => a.health.total - b.health.total);
@@ -527,7 +531,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
       });
 
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Optimizasyon başarısız';
+      const msg = err instanceof Error ? err.message : t('optimizationFailed');
       toast.error(msg);
     } finally {
       setOptimizing(false);
@@ -587,7 +591,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         setPercentileRank(pctile);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Kıyaslama başarısız';
+      const msg = err instanceof Error ? err.message : t('benchmarkFailed');
       toast.error(msg);
     } finally {
       setBenchmarking(false);
@@ -640,7 +644,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
   // ── Copy to clipboard ──
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('Panoya kopyalandı');
+    toast.success(t('copiedToClipboard'));
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -659,8 +663,8 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
           <TextField
             size="small"
             fullWidth
-            placeholder="ör: https://www.ebay.com/itm/123456789"
-            helperText="eBay listing URL'si yapıştırın — otomatik sağlık analizi yapılacak"
+            placeholder={t('listingUrlPlaceholder')}
+            helperText={t('listingUrlHelper')}
             value={manualUrl}
             onChange={e => setManualUrl(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && analyzeByUrl()}
@@ -690,17 +694,17 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               <ScoreBadge score={manualListing.health.total} size={64} />
               <Box sx={{ flex: 1, minWidth: 200 }}>
                 <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>{manualListing.title}</Typography>
-                <ScoreBar label="Başlık" score={manualListing.health.title} max={25} icon={<FileText size={14} />} />
-                <ScoreBar label="Açıklama" score={manualListing.health.description} max={25} icon={<FileText size={14} />} />
+                <ScoreBar label={t('titleLabel')} score={manualListing.health.title} max={25} icon={<FileText size={14} />} />
+                <ScoreBar label={t('descriptionLabel')} score={manualListing.health.description} max={25} icon={<FileText size={14} />} />
                 <ScoreBar label="Resimler" score={manualListing.health.images} max={25} icon={<ImageIcon size={14} />} />
-                <ScoreBar label="Özellikler" score={manualListing.health.aspects} max={25} icon={<Tag size={14} />} />
+                <ScoreBar label={t('aspectsLabel')} score={manualListing.health.aspects} max={25} icon={<Tag size={14} />} />
               </Box>
             </Box>
             <Box sx={{ mt: 1.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <Chip label={`Başlık: ${manualListing.titleLength} karakter`} size="small" variant="outlined" />
-              <Chip label={`Açıklama: ${manualListing.descriptionLength} karakter`} size="small" variant="outlined" />
+              <Chip label={t('titleChars', { count: manualListing.titleLength })} size="small" variant="outlined" />
+              <Chip label={t('descChars', { count: manualListing.descriptionLength })} size="small" variant="outlined" />
               <Chip label={`${manualListing.imageCount} resim`} size="small" variant="outlined" />
-              <Chip label={`${manualListing.aspectCount} özellik`} size="small" variant="outlined" />
+              <Chip label={t('aspectCount', { count: manualListing.aspectCount })} size="small" variant="outlined" />
             </Box>
           </Paper>
         )}
@@ -715,19 +719,19 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         sx={{ borderBottom: 1, borderColor: 'divider', mb: 1, '& .Mui-selected': { color: '#6366f1' }, '& .MuiTabs-indicator': { bgcolor: '#6366f1' } }}
       >
         <Tab
-          label="Listeleme Sağlık Panosu"
+          label={t('healthDashboard')}
           icon={<Heart size={16} />}
           iconPosition="start"
           sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }}
         />
         <Tab
-          label="Otomatik İyileştirici"
+          label={t('autoOptimizer')}
           icon={<Zap size={16} />}
           iconPosition="start"
           sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }}
         />
         <Tab
-          label="Rakip Kıyaslama"
+          label={t('competitorBenchmark')}
           icon={<Target size={16} />}
           iconPosition="start"
           sx={{ textTransform: 'none', fontWeight: 600, fontSize: 13 }}
@@ -758,7 +762,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   <Stack spacing={0.5} alignItems="center">
                     <Chip
                       icon={<CheckCircle size={14} />}
-                      label={`${stats.good} İyi`}
+                      label={t('goodCount', { count: stats.good })}
                       size="small"
                       sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 600 }}
                     />
@@ -778,7 +782,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600, fontSize: 13 }}>
-                    Sağlık Dağılımı ({stats.total} listeleme)
+                    {t('healthDistribution')} ({stats.total})
                   </Typography>
                   <DistributionBar
                     good={stats.good}
@@ -787,7 +791,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                     total={stats.total}
                   />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                    <Typography variant="caption" sx={{ color: '#4caf50' }}>İyi (%{stats.total ? Math.round((stats.good / stats.total) * 100) : 0})</Typography>
+                    <Typography variant="caption" sx={{ color: '#4caf50' }}>{t('good')} (%{stats.total ? Math.round((stats.good / stats.total) * 100) : 0})</Typography>
                     <Typography variant="caption" sx={{ color: '#ff9800' }}>Orta (%{stats.total ? Math.round((stats.warning / stats.total) * 100) : 0})</Typography>
                     <Typography variant="caption" sx={{ color: '#f44336' }}>Kritik (%{stats.total ? Math.round((stats.critical / stats.total) * 100) : 0})</Typography>
                   </Box>
@@ -814,11 +818,11 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 <TableHead>
                   <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                     <TableCell sx={{ fontWeight: 700, fontSize: 12, width: 40 }}></TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Görsel</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>Başlık</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>{t('image')}</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>{t('titleLabel')}</TableCell>
                     <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>Skor</TableCell>
                     <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'right' }}>Fiyat</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'right' }}>Satılan</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'right' }}>{t('sold')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -879,19 +883,19 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                             <Collapse in={isExpanded} unmountOnExit>
                               <Box sx={{ p: 2, bgcolor: '#f8faff' }}>
                                 <Typography variant="body2" sx={{ fontWeight: 700, mb: 1, fontSize: 13 }}>
-                                  Sağlık Detayları
+                                  {t('healthDetails')}
                                 </Typography>
-                                <ScoreBar label="Başlık" score={listing.health.title} max={25} icon={<FileText size={14} />} />
-                                <ScoreBar label="Açıklama" score={listing.health.description} max={25} icon={<FileText size={14} />} />
-                                <ScoreBar label="Görseller" score={listing.health.images} max={25} icon={<ImageIcon size={14} />} />
-                                <ScoreBar label="Özellikler" score={listing.health.aspects} max={25} icon={<Tag size={14} />} />
+                                <ScoreBar label={t('titleLabel')} score={listing.health.title} max={25} icon={<FileText size={14} />} />
+                                <ScoreBar label={t('descriptionLabel')} score={listing.health.description} max={25} icon={<FileText size={14} />} />
+                                <ScoreBar label={t('imagesLabel')} score={listing.health.images} max={25} icon={<ImageIcon size={14} />} />
+                                <ScoreBar label={t('aspectsLabel')} score={listing.health.aspects} max={25} icon={<Tag size={14} />} />
 
                                 <Divider sx={{ my: 1 }} />
                                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                                  <Chip size="small" label={`${listing.titleLength} karakter başlık`} variant="outlined" />
-                                  <Chip size="small" label={`${listing.descriptionLength} karakter açıklama`} variant="outlined" />
-                                  <Chip size="small" label={`${listing.imageCount} görsel`} variant="outlined" />
-                                  <Chip size="small" label={`${listing.aspectCount} özellik`} variant="outlined" />
+                                  <Chip size="small" label={t('titleChars', { count: listing.titleLength })} variant="outlined" />
+                                  <Chip size="small" label={t('descChars', { count: listing.descriptionLength })} variant="outlined" />
+                                  <Chip size="small" label={t('imageCountChip', { count: listing.imageCount })} variant="outlined" />
+                                  <Chip size="small" label={t('aspectCount', { count: listing.aspectCount })} variant="outlined" />
                                 </Box>
 
                                 <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
@@ -919,7 +923,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                                       }}
                                       sx={{ textTransform: 'none', fontSize: 12 }}
                                     >
-                                      eBay'de Görüntüle
+                                      {t('viewOnEbay')}
                                     </Button>
                                   )}
                                 </Box>
@@ -938,7 +942,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
 
         {!loading && listings.length === 0 && !error && (
           <Alert severity="info" sx={{ mt: 2 }}>
-            Henüz listeleme bulunamadı. Lütfen eBay mağazanızı bağladığınızdan emin olun.
+            {t('noListings')}
           </Alert>
         )}
       </TabPanel>
@@ -950,10 +954,10 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         {/* Listing selector */}
         <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <FormControl fullWidth size="small">
-            <InputLabel sx={{ fontSize: 13 }}>Listeleme Seçin</InputLabel>
+            <InputLabel sx={{ fontSize: 13 }}>{t('selectListing')}</InputLabel>
             <Select
               value={selectedListingId}
-              label="Listeleme Seçin"
+              label={t('selectListing')}
               onChange={e => {
                 setSelectedListingId(e.target.value);
                 setSuggestedTitle('');
@@ -1013,12 +1017,12 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             <Typography variant="body2" sx={{ fontWeight: 700, mb: 1, fontSize: 13 }}>
               Mevcut Durum
             </Typography>
-            <ScoreBar label="Başlık" score={selectedListing.health.title} max={25} icon={<FileText size={14} />} />
-            <ScoreBar label="Açıklama" score={selectedListing.health.description} max={25} icon={<FileText size={14} />} />
-            <ScoreBar label="Görseller" score={selectedListing.health.images} max={25} icon={<ImageIcon size={14} />} />
-            <ScoreBar label="Özellikler" score={selectedListing.health.aspects} max={25} icon={<Tag size={14} />} />
+            <ScoreBar label={t('titleLabel')} score={selectedListing.health.title} max={25} icon={<FileText size={14} />} />
+            <ScoreBar label={t('descriptionLabel')} score={selectedListing.health.description} max={25} icon={<FileText size={14} />} />
+            <ScoreBar label={t('imagesLabel')} score={selectedListing.health.images} max={25} icon={<ImageIcon size={14} />} />
+            <ScoreBar label={t('aspectsLabel')} score={selectedListing.health.aspects} max={25} icon={<Tag size={14} />} />
             <Alert severity="info" sx={{ mt: 1, fontSize: 12 }}>
-              &quot;Analiz Et&quot; butonuna tıklayarak detaylı optimizasyon önerilerini görün.
+              &quot;Analiz Et&quot; 
             </Alert>
           </Paper>
         )}
@@ -1027,7 +1031,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
           <Paper sx={{ p: 3, textAlign: 'center', borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
             <CircularProgress size={40} />
             <Typography variant="body2" sx={{ mt: 1, color: '#666' }}>
-              Pazar analizi yapılıyor ve öneriler hazırlanıyor...
+              {t('analyzingMarket')}
             </Typography>
           </Paper>
         )}
@@ -1039,11 +1043,11 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             {optimizedScore && (
               <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
                 <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5, fontSize: 14 }}>
-                  Tahmini Skor Karşılaştırması
+                  {t('estimatedScoreComparison')}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                   <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, fontSize: 11, color: '#999' }}>ÖNCE</Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 600, fontSize: 11, color: '#999' }}>{t('before')}</Typography>
                     <ScoreBadge score={selectedListing.health.total} size={72} />
                   </Box>
                   <ArrowRight size={24} color="#666" />
@@ -1069,14 +1073,14 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <FileText size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
-                  Başlık Optimizasyonu
+                  {t('titleOptimization')}
                 </Typography>
               </Box>
 
               {/* Current title */}
               <Box sx={{ mb: 2 }}>
                 <Typography variant="caption" sx={{ fontWeight: 600, color: '#999', fontSize: 11 }}>
-                  MEVCUT BAŞLIK ({selectedListing.titleLength} karakter)
+                  {t('currentTitleLabel')} ({selectedListing.titleLength})
                 </Typography>
                 <Paper variant="outlined" sx={{ p: 1.5, mt: 0.5, bgcolor: '#fef3c7', borderColor: '#f59e0b40', borderRadius: 2, boxShadow: '0 1px 4px rgba(245,158,11,0.08)' }}>
                   <Typography variant="body2" sx={{ fontSize: 13 }}>
@@ -1089,7 +1093,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               {marketKeywords.length > 0 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" sx={{ fontWeight: 600, color: '#999', fontSize: 11, mb: 0.5 }}>
-                    POPÜLER ANAHTAR KELİMELER (Pazardan)
+                    {t('popularKeywords')}
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                     {marketKeywords.slice(0, 20).map(kw => {
@@ -1116,7 +1120,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               {/* Suggested title */}
               <Box sx={{ mb: 1 }}>
                 <Typography variant="caption" sx={{ fontWeight: 600, color: '#999', fontSize: 11 }}>
-                  ÖNERİLEN BAŞLIK ({suggestedTitle.length} karakter)
+                  {t('suggestedTitleLabel')} ({suggestedTitle.length})
                 </Typography>
                 <Paper variant="outlined" sx={{ p: 1.5, mt: 0.5, bgcolor: '#d1fae5', borderColor: '#10b98140', borderRadius: 2, boxShadow: '0 1px 4px rgba(16,185,129,0.08)' }}>
                   <Typography variant="body2" sx={{ fontSize: 13 }}>
@@ -1135,7 +1139,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                     onClick={() => copyToClipboard(suggestedTitle)}
                     sx={{ textTransform: 'none', fontSize: 12 }}
                   >
-                    Başlığı Kopyala
+                    {t('copyTitle')}
                   </Button>
                 </Box>
               )}
@@ -1146,7 +1150,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <Tag size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
-                  Ürün Özellikleri Tavsiyeleri
+                  {t('aspectRecommendations')}
                 </Typography>
               </Box>
 
@@ -1154,7 +1158,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               {selectedListing.aspects && Object.keys(selectedListing.aspects).length > 0 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" sx={{ fontWeight: 600, color: '#999', fontSize: 11 }}>
-                    MEVCUT ÖZELLİKLER ({selectedListing.aspectCount})
+                    {t('currentAspects')} ({selectedListing.aspectCount})
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                     {Object.entries(selectedListing.aspects).map(([name, values]) => (
@@ -1175,13 +1179,13 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <CircularProgress size={16} />
                   <Typography variant="body2" sx={{ fontSize: 12, color: '#666' }}>
-                    Kategori özellikleri yükleniyor...
+                    {t('loadingCategoryAspects')}
                   </Typography>
                 </Box>
               ) : missingAspects.length > 0 ? (
                 <Box>
                   <Typography variant="caption" sx={{ fontWeight: 600, color: '#999', fontSize: 11 }}>
-                    EKSİK ÖZELLİKLER ({missingAspects.length})
+                    {t('missingAspects')} ({missingAspects.length})
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                     {missingAspects.slice(0, 15).map(aspect => (
@@ -1189,8 +1193,8 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         key={aspect.localizedAspectName}
                         title={
                           aspect.aspectValues
-                            ? `Olası değerler: ${aspect.aspectValues.slice(0, 5).map(v => v.localizedValue).join(', ')}${aspect.aspectValues.length > 5 ? '...' : ''}`
-                            : 'Değer girilmeli'
+                            ? `${t('possibleValues')}: ${aspect.aspectValues.slice(0, 5).map(v => v.localizedValue).join(', ')}${aspect.aspectValues.length > 5 ? '...' : ''}`
+                            : t('valueRequired')
                         }
                       >
                         <Chip
@@ -1213,12 +1217,12 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                     </Typography>
                   )}
                   <Alert severity="warning" sx={{ mt: 1, fontSize: 12 }}>
-                    Bu özellikleri eklemek listelemenizin arama sonuçlarında daha iyi sıralanmasına yardımcı olur.
+                    {t('aspectsHelpRanking')}
                   </Alert>
                 </Box>
               ) : (
                 <Alert severity="success" sx={{ fontSize: 12 }}>
-                  Tüm önemli özellikler mevcut. Harika!
+                  {t('allAspectsPresent')}
                 </Alert>
               )}
             </Paper>
@@ -1228,7 +1232,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <ImageIcon size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
-                  Görsel Analizi
+                  {t('imageAnalysis')}
                 </Typography>
               </Box>
 
@@ -1250,11 +1254,11 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
 
               {marketAvgImages > selectedListing.imageCount ? (
                 <Alert severity="warning" sx={{ mt: 1, fontSize: 12 }}>
-                  Rakipleriniz ortalama {marketAvgImages} görsel kullanıyor. {marketAvgImages - selectedListing.imageCount} görsel daha eklemeniz önerilir.
+                  {t('addMoreImages', { avg: marketAvgImages, needed: marketAvgImages - selectedListing.imageCount })}
                 </Alert>
               ) : (
                 <Alert severity="success" sx={{ mt: 1, fontSize: 12 }}>
-                  Görsel sayınız rakip ortalamasının üzerinde. Harika!
+                  {t('imagesAboveAverage')}
                 </Alert>
               )}
             </Paper>
@@ -1276,14 +1280,14 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         {selectedListing.price?.currency === 'USD' ? '$' : selectedListing.price?.currency}
                         {selectedListing.price?.value}
                       </Typography>
-                      <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>Sizin Fiyatınız</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>{t('yourPrice')}</Typography>
                     </Box>
                     <ArrowRight size={20} color="#999" />
                     <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', minWidth: 100 }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#6366f1' }}>
                         {fmt(marketAvgPrice)}
                       </Typography>
-                      <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>Pazar Ortalaması</Typography>
+                      <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>{t('marketAverage')}</Typography>
                     </Box>
                   </Box>
 
@@ -1296,7 +1300,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                       <>
                         <Box sx={{ mt: 1.5 }}>
                           <Typography variant="caption" sx={{ fontWeight: 600, color: '#666', fontSize: 11 }}>
-                            Önerilen Fiyat Aralığı: {fmt(rangeLow)} - {fmt(rangeHigh)}
+                            {t('suggestedPriceRange')}: {fmt(rangeLow)} - {fmt(rangeHigh)}
                           </Typography>
                           <Box sx={{ position: 'relative', mt: 1, height: 20 }}>
                             <Box sx={{ position: 'absolute', left: 0, right: 0, top: 8, height: 4, bgcolor: '#e0e0e0', borderRadius: 2 }} />
@@ -1321,15 +1325,15 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         <Box sx={{ mt: 1 }}>
                           {diff > 15 ? (
                             <Alert severity="warning" sx={{ fontSize: 12 }}>
-                              Fiyatınız pazar ortalamasının %{Math.round(diff)} üzerinde. Rekabet gücünüzü artırmak için fiyatı gözden geçirmeniz önerilir.
+                              {t('priceAboveAvg')}
                             </Alert>
                           ) : diff < -15 ? (
                             <Alert severity="info" sx={{ fontSize: 12 }}>
-                              Fiyatınız pazar ortalamasının %{Math.round(Math.abs(diff))} altında. Kar marjınızı artırma fırsatı olabilir.
+                              {t('priceBelowAvg')}
                             </Alert>
                           ) : (
                             <Alert severity="success" sx={{ fontSize: 12 }}>
-                              Fiyatınız rekabetçi bir aralıkta. Pazar ortalamasına yakın.
+                              {t('priceCompetitive')}
                             </Alert>
                           )}
                         </Box>
@@ -1339,7 +1343,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 </>
               ) : (
                 <Typography variant="body2" sx={{ color: '#666', fontSize: 12 }}>
-                  Pazar fiyat verisi bulunamadı.
+                  {t('noMarketPriceData')}
                 </Typography>
               )}
             </Paper>
@@ -1348,7 +1352,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
 
         {!selectedListingId && (
           <Alert severity="info" sx={{ mt: 1, fontSize: 12 }}>
-            Optimizasyon önerilerini görmek için yukarıdan bir listeleme seçin.
+            {t('selectListingForOptimization')}
           </Alert>
         )}
       </TabPanel>
@@ -1360,10 +1364,10 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
         {/* Listing selector */}
         <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
           <FormControl fullWidth size="small">
-            <InputLabel sx={{ fontSize: 13 }}>Listeleme Seçin</InputLabel>
+            <InputLabel sx={{ fontSize: 13 }}>{t('selectListing')}</InputLabel>
             <Select
               value={benchmarkListingId}
-              label="Listeleme Seçin"
+              label={t('selectListing')}
               onChange={e => {
                 setBenchmarkListingId(e.target.value);
                 setCompetitorMetrics(null);
@@ -1401,7 +1405,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#666' }}>
                   {benchmarkListing.price?.currency === 'USD' ? '$' : benchmarkListing.price?.currency}
-                  {benchmarkListing.price?.value} | {benchmarkListing.imageCount} görsel | {benchmarkListing.aspectCount} özellik
+                  {benchmarkListing.price?.value} | {benchmarkListing.imageCount} {t('imagesLabel')} | {benchmarkListing.aspectCount} {t('aspectsLabel')}
                 </Typography>
               </Box>
               <Button
@@ -1411,7 +1415,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                 disabled={benchmarking}
                 sx={{ textTransform: 'none', fontSize: 12, whiteSpace: 'nowrap' }}
               >
-                {benchmarking ? 'Analiz Ediliyor...' : 'Kıyasla'}
+                {benchmarking ? t('analyzing') : t('benchmark')}
               </Button>
             </Box>
           )}
@@ -1445,13 +1449,13 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   </Box>
                   <Typography variant="body2" sx={{ mt: 1, fontWeight: 600, fontSize: 15 }}>
                     {percentileRank >= 75
-                      ? 'Harika! Rakiplerinizin önündesiniz.'
+                      ? t('aheadOfCompetitors')
                       : percentileRank >= 50
-                        ? 'Ortalama seviyedesiniz. İyileştirme alanları var.'
-                        : 'Geride kalıyorsunuz. Aşağıdaki önerilere dikkat edin.'}
+                        ? t('averageLevel')
+                        : t('behindCompetitors')}
                   </Typography>
                   <Typography variant="caption" sx={{ color: '#666' }}>
-                    İlk {competitorMetrics.items.length} rakip arasında karşılaştırma yapılmıştır.
+                    {t('comparedWith', { count: competitorMetrics.items.length })}
                   </Typography>
                 </Box>
               )}
@@ -1460,11 +1464,11 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             {/* Metric Comparisons */}
             <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="body2" sx={{ fontWeight: 700, mb: 2, fontSize: 14 }}>
-                Metrik Karşılaştırması
+                {t('metricComparison')}
               </Typography>
 
               <ComparisonBar
-                label="Başlık Uzunluğu"
+                label={t('titleLength')}
                 myValue={benchmarkListing.titleLength}
                 avgValue={competitorMetrics.avgTitleLength}
                 unit=" kr"
@@ -1480,21 +1484,21 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               />
 
               <ComparisonBar
-                label="Görsel Sayısı"
+                label={t('imageCountLabel')}
                 myValue={benchmarkListing.imageCount}
                 avgValue={competitorMetrics.avgImageCount}
                 higherIsBetter={true}
               />
 
               <ComparisonBar
-                label="Özellik Sayısı"
+                label={t('aspectCountLabel')}
                 myValue={benchmarkListing.aspectCount}
                 avgValue={competitorMetrics.avgAspectCount}
                 higherIsBetter={true}
               />
 
               <ComparisonBar
-                label="Satıcı Puanı"
+                label={t('sellerScore')}
                 myValue={benchmarkListing.seller?.feedbackScore || 0}
                 avgValue={competitorMetrics.avgFeedbackScore}
                 higherIsBetter={true}
@@ -1504,7 +1508,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             {/* Comparison Table */}
             <Paper sx={{ p: 2, mb: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5, fontSize: 14 }}>
-                Sizin Listeleme vs Pazar Ortalaması
+                Sizin Listeleme vs {t('marketAverage')}
               </Typography>
 
               <TableContainer>
@@ -1520,7 +1524,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   <TableBody>
                     {[
                       {
-                        label: 'Başlık Uzunluğu',
+                        label: t('titleLength'),
                         my: `${benchmarkListing.titleLength} kr`,
                         avg: `${competitorMetrics.avgTitleLength} kr`,
                         win: benchmarkListing.titleLength >= competitorMetrics.avgTitleLength,
@@ -1532,19 +1536,19 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         win: parseFloat(benchmarkListing.price?.value || '0') <= competitorMetrics.avgPrice,
                       },
                       {
-                        label: 'Görsel Sayısı',
+                        label: t('imageCountLabel'),
                         my: `${benchmarkListing.imageCount}`,
                         avg: `${competitorMetrics.avgImageCount}`,
                         win: benchmarkListing.imageCount >= competitorMetrics.avgImageCount,
                       },
                       {
-                        label: 'Özellik Sayısı',
+                        label: t('aspectCountLabel'),
                         my: `${benchmarkListing.aspectCount}`,
                         avg: `${competitorMetrics.avgAspectCount}`,
                         win: benchmarkListing.aspectCount >= competitorMetrics.avgAspectCount,
                       },
                       {
-                        label: 'Satıcı Puanı',
+                        label: t('sellerScore'),
                         my: `${benchmarkListing.seller?.feedbackScore || 0}`,
                         avg: `${competitorMetrics.avgFeedbackScore}`,
                         win: (benchmarkListing.seller?.feedbackScore || 0) >= competitorMetrics.avgFeedbackScore,
@@ -1556,7 +1560,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         <TableCell sx={{ fontSize: 12, textAlign: 'center', color: '#666' }}>{row.avg}</TableCell>
                         <TableCell sx={{ textAlign: 'center' }}>
                           {row.win ? (
-                            <Chip label="Kazanıyor" size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontSize: 10, fontWeight: 600, height: 22 }} />
+                            <Chip label={t('winning')} size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontSize: 10, fontWeight: 600, height: 22 }} />
                           ) : (
                             <Chip label="Geride" size="small" sx={{ bgcolor: '#ffebee', color: '#c62828', fontSize: 10, fontWeight: 600, height: 22 }} />
                           )}
@@ -1573,36 +1577,36 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <ShieldCheck size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
-                  Aksiyon Önerileri
+                  {t('actionItems')}
                 </Typography>
               </Box>
 
               <Stack spacing={1}>
                 {benchmarkListing.titleLength < competitorMetrics.avgTitleLength && (
                   <Alert severity="warning" sx={{ fontSize: 12 }} icon={<FileText size={16} />}>
-                    <strong>Başlık:</strong> Başlığınız rakip ortalamasından ({competitorMetrics.avgTitleLength} kr) kısa.
-                    Daha fazla anahtar kelime ekleyerek başlığınızı {Math.min(80, competitorMetrics.avgTitleLength + 10)} karaktere uzatın.
+                    <strong>{t('titleLabel')}:</strong> {t('titleTooShort', { avg: competitorMetrics.avgTitleLength })}
+                    {t('extendTitle', { target: Math.min(80, competitorMetrics.avgTitleLength + 10) })}
                   </Alert>
                 )}
 
                 {benchmarkListing.imageCount < competitorMetrics.avgImageCount && (
                   <Alert severity="warning" sx={{ fontSize: 12 }} icon={<ImageIcon size={16} />}>
-                    <strong>Görseller:</strong> Rakipleriniz ortalama {competitorMetrics.avgImageCount} görsel kullanıyor, sizin {benchmarkListing.imageCount} görseliniz var.
-                    En az {competitorMetrics.avgImageCount - benchmarkListing.imageCount} görsel daha ekleyin.
+                    <strong>{t('imagesLabel')}:</strong> {t('imagesTooFew', { avg: competitorMetrics.avgImageCount, yours: benchmarkListing.imageCount })}
+                    {t('addImages', { count: competitorMetrics.avgImageCount - benchmarkListing.imageCount })}
                   </Alert>
                 )}
 
                 {benchmarkListing.aspectCount < competitorMetrics.avgAspectCount && (
                   <Alert severity="warning" sx={{ fontSize: 12 }} icon={<Tag size={16} />}>
-                    <strong>Özellikler:</strong> Rakipleriniz ortalama {competitorMetrics.avgAspectCount} özellik belirtiyor, sizin {benchmarkListing.aspectCount} özelliğiniz var.
-                    Eksik özellikleri doldurun.
+                    <strong>{t('aspectsLabel')}:</strong> {t('aspectsTooFew', { avg: competitorMetrics.avgAspectCount, yours: benchmarkListing.aspectCount })}
+                    {t('fillMissingAspects')}
                   </Alert>
                 )}
 
                 {parseFloat(benchmarkListing.price?.value || '0') > competitorMetrics.avgPrice * 1.15 && (
                   <Alert severity="info" sx={{ fontSize: 12 }} icon={<TrendingUp size={16} />}>
-                    <strong>Fiyat:</strong> Fiyatınız pazar ortalamasının ({fmt(competitorMetrics.avgPrice)}) %15&apos;inden fazla üzerinde.
-                    Fiyat stratejinizi gözden geçirmeniz önerilir.
+                    <strong>{t('price')}:</strong> {t('priceTooHigh', { avg: fmt(competitorMetrics.avgPrice) })}
+                    {t('reviewPricing')}
                   </Alert>
                 )}
 
@@ -1611,7 +1615,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                  benchmarkListing.imageCount >= competitorMetrics.avgImageCount &&
                  benchmarkListing.aspectCount >= competitorMetrics.avgAspectCount && (
                   <Alert severity="success" sx={{ fontSize: 12 }}>
-                    Tebrikler! Tüm temel metriklerde rakiplerinizin önündesiniz. Listelemenizi güncel tutmaya devam edin.
+                    {t('congratulations')}
                   </Alert>
                 )}
               </Stack>
@@ -1620,17 +1624,17 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
             {/* Top Competitors List */}
             <Paper sx={{ p: 2, borderRadius: 3, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(99,102,241,0.08)' }}>
               <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5, fontSize: 14 }}>
-                Rakip Listeleri (İlk {competitorItems.length})
+                {t('competitorListings')} ({competitorItems.length})
               </Typography>
 
               <TableContainer sx={{ maxHeight: 400 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Görsel</TableCell>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>Başlık</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>{t('image')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>{t('titleLabel')}</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: 'right' }}>Fiyat</TableCell>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: 'center' }}>Satıcı Puanı</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: 'center' }}>{t('sellerScore')}</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: 'center' }}></TableCell>
                     </TableRow>
                   </TableHead>
@@ -1688,7 +1692,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
 
         {!benchmarkListingId && (
           <Alert severity="info" sx={{ mt: 1, fontSize: 12 }}>
-            Rakip kıyaslama yapmak için yukarıdan bir listeleme seçin.
+            {t('selectListingForBenchmark')}
           </Alert>
         )}
       </TabPanel>

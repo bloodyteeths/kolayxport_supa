@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Drawer, Box, Typography, IconButton, TextField, Select, MenuItem, FormControl, InputLabel, Button, Alert, Chip, Autocomplete, Accordion, AccordionSummary, AccordionDetails } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import CloseIcon from '@mui/icons-material/Close';
@@ -6,6 +6,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { UPS_SERVICE_TYPES, UPS_PACKAGE_TYPES, UPS_SIGNATURE_OPTIONS } from '@/constants/ups';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 // Check if an order has existing successful shipments (labels)
 function hasExistingLabel(order: any): boolean {
@@ -64,69 +66,16 @@ const DEFAULTS = {
   weight: 0.5,
 };
 
-const UPS_EXPORT_REASONS = [
-  { value: 'SALE', label: 'Satış' },
-  { value: 'GIFT', label: 'Hediye' },
-  { value: 'RETURN', label: 'İade' },
-  { value: 'REPAIR', label: 'Tamir' },
-  { value: 'SAMPLE', label: 'Numune' },
-];
+const EXPORT_REASON_KEYS = ['SALE', 'GIFT', 'RETURN', 'REPAIR', 'SAMPLE'] as const;
 
-const UPS_CURRENCY_CODES = [
-  { value: 'USD', label: 'ABD Doları (USD)' },
-  { value: 'EUR', label: 'Euro (EUR)' },
-  { value: 'GBP', label: 'İngiliz Sterlini (GBP)' },
-  { value: 'TRY', label: 'Türk Lirası (TRY)' },
-  { value: 'CAD', label: 'Kanada Doları (CAD)' },
-  { value: 'AUD', label: 'Avustralya Doları (AUD)' },
-  { value: 'JPY', label: 'Japon Yeni (JPY)' },
-  { value: 'CHF', label: 'İsviçre Frangı (CHF)' },
-  { value: 'CNY', label: 'Çin Yuanı (CNY)' },
-  { value: 'SEK', label: 'İsveç Kronu (SEK)' },
-  { value: 'NOK', label: 'Norveç Kronu (NOK)' },
-  { value: 'DKK', label: 'Danimarka Kronu (DKK)' },
-  { value: 'NZD', label: 'Yeni Zelanda Doları (NZD)' },
-  { value: 'SGD', label: 'Singapur Doları (SGD)' },
-  { value: 'HKD', label: 'Hong Kong Doları (HKD)' },
-  { value: 'KRW', label: 'Güney Kore Wonu (KRW)' },
-  { value: 'MXN', label: 'Meksika Pesosu (MXN)' },
-  { value: 'BRL', label: 'Brezilya Reali (BRL)' },
-  { value: 'INR', label: 'Hindistan Rupisi (INR)' },
-  { value: 'ZAR', label: 'Güney Afrika Randı (ZAR)' },
-  { value: 'AED', label: 'BAE Dirhemi (AED)' },
-  { value: 'SAR', label: 'Suudi Arabistan Riyali (SAR)' },
-  { value: 'PLN', label: 'Polonya Zlotisi (PLN)' },
-  { value: 'CZK', label: 'Çek Korunası (CZK)' },
-  { value: 'HUF', label: 'Macar Forinti (HUF)' },
-  { value: 'RON', label: 'Romen Leyi (RON)' },
-  { value: 'BGN', label: 'Bulgar Levası (BGN)' },
-  { value: 'HRK', label: 'Hırvat Kunası (HRK)' },
-  { value: 'RUB', label: 'Rus Rublesi (RUB)' },
-  { value: 'THB', label: 'Tayland Bahtı (THB)' },
-  { value: 'MYR', label: 'Malezya Ringgiti (MYR)' },
-  { value: 'IDR', label: 'Endonezya Rupisi (IDR)' },
-  { value: 'PHP', label: 'Filipin Pesosu (PHP)' },
-  { value: 'ILS', label: 'İsrail Şekeli (ILS)' },
-  { value: 'TWD', label: 'Tayvan Doları (TWD)' },
-  { value: 'VND', label: 'Vietnam Dongu (VND)' },
-  { value: 'CLP', label: 'Şili Pesosu (CLP)' },
-  { value: 'ARS', label: 'Arjantin Pesosu (ARS)' },
-  { value: 'COP', label: 'Kolombiya Pesosu (COP)' },
-  { value: 'PEN', label: 'Peru Solu (PEN)' },
-  { value: 'UAH', label: 'Ukrayna Grivnası (UAH)' },
-  { value: 'KZT', label: 'Kazakistan Tengesi (KZT)' },
-  { value: 'EGP', label: 'Mısır Lirası (EGP)' },
-  { value: 'MAD', label: 'Fas Dirhemi (MAD)' },
-  { value: 'QAR', label: 'Katar Riyali (QAR)' },
-  { value: 'KWD', label: 'Kuveyt Dinarı (KWD)' },
-  { value: 'OMR', label: 'Umman Riyali (OMR)' },
-  { value: 'BHD', label: 'Bahreyn Dinarı (BHD)' },
-  { value: 'JOD', label: 'Ürdün Dinarı (JOD)' },
-  { value: 'LBP', label: 'Lübnan Lirası (LBP)' },
-  { value: 'PKR', label: 'Pakistan Rupisi (PKR)' },
-  { value: 'BDT', label: 'Bangladeş Takası (BDT)' },
-  { value: 'LKR', label: 'Sri Lanka Rupisi (LKR)' },
-].sort((a, b) => a.label.localeCompare(b.label, 'tr'));
+const CURRENCY_CODES = [
+  'USD', 'EUR', 'GBP', 'TRY', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'SEK',
+  'NOK', 'DKK', 'NZD', 'SGD', 'HKD', 'KRW', 'MXN', 'BRL', 'INR', 'ZAR',
+  'AED', 'SAR', 'PLN', 'CZK', 'HUF', 'RON', 'BGN', 'HRK', 'RUB', 'THB',
+  'MYR', 'IDR', 'PHP', 'ILS', 'TWD', 'VND', 'CLP', 'ARS', 'COP', 'PEN',
+  'UAH', 'KZT', 'EGP', 'MAD', 'QAR', 'KWD', 'OMR', 'BHD', 'JOD', 'LBP',
+  'PKR', 'BDT', 'LKR',
+] as const;
 
 // Comprehensive list of countries with ISO codes
 const COUNTRIES = [
@@ -475,6 +424,19 @@ const US_STATES = [
 ];
 
 export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLabelDrawerProps) {
+  const t = useTranslations('ups');
+  const { locale, config, formatDateTime } = useLocale();
+
+  const exportReasons = useMemo(
+    () => EXPORT_REASON_KEYS.map(key => ({ value: key, label: t(`exportReasons.${key}`) })),
+    [t]
+  );
+  const currencyOptions = useMemo(
+    () => CURRENCY_CODES.map(code => ({ value: code, label: t(`currencies.${code}`) }))
+      .sort((a, b) => a.label.localeCompare(b.label, locale)),
+    [t, locale]
+  );
+
   type Product = {
     description: string;
     quantity: number;
@@ -567,7 +529,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
       commodityCode: '',
       unitOfMeasurement: 'PCS',
       weight: formatDecimal(DEFAULTS.weight),
-      originCountry: 'TR',
+      originCountry: config.defaultCountryOfOrigin || 'TR',
     }],
     soldToName: '',
     soldToAttention: '',
@@ -575,7 +537,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
     soldToStreet2: '',
     soldToCity: '',
     soldToPostal: '',
-    soldToCountry: 'TR',
+    soldToCountry: config.defaultSoldToCountry || 'TR',
     soldToPhone: '',
     soldToState: '',
     soldToEmail: '',
@@ -634,7 +596,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
           commodityCode: order?.hsCode || '',
           unitOfMeasurement: 'PCS',
           weight: formatDecimal(order?.weight || DEFAULTS.weight),
-          originCountry: order?.countryOfOrigin || 'TR',
+          originCountry: order?.countryOfOrigin || config.defaultCountryOfOrigin || 'TR',
         }],
         invoiceLineTotal: {
           currencyCode: order?.currency || 'USD',
@@ -765,11 +727,11 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
         setSaving(false);
         return;
       }
-      toast.success(`UPS etiketi oluşturuldu! Takip No: ${data.trackingNumber}`);
+      toast.success(t('labelCreatedSuccess', { trackingNumber: data.trackingNumber }));
       if (data.trackingNumber) {
-        try { 
+        try {
           await navigator.clipboard.writeText(data.trackingNumber);
-          toast.success('Takip numarası panoya kopyalandı');
+          toast.success(t('trackingCopied'));
         } catch (e) {
           console.error('Failed to copy tracking number:', e);
         }
@@ -808,7 +770,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
     <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: '90%', sm: 450, md: 500 }, p: { xs: 1, sm: 2 } } }}>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box display="flex" alignItems="center" justifyContent="space-between" mb={1} p={1} sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="h6">UPS Etiketi Oluştur</Typography>
+          <Typography variant="h6">{t('drawerTitle')}</Typography>
           <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
         </Box>
         <Box sx={{ overflowY: 'auto', p: { xs: 1, sm: 2 }, flexGrow: 1 }}>
@@ -818,48 +780,48 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
             
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>UPS Seçenekleri</Typography>
+                <Typography>{t('upsOptions')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box>
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Service Type</InputLabel>
-                    <Select name="serviceType" value={form.serviceType} onChange={handleSelectChange} label="Service Type">
+                    <InputLabel>{t('serviceType')}</InputLabel>
+                    <Select name="serviceType" value={form.serviceType} onChange={handleSelectChange} label={t('serviceType')}>
                       {UPS_SERVICE_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
                     </Select>
                   </FormControl>
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Package Type</InputLabel>
-                    <Select name="packageType" value={form.packageType} onChange={handleSelectChange} label="Package Type">
+                    <InputLabel>{t('packageType')}</InputLabel>
+                    <Select name="packageType" value={form.packageType} onChange={handleSelectChange} label={t('packageType')}>
                       {UPS_PACKAGE_TYPES.map(type => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
                     </Select>
                   </FormControl>
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Signature Option</InputLabel>
-                    <Select name="signatureOption" value={form.signatureOption} onChange={handleSelectChange} label="Signature Option">
+                    <InputLabel>{t('signatureOption')}</InputLabel>
+                    <Select name="signatureOption" value={form.signatureOption} onChange={handleSelectChange} label={t('signatureOption')}>
                       {UPS_SIGNATURE_OPTIONS.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
                     </Select>
                   </FormControl>
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Vergi/Gümrük Ödemesi</InputLabel>
-                    <Select name="dutyPaymentType" value={form.dutyPaymentType} onChange={handleSelectChange} label="Vergi/Gümrük Ödemesi">
-                      <MenuItem value="RECEIVER">Alıcı (Receiver)</MenuItem>
-                      <MenuItem value="SHIPPER">Gönderici (Shipper)</MenuItem>
+                    <InputLabel>{t('dutyPayment')}</InputLabel>
+                    <Select name="dutyPaymentType" value={form.dutyPaymentType} onChange={handleSelectChange} label={t('dutyPayment')}>
+                      <MenuItem value="RECEIVER">{t('dutyReceiver')}</MenuItem>
+                      <MenuItem value="SHIPPER">{t('dutyShipper')}</MenuItem>
                     </Select>
                   </FormControl>
-                  <TextField label="Weight (kg)" name="weight" type="number" value={form.weight} onChange={handleInputChange} fullWidth margin="dense" size="small" inputProps={{ min: 0, step: 0.01 }} />
+                  <TextField label={t('weightKg')} name="weight" type="number" value={form.weight} onChange={handleInputChange} fullWidth margin="dense" size="small" inputProps={{ min: 0, step: 0.01 }} />
                 </Box>
               </AccordionDetails>
             </Accordion>
             
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Satış Bilgileri</Typography>
+                <Typography>{t('salesInfo')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box>
                   <TextField
-                    label="Fatura Numarası"
+                    label={t('invoiceNumber')}
                     name="invoiceNumber"
                     value={form.invoiceNumber}
                     onChange={handleInputChange}
@@ -870,7 +832,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Fatura Tarihi"
+                    label={t('invoiceDate')}
                     name="invoiceDate"
                     type="date"
                     value={form.invoiceDate}
@@ -882,35 +844,35 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     InputLabelProps={{ shrink: true }}
                   />
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>İhracat Nedeni</InputLabel>
+                    <InputLabel>{t('exportReason')}</InputLabel>
                     <Select
                       name="exportReason"
                       value={form.exportReason}
                       onChange={handleSelectChange}
-                      label="İhracat Nedeni"
+                      label={t('exportReason')}
                       required
                     >
-                      {UPS_EXPORT_REASONS.map(opt => (
+                      {exportReasons.map(opt => (
                         <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
                       ))}
                     </Select>
                   </FormControl>
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Para Birimi</InputLabel>
+                    <InputLabel>{t('currency')}</InputLabel>
                     <Select
                       name="currencyCode"
                       value={form.currencyCode}
                       onChange={handleSelectChange}
-                      label="Para Birimi"
+                      label={t('currency')}
                       required
                     >
-                      {UPS_CURRENCY_CODES.map(opt => (
+                      {currencyOptions.map(opt => (
                         <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
                       ))}
                     </Select>
                   </FormControl>
                   <TextField
-                    label="IOSS Numarası"
+                    label={t('iossNumber')}
                     name="iossNumber"
                     value={form.iossNumber}
                     onChange={handleInputChange}
@@ -920,7 +882,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="KDV Numarası"
+                    label={t('vatNumber')}
                     name="vatNumber"
                     value={form.vatNumber}
                     onChange={handleInputChange}
@@ -935,12 +897,12 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
             
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Ürün Bilgisi</Typography>
+                <Typography>{t('productInfo')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box>
                   <TextField
-                    label="Açıklama"
+                    label={t('description')}
                     name="description"
                     value={form.products[0].description}
                     onChange={e => {
@@ -960,7 +922,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="GTIP Kodu"
+                    label={t('hsCode')}
                     name="commodityCode"
                     value={form.products[0].commodityCode}
                     onChange={e => setForm(f => ({
@@ -973,7 +935,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Miktar"
+                    label={t('quantity')}
                     name="quantity"
                     type="number"
                     value={form.products[0].quantity}
@@ -996,7 +958,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Birim Fiyat"
+                    label={t('unitPrice')}
                     name="value"
                     type="number"
                     value={form.products[0].value}
@@ -1018,7 +980,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Toplam Tutar"
+                    label={t('totalAmount')}
                     type="number"
                     value={formatDecimal(form.products[0].quantity * form.products[0].value)}
                     disabled
@@ -1027,24 +989,24 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Ürün Birimi</InputLabel>
+                    <InputLabel>{t('productUnit')}</InputLabel>
                     <Select
                       name="unitOfMeasurement"
                       value={form.products[0].unitOfMeasurement}
                       onChange={e => setForm(f => ({ ...f, products: [{ ...f.products[0], unitOfMeasurement: e.target.value }] }))}
-                      label="Ürün Birimi"
+                      label={t('productUnit')}
                       required
                     >
-                      <MenuItem value="PCS">Adet</MenuItem>
-                      <MenuItem value="KG">Kilogram</MenuItem>
-                      <MenuItem value="LTR">Litre</MenuItem>
-                      <MenuItem value="MTR">Metre</MenuItem>
-                      <MenuItem value="CMT">Santimetre</MenuItem>
-                      <MenuItem value="MMT">Milimetre</MenuItem>
+                      <MenuItem value="PCS">{t('unitPCS')}</MenuItem>
+                      <MenuItem value="KG">{t('unitKG')}</MenuItem>
+                      <MenuItem value="LTR">{t('unitLTR')}</MenuItem>
+                      <MenuItem value="MTR">{t('unitMTR')}</MenuItem>
+                      <MenuItem value="CMT">{t('unitCMT')}</MenuItem>
+                      <MenuItem value="MMT">{t('unitMMT')}</MenuItem>
                     </Select>
                   </FormControl>
                   <TextField
-                    label="Ürün Ağırlığı"
+                    label={t('productWeight')}
                     name="weight"
                     type="number"
                     value={form.products[0].weight}
@@ -1063,12 +1025,12 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     getOptionLabel={(option) => option.name}
                     value={COUNTRIES.find(c => c.code === form.products[0].originCountry) || null}
                     onChange={(event, newValue) => {
-                      setForm(f => ({ ...f, products: [{ ...f.products[0], originCountry: newValue?.code || 'TR' }] }));
+                      setForm(f => ({ ...f, products: [{ ...f.products[0], originCountry: newValue?.code || config.defaultCountryOfOrigin || 'TR' }] }));
                     }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Country of Origin"
+                        label={t('countryOfOrigin')}
                         required
                         margin="dense"
                         size="small"
@@ -1084,12 +1046,12 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
             
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>Alıcı</Typography>
+                <Typography>{t('recipient')}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <Box>
                   <TextField
-                    label="Ad"
+                    label={t('firstName')}
                     name="soldToName"
                     value={form.soldToName}
                     onChange={handleInputChange}
@@ -1100,7 +1062,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Dikkat Edilecek Kişi"
+                    label={t('attention')}
                     name="soldToAttention"
                     value={form.soldToAttention}
                     onChange={handleInputChange}
@@ -1111,7 +1073,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Adres Satırı 1"
+                    label={t('addressLine1')}
                     name="soldToStreet1"
                     value={form.soldToStreet1}
                     onChange={handleInputChange}
@@ -1122,7 +1084,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Adres Satırı 2"
+                    label={t('addressLine2')}
                     name="soldToStreet2"
                     value={form.soldToStreet2}
                     onChange={handleInputChange}
@@ -1132,7 +1094,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Şehir"
+                    label={t('city')}
                     name="soldToCity"
                     value={form.soldToCity}
                     onChange={handleInputChange}
@@ -1143,7 +1105,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Posta Kodu"
+                    label={t('postalCode')}
                     name="soldToPostal"
                     value={form.soldToPostal}
                     onChange={handleInputChange}
@@ -1154,7 +1116,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <TextField
-                    label="Telefon Numarası"
+                    label={t('phoneNumber')}
                     name="soldToPhone"
                     value={form.soldToPhone}
                     onChange={handleInputChange}
@@ -1169,16 +1131,16 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     getOptionLabel={(option) => option.name}
                     value={COUNTRIES.find(c => c.code === form.soldToCountry) || null}
                     onChange={(event, newValue) => {
-                      setForm(f => ({ 
-                        ...f, 
-                        soldToCountry: newValue?.code || 'TR',
+                      setForm(f => ({
+                        ...f,
+                        soldToCountry: newValue?.code || config.defaultSoldToCountry || 'TR',
                         recipientCountry: newValue?.code || ''
                       }));
                     }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        label="Country"
+                        label={t('country')}
                         required
                         margin="dense"
                         size="small"
@@ -1189,7 +1151,7 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     sx={{ mt: 1 }}
                   />
                   <TextField
-                    label="State/Province"
+                    label={t('stateProvince')}
                     name="soldToState"
                     value={form.soldToState}
                     onChange={handleInputChange}
@@ -1199,13 +1161,13 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     margin="dense"
                     size="small"
                     helperText={
-                      countryRequiresState(form.soldToCountry) 
-                        ? 'State/Province is required for this country' 
-                        : 'State/Province is optional for this country'
+                      countryRequiresState(form.soldToCountry)
+                        ? t('stateRequired')
+                        : t('stateOptional')
                     }
                   />
                   <TextField
-                    label="Alıcı E-posta"
+                    label={t('recipientEmail')}
                     name="soldToEmail"
                     type="email"
                     value={form.soldToEmail}
@@ -1216,12 +1178,12 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
                     size="small"
                   />
                   <FormControl fullWidth margin="dense" size="small">
-                    <InputLabel>Teslim Şartı</InputLabel>
+                    <InputLabel>{t('deliveryTerms')}</InputLabel>
                     <Select
                       name="termsOfShipment"
                       value={form.termsOfShipment}
                       onChange={handleSelectChange}
-                      label="Teslim Şartı"
+                      label={t('deliveryTerms')}
                       required
                     >
                       <MenuItem value="DAP">DAP (Delivered At Place)</MenuItem>
@@ -1241,15 +1203,15 @@ export default function UPSLabelDrawer({ open, onClose, order, onSaved }: UPSLab
               </AccordionDetails>
             </Accordion>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            {success && <Alert severity="success" sx={{ mb: 2 }}>UPS etiketi başarıyla kaydedildi.</Alert>}
-            <Button type="submit" variant="contained" color="primary" fullWidth disabled={saving || (!!order && hasExistingLabel(order))}>{saving ? 'Kaydediliyor...' : (order && hasExistingLabel(order) ? 'Mevcut Etiketi Silin' : 'Kaydet')}</Button>
+            {success && <Alert severity="success" sx={{ mb: 2 }}>{t('labelSavedSuccess')}</Alert>}
+            <Button type="submit" variant="contained" color="primary" fullWidth disabled={saving || (!!order && hasExistingLabel(order))}>{saving ? t('saving') : (order && hasExistingLabel(order) ? t('deleteExistingLabel') : t('save'))}</Button>
           </form>
           {labelUrl && (
             <Box mt={2} textAlign="center">
-              <Typography variant="subtitle1" gutterBottom>UPS Etiketi</Typography>
+              <Typography variant="subtitle1" gutterBottom>{t('upsLabel')}</Typography>
               <img src={labelUrl} alt="UPS Label" style={{ maxWidth: '100%', border: '1px solid #ccc', marginBottom: 8 }} />
               <a href={labelUrl} download="ups-label.gif">
-                <Button variant="outlined" color="primary">Etiketi İndir</Button>
+                <Button variant="outlined" color="primary">{t('downloadLabel')}</Button>
               </a>
             </Box>
           )}

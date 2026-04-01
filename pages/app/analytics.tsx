@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
 import dynamic from 'next/dynamic';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 import {
   TrendingUp,
   TrendingDown,
@@ -154,13 +156,7 @@ const MARKETPLACE_BG: Record<string, string> = {
   manual: 'bg-gray-100 text-gray-800',
 };
 
-const TR_MONTHS = ['Oca', 'Sub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Agu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-const TR_MONTHS_FULL = ['Ocak', 'Subat', 'Mart', 'Nisan', 'Mayis', 'Haziran', 'Temmuz', 'Agustos', 'Eylul', 'Ekim', 'Kasim', 'Aralik'];
-
-const formatCurrency = (value: number): string =>
-  new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value);
-
-const formatNumber = (value: number): string => value.toLocaleString('tr-TR');
+// formatCurrency and formatNumber are now provided by useLocale() inside the component
 
 // ---------------------------------------------------------------------------
 // Small reusable pieces
@@ -174,8 +170,8 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h3 className="text-base font-semibold text-slate-900 mb-4" style={{ letterSpacing: '-0.01em' }}>{children}</h3>
 );
 
-const EmptyState = ({ message = 'Veri yok' }: { message?: string }) => (
-  <div className="flex items-center justify-center py-10 text-slate-400 text-sm">{message}</div>
+const EmptyState = ({ message }: { message?: string }) => (
+  <div className="flex items-center justify-center py-10 text-slate-400 text-sm">{message || '-'}</div>
 );
 
 const MarketplaceBadge = ({ name }: { name: string | null | undefined }) => {
@@ -223,6 +219,7 @@ const StatCard = ({
   trendLabel,
   icon: Icon,
   color = 'blue',
+  fmtNumber,
 }: {
   title: string;
   value: string | number;
@@ -230,6 +227,7 @@ const StatCard = ({
   trendLabel?: string;
   icon: React.ComponentType<any>;
   color?: string;
+  fmtNumber?: (v: number) => string;
 }) => {
   const trendPositive = trend !== undefined && trend >= 0;
 
@@ -265,7 +263,7 @@ const StatCard = ({
       </div>
       <div className="mt-2.5 sm:mt-4 min-w-0">
         <h3 className="text-sm sm:text-xl font-bold text-slate-900 truncate" style={{ letterSpacing: '-0.025em' }}>
-          {typeof value === 'number' ? formatNumber(value) : value}
+          {typeof value === 'number' ? (fmtNumber ? fmtNumber(value) : String(value)) : value}
         </h3>
         <p className="text-[10px] sm:text-[13px] font-medium text-slate-500 truncate mt-0.5">{title}</p>
         {trendLabel && <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">{trendLabel}</p>}
@@ -314,6 +312,9 @@ const LoadingSkeleton = () => (
 export default function AnalyticsPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const t = useTranslations('analytics');
+  const tc = useTranslations('common');
+  const { config, formatCurrency, formatDate, formatDateTime, formatNumber } = useLocale();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('day');
@@ -351,15 +352,15 @@ export default function AnalyticsPage() {
   const selectedMonthLabel = useMemo(() => {
     if (!selectedMonth) return '';
     const [y, m] = selectedMonth.split('-').map(Number);
-    return `${TR_MONTHS_FULL[m - 1]} ${y}`;
-  }, [selectedMonth]);
+    return `${config.monthsFull[m - 1]} ${y}`;
+  }, [selectedMonth, config.monthsFull]);
 
+  const dayNamesArr: string[] = t.raw('dayNames');
   const selectedDayLabel = useMemo(() => {
     if (!selectedDay) return '';
     const d = new Date(selectedDay + 'T00:00:00');
-    const dayNames = ['Pazar', 'Pazartesi', 'Sali', 'Carsamba', 'Persembe', 'Cuma', 'Cumartesi'];
-    return `${d.getDate()} ${TR_MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}, ${dayNames[d.getDay()]}`;
-  }, [selectedDay]);
+    return `${d.getDate()} ${config.monthsFull[d.getMonth()]} ${d.getFullYear()}, ${dayNamesArr[d.getDay()]}`;
+  }, [selectedDay, config.monthsFull, dayNamesArr]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -428,7 +429,7 @@ export default function AnalyticsPage() {
 
   const dailyLabels =
     data?.dailyStats.map((s) =>
-      new Date(s.date).toLocaleDateString('tr-TR', { month: 'short', day: 'numeric' })
+      formatDate(new Date(s.date), { month: 'short', day: 'numeric' })
     ) || [];
 
   const revenueChartOptions: ApexCharts.ApexOptions = {
@@ -438,22 +439,22 @@ export default function AnalyticsPage() {
     stroke: { curve: 'smooth', width: [0, 3] },
     xaxis: { categories: dailyLabels },
     yaxis: [
-      { title: { text: 'Siparis' }, labels: { formatter: (v: number) => Math.round(v).toString() } },
-      { opposite: true, title: { text: 'Gelir (TL)' }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
+      { title: { text: t('orders') }, labels: { formatter: (v: number) => Math.round(v).toString() } },
+      { opposite: true, title: { text: t('revenueLabel') }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
     ],
     fill: { type: ['solid', 'gradient'], opacity: [0.35, 1], gradient: { shadeIntensity: 1, stops: [0, 100] } },
     legend: { position: 'top' },
     tooltip: {
       y: {
         formatter: (v: number, { seriesIndex }: { seriesIndex: number }) =>
-          seriesIndex === 1 ? formatCurrency(v) : `${v} siparis`,
+          seriesIndex === 1 ? formatCurrency(v) : `${v} ${t('orders').toLowerCase()}`,
       },
     },
   };
 
   const revenueChartSeries = [
-    { name: 'Siparis', type: 'column', data: data?.dailyStats.map((s) => s.orders) || [] },
-    { name: 'Gelir', type: 'line', data: data?.dailyStats.map((s) => Math.round(s.revenue)) || [] },
+    { name: t('orders'), type: 'column', data: data?.dailyStats.map((s) => s.orders) || [] },
+    { name: t('revenue'), type: 'line', data: data?.dailyStats.map((s) => Math.round(s.revenue)) || [] },
   ];
 
   // Marketplace donut — prefer marketplaceBreakdown, fallback to topMarketplaces
@@ -483,7 +484,7 @@ export default function AnalyticsPage() {
   const monthlyStats = data?.monthlyStats ?? [];
   const monthlyLabels = monthlyStats.map((m) => {
     const d = new Date(m.month + '-01');
-    return isNaN(d.getTime()) ? m.month : TR_MONTHS[d.getMonth()];
+    return isNaN(d.getTime()) ? m.month : config.monthsShort[d.getMonth()];
   });
 
   const monthlyChartOptions: ApexCharts.ApexOptions = {
@@ -494,21 +495,21 @@ export default function AnalyticsPage() {
     stroke: { width: [0, 3], curve: 'smooth' },
     xaxis: { categories: monthlyLabels },
     yaxis: [
-      { title: { text: 'Siparis' }, labels: { formatter: (v: number) => Math.round(v).toString() } },
-      { opposite: true, title: { text: 'Gelir (TL)' }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
+      { title: { text: t('orders') }, labels: { formatter: (v: number) => Math.round(v).toString() } },
+      { opposite: true, title: { text: t('revenueLabel') }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
     ],
     legend: { position: 'top' },
     tooltip: {
       y: {
         formatter: (v: number, { seriesIndex }: { seriesIndex: number }) =>
-          seriesIndex === 1 ? formatCurrency(v) : `${formatNumber(v)} siparis`,
+          seriesIndex === 1 ? formatCurrency(v) : `${formatNumber(v)} ${t('orders').toLowerCase()}`,
       },
     },
   };
 
   const monthlyChartSeries = [
-    { name: 'Siparis', type: 'column', data: monthlyStats.map((m) => m.orders) },
-    { name: 'Gelir', type: 'line', data: monthlyStats.map((m) => Math.round(m.revenue)) },
+    { name: t('orders'), type: 'column', data: monthlyStats.map((m) => m.orders) },
+    { name: t('revenue'), type: 'line', data: monthlyStats.map((m) => Math.round(m.revenue)) },
   ];
 
   // Hourly chart for day mode
@@ -521,16 +522,16 @@ export default function AnalyticsPage() {
     plotOptions: { bar: { borderRadius: 5, columnWidth: '60%' } },
     dataLabels: { enabled: false },
     xaxis: { categories: hourlyLabels, labels: { style: { fontSize: '10px' } } },
-    yaxis: { title: { text: 'Siparis' }, labels: { formatter: (v: number) => Math.round(v).toString() } },
+    yaxis: { title: { text: t('orders') }, labels: { formatter: (v: number) => Math.round(v).toString() } },
     legend: { position: 'top' },
     tooltip: {
-      y: { formatter: (v: number) => `${v} siparis` },
+      y: { formatter: (v: number) => `${v} ${t('orders').toLowerCase()}` },
     },
   };
 
   const hourlyChartSeries = [
-    { name: 'Secilen Gun', data: hourlyData.map((h) => h.orders) },
-    { name: 'Onceki Gun', data: hourlyData.map((h) => h.prevOrders) },
+    { name: t('selectedDay'), data: hourlyData.map((h) => h.orders) },
+    { name: t('previousDayChart'), data: hourlyData.map((h) => h.prevOrders) },
   ];
 
   const hourlyRevenueChartOptions: ApexCharts.ApexOptions = {
@@ -540,7 +541,7 @@ export default function AnalyticsPage() {
     stroke: { curve: 'smooth', width: 2 },
     fill: { type: 'gradient', opacity: [0.4, 0.1], gradient: { shadeIntensity: 1, stops: [0, 100] } },
     xaxis: { categories: hourlyLabels, labels: { style: { fontSize: '10px' } } },
-    yaxis: { title: { text: 'Gelir (TL)' }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
+    yaxis: { title: { text: t('revenueLabel') }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
     legend: { position: 'top' },
     tooltip: {
       y: { formatter: (v: number) => formatCurrency(v) },
@@ -548,8 +549,8 @@ export default function AnalyticsPage() {
   };
 
   const hourlyRevenueChartSeries = [
-    { name: 'Secilen Gun', data: hourlyData.map((h) => h.revenue) },
-    { name: 'Onceki Gun', data: hourlyData.map((h) => h.prevRevenue) },
+    { name: t('selectedDay'), data: hourlyData.map((h) => h.revenue) },
+    { name: t('previousDayChart'), data: hourlyData.map((h) => h.prevRevenue) },
   ];
 
   // Order status helpers
@@ -561,23 +562,23 @@ export default function AnalyticsPage() {
 
   if (authLoading || loading) {
     return (
-      <AppLayout title="Analitik - KolayXport Dashboard">
+      <AppLayout title={t('pageTitle')}>
         <LoadingSkeleton />
       </AppLayout>
     );
   }
 
   return (
-    <AppLayout title="Analitik - KolayXport Dashboard">
+    <AppLayout title={t('pageTitle')}>
       <div className="space-y-6 overflow-x-hidden max-w-full">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-lg sm:text-2xl font-bold text-slate-900 truncate" style={{ letterSpacing: '-0.025em' }}>
-              {dateRange === 'day' ? 'Gunun Analizi' : 'Analitik Dashboard'}
+              {dateRange === 'day' ? t('dayAnalysis') : t('dashboardTitle')}
             </h1>
             <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500 truncate">
-              {dateRange === 'day' ? selectedDayLabel : 'Pazaryeri satis performansinizi takip edin'}
+              {dateRange === 'day' ? selectedDayLabel : t('trackPerformance')}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -587,7 +588,7 @@ export default function AnalyticsPage() {
               className="btn-primary text-xs sm:text-sm !py-2 !px-3 sm:!px-4 disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              Yenile
+              {t('refresh')}
             </button>
           </div>
         </div>
@@ -597,40 +598,44 @@ export default function AnalyticsPage() {
         {/* ============================================================= */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6 overflow-hidden">
           <StatCard
-            title={dateRange === 'day' ? 'Siparis' : 'Toplam Siparis'}
+            title={dateRange === 'day' ? t('orders') : t('totalOrders')}
             value={data?.totalOrders ?? 0}
             trend={data?.orderTrend}
             trendLabel={
-              dateRange === 'day' ? `Onceki gun: ${formatNumber(data?.previousPeriod?.orders ?? 0)}`
-              : dateRange === 'month' ? `Onceki ay: ${formatNumber(data?.previousPeriod?.orders ?? 0)}`
-              : 'Onceki doneme gore'
+              dateRange === 'day' ? `${t('previousDay')}: ${formatNumber(data?.previousPeriod?.orders ?? 0)}`
+              : dateRange === 'month' ? `${t('previousMonth')}: ${formatNumber(data?.previousPeriod?.orders ?? 0)}`
+              : t('previousPeriod')
             }
             icon={ShoppingCart}
             color="blue"
+            fmtNumber={formatNumber}
           />
           <StatCard
-            title={dateRange === 'day' ? 'Ciro' : 'Toplam Gelir'}
+            title={dateRange === 'day' ? t('revenue') : t('totalRevenue')}
             value={formatCurrency(data?.totalRevenue ?? 0)}
             trend={data?.revenueTrend}
             trendLabel={
-              dateRange === 'day' ? `Onceki gun: ${formatCurrency(data?.previousPeriod?.revenue ?? 0)}`
-              : dateRange === 'month' ? `Onceki ay: ${formatCurrency(data?.previousPeriod?.revenue ?? 0)}`
-              : 'Onceki doneme gore'
+              dateRange === 'day' ? `${t('previousDay')}: ${formatCurrency(data?.previousPeriod?.revenue ?? 0)}`
+              : dateRange === 'month' ? `${t('previousMonth')}: ${formatCurrency(data?.previousPeriod?.revenue ?? 0)}`
+              : t('previousPeriod')
             }
             icon={DollarSign}
             color="green"
+            fmtNumber={formatNumber}
           />
           <StatCard
-            title="Musteri Sayisi"
+            title={t('customerCount')}
             value={data?.totalCustomers ?? 0}
             icon={Users}
             color="purple"
+            fmtNumber={formatNumber}
           />
           <StatCard
-            title="Ortalama Siparis"
+            title={t('averageOrder')}
             value={formatCurrency(data?.averageOrderValue ?? 0)}
             icon={Package}
             color="orange"
+            fmtNumber={formatNumber}
           />
         </div>
 
@@ -644,14 +649,14 @@ export default function AnalyticsPage() {
               onChange={(e) => setDateRange(e.target.value)}
               className="px-2 py-1.5 sm:px-3 sm:py-2 border border-slate-200 rounded-xl text-xs sm:text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
             >
-              <option value="day">Gunun Analizi</option>
-              <option value="month">Aya Gore</option>
-              <option value="7days">Son 7 Gun</option>
-              <option value="30days">Son 30 Gun</option>
-              <option value="90days">Son 90 Gun</option>
-              <option value="6months">Son 6 Ay</option>
-              <option value="12months">Son 12 Ay</option>
-              <option value="all">Tum Zamanlar</option>
+              <option value="day">{t('dateRanges.day')}</option>
+              <option value="month">{t('dateRanges.month')}</option>
+              <option value="7days">{t('dateRanges.7days')}</option>
+              <option value="30days">{t('dateRanges.30days')}</option>
+              <option value="90days">{t('dateRanges.90days')}</option>
+              <option value="6months">{t('dateRanges.6months')}</option>
+              <option value="12months">{t('dateRanges.12months')}</option>
+              <option value="all">{t('dateRanges.all')}</option>
             </select>
             {dateRange === 'day' && (
               <div className="flex items-center bg-white border border-slate-200 rounded-xl">
@@ -700,7 +705,7 @@ export default function AnalyticsPage() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6">
                 <div className="flex items-center gap-2">
                   <CurrencyIcon className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-700">Guncel Kurlar:</span>
+                  <span className="text-sm font-medium text-gray-700">{t('currentRates')}:</span>
                 </div>
                 <div className="flex items-center gap-4 sm:gap-6">
                   <div className="flex items-center gap-1">
@@ -718,7 +723,7 @@ export default function AnalyticsPage() {
                 </div>
                 {data.exchangeRates.lastUpdated && (
                   <span className="text-xs text-gray-500">
-                    {new Date(data.exchangeRates.lastUpdated).toLocaleTimeString('tr-TR')}
+                    {formatDateTime(new Date(data.exchangeRates.lastUpdated), { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
                 )}
               </div>
@@ -732,19 +737,19 @@ export default function AnalyticsPage() {
         {dateRange === 'day' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <SectionCard>
-              <SectionTitle>Saatlik Siparis Dagilimi</SectionTitle>
+              <SectionTitle>{t('hourlyOrderBreakdown')}</SectionTitle>
               {hourlyData.some((h) => h.orders > 0 || h.prevOrders > 0) ? (
                 <Chart options={hourlyChartOptions} series={hourlyChartSeries} type="bar" height={300} />
               ) : (
-                <EmptyState message="Bu gun icin siparis verisi yok" />
+                <EmptyState message={t('noOrderDataToday')} />
               )}
             </SectionCard>
             <SectionCard>
-              <SectionTitle>Saatlik Ciro Karsilastirmasi</SectionTitle>
+              <SectionTitle>{t('hourlyRevenueComparison')}</SectionTitle>
               {hourlyData.some((h) => h.revenue > 0 || h.prevRevenue > 0) ? (
                 <Chart options={hourlyRevenueChartOptions} series={hourlyRevenueChartSeries} type="area" height={300} />
               ) : (
-                <EmptyState message="Bu gun icin ciro verisi yok" />
+                <EmptyState message={t('noRevenueDataToday')} />
               )}
             </SectionCard>
           </div>
@@ -755,20 +760,20 @@ export default function AnalyticsPage() {
         {/* ============================================================= */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <SectionCard>
-            <SectionTitle>Gelir ve Siparis Trendi</SectionTitle>
+            <SectionTitle>{t('revenueAndOrderTrend')}</SectionTitle>
             {data?.dailyStats && data.dailyStats.length > 0 ? (
               <Chart options={revenueChartOptions} series={revenueChartSeries} type="line" height={280} />
             ) : (
-              <EmptyState message="Secilen tarih araliginda veri yok" />
+              <EmptyState message={t('noDataInRange')} />
             )}
           </SectionCard>
 
           <SectionCard>
-            <SectionTitle>Pazaryeri Dagilimi</SectionTitle>
+            <SectionTitle>{t('marketplaceDistribution')}</SectionTitle>
             {donutSeries.length > 0 && donutSeries.some((v) => v > 0) ? (
               <Chart options={donutOptions} series={donutSeries} type="donut" height={280} />
             ) : (
-              <EmptyState message="Pazaryeri verisi yok" />
+              <EmptyState message={t('noMarketplaceData')} />
             )}
           </SectionCard>
         </div>
@@ -777,7 +782,7 @@ export default function AnalyticsPage() {
         {/* ROW 4: Marketplace Breakdown Table                            */}
         {/* ============================================================= */}
         <SectionCard>
-          <SectionTitle>Pazaryeri Performansi</SectionTitle>
+          <SectionTitle>{t('marketplacePerformance')}</SectionTitle>
           {mpData.length > 0 ? (
             <>
               {/* Mobile cards */}
@@ -795,11 +800,11 @@ export default function AnalyticsPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <p className="text-xs text-gray-500">Siparis</p>
+                            <p className="text-xs text-gray-500">{t('orders')}</p>
                             <p className="text-sm font-semibold text-gray-900">{formatNumber(mp.orders)}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500">Gelir</p>
+                            <p className="text-xs text-gray-500">{t('revenue')}</p>
                             <p className="text-sm font-semibold text-gray-900">{formatCurrency(mp.revenue)}</p>
                           </div>
                         </div>
@@ -813,22 +818,22 @@ export default function AnalyticsPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Pazaryeri
+                        {t('marketplace')}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Siparis
+                        {t('orders')}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Gelir (TL)
+                        {t('revenueLabel')}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Musteri
+                        {t('customers')}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ort. Siparis (TL)
+                        {t('avgOrder')}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        % Oran
+                        % {t('percentage')}
                       </th>
                     </tr>
                   </thead>
@@ -876,7 +881,7 @@ export default function AnalyticsPage() {
         {/* ============================================================= */}
         {monthlyStats.length > 0 && (
           <SectionCard>
-            <SectionTitle>Aylik Trendler (Son 12 Ay)</SectionTitle>
+            <SectionTitle>{t('monthlyTrends')}</SectionTitle>
             <Chart options={monthlyChartOptions} series={monthlyChartSeries} type="line" height={280} />
           </SectionCard>
         )}
@@ -887,7 +892,7 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Top Products */}
           <SectionCard>
-            <SectionTitle>En Cok Satan Urunler</SectionTitle>
+            <SectionTitle>{t('topSellingProducts')}</SectionTitle>
             {data?.topProducts && data.topProducts.length > 0 ? (
               <>
                 {/* Mobile cards */}
@@ -900,11 +905,11 @@ export default function AnalyticsPage() {
                       <p className="text-sm font-medium text-gray-900 mb-3 line-clamp-2">{product.name}</p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <p className="text-xs text-gray-500">Siparis</p>
+                          <p className="text-xs text-gray-500">{t('orders')}</p>
                           <p className="text-sm font-semibold text-gray-900">{formatNumber(product.orders)}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Gelir</p>
+                          <p className="text-xs text-gray-500">{t('revenue')}</p>
                           <p className="text-sm font-semibold text-gray-900">{formatCurrency(product.revenue)}</p>
                         </div>
                       </div>
@@ -917,9 +922,9 @@ export default function AnalyticsPage() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Urun</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Siparis</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Gelir (TL)</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{t('product')}</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{t('orders')}</th>
+                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{t('revenueLabel')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -936,13 +941,13 @@ export default function AnalyticsPage() {
                 </div>
               </>
             ) : (
-              <EmptyState message="Urun verisi yok" />
+              <EmptyState message={t('noProductData')} />
             )}
           </SectionCard>
 
           {/* Order Status Breakdown */}
           <SectionCard>
-            <SectionTitle>Siparis Durumlari</SectionTitle>
+            <SectionTitle>{t('orderStatuses')}</SectionTitle>
             {data?.orderStatusBreakdown && data.orderStatusBreakdown.length > 0 ? (
               <div className="space-y-3">
                 {data.orderStatusBreakdown.map((status, index) => {
@@ -970,7 +975,7 @@ export default function AnalyticsPage() {
                 })}
               </div>
             ) : (
-              <EmptyState message="Durum verisi yok" />
+              <EmptyState message={t('noStatusData')} />
             )}
           </SectionCard>
         </div>
@@ -981,25 +986,25 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Shipping Stats */}
           <SectionCard>
-            <SectionTitle>Kargo Istatistikleri</SectionTitle>
+            <SectionTitle>{t('shippingStatistics')}</SectionTitle>
             {data?.shippingStats ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-blue-50 rounded-lg p-4 text-center">
                     <Truck className="h-6 w-6 text-blue-600 mx-auto mb-1" />
                     <p className="text-2xl font-bold text-gray-900">{formatNumber(data.shippingStats.totalLabels)}</p>
-                    <p className="text-xs text-gray-600">Toplam Etiket</p>
+                    <p className="text-xs text-gray-600">{t('totalLabels')}</p>
                   </div>
                   <div className="bg-amber-50 rounded-lg p-4 text-center">
                     <Clock className="h-6 w-6 text-amber-600 mx-auto mb-1" />
                     <p className="text-2xl font-bold text-gray-900">{formatNumber(data.shippingStats.pendingLabels)}</p>
-                    <p className="text-xs text-gray-600">Bekleyen Etiket</p>
+                    <p className="text-xs text-gray-600">{t('pendingLabels')}</p>
                   </div>
                 </div>
 
                 {data.shippingStats.byCarrier && data.shippingStats.byCarrier.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">Tasiyiciya Gore</p>
+                    <p className="text-sm font-medium text-gray-700 mb-2">{t('byCarrier')}</p>
                     <div className="space-y-2">
                       {data.shippingStats.byCarrier.map((c, i) => {
                         const maxCount = Math.max(...data.shippingStats!.byCarrier.map((x) => x.count), 1);
@@ -1022,7 +1027,7 @@ export default function AnalyticsPage() {
                 )}
               </div>
             ) : (
-              <EmptyState message="Kargo verisi yok" />
+              <EmptyState message={t('noShippingData')} />
             )}
           </SectionCard>
 
@@ -1030,7 +1035,7 @@ export default function AnalyticsPage() {
           <SectionCard>
             <div className="flex items-center gap-2 mb-4">
               <Activity className="h-5 w-5 text-gray-600" />
-              <SectionTitle>Son Aktivite</SectionTitle>
+              <SectionTitle>{t('recentActivity')}</SectionTitle>
             </div>
             {data?.recentActivity && data.recentActivity.length > 0 ? (
               <div className="space-y-2 max-h-[380px] overflow-y-auto">
@@ -1048,7 +1053,7 @@ export default function AnalyticsPage() {
                     <StatusBadge status={item.externalStatus} />
                     <span className="text-xs text-gray-400">
                       {item.uiOrderDate
-                        ? new Date(item.uiOrderDate).toLocaleDateString('tr-TR', {
+                        ? formatDate(new Date(item.uiOrderDate), {
                             day: 'numeric',
                             month: 'short',
                           })
@@ -1058,7 +1063,7 @@ export default function AnalyticsPage() {
                 ))}
               </div>
             ) : (
-              <EmptyState message="Henuz aktivite yok" />
+              <EmptyState message={t('noActivityYet')} />
             )}
           </SectionCard>
         </div>

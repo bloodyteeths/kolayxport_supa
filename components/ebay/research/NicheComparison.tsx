@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Box, Typography, TextField, Button, Paper, Chip, Autocomplete,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -114,7 +115,7 @@ const METRICS: MetricDef[] = [
   { key: 'medianPrice', label: 'Medyan Fiyat', format: v => `$${v.toFixed(2)}`, higherIsBetter: true, isScore: false },
   { key: 'demandScore', label: 'Talep Skoru', format: v => String(v), higherIsBetter: true, isScore: true },
   { key: 'competitionScore', label: 'Rekabet Skoru', format: v => String(v), higherIsBetter: false, isScore: true },
-  { key: 'opportunityScore', label: 'Firsat Skoru', format: v => String(v), higherIsBetter: true, isScore: true },
+  { key: 'opportunityScore', label: 'opportunityScore', format: v => String(v), higherIsBetter: true, isScore: true },
   { key: 'uniqueSellers', label: 'Benzersiz Satici', format: v => v.toLocaleString(), higherIsBetter: false, isScore: false },
   { key: 'freeShippingPct', label: 'Ucretsiz Kargo %', format: v => `%${v.toFixed(1)}`, higherIsBetter: true, isScore: false },
   { key: 'sellerConcentration', label: 'Satici Yogunlugu', format: v => `%${v.toFixed(1)}`, higherIsBetter: false, isScore: false },
@@ -152,6 +153,7 @@ function savedNicheToData(n: SavedNiche): NicheData {
 }
 
 export default function NicheComparison({ userId, onNavigate }: NicheComparisonProps) {
+  const t = useTranslations('ebay.nicheComparison');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -293,7 +295,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                   Nis {index + 1}
                 </Typography>
                 {slot.data && (
-                  <ScoreBadge score={slot.data.opportunityScore} label="Firsat Skoru" />
+                  <ScoreBadge score={slot.data.opportunityScore} label={t('opportunityScore')} />
                 )}
                 {slots.length > 2 && (
                   <IconButton size="small" onClick={() => removeSlot(index)} sx={{ ml: 'auto' }}>
@@ -326,8 +328,8 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      placeholder="ör: wireless earbuds, baby monitor"
-                      helperText="Karşılaştırmak istediğiniz nişi girin veya kayıtlı nişlerden seçin"
+                      placeholder={t('placeholder')}
+                      helperText={t('helperText')}
                       onKeyDown={e => {
                         if (e.key === 'Enter' && slot.keyword.trim()) {
                           e.preventDefault();
@@ -530,12 +532,17 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                 <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e1b4b' }}>
                   En Iyi Nis: {bestNiche.data.query}
                 </Typography>
-                <ScoreBadge score={bestNiche.data.opportunityScore} label="Firsat Skoru" />
+                <ScoreBadge score={bestNiche.data.opportunityScore} label={t('opportunityScore')} />
               </Box>
               <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-                {bestNiche.data.opportunityLabel || (
-                  `${bestNiche.data.query} nisi ${bestNiche.data.demandScore >= 50 ? 'yuksek' : 'orta'} talep (${bestNiche.data.demandScore}) ve ${bestNiche.data.competitionScore < 50 ? 'dusuk' : 'orta'} rekabet (${bestNiche.data.competitionScore}) ile en iyi firsati sunuyor. Ortalama fiyat $${bestNiche.data.avgPrice.toFixed(2)}.`
-                )}
+                {bestNiche.data.opportunityLabel || t('verdictFallback', {
+                  query: bestNiche.data.query,
+                  demandLevel: bestNiche.data.demandScore >= 50 ? t('highDemand') : t('medDemand'),
+                  demandScore: bestNiche.data.demandScore,
+                  competitionLevel: bestNiche.data.competitionScore < 50 ? t('lowCompetition') : t('medCompetition'),
+                  competitionScore: bestNiche.data.competitionScore,
+                  avgPrice: bestNiche.data.avgPrice.toFixed(2),
+                })}
               </Typography>
 
               {/* Cross-tool buttons for each niche */}
@@ -576,13 +583,13 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
       {/* Tips — show when less than 2 niches have data */}
       {!canCompare && !anyLoading && (
         <Paper sx={{ p: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
-          <Typography variant="subtitle2" fontWeight={700} gutterBottom>Nis Karsilastirma Nasil Kullanilir?</Typography>
+          <Typography variant="subtitle2" fontWeight={700} gutterBottom>{t('howToUseTitle')}</Typography>
           <Typography variant="body2" color="text.secondary" component="div">
             <ul style={{ margin: 0, paddingLeft: 16 }}>
-              <li>En az 2 nis anahtar kelime girin (or: &quot;wireless earbuds&quot; vs &quot;bluetooth speaker&quot;)</li>
-              <li>Talep, rekabet, firsat skoru ve fiyat araliklarini yan yana karsilastirin</li>
-              <li>Kazanan nis yesil ile vurgulanir — en dusuk rekabet + en yuksek talep</li>
-              <li>Kaydedilmis nislerinizi de karsilastirmaya ekleyebilirsiniz</li>
+              <li>{t('tip1')}</li>
+              <li>{t('tip2')}</li>
+              <li>{t('tip3')}</li>
+              <li>{t('tip4')}</li>
             </ul>
           </Typography>
         </Paper>

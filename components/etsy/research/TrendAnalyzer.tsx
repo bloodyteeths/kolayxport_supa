@@ -6,10 +6,12 @@ import { useTheme } from '@mui/material/styles';
 import { TrendingUp, BarChart2, Calendar, Activity, Lightbulb, Flame } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
+import { useTranslations } from 'next-intl';
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
 import { StatCard, TrendChart, GradientBar, PremiumEmptyState, GRADIENTS, glassCard } from './shared/ui';
 
 export default function TrendAnalyzer() {
+  const t = useTranslations('etsy.trendAnalyzer');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const {
@@ -35,21 +37,21 @@ export default function TrendAnalyzer() {
           }}>
             <Activity size={18} color="#fff" />
           </Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Trend Analizi</Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{t('title')}</Typography>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Google Trends + Wikipedia verileri ile arama trendleri ve mevsimsel analiz
+          {t('description')}
         </Typography>
         <Button variant="contained" onClick={fetchTrends}
           disabled={trendLoading || (!query.trim() && !kwExplorerQuery.trim())} size="large"
           startIcon={trendLoading ? <CircularProgress size={16} /> : <TrendingUp size={16} />}
           sx={{ background: GRADIENTS.success, borderRadius: '12px', px: 4, boxShadow: '0 4px 12px rgba(17,153,142,0.3)', ...(isMobile && { width: '100%' }) }}
         >
-          {trendLoading ? 'Analiz ediliyor...' : 'Trend Analizi Baslat'}
+          {trendLoading ? t('analyzing') : t('startAnalysis')}
         </Button>
         {!query.trim() && !kwExplorerQuery.trim() && (
           <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-            Önce "Kelime Keşif" sekmesinde bir anahtar kelime arayın
+            {t('searchFirstTip')}
           </Typography>
         )}
       </Paper>
@@ -60,15 +62,15 @@ export default function TrendAnalyzer() {
         <>
           {/* Trend summary cards */}
           <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 1.5, mb: 2 }}>
-            <StatCard label="Ort. Ilgi" value={String(trendData.averageInterest)} color="#2196F3"
+            <StatCard label={t('avgInterest')} value={String(trendData.averageInterest)} color="#2196F3"
               icon={<BarChart2 size={18} />} />
-            <StatCard label="Zirve Degeri" value={String(trendData.peakValue)} color="#4caf50"
+            <StatCard label={t('peakValue')} value={String(trendData.peakValue)} color="#4caf50"
               icon={<TrendingUp size={18} />} />
-            <StatCard label="Zirve Tarihi" value={trendData.peakDate || '-'} color="#ff9800"
+            <StatCard label={t('peakDate')} value={trendData.peakDate || '-'} color="#ff9800"
               icon={<Calendar size={18} />} />
-            <StatCard label="Yon" value={
-              trendData.trendDirection === 'rising' ? 'Yukselis' :
-              trendData.trendDirection === 'declining' ? 'Dusus' : 'Stabil'
+            <StatCard label={t('direction')} value={
+              trendData.trendDirection === 'rising' ? t('rising') :
+              trendData.trendDirection === 'declining' ? t('declining') : t('stable')
             } color={
               trendData.trendDirection === 'rising' ? '#4caf50' :
               trendData.trendDirection === 'declining' ? '#f44336' : '#ff9800'
@@ -81,7 +83,7 @@ export default function TrendAnalyzer() {
           {trendData.timeline.length > 0 && (
             <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-                12 Aylik Google Trends (Alisveris Kategorisi)
+                {t('monthlyTrend')}
               </Typography>
               <TrendChart data={trendData.timeline} />
             </Paper>
@@ -92,13 +94,13 @@ export default function TrendAnalyzer() {
             {trendData.risingQueries.length > 0 && (
               <Paper sx={{ ...glassCard, p: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#4caf50' }}>
-                  Yukselen Aramalar
+                  {t('risingQueries')}
                 </Typography>
                 {trendData.risingQueries.map(q => (
                   <Box key={q.query} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, alignItems: 'center' }}>
                     <Typography variant="body2" sx={{
                       cursor: 'pointer', '&:hover': { color: 'primary.main' },
-                    }} onClick={() => { setQuery(q.query); toast.success(`"${q.query}" arama alanina eklendi`); }}>
+                    }} onClick={() => { setQuery(q.query); toast.success(t('addedToSearch', { query: q.query })); }}>
                       {q.query}
                     </Typography>
                     <Chip label={q.value} size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 600 }} />
@@ -110,13 +112,13 @@ export default function TrendAnalyzer() {
             {trendData.topQueries.length > 0 && (
               <Paper sx={{ ...glassCard, p: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#2196F3' }}>
-                  En Populer Iliskili Aramalar
+                  {t('topRelatedQueries')}
                 </Typography>
                 {trendData.topQueries.map(q => (
                   <Box key={q.query} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, alignItems: 'center' }}>
                     <Typography variant="body2" sx={{
                       cursor: 'pointer', '&:hover': { color: 'primary.main' },
-                    }} onClick={() => { setQuery(q.query); toast.success(`"${q.query}" arama alanina eklendi`); }}>
+                    }} onClick={() => { setQuery(q.query); toast.success(t('addedToSearch', { query: q.query })); }}>
                       {q.query}
                     </Typography>
                     <GradientBar value={q.value} max={100} height={6} />
@@ -132,11 +134,11 @@ export default function TrendAnalyzer() {
       {seasonalData && seasonalData.hasData && (
         <Paper sx={{ ...glassCard, p: 2.5 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-            Mevsimsel Takvim
+            {t('seasonalCalendar')}
           </Typography>
           {seasonalData.peakMonth && (
             <Alert severity="success" sx={{ mb: 2, borderRadius: '12px' }}>
-              Zirve ay: <strong>{seasonalData.peakMonth}</strong> | Dusuk ay: <strong>{seasonalData.lowMonth}</strong>
+              {t('peakMonth')}: <strong>{seasonalData.peakMonth}</strong> | {t('lowMonth')}: <strong>{seasonalData.lowMonth}</strong>
             </Alert>
           )}
           <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(4, 1fr)' : 'repeat(auto-fill, minmax(70px, 1fr))', gap: isMobile ? 0.5 : 1 }}>
@@ -181,15 +183,15 @@ export default function TrendAnalyzer() {
           {discoveryData?.trendingNiches?.length > 0 && (
             <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Flame size={16} color="#f44336" /> Suggested Trend Searches
+                <Flame size={16} color="#f44336" /> {t('suggestedTrendSearches')}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                Click a niche to set it as search query, then run Trend Analysis
+                {t('clickNicheToSearch')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 {discoveryData.trendingNiches.map((niche: any) => (
                   <Chip key={niche.query} label={niche.query} variant="outlined"
-                    onClick={() => { setQuery(niche.query); toast.success(`"${niche.query}" arama alanina eklendi`); }}
+                    onClick={() => { setQuery(niche.query); toast.success(t('addedToSearch', { query: niche.query })); }}
                     sx={{
                       cursor: 'pointer', borderRadius: '10px', fontWeight: 600, textTransform: 'capitalize',
                       '&:hover': { bgcolor: 'rgba(17,153,142,0.08)', borderColor: '#11998e' },
@@ -203,7 +205,7 @@ export default function TrendAnalyzer() {
           {discoveryData?.seasonalTips?.length > 0 && (
             <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Lightbulb size={16} color="#ff9800" /> Seasonal Tips
+                <Lightbulb size={16} color="#ff9800" /> {t('seasonalTips')}
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
                 {discoveryData.seasonalTips.map((tip: string, i: number) => (
@@ -219,9 +221,9 @@ export default function TrendAnalyzer() {
           {!discoveryLoading && !discoveryData && (
             <PremiumEmptyState
               icon={<Activity size={48} />}
-              title="Trend Analizi"
-              desc="Ürün kategoriniz yılın hangi aylarında popüler? Ne zaman stok yapmalısınız?"
-              steps={['Önce "Pazar Araştırma" bölümünde bir anahtar kelime arayın', 'Bu sekmeye gelin ve "Trend Analizi Başlat" butonuna tıklayın', 'Mevsimsel takvim ve yükselen aramaları görün']}
+              title={t('title')}
+              desc={t('emptyDesc')}
+              steps={[t('emptyStep1'), t('emptyStep2'), t('emptyStep3')]}
             />
           )}
         </>

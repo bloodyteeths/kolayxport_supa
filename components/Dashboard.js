@@ -8,8 +8,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useState, useEffect } from "react";
 import OrdersTable from "@/components/OrdersTable";
 import SettingsForm from '@/components/SettingsForm';
+import { useTranslations } from 'next-intl';
 
 export default function Dashboard() {
+  const t = useTranslations('dashboard');
   // Script metinleri
   const [v2Script, setV2Script] = useState('');
   const [labelScript, setLabelScript] = useState('');
@@ -20,14 +22,13 @@ export default function Dashboard() {
     if (savedV2) setV2Script(savedV2);
     if (savedLabel) setLabelScript(savedLabel);
   }, []);
-  
+
   // Handler to save scripts to localStorage
   const handleSaveScripts = () => {
     localStorage.setItem('v2Script', v2Script);
     localStorage.setItem('labelScript', labelScript);
-    alert('Local script backups saved successfully');
+    alert(t('backupsSaved'));
   };
-  // Entegrasyon sayıları
   const [marketplaces, setMarketplaces] = useState(1);
   const [carriers, setCarriers] = useState(1);
   const [integrations, setIntegrations] = useState(1);
@@ -35,23 +36,23 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto py-10 px-6 grid gap-6">
-        <h1 className="text-3xl font-semibold text-gray-900">Sipariş Otomasyon Paneli</h1>
+        <h1 className="text-3xl font-semibold text-gray-900">{t('legacyTitle')}</h1>
         <Tabs defaultValue="ayarlar">
           <TabsList>
-            <TabsTrigger value="ayarlar" className="uppercase text-xs tracking-wide">Ayarlar</TabsTrigger>
-            <TabsTrigger value="entegrasyon" className="uppercase text-xs tracking-wide">Entegrasyonlar</TabsTrigger>
-            <TabsTrigger value="senkron" className="uppercase text-xs tracking-wide">Senkron</TabsTrigger>
-            <TabsTrigger value="abonelik" className="uppercase text-xs tracking-wide">Abonelik</TabsTrigger>
+            <TabsTrigger value="ayarlar" className="uppercase text-xs tracking-wide">{t('settingsTab')}</TabsTrigger>
+            <TabsTrigger value="entegrasyon" className="uppercase text-xs tracking-wide">{t('integrationsTab')}</TabsTrigger>
+            <TabsTrigger value="senkron" className="uppercase text-xs tracking-wide">{t('syncTab')}</TabsTrigger>
+            <TabsTrigger value="abonelik" className="uppercase text-xs tracking-wide">{t('subscriptionTab')}</TabsTrigger>
           </TabsList>
           <TabsContent value="ayarlar" className="space-y-6">
             <SettingsForm />
             <Card>
               <CardContent className="grid gap-4 pt-6">
-                <h3 className="text-lg font-medium">Script Yedekleri (Local Storage)</h3>
-                <p className="text-sm text-muted-foreground">Bu bölüm script kodlarınızı tarayıcınızın yerel depolamasına yedeklemenizi sağlar. API anahtarlarınız Google Apps Script özelliklerinde saklanır.</p>
-                <Textarea aria-label="syncOrdersToSheet Script Backup" placeholder="syncOrdersToSheet script kodunu buraya yapıştırın (yerel yedekleme için)" value={v2Script} onChange={e => setV2Script(e.target.value)} rows={6} />
-                <Textarea aria-label="Label Script Backup" placeholder="Etiket script kodunu buraya yapıştırın (yerel yedekleme için)" value={labelScript} onChange={e => setLabelScript(e.target.value)} rows={6} />
-                <Button onClick={handleSaveScripts} variant="outline">Yerel Yedekleri Kaydet</Button>
+                <h3 className="text-lg font-medium">{t('scriptBackups')}</h3>
+                <p className="text-sm text-muted-foreground">{t('scriptBackupsDesc')}</p>
+                <Textarea aria-label="syncOrdersToSheet Script Backup" placeholder={t('syncScriptPlaceholder')} value={v2Script} onChange={e => setV2Script(e.target.value)} rows={6} />
+                <Textarea aria-label="Label Script Backup" placeholder={t('labelScriptPlaceholder')} value={labelScript} onChange={e => setLabelScript(e.target.value)} rows={6} />
+                <Button onClick={handleSaveScripts} variant="outline">{t('saveLocalBackups')}</Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -59,18 +60,18 @@ export default function Dashboard() {
             <Card>
               <CardContent className="grid gap-6">
                 <div className="grid gap-2">
-                  <label>Aktif Pazaryeri Sayısı</label>
+                  <label>{t('activeMarketplaces')}</label>
                   <Input type="number" value={marketplaces} onChange={e => setMarketplaces(e.target.value)} />
                 </div>
                 <div className="grid gap-2">
-                  <label>Kargo Entegrasyonu Sayısı</label>
+                  <label>{t('shippingIntegrations')}</label>
                   <Input type="number" value={carriers} onChange={e => setCarriers(e.target.value)} />
                 </div>
                 <div className="grid gap-2">
-                  <label>Script Bağlantı Adedi</label>
+                  <label>{t('scriptConnections')}</label>
                   <Input type="number" value={integrations} onChange={e => setIntegrations(e.target.value)} />
                 </div>
-                <Button>Entegrasyonları Kaydet</Button>
+                <Button>{t('saveIntegrations')}</Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -80,13 +81,13 @@ export default function Dashboard() {
           <TabsContent value="abonelik">
             <Card>
               <CardContent className="grid gap-6">
-                <p>1 aylık ücretsiz deneme başladı. Paket seçin ve iyzico ile ödeyin:</p>
+                <p>{t('trialStarted')}</p>
                 <ul className="list-disc list-inside text-sm">
-                  <li>Temel: 1 pazaryeri + 1 kargo – ₺149/ay</li>
-                  <li>Gelişmiş: 3 pazaryeri + 2 kargo – ₺299/ay</li>
-                  <li>Profesyonel: Sınırsız – ₺499/ay</li>
+                  <li>{t('basicPlan')} – &#8378;149/ay</li>
+                  <li>{t('advancedPlan')} – &#8378;299/ay</li>
+                  <li>{t('proPlan')} – &#8378;499/ay</li>
                 </ul>
-                <Button>iyzico ile Öde</Button>
+                <Button>{t('payWithIyzico')}</Button>
               </CardContent>
             </Card>
           </TabsContent>

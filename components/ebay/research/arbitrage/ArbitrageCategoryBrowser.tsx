@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useTranslations } from 'next-intl';
 import { TRENDYOL_CATEGORIES } from '../../../../lib/integrations/trendyolSearch';
 import { CATEGORY_GROUPS } from './arbitrageConstants';
 import { useArbitrageStore } from './useArbitrageStore';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default function ArbitrageCategoryBrowser({ open, onClose, onScan }: Props) {
+  const ta = useTranslations('ebay.research.arbitrage');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { selectedCategories, setSelectedCategories, toggleCategory } = useArbitrageStore();
@@ -25,7 +27,7 @@ export default function ArbitrageCategoryBrowser({ open, onClose, onScan }: Prop
   const categoriesByGroup = useMemo(() => {
     const groups = new Map<string, typeof TRENDYOL_CATEGORIES>();
     for (const cat of TRENDYOL_CATEGORIES) {
-      const group = (cat as any).group || 'Diğer';
+      const group = (cat as any).group || 'Other';
       if (!groups.has(group)) groups.set(group, []);
       groups.get(group)!.push(cat);
     }
@@ -81,10 +83,10 @@ export default function ArbitrageCategoryBrowser({ open, onClose, onScan }: Prop
       <DialogTitle sx={{ pb: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6" sx={{ fontSize: '1rem' }}>
-            Kategori Seç
+            {ta('selectCategory')}
           </Typography>
           <Badge badgeContent={selectedCategories.length} color="primary">
-            <Chip label="Seçili" size="small" variant="outlined" />
+            <Chip label={ta('selected')} size="small" variant="outlined" />
           </Badge>
         </Box>
       </DialogTitle>
@@ -94,7 +96,7 @@ export default function ArbitrageCategoryBrowser({ open, onClose, onScan }: Prop
         <TextField
           size="small"
           fullWidth
-          placeholder="Kategori ara... (TR/EN)"
+          placeholder={ta('searchCategories')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ mb: 1.5 }}
@@ -105,15 +107,15 @@ export default function ArbitrageCategoryBrowser({ open, onClose, onScan }: Prop
 
         {/* Quick actions */}
         <Box sx={{ display: 'flex', gap: 0.75, mb: 1.5, flexWrap: 'wrap' }}>
-          <Chip label="Tümünü Seç" size="small" variant="outlined" onClick={selectAll} />
-          <Chip label="Temizle" size="small" variant="outlined" onClick={clearAll} />
+          <Chip label={ta('selectAll')} size="small" variant="outlined" onClick={selectAll} />
+          <Chip label={ta('clear')} size="small" variant="outlined" onClick={clearAll} />
           {CATEGORY_GROUPS.map(g => {
             const groupCats = categoriesByGroup.get(g.key) || [];
             const groupCount = groupCats.filter(c => selectedCategories.includes(c.slug)).length;
             return (
               <Chip
                 key={g.key}
-                label={`${g.icon} ${g.label} (${groupCount}/${groupCats.length})`}
+                label={`${g.icon} ${ta(g.label)} (${groupCount}/${groupCats.length})`}
                 size="small"
                 variant={groupCount === groupCats.length ? 'filled' : 'outlined'}
                 onClick={() => selectGroup(g.key)}
@@ -166,14 +168,14 @@ export default function ArbitrageCategoryBrowser({ open, onClose, onScan }: Prop
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 1.5 }}>
-        <Button variant="text" onClick={onClose}>İptal</Button>
+        <Button variant="text" onClick={onClose}>{ta('cancel')}</Button>
         <Button
           variant="contained"
           disabled={selectedCategories.length === 0}
           onClick={() => { onScan(selectedCategories); onClose(); }}
           sx={{ fontWeight: 700 }}
         >
-          {selectedCategories.length} Kategori Tara
+          {ta('scanCategories', { count: selectedCategories.length })}
         </Button>
       </DialogActions>
     </Dialog>

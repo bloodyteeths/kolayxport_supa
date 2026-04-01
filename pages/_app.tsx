@@ -14,6 +14,10 @@ import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
 import Head from 'next/head';
+import { NextIntlClientProvider } from 'next-intl';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
+import trMessages from '@/messages/tr.json';
+import enMessages from '@/messages/en.json';
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
@@ -23,8 +27,11 @@ type AppPropsWithLayout = AppProps & {
   Component: NextPageWithLayout;
 };
 
+const messages = { tr: trMessages, en: enMessages } as const;
+
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
+  const locale = useLocaleStore((s) => s.locale);
 
   useEffect(() => {
     const { session_id } = router.query;
@@ -36,6 +43,7 @@ function MyApp({ Component, pageProps }: AppProps) {
 
   return (
     <AuthProvider>
+      <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Head>
@@ -91,6 +99,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         <Component {...pageProps} />
         <Toaster position="top-center" />
       </ThemeProvider>
+      </NextIntlClientProvider>
     </AuthProvider>
   );
 }

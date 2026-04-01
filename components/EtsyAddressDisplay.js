@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { Chip, Tooltip, IconButton, Dialog, DialogTitle, DialogContent, Typography, Box } from '@mui/material';
 import { Info, MapPin, Store } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 const EtsyAddressDisplay = ({ order, etsyAddress }) => {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const t = useTranslations('etsyAddress');
+  const { formatDateTime } = useLocale();
 
   // If no Etsy address data, show nothing
   if (!etsyAddress) {
@@ -15,7 +19,7 @@ const EtsyAddressDisplay = ({ order, etsyAddress }) => {
   // Format address for display
   const formatAddress = (addr) => {
     if (!addr || typeof addr !== 'object') return '';
-    
+
     const parts = [
       addr.line1,
       addr.line2,
@@ -23,37 +27,45 @@ const EtsyAddressDisplay = ({ order, etsyAddress }) => {
       addr.state,
       addr.postalCode
     ].filter(Boolean);
-    
+
     return parts.join(', ');
   };
 
   const fullAddress = formatAddress(shippingAddress);
-  
+
   return (
     <>
       {/* Compact display with chip */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Chip
           icon={<MapPin size={14} />}
-          label="Etsy Adres"
+          label={t('etsyAddressChip')}
           color="success"
           variant="outlined"
           size="small"
           sx={{ fontSize: '11px' }}
         />
-        
+
         {etsyStoreName && (
           <Chip
             icon={<Store size={14} />}
             label={etsyStoreName}
             color="info"
-            variant="outlined" 
+            variant="outlined"
             size="small"
             sx={{ fontSize: '11px' }}
           />
         )}
-        
-        <Tooltip title="Detayları görüntüle">\n          <IconButton \n            size="small" \n            onClick={() => setDialogOpen(true)}\n            sx={{ p: 0.5 }}\n          >\n            <Info size={16} />\n          </IconButton>\n        </Tooltip>
+
+        <Tooltip title={t('viewDetails')}>
+          <IconButton
+            size="small"
+            onClick={() => setDialogOpen(true)}
+            sx={{ p: 0.5 }}
+          >
+            <Info size={16} />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {/* Detailed dialog */}
@@ -61,7 +73,7 @@ const EtsyAddressDisplay = ({ order, etsyAddress }) => {
         <DialogTitle sx={{ pb: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <MapPin size={20} />
-            Etsy Adres Bilgileri
+            {t('addressDialogTitle')}
           </Box>
         </DialogTitle>
         <DialogContent>
@@ -69,11 +81,11 @@ const EtsyAddressDisplay = ({ order, etsyAddress }) => {
             {/* Order info */}
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" color="text.secondary">
-                Sipariş No: {order.orderNumber || 'N/A'}
+                {t('orderNo')}: {order.orderNumber || 'N/A'}
               </Typography>
               {etsyStoreName && (
                 <Typography variant="subtitle2" color="text.secondary">
-                  Mağaza: {etsyStoreName} {etsyStoreId && `(ID: ${etsyStoreId})`}
+                  {t('store')}: {etsyStoreName} {etsyStoreId && `(ID: ${etsyStoreId})`}
                 </Typography>
               )}
             </Box>
@@ -82,7 +94,7 @@ const EtsyAddressDisplay = ({ order, etsyAddress }) => {
             {shippingAddress && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                  📦 Teslimat Adresi
+                  {t('deliveryAddress')}
                 </Typography>
                 <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
                   {shippingAddress.name && (
@@ -100,11 +112,11 @@ const EtsyAddressDisplay = ({ order, etsyAddress }) => {
             {notes && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                  📝 Notlar
+                  {t('notes')}
                 </Typography>
-                <Typography variant="body2" sx={{ 
-                  backgroundColor: '#f5f5f5', 
-                  p: 1, 
+                <Typography variant="body2" sx={{
+                  backgroundColor: '#f5f5f5',
+                  p: 1,
                   borderRadius: 1,
                   fontStyle: 'italic'
                 }}>
@@ -120,9 +132,9 @@ const EtsyAddressDisplay = ({ order, etsyAddress }) => {
               borderTop: '1px solid #e0e0e0'
             }}>
               <Typography variant="caption" color="text.secondary">
-                ✅ Chrome uzantısı ile senkronize edildi
+                {t('syncedViaExtension')}
                 <br />
-                Son güncelleme: {new Date(etsyAddress.updatedAt).toLocaleString('tr-TR')}
+                {t('lastUpdate')}: {formatDateTime(etsyAddress.updatedAt)}
               </Typography>
             </Box>
           </Box>

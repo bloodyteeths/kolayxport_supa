@@ -4,6 +4,7 @@ import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
 import { HelpCircle, Settings, ExternalLink, Link as LinkIcon, ListChecks } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 const GuideSection = ({ title, icon: Icon, children, id }) => (
   <motion.section
@@ -36,8 +37,10 @@ const Step = ({ number, title, children }) => (
 );
 
 export default function HowToUsePage() {
+  const t = useTranslations('howToUse');
+
   return (
-    <AppLayout title="KolayXport Nasıl Kullanılır?">
+    <AppLayout title={t('title')}>
       <NextSeo noindex={true} nofollow={true} />
 
       <motion.div
@@ -49,70 +52,70 @@ export default function HowToUsePage() {
         <div className="bg-white p-6 rounded-lg shadow">
           <h1 className="text-3xl font-bold text-slate-800 flex items-center">
             <HelpCircle size={36} className="mr-3 text-blue-600" />
-            KolayXport Nasıl Kullanılır?
+            {t('title')}
           </h1>
           <p className="mt-2 text-slate-600">
-            Bu rehber, KolayXport'u etkili bir şekilde kullanmanıza ve e-ticaret süreçlerinizi otomatikleştirmenize yardımcı olmak için hazırlanmıştır.
+            {t('description')}
           </p>
         </div>
       </motion.div>
 
-      <GuideSection title="Veeqo Hesabınızı Bağlama" icon={LinkIcon} id="connect-veeqo">
+      <GuideSection title={t('veeqoTitle')} icon={LinkIcon} id="connect-veeqo">
         <p className="mb-4">
-          Veeqo hesabınızdaki sipariş ve ürün verilerinizi KolayXport'a aktarmak için aşağıdaki adımları izleyin. Başlamadan önce Veeqo API anahtarınızın hazır olduğundan emin olun.
+          {t('veeqoIntro')}
         </p>
-        <Step number="1" title="Veeqo API Anahtarınızı Edinin">
-          <p>Veeqo hesabınıza giriş yapın. API anahtarınızı genellikle Veeqo'nun ayarlar veya entegrasyonlar bölümünde bulabilirsiniz.</p>
-          <p className="mt-1 text-sm text-slate-500">Veeqo arayüzü zamanla değişebilir. En güncel bilgi için Veeqo'nun kendi yardım dokümanlarına başvurmanız önerilir.</p>
+        <Step number="1" title={t('veeqoStep1Title')}>
+          <p>{t('veeqoStep1Desc')}</p>
+          <p className="mt-1 text-sm text-slate-500">{t('veeqoStep1Note')}</p>
         </Step>
-        <Step number="2" title="KolayXport Ayarlar Sayfasına Gidin">
-          <p>KolayXport uygulamasında, sol menüden veya profilinizden <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> sayfasına gidin.</p>
+        <Step number="2" title={t('veeqoStep2Title')}>
+          <p>{t('veeqoStep2Desc')}</p>
         </Step>
-        <Step number="3" title="Veeqo API Bilgilerini Girin">
-          <p>Ayarlar sayfasındaki "Veeqo API Bilgileri" bölümünü bulun. İlgili alana Veeqo API Anahtarınızı girin.</p>
+        <Step number="3" title={t('veeqoStep3Title')}>
+          <p>{t('veeqoStep3Desc')}</p>
           <p className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-            <Settings size={16} className="inline mr-1" /> API anahtarınızı girerken kopyala-yapıştır yöntemini kullanmanız, olası yazım hatalarını engelleyecektir.
+            <Settings size={16} className="inline mr-1" /> {t('veeqoStep3Note')}
           </p>
         </Step>
-        <Step number="4" title="Ayarları Kaydedin ve Senkronizasyonu Bekleyin">
-          <p>"Veeqo Ayarlarını Kaydet" butonuna tıklayın. Bağlantı başarılı olduğunda, Veeqo verileriniz KolayXport ile senkronize olmaya başlayacaktır. Bu işlem veri miktarına bağlı olarak biraz zaman alabilir.</p>
+        <Step number="4" title={t('veeqoStep4Title')}>
+          <p>{t('veeqoStep4Desc')}</p>
         </Step>
         <p className="mt-4 text-sm text-slate-500">
-          Sorun yaşarsanız, API anahtarınızın doğru olduğundan ve Veeqo hesabınızda API erişim izinlerinin aktif olduğundan emin olun. Gerekirse <Link href="/destek" className="text-blue-600 hover:underline">destek</Link> alın.
+          {t('veeqoWarning')}
         </p>
       </GuideSection>
 
-      <GuideSection title="Shippo Hesabınızı Bağlama" icon={LinkIcon} id="connect-shippo">
+      <GuideSection title={t('shippoTitle')} icon={LinkIcon} id="connect-shippo">
         <p className="mb-4">
-          Shippo hesabınızdaki gönderi ve sipariş verilerinizi (veya Shippo'nun entegre olduğu platformlardan gelen verileri) KolayXport'a aktarmak için aşağıdaki adımları izleyin. Başlamadan önce Shippo Özel API Token'ınızın (Private API Token) hazır olduğundan emin olun.
+          {t('shippoIntro')}
         </p>
-        <Step number="1" title="Shippo Özel API Token'ınızı Edinin">
-          <p>Shippo hesabınıza giriş yapın. Özel API Token'ınızı genellikle Shippo'nun API ayarları veya geliştirici bölümünde bulabilirsiniz.</p>
-          <p className="mt-1 text-sm text-slate-500">Shippo arayüzü zamanla değişebilir. En güncel bilgi için Shippo'nun kendi yardım dokümanlarına başvurmanız önerilir.</p>
+        <Step number="1" title={t('shippoStep1Title')}>
+          <p>{t('shippoStep1Desc')}</p>
+          <p className="mt-1 text-sm text-slate-500">{t('shippoStep1Note')}</p>
         </Step>
-        <Step number="2" title="KolayXport Ayarlar Sayfasına Gidin">
-          <p>KolayXport uygulamasında, sol menüden veya profilinizden <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> sayfasına gidin.</p>
+        <Step number="2" title={t('shippoStep2Title')}>
+          <p>{t('shippoStep2Desc')}</p>
         </Step>
-        <Step number="3" title="Shippo API Bilgilerini Girin">
-          <p>Ayarlar sayfasındaki "Shippo API Bilgileri" bölümünü bulun. İlgili alana Shippo Özel API Token'ınızı girin.</p>
+        <Step number="3" title={t('shippoStep3Title')}>
+          <p>{t('shippoStep3Desc')}</p>
           <p className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-            <Settings size={16} className="inline mr-1" /> API token'ınızı girerken kopyala-yapıştır yöntemini kullanmanız, olası yazım hatalarını engelleyecektir.
+            <Settings size={16} className="inline mr-1" /> {t('shippoStep3Note')}
           </p>
         </Step>
-        <Step number="4" title="Ayarları Kaydedin ve Senkronizasyonu Bekleyin">
-          <p>"Shippo Ayarlarını Kaydet" butonuna tıklayın. Bağlantı başarılı olduğunda, Shippo verileriniz KolayXport ile senkronize olmaya başlayacaktır.</p>
+        <Step number="4" title={t('shippoStep4Title')}>
+          <p>{t('shippoStep4Desc')}</p>
         </Step>
         <p className="mt-4 text-sm text-slate-500">
-          Sorun yaşarsanız, API token'ınızın doğru olduğundan ve Shippo hesabınızda gerekli izinlerin bulunduğundan emin olun. Gerekirse <Link href="/destek" className="text-blue-600 hover:underline">destek</Link> alın.
+          {t('shippoWarning')}
         </p>
       </GuideSection>
 
-      <GuideSection title="Diğer Rehberler (Yakında)" icon={ListChecks} id="other-guides">
+      <GuideSection title={t('otherGuidesTitle')} icon={ListChecks} id="other-guides">
         <p>
-          Trendyol ve Hepsiburada gibi doğrudan entegrasyonlarımızın kurulumu, FedEx ile kargo yönetimi, ürün ve sipariş yönetimi gibi KolayXport'un diğer özelliklerinin nasıl kullanılacağına dair detaylı rehberler yakında bu sayfada yer alacaktır.
+          {t('otherGuidesDesc')}
         </p>
         <p className="mt-2">
-          Trendyol entegrasyonu hakkında bilgi için <Link href="/app/entegrasyonlar-ve-rehberler#trendyol-guide" className="text-blue-600 hover:underline">Entegrasyonlar ve Rehberler sayfasındaki Trendyol bölümüne</Link> göz atabilirsiniz.
+          {t('trendyolLink')}
         </p>
       </GuideSection>
 
@@ -122,4 +125,4 @@ export default function HowToUsePage() {
 
 HowToUsePage.getLayout = function getLayout(page) {
   return <AppLayout>{page}</AppLayout>;
-}; 
+};

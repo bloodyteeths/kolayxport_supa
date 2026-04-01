@@ -249,14 +249,14 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 0 }}>
         <Box>
-          <Typography variant="subtitle1" fontWeight={700}>Fiyat Gecmisi</Typography>
+          <Typography variant="subtitle1" fontWeight={700}>{t('priceHistory')}</Typography>
           {title && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</Typography>}
         </Box>
         <IconButton size="small" onClick={onClose}><X size={18} /></IconButton>
       </DialogTitle>
       <DialogContent sx={{ bgcolor: '#fafbff' }}>
         <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-          <Chip label={`Son: $${latest.price.toFixed(2)}`} size="small" sx={{ bgcolor: '#6366f1', color: '#fff', fontWeight: 600 }} />
+          <Chip label={`${t('latest')}: $${latest.price.toFixed(2)}`} size="small" sx={{ bgcolor: '#6366f1', color: '#fff', fontWeight: 600 }} />
           <Chip label={`Min: $${min.toFixed(2)}`} size="small" variant="outlined" sx={{ borderColor: 'rgba(99,102,241,0.3)' }} />
           <Chip label={`Max: $${max.toFixed(2)}`} size="small" variant="outlined" sx={{ borderColor: 'rgba(99,102,241,0.3)' }} />
           <Chip
@@ -309,7 +309,7 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
         {/* Sold quantity trend if available */}
         {data.some(d => d.soldQuantity != null && d.soldQuantity > 0) && (
           <Box sx={{ mt: 2 }}>
-            <Typography variant="caption" fontWeight={700} color="text.secondary">Satis Trendi:</Typography>
+            <Typography variant="caption" fontWeight={700} color="text.secondary">{t('salesTrend')}:</Typography>
             <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: 40, mt: 0.5 }}>
               {data.map((s, i) => {
                 const maxSold = Math.max(...data.map(d => d.soldQuantity || 0), 1);
@@ -333,9 +333,10 @@ function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price:
 }
 
 function MiniPriceChart({ snapshots, title, expandable = true }: { snapshots: { price: number; soldQuantity?: number; timestamp: string }[]; title?: string; expandable?: boolean }) {
+  const t = useTranslations('ebayResearch');
   const { formatDate } = useLocale();
   const [expanded, setExpanded] = useState(false);
-  if (!snapshots || snapshots.length < 2) return <Typography variant="caption" color="text.secondary">Veri yok</Typography>;
+  if (!snapshots || snapshots.length < 2) return <Typography variant="caption" color="text.secondary">{t('noData')}</Typography>;
   const prices = snapshots.map(s => s.price);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
@@ -345,7 +346,7 @@ function MiniPriceChart({ snapshots, title, expandable = true }: { snapshots: { 
       <Box
         sx={{ display: 'flex', alignItems: 'flex-end', gap: '1px', height: 30, minWidth: 60, cursor: expandable ? 'pointer' : 'default', '&:hover': expandable ? { opacity: 0.8 } : {} }}
         onClick={() => expandable && setExpanded(true)}
-        title={expandable ? 'Tikla: Detayli grafik' : undefined}
+        title={expandable ? t('clickDetailedChart') : undefined}
       >
         {snapshots.slice(-30).map((s, i, arr) => (
           <Tooltip key={i} title={`$${s.price.toFixed(2)} - ${formatDate(s.timestamp)}`}>
@@ -413,10 +414,10 @@ function PriceStatsBar({ stats }: { stats: PriceStats | null }) {
   return (
     <Paper sx={{ p: 1.5, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #fafbff 0%, #f5f0ff 100%)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
       <Chip icon={<DollarSign size={14} />} label={`Min: $${stats.min.toFixed(2)}`} size="small" variant="outlined" />
-      <Chip icon={<BarChart2 size={14} />} label={`Ort: $${stats.avg.toFixed(2)}`} size="small" color="primary" variant="outlined" />
-      <Chip icon={<Target size={14} />} label={`Medyan: $${stats.median.toFixed(2)}`} size="small" variant="outlined" />
+      <Chip icon={<BarChart2 size={14} />} label={`${t('avg')}: $${stats.avg.toFixed(2)}`} size="small" color="primary" variant="outlined" />
+      <Chip icon={<Target size={14} />} label={`${t('median')}: $${stats.median.toFixed(2)}`} size="small" variant="outlined" />
       <Chip icon={<DollarSign size={14} />} label={`Max: $${stats.max.toFixed(2)}`} size="small" variant="outlined" />
-      <Chip icon={<Package size={14} />} label={`${stats.totalResults.toLocaleString()} sonu\u00e7`} size="small" color="secondary" />
+      <Chip icon={<Package size={14} />} label={`${stats.totalResults.toLocaleString()} ${t('results')}`} size="small" color="secondary" />
     </Paper>
   );
 }
@@ -452,11 +453,12 @@ function PriceChangeChip({ change }: { change: number }) {
 }
 
 function SoldBadge({ count }: { count: number }) {
+  const t = useTranslations('ebayResearch');
   const color = count > 10 ? '#10b981' : count > 0 ? '#f59e0b' : '#9e9e9e';
   const bg = count > 10 ? '#ecfdf5' : count > 0 ? '#fffbeb' : '#f5f5f5';
   return (
     <Chip
-      label={`${count} {t('sales')}`}
+      label={`${count} ${t('sales')}`}
       size="small"
       sx={{ bgcolor: bg, color, fontWeight: 600, fontSize: '0.75rem', boxShadow: count > 0 ? '0 1px 4px rgba(0,0,0,0.06)' : 'none' }}
     />
@@ -469,7 +471,7 @@ function SimpleHistogram({ data }: { data: { range: string; count: number }[] })
   return (
     <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.5, height: 100, mt: 1 }}>
       {data.map((d, i) => (
-        <Tooltip key={i} title={`${d.range}: ${d.count} ürün`}>
+        <Tooltip key={i} title={`${d.range}: ${d.count}`}>
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Box sx={{
               width: '100%', maxWidth: 40,
@@ -621,7 +623,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
 
   const handleSearch = useCallback(async (append = false) => {
     if (!filters.keyword.trim() && !filters.categoryId.trim()) {
-      toast.error('Anahtar kelime veya kategori ID girin');
+      toast.error(t('enterKeywordOrCategory'));
       return;
     }
     setLoading(true);
@@ -722,11 +724,11 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: isMobile ? 1 : 0 }}>
           <Typography variant="subtitle1" fontWeight={700} sx={{ color: '#1e1b4b' }}>
             <Search size={18} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
-            Ürün Arama
+            {t('productSearch')}
           </Typography>
           {isMobile && (
             <Button size="small" startIcon={<Filter size={14} />} onClick={() => setShowFilters(!showFilters)}>
-              Filtreler
+              {t('filters')}
             </Button>
           )}
         </Box>
@@ -735,7 +737,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         {userCategories.length > 0 && (
           <Box sx={{ mb: 2, mt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Senin Kategorilerin:
+              {t('yourCategories')}:
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {userCategories.slice(0, 8).map(cat => (
@@ -771,9 +773,9 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            label="Anahtar Kelime"
-            placeholder="or: wireless earbuds, bluetooth speaker, yoga mat"
-            helperText="Anahtar kelime veya eBay URL yapistirin — en az 2 karakter"
+            label={t('keyword')}
+            placeholder="e.g.: wireless earbuds, bluetooth speaker, yoga mat"
+            helperText={t('keywordHelperText')}
             value={filters.keyword}
             onChange={e => updateFilter('keyword', e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { setAutoLoaded(false); handleSearch(); } }}
@@ -784,7 +786,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
           />
           <TextField
             size="small"
-            label="Kategori ID"
+            label={t('categoryId')}
             value={filters.categoryId}
             onChange={e => updateFilter('categoryId', e.target.value)}
             sx={{ flex: '1 1 120px', maxWidth: 160 }}
@@ -797,11 +799,11 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             transition: 'all 0.2s ease',
             '&:hover': { background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', boxShadow: '0 4px 12px rgba(99,102,241,0.4)' },
           }}>
-            {loading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Ara'}
+            {loading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : t('searchBtn')}
           </Button>
           <Chip
             icon={<Lightbulb size={14} />}
-            label="Ipuclari"
+            label={t('tips')}
             size="small"
             variant={showTips ? 'filled' : 'outlined'}
             onClick={() => setShowTips(v => !v)}
@@ -821,13 +823,13 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         {/* Tips */}
         <Collapse in={showTips}>
           <Paper sx={{ p: 2, mt: 1.5, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Ipuclari</Typography>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>{t('tips')}</Typography>
             <Typography variant="body2" color="text.secondary" component="div">
               <ul style={{ margin: 0, paddingLeft: 16 }}>
-                <li>Genel kelimeler yerine spesifik urun adlari arayin (or: &quot;bluetooth earbuds&quot; yerine &quot;wireless earbuds bluetooth 5.3&quot;)</li>
-                <li>Fiyat araligi filtresini kullanarak karli urunleri bulun</li>
-                <li>Begediginiz urunleri &quot;Takip Et&quot; ile fiyat degisikliklerini izleyin</li>
-                <li>&quot;Nis Analizi&quot; butonu ile bir urun kategorisinin rekabet seviyesini ogrenin</li>
+                <li>{t('tip1')}</li>
+                <li>{t('tip2')}</li>
+                <li>{t('tip3')}</li>
+                <li>{t('tip4')}</li>
               </ul>
             </Typography>
           </Paper>
@@ -838,8 +840,8 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
           <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
             {/* Marketplace */}
             <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 130 } }}>
-              <InputLabel>Pazar Yeri</InputLabel>
-              <Select value={filters.marketplace} label="Pazar Yeri" onChange={e => updateFilter('marketplace', e.target.value)}>
+              <InputLabel>{t('marketplace')}</InputLabel>
+              <Select value={filters.marketplace} label={t('marketplace')} onChange={e => updateFilter('marketplace', e.target.value)}>
                 {MARKETPLACES_DATA.map(m => (
                   <MenuItem key={m.value} value={m.value}>{m.flag} {t(m.labelKey)}</MenuItem>
                 ))}
@@ -848,8 +850,8 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
 
             {/* Condition */}
             <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 120 } }}>
-              <InputLabel>Durum</InputLabel>
-              <Select value={filters.condition} label="Durum" onChange={e => updateFilter('condition', e.target.value)}>
+              <InputLabel>{t('condition')}</InputLabel>
+              <Select value={filters.condition} label={t('condition')} onChange={e => updateFilter('condition', e.target.value)}>
                 {CONDITIONS_DATA.map(c => (
                   <MenuItem key={c.value} value={c.value}>{t(c.labelKey)}</MenuItem>
                 ))}
@@ -869,7 +871,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             {/* Price Range */}
             <TextField
               size="small"
-              label="Min Fiyat"
+              label={t('minPrice')}
               type="number"
               value={filters.priceMin || ''}
               onChange={e => updateFilter('priceMin', Number(e.target.value))}
@@ -878,7 +880,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             />
             <TextField
               size="small"
-              label="Max Fiyat"
+              label={t('maxPrice')}
               type="number"
               value={filters.priceMax >= 10000 ? '' : filters.priceMax}
               onChange={e => updateFilter('priceMax', Number(e.target.value) || 10000)}
@@ -894,7 +896,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
         <Paper sx={{ p: 1.5, mb: 2, background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', display: 'flex', alignItems: 'center', gap: 1 }}>
           <TrendingUp size={16} color="#6366f1" />
           <Typography variant="body2" color="text.secondary">
-            Trend urunler gosteriliyor — kendi aramanizi yaparak baslayin
+            {t('trendingShown')}
           </Typography>
         </Paper>
       )}
@@ -912,7 +914,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
           boxShadow: '0 1px 8px rgba(99,102,241,0.06)',
         }}>
           <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: 'block', color: '#6366f1' }}>
-            Trend Kelimeler:
+            {t('trendingKeywords')}:
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             {topKeywords.slice(0, 15).map((kw, i) => (
@@ -952,7 +954,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
       {!searched && userListings.length > 0 ? (
         <Paper sx={{ p: 3, textAlign: 'center', background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)', boxShadow: '0 2px 16px rgba(0,0,0,0.04)' }}>
           <Typography variant="body1" fontWeight={600} sx={{ mb: 1 }}>
-            Aramaya başla veya kategorilerinden birini seç
+            {t('startSearchOrSelectCategory')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {userListings.length} {t('activeListingsHint')}
@@ -975,22 +977,22 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
           <Table size="small">
             <TableHead>
               <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                <TableCell sx={{ width: 60, fontWeight: 700, color: '#1e1b4b' }}>Resim</TableCell>
+                <TableCell sx={{ width: 60, fontWeight: 700, color: '#1e1b4b' }}>{t('image')}</TableCell>
                 <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('title')}</TableCell>
                 <TableCell align="right" sortDirection={productSort.sortKey === 'price' ? productSort.sortDir : false}>
                   <TableSortLabel active={productSort.sortKey === 'price'} direction={productSort.sortKey === 'price' ? productSort.sortDir : 'desc'} onClick={() => productSort.handleSort('price')}>
-                    Fiyat
+                    {t('price')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell align="center" sortDirection={productSort.sortKey === 'estimatedSold' ? productSort.sortDir : false}>
                   <TableSortLabel active={productSort.sortKey === 'estimatedSold'} direction={productSort.sortKey === 'estimatedSold' ? productSort.sortDir : 'desc'} onClick={() => productSort.handleSort('estimatedSold')}>
-                    Satış
+                    {t('sales')}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Durum</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('condition')}</TableCell>
                 <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('seller')}</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Kargo</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 700, color: '#1e1b4b' }}>Aksiyon</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('shipping')}</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('action')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1058,7 +1060,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                   </TableCell>
                   <TableCell align="center">
                     <Box sx={{ display: 'flex', gap: 0.25, justifyContent: 'center' }}>
-                      <Tooltip title={trackingIds.has(product.itemId) ? 'Takipte' : 'Takip Et'}>
+                      <Tooltip title={trackingIds.has(product.itemId) ? t('tracking') : t('trackProduct')}>
                         <IconButton
                           size="small"
                           color={trackingIds.has(product.itemId) ? 'primary' : 'default'}
@@ -1070,14 +1072,14 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                         </IconButton>
                       </Tooltip>
                       {onNavigate && (
-                        <Tooltip title="Nis Analizi">
+                        <Tooltip title={t('nicheAnalysis')}>
                           <IconButton size="small" sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }} onClick={() => onNavigate('niche_finder', { keyword: product.title.split(' ').slice(0, 4).join(' ') })}>
                             <Gauge size={16} />
                           </IconButton>
                         </Tooltip>
                       )}
                       {onNavigate && (
-                        <Tooltip title="SEO Kontrol">
+                        <Tooltip title={t('seoCheck')}>
                           <IconButton size="small" sx={{ borderRadius: 2, transition: 'all 0.2s ease', '&:hover': { bgcolor: 'rgba(99,102,241,0.08)' } }} onClick={() => onNavigate('seo_analyzer', { keyword: product.title.split(' ').slice(0, 4).join(' '), title: product.title })}>
                             <Target size={16} />
                           </IconButton>
@@ -1105,7 +1107,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
             transition: 'all 0.2s ease',
             '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)', boxShadow: '0 2px 8px rgba(99,102,241,0.15)' },
           }}>
-            Daha Fazla Yükle
+            {t('loadMore')}
           </Button>
         </Box>
       )}
@@ -1150,7 +1152,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
         <Divider />
         <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" color="text.secondary">Durum:</Typography>
+            <Typography variant="caption" color="text.secondary">{t('condition')}:</Typography>
             <Typography variant="caption">{product.condition}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -1164,9 +1166,9 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="caption" color="text.secondary">Kargo:</Typography>
+            <Typography variant="caption" color="text.secondary">{t('shipping')}:</Typography>
             <Typography variant="caption">
-              {product.freeShipping ? 'Ucretsiz' : product.shippingCost != null ? `$${product.shippingCost.toFixed(2)}` : '-'}
+              {product.freeShipping ? t('free') : product.shippingCost != null ? `$${product.shippingCost.toFixed(2)}` : '-'}
             </Typography>
           </Box>
           <Divider />
@@ -1177,7 +1179,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
               onClick={() => onTrack(product)}
               disabled={tracked}
             >
-              {tracked ? 'Takipte' : 'Takip Et'}
+              {tracked ? t('tracking') : t('trackProduct')}
             </Button>
             {onNavigate && (
               <Button
@@ -1185,7 +1187,7 @@ function MobileProductCard({ product, onTrack, onSellerSearch, tracked, onNaviga
                 startIcon={<Gauge size={14} />}
                 onClick={() => onNavigate('niche_finder', { keyword: product.title.split(' ').slice(0, 4).join(' ') })}
               >
-                Nis Analizi
+                {t('nicheAnalysis')}
               </Button>
             )}
             {onNavigate && (
@@ -1265,7 +1267,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
     a.download = `tracked-products-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('CSV indirildi');
+    toast.success(t('csvDownloaded'));
   }, [tracked]);
 
   const fetchTracked = useCallback(async () => {
@@ -1333,9 +1335,9 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
       await apiPost('update_product', userId, { id, notes: notesText });
       setTracked(prev => prev.map(p => p.id === id ? { ...p, notes: notesText } : p));
       setEditingNotes(null);
-      toast.success('Not kaydedildi');
+      toast.success(t('noteSaved'));
     } catch (err: any) {
-      toast.error(err.message || 'Not kaydedilemedi');
+      toast.error(err.message || t('noteSaveFailed'));
     }
   }, [userId, notesText]);
 
@@ -1348,7 +1350,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
       setTagDialog({ id, tags: updated });
       setNewTag('');
     } catch (err: any) {
-      toast.error(err.message || 'Etiket eklenemedi');
+      toast.error(err.message || t('tagAddFailed'));
     }
   }, [userId, newTag, tagDialog]);
 
@@ -1360,7 +1362,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
       setTracked(prev => prev.map(p => p.id === id ? { ...p, tags: updated } : p));
       setTagDialog({ id, tags: updated });
     } catch (err: any) {
-      toast.error(err.message || 'Etiket silinemedi');
+      toast.error(err.message || t('tagDeleteFailed'));
     }
   }, [userId, tagDialog]);
 
@@ -1389,12 +1391,12 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
           disabled={refreshing || tracked.length === 0}
           sx={{ bgcolor: '#6366f1', '&:hover': { bgcolor: '#4f46e5' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
         >
-          Takip Edilen Ürünleri Yenile
+          {t('refreshTrackedProducts')}
         </Button>
         <Button variant="outlined" startIcon={<Plus size={16} />} onClick={() => setAddDialogOpen(true)}
           sx={{ borderColor: '#6366f1', color: '#6366f1', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
         >
-          URL/ID ile Ekle
+          {t('addByUrlId')}
         </Button>
         <Tooltip title={t('downloadCSV')}>
           <span>
@@ -1423,17 +1425,17 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
       {tracked.length === 0 ? (
         <Box>
           <EmptyState
-            message="Henuz takip ettiginiz urun yok"
-            sub="Urun Veritabani'nda bir urun bulup 'Takip Et' butonuna tiklayin. Fiyat ve stok degisikliklerini otomatik izleyin."
+            message={t('noTrackedProducts')}
+            sub={t('noTrackedProductsSub')}
           />
           <Paper sx={{ p: 2, mt: 2, bgcolor: '#f8faff', borderRadius: 3, border: '1px solid rgba(99,102,241,0.08)' }}>
-            <Typography variant="subtitle2" fontWeight={700} gutterBottom>Urun Takibi Nasil Kullanilir?</Typography>
+            <Typography variant="subtitle2" fontWeight={700} gutterBottom>{t('howToTrackProducts')}</Typography>
             <Typography variant="body2" color="text.secondary" component="div">
               <ul style={{ margin: 0, paddingLeft: 16 }}>
-                <li>Urun Veritabani&apos;nda begendiiginiz urunleri &quot;Takip Et&quot; butonuyla ekleyin</li>
-                <li>Fiyat dususu ve stok degisikliklerinde otomatik uyari alirsiniz</li>
-                <li>Her urun icin notlar ve etiketler ekleyerek organize edin</li>
-                <li>CSV olarak disari aktararak raporlayin</li>
+                <li>{t('trackStep1')}</li>
+                <li>{t('trackStep2')}</li>
+                <li>{t('trackStep3')}</li>
+                <li>{t('trackStep4')}</li>
               </ul>
             </Typography>
           </Paper>
@@ -1458,24 +1460,24 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
           <Table size="small">
             <TableHead>
               <TableRow sx={{ background: 'linear-gradient(135deg, #f8f9ff 0%, #eef0ff 100%)' }}>
-                <TableCell sx={{ width: 60, fontWeight: 600, color: '#4338ca' }}>Resim</TableCell>
+                <TableCell sx={{ width: 60, fontWeight: 600, color: '#4338ca' }}>{t('image')}</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: '#4338ca' }}>{t('title')}</TableCell>
                 <TableCell align="right" sortDirection={trackedSort.sortKey === 'currentPrice' ? trackedSort.sortDir : false}>
                   <TableSortLabel active={trackedSort.sortKey === 'currentPrice'} direction={trackedSort.sortKey === 'currentPrice' ? trackedSort.sortDir : 'desc'} onClick={() => trackedSort.handleSort('currentPrice')}>
-                    Fiyat
+                    {t('price')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell align="center">{t('change')}</TableCell>
                 <TableCell align="center" sortDirection={trackedSort.sortKey === 'totalSold' ? trackedSort.sortDir : false}>
                   <TableSortLabel active={trackedSort.sortKey === 'totalSold'} direction={trackedSort.sortKey === 'totalSold' ? trackedSort.sortDir : 'desc'} onClick={() => trackedSort.handleSort('totalSold')}>
-                    Satış
+                    {t('sales')}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell>{t('priceHistory')}</TableCell>
-                <TableCell>Notlar</TableCell>
-                <TableCell>Etiketler</TableCell>
-                <TableCell align="center">Son Kontrol</TableCell>
-                <TableCell align="center">Sil</TableCell>
+                <TableCell>{t('notes')}</TableCell>
+                <TableCell>{t('tags')}</TableCell>
+                <TableCell align="center">{t('lastChecked')}</TableCell>
+                <TableCell align="center">{t('deleteLabel')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -1571,12 +1573,12 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                       {onNavigate && (
                         <>
-                          <Tooltip title="SEO Analizi">
+                          <Tooltip title={t('seoAnalysis')}>
                             <IconButton size="small" onClick={() => onNavigate('seo_analyzer', { keyword: product.title })}>
                               <Target size={16} />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="AI Asistan">
+                          <Tooltip title={t('aiAssistant')}>
                             <IconButton size="small" onClick={() => onNavigate('ai_hub', { title: product.title })}>
                               <Sparkles size={16} />
                             </IconButton>
@@ -1747,7 +1749,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
           {(product.itemWebUrl || product.legacyItemId) && (
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Button size="small" variant="text" component="a" href={product.itemWebUrl || `https://www.ebay.com/itm/${product.legacyItemId}`} target="_blank" rel="noopener noreferrer" startIcon={<ExternalLink size={12} />}>
-                eBay'de Gör
+                {t('viewOnEbay')}
               </Button>
             </Box>
           )}
@@ -1848,7 +1850,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
 
   const handleAnalyze = useCallback(async () => {
     if (!keyword.trim()) {
-      toast.error('Anahtar kelime girin');
+      toast.error(t('enterKeyword'));
       return;
     }
     setLoading(true);
@@ -2016,14 +2018,14 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       }}>
         <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1, color: '#1e1b4b' }}>
           <Gauge size={18} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
-          Niş Analizi
+          {t('nicheAnalysis')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            label="Anahtar Kelime veya Kategori"
+            label={t('keywordOrCategory')}
             placeholder="or: vintage jewelry, phone case, led lights"
-            helperText="Nis analizi icin bir urun kategorisi veya anahtar kelime girin"
+            helperText={t('nicheAnalysisHelper')}
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { setAutoLoaded(false); handleAnalyze(); } }}
@@ -2033,7 +2035,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             }}
           />
           <FormControl size="small" sx={{ minWidth: 130 }}>
-            <InputLabel>Pazar Yeri</InputLabel>
+            <InputLabel>{t('marketplace')}</InputLabel>
             <Select value={marketplace} label="Pazar Yeri" onChange={e => setMarketplace(e.target.value)}>
               {MARKETPLACES_DATA.map(m => (
                 <MenuItem key={m.value} value={m.value}>{m.flag} {t(m.labelKey)}</MenuItem>
@@ -2052,7 +2054,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
           </Button>
           <Chip
             icon={<Lightbulb size={14} />}
-            label="Ipuclari"
+            label={t('tips')}
             size="small"
             variant={showTips ? 'filled' : 'outlined'}
             onClick={() => setShowTips(v => !v)}
@@ -2090,7 +2092,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         <Paper sx={{ p: 1.5, mb: 2, background: 'linear-gradient(135deg, #f8faff 0%, #f0edff 100%)', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', display: 'flex', alignItems: 'center', gap: 1 }}>
           <TrendingUp size={16} color="#6366f1" />
           <Typography variant="body2" color="text.secondary">
-            Ornek nis analizi gosteriliyor — kendi nis aramanizi yapin
+            {t('sampleNicheAnalysis')}
           </Typography>
         </Paper>
       )}
@@ -2106,10 +2108,10 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         }}>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5, color: '#1e1b4b' }}>
             <TrendingUp size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
-            Populer Kategoriler — Tikla, Analiz Otomatik Baslasin
+            {t('popularCategories')}
           </Typography>
           <Typography variant="caption" sx={{ display: 'block', mb: 1.5, color: '#64748b' }}>
-            Anahtar kelime bilmene gerek yok! Bir kategori sec, o niste neler satiliyor gorelim.
+            {t('popularCategoriesHint')}
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
             {POPULAR_CATEGORIES_DATA.map(cat => (
@@ -2171,12 +2173,12 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                   disabled={savingNiche}
                   sx={{ borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}
                 >
-                  Kaydet
+                  {t('save')}
                 </Button>
                 {onNavigate && (
                   <>
                     <Button size="small" variant="outlined" startIcon={<Search size={14} />} onClick={() => onNavigate('product_database', { keyword: report.keyword })} sx={{ borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}>
-                      Urunleri Gor
+                      {t('viewProducts')}
                     </Button>
                     <Button size="small" variant="outlined" startIcon={<Target size={14} />} onClick={() => onNavigate('seo_analyzer', { keyword: report.keyword })} sx={{ borderRadius: 2, borderColor: '#6366f1', color: '#6366f1', transition: 'all 0.2s ease', '&:hover': { borderColor: '#4f46e5', bgcolor: 'rgba(99,102,241,0.04)' } }}>
                       SEO
@@ -2221,8 +2223,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
               <StatCard icon={<Package size={16} />} label={t('totalListings')} value={report.totalListings.toLocaleString()} />
               <StatCard icon={<Users size={16} />} label={t('uniqueSellers')} value={report.uniqueSellers.toLocaleString()} />
-              <StatCard icon={<DollarSign size={16} />} label="Ort. Fiyat" value={`$${report.avgPrice.toFixed(2)}`} />
-              <StatCard icon={<Target size={16} />} label="Medyan Fiyat" value={`$${report.medianPrice.toFixed(2)}`} />
+              <StatCard icon={<DollarSign size={16} />} label={t('avgPrice')} value={`$${report.avgPrice.toFixed(2)}`} />
+              <StatCard icon={<Target size={16} />} label={t('medianPrice')} value={`$${report.medianPrice.toFixed(2)}`} />
               <StatCard icon={<ArrowUpDown size={16} />} label={t('priceRange')} value={`$${report.priceMin.toFixed(0)} - $${report.priceMax.toFixed(0)}`} />
               <StatCard icon={<ShoppingBag size={16} />} label={t('freeShipping')} value={`%${report.freeShippingPct.toFixed(0)}`} />
               <StatCard icon={<Users size={16} />} label={t('sellerDensity')} value={`%${report.sellerConcentration.toFixed(0)}`} sub={t('top10SellerShare')} />
@@ -2249,7 +2251,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             }}>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, color: '#1e1b4b' }}>
                 <BarChart2 size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
-                Fiyat Dağılımı
+                {t('priceDistribution')}
               </Typography>
               <SimpleHistogram data={report.priceDistribution} />
             </Paper>
@@ -2266,7 +2268,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             }}>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, color: '#1e1b4b' }}>
                 <FolderTree size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
-                Özellik Analizi
+                {t('aspectAnalysis')}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {report.aspects.slice(0, 30).map(a => (
@@ -2301,7 +2303,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
             }}>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1, color: '#1e1b4b' }}>
                 <Star size={16} style={{ verticalAlign: 'middle', marginRight: 6, color: '#f59e0b' }} />
-                En Çok Satan Ürünler
+                {t('topSellingProducts')}
               </Typography>
               {isMobile ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -2333,12 +2335,12 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                         <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('title')}</TableCell>
                         <TableCell align="right" sortDirection={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : false}>
                           <TableSortLabel active={nicheProductSort.sortKey === 'price'} direction={nicheProductSort.sortKey === 'price' ? nicheProductSort.sortDir : 'desc'} onClick={() => nicheProductSort.handleSort('price')}>
-                            Fiyat
+                            {t('price')}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell align="center" sortDirection={nicheProductSort.sortKey === 'estimatedSold' ? nicheProductSort.sortDir : false}>
                           <TableSortLabel active={nicheProductSort.sortKey === 'estimatedSold'} direction={nicheProductSort.sortKey === 'estimatedSold' ? nicheProductSort.sortDir : 'desc'} onClick={() => nicheProductSort.handleSort('estimatedSold')}>
-                            Satış
+                            {t('sales')}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('seller')}</TableCell>
@@ -2391,7 +2393,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
       <Divider sx={{ my: 3 }} />
       <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5, color: '#1e1b4b' }}>
         <Bookmark size={18} style={{ verticalAlign: 'middle', marginRight: 6, color: '#6366f1' }} />
-        Kaydedilen Nişler
+        {t('savedNiches')}
       </Typography>
 
       {loadingNiches ? (
@@ -2400,7 +2402,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
         </Box>
       ) : savedNiches.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-          Henüz kaydedilen niş yok.
+          {t('noSavedNiches')}
         </Typography>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -2432,7 +2434,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                   size="small"
                   sx={{ bgcolor: `${SCORE_COLOR(niche.competitionScore, true)}22`, color: SCORE_COLOR(niche.competitionScore, true), fontWeight: 600 }}
                 />
-                <Chip label={`${niche.totalListings.toLocaleString()} ürün`} size="small" variant="outlined" />
+                <Chip label={`${niche.totalListings.toLocaleString()} ${t('products')}`} size="small" variant="outlined" />
               </Box>
               <Box sx={{ display: 'flex', gap: 0.5 }}>
                 <Tooltip title={t('loadReport')}>
@@ -2440,7 +2442,7 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
                     <Eye size={16} />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Sil">
+                <Tooltip title={t('delete')}>
                   <IconButton size="small" color="error" onClick={() => niche.id && handleDeleteNiche(niche.id)} sx={{ borderRadius: 2, transition: 'all 0.2s ease' }}>
                     <Trash2 size={16} />
                   </IconButton>
@@ -2516,9 +2518,9 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
       await apiPost('update_seller', userId, { id, notes: notesText });
       setSellers(prev => prev.map(s => s.id === id ? { ...s, notes: notesText } : s));
       setEditingNotes(null);
-      toast.success('Not kaydedildi');
+      toast.success(t('noteSaved'));
     } catch (err: any) {
-      toast.error(err.message || 'Not kaydedilemedi');
+      toast.error(err.message || t('noteSaveFailed'));
     }
   }, [userId, notesText]);
 
@@ -2547,14 +2549,14 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
       }}>
         <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1, color: '#312e81' }}>
           <Users size={18} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-          Satıcı Takip Et
+          {t('trackSeller')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <TextField
             size="small"
-            label="eBay Kullanici Adi"
+            label={t('ebayUsername')}
             placeholder="or: top_seller_2024, best.deals.shop"
-            helperText="Takip etmek istediginiz saticinin eBay kullanici adini girin"
+            helperText={t('sellerUsernameHelp')}
             value={username}
             onChange={e => setUsername(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAddSeller()}
@@ -2569,7 +2571,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
             disabled={adding || !username.trim()}
             sx={{ minWidth: 100, bgcolor: '#6366f1', '&:hover': { bgcolor: '#4f46e5' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
           >
-            {adding ? <CircularProgress size={18} /> : 'Takip Et'}
+            {adding ? <CircularProgress size={18} /> : t('track')}
           </Button>
         </Box>
       </Paper>
@@ -2665,7 +2667,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                       startIcon={<Package size={14} />}
                       onClick={() => onNavigate('product_database', { keyword: seller.sellerUsername })}
                     >
-                      Ürünleri Gör
+                      {t('viewProducts')}
                     </Button>
                     <Button
                       size="small"
@@ -2673,7 +2675,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                       startIcon={<Eye size={14} />}
                       onClick={() => onNavigate('competitive_intelligence', { seller: seller.sellerUsername })}
                     >
-                      Rakip Analizi
+                      {t('competitiveIntelligence')}
                     </Button>
                   </>
                 )}
@@ -2683,7 +2685,7 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                   startIcon={<ExternalLink size={14} />}
                   onClick={() => handleViewProducts(seller.sellerUsername)}
                 >
-                  eBay'de Gör
+                  {t('viewOnEbay')}
                 </Button>
               </Box>
 
@@ -2774,19 +2776,19 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                       {onNavigate && (
                         <>
-                          <Tooltip title="Ürünleri Gör">
+                          <Tooltip title={t('viewProducts')}>
                             <IconButton size="small" onClick={() => onNavigate('product_database', { keyword: seller.sellerUsername })}>
                               <Package size={16} />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Rakip Analizi">
+                          <Tooltip title={t('competitiveIntelligence')}>
                             <IconButton size="small" onClick={() => onNavigate('competitive_intelligence', { seller: seller.sellerUsername })}>
                               <Eye size={16} />
                             </IconButton>
                           </Tooltip>
                         </>
                       )}
-                      <Tooltip title="eBay'de Gör">
+                      <Tooltip title={t('viewOnEbay')}>
                         <IconButton size="small" onClick={() => handleViewProducts(seller.sellerUsername)}>
                           <ExternalLink size={16} />
                         </IconButton>
@@ -2814,41 +2816,41 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
 
 const SECTIONS = [
   {
-    label: 'Arastirma',
+    labelKey: 'sectionResearch',
     icon: <Search size={18} />,
-    description: 'Pazar analizi ve urun kesfetme araclari',
-    welcome: 'eBay pazarini analiz edin, trendleri kesfet ve karli nisler bulun',
+    descriptionKey: 'sectionResearchDesc',
+    welcomeKey: 'sectionResearchWelcome',
     subTabs: [
-      { label: 'Urun Veritabani', icon: <Package size={14} /> },
-      { label: 'Kategori & Nis Bulucu', icon: <Gauge size={14} /> },
-      { label: 'Anahtar Kelime Analizi', icon: <Tag size={14} /> },
-      { label: 'Arbitraj Bulucu', icon: <Globe size={14} /> },
-      { label: 'Pazar Karsilastirma', icon: <Globe size={14} /> },
-      { label: 'Kategori Kesif', icon: <Layers size={14} /> },
-      { label: 'Nis Karsilastirma', icon: <BarChart2 size={14} /> },
+      { labelKey: 'tabProductDatabase', icon: <Package size={14} /> },
+      { labelKey: 'tabCategoryNiche', icon: <Gauge size={14} /> },
+      { labelKey: 'tabKeywordAnalysis', icon: <Tag size={14} /> },
+      { labelKey: 'tabArbitrageFinder', icon: <Globe size={14} /> },
+      { labelKey: 'tabMarketComparison', icon: <Globe size={14} /> },
+      { labelKey: 'tabCategoryExplorer', icon: <Layers size={14} /> },
+      { labelKey: 'tabNicheComparison', icon: <BarChart2 size={14} /> },
     ],
   },
   {
-    label: 'Takip',
+    labelKey: 'sectionTracking',
     icon: <Bookmark size={18} />,
-    description: 'Urun ve satici takip merkezi',
-    welcome: 'Rakiplerinizi ve ilgilendiginiz urunleri yakindan takip edin',
+    descriptionKey: 'sectionTrackingDesc',
+    welcomeKey: 'sectionTrackingWelcome',
     subTabs: [
-      { label: 'Urun Takipcisi', icon: <Bookmark size={14} /> },
-      { label: 'Satici Takipcisi', icon: <Users size={14} /> },
-      { label: 'Rakip Analizi', icon: <Eye size={14} /> },
+      { labelKey: 'tabProductTracker', icon: <Bookmark size={14} /> },
+      { labelKey: 'tabSellerTracker', icon: <Users size={14} /> },
+      { labelKey: 'tabCompetitorAnalysis', icon: <Eye size={14} /> },
     ],
   },
   {
-    label: 'Optimizasyon',
+    labelKey: 'sectionOptimization',
     icon: <TrendingUp size={18} />,
-    description: 'SEO, AI ve finansal iyilestirme',
-    welcome: 'Listelerinizi iyilestirin ve karliligimizi artirin',
+    descriptionKey: 'sectionOptimizationDesc',
+    welcomeKey: 'sectionOptimizationWelcome',
     subTabs: [
-      { label: 'SEO Analizi', icon: <Target size={14} /> },
-      { label: 'AI Asistan', icon: <Sparkles size={14} /> },
-      { label: 'Liste Iyilestirme', icon: <Zap size={14} /> },
-      { label: 'Finansal Hesaplamalar', icon: <DollarSign size={14} /> },
+      { labelKey: 'tabSeoAnalysis', icon: <Target size={14} /> },
+      { labelKey: 'tabAiAssistant', icon: <Sparkles size={14} /> },
+      { labelKey: 'tabListingOptimizer', icon: <Zap size={14} /> },
+      { labelKey: 'tabFinancialCalc', icon: <DollarSign size={14} /> },
     ],
   },
 ];
@@ -2884,10 +2886,10 @@ function SectionWelcome({ section, userListings = [], sectionIndex }: { section:
     >
       <Box sx={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg, #ede9fe 0%, #e0f2fe 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>{React.cloneElement(section.icon as React.ReactElement, { size: 36, strokeWidth: 1.5, style: { color: '#6366f1' } })}</Box>
       <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
-        {section.label}
+        {t(section.labelKey)}
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 480, mx: 'auto', wordBreak: 'break-word', px: 1 }}>
-        {section.welcome}
+        {t(section.welcomeKey)}
       </Typography>
       {personalizedMessage && (
         <Typography variant="body2" color="primary.main" fontWeight={600} sx={{ mb: 2, maxWidth: 480, mx: 'auto', wordBreak: 'break-word', px: 1 }}>
@@ -3052,8 +3054,8 @@ function EbayResearchPage() {
         <TextField
           size="small"
           fullWidth
-          placeholder="Anahtar kelime, eBay URL veya @satici adi girin..."
-          helperText="Arama: kelime → Urun DB | eBay URL → Listing Analiz | @satici → Satici Takip"
+          placeholder={t('searchPlaceholder')}
+          helperText={t('searchHelper')}
           value={globalSearch}
           onChange={e => setGlobalSearch(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}
@@ -3093,11 +3095,11 @@ function EbayResearchPage() {
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                     {section.icon}
-                    <span style={{ fontWeight: 700, fontSize: isMobile ? '0.8rem' : '0.95rem', whiteSpace: 'nowrap' }}>{section.label}</span>
+                    <span style={{ fontWeight: 700, fontSize: isMobile ? '0.8rem' : '0.95rem', whiteSpace: 'nowrap' }}>{t(section.labelKey)}</span>
                   </Box>
                   {!isMobile && (
                     <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', lineHeight: 1.2 }}>
-                      {section.description}
+                      {t(section.descriptionKey)}
                     </Typography>
                   )}
                 </Box>
@@ -3113,7 +3115,7 @@ function EbayResearchPage() {
           <Chip
             key={i}
             icon={st.icon as React.ReactElement}
-            label={st.label}
+            label={t(st.labelKey)}
             clickable
             onClick={() => setSubTab(i)}
             sx={{

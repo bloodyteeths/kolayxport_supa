@@ -4,6 +4,7 @@ import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
 import { Zap, Info, Settings, HelpCircle, CheckCircle, ExternalLink, ShoppingCart, Briefcase, Truck, ChevronDown, ChevronUp, BookOpen, Download, Chrome, Globe } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 const Section = ({ title, icon: Icon, children, id }) => (
   <motion.div
@@ -46,9 +47,10 @@ const PlatformList = ({ platforms }) => (
 );
 
 export default function EntegrasyonlarVeRehberlerPage() {
+  const t = useTranslations('integrations');
   const [isVeeqoGuideOpen, setIsVeeqoGuideOpen] = useState(false);
   const [isEtsyGuideOpen, setIsEtsyGuideOpen] = useState(false);
-  
+
   const veeqoEcommercePlatforms = ['Shopify', 'Shopify Plus', 'Magento', 'BigCommerce', 'WooCommerce', 'Wix'];
   const veeqoMarketplaces = ['Amazon', 'eBay', 'Etsy', 'Walmart'];
 
@@ -56,7 +58,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
   const shippoMarketplaces = ['Etsy', 'Amazon', 'eBay', 'Walmart', 'Mercari'];
 
   return (
-    <AppLayout title="Entegrasyonlar ve Rehberler - KolayXport">
+    <AppLayout title={t('pageTitle')}>
       <NextSeo noindex={true} nofollow={true} />
 
       <motion.div
@@ -68,63 +70,66 @@ export default function EntegrasyonlarVeRehberlerPage() {
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow overflow-hidden">
           <h1 className="text-xl sm:text-3xl font-bold text-slate-800 flex items-center min-w-0">
             <Zap size={28} className="mr-2 sm:mr-3 text-blue-600 flex-shrink-0" />
-            <span className="break-words min-w-0">Entegrasyonlar ve Kurulum Rehberleri</span>
+            <span className="break-words min-w-0">{t('title')}</span>
           </h1>
           <p className="mt-2 text-sm sm:text-base text-slate-600" style={{ wordBreak: 'break-word' }}>
-            KolayXport'u e-ticaret altyapınızla nasıl entegre edeceğinizi ve verilerinizi nasıl yöneteceğinizi öğrenin.
+            {t('subtitle')}
           </p>
         </div>
       </motion.div>
 
-      <Section title="Genel Entegrasyon Yaklaşımımız" icon={Info}>
+      <Section title={t('generalApproach')} icon={Info}>
         <p>
-          KolayXport, e-ticaret operasyonlarınızı merkezileştirmek için esnek bir entegrasyon modeli sunar.
-          Doğrudan entegrasyonlarımızla Türkiye'nin önde gelen pazaryerlerinden olan <strong>Trendyol</strong> ve <strong>Hepsiburada</strong>'dan sipariş ve ürün verilerinizi çekebilirsiniz.
+          {t('generalApproachP1')}
         </p>
         <p className="mt-2">
-          Daha geniş bir platform yelpazesine erişim için, mevcut <strong>Veeqo</strong> veya <strong>Shippo</strong> hesaplarınızı KolayXport'a bağlayabilirsiniz. Bu sayede, Veeqo ve Shippo'nun desteklediği çok sayıda uluslararası pazaryeri ve e-ticaret platformundan veri akışı sağlayabilirsiniz. Veeqo ve Shippo hesaplarınızı nasıl bağlayacağınıza dair detaylı bilgiyi "Nasıl Kullanırım?" sayfamızda bulabilirsiniz.
+          {t('generalApproachP2')}
         </p>
         <p className="mt-2">
-          KolayXport üzerinden oluşturulan gönderileriniz için ise şu anda <strong>FedEx</strong> kargo entegrasyonumuzu kullanmaktayız.
+          {t('generalApproachP3')}
         </p>
         <p className="mt-3">
-          Aşağıda, desteklediğimiz doğrudan entegrasyonları ve Veeqo/Shippo aracılığıyla erişebileceğiniz platform türlerini bulabilirsiniz. API anahtarlarınızı yönetmek ve bağlantıları kurmak için <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> sayfanızı ziyaret edebilirsiniz.
+          {t.rich('generalApproachP4', {
+            settingsLink: (chunks) => <Link href="/app/settings" className="text-blue-600 hover:underline">{chunks}</Link>
+          })}
         </p>
       </Section>
 
-      <Section title="Doğrudan KolayXport Entegrasyonları" icon={ShoppingCart}>
-        <p className="mb-4">Aşağıdaki platformlarla doğrudan entegre olarak sipariş ve ürün verilerinizi KolayXport'a aktarabilirsiniz:</p>
+      <Section title={t('directIntegrations')} icon={ShoppingCart}>
+        <p className="mb-4">{t('directIntegrationsDesc')}</p>
         <div className="space-y-6">
           <div>
             <h3 className="text-xl font-semibold text-slate-700 mb-2 flex items-center">
               <Chrome size={20} className="mr-2 text-green-600" />
-              Etsy (Chrome Eklentisi)
+              {t('etsyChromeTitle')}
             </h3>
-            <p className="mb-3">Etsy Shop Manager siparişlerinizi güvenli Chrome eklentisiyle aktarın. API gerektirmez, otomatik senkronizasyon sağlar. <Link href="#etsy-guide" className="text-blue-600 hover:underline">Kurulum rehberini görmek için tıklayın</Link>.</p>
+            <p className="mb-3">{t('etsyChromeDesc')} <Link href="#etsy-guide" className="text-blue-600 hover:underline">{t('etsyChromeGuideLink')}</Link>.</p>
           </div>
           <div>
-            <h3 className="text-xl font-semibold text-slate-700 mb-2">Trendyol</h3>
-            <p className="mb-3">Trendyol mağaza verilerinizi KolayXport'a bağlamak için <Link href="#trendyol-guide" className="text-blue-600 hover:underline">Trendyol Entegrasyon Rehberi</Link> bölümündeki adımları takip edebilirsiniz.</p>
+            <h3 className="text-xl font-semibold text-slate-700 mb-2">{t('trendyolTitle')}</h3>
+            <p className="mb-3">{t.rich('trendyolDesc', {
+              link: (chunks) => <Link href="#trendyol-guide" className="text-blue-600 hover:underline">{chunks}</Link>
+            })}</p>
           </div>
           <div>
-            <h3 className="text-xl font-semibold text-slate-700 mb-2">Hepsiburada</h3>
-            <p>Hepsiburada entegrasyon rehberi yakında eklenecektir. Bu entegrasyon için Hepsiburada satıcı panelinizden alacağınız API bilgileri gerekecektir.</p>
+            <h3 className="text-xl font-semibold text-slate-700 mb-2">{t('hepsiburadaTitle')}</h3>
+            <p>{t('hepsiburadaDesc')}</p>
           </div>
         </div>
       </Section>
 
-      <Section title="Veeqo ile Erişebileceğiniz Platformlar" icon={Briefcase}>
+      <Section title={t('veeqoPlatforms')} icon={Briefcase}>
         <p className="mb-4">
-          Mevcut Veeqo hesabınızı KolayXport'a bağlayarak (detaylar "Nasıl Kullanırım?" sayfasında), Veeqo'nun entegre olduğu aşağıdaki gibi popüler e-ticaret platformlarından ve pazaryerlerinden veri çekebilirsiniz:
+          {t('veeqoPlatformsDesc')}
         </p>
-        <h4 className="text-lg font-semibold text-slate-700 mt-4 mb-2">E-Ticaret Platformları:</h4>
+        <h4 className="text-lg font-semibold text-slate-700 mt-4 mb-2">{t('ecommercePlatforms')}</h4>
         <PlatformList platforms={veeqoEcommercePlatforms} />
-        <h4 className="text-lg font-semibold text-slate-700 mt-6 mb-2">Pazaryerleri:</h4>
+        <h4 className="text-lg font-semibold text-slate-700 mt-6 mb-2">{t('marketplaces')}</h4>
         <PlatformList platforms={veeqoMarketplaces} />
         <p className="mt-4 text-sm text-slate-500">
-          Bu listeler başlıca platformları içermektedir. Veeqo'nun güncel ve tam entegrasyon listesi için lütfen Veeqo'nun resmi kaynaklarını kontrol ediniz. KolayXport, Veeqo hesabınız üzerinden bu platformlardan veri alabilir.
+          {t('veeqoPlatformsNote')}
         </p>
-        
+
         <div className="mt-6">
           <button
             onClick={() => setIsVeeqoGuideOpen(!isVeeqoGuideOpen)}
@@ -132,7 +137,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
           >
             <div className="flex items-center">
               <BookOpen size={20} className="mr-2 text-blue-600" />
-              <span className="text-lg font-semibold text-blue-800">Veeqo Entegrasyon Rehberi</span>
+              <span className="text-lg font-semibold text-blue-800">{t('veeqoGuide')}</span>
             </div>
             {isVeeqoGuideOpen ? (
               <ChevronUp size={24} className="text-blue-600" />
@@ -140,7 +145,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
               <ChevronDown size={24} className="text-blue-600" />
             )}
           </button>
-          
+
           {isVeeqoGuideOpen && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
@@ -151,161 +156,151 @@ export default function EntegrasyonlarVeRehberlerPage() {
             >
               <div className="space-y-6">
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                  <p className="text-amber-800 font-semibold mb-2">Önemli Bilgi</p>
+                  <p className="text-amber-800 font-semibold mb-2">{t('importantNote')}</p>
                   <p className="text-sm text-amber-700">
-                    Veeqo entegrasyonu, tüm pazaryerlerini Amazon üzerinden bağlar. Bu sayede gizli bilgilerinizin dışarıya sızma riski yoktur ve entegrasyon nedeniyle hesabınızın askıya alınma riski bulunmaz.
+                    {t('veeqoImportantNoteDesc')}
                   </p>
                 </div>
 
                 <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-slate-800">Veeqo Entegrasyon Adımları</h3>
-                  
+                  <h3 className="text-xl font-bold text-slate-800">{t('veeqoSteps')}</h3>
+
                   <div className="space-y-6">
-                    <Step number="1" title="Veeqo.com'a Üye Olun">
+                    <Step number="1" title={t('veeqoStep1Title')}>
                       <p>
-                        <a href="https://veeqo.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Veeqo.com</a>'a giriş yapın. 
-                        "Sign up" (yeşil buton) tıkladığınızda üyelik ekranına yönlendirileceksiniz. 
-                        E-mail adresinizle üyelik oluşturabilir veya Amazon hesabı ile giriş yapabilirsiniz.
+                        {t('veeqoStep1Desc')}
                       </p>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-signup.png" 
-                        alt="Veeqo üyelik ekranı" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-signup.png"
+                        alt="Veeqo signup"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                     </Step>
 
-                    <Step number="2" title="Şirket Bilgilerini Doldurun">
-                      <p>E-mail ve şifrenizi oluşturduktan sonra karşınıza çıkacak şirket bilgileri formunu doldurun.</p>
+                    <Step number="2" title={t('veeqoStep2Title')}>
+                      <p>{t('veeqoStep2Desc')}</p>
                       <div className="mt-2 p-3 bg-gray-100 rounded text-sm">
-                        <p className="font-semibold mb-1">Örnek Bilgiler (ABD adresi yoksa kullanabilirsiniz):</p>
+                        <p className="font-semibold mb-1">{t('veeqoStep2Example')}</p>
                         <ul className="space-y-1 text-gray-700">
-                          <li><strong>Company name:</strong> Benim firmam</li>
-                          <li><strong>Orders per month:</strong> Herhangi bir aralık (önemi yok)</li>
-                          <li><strong>Country:</strong> United States</li>
-                          <li><strong>Phone number:</strong> +11234567890</li>
-                          <li><strong>Referral code:</strong> Boş bırakın</li>
+                          <li><strong>Company name:</strong> {t('veeqoStep2CompanyName')}</li>
+                          <li><strong>Orders per month:</strong> {t('veeqoStep2Orders')}</li>
+                          <li><strong>Country:</strong> {t('veeqoStep2Country')}</li>
+                          <li><strong>Phone number:</strong> {t('veeqoStep2Phone')}</li>
+                          <li><strong>Referral code:</strong> {t('veeqoStep2Referral')}</li>
                         </ul>
                       </div>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-company-info.png" 
-                        alt="Veeqo şirket bilgileri formu" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-company-info.png"
+                        alt="Veeqo company info"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                       <p className="mt-3 text-sm text-gray-600">
-                        "Connect store" butonuna basarak ilk mağazanızı bağlayabilirsiniz.
+                        {t('veeqoStep2ConnectStore')}
                       </p>
                     </Step>
 
-                    <Step number="3" title="Mağazanızı Bağlayın">
+                    <Step number="3" title={t('veeqoStep3Title')}>
                       <p>
-                        "Connect store" butonuna basarak ilk mağazanızı bağlayabilirsiniz. 
-                        Listeden bağlamak istediğiniz pazaryerini seçin (örn: Etsy). 
+                        {t('veeqoStep3Desc')}
                       </p>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-connect-store.png" 
-                        alt="Veeqo mağaza bağlama ekranı" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-connect-store.png"
+                        alt="Veeqo connect store"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                       <p className="mt-3">
-                        Karşınıza çıkan yönergeleri takip edin. Buradaki kodlarla bir işlem yapmanıza gerek yok, 
-                        "Next" diyerek devam edin.
+                        {t('veeqoStep3Instructions')}
                       </p>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-etsy-auth.png" 
-                        alt="Etsy yetkilendirme ekranı" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-etsy-auth.png"
+                        alt="Etsy auth"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                       <p className="mt-3">
-                        Etsy sayfasına yönlendirileceksiniz. Etsy kullanıcı adı ve şifrenizle giriş yapın, 
-                        ardından "Give authorization" seçeneğini tıklayın.
+                        {t('veeqoStep3EtsyAuth')}
                       </p>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-etsy-login.png" 
-                        alt="Etsy giriş ve yetkilendirme" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-etsy-login.png"
+                        alt="Etsy login"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                     </Step>
 
-                    <Step number="4" title="Siparişlerinizi Görüntüleyin">
+                    <Step number="4" title={t('veeqoStep4Title')}>
                       <p>
-                        İlk mağazanızı başarıyla bağladıktan sonra, Veeqo dashboard'unda siparişleriniz görünmeye başlayacaktır.
+                        {t('veeqoStep4Desc')}
                       </p>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-dashboard.png" 
-                        alt="Veeqo dashboard sipariş görünümü" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-dashboard.png"
+                        alt="Veeqo dashboard"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                     </Step>
 
-                    <Step number="5" title="API Anahtarı Talep Edin">
+                    <Step number="5" title={t('veeqoStep5Title')}>
                       <p>
-                        Sağ üst köşedeki soru işareti (?) menüsünden "Chat with us" seçeneğine tıklayın.
+                        {t('veeqoStep5Desc')}
                       </p>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-support-chat.png" 
-                        alt="Veeqo destek sohbeti" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-support-chat.png"
+                        alt="Veeqo support"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                       <div className="mt-3 p-3 bg-blue-50 rounded">
-                        <p className="text-sm font-semibold text-blue-800">Destek ekibine şu mesajı gönderin:</p>
+                        <p className="text-sm font-semibold text-blue-800">{t('veeqoStep5SupportMessage')}</p>
                         <p className="text-sm text-blue-700 italic mt-1">
-                          "Can you assist me to create for my admin account api key in users, I cannot see them."
+                          {t('veeqoStep5SupportText')}
                         </p>
                       </div>
                       <p className="mt-3 text-sm text-gray-600">
-                        Destek ekibi 5-30 dakika içinde (hafta sonları ve sabah saatlerinde değişebilir) 
-                        sistemlerini açacak ve e-mail ile size bildirecektir.
+                        {t('veeqoStep5WaitTime')}
                       </p>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-email-notification.png" 
-                        alt="Veeqo API erişimi e-mail bildirimi" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-email-notification.png"
+                        alt="Veeqo email"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                     </Step>
 
-                    <Step number="6" title="API Anahtarını Bulun">
-                      <p>API erişimi açıldıktan sonra:</p>
+                    <Step number="6" title={t('veeqoStep6Title')}>
+                      <p>{t('veeqoStep6Desc')}</p>
                       <ul className="list-disc list-inside ml-4 mt-2 space-y-1 text-sm">
-                        <li>Üst menüden <strong>Settings</strong> seçeneğini tıklayın</li>
-                        <li>Aşağı kaydırıp <strong>Users</strong> seçeneğini tıklayın</li>
+                        <li>{t('veeqoStep6Instructions1')}</li>
+                        <li>{t('veeqoStep6Instructions2')}</li>
                       </ul>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-settings-users.png" 
-                        alt="Veeqo ayarlar ve kullanıcılar menüsü" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-settings-users.png"
+                        alt="Veeqo settings"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                       <p className="mt-3">
-                        Kullanıcınızın yanındaki <strong>Actions</strong> altındaki kalem işaretine tıklayın. 
-                        Aşağı kaydırdığınızda <strong>API KEY</strong> kısmında karışık karakterli bir metin göreceksiniz.
+                        {t('veeqoStep6ActionsDesc')}
                       </p>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-api-key.png" 
-                        alt="Veeqo API anahtarı görünümü" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-api-key.png"
+                        alt="Veeqo API key"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                       <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
                         <p className="text-sm text-red-700">
-                          <strong>ÖNEMLİ:</strong> "Refresh API KEY" düğmesine basarsanız entegrasyonunuz kopacaktır. 
-                          Bu durumda yeni kodu sistemimize girmeniz gerekir.
+                          <strong>{t('importantNote').toUpperCase()}:</strong> {t('apiKeyWarning')}
                         </p>
                       </div>
                     </Step>
 
-                    <Step number="7" title="KolayXport'a API Anahtarını Girin">
+                    <Step number="7" title={t('veeqoStep7Title')}>
                       <p>
-                        API anahtarınızı kopyalayın ve{' '}
-                        <Link href="/app/settings" className="text-blue-600 hover:underline">
-                          kolayxport.com/app/ayarlar
-                        </Link>{' '}
-                        sayfasındaki <strong>Veeqo API Key</strong> alanına yapıştırın.
+                        {t.rich('veeqoStep7Desc', {
+                          settingsLink: (chunks) => <Link href="/app/settings" className="text-blue-600 hover:underline">{chunks}</Link>
+                        })}
                       </p>
-                      <img 
-                        src="/images/veeqo-guide/veeqo-kolayxport-settings.png" 
-                        alt="KolayXport Veeqo API ayarları" 
+                      <img
+                        src="/images/veeqo-guide/veeqo-kolayxport-settings.png"
+                        alt="KolayXport settings"
                         className="mt-3 rounded-lg shadow-md border border-gray-200 max-w-full"
                       />
                       <p className="mt-3 text-sm text-gray-600">
-                        Karakterler büyük/küçük harf hassas olduğu için kopyala-yapıştır yapmanızı tavsiye ederiz.
+                        {t('veeqoStep7CaseSensitive')}
                       </p>
                     </Step>
                   </div>
@@ -315,10 +310,9 @@ export default function EntegrasyonlarVeRehberlerPage() {
                   <div className="flex items-start">
                     <CheckCircle size={20} className="text-green-600 mr-2 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-green-800 font-semibold">Tebrikler!</p>
+                      <p className="text-green-800 font-semibold">{t('veeqoCongrats')}</p>
                       <p className="text-sm text-green-700 mt-1">
-                        Veeqo entegrasyonunuz tamamlandı. Artık Veeqo'ya bağlı tüm pazaryerlerinden 
-                        siparişlerinizi KolayXport üzerinden yönetebilirsiniz.
+                        {t('veeqoCongratsDesc')}
                       </p>
                     </div>
                   </div>
@@ -329,30 +323,33 @@ export default function EntegrasyonlarVeRehberlerPage() {
         </div>
       </Section>
 
-      <Section title="Shippo ile Erişebileceğiniz Platformlar" icon={Briefcase}>
+      <Section title={t('shippoPlatforms')} icon={Briefcase}>
         <p className="mb-4">
-          Mevcut Shippo hesabınızı KolayXport'a bağlayarak (detaylar "Nasıl Kullanırım?" sayfasında), Shippo'nun entegre olduğu aşağıdaki gibi popüler e-ticaret platformlarından ve pazaryerlerinden veri çekebilirsiniz:
+          {t('shippoPlatformsDesc')}
         </p>
-        <h4 className="text-lg font-semibold text-slate-700 mt-4 mb-2">E-Ticaret Platformları:</h4>
+        <h4 className="text-lg font-semibold text-slate-700 mt-4 mb-2">{t('ecommercePlatforms')}</h4>
         <PlatformList platforms={shippoEcommercePlatforms} />
-        <h4 className="text-lg font-semibold text-slate-700 mt-6 mb-2">Pazaryerleri:</h4>
+        <h4 className="text-lg font-semibold text-slate-700 mt-6 mb-2">{t('marketplaces')}</h4>
         <PlatformList platforms={shippoMarketplaces} />
         <p className="mt-4 text-sm text-slate-500">
-          Bu listeler başlıca platformları içermektedir. Shippo'nun güncel ve tam entegrasyon listesi için lütfen Shippo'nun resmi kaynaklarını kontrol ediniz. KolayXport, Shippo hesabınız üzerinden bu platformlardan veri alabilir.
+          {t('shippoPlatformsNote')}
         </p>
-      </Section>
-      
-      <Section title="Kargo Entegrasyonumuz" icon={Truck}>
-        <p>KolayXport üzerinden yapacağınız gönderiler için şu anda <strong>FedEx</strong> altyapısını kullanmaktayız. Siparişlerinizi hazırlayıp kargoya hazır hale getirdiğinizde, gönderi süreçleri FedEx üzerinden yönetilecektir.</p>
-        <p className="mt-2 text-sm text-slate-500">FedEx entegrasyonumuzla ilgili ayar veya seçenekler (eğer kullanıcı tarafından yönetilebilir ise) <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> sayfasında veya "Nasıl Kullanırım?" bölümünde detaylandırılacaktır.</p>
       </Section>
 
-      <Section title="Etsy Entegrasyonu" icon={Chrome} id="etsy-guide">
-        <p className="mb-4">
-          Etsy Shop Manager'dan siparişlerinizi otomatik olarak KolayXport'a aktarmak için <strong>Kolayxport Etsy Chrome Eklentisi</strong>'ni kullanabilirsiniz. 
-          Bu eklenti, Etsy siparişlerinizi tarayıcınızdan güvenli bir şekilde KolayXport hesabınıza aktarır.
+      <Section title={t('shippingIntegration')} icon={Truck}>
+        <p>{t('shippingIntegrationDesc')}</p>
+        <p className="mt-2 text-sm text-slate-500">
+          {t.rich('shippingIntegrationNote', {
+            settingsLink: (chunks) => <Link href="/app/settings" className="text-blue-600 hover:underline">{chunks}</Link>
+          })}
         </p>
-        
+      </Section>
+
+      <Section title={t('etsyIntegration')} icon={Chrome} id="etsy-guide">
+        <p className="mb-4">
+          {t('etsyIntegrationDesc')}
+        </p>
+
         <div className="mb-6">
           <button
             onClick={() => setIsEtsyGuideOpen(!isEtsyGuideOpen)}
@@ -360,7 +357,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
           >
             <div className="flex items-center">
               <Download size={20} className="mr-2 text-green-600" />
-              <span className="text-lg font-semibold text-green-800">Etsy Chrome Eklentisi Kurulum Rehberi</span>
+              <span className="text-lg font-semibold text-green-800">{t('etsyChromeGuide')}</span>
             </div>
             {isEtsyGuideOpen ? (
               <ChevronUp size={24} className="text-green-600" />
@@ -368,7 +365,7 @@ export default function EntegrasyonlarVeRehberlerPage() {
               <ChevronDown size={24} className="text-green-600" />
             )}
           </button>
-          
+
           {isEtsyGuideOpen && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
@@ -379,121 +376,121 @@ export default function EntegrasyonlarVeRehberlerPage() {
             >
               <div className="space-y-6">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <p className="text-green-800 font-semibold mb-2">Güvenlik ve Avantajlar</p>
+                  <p className="text-green-800 font-semibold mb-2">{t('securityAdvantages')}</p>
                   <ul className="text-sm text-green-700 space-y-1">
-                    <li>• Etsy API'sine ihtiyaç duymaz</li>
-                    <li>• Sadece görünür sipariş bilgilerini okur</li>
-                    <li>• Otomatik senkronizasyon</li>
-                    <li>• Takılma veya askıya alınma riski yok</li>
+                    <li>• {t('securityNoApi')}</li>
+                    <li>• {t('securityReadOnly')}</li>
+                    <li>• {t('securityAutoSync')}</li>
+                    <li>• {t('securityNoRisk')}</li>
                   </ul>
                 </div>
 
                 <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-slate-800">Chrome Eklentisi Kurulum Adımları</h3>
-                  
+                  <h3 className="text-xl font-bold text-slate-800">{t('chromeSteps')}</h3>
+
                   <div className="space-y-6">
-                    <Step number="1" title="Chrome Eklentisini İndirin">
+                    <Step number="1" title={t('chromeStep1Title')}>
                       <p>
-                        Kolayxport Etsy Chrome Eklentisi'ni doğrudan aşağıdaki linkten indirin:
+                        {t('chromeStep1Desc')}
                       </p>
                       <div className="mt-3 space-y-3">
-                        <a 
-                          href="/downloads/kolayxport-etsy-extension-v5.3-multistore.zip" 
+                        <a
+                          href="/downloads/kolayxport-etsy-extension-v5.3-multistore.zip"
                           download="kolayxport-etsy-extension-v5.3-multistore.zip"
                           className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                         >
                           <Download size={18} className="mr-2" />
-                          Doğrudan İndir (.zip) - Güncel Sürüm
+                          {t('chromeStep1Download')}
                         </a>
                         <p className="text-sm text-gray-600">
-                          <strong>Dosya Boyutu:</strong> 25KB | <strong>Versiyon:</strong> 5.3.0 | <strong>İçerik:</strong> Çoklu mağaza desteği, kurulum rehberi dahil
+                          <strong>{t('fileSize')}:</strong> {t('chromeStep1FileInfo')} | <strong>{t('version')}:</strong> {t('chromeStep1Version')} | <strong>{t('content')}:</strong> {t('chromeStep1Content')}
                         </p>
                       </div>
                       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-sm text-blue-800">
-                          <strong>Alternatif:</strong> Chrome Web Store'dan da indirebilirsiniz: <br />
-                          <a 
-                            href="https://chrome.google.com/webstore/detail/kolayxport-etsy-sync" 
-                            target="_blank" 
+                          <strong>{t('alternative')}:</strong> {t('chromeStep1Alt')} <br />
+                          <a
+                            href="https://chrome.google.com/webstore/detail/kolayxport-etsy-sync"
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline inline-flex items-center"
                           >
                             Chrome Web Store
                             <ExternalLink size={12} className="ml-1" />
                           </a>
-                          <span className="text-xs text-blue-600 ml-2">(henüz yayınlanmadıysa mevcut olmayabilir)</span>
+                          <span className="text-xs text-blue-600 ml-2">{t('chromeStep1NotAvailable')}</span>
                         </p>
                       </div>
                     </Step>
 
-                    <Step number="2" title="Eklentiyi Chrome'a Yükleyin">
-                      <p>İndirdiğiniz ZIP dosyasını açın ve Chrome'a yükleyin:</p>
+                    <Step number="2" title={t('chromeStep2Title')}>
+                      <p>{t('chromeStep2Desc')}</p>
                       <ol className="list-decimal list-inside space-y-2 text-sm mt-3">
-                        <li>İndirdiğiniz <code className="bg-gray-100 px-2 py-1 rounded">kolayxport-etsy-extension-v5.3-multistore.zip</code> dosyasını bilgisayarınızda uygun bir yere çıkarın</li>
-                        <li>Chrome tarayıcısında <code className="bg-gray-100 px-2 py-1 rounded">chrome://extensions/</code> adresine gidin</li>
-                        <li>Sağ üst köşede "Geliştirici modu" (Developer mode) anahtarını açın</li>
-                        <li>"Paketlenmemiş öğe yükle" (Load unpacked) butonuna tıklayın</li>
-                        <li>Çıkardığınız <code className="bg-gray-100 px-2 py-1 rounded">chrome-extension</code> klasörünü seçin</li>
-                        <li>Eklenti Chrome'a yüklendi! Sağ üst köşede Kolayxport simgesini göreceksiniz.</li>
+                        <li>{t('chromeStep2Item1')}</li>
+                        <li>{t('chromeStep2Item2')}</li>
+                        <li>{t('chromeStep2Item3')}</li>
+                        <li>{t('chromeStep2Item4')}</li>
+                        <li>{t('chromeStep2Item5')}</li>
+                        <li>{t('chromeStep2Item6')}</li>
                       </ol>
                       <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <p className="text-sm text-green-700">
-                          <strong>İpucu:</strong> Eklentiyi her zaman erişilebilir tutmak için Chrome araç çubuğunda pin simgesine tıklayarak sabitleyin.
+                          <strong>{t('tip')}:</strong> {t('chromeStep2Tip')}
                         </p>
                       </div>
                     </Step>
 
-                    <Step number="3" title="Kolayxport'a Giriş Yapın">
+                    <Step number="3" title={t('chromeStep3Title')}>
                       <p>
                         <Link href="/app" className="text-blue-600 hover:underline">
-                          KolayXport hesabınıza
-                        </Link> giriş yapın ve oturum açık olduğundan emin olun.
+                          KolayXport
+                        </Link> — {t('chromeStep3Desc')}
                       </p>
                       <p className="mt-2 text-sm text-gray-600">
-                        Eklenti otomatik olarak oturum bilgilerinizi algılar ve kimlik doğrulama yapar.
+                        {t('chromeStep3AutoAuth')}
                       </p>
                     </Step>
 
-                    <Step number="4" title="Etsy Shop Manager'a Gidin">
+                    <Step number="4" title={t('chromeStep4Title')}>
                       <p>
-                        Etsy hesabınıza giriş yapın ve{' '}
-                        <a 
-                          href="https://www.etsy.com/your/orders/sold" 
-                          target="_blank" 
+                        {t('chromeStep4Desc')}{' '}
+                        <a
+                          href="https://www.etsy.com/your/orders/sold"
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:underline"
                         >
                           Shop Manager → Orders
                           <ExternalLink size={12} className="ml-1 inline" />
-                        </a> sayfasına gidin.
+                        </a>
                       </p>
                       <p className="mt-2 text-sm text-gray-600">
-                        Eklenti otomatik olarak siparişlerinizi algılar ve senkronizasyona başlar.
+                        {t('chromeStep4AutoDetect')}
                       </p>
                     </Step>
 
-                    <Step number="5" title="Senkronizasyonu Takip Edin">
+                    <Step number="5" title={t('chromeStep5Title')}>
                       <p>
-                        Chrome'da eklenti simgesine tıklayarak senkronizasyon durumunu takip edebilirsiniz:
+                        {t('chromeStep5Desc')}
                       </p>
                       <ul className="list-disc list-inside ml-4 mt-2 space-y-1 text-sm">
-                        <li><strong>Yeşil simge:</strong> Bağlantı başarılı, senkronizasyon aktif</li>
-                        <li><strong>Kırmızı simge:</strong> Kimlik doğrulama sorunu</li>
-                        <li><strong>Sarı simge:</strong> Bağlantı kontrol ediliyor</li>
+                        <li><strong>{t('greenIcon')}:</strong> {t('chromeStep5Green')}</li>
+                        <li><strong>{t('redIcon')}:</strong> {t('chromeStep5Red')}</li>
+                        <li><strong>{t('yellowIcon')}:</strong> {t('chromeStep5Yellow')}</li>
                       </ul>
                     </Step>
 
-                    <Step number="6" title="Toplu İçe Aktarma (Opsiyonel)">
+                    <Step number="6" title={t('chromeStep6Title')}>
                       <p>
-                        Mevcut tüm siparişlerinizi içe aktarmak için:
+                        {t('chromeStep6Desc')}
                       </p>
                       <ol className="list-decimal list-inside ml-4 mt-2 space-y-1 text-sm">
-                        <li>Eklenti popup'ında "Tüm Siparişleri İçe Aktar" butonuna tıklayın</li>
-                        <li>Etsy Orders sayfasını açık tutun</li>
-                        <li>Eklenti otomatik olarak tüm sayfalarda dolaşır ve siparişleri aktarır</li>
+                        <li>{t('chromeStep6Item1')}</li>
+                        <li>{t('chromeStep6Item2')}</li>
+                        <li>{t('chromeStep6Item3')}</li>
                       </ol>
                       <p className="mt-2 text-sm text-red-600">
-                        <strong>Not:</strong> Bu işlem sipariş sayınıza göre 5-30 dakika sürebilir.
+                        <strong>{t('note')}:</strong> {t('chromeStep6Note')}
                       </p>
                     </Step>
                   </div>
@@ -503,25 +500,25 @@ export default function EntegrasyonlarVeRehberlerPage() {
                   <div className="flex items-start">
                     <Globe size={20} className="text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-blue-800 font-semibold">Otomatik Senkronizasyon</p>
+                      <p className="text-blue-800 font-semibold">{t('autoSync')}</p>
                       <p className="text-sm text-blue-700 mt-1">
-                        Kurulum tamamlandıktan sonra, Etsy Orders sayfasını her ziyaret ettiğinizde 
-                        yeni siparişler otomatik olarak KolayXport'a aktarılacaktır. Dublaj önleme 
-                        sistemi sayesinde aynı sipariş iki kez aktarılmaz.
+                        {t('autoSyncDesc')}
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-6 space-y-3">
-                  <h4 className="text-lg font-semibold text-slate-800">Sorun Giderme</h4>
+                  <h4 className="text-lg font-semibold text-slate-800">{t('troubleshooting')}</h4>
                   <div className="space-y-2 text-sm text-slate-600">
-                    <p><strong>Eklenti siparişleri görmüyor:</strong> KolayXport'a giriş yaptığınızdan ve Etsy Orders sayfasında olduğunuzdan emin olun.</p>
-                    <p><strong>Kimlik doğrulama hatası:</strong> KolayXport'tan çıkış yapıp tekrar giriş yapın.</p>
-                    <p><strong>Siparişler eksik aktarılıyor:</strong> Sayfayı yenileyin ve birkaç saniye bekleyin.</p>
+                    <p><strong>{t('troubleshootNoOrdersTitle')}</strong> {t('troubleshootNoOrders')}</p>
+                    <p><strong>{t('troubleshootAuthErrorTitle')}</strong> {t('troubleshootAuthError')}</p>
+                    <p><strong>{t('troubleshootMissingOrdersTitle')}</strong> {t('troubleshootMissingOrders')}</p>
                   </div>
                   <p className="text-sm text-slate-500">
-                    Daha fazla yardım için <Link href="/iletisim" className="text-blue-600 hover:underline">destek ekibimizle iletişime geçin</Link>.
+                    {t.rich('troubleshootMoreHelp', {
+                      contactLink: (chunks) => <Link href="/iletisim" className="text-blue-600 hover:underline">{chunks}</Link>
+                    })}
                   </p>
                 </div>
               </div>
@@ -530,32 +527,36 @@ export default function EntegrasyonlarVeRehberlerPage() {
         </div>
       </Section>
 
-      <Section title="Trendyol Entegrasyon Rehberi" icon={HelpCircle} id="trendyol-guide">
+      <Section title={t('trendyolGuide')} icon={HelpCircle} id="trendyol-guide">
         <p className="mb-4">
-          Trendyol mağazanızdan siparişlerinizi KolayXport'a otomatik olarak aktarmak için aşağıdaki adımları izleyin:
+          {t('trendyolGuideDesc')}
         </p>
-        <Step number="1" title="Trendyol Satıcı Paneline Giriş Yapın">
-          <p><a href="https://partner.trendyol.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Trendyol Satıcı Paneli</a>'ne (partner.trendyol.com) kullanıcı bilgilerinizle giriş yapın.</p>
+        <Step number="1" title={t('trendyolStep1Title')}>
+          <p><a href="https://partner.trendyol.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{t('trendyolStep1Title')}</a> — {t('trendyolStep1Desc')}</p>
         </Step>
-        <Step number="2" title="API Anahtarı Bilgilerinizi Bulun">
-          <p>Satıcı panelinde genellikle "Entegrasyon Bilgileri", "API Bilgileri" veya benzeri bir menü altında API Anahtarınızı (API Key) ve Satıcı ID'nizi (Supplier ID/Satıcı ID) bulabilirsiniz.</p>
-          <p className="mt-1">Bu bilgiler genellikle şu şekilde görünür:</p>
+        <Step number="2" title={t('trendyolStep2Title')}>
+          <p>{t('trendyolStep2Desc')}</p>
+          <p className="mt-1">{t('trendyolStep2InfoLabel')}</p>
           <ul className="list-disc list-inside ml-4 mt-1 text-xs">
-            <li><strong>Satıcı ID (Supplier ID):</strong> Genellikle sayısal bir değerdir.</li>
-            <li><strong>API Key (API Anahtarı):</strong> Uzun bir karakter dizisidir.</li>
-            <li><strong>API Secret (API Gizli Anahtarı):</strong> Bazı durumlarda API Key ile birlikte bir de Secret Key verilebilir. KolayXport için genellikle API Key ve Satıcı ID yeterlidir.</li>
+            <li><strong>{t('supplierIdLabel')}:</strong> {t('trendyolStep2SupplierId')}</li>
+            <li><strong>{t('apiKeyLabel')}:</strong> {t('trendyolStep2ApiKey')}</li>
+            <li><strong>{t('apiSecretLabel')}:</strong> {t('trendyolStep2ApiSecret')}</li>
           </ul>
-          <p className="mt-1 text-xs text-slate-500">Trendyol paneli arayüzü zaman zaman güncellenebilir. API bilgilerinizi bulmakta zorlanırsanız, Trendyol Satıcı Destek Hattı'ndan yardım alabilirsiniz.</p>
+          <p className="mt-1 text-xs text-slate-500">{t('trendyolStep2Note')}</p>
         </Step>
-        <Step number="3" title="API Bilgilerini KolayXport'a Girin">
-          <p>Elde ettiğiniz Satıcı ID ve API Anahtarı bilgilerinizi KolayXport dashboard'unuzdaki <Link href="/app/settings" className="text-blue-600 hover:underline">Ayarlar</Link> bölümünde ilgili Trendyol entegrasyon alanlarına girin ve kaydedin.</p>
+        <Step number="3" title={t('trendyolStep3Title')}>
+          <p>{t.rich('trendyolStep3Desc', {
+            settingsLink: (chunks) => <Link href="/app/settings" className="text-blue-600 hover:underline">{chunks}</Link>
+          })}</p>
           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
-            <p><Settings size={16} className="inline mr-1"/> API anahtarlarınızı girerken kopyala-yapıştır yöntemini kullanmanız, olası yazım hatalarını engelleyecektir.</p>
+            <p><Settings size={16} className="inline mr-1"/> {t('trendyolStep3Tip')}</p>
           </div>
         </Step>
-        <Step number="4" title="Entegrasyonu Test Edin">
-          <p>Bilgileri kaydettikten sonra, sistemimiz Trendyol mağazanızla bağlantıyı test edecektir. Birkaç dakika içinde siparişlerinizin akmaya başladığını görmelisiniz.</p>
-          <p className="mt-1 text-xs text-slate-500">Sorun yaşamanız durumunda <Link href="/destek" className="text-blue-600 hover:underline">Destek sayfamızdan</Link> bize ulaşabilirsiniz. (Not: /support linki /destek olarak güncellendi.)</p>
+        <Step number="4" title={t('trendyolStep4Title')}>
+          <p>{t('trendyolStep4Desc')}</p>
+          <p className="mt-1 text-xs text-slate-500">{t.rich('trendyolStep4Note', {
+            supportLink: (chunks) => <Link href="/destek" className="text-blue-600 hover:underline">{chunks}</Link>
+          })}</p>
         </Step>
       </Section>
 
@@ -565,4 +566,4 @@ export default function EntegrasyonlarVeRehberlerPage() {
 
 EntegrasyonlarVeRehberlerPage.getLayout = function getLayout(page) {
   return <AppLayout>{page}</AppLayout>;
-}; 
+};

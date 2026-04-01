@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Accordion,
   AccordionSummary,
@@ -18,6 +18,8 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { TURKISH_CITIES, getRegionCodeForCity } from '../lib/data/turkishLocations';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '../lib/i18n/useLocale';
 
 export interface ImporterData {
   contact: {
@@ -46,44 +48,49 @@ interface ImporterFormProps {
   error?: string | null;
 }
 
-const INITIAL_IMPORTER_DATA: ImporterData = {
-  contact: {
-    personName: '',
-    companyName: '',
-    phoneNumber: '',
-    emailAddress: ''
-  },
-  address: {
-    streetLines: [''],
-    city: '',
-    stateOrProvinceCode: '',
-    postalCode: '',
-    countryCode: 'TR'
-  },
-  tins: []
-};
+function getInitialImporterData(defaultCountry: string): ImporterData {
+  return {
+    contact: {
+      personName: '',
+      companyName: '',
+      phoneNumber: '',
+      emailAddress: ''
+    },
+    address: {
+      streetLines: [''],
+      city: '',
+      stateOrProvinceCode: '',
+      postalCode: '',
+      countryCode: defaultCountry || ''
+    },
+    tins: []
+  };
+}
 
-const TIN_TYPES = [
-  { value: 'VAT', label: 'KDV Numarası' },
-  { value: 'EORI', label: 'EORI Numarası' },
-  { value: 'BUSINESS_NATIONAL', label: 'İş Vergi Numarası' },
-  { value: 'TIN', label: 'Vergi Kimlik Numarası' }
-];
-
-const TIN_USAGE_TYPES = [
-  { value: 'IMPORTER_OF_RECORD', label: 'Importer of Record' },
-  { value: 'ULTIMATE_CONSIGNEE', label: 'Ultimate Consignee' }
-];
+const TIN_TYPE_CODES = ['VAT', 'EORI', 'BUSINESS_NATIONAL', 'TIN'] as const;
+const TIN_USAGE_CODES = ['IMPORTER_OF_RECORD', 'ULTIMATE_CONSIGNEE'] as const;
 
 const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
   value,
   onChange,
   error
 }) => {
-  const [importerData, setImporterData] = useState<ImporterData>(INITIAL_IMPORTER_DATA);
+  const t = useTranslations('importer');
+  const { config } = useLocale();
+  const initialData = useMemo(() => getInitialImporterData(config.defaultCountryOfOrigin), [config]);
+  const [importerData, setImporterData] = useState<ImporterData>(initialData);
   const [isExpanded, setIsExpanded] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [hasData, setHasData] = useState(false);
+
+  const tinTypes = useMemo(() =>
+    TIN_TYPE_CODES.map(code => ({ value: code, label: t(`tinTypes.${code}`) })),
+    [t]
+  );
+  const tinUsageTypes = useMemo(() =>
+    TIN_USAGE_CODES.map(code => ({ value: code, label: t(`tinUsageTypes.${code}`) })),
+    [t]
+  );
 
   // Parse JSON value on mount and when it changes
   useEffect(() => {
@@ -102,22 +109,22 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
             city: parsed.address?.city || '',
             stateOrProvinceCode: parsed.address?.stateOrProvinceCode || '',
             postalCode: parsed.address?.postalCode || '',
-            countryCode: parsed.address?.countryCode || 'TR'
+            countryCode: parsed.address?.countryCode || config.defaultCountryOfOrigin
           },
           tins: parsed.tins || []
         });
         setHasData(true);
         setJsonError(null);
       } catch (e) {
-        setJsonError('Geçersiz JSON formatı');
+        setJsonError(t('invalidJson'));
         setHasData(false);
       }
     } else {
-      setImporterData(INITIAL_IMPORTER_DATA);
+      setImporterData(initialData);
       setHasData(false);
       setJsonError(null);
     }
-  }, [value]);
+  }, [value, config, initialData]);
 
   const handleFormChange = (path: string, newValue: any) => {
     const updatedData = { ...importerData };
@@ -179,12 +186,12 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
     try {
       // Validate required fields
       if (!importerData.contact.personName || !importerData.contact.companyName) {
-        setJsonError('Kişi adı ve şirket adı gereklidir');
+        setJsonError(t('nameAndCompanyRequired'));
         return;
       }
 
       if (!importerData.address.city || !importerData.address.postalCode) {
-        setJsonError('Şehir ve posta kodu gereklidir');
+        setJsonError(t('cityAndPostalRequired'));
         return;
       }
 
@@ -208,12 +215,12 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
       setJsonError(null);
       setHasData(true);
     } catch (e) {
-      setJsonError('Veri kaydedilirken hata oluştu');
+      setJsonError(t('saveError'));
     }
   };
 
   const handleClear = () => {
-    setImporterData(INITIAL_IMPORTER_DATA);
+    setImporterData(initialData);
     onChange('');
     setHasData(false);
     setJsonError(null);
@@ -228,19 +235,19 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
           <Typography variant="h6">
-            Importer of Record Bilgileri
+            {t('title')}
           </Typography>
           {hasData && (
-            <Chip 
-              label="Yapılandırılmış" 
-              color="success" 
+            <Chip
+              label={t('configured')}
+              color="success"
               size="small"
             />
           )}
           {!hasData && (
-            <Chip 
-              label="Yapılandırılmamış" 
-              color="default" 
+            <Chip
+              label={t('notConfigured')}
+              color="default"
               size="small"
             />
           )}
@@ -263,13 +270,13 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
 
           {/* Contact Information */}
           <Typography variant="h6" sx={{ mb: 2, mt: 1 }}>
-            İletişim Bilgileri
+            {t('contactInfo')}
           </Typography>
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Kişi Adı *"
+                label={`${t('personName')} *`}
                 value={importerData.contact.personName}
                 onChange={(e) => handleFormChange('contact.personName', e.target.value)}
                 required
@@ -278,7 +285,7 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Şirket Adı *"
+                label={`${t('companyName')} *`}
                 value={importerData.contact.companyName}
                 onChange={(e) => handleFormChange('contact.companyName', e.target.value)}
                 required
@@ -287,7 +294,7 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="Telefon Numarası"
+                label={t('phoneNumber')}
                 value={importerData.contact.phoneNumber}
                 onChange={(e) => handleFormChange('contact.phoneNumber', e.target.value)}
                 placeholder="905335010211"
@@ -296,7 +303,7 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
-                label="E-posta Adresi"
+                label={t('emailAddress')}
                 type="email"
                 value={importerData.contact.emailAddress}
                 onChange={(e) => handleFormChange('contact.emailAddress', e.target.value)}
@@ -306,7 +313,7 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
 
           {/* Address Information */}
           <Typography variant="h6" sx={{ mb: 2 }}>
-            Adres Bilgileri
+            {t('addressInfo')}
           </Typography>
           <Grid container spacing={3} sx={{ mb: 3 }}>
             {/* Street Lines */}
@@ -315,7 +322,7 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                   <TextField
                     fullWidth
-                    label={`Adres Satırı ${index + 1}${index === 0 ? ' *' : ''}`}
+                    label={`${t('addressLine')} ${index + 1}${index === 0 ? ' *' : ''}`}
                     value={line}
                     onChange={(e) => updateStreetLine(index, e.target.value)}
                     required={index === 0}
@@ -326,7 +333,7 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
                       onClick={() => removeStreetLine(index)}
                       sx={{ minWidth: 'auto', px: 2 }}
                     >
-                      Sil
+                      {t('delete')}
                     </Button>
                   )}
                   {index === importerData.address.streetLines.length - 1 && (
@@ -344,11 +351,11 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
 
             <Grid item xs={12} md={4}>
               <FormControl fullWidth required>
-                <InputLabel>Şehir *</InputLabel>
+                <InputLabel>{t('city')} *</InputLabel>
                 <Select
                   value={importerData.address.city}
                   onChange={(e: SelectChangeEvent<string>) => handleCityChange(e.target.value)}
-                  label="Şehir *"
+                  label={`${t('city')} *`}
                 >
                   {TURKISH_CITIES.map(city => (
                     <MenuItem key={city.code} value={city.name}>
@@ -362,17 +369,17 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Bölge Kodu (Otomatik)"
+                label={t('regionCode')}
                 value={importerData.address.stateOrProvinceCode}
                 InputProps={{ readOnly: true }}
-                helperText="Şehir seçimine göre otomatik belirlenir"
+                helperText={t('regionCodeHelper')}
               />
             </Grid>
 
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Posta Kodu *"
+                label={`${t('postalCode')} *`}
                 value={importerData.address.postalCode}
                 onChange={(e) => handleFormChange('address.postalCode', e.target.value)}
                 required
@@ -382,10 +389,10 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                label="Ülke Kodu"
+                label={t('countryCode')}
                 value={importerData.address.countryCode}
                 InputProps={{ readOnly: true }}
-                helperText="Türkiye için TR sabitlenmiştir"
+                helperText={t('countryCodeHelper')}
               />
             </Grid>
           </Grid>
@@ -393,10 +400,10 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
           {/* TIN Information */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6">
-              Vergi Numaraları
+              {t('taxNumbers')}
             </Typography>
             <Button color="primary" onClick={addTin}>
-              Vergi Numarası Ekle
+              {t('addTaxNumber')}
             </Button>
           </Box>
 
@@ -404,13 +411,13 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
             <Grid container spacing={3} key={index} sx={{ mb: 2, p: 2, border: '1px solid #ddd', borderRadius: 1 }}>
               <Grid item xs={12} md={4}>
                 <FormControl fullWidth>
-                  <InputLabel>Vergi Tipi</InputLabel>
+                  <InputLabel>{t('tinType')}</InputLabel>
                   <Select
                     value={tin.tinType}
                     onChange={(e: SelectChangeEvent<string>) => updateTin(index, 'tinType', e.target.value)}
-                    label="Vergi Tipi"
+                    label={t('tinType')}
                   >
-                    {TIN_TYPES.map(type => (
+                    {tinTypes.map(type => (
                       <MenuItem key={type.value} value={type.value}>
                         {type.label}
                       </MenuItem>
@@ -422,7 +429,7 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
               <Grid item xs={12} md={4}>
                 <TextField
                   fullWidth
-                  label="Vergi Numarası"
+                  label={t('tinNumber')}
                   value={tin.number}
                   onChange={(e) => updateTin(index, 'number', e.target.value)}
                 />
@@ -430,13 +437,13 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
 
               <Grid item xs={12} md={3}>
                 <FormControl fullWidth>
-                  <InputLabel>Kullanım Amacı</InputLabel>
+                  <InputLabel>{t('tinUsage')}</InputLabel>
                   <Select
                     value={tin.usage || ''}
                     onChange={(e: SelectChangeEvent<string>) => updateTin(index, 'usage', e.target.value)}
-                    label="Kullanım Amacı"
+                    label={t('tinUsage')}
                   >
-                    {TIN_USAGE_TYPES.map(usage => (
+                    {tinUsageTypes.map(usage => (
                       <MenuItem key={usage.value} value={usage.value}>
                         {usage.label}
                       </MenuItem>
@@ -451,7 +458,7 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
                   onClick={() => removeTin(index)}
                   sx={{ height: '56px' }}
                 >
-                  Sil
+                  {t('delete')}
                 </Button>
               </Grid>
             </Grid>
@@ -460,10 +467,10 @@ const ImporterFormCollapsible: React.FC<ImporterFormProps> = ({
           {/* Action Buttons */}
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
             <Button variant="outlined" onClick={handleClear}>
-              Temizle
+              {t('clear')}
             </Button>
             <Button variant="contained" onClick={handleSave} color="primary">
-              Kaydet
+              {t('save')}
             </Button>
           </Box>
         </Box>

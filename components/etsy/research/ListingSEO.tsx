@@ -404,13 +404,13 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
               <Table size="small">
                 <TableBody>
                   <TableRow>
-                    <TableCell>Satış Fiyatı</TableCell>
+                    <TableCell>{t('salePrice')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>{fmt(profitCalc.sell)}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        Listeleme Ücreti <Tooltip title="Her listeleme için $0.20 (4 ay geçerli)"><Info size={14} color="#999" /></Tooltip>
+                        {t('listingFee')} <Tooltip title={t('listingFeeTooltip')}><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.listingFee)}</TableCell>
@@ -418,7 +418,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        İşlem Komisyonu (%6.5) <Tooltip title="Her satış için fiyatın %6.5'i"><Info size={14} color="#999" /></Tooltip>
+                        {t('transactionCommission')} <Tooltip title={t('transactionCommissionTooltip')}><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.transactionFee)}</TableCell>
@@ -426,10 +426,10 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        Ödeme İşleme ({shopRegion === 'tr' ? '%6.5 + 3₺' : '%3 + $0.25'})
+                        {t('paymentProcessing')} ({shopRegion === 'tr' ? '%6.5 + 3₺' : '%3 + $0.25'})
                         <Tooltip title={shopRegion === 'tr'
-                          ? 'Türkiye mağazaları için %6.5 + 3₺ sabit ücret'
-                          : 'ABD mağazaları için %3 + $0.25'
+                          ? t('paymentProcessingTR')
+                          : t('paymentProcessingUS')
                         }><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
@@ -439,8 +439,8 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                     <TableRow>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          Düzenleyici İşletim Ücreti (%2.27)
-                          <Tooltip title="Türkiye'ye özel düzenleyici işletim ücreti — Dijital Hizmet Vergisi kapsamında"><Info size={14} color="#999" /></Tooltip>
+                          {t('regulatoryFee')}
+                          <Tooltip title={t('regulatoryFeeTooltip')}><Info size={14} color="#999" /></Tooltip>
                         </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.regulatoryFee)}</TableCell>
@@ -450,8 +450,8 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                     <TableRow>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          Offsite Ads (%15)
-                          <Tooltip title="Etsy'nin dış site reklamları üzerinden satış olursa kesilir"><Info size={14} color="#999" /></Tooltip>
+                          {t('offsiteAdsLabel')}
+                          <Tooltip title={t('offsiteAdsTooltip')}><Info size={14} color="#999" /></Tooltip>
                         </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.offsiteAdsFee)}</TableCell>
@@ -461,21 +461,21 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                     <TableRow>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          Etsy Ads Maliyeti (ROAS: {profitCalc.roas}x)
-                          <Tooltip title={`ROAS ${profitCalc.roas}x = her $1 reklam harcamasına $${profitCalc.roas} gelir. Satış başı reklam maliyeti: ${fmt(profitCalc.sell)} / ${profitCalc.roas} = ${fmt(profitCalc.etsyAdsCost)}`}><Info size={14} color="#999" /></Tooltip>
+                          {t('etsyAdsCost')} (ROAS: {profitCalc.roas}x)
+                          <Tooltip title={t('etsyAdsCostTooltip', { roas: String(profitCalc.roas), sell: fmt(profitCalc.sell), cost: fmt(profitCalc.etsyAdsCost) })}><Info size={14} color="#999" /></Tooltip>
                         </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.etsyAdsCost)}</TableCell>
                     </TableRow>
                   )}
-                  <TableRow><TableCell>Alış Maliyeti</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.cost)}</TableCell></TableRow>
-                  <TableRow><TableCell>Kargo Maliyeti</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.ship)}</TableCell></TableRow>
+                  <TableRow><TableCell>{t('purchaseCostRow')}</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.cost)}</TableCell></TableRow>
+                  <TableRow><TableCell>{t('shippingCostRow')}</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.ship)}</TableCell></TableRow>
                   <TableRow sx={{
                     background: profitCalc.profit >= 0
                       ? 'linear-gradient(135deg, rgba(17,153,142,0.08) 0%, rgba(56,239,125,0.08) 100%)'
                       : 'linear-gradient(135deg, rgba(235,51,73,0.08) 0%, rgba(244,92,67,0.08) 100%)',
                   }}>
-                    <TableCell sx={{ fontWeight: 800 }}>Net Kâr</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>{t('netProfit')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: profitCalc.profit >= 0 ? '#11998e' : '#eb3349' }}>
                       {fmt(profitCalc.profit)}
                     </TableCell>
@@ -485,7 +485,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                       ? 'linear-gradient(135deg, rgba(17,153,142,0.08) 0%, rgba(56,239,125,0.08) 100%)'
                       : 'linear-gradient(135deg, rgba(235,51,73,0.08) 0%, rgba(244,92,67,0.08) 100%)',
                   }}>
-                    <TableCell sx={{ fontWeight: 800 }}>Kâr Marjı</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>{t('profitMargin')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: profitCalc.profit >= 0 ? '#11998e' : '#eb3349' }}>
                       {pct(profitCalc.margin)}
                     </TableCell>
@@ -497,16 +497,16 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
 
           <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
             <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Farklı Fiyat Noktaları</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('differentPricePoints')}</Typography>
             </Box>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
-                    <TableCell>Senaryo</TableCell>
-                    <TableCell align="right">Fiyat</TableCell>
-                    <TableCell align="right">Kâr</TableCell>
-                    <TableCell align="right">Marj</TableCell>
+                    <TableCell>{t('scenario')}</TableCell>
+                    <TableCell align="right">{t('priceColumn')}</TableCell>
+                    <TableCell align="right">{t('profitColumn')}</TableCell>
+                    <TableCell align="right">{t('marginColumn')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -539,17 +539,17 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
               <Paper sx={{ ...glassCard, p: isMobile ? 2 : 3, mb: 2, textAlign: 'center' }}>
                 <ScoreRing score={seoResult.score} size={isMobile ? 100 : 140} label="SEO" />
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Kelime ({seoResult.coveredKw}/{seoResult.totalKw}) + Tag ({seoResult.coveredTags}/{seoResult.totalTags}) kapsami
+                  {t('keywordCoverage')} ({seoResult.coveredKw}/{seoResult.totalKw}) + {t('tagCoverage')} ({seoResult.coveredTags}/{seoResult.totalTags}) {t('coverage')}
                 </Typography>
               </Paper>
 
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Skor Detayi</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>{t('scoreDetails')}</Typography>
                 {[
-                  { label: 'Kelime Kapsami', score: seoResult.kwScore, max: 30 },
-                  { label: 'Tag Kapsami', score: seoResult.tagScore, max: 30 },
-                  { label: 'Baslik Uzunlugu', score: seoResult.lengthScore, max: 20 },
-                  { label: 'Tag Sayisi', score: seoResult.hasTagsScore, max: 20 },
+                  { label: t('keywordCoverageLabel'), score: seoResult.kwScore, max: 30 },
+                  { label: t('tagCoverageLabel'), score: seoResult.tagScore, max: 30 },
+                  { label: t('titleLength'), score: seoResult.lengthScore, max: 20 },
+                  { label: t('tagCount'), score: seoResult.hasTagsScore, max: 20 },
                 ].map(b => (
                   <Box key={b.label} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                     <Typography variant="body2" sx={{ minWidth: 120, fontWeight: 500 }}>{b.label}</Typography>
@@ -567,18 +567,18 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
               </Paper>
 
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Baslik Uzunlugu</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('titleLength')}</Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120, borderRadius: '12px' }}>
-                    <Typography variant="caption" color="text.secondary">Benim</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{myTitle.length} kr</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('mine')}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{myTitle.length} {t('chars')}</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120, borderRadius: '12px' }}>
-                    <Typography variant="caption" color="text.secondary">Rakip Ort.</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{seoResult.avgLen} kr</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('competitorAvg')}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{seoResult.avgLen} {t('chars')}</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120, borderRadius: '12px' }}>
-                    <Typography variant="caption" color="text.secondary">Optimal</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('optimal')}</Typography>
                     <Typography variant="h6" sx={{ fontWeight: 800, color: '#11998e' }}>100-140</Typography>
                   </Paper>
                 </Box>
@@ -586,7 +586,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
 
               {seoResult.recommendations.length > 0 && (
                 <Alert severity={seoResult.score >= 70 ? 'success' : 'warning'} sx={{ mb: 2, borderRadius: '12px' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>Oneriler</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>{t('recommendations')}</Typography>
                   {seoResult.recommendations.map((rec, i) => (
                     <Typography key={i} variant="body2">• {rec}</Typography>
                   ))}
@@ -599,10 +599,10 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
-                          <TableCell>Kelime</TableCell>
-                          <TableCell align="center">Kullanim %</TableCell>
-                          <TableCell align="center">Basligimda</TableCell>
-                          <TableCell align="center">Kopyala</TableCell>
+                          <TableCell>{t('keywordColumn')}</TableCell>
+                          <TableCell align="center">{t('usagePct')}</TableCell>
+                          <TableCell align="center">{t('inMyTitle')}</TableCell>
+                          <TableCell align="center">{t('copyColumn')}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -625,7 +625,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                             <TableCell align="center">
                               {!kw.inMyTitle && (
                                 <IconButton size="small" onClick={() => {
-                                  navigator.clipboard.writeText(kw.keyword); toast.success(`"${kw.keyword}" kopyalandi`);
+                                  navigator.clipboard.writeText(kw.keyword); toast.success(t('keywordCopied', { keyword: kw.keyword }));
                                 }}><Copy size={14} /></IconButton>
                               )}
                             </TableCell>
@@ -652,10 +652,10 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
               {discoveryData?.seasonalTips?.length > 0 && (
                 <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Lightbulb size={16} color="#ff9800" /> SEO Seasonal Tips
+                    <Lightbulb size={16} color="#ff9800" /> {t('seoSeasonalTips')}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                    Keep these in mind when optimizing your listing titles and tags
+                    {t('seoSeasonalTipsDesc')}
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
                     {discoveryData.seasonalTips.map((tip: string, i: number) => (
@@ -670,22 +670,22 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
 
               <PremiumEmptyState
                 icon={<TrendingUp size={48} />}
-                title="SEO Karşılaştırma"
+                title={t('seoComparison')}
                 desc={userListings?.length
-                  ? 'Üstten bir listeleme seçin, sonra "Pazar Araştırma" bölümünden arama yapın — başlık ve taglar otomatik doldurulur.'
-                  : 'Başlığınız ve taglarınız rakiplere kıyasla ne kadar güçlü?'
+                  ? t('seoEmptyWithListings')
+                  : t('seoEmptyNoListings')
                 }
                 steps={userListings?.length
                   ? [
-                      'Üstteki "Listelemenizi Seçin" kutusundan bir ürün seçin',
-                      '"Pazar Araştırma" bölümüne geçip rakiplerinizi aratın',
-                      'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
+                      t('seoStep1WithListings'),
+                      t('seoStep2WithListings'),
+                      t('seoStep3WithListings'),
                     ]
                   : [
-                      '"Pazar Araştırma" bölümüne geçin ve bir anahtar kelime arayın',
-                      'Arama çubuğundaki "SEO karşılaştırma için başlık/tag girin" bölümünü açın',
-                      'Kendi listeleme başlığınızı ve taglarınızı girin',
-                      'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
+                      t('seoStep1NoListings'),
+                      t('seoStep2NoListings'),
+                      t('seoStep3NoListings'),
+                      t('seoStep4NoListings'),
                     ]
                 }
               />
@@ -702,7 +702,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
           {/* Add keyword form */}
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Target size={16} color="#667eea" /> Anahtar Kelime Takibe Al
+              <Target size={16} color="#667eea" /> {t('addKeywordToTrack')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <Autocomplete
@@ -727,14 +727,14 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                   </li>
                 )}
                 renderInput={(params) => (
-                  <TextField {...params} size="small" label="Listeleme Secin" placeholder="Listeleme ara..." />
+                  <TextField {...params} size="small" label={t('selectListing')} placeholder={t('searchListing')} />
                 )}
                 isOptionEqualToValue={(opt: any, val: any) => (opt.listing_id || opt.id) === (val.listing_id || val.id)}
                 sx={{ flex: 2, minWidth: isMobile ? '100%' : 200 }}
               />
               <TextField
                 size="small"
-                label="Anahtar Kelime"
+                label={t('keywordLabel')}
                 placeholder="baby blanket, crochet dress..."
                 value={rankKeywordInput}
                 onChange={(e) => setRankKeywordInput(e.target.value)}
@@ -752,7 +752,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                   ...(isMobile && { width: '100%' }),
                 }}
               >
-                Takip Et
+                {t('trackButton')}
               </Button>
             </Box>
           </Paper>
@@ -763,13 +763,13 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
           ) : trackedKeywords.length === 0 ? (
             <PremiumEmptyState
               icon={<Target size={64} />}
-              title="Sıralama Takibi"
-              desc="Listelerinizin Etsy aramada kaçıncı sırada olduğunu takip edin"
+              title={t('rankTracking')}
+              desc={t('rankTrackingDesc')}
               steps={[
-                'Yukarıdan bir listeleme seçin',
-                'Takip etmek istediğiniz anahtar kelimeyi girin',
-                '"Takip Et" butonuna basın — anında sıralama sonucunu görün',
-                'Her 12 saatte otomatik güncellenir',
+                t('rankStep1'),
+                t('rankStep2'),
+                t('rankStep3'),
+                t('rankStep4'),
               ]}
             />
           ) : (
@@ -778,12 +778,12 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'rgba(102,126,234,0.06)' }}>
-                      <TableCell sx={{ fontWeight: 700 }}>Anahtar Kelime</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Listeleme</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Sıra</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Sayfa</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Değişim</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Son Kontrol</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>{t('keywordColumn')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>{t('listingColumn')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">{t('rankColumn')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">{t('pageColumn')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">{t('changeColumn')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">{t('lastCheckColumn')}</TableCell>
                       <TableCell sx={{ fontWeight: 700 }} align="center" />
                     </TableRow>
                   </TableHead>
@@ -817,7 +817,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                             </TableCell>
                             <TableCell align="center">
                               <Chip
-                                label={kw.rank != null ? `#${kw.rank}` : 'Yok'}
+                                label={kw.rank != null ? `#${kw.rank}` : t('notFound')}
                                 size="small"
                                 sx={{
                                   bgcolor: rankColor, color: '#fff', fontWeight: 700,
@@ -837,7 +837,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                             </TableCell>
                             <TableCell align="center">
                               <Typography variant="caption" color="text.secondary">
-                                {kw.checkedAt ? new Date(kw.checkedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                {kw.checkedAt ? formatDate(new Date(kw.checkedAt), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                               </Typography>
                             </TableCell>
                             <TableCell align="center">
@@ -853,12 +853,12 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                                 {rankHistory.length > 1 ? (
                                   <Box>
                                     <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block' }}>
-                                      Son 30 gün sıralama geçmişi (düşük = daha iyi)
+                                      {t('rankHistory30Days')}
                                     </Typography>
                                     <Box sx={{ height: 120 }}>
                                       <TrendChart
                                         data={rankHistory.map((s: any) => ({
-                                          date: new Date(s.checkedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }),
+                                          date: formatDate(new Date(s.checkedAt), { day: '2-digit', month: '2-digit' }),
                                           value: s.rank != null ? Math.max(1, 500 - s.rank) : 0,
                                         }))}
                                         height={120}
@@ -871,7 +871,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                                           key={i}
                                           size="small"
                                           variant="outlined"
-                                          label={`${new Date(s.checkedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}: ${s.rank != null ? `#${s.rank}` : 'Yok'}`}
+                                          label={`${formatDate(new Date(s.checkedAt), { day: '2-digit', month: '2-digit' })}: ${s.rank != null ? `#${s.rank}` : t('rankNotAvailable')}`}
                                           sx={{ fontSize: '0.7rem' }}
                                         />
                                       ))}
@@ -879,7 +879,7 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
                                   </Box>
                                 ) : (
                                   <Typography variant="caption" color="text.secondary">
-                                    Henüz yeterli veri yok — 12 saat sonra ilk güncelleme gelecek
+                                    {t('rankNotEnoughData')}
                                   </Typography>
                                 )}
                               </TableCell>
@@ -897,9 +897,9 @@ export default function ListingSEO({ shopId, userListings }: ListingSEOProps) {
           {/* Rank legend */}
           <Box sx={{ display: 'flex', gap: 1.5, mt: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
             {[
-              { label: 'Sayfa 1 (1-48)', color: '#11998e' },
-              { label: 'Sayfa 2 (49-96)', color: '#e67e22' },
-              { label: '96+', color: '#eb3349' },
+              { label: t('rankLegendPage1'), color: '#11998e' },
+              { label: t('rankLegendPage2'), color: '#e67e22' },
+              { label: t('rankLegend96Plus'), color: '#eb3349' },
             ].map((item) => (
               <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: item.color }} />

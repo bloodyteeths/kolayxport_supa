@@ -27,6 +27,9 @@ import {
 } from '@mui/icons-material';
 import { format, differenceInDays } from 'date-fns';
 import { tr } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
+import { useTranslations } from 'next-intl';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
 
 interface SubscriptionData {
   subscriptionPlan: 'trial' | 'starter' | 'growth' | 'enterprise' | null;
@@ -50,18 +53,11 @@ const PLAN_LIMITS: Record<string, PlanLimits> = {
   enterprise: { orderSyncs: Infinity, labels: Infinity },
 };
 
-const PLAN_NAMES: Record<string, string> = {
-  trial: 'Deneme',
-  starter: 'Başlangıç',
-  growth: 'Büyüme',
-  enterprise: 'Kurumsal',
-};
-
-const STATUS_LABELS: Record<string, { label: string; color: 'default' | 'success' | 'warning' | 'error' }> = {
-  trialing: { label: 'Deneme Sürümü', color: 'default' },
-  active: { label: 'Aktif', color: 'success' },
-  canceled: { label: 'İptal Edildi', color: 'warning' },
-  past_due: { label: 'Ödeme Gecikmiş', color: 'error' },
+const STATUS_COLORS: Record<string, 'default' | 'success' | 'warning' | 'error'> = {
+  trialing: 'default',
+  active: 'success',
+  canceled: 'warning',
+  past_due: 'error',
 };
 
 interface SubscriptionDashboardProps {
@@ -77,6 +73,10 @@ export default function SubscriptionDashboard({
   onManageSubscription,
   onViewBillingHistory,
 }: SubscriptionDashboardProps) {
+  const t = useTranslations('subscription');
+  const locale = useLocaleStore((s) => s.locale);
+  const dateFnsLocale = locale === 'tr' ? tr : enUS;
+
   try {
     const plan = subscriptionData.subscriptionPlan || 'trial';
     const status = subscriptionData.subscriptionStatus || 'trialing';
@@ -108,10 +108,12 @@ export default function SubscriptionDashboard({
       })()
     : null;
 
+  const statusKey = status === 'past_due' ? 'pastDue' : status;
+
   return (
     <Box sx={{ mb: 4, overflowX: 'hidden', maxWidth: '100%' }}>
       <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 3, fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        Abonelik ve Kullanım
+        {t('title')}
       </Typography>
 
       <Grid container spacing={3}>
@@ -121,22 +123,22 @@ export default function SubscriptionDashboard({
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" component="h3">
-                  Mevcut Plan
+                  {t('currentPlan')}
                 </Typography>
                 <Chip
-                  label={STATUS_LABELS[status].label}
-                  color={STATUS_LABELS[status].color}
+                  label={t(`statusLabels.${statusKey}`)}
+                  color={STATUS_COLORS[status]}
                   size="small"
                 />
               </Box>
 
               <Box sx={{ mb: 2 }}>
                 <Typography variant="h4" component="div" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  {PLAN_NAMES[plan]}
+                  {t(`planNames.${plan}`)}
                 </Typography>
                 {subscriptionData.billingInterval && plan !== 'trial' && (
                   <Typography variant="body2" color="text.secondary">
-                    {subscriptionData.billingInterval === 'month' ? 'Aylık' : 'Yıllık'} Abonelik
+                    {subscriptionData.billingInterval === 'month' ? t('monthlySubscription') : t('yearlySubscription')}
                   </Typography>
                 )}
               </Box>
@@ -144,18 +146,18 @@ export default function SubscriptionDashboard({
               {/* Trial Warning */}
               {status === 'trialing' && daysUntilTrialEnds !== null && (
                 <Alert severity={daysUntilTrialEnds <= 3 ? 'warning' : 'info'} sx={{ mb: 2 }}>
-                  <AlertTitle>Deneme Sürümü</AlertTitle>
+                  <AlertTitle>{t('trialVersion')}</AlertTitle>
                   {daysUntilTrialEnds > 0
-                    ? `Deneme süreniz ${daysUntilTrialEnds} gün sonra sona erecek.`
-                    : 'Deneme süreniz bugün sona eriyor!'}
+                    ? t('trialExpiresIn', { days: daysUntilTrialEnds })
+                    : t('trialExpiresToday')}
                 </Alert>
               )}
 
               {/* Past Due Warning */}
               {status === 'past_due' && (
                 <Alert severity="error" sx={{ mb: 2 }}>
-                  <AlertTitle>Ödeme Gecikmiş</AlertTitle>
-                  Aboneliğinizi devam ettirmek için lütfen ödeme bilgilerinizi güncelleyin.
+                  <AlertTitle>{t('pastDueTitle')}</AlertTitle>
+                  {t('pastDueMessage')}
                 </Alert>
               )}
 
@@ -169,7 +171,7 @@ export default function SubscriptionDashboard({
                     fullWidth
                     sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                   >
-                    Plan Yükselt
+                    {t('upgradePlan')}
                   </Button>
                 )}
                 {plan !== 'trial' && (
@@ -180,7 +182,7 @@ export default function SubscriptionDashboard({
                     fullWidth
                     sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                   >
-                    Abonelik Yönet
+                    {t('manageSubscription')}
                   </Button>
                 )}
               </Box>
@@ -195,7 +197,7 @@ export default function SubscriptionDashboard({
                     size="small"
                     sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: { xs: '0.75rem', sm: '0.8rem' } }}
                   >
-                    Fatura Geçmişi
+                    {t('billingHistory')}
                   </Button>
                 </Box>
               )}
@@ -209,13 +211,13 @@ export default function SubscriptionDashboard({
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" component="h3">
-                  Kullanım Durumu
+                  {t('usageStatus')}
                 </Typography>
                 {daysUntilReset !== null && (
-                  <Tooltip title="Kullanım limitiniz sıfırlanana kadar kalan gün sayısı">
+                  <Tooltip title={t('usageDaysTooltip')}>
                     <Chip
                       icon={<CalendarMonth />}
-                      label={`${daysUntilReset} gün`}
+                      label={t('daysRemaining', { days: daysUntilReset })}
                       size="small"
                       variant="outlined"
                     />
@@ -228,7 +230,7 @@ export default function SubscriptionDashboard({
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Sync fontSize="small" />
-                    <Typography variant="body2">Sipariş Senkronizasyonu</Typography>
+                    <Typography variant="body2">{t('orderSync')}</Typography>
                   </Box>
                   <Typography variant="body2" fontWeight="bold">
                     {subscriptionData.orderSyncCount} / {limits.orderSyncs === Infinity ? '∞' : limits.orderSyncs}
@@ -249,7 +251,7 @@ export default function SubscriptionDashboard({
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Label fontSize="small" />
-                    <Typography variant="body2">Etiket Oluşturma</Typography>
+                    <Typography variant="body2">{t('labelCreation')}</Typography>
                   </Box>
                   <Typography variant="body2" fontWeight="bold">
                     {subscriptionData.labelCount} / {limits.labels === Infinity ? '∞' : limits.labels}
@@ -268,14 +270,14 @@ export default function SubscriptionDashboard({
               {/* Usage Warnings */}
               {hasReachedLimit && (
                 <Alert severity="error" sx={{ mt: 2 }}>
-                  <AlertTitle>Limit Aşıldı</AlertTitle>
-                  Kullanım limitinizi aştınız. Devam etmek için planınızı yükseltin.
+                  <AlertTitle>{t('limitExceeded')}</AlertTitle>
+                  {t('limitExceededMessage')}
                 </Alert>
               )}
               {!hasReachedLimit && isNearLimit && (
                 <Alert severity="warning" sx={{ mt: 2 }}>
-                  <AlertTitle>Limite Yaklaşıyorsunuz</AlertTitle>
-                  Kullanım limitinize yaklaşıyorsunuz. Kesintisiz hizmet için planınızı yükseltmeyi düşünün.
+                  <AlertTitle>{t('nearingLimit')}</AlertTitle>
+                  {t('nearingLimitMessage')}
                 </Alert>
               )}
             </CardContent>
@@ -286,9 +288,8 @@ export default function SubscriptionDashboard({
       {/* Info Alert for Trial Users */}
       {plan === 'trial' && (
         <Alert severity="info" sx={{ mt: 3 }}>
-          <AlertTitle>Deneme Sürümü Özellikleri</AlertTitle>
-          Deneme sürümünde 50 sipariş senkronizasyonu ve 10 etiket oluşturma hakkınız bulunmaktadır. 
-          Tüm özelliklere erişim için ücretli plana geçebilirsiniz.
+          <AlertTitle>{t('trialFeatures')}</AlertTitle>
+          {t('trialFeaturesDesc')}
         </Alert>
       )}
     </Box>
@@ -298,7 +299,7 @@ export default function SubscriptionDashboard({
     return (
       <Box sx={{ mb: 4 }}>
         <Alert severity="warning">
-          Abonelik bilgileri yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.
+          {t('loadError')}
         </Alert>
       </Box>
     );

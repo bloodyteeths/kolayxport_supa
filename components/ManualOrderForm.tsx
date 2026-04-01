@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -21,6 +21,8 @@ import {
 } from '@mui/material';
 import { Close as CloseIcon, Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '../lib/i18n/useLocale';
 
 interface OrderItem {
   productName: string;
@@ -60,178 +62,89 @@ interface ManualOrderFormProps {
   onSuccess: () => void;
 }
 
-const initialOrderData: ManualOrderData = {
-  customerName: '',
-  customerEmail: '',
-  customerPhone: '',
-  orderNumber: '',
-  currency: 'TRY',
-  street1: '',
-  street2: '',
-  city: '',
-  state: '',
-  postal: '',
-  country: 'TR',
-  items: [{
-    productName: '',
-    quantity: 1,
-    unitPrice: 0,
-    weight: 0.5,
-    sku: '',
-    hsCode: '',
-    countryOfOrigin: 'TR'
-  }]
+function getInitialOrderData(defaultCountry: string, defaultCurrency: string): ManualOrderData {
+  return {
+    customerName: '',
+    customerEmail: '',
+    customerPhone: '',
+    orderNumber: '',
+    currency: defaultCurrency || 'USD',
+    street1: '',
+    street2: '',
+    city: '',
+    state: '',
+    postal: '',
+    country: defaultCountry || '',
+    items: [{
+      productName: '',
+      quantity: 1,
+      unitPrice: 0,
+      weight: 0.5,
+      sku: '',
+      hsCode: '',
+      countryOfOrigin: defaultCountry || ''
+    }]
+  };
+}
+
+const CURRENCY_CODES = [
+  'TRY', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY',
+  'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF', 'RON', 'BGN', 'HRK',
+  'RUB', 'INR', 'KRW', 'SGD', 'HKD', 'NZD', 'MXN', 'BRL', 'ARS',
+  'CLP', 'ZAR', 'AED', 'SAR', 'QAR', 'KWD', 'BHD', 'OMR', 'JOD',
+  'LBP', 'EGP', 'ILS', 'THB', 'MYR', 'IDR', 'PHP', 'VND'
+] as const;
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  TRY: '₺', USD: '$', EUR: '€', GBP: '£', CAD: 'C$', AUD: 'A$',
+  JPY: '¥', CHF: 'CHF', CNY: '¥', SEK: 'kr', NOK: 'kr', DKK: 'kr',
+  PLN: 'zł', CZK: 'Kč', HUF: 'Ft', RON: 'lei', BGN: 'лв', HRK: 'kn',
+  RUB: '₽', INR: '₹', KRW: '₩', SGD: 'S$', HKD: 'HK$', NZD: 'NZ$',
+  MXN: '$', BRL: 'R$', ARS: '$', CLP: '$', ZAR: 'R', AED: 'د.إ',
+  SAR: '﷼', QAR: '﷼', KWD: 'د.ك', BHD: '.د.ب', OMR: '﷼', JOD: 'د.ا',
+  LBP: '£', EGP: '£', ILS: '₪', THB: '฿', MYR: 'RM', IDR: 'Rp',
+  PHP: '₱', VND: '₫'
 };
 
-const currencies = [
-  { value: 'TRY', label: 'Türk Lirası (TRY)', symbol: '₺' },
-  { value: 'USD', label: 'ABD Doları (USD)', symbol: '$' },
-  { value: 'EUR', label: 'Euro (EUR)', symbol: '€' },
-  { value: 'GBP', label: 'İngiliz Sterlini (GBP)', symbol: '£' },
-  { value: 'CAD', label: 'Kanada Doları (CAD)', symbol: 'C$' },
-  { value: 'AUD', label: 'Avustralya Doları (AUD)', symbol: 'A$' },
-  { value: 'JPY', label: 'Japon Yeni (JPY)', symbol: '¥' },
-  { value: 'CHF', label: 'İsviçre Frangı (CHF)', symbol: 'CHF' },
-  { value: 'CNY', label: 'Çin Yuanı (CNY)', symbol: '¥' },
-  { value: 'SEK', label: 'İsveç Kronu (SEK)', symbol: 'kr' },
-  { value: 'NOK', label: 'Norveç Kronu (NOK)', symbol: 'kr' },
-  { value: 'DKK', label: 'Danimarka Kronu (DKK)', symbol: 'kr' },
-  { value: 'PLN', label: 'Polonya Zlotisi (PLN)', symbol: 'zł' },
-  { value: 'CZK', label: 'Çek Korunası (CZK)', symbol: 'Kč' },
-  { value: 'HUF', label: 'Macar Forinti (HUF)', symbol: 'Ft' },
-  { value: 'RON', label: 'Romen Leyi (RON)', symbol: 'lei' },
-  { value: 'BGN', label: 'Bulgar Levası (BGN)', symbol: 'лв' },
-  { value: 'HRK', label: 'Hırvat Kunası (HRK)', symbol: 'kn' },
-  { value: 'RUB', label: 'Rus Rublesi (RUB)', symbol: '₽' },
-  { value: 'INR', label: 'Hindistan Rupisi (INR)', symbol: '₹' },
-  { value: 'KRW', label: 'Güney Kore Wonu (KRW)', symbol: '₩' },
-  { value: 'SGD', label: 'Singapur Doları (SGD)', symbol: 'S$' },
-  { value: 'HKD', label: 'Hong Kong Doları (HKD)', symbol: 'HK$' },
-  { value: 'NZD', label: 'Yeni Zelanda Doları (NZD)', symbol: 'NZ$' },
-  { value: 'MXN', label: 'Meksika Pezosu (MXN)', symbol: '$' },
-  { value: 'BRL', label: 'Brezilya Reali (BRL)', symbol: 'R$' },
-  { value: 'ARS', label: 'Arjantin Pezosu (ARS)', symbol: '$' },
-  { value: 'CLP', label: 'Şili Pezosu (CLP)', symbol: '$' },
-  { value: 'ZAR', label: 'Güney Afrika Randı (ZAR)', symbol: 'R' },
-  { value: 'AED', label: 'BAE Dirhemi (AED)', symbol: 'د.إ' },
-  { value: 'SAR', label: 'Suudi Arabistan Riyali (SAR)', symbol: '﷼' },
-  { value: 'QAR', label: 'Katar Riyali (QAR)', symbol: '﷼' },
-  { value: 'KWD', label: 'Kuveyt Dinarı (KWD)', symbol: 'د.ك' },
-  { value: 'BHD', label: 'Bahreyn Dinarı (BHD)', symbol: '.د.ب' },
-  { value: 'OMR', label: 'Umman Riyali (OMR)', symbol: '﷼' },
-  { value: 'JOD', label: 'Ürdün Dinarı (JOD)', symbol: 'د.ا' },
-  { value: 'LBP', label: 'Lübnan Lirası (LBP)', symbol: '£' },
-  { value: 'EGP', label: 'Mısır Lirası (EGP)', symbol: '£' },
-  { value: 'ILS', label: 'İsrail Şekeli (ILS)', symbol: '₪' },
-  { value: 'THB', label: 'Tayland Bahtı (THB)', symbol: '฿' },
-  { value: 'MYR', label: 'Malezya Ringiti (MYR)', symbol: 'RM' },
-  { value: 'IDR', label: 'Endonezya Rupiahı (IDR)', symbol: 'Rp' },
-  { value: 'PHP', label: 'Filipin Pezosu (PHP)', symbol: '₱' },
-  { value: 'VND', label: 'Vietnam Dongu (VND)', symbol: '₫' }
-];
+const COUNTRY_CODES = [
+  'TR', 'US', 'DE', 'GB', 'FR', 'IT', 'ES', 'NL', 'BE', 'AT', 'CH',
+  'SE', 'NO', 'DK', 'FI', 'PL', 'CZ', 'HU', 'SK', 'SI', 'HR', 'RS',
+  'BG', 'RO', 'GR', 'CY', 'MT', 'LU', 'IE', 'PT', 'CA', 'MX', 'BR',
+  'AR', 'CL', 'CO', 'PE', 'UY', 'PY', 'BO', 'EC', 'VE', 'AU', 'NZ',
+  'JP', 'KR', 'CN', 'IN', 'SG', 'HK', 'TW', 'MY', 'TH', 'ID', 'PH',
+  'VN', 'RU', 'UA', 'BY', 'KZ', 'UZ', 'AZ', 'GE', 'AM', 'IL', 'SA',
+  'AE', 'QA', 'KW', 'BH', 'OM', 'JO', 'LB', 'SY', 'IQ', 'IR', 'AF',
+  'PK', 'BD', 'LK', 'NP', 'BT', 'MV', 'EG', 'LY', 'TN', 'DZ', 'MA',
+  'ZA', 'NG', 'KE', 'ET', 'GH', 'CI', 'SN', 'TZ', 'UG', 'RW', 'MU', 'SC'
+] as const;
 
-const countries = [
-  { value: 'TR', label: 'Türkiye', flag: '🇹🇷' },
-  { value: 'US', label: 'Amerika Birleşik Devletleri', flag: '🇺🇸' },
-  { value: 'DE', label: 'Almanya', flag: '🇩🇪' },
-  { value: 'GB', label: 'Birleşik Krallık', flag: '🇬🇧' },
-  { value: 'FR', label: 'Fransa', flag: '🇫🇷' },
-  { value: 'IT', label: 'İtalya', flag: '🇮🇹' },
-  { value: 'ES', label: 'İspanya', flag: '🇪🇸' },
-  { value: 'NL', label: 'Hollanda', flag: '🇳🇱' },
-  { value: 'BE', label: 'Belçika', flag: '🇧🇪' },
-  { value: 'AT', label: 'Avusturya', flag: '🇦🇹' },
-  { value: 'CH', label: 'İsviçre', flag: '🇨🇭' },
-  { value: 'SE', label: 'İsveç', flag: '🇸🇪' },
-  { value: 'NO', label: 'Norveç', flag: '🇳🇴' },
-  { value: 'DK', label: 'Danimarka', flag: '🇩🇰' },
-  { value: 'FI', label: 'Finlandiya', flag: '🇫🇮' },
-  { value: 'PL', label: 'Polonya', flag: '🇵🇱' },
-  { value: 'CZ', label: 'Çek Cumhuriyeti', flag: '🇨🇿' },
-  { value: 'HU', label: 'Macaristan', flag: '🇭🇺' },
-  { value: 'SK', label: 'Slovakya', flag: '🇸🇰' },
-  { value: 'SI', label: 'Slovenya', flag: '🇸🇮' },
-  { value: 'HR', label: 'Hırvatistan', flag: '🇭🇷' },
-  { value: 'RS', label: 'Sırbistan', flag: '🇷🇸' },
-  { value: 'BG', label: 'Bulgaristan', flag: '🇧🇬' },
-  { value: 'RO', label: 'Romanya', flag: '🇷🇴' },
-  { value: 'GR', label: 'Yunanistan', flag: '🇬🇷' },
-  { value: 'CY', label: 'Kıbrıs', flag: '🇨🇾' },
-  { value: 'MT', label: 'Malta', flag: '🇲🇹' },
-  { value: 'LU', label: 'Lüksemburg', flag: '🇱🇺' },
-  { value: 'IE', label: 'İrlanda', flag: '🇮🇪' },
-  { value: 'PT', label: 'Portekiz', flag: '🇵🇹' },
-  { value: 'CA', label: 'Kanada', flag: '🇨🇦' },
-  { value: 'MX', label: 'Meksika', flag: '🇲🇽' },
-  { value: 'BR', label: 'Brezilya', flag: '🇧🇷' },
-  { value: 'AR', label: 'Arjantin', flag: '🇦🇷' },
-  { value: 'CL', label: 'Şili', flag: '🇨🇱' },
-  { value: 'CO', label: 'Kolombiya', flag: '🇨🇴' },
-  { value: 'PE', label: 'Peru', flag: '🇵🇪' },
-  { value: 'UY', label: 'Uruguay', flag: '🇺🇾' },
-  { value: 'PY', label: 'Paraguay', flag: '🇵🇾' },
-  { value: 'BO', label: 'Bolivya', flag: '🇧🇴' },
-  { value: 'EC', label: 'Ekvador', flag: '🇪🇨' },
-  { value: 'VE', label: 'Venezuela', flag: '🇻🇪' },
-  { value: 'AU', label: 'Avustralya', flag: '🇦🇺' },
-  { value: 'NZ', label: 'Yeni Zelanda', flag: '🇳🇿' },
-  { value: 'JP', label: 'Japonya', flag: '🇯🇵' },
-  { value: 'KR', label: 'Güney Kore', flag: '🇰🇷' },
-  { value: 'CN', label: 'Çin', flag: '🇨🇳' },
-  { value: 'IN', label: 'Hindistan', flag: '🇮🇳' },
-  { value: 'SG', label: 'Singapur', flag: '🇸🇬' },
-  { value: 'HK', label: 'Hong Kong', flag: '🇭🇰' },
-  { value: 'TW', label: 'Tayvan', flag: '🇹🇼' },
-  { value: 'MY', label: 'Malezya', flag: '🇲🇾' },
-  { value: 'TH', label: 'Tayland', flag: '🇹🇭' },
-  { value: 'ID', label: 'Endonezya', flag: '🇮🇩' },
-  { value: 'PH', label: 'Filipinler', flag: '🇵🇭' },
-  { value: 'VN', label: 'Vietnam', flag: '🇻🇳' },
-  { value: 'RU', label: 'Rusya', flag: '🇷🇺' },
-  { value: 'UA', label: 'Ukrayna', flag: '🇺🇦' },
-  { value: 'BY', label: 'Belarus', flag: '🇧🇾' },
-  { value: 'KZ', label: 'Kazakistan', flag: '🇰🇿' },
-  { value: 'UZ', label: 'Özbekistan', flag: '🇺🇿' },
-  { value: 'AZ', label: 'Azerbaycan', flag: '🇦🇿' },
-  { value: 'GE', label: 'Gürcistan', flag: '🇬🇪' },
-  { value: 'AM', label: 'Ermenistan', flag: '🇦🇲' },
-  { value: 'IL', label: 'İsrail', flag: '🇮🇱' },
-  { value: 'SA', label: 'Suudi Arabistan', flag: '🇸🇦' },
-  { value: 'AE', label: 'Birleşik Arap Emirlikleri', flag: '🇦🇪' },
-  { value: 'QA', label: 'Katar', flag: '🇶🇦' },
-  { value: 'KW', label: 'Kuveyt', flag: '🇰🇼' },
-  { value: 'BH', label: 'Bahreyn', flag: '🇧🇭' },
-  { value: 'OM', label: 'Umman', flag: '🇴🇲' },
-  { value: 'JO', label: 'Ürdün', flag: '🇯🇴' },
-  { value: 'LB', label: 'Lübnan', flag: '🇱🇧' },
-  { value: 'SY', label: 'Suriye', flag: '🇸🇾' },
-  { value: 'IQ', label: 'Irak', flag: '🇮🇶' },
-  { value: 'IR', label: 'İran', flag: '🇮🇷' },
-  { value: 'AF', label: 'Afganistan', flag: '🇦🇫' },
-  { value: 'PK', label: 'Pakistan', flag: '🇵🇰' },
-  { value: 'BD', label: 'Bangladeş', flag: '🇧🇩' },
-  { value: 'LK', label: 'Sri Lanka', flag: '🇱🇰' },
-  { value: 'NP', label: 'Nepal', flag: '🇳🇵' },
-  { value: 'BT', label: 'Bhutan', flag: '🇧🇹' },
-  { value: 'MV', label: 'Maldivler', flag: '🇲🇻' },
-  { value: 'EG', label: 'Mısır', flag: '🇪🇬' },
-  { value: 'LY', label: 'Libya', flag: '🇱🇾' },
-  { value: 'TN', label: 'Tunus', flag: '🇹🇳' },
-  { value: 'DZ', label: 'Cezayir', flag: '🇩🇿' },
-  { value: 'MA', label: 'Fas', flag: '🇲🇦' },
-  { value: 'ZA', label: 'Güney Afrika', flag: '🇿🇦' },
-  { value: 'NG', label: 'Nijerya', flag: '🇳🇬' },
-  { value: 'KE', label: 'Kenya', flag: '🇰🇪' },
-  { value: 'ET', label: 'Etiyopya', flag: '🇪🇹' },
-  { value: 'GH', label: 'Gana', flag: '🇬🇭' },
-  { value: 'CI', label: 'Fildişi Sahili', flag: '🇨🇮' },
-  { value: 'SN', label: 'Senegal', flag: '🇸🇳' },
-  { value: 'TZ', label: 'Tanzanya', flag: '🇹🇿' },
-  { value: 'UG', label: 'Uganda', flag: '🇺🇬' },
-  { value: 'RW', label: 'Ruanda', flag: '🇷🇼' },
-  { value: 'MU', label: 'Mauritius', flag: '🇲🇺' },
-  { value: 'SC', label: 'Seyşeller', flag: '🇸🇨' }
-];
+const COUNTRY_FLAGS: Record<string, string> = {
+  TR: '\u{1F1F9}\u{1F1F7}', US: '\u{1F1FA}\u{1F1F8}', DE: '\u{1F1E9}\u{1F1EA}', GB: '\u{1F1EC}\u{1F1E7}',
+  FR: '\u{1F1EB}\u{1F1F7}', IT: '\u{1F1EE}\u{1F1F9}', ES: '\u{1F1EA}\u{1F1F8}', NL: '\u{1F1F3}\u{1F1F1}',
+  BE: '\u{1F1E7}\u{1F1EA}', AT: '\u{1F1E6}\u{1F1F9}', CH: '\u{1F1E8}\u{1F1ED}', SE: '\u{1F1F8}\u{1F1EA}',
+  NO: '\u{1F1F3}\u{1F1F4}', DK: '\u{1F1E9}\u{1F1F0}', FI: '\u{1F1EB}\u{1F1EE}', PL: '\u{1F1F5}\u{1F1F1}',
+  CZ: '\u{1F1E8}\u{1F1FF}', HU: '\u{1F1ED}\u{1F1FA}', SK: '\u{1F1F8}\u{1F1F0}', SI: '\u{1F1F8}\u{1F1EE}',
+  HR: '\u{1F1ED}\u{1F1F7}', RS: '\u{1F1F7}\u{1F1F8}', BG: '\u{1F1E7}\u{1F1EC}', RO: '\u{1F1F7}\u{1F1F4}',
+  GR: '\u{1F1EC}\u{1F1F7}', CY: '\u{1F1E8}\u{1F1FE}', MT: '\u{1F1F2}\u{1F1F9}', LU: '\u{1F1F1}\u{1F1FA}',
+  IE: '\u{1F1EE}\u{1F1EA}', PT: '\u{1F1F5}\u{1F1F9}', CA: '\u{1F1E8}\u{1F1E6}', MX: '\u{1F1F2}\u{1F1FD}',
+  BR: '\u{1F1E7}\u{1F1F7}', AR: '\u{1F1E6}\u{1F1F7}', CL: '\u{1F1E8}\u{1F1F1}', CO: '\u{1F1E8}\u{1F1F4}',
+  PE: '\u{1F1F5}\u{1F1EA}', UY: '\u{1F1FA}\u{1F1FE}', PY: '\u{1F1F5}\u{1F1FE}', BO: '\u{1F1E7}\u{1F1F4}',
+  EC: '\u{1F1EA}\u{1F1E8}', VE: '\u{1F1FB}\u{1F1EA}', AU: '\u{1F1E6}\u{1F1FA}', NZ: '\u{1F1F3}\u{1F1FF}',
+  JP: '\u{1F1EF}\u{1F1F5}', KR: '\u{1F1F0}\u{1F1F7}', CN: '\u{1F1E8}\u{1F1F3}', IN: '\u{1F1EE}\u{1F1F3}',
+  SG: '\u{1F1F8}\u{1F1EC}', HK: '\u{1F1ED}\u{1F1F0}', TW: '\u{1F1F9}\u{1F1FC}', MY: '\u{1F1F2}\u{1F1FE}',
+  TH: '\u{1F1F9}\u{1F1ED}', ID: '\u{1F1EE}\u{1F1E9}', PH: '\u{1F1F5}\u{1F1ED}', VN: '\u{1F1FB}\u{1F1F3}',
+  RU: '\u{1F1F7}\u{1F1FA}', UA: '\u{1F1FA}\u{1F1E6}', BY: '\u{1F1E7}\u{1F1FE}', KZ: '\u{1F1F0}\u{1F1FF}',
+  UZ: '\u{1F1FA}\u{1F1FF}', AZ: '\u{1F1E6}\u{1F1FF}', GE: '\u{1F1EC}\u{1F1EA}', AM: '\u{1F1E6}\u{1F1F2}',
+  IL: '\u{1F1EE}\u{1F1F1}', SA: '\u{1F1F8}\u{1F1E6}', AE: '\u{1F1E6}\u{1F1EA}', QA: '\u{1F1F6}\u{1F1E6}',
+  KW: '\u{1F1F0}\u{1F1FC}', BH: '\u{1F1E7}\u{1F1ED}', OM: '\u{1F1F4}\u{1F1F2}', JO: '\u{1F1EF}\u{1F1F4}',
+  LB: '\u{1F1F1}\u{1F1E7}', SY: '\u{1F1F8}\u{1F1FE}', IQ: '\u{1F1EE}\u{1F1F6}', IR: '\u{1F1EE}\u{1F1F7}',
+  AF: '\u{1F1E6}\u{1F1EB}', PK: '\u{1F1F5}\u{1F1F0}', BD: '\u{1F1E7}\u{1F1E9}', LK: '\u{1F1F1}\u{1F1F0}',
+  NP: '\u{1F1F3}\u{1F1F5}', BT: '\u{1F1E7}\u{1F1F9}', MV: '\u{1F1F2}\u{1F1FB}', EG: '\u{1F1EA}\u{1F1EC}',
+  LY: '\u{1F1F1}\u{1F1FE}', TN: '\u{1F1F9}\u{1F1F3}', DZ: '\u{1F1E9}\u{1F1FF}', MA: '\u{1F1F2}\u{1F1E6}',
+  ZA: '\u{1F1FF}\u{1F1E6}', NG: '\u{1F1F3}\u{1F1EC}', KE: '\u{1F1F0}\u{1F1EA}', ET: '\u{1F1EA}\u{1F1F9}',
+  GH: '\u{1F1EC}\u{1F1ED}', CI: '\u{1F1E8}\u{1F1EE}', SN: '\u{1F1F8}\u{1F1F3}', TZ: '\u{1F1F9}\u{1F1FF}',
+  UG: '\u{1F1FA}\u{1F1EC}', RW: '\u{1F1F7}\u{1F1FC}', MU: '\u{1F1F2}\u{1F1FA}', SC: '\u{1F1F8}\u{1F1E8}'
+};
 
 const US_STATES = [
   { value: 'AL', label: 'Alabama' },
@@ -287,9 +200,30 @@ const US_STATES = [
 ];
 
 export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrderFormProps) {
-  const [orderData, setOrderData] = useState<ManualOrderData>(initialOrderData);
+  const t = useTranslations('manualOrder');
+  const { config } = useLocale();
+  const initialData = useMemo(() => getInitialOrderData(config.defaultCountryOfOrigin, config.defaultCurrency), [config]);
+  const [orderData, setOrderData] = useState<ManualOrderData>(initialData);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const currencies = useMemo(() =>
+    CURRENCY_CODES.map(code => ({
+      value: code,
+      label: t(`currencies.${code}`),
+      symbol: CURRENCY_SYMBOLS[code] || code
+    })),
+    [t]
+  );
+
+  const countries = useMemo(() =>
+    COUNTRY_CODES.map(code => ({
+      value: code,
+      label: t(`countries.${code}`),
+      flag: COUNTRY_FLAGS[code] || ''
+    })),
+    [t]
+  );
 
   // Clear state when switching from US to another country
   React.useEffect(() => {
@@ -299,7 +233,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
   }, [orderData.country, orderData.state]);
 
   const handleClose = () => {
-    setOrderData(initialOrderData);
+    setOrderData(initialData);
     setErrors({});
     onClose();
   };
@@ -308,30 +242,30 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
     const newErrors: Record<string, string> = {};
 
     // Required fields validation
-    if (!orderData.customerName.trim()) newErrors.customerName = 'Müşteri adı gerekli';
-    if (!orderData.orderNumber.trim()) newErrors.orderNumber = 'Sipariş numarası gerekli';
-    if (!orderData.street1.trim()) newErrors.street1 = 'Adres 1 gerekli';
-    if (!orderData.city.trim()) newErrors.city = 'Şehir gerekli';
-    if (!orderData.postal.trim()) newErrors.postal = 'Posta kodu gerekli';
-    
+    if (!orderData.customerName.trim()) newErrors.customerName = t('validation.customerNameRequired');
+    if (!orderData.orderNumber.trim()) newErrors.orderNumber = t('validation.orderNumberRequired');
+    if (!orderData.street1.trim()) newErrors.street1 = t('validation.address1Required');
+    if (!orderData.city.trim()) newErrors.city = t('validation.cityRequired');
+    if (!orderData.postal.trim()) newErrors.postal = t('validation.postalRequired');
+
     // US specific validations
     if (orderData.country === 'US' && !orderData.state.trim()) {
-      newErrors.state = 'ABD adresleri için eyalet gerekli';
+      newErrors.state = t('validation.stateRequiredUS');
     }
 
     // Items validation
     orderData.items.forEach((item, index) => {
       if (!item.productName.trim()) {
-        newErrors[`item_${index}_productName`] = 'Ürün adı gerekli';
+        newErrors[`item_${index}_productName`] = t('validation.productNameRequired');
       }
       if (item.quantity <= 0) {
-        newErrors[`item_${index}_quantity`] = 'Miktar 0\'dan büyük olmalı';
+        newErrors[`item_${index}_quantity`] = t('validation.quantityPositive');
       }
       if (item.unitPrice <= 0) {
-        newErrors[`item_${index}_unitPrice`] = 'Birim fiyat 0\'dan büyük olmalı';
+        newErrors[`item_${index}_unitPrice`] = t('validation.pricePositive');
       }
       if (item.weight <= 0) {
-        newErrors[`item_${index}_weight`] = 'Ağırlık 0\'dan büyük olmalı';
+        newErrors[`item_${index}_weight`] = t('validation.weightPositive');
       }
     });
 
@@ -341,7 +275,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
 
   const handleSubmit = async () => {
     if (!validateForm()) {
-      toast.error('Lütfen tüm gerekli alanları doldurun');
+      toast.error(t('validation.fillRequired'));
       return;
     }
 
@@ -357,15 +291,15 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Sipariş oluşturulurken hata oluştu');
+        throw new Error(error.message || t('orderCreateFailed'));
       }
 
-      toast.success('Manuel sipariş başarıyla oluşturuldu');
+      toast.success(t('orderCreated'));
       handleClose();
       onSuccess();
     } catch (error) {
       console.error('Error creating manual order:', error);
-      toast.error(error instanceof Error ? error.message : 'Sipariş oluşturulurken hata oluştu');
+      toast.error(error instanceof Error ? error.message : t('orderCreateFailed'));
     } finally {
       setLoading(false);
     }
@@ -381,7 +315,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
         weight: 0.5,
         sku: '',
         hsCode: '',
-        countryOfOrigin: 'TR'
+        countryOfOrigin: config.defaultCountryOfOrigin || ''
       }]
     }));
   };
@@ -424,7 +358,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
     >
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Manuel Sipariş Ekle</Typography>
+          <Typography variant="h6">{t('dialogTitle')}</Typography>
           <IconButton onClick={handleClose} size="small">
             <CloseIcon />
           </IconButton>
@@ -436,14 +370,14 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           {/* Customer Information */}
           <Grid item xs={12}>
             <Typography variant="h6" gutterBottom color="primary">
-              Müşteri Bilgileri
+              {t('customerInfo')}
             </Typography>
           </Grid>
           
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Müşteri Adı *"
+              label={`${t('customerName')} *`}
               value={orderData.customerName}
               onChange={(e) => updateField('customerName', e.target.value)}
               error={!!errors.customerName}
@@ -454,7 +388,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="E-posta"
+              label={t('email')}
               type="email"
               value={orderData.customerEmail}
               onChange={(e) => updateField('customerEmail', e.target.value)}
@@ -464,7 +398,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Telefon"
+              label={t('phone')}
               value={orderData.customerPhone}
               onChange={(e) => updateField('customerPhone', e.target.value)}
             />
@@ -473,7 +407,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Sipariş Numarası *"
+              label={`${t('orderNumber')} *`}
               value={orderData.orderNumber}
               onChange={(e) => updateField('orderNumber', e.target.value)}
               error={!!errors.orderNumber}
@@ -486,12 +420,12 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
               options={currencies}
               getOptionLabel={(option) => option.label}
               value={currencies.find(c => c.value === orderData.currency) || null}
-              onChange={(_, newValue) => updateField('currency', newValue?.value || 'TRY')}
+              onChange={(_, newValue) => updateField('currency', newValue?.value || config.defaultCurrency)}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Para Birimi"
-                  placeholder="Para birimi ara..."
+                  label={t('currency')}
+                  placeholder={t('currencySearch')}
                 />
               )}
               renderOption={(props, option) => (
@@ -514,14 +448,14 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           <Grid item xs={12}>
             <Divider sx={{ my: 2 }} />
             <Typography variant="h6" gutterBottom color="primary">
-              Teslimat Adresi
+              {t('deliveryAddress')}
             </Typography>
           </Grid>
 
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Adres 1 *"
+              label={`${t('address1')} *`}
               value={orderData.street1}
               onChange={(e) => updateField('street1', e.target.value)}
               error={!!errors.street1}
@@ -532,7 +466,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Adres 2"
+              label={t('address2')}
               value={orderData.street2}
               onChange={(e) => updateField('street2', e.target.value)}
             />
@@ -541,7 +475,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Şehir *"
+              label={`${t('city')} *`}
               value={orderData.city}
               onChange={(e) => updateField('city', e.target.value)}
               error={!!errors.city}
@@ -552,15 +486,15 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           <Grid item xs={12} sm={6}>
             {orderData.country === 'US' ? (
               <FormControl fullWidth>
-                <InputLabel>Eyalet *</InputLabel>
+                <InputLabel>{t('state')} *</InputLabel>
                 <Select
                   value={orderData.state}
-                  label="Eyalet *"
+                  label={`${t('state')} *`}
                   onChange={(e) => updateField('state', e.target.value)}
                   error={!!errors.state}
                 >
                   <MenuItem value="">
-                    <em>Eyalet seçin</em>
+                    <em>{t('selectState')}</em>
                   </MenuItem>
                   {US_STATES.map(state => (
                     <MenuItem key={state.value} value={state.value}>
@@ -577,7 +511,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
             ) : (
               <TextField
                 fullWidth
-                label="İl/Eyalet"
+                label={t('stateProvince')}
                 value={orderData.state}
                 onChange={(e) => updateField('state', e.target.value)}
                 error={!!errors.state}
@@ -589,7 +523,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Posta Kodu *"
+              label={`${t('postalCode')} *`}
               value={orderData.postal}
               onChange={(e) => updateField('postal', e.target.value)}
               error={!!errors.postal}
@@ -602,12 +536,12 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
               options={countries}
               getOptionLabel={(option) => option.label}
               value={countries.find(c => c.value === orderData.country) || null}
-              onChange={(_, newValue) => updateField('country', newValue?.value || 'TR')}
+              onChange={(_, newValue) => updateField('country', newValue?.value || config.defaultCountryOfOrigin)}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Ülke"
-                  placeholder="Ülke ara..."
+                  label={t('country')}
+                  placeholder={t('searchCountry')}
                 />
               )}
               renderOption={(props, option) => (
@@ -631,7 +565,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
             <Divider sx={{ my: 2 }} />
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6" color="primary">
-                Ürünler
+                {t('products')}
               </Typography>
               <Button
                 startIcon={<AddIcon />}
@@ -639,7 +573,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
                 variant="outlined"
                 size="small"
               >
-                Ürün Ekle
+                {t('addProduct')}
               </Button>
             </Box>
           </Grid>
@@ -649,7 +583,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
               <Box border={1} borderColor="divider" borderRadius={1} p={2} mb={2}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="subtitle1">
-                    Ürün {index + 1}
+                    {t('productItem', { index: index + 1 })}
                   </Typography>
                   {orderData.items.length > 1 && (
                     <IconButton onClick={() => removeItem(index)} size="small" color="error">
@@ -662,7 +596,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Ürün Adı *"
+                      label={`${t('productName')} *`}
                       value={item.productName}
                       onChange={(e) => updateItem(index, 'productName', e.target.value)}
                       error={!!errors[`item_${index}_productName`]}
@@ -673,7 +607,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="SKU"
+                      label={t('sku')}
                       value={item.sku}
                       onChange={(e) => updateItem(index, 'sku', e.target.value)}
                     />
@@ -682,7 +616,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
                   <Grid item xs={6} sm={3}>
                     <TextField
                       fullWidth
-                      label="Miktar *"
+                      label={`${t('quantity')} *`}
                       type="number"
                       value={item.quantity}
                       onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 0)}
@@ -695,7 +629,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
                   <Grid item xs={6} sm={3}>
                     <TextField
                       fullWidth
-                      label="Birim Fiyat *"
+                      label={`${t('unitPrice')} *`}
                       type="number"
                       value={item.unitPrice}
                       onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
@@ -708,7 +642,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
                   <Grid item xs={6} sm={3}>
                     <TextField
                       fullWidth
-                      label="Ağırlık (kg) *"
+                      label={`${t('weightKg')} *`}
                       type="number"
                       value={item.weight}
                       onChange={(e) => updateItem(index, 'weight', parseFloat(e.target.value) || 0)}
@@ -721,7 +655,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
                   <Grid item xs={6} sm={3}>
                     <TextField
                       fullWidth
-                      label="Toplam"
+                      label={t('total')}
                       value={`${currencySymbol} ${(item.quantity * item.unitPrice).toFixed(2)}`}
                       InputProps={{ readOnly: true }}
                       variant="filled"
@@ -731,7 +665,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="HS Kodu"
+                      label={t('hsCode')}
                       value={item.hsCode}
                       onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
                     />
@@ -742,12 +676,12 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
                       options={countries}
                       getOptionLabel={(option) => option.label}
                       value={countries.find(c => c.value === item.countryOfOrigin) || null}
-                      onChange={(_, newValue) => updateItem(index, 'countryOfOrigin', newValue?.value || 'TR')}
+                      onChange={(_, newValue) => updateItem(index, 'countryOfOrigin', newValue?.value || config.defaultCountryOfOrigin)}
                       renderInput={(params) => (
                         <TextField
                           {...params}
-                          label="Menşei Ülke"
-                          placeholder="Ülke ara..."
+                          label={t('countryOfOrigin')}
+                          placeholder={t('searchCountry')}
                           size="small"
                         />
                       )}
@@ -776,7 +710,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           <Grid item xs={12}>
             <Alert severity="info">
               <Typography variant="h6">
-                Toplam Tutar: {currencySymbol} {totalPrice.toFixed(2)}
+                {t('totalAmount')}: {currencySymbol} {totalPrice.toFixed(2)}
               </Typography>
             </Alert>
           </Grid>
@@ -785,7 +719,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
 
       <DialogActions sx={{ p: 3 }}>
         <Button onClick={handleClose} disabled={loading}>
-          İptal
+          {t('cancel')}
         </Button>
         <Button
           onClick={handleSubmit}
@@ -793,7 +727,7 @@ export default function ManualOrderForm({ open, onClose, onSuccess }: ManualOrde
           disabled={loading}
           startIcon={loading ? <CircularProgress size={16} /> : null}
         >
-          {loading ? 'Oluşturuluyor...' : 'Sipariş Oluştur'}
+          {loading ? t('creating') : t('createOrder')}
         </Button>
       </DialogActions>
     </Dialog>

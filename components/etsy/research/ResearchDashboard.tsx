@@ -8,6 +8,7 @@ import {
   Search, TrendingUp, BarChart2, Compass, Trash2, Clock,
   ArrowRight, Zap, Star, Flame, Lightbulb,
 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
 import { GRADIENTS, glassCard, StatCard, ScoreRing } from './shared/ui';
 
@@ -16,6 +17,7 @@ interface ResearchDashboardProps {
 }
 
 export default function ResearchDashboard({ onNavigateToSection }: ResearchDashboardProps) {
+  const t = useTranslations('etsy.researchDashboard');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const {
@@ -47,8 +49,8 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
           <Box sx={{ width: 44, height: 44, borderRadius: '12px', background: GRADIENTS.primary, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1 }}>
             <Search size={20} color="#fff" />
           </Box>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>Niş Analizi</Typography>
-          <Typography variant="caption" color="text.secondary">Pazar talep ve rekabet</Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>{t('nicheAnalysis')}</Typography>
+          <Typography variant="caption" color="text.secondary">{t('nicheAnalysisDesc')}</Typography>
         </Paper>
 
         <Paper
@@ -61,8 +63,8 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
           <Box sx={{ width: 44, height: 44, borderRadius: '12px', background: GRADIENTS.info, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1 }}>
             <Compass size={20} color="#fff" />
           </Box>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>Kelime Keşif</Typography>
-          <Typography variant="caption" color="text.secondary">Yeni fırsatlar bul</Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>{t('keywordDiscovery')}</Typography>
+          <Typography variant="caption" color="text.secondary">{t('keywordDiscoveryDesc')}</Typography>
         </Paper>
 
         <Paper
@@ -75,8 +77,8 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
           <Box sx={{ width: 44, height: 44, borderRadius: '12px', background: GRADIENTS.success, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1 }}>
             <TrendingUp size={20} color="#fff" />
           </Box>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>Trendler</Typography>
-          <Typography variant="caption" color="text.secondary">Mevsimsel analiz</Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>{t('trends')}</Typography>
+          <Typography variant="caption" color="text.secondary">{t('trendsDesc')}</Typography>
         </Paper>
 
         <Paper
@@ -89,8 +91,8 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
           <Box sx={{ width: 44, height: 44, borderRadius: '12px', background: GRADIENTS.warning, display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1 }}>
             <Zap size={20} color="#fff" />
           </Box>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>Mağazam</Typography>
-          <Typography variant="caption" color="text.secondary">SEO & kâr hesaplama</Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>{t('myShop')}</Typography>
+          <Typography variant="caption" color="text.secondary">{t('myShopDesc')}</Typography>
         </Paper>
       </Box>
 
@@ -99,7 +101,7 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
         <Paper sx={{ ...glassCard, p: 2.5, mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
             <Typography variant={isMobile ? 'body1' : 'subtitle1'} sx={{ fontWeight: 800 }}>
-              Son Arastirma: "{query}"
+              {t('lastResearch')}: &quot;{query}&quot;
             </Typography>
             <Button
               size="small" variant="outlined"
@@ -107,14 +109,14 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
               onClick={() => onNavigateToSection(1, 100)}
               sx={{ borderRadius: '10px', textTransform: 'none', ...(isMobile && { width: '100%' }) }}
             >
-              Detaylara Git
+              {t('goToDetails')}
             </Button>
           </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 1.5 }}>
-            <StatCard label="Toplam Sonuc" value={totalResults.toLocaleString()} color="#667eea" icon={<BarChart2 size={16} />} />
-            <StatCard label="Ort. Fiyat" value={`$${avgPrice}`} color="#11998e" />
-            <StatCard label="Ort. Favori" value={String(avgFav)} color="#e91e63" icon={<Star size={16} />} />
-            <StatCard label="Benzersiz Magaza" value={String(uniqueShops)} color="#9c27b0" />
+            <StatCard label={t('totalResults')} value={totalResults.toLocaleString()} color="#667eea" icon={<BarChart2 size={16} />} />
+            <StatCard label={t('avgPrice')} value={`$${avgPrice}`} color="#11998e" />
+            <StatCard label={t('avgFavorites')} value={String(avgFav)} color="#e91e63" icon={<Star size={16} />} />
+            <StatCard label={t('uniqueShops')} value={String(uniqueShops)} color="#9c27b0" />
           </Box>
         </Paper>
       )}
@@ -123,7 +125,7 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
       {savedSearches.length > 0 && (
         <Paper sx={{ ...glassCard, p: 2.5 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Clock size={16} color="#667eea" /> Kayıtlı Aramalar
+            <Clock size={16} color="#667eea" /> {t('savedSearches')}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             {savedSearches.map((s, i) => (
@@ -172,7 +174,7 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
           {discoveryData?.trendingNiches?.length > 0 && (
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Flame size={18} color="#f44336" /> Trending Niches
+                <Flame size={18} color="#f44336" /> {t('trendingNiches')}
               </Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
                 {discoveryData.trendingNiches.map((niche: any) => (
@@ -191,13 +193,13 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                         <Typography variant="caption" color="text.secondary">
-                          {niche.totalResults?.toLocaleString()} results
+                          {niche.totalResults?.toLocaleString()} {t('results')}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          ${niche.priceStats?.avg?.toFixed(2)} avg
+                          ${niche.priceStats?.avg?.toFixed(2)} {t('avgLabel')}
                         </Typography>
                         <Typography variant="caption" sx={{ color: '#e91e63', display: 'flex', alignItems: 'center', gap: 0.3 }}>
-                          <Star size={10} /> {niche.avgFavorites} fav
+                          <Star size={10} /> {niche.avgFavorites} {t('favLabel')}
                         </Typography>
                       </Box>
                     </CardContent>
@@ -211,7 +213,7 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
           {discoveryData?.hotKeywords?.length > 0 && (
             <Paper sx={{ ...glassCard, p: 2.5, mb: 3 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <TrendingUp size={16} color="#667eea" /> Hot Keywords
+                <TrendingUp size={16} color="#667eea" /> {t('hotKeywords')}
               </Typography>
               <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
                 {discoveryData.hotKeywords.map((kw: any) => (
@@ -231,7 +233,7 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
           {discoveryData?.seasonalTips?.length > 0 && (
             <Paper sx={{ ...glassCard, p: 2.5, mb: 3 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Lightbulb size={16} color="#ff9800" /> Seasonal Tips
+                <Lightbulb size={16} color="#ff9800" /> {t('seasonalTips')}
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {discoveryData.seasonalTips.map((tip: string, i: number) => (
@@ -253,9 +255,9 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
               <Box sx={{ mb: 2 }}>
                 <Search size={48} color="#667eea" style={{ opacity: 0.5 }} />
               </Box>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>Etsy Araştırma Merkezi</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>{t('researchCenter')}</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Rakipleri analiz edin, trendleri keşfedin, fiyatlandırma stratejinizi belirleyin.
+                {t('researchCenterDesc')}
               </Typography>
               <Button
                 variant="contained"
@@ -263,7 +265,7 @@ export default function ResearchDashboard({ onNavigateToSection }: ResearchDashb
                 onClick={() => onNavigateToSection(1, 100)}
                 sx={{ background: GRADIENTS.primary, borderRadius: '12px', textTransform: 'none', fontWeight: 600, px: 3, ...(isMobile && { width: '100%' }) }}
               >
-                İlk Araştırmanızı Yapın
+                {t('doFirstResearch')}
               </Button>
             </Paper>
           )}

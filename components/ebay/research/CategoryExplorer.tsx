@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Box, Typography, Paper, Chip, CircularProgress, LinearProgress,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -35,13 +36,13 @@ const POPULAR_CATEGORIES = [
   { id: '293', name: 'Elektronik', icon: '⚡' },
   { id: '11450', name: 'Giyim', icon: '👕' },
   { id: '1', name: 'Koleksiyon', icon: '🏆' },
-  { id: '11700', name: 'Ev & Bahçe', icon: '🏠' },
+  { id: '11700', name: 'homeGarden', icon: '🏠' },
   { id: '888', name: 'Spor', icon: '⚽' },
   { id: '220', name: 'Oyuncak', icon: '🧸' },
   { id: '267', name: 'Kitap', icon: '📚' },
-  { id: '281', name: 'Takı', icon: '💎' },
-  { id: '6000', name: 'Oto Parça', icon: '🚗' },
-  { id: '26395', name: 'Sağlık & Güzellik', icon: '💄' },
+  { id: '281', name: 'jewelry', icon: '💎' },
+  { id: '6000', name: 'autoParts', icon: '🚗' },
+  { id: '26395', name: 'healthBeauty', icon: '💄' },
   { id: '15032', name: 'Cep Telefonu', icon: '📱' },
   { id: '58058', name: 'Bilgisayar', icon: '💻' },
 ];
@@ -55,7 +56,7 @@ async function ebayApiCall(action: string, userId: string, params: Record<string
   const res = await fetch(`/api/clawd/ebay?${query.toString()}`);
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error || `API hatası: ${res.status}`);
+    throw new Error(errBody.error || `API error: ${res.status}`);
   }
   return res.json();
 }
@@ -136,6 +137,7 @@ function CategoryTreeNode({
 }
 
 export default function CategoryExplorer({ userId, onNavigate }: CategoryExplorerProps) {
+  const t = useTranslations('ebay.categoryExplorer');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -181,7 +183,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
       setTreeLoaded(true);
       setTreeExpanded(true);
     } catch (err: any) {
-      toast.error(err.message || 'Kategori ağacı yüklenemedi');
+      toast.error(err.message || t('treeLoadError'));
     } finally {
       setTreeLoading(false);
     }
@@ -198,7 +200,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
       });
       setBestsellers(data.items || []);
     } catch (err: any) {
-      toast.error(err.message || 'Çok satanlar yüklenemedi');
+      toast.error(err.message || t('bestsellersLoadError'));
     } finally {
       setBestsellersLoading(false);
     }
@@ -226,10 +228,10 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
       }}>
         <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700, color: '#1e1b4b' }}>
           <Layers size={20} color="#6366f1" />
-          Kategori Keşfet
+          {t('title')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Popüler kategorileri keşfedin, en çok satanları görün ve niş fırsatlarını yakalayın. Aşağıdan bir kategori seçerek başlayın.
+          {t('description')}
         </Typography>
       </Paper>
 
@@ -243,10 +245,10 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
       }}>
         <Typography variant="subtitle2" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1e1b4b' }}>
           <TrendingUp size={16} color="#6366f1" />
-          Popüler Kategoriler
+          {t('popularCategories')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Popüler bir kategori seçin veya aşağıdaki arama ile bulun
+          {t('selectOrSearch')}
         </Typography>
         <Box
           sx={{
@@ -311,7 +313,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
         >
           <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1e1b4b' }}>
             <Grid size={16} color="#6366f1" />
-            Kategori Ağacı
+            {t('categoryTree')}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {treeLoading && <CircularProgress size={16} />}
@@ -335,7 +337,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
               ))}
             </Box>
           ) : treeLoaded ? (
-            <Alert severity="info" sx={{ mt: 1.5 }}>Kategori ağacı verisi bulunamadı. Lütfen daha sonra tekrar deneyin.</Alert>
+            <Alert severity="info" sx={{ mt: 1.5 }}>{t('noTreeData')}</Alert>
           ) : null}
         </Collapse>
       </Paper>
@@ -352,7 +354,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
             <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1e1b4b' }}>
               <Package size={16} color="#6366f1" />
-              {selectedCategory.name} — Çok Satanlar
+              {t(selectedCategory.name)} — {t('bestsellers')}
             </Typography>
             {onNavigate && (
               <Stack direction="row" spacing={1}>
@@ -372,7 +374,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                   onClick={() => onNavigate('niche_finder', { categoryId: selectedCategory.id })}
                   sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)', fontWeight: 600, '&:hover': { bgcolor: '#8b5cf6', color: '#fff', borderColor: '#8b5cf6' } }}
                 >
-                  Niş Analizi
+                  {t('nicheAnalysis')}
                 </Button>
               </Stack>
             )}
@@ -391,7 +393,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 0.5, color: '#6366f1' }}>
                   <Package size={18} />
                 </Box>
-                <Typography variant="caption" color="text.secondary">Ürün Sayısı</Typography>
+                <Typography variant="caption" color="text.secondary">{t('productCount')}</Typography>
                 <Typography variant="h6" fontWeight={700} sx={{ color: '#1e1b4b' }}>{stats.count}</Typography>
               </Paper>
               <Paper variant="outlined" sx={{
@@ -414,8 +416,8 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)' }}>
-                    <TableCell sx={{ fontWeight: 700, width: 56, color: '#1e1b4b' }}>Görsel</TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Başlık</TableCell>
+                    <TableCell sx={{ fontWeight: 700, width: 56, color: '#1e1b4b' }}>{t('image')}</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>{t('titleCol')}</TableCell>
                     <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }} align="right">Fiyat</TableCell>
                     <TableCell sx={{ fontWeight: 700, color: '#1e1b4b' }}>Durum</TableCell>
                   </TableRow>
@@ -507,7 +509,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
           )}
 
           {!bestsellersLoading && bestsellers.length === 0 && (
-            <Alert severity="info" sx={{ mt: 2 }}>Bu kategoride henüz çok satan ürün bulunamadı. Farklı bir kategori deneyebilir veya alt kategorilere göz atabilirsiniz.</Alert>
+            <Alert severity="info" sx={{ mt: 2 }}>{t('noBestsellers')}</Alert>
           )}
         </Paper>
       )}

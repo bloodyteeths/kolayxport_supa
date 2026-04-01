@@ -4,6 +4,7 @@ import {
   useTheme, useMediaQuery,
 } from '@mui/material';
 import { X, Pin, TrendingUp, TrendingDown, Minus, DollarSign, Heart, Eye, Tag } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
 import { GRADIENTS, glassCard } from './shared/ui';
 
@@ -15,7 +16,8 @@ function pctDiff(val: number, avg: number): { pct: number; dir: 'up' | 'down' | 
 
 function DiffChip({ val, avg, higherIsBetter = true }: { val: number; avg: number; higherIsBetter?: boolean }) {
   const { pct, dir } = pctDiff(val, avg);
-  if (dir === 'same') return <Chip size="small" label="≈ Ortalama" sx={{ fontSize: '0.7rem' }} />;
+  const t = useTranslations('etsy.comparisonPanel');
+  if (dir === 'same') return <Chip size="small" label={`≈ ${t('average')}`} sx={{ fontSize: '0.7rem' }} />;
   const isGood = (dir === 'up') === higherIsBetter;
   const Icon = dir === 'up' ? TrendingUp : TrendingDown;
   return (
@@ -41,6 +43,7 @@ function StatRow({ label, icon: Icon, yours, market, higherIsBetter = true, form
   higherIsBetter?: boolean;
   format?: (v: number) => string;
 }) {
+  const t = useTranslations('etsy.comparisonPanel');
   const max = Math.max(yours, market) || 1;
   return (
     <Box sx={{ mb: 1.5 }}>
@@ -53,7 +56,7 @@ function StatRow({ label, icon: Icon, yours, market, higherIsBetter = true, form
       </Box>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
         <Box sx={{ flex: 1 }}>
-          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: '#999' }}>Senin</Typography>
+          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: '#999' }}>{t('yours')}</Typography>
           <LinearProgress
             variant="determinate"
             value={(yours / max) * 100}
@@ -66,7 +69,7 @@ function StatRow({ label, icon: Icon, yours, market, higherIsBetter = true, form
           <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>{format(yours)}</Typography>
         </Box>
         <Box sx={{ flex: 1 }}>
-          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: '#999' }}>Pazar Ort.</Typography>
+          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: '#999' }}>{t('marketAvg')}</Typography>
           <LinearProgress
             variant="determinate"
             value={(market / max) * 100}
@@ -84,6 +87,7 @@ function StatRow({ label, icon: Icon, yours, market, higherIsBetter = true, form
 }
 
 export default function ComparisonPanel() {
+  const t = useTranslations('etsy.comparisonPanel');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const pinnedListing = useEtsyResearchStore((s) => s.pinnedListing);
@@ -127,7 +131,7 @@ export default function ComparisonPanel() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Pin size={16} color="#667eea" />
             <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-              Karşılaştırma
+              {t('comparison')}
             </Typography>
           </Box>
           <IconButton size="small" onClick={() => pinListing(null)}>
@@ -149,7 +153,7 @@ export default function ComparisonPanel() {
         {/* Comparison rows */}
         <Box sx={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
           <StatRow
-            label="Fiyat"
+            label={t('price')}
             icon={DollarSign}
             yours={yourPrice}
             market={marketAvg.price}
@@ -157,21 +161,21 @@ export default function ComparisonPanel() {
             format={(v) => `$${v.toFixed(2)}`}
           />
           <StatRow
-            label="Favoriler"
+            label={t('favorites')}
             icon={Heart}
             yours={yourFavs}
             market={marketAvg.favorites}
             format={(v) => v.toLocaleString()}
           />
           <StatRow
-            label="Görüntüleme"
+            label={t('views')}
             icon={Eye}
             yours={yourViews}
             market={marketAvg.views}
             format={(v) => v.toLocaleString()}
           />
           <StatRow
-            label="Tag Sayısı"
+            label={t('tagCount')}
             icon={Tag}
             yours={yourTags}
             market={marketAvg.tags}
@@ -183,7 +187,7 @@ export default function ComparisonPanel() {
         {pinnedListing.tags && pinnedListing.tags.length > 0 && (
           <Box sx={{ mt: 1.5 }}>
             <Typography variant="caption" sx={{ fontWeight: 600, color: '#555', mb: 0.5, display: 'block' }}>
-              Taglarınız (Pazar Eşleşme)
+              {t('yourTags')}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
               {pinnedListing.tags.map((tag) => {
@@ -206,7 +210,7 @@ export default function ComparisonPanel() {
               })}
             </Box>
             <Typography variant="caption" sx={{ color: '#999', mt: 0.5, display: 'block', fontSize: '0.6rem' }}>
-              🟣 Rakiplerde var · 🔴 Benzersiz (sadece sende)
+              {t('tagLegend')}
             </Typography>
           </Box>
         )}

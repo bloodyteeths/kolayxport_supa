@@ -10,7 +10,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import { useTranslations } from 'next-intl';
 import type { ArbitrageResult } from '../../../../lib/arbitrage/types';
+import useLocaleStore from '../../../../lib/stores/useLocaleStore';
 import { formatCurrency, formatPercent, getVerdictConfig } from './arbitrageConstants';
 import { useArbitrageStore } from './useArbitrageStore';
 
@@ -20,6 +22,8 @@ interface Props {
 }
 
 export default function ArbitrageResultsTable({ results, onViewDetail }: Props) {
+  const ta = useTranslations('ebay.research.arbitrage');
+  const locale = useLocaleStore(s => s.locale);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { sortField, sortDirection, setSortField, toggleSortDirection, searchText, setSearchText } = useArbitrageStore();
@@ -40,7 +44,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
   if (results.length === 0) {
     return (
       <Paper sx={{ p: 3, textAlign: 'center' }} variant="outlined">
-        <Typography color="text.secondary">Filtrelere uygun sonuç bulunamadı</Typography>
+        <Typography color="text.secondary">{ta('noResultsFound')}</Typography>
       </Paper>
     );
   }
@@ -50,7 +54,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
       {/* Search */}
       <TextField
         size="small"
-        placeholder="Ürün ara..."
+        placeholder={ta('searchProducts')}
         value={searchText}
         onChange={(e) => setSearchText(e.target.value)}
         sx={{ mb: 1.5, maxWidth: 300 }}
@@ -85,10 +89,10 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 0.5 }}>
                       <Typography variant="caption">
-                        {formatCurrency(r.trendyol.priceTry, 'TRY')} → {formatCurrency(r.ebay.medianPrice)}
+                        {formatCurrency(r.trendyol.priceTry, 'TRY', locale)} → {formatCurrency(r.ebay.medianPrice, 'USD', locale)}
                       </Typography>
                       <Chip
-                        label={`${vc.label} ${r.score}`}
+                        label={`${ta(vc.label)} ${r.score}`}
                         size="small"
                         sx={{ fontSize: '0.65rem', height: 20, bgcolor: vc.bg, color: vc.color, fontWeight: 700 }}
                       />
@@ -96,7 +100,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                   </Box>
                   <Box sx={{ textAlign: 'right', minWidth: 50 }}>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: r.financials.profitUsd > 0 ? '#2e7d32' : '#c62828' }}>
-                      {formatCurrency(r.financials.profitUsd)}
+                      {formatCurrency(r.financials.profitUsd, 'USD', locale)}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {formatPercent(r.financials.roiPercent)}
@@ -107,21 +111,21 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
 
                 <Collapse in={isExpanded}>
                   <Box sx={{ px: 1.5, pb: 1.5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5, fontSize: '0.75rem' }}>
-                    <Typography variant="caption">Maliyet: {formatCurrency(r.financials.costUsd)}</Typography>
-                    <Typography variant="caption">Kargo: {formatCurrency(r.financials.shippingUsd)}</Typography>
-                    <Typography variant="caption">eBay Kom.: {formatCurrency(r.financials.ebayFeeUsd)}</Typography>
-                    <Typography variant="caption">Ödeme: {formatCurrency(r.financials.paymentFeeUsd)}</Typography>
-                    <Typography variant="caption">Top. Maliyet: {formatCurrency(r.financials.totalCostUsd)}</Typography>
-                    <Typography variant="caption">Marj: {formatPercent(r.financials.marginPercent)}</Typography>
+                    <Typography variant="caption">{ta("costLabel")}: {formatCurrency(r.financials.costUsd, 'USD', locale)}</Typography>
+                    <Typography variant="caption">{ta("shippingLabel")}: {formatCurrency(r.financials.shippingUsd, 'USD', locale)}</Typography>
+                    <Typography variant="caption">{ta("ebayFeeLabel")}: {formatCurrency(r.financials.ebayFeeUsd, 'USD', locale)}</Typography>
+                    <Typography variant="caption">{ta("paymentLabel")}: {formatCurrency(r.financials.paymentFeeUsd, 'USD', locale)}</Typography>
+                    <Typography variant="caption">{ta("totalCostLabel")}: {formatCurrency(r.financials.totalCostUsd, 'USD', locale)}</Typography>
+                    <Typography variant="caption">{ta("marginLabel")}: {formatPercent(r.financials.marginPercent)}</Typography>
                     {r.matchTier && (
-                      <Typography variant="caption">Eşleşme: {r.matchTier === 'gtin' ? 'GTIN' : r.matchTier === 'gemini' ? 'AI' : 'Fallback'}</Typography>
+                      <Typography variant="caption">{ta("matchLabel")}: {r.matchTier === 'gtin' ? 'GTIN' : r.matchTier === 'gemini' ? 'AI' : 'Fallback'}</Typography>
                     )}
                     {r.translatedQuery && (
-                      <Typography variant="caption">Sorgu: {r.translatedQuery}</Typography>
+                      <Typography variant="caption">{ta("queryLabel")}: {r.translatedQuery}</Typography>
                     )}
                     <Box sx={{ gridColumn: '1 / -1', display: 'flex', gap: 1, mt: 0.5 }}>
                       <Chip
-                        label="Detay"
+                        label={ta("detail")}
                         size="small"
                         variant="outlined"
                         onClick={() => onViewDetail(globalIdx)}
@@ -151,8 +155,8 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
             <TableHead>
               <TableRow sx={{ '& th': { fontWeight: 700, fontSize: '0.75rem' } }}>
                 <TableCell sx={{ width: 48 }} />
-                <TableCell>Ürün</TableCell>
-                <TableCell>Marka</TableCell>
+                <TableCell>{ta("product")}</TableCell>
+                <TableCell>{ta("brand")}</TableCell>
                 <TableCell align="right">Trendyol</TableCell>
                 <TableCell align="right">
                   <TableSortLabel
@@ -169,7 +173,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                     direction={sortField === 'profitUsd' ? sortDirection : 'desc'}
                     onClick={() => handleSort('profitUsd')}
                   >
-                    Kâr
+                    {ta("profit")}
                   </TableSortLabel>
                 </TableCell>
                 <TableCell align="right">
@@ -187,10 +191,10 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                     direction={sortField === 'score' ? sortDirection : 'desc'}
                     onClick={() => handleSort('score')}
                   >
-                    Skor
+                    {ta("scoreLabel")}
                   </TableSortLabel>
                 </TableCell>
-                <TableCell align="center" sx={{ width: 80 }}>Aksiyon</TableCell>
+                <TableCell align="center" sx={{ width: 80 }}>{ta("action")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -217,12 +221,12 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                        {formatCurrency(r.trendyol.priceTry, 'TRY')}
+                        {formatCurrency(r.trendyol.priceTry, 'TRY', locale)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                        {formatCurrency(r.ebay.medianPrice)}
+                        {formatCurrency(r.ebay.medianPrice, 'USD', locale)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -230,7 +234,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                         fontWeight: 700, fontSize: '0.8rem',
                         color: r.financials.profitUsd > 0 ? '#2e7d32' : '#c62828',
                       }}>
-                        {formatCurrency(r.financials.profitUsd)}
+                        {formatCurrency(r.financials.profitUsd, 'USD', locale)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -249,7 +253,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                       />
                     </TableCell>
                     <TableCell align="center" onClick={(e) => e.stopPropagation()}>
-                      <Tooltip title="Detay">
+                      <Tooltip title={ta("detail")}>
                         <IconButton size="small" onClick={() => onViewDetail(globalIdx)}>
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
@@ -276,7 +280,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
         rowsPerPage={rowsPerPage}
         onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value)); setPage(0); }}
         rowsPerPageOptions={[10, 25, 50]}
-        labelRowsPerPage="Sayfa başına:"
+        labelRowsPerPage={ta("rowsPerPage")}
         labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
         sx={{ borderTop: 'none' }}
       />

@@ -1672,14 +1672,14 @@ export default function ListingEditorDrawer({
                         }
                       >
                         <Typography variant="caption" fontWeight={600} sx={{ cursor: 'pointer' }} onClick={() => setResearchBannerOpen((prev) => !prev)}>
-                          Pazar Verileri: &quot;{marketResearchData.query}&quot;
+                          {t('editor.marketData')}: &quot;{marketResearchData.query}&quot;
                         </Typography>
                         <Collapse in={researchBannerOpen}>
                           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                            {marketResearchData.topTags.slice(0, 10).map((t) => (
+                            {marketResearchData.topTags.slice(0, 10).map((tagItem) => (
                               <Chip
-                                key={t.tag}
-                                label={`${t.tag} (${t.pct}%)`}
+                                key={tagItem.tag}
+                                label={`${tagItem.tag} (${tagItem.pct}%)`}
                                 size="small"
                                 variant="outlined"
                                 sx={{
@@ -1693,12 +1693,12 @@ export default function ListingEditorDrawer({
                                     toast.error(t('editor.maxTagsError'));
                                     return;
                                   }
-                                  if (fields.tags.includes(t.tag)) {
+                                  if (fields.tags.includes(tagItem.tag)) {
                                     toast(t('editor.tagExists'), { icon: 'ℹ️' });
                                     return;
                                   }
-                                  updateField('tags', [...fields.tags, t.tag]);
-                                  toast.success(`"${t.tag}" ${t('editor.tagAdded')}`);
+                                  updateField('tags', [...fields.tags, tagItem.tag]);
+                                  toast.success(`"${tagItem.tag}" ${t('editor.tagAdded')}`);
                                 }}
                               />
                             ))}
@@ -1804,7 +1804,7 @@ export default function ListingEditorDrawer({
                             const suggested = result?.suggestions || result?.tags;
                             if (suggested && Array.isArray(suggested)) {
                               updateField('tags', suggested.slice(0, 13));
-                              toast.success(`${Math.min(suggested.length, 13)} etiket ile degistirildi`);
+                              toast.success(t('editor.tagsReplaced', { count: Math.min(suggested.length, 13) }));
                             }
                           }}
                           disabled={!!aiLoading.suggest_tags || !fields.title}
@@ -1860,7 +1860,7 @@ export default function ListingEditorDrawer({
                                 const merged = [...fields.tags, ...newTags].slice(0, 13);
                                 updateField('tags', merged);
                                 setAiTagSuggestions([]);
-                                toast.success(`${merged.length - fields.tags.length} etiket eklendi`);
+                                toast.success(t('editor.tagsAdded', { count: merged.length - fields.tags.length }));
                               }}
                               disabled={fields.tags.length >= 13 || aiTagSuggestions.every((t) => fields.tags.includes(t))}
                               sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.5, px: 1, minWidth: 0, minHeight: 32 }}
@@ -1906,7 +1906,7 @@ export default function ListingEditorDrawer({
                         </Box>
                         {fields.tags.length >= 13 && (
                           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                            Etiketler dolu — tikladiginiz oneri son etiketi degistirir
+                            {t('editor.tagsFull')}
                           </Typography>
                         )}
                       </Box>

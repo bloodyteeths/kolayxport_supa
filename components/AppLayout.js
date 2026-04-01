@@ -35,53 +35,59 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import useSidebar from '../hooks/useSidebar';
 import useScreenSize from '../hooks/useScreenSize';
+import { useTranslations } from 'next-intl';
+import useLocaleStore from '@/lib/stores/useLocaleStore';
 
 /**
  * AppLayout: For authenticated application routes (e.g., /app/*)
  * Provides sidebar, topbar, and dashboard navigation for logged-in users.
  */
 
-const navGroups = [
-  {
-    label: null,
-    items: [
-      { href: '/app', icon: LayoutDashboard, label: 'Genel Bakış' },
-      { href: '/app/analytics', icon: TrendingUp, label: 'Analitik' },
-    ],
-  },
-  {
-    label: 'Pazaryerleri',
-    items: [
-      { href: '/app/etsy-listings', icon: Store, label: 'Etsy Listings' },
-      { href: '/app/etsy-research', icon: Target, label: 'Etsy Araştırma' },
-      { href: '/app/ebay-listings', icon: ShoppingBag, label: 'eBay Listings' },
-      { href: '/app/ebay-research', icon: Target, label: 'eBay Research' },
-    ],
-  },
-  {
-    label: 'Operasyonlar',
-    items: [
-      { href: '/app/labels', icon: FileText, label: 'Label' },
-      { href: '/app/senkron', icon: ShoppingCart, label: 'Senkron' },
-    ],
-  },
-  {
-    label: 'Yönetim',
-    items: [
-      { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: 'Entegrasyonlar' },
-      { href: '/ayarlar', icon: Settings, label: 'Ayarlar' },
-    ],
-  },
-];
-
-// Flat list for backward compat
-const navItems = navGroups.flatMap(g => g.items);
+function getNavGroups(t) {
+  return [
+    {
+      label: null,
+      items: [
+        { href: '/app', icon: LayoutDashboard, label: t('overview') },
+        { href: '/app/analytics', icon: TrendingUp, label: t('analytics') },
+      ],
+    },
+    {
+      label: t('marketplaces'),
+      items: [
+        { href: '/app/etsy-listings', icon: Store, label: 'Etsy Listings' },
+        { href: '/app/etsy-research', icon: Target, label: t('etsyResearch') },
+        { href: '/app/ebay-listings', icon: ShoppingBag, label: 'eBay Listings' },
+        { href: '/app/ebay-research', icon: Target, label: 'eBay Research' },
+      ],
+    },
+    {
+      label: t('operations'),
+      items: [
+        { href: '/app/labels', icon: FileText, label: t('labelsNav') },
+        { href: '/app/senkron', icon: ShoppingCart, label: t('sync') },
+      ],
+    },
+    {
+      label: t('management'),
+      items: [
+        { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: t('integrations') },
+        { href: '/ayarlar', icon: Settings, label: t('settings') },
+      ],
+    },
+  ];
+}
 
 const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   const { user, session, supabaseSignOut, isLoading } = useAuth();
   const router = useRouter();
   const { isOpen, openSidebar, closeSidebar } = useSidebar();
   const { isMobile, isDesktop } = useScreenSize();
+  const t = useTranslations('nav');
+  const locale = useLocaleStore((s) => s.locale);
+  const setLocale = useLocaleStore((s) => s.setLocale);
+  const navGroups = getNavGroups(t);
+  const navItems = navGroups.flatMap(g => g.items);
 
   const isActive = (href) => router.pathname === href;
 
@@ -229,7 +235,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
               </svg>
             )}
             <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', fontWeight: 500 }}>
-              {isRefreshing ? 'Yenileniyor...' : pullDistance >= PULL_THRESHOLD ? 'Bırak' : 'Yenilemek icin cek'}
+              {isRefreshing ? t('refreshing') : pullDistance >= PULL_THRESHOLD ? t('release') : t('pullToRefresh')}
             </span>
           </div>
         </div>
@@ -367,12 +373,12 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 transition={{ duration: 0.15 }}
                 className="text-[13px] font-medium whitespace-nowrap overflow-hidden"
               >
-                Çıkış Yap
+                {t('signOut')}
               </motion.span>
 
               {!isOpen && isDesktop && (
                 <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none whitespace-nowrap z-50 shadow-lg">
-                  Çıkış Yap
+                  {t('signOut')}
                 </div>
               )}
             </button>
@@ -437,7 +443,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                   id="app-search"
                   className="block w-full pl-9 pr-3 py-2 text-sm text-slate-700 border-0 rounded-xl placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                   style={{ backgroundColor: 'rgba(241, 245, 249, 0.8)' }}
-                  placeholder="Sipariş, ürün, kullanıcı…"
+                  placeholder={t('searchPlaceholder')}
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                   <kbd className="hidden lg:inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
@@ -450,13 +456,20 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
             {/* Right actions */}
             <div className="flex items-center gap-1">
               <button
-                onClick={() => alert('Yeni bildiriminiz yok.')}
+                onClick={() => setLocale(locale === 'tr' ? 'en' : 'tr')}
+                className="px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
+              >
+                {locale === 'tr' ? 'EN' : 'TR'}
+              </button>
+
+              <button
+                onClick={() => alert(t('noNotifications'))}
                 className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
               >
                 <Bell size={19} />
                 {/* Notification dot */}
                 <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
-                <span className="sr-only">Bildirimler</span>
+                <span className="sr-only">{t('notifications')}</span>
               </button>
 
               {/* User avatar */}
@@ -464,7 +477,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 onClick={() => router.push('/ayarlar')}
                 className="ml-1 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-semibold text-white transition-transform hover:scale-105"
                 style={{ background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)' }}
-                title="Ayarlar"
+                title={t('settings')}
               >
                 {userInitials}
               </button>

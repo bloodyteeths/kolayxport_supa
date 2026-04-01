@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Box, Typography, Button, Paper, Chip, Tabs, Tab,
   LinearProgress, Alert, Switch, FormControlLabel, TextField,
@@ -26,6 +27,7 @@ interface ArbitrageScannerProps {
 }
 
 export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
+  const ta = useTranslations('ebay.arbitrage');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -81,12 +83,12 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
 
   const runQuickScan = useCallback(async (categories: string[]) => {
     if (categories.length === 0) {
-      toast.error('En az bir kategori seçin');
+      toast.error(ta('selectAtLeastOne'));
       return;
     }
 
     setLoading(true);
-    setScanProgress({ current: 0, total: categories.length, phase: 'Trendyol ürünleri yükleniyor...' });
+    setScanProgress({ current: 0, total: categories.length, phase: ta('loadingTrendyolProducts') });
     setScanResponse(null);
 
     try {
@@ -102,19 +104,19 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
 
       const data: ArbitrageScanResponse = await res.json();
 
-      if (!res.ok) throw new Error((data as any).error || 'Tarama başarısız');
+      if (!res.ok) throw new Error((data as any).error || ta('scanFailed'));
 
       setScanResponse(data);
       setScanProgress(null);
 
       const profitCount = data.profitable;
       if (profitCount > 0) {
-        toast.success(`${data.results.length} ürün tarandı, ${profitCount} kârlı fırsat bulundu!`);
+        toast.success(ta('scanSuccess', { total: data.results.length, profitable: profitCount }));
       } else {
-        toast(`${data.results.length} ürün tarandı, kârlı fırsat bulunamadı`, { icon: '📊' });
+        toast(ta('scanNoProfit', { total: data.results.length }), { icon: '📊' });
       }
     } catch (err: any) {
-      toast.error(err.message || 'Tarama hatası');
+      toast.error(err.message || ta('scanError'));
     } finally {
       setLoading(false);
       setScanProgress(null);
@@ -123,12 +125,12 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
 
   const startBackgroundScan = useCallback(async (categories: string[]) => {
     if (categories.length === 0) {
-      toast.error('En az bir kategori seçin');
+      toast.error(ta('selectAtLeastOne'));
       return;
     }
 
     setLoading(true);
-    setScanProgress({ current: 0, total: categories.length, phase: 'Tarama başlatılıyor...' });
+    setScanProgress({ current: 0, total: categories.length, phase: ta('startingScan') });
     setScanResponse(null);
 
     try {
@@ -144,7 +146,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Tarama başlatılamadı');
+      if (!res.ok) throw new Error(data.error || ta('scanStartFailed'));
 
       setJobId(data.jobId);
 
@@ -162,8 +164,8 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
             current: status.progress,
             total: status.totalProducts,
             phase: status.status === 'processing'
-              ? `${status.progress}/${status.totalProducts} kategori taranıyor...`
-              : 'Tamamlanıyor...',
+              ? ta('categoriesScanning', { current: status.progress, total: status.totalProducts })
+              : ta('completing'),
           });
 
           if (status.results && status.results.length > 0) {
@@ -183,9 +185,9 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
             setJobId(null);
 
             if (status.status === 'completed') {
-              toast.success(`Tarama tamamlandı! ${status.resultsCount} sonuç bulundu`);
+              toast.success(ta('scanCompleted', { count: status.resultsCount }));
             } else {
-              toast.error(status.error || 'Tarama başarısız');
+              toast.error(status.error || ta('scanFailed'));
             }
           }
         } catch {
@@ -193,7 +195,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
         }
       }, 4000);
     } catch (err: any) {
-      toast.error(err.message || 'Tarama hatası');
+      toast.error(err.message || ta('scanError'));
       setLoading(false);
       setScanProgress(null);
     }
@@ -235,7 +237,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
               Trendyol → eBay Arbitraj Pro
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.8 }}>
-              {TRENDYOL_CATEGORIES.length} kategori | {exchangeRate ? `1 TRY = $${exchangeRate.toFixed(4)}` : 'Kur yükleniyor...'}
+              {TRENDYOL_CATEGORIES.length} {ta('categoriesLabel')} | {exchangeRate ? `1 TRY = $${exchangeRate.toFixed(4)}` : ta('loadingRate')}
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -245,7 +247,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
               </IconButton>
             </Tooltip>
             {scanResponse && (
-              <Tooltip title="Taramayı Kaydet">
+              <Tooltip title={ta('saveScan')}>
                 <IconButton size="small" sx={{ color: '#fff' }} onClick={() => setSaveDialogOpen(true)}>
                   <Save size={18} />
                 </IconButton>
@@ -290,7 +292,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
               placeholder="Otomatik"
             />
             <TextField
-              size="small" label="Max Sonuç"
+              size="small" label={ta('maxResults')}
               type="number" value={maxResults}
               onChange={(e) => store.setMaxResults(Number(e.target.value))}
             />
@@ -298,11 +300,11 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
           <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
             <FormControlLabel
               control={<Switch size="small" checked={includeInternational} onChange={(e) => store.setIncludeInternational(e.target.checked)} />}
-              label={<Typography variant="caption">Uluslararası Ücret (1.65%)</Typography>}
+              label={<Typography variant="caption">{ta('internationalFee')} (1.65%)</Typography>}
             />
             <FormControlLabel
               control={<Switch size="small" checked={highDefectRate} onChange={(e) => store.setHighDefectRate(e.target.checked)} />}
-              label={<Typography variant="caption">Yüksek Defect (+5%)</Typography>}
+              label={<Typography variant="caption">{ta('highDefect')} (+5%)</Typography>}
             />
           </Box>
         </Paper>
@@ -334,11 +336,11 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
           startIcon={<Search size={14} />}
         >
           <Badge badgeContent={selectedCategories.length} color="error" sx={{ '& .MuiBadge-badge': { top: -4, right: -4 } }}>
-            Kategori Seç
+            {ta('selectCategory')}
           </Badge>
         </Button>
 
-        <Tooltip title="Tüm kategorileri tara (arka planda)">
+        <Tooltip title={ta('scanAllTooltip')}>
           <Button
             size="small"
             variant="contained"
@@ -365,7 +367,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
           />
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
             {scanProgress.current} / {scanProgress.total}
-            {scanResponse ? ` | ${scanResponse.results.length} sonuç bulundu` : ''}
+            {scanResponse ? ` | ${scanResponse.results.length} ${ta('resultsFound')}` : ''}
           </Typography>
         </Paper>
       )}
@@ -381,9 +383,9 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
             onChange={(_, v) => setActiveTab(v)}
             sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
           >
-            <Tab label={`Sonuçlar (${filteredResults.length})`} sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
+            <Tab label={`${ta('resultsTab')} (${filteredResults.length})`} sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
             <Tab label="Grafikler" sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
-            <Tab label="Geçmiş" sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
+            <Tab label={ta('historyTab')} sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
           </Tabs>
 
           {activeTab === 0 && (
@@ -410,13 +412,13 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
       {!scanResponse && !loading && (
         <Paper sx={{ p: 4, textAlign: 'center' }} variant="outlined">
           <Typography variant="h6" sx={{ mb: 1, opacity: 0.6 }}>
-            Trendyol → eBay Arbitraj Tarayıcı
+            {ta('scannerTitle')}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Yukarıdaki preset butonlarından birini tıklayın veya "Kategori Seç" ile özel tarama yapın.
+            {ta('scannerHint')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {TRENDYOL_CATEGORIES.length} Trendyol kategorisi hazır | Tiered matching: GTIN → AI → Fallback
+            {TRENDYOL_CATEGORIES.length} {ta('categoriesReady')} | Tiered matching: GTIN → AI → Fallback
           </Typography>
         </Paper>
       )}
@@ -437,22 +439,22 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
 
       {/* Save Dialog */}
       <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontSize: '1rem' }}>Taramayı Kaydet</DialogTitle>
+        <DialogTitle sx={{ fontSize: '1rem' }}>{ta('saveScan')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             fullWidth
             size="small"
-            label="Tarama adı"
+            label={ta('scanName')}
             value={saveLabel}
             onChange={(e) => setSaveLabel(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSaveScan()}
             sx={{ mt: 1 }}
-            placeholder="örn. Ev dekor taraması"
+            placeholder={ta('scanNamePlaceholder')}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSaveDialogOpen(false)}>İptal</Button>
+          <Button onClick={() => setSaveDialogOpen(false)}>{ta('cancel')}</Button>
           <Button variant="contained" onClick={handleSaveScan} disabled={!saveLabel.trim()}>Kaydet</Button>
         </DialogActions>
       </Dialog>

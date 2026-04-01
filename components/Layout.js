@@ -8,6 +8,7 @@ import { useRouter } from 'next/router'
 import useSidebar from '../hooks/useSidebar';
 import SidebarToggle from './SidebarToggle';
 import AuthForm from './AuthForm';
+import { useTranslations } from 'next-intl';
 
 /**
  * Layout: Generic wrapper for both authenticated and public pages.
@@ -18,6 +19,7 @@ export default function Layout({ children }) {
   const { isOpen, toggleSidebar, closeSidebar } = useSidebar();
   const { user, session, isLoading, signIn: supabaseSignIn, signOut: supabaseSignOut } = useAuth();
   const router = useRouter();
+  const t = useTranslations('public');
 
   const publicPaths = [
     '/privacy','/privacy-tr','/auth/error','/404',
@@ -56,7 +58,7 @@ export default function Layout({ children }) {
                 <button 
                   onClick={closeSidebar} 
                   className="text-slate-400 hover:text-slate-200 lg:hidden"
-                  aria-label="Kenar çubuğunu kapat"
+                  aria-label={t('closeSidebar')}
                 >
                   ×
                 </button>
@@ -66,21 +68,21 @@ export default function Layout({ children }) {
                   <li className="px-3 py-1">
                     <Link href="/app" className="flex items-center p-2 rounded hover:bg-slate-700 text-white">
                       <span className="flex items-center">
-                        <Home className="w-5 h-5 mr-3" /> Kontrol Paneli
+                        <Home className="w-5 h-5 mr-3" /> {t('dashboard')}
                       </span>
                     </Link>
                   </li>
                   <li className="px-3 py-1">
                     <Link href="/subscribe" className="flex items-center p-2 rounded hover:bg-slate-700 text-white">
                       <span className="flex items-center">
-                        <CreditCard className="w-5 h-5 mr-3" /> Abonelik
+                        <CreditCard className="w-5 h-5 mr-3" /> {t('subscription')}
                       </span>
                     </Link>
                   </li>
                   <li className="px-3 py-1">
                     <Link href="/ayarlar" className="flex items-center p-2 rounded hover:bg-slate-700 text-white">
                       <span className="flex items-center">
-                        <Settings className="w-5 h-5 mr-3" /> Ayarlar
+                        <Settings className="w-5 h-5 mr-3" /> {t('settings')}
                       </span>
                     </Link>
                   </li>
@@ -95,14 +97,14 @@ export default function Layout({ children }) {
                     });
                     if (error) console.error('Error signing in with Google:', error);
                   }} className="w-full flex items-center justify-center">
-                    <LogIn className="w-4 h-4 mr-2" /> Google ile Giriş Yap
+                    <LogIn className="w-4 h-4 mr-2" /> {t('signInWithGoogle')}
                   </Button>
                 )}
                 {user && (
                   <div className="flex flex-col items-center space-y-2">
                     <span className="text-sm text-gray-200 truncate" title={user.email}>{user.name || user.email}</span>
                     <Button onClick={async () => await supabaseSignOut()} variant="outline" className="w-full flex items-center justify-center">
-                      <LogOut className="w-4 h-4 mr-2" /> Çıkış Yap
+                      <LogOut className="w-4 h-4 mr-2" /> {t('signOut')}
                     </Button>
                   </div>
                 )}
@@ -117,7 +119,7 @@ export default function Layout({ children }) {
         {!isHomePage && !isGenericPublicPage && (
           <header className="bg-white shadow p-4 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900">
-              Kontrol Paneli
+              {t('dashboard')}
             </h2>
             <button className="p-2 rounded hover:bg-gray-100">
               <Bell className="w-6 h-6 text-gray-600" />
@@ -134,20 +136,20 @@ export default function Layout({ children }) {
         {/* Footer - Conditionally render or use the one from pages/index.js for homepage */}
         {!isHomePage && (
           <footer className="bg-white border-t py-4 text-center text-sm text-gray-600">
-            <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+            <Link href="/privacy" className="hover:underline">{t('privacyPolicyEN')}</Link>
             <span className="mx-2">|</span>
-            <Link href="/privacy-tr" className="hover:underline">Gizlilik Politikası</Link>
+            <Link href="/privacy-tr" className="hover:underline">{t('privacyPolicy')}</Link>
             {user && (
               <>
                 <span className="mx-2">|</span>
-                <a href="#" onClick={async (e) => { e.preventDefault(); await supabaseSignOut(); }} className="hover:underline">Logout</a>
+                <a href="#" onClick={async (e) => { e.preventDefault(); await supabaseSignOut(); }} className="hover:underline">{t('logout')}</a>
               </>
             )}
             <div className="mt-2">
-              &copy; {new Date().getFullYear()} Tamsar Tekstil Dış Tic. Ltd. Şti. All rights reserved.
+              &copy; {new Date().getFullYear()} Tamsar Tekstil Dış Tic. Ltd. Şti. {t('allRightsReserved')}
             </div>
             <div className="mt-1">
-              Support: <a href="mailto:destek@kolayxport.com" className="hover:underline">destek@kolayxport.com</a>
+              {t('support')}: <a href="mailto:destek@kolayxport.com" className="hover:underline">destek@kolayxport.com</a>
             </div>
           </footer>
         )}

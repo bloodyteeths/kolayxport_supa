@@ -350,8 +350,8 @@ function InlineTagEditor({
   const handleAdd = () => {
     const newTags = inputVal
       .split(',')
-      .map(t => t.trim().toLowerCase())
-      .filter(t => t.length > 0 && t.length <= maxCharsPerTag && !tags.includes(t));
+      .map(s => s.trim().toLowerCase())
+      .filter(s => s.length > 0 && s.length <= maxCharsPerTag && !tags.includes(s));
     if (newTags.length === 0) return;
     const merged = [...tags, ...newTags].slice(0, maxTags);
     onChange(merged);
@@ -435,8 +435,8 @@ function InlineMaterialEditor({
   const handleAdd = () => {
     const newMats = inputVal
       .split(',')
-      .map(t => t.trim())
-      .filter(t => t.length > 0 && !materials.includes(t));
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !materials.includes(s));
     if (newMats.length === 0) return;
     onChange([...materials, ...newMats].slice(0, maxMaterials));
     setInputVal('');
@@ -649,12 +649,12 @@ export default function BulkEditor({
           let newTags = [...(current as string[])];
           switch (operation) {
             case 'add': {
-              const adding = tagsInput.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0 && t.length <= 20);
+              const adding = tagsInput.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0 && s.length <= 20);
               newTags = [...new Set([...newTags, ...adding])].slice(0, 13);
               break;
             }
             case 'remove': {
-              const removing = tagsInput.split(',').map(t => t.trim().toLowerCase());
+              const removing = tagsInput.split(',').map(s => s.trim().toLowerCase());
               newTags = newTags.filter(t => !removing.includes(t.toLowerCase()));
               break;
             }
@@ -663,7 +663,7 @@ export default function BulkEditor({
               break;
             }
             case 'change_to': {
-              newTags = tagsInput.split(',').map(t => t.trim().toLowerCase()).filter(t => t.length > 0 && t.length <= 20).slice(0, 13);
+              newTags = tagsInput.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0 && s.length <= 20).slice(0, 13);
               break;
             }
             case 'ai_rewrite': return;
@@ -675,12 +675,12 @@ export default function BulkEditor({
           let newMats = [...(current as string[])];
           switch (operation) {
             case 'add': {
-              const adding = tagsInput.split(',').map(t => t.trim()).filter(t => t.length > 0);
+              const adding = tagsInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
               newMats = [...new Set([...newMats, ...adding])].slice(0, 13);
               break;
             }
             case 'remove': {
-              const removing = tagsInput.split(',').map(t => t.trim().toLowerCase());
+              const removing = tagsInput.split(',').map(s => s.trim().toLowerCase());
               newMats = newMats.filter(t => !removing.includes(t.toLowerCase()));
               break;
             }
@@ -689,7 +689,7 @@ export default function BulkEditor({
               break;
             }
             case 'change_to': {
-              newMats = tagsInput.split(',').map(t => t.trim()).filter(t => t.length > 0).slice(0, 13);
+              newMats = tagsInput.split(',').map(s => s.trim()).filter(s => s.length > 0).slice(0, 13);
               break;
             }
           }

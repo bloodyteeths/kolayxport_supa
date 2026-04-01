@@ -70,6 +70,7 @@ import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 import { Tabs, Tab } from '@mui/material';
 import SEOIndicator from '@/components/ebay/SEOIndicator';
@@ -256,10 +257,10 @@ function MobileListingCard({
               {formatPrice(listing.price)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Stok: {listing.quantity}
+              {t('stock')}: {listing.quantity}
             </Typography>
             <Chip
-              label={isPublished ? 'Yayinda' : 'Taslak'}
+              label={isPublished ? t('published') : t('draft')}
               size="small"
               color={isPublished ? 'success' : 'warning'}
               variant="outlined"
@@ -282,17 +283,17 @@ function MobileListingCard({
               <Typography variant="body2">{listing.sku || '\u2014'}</Typography>
             </Box>
             <Box sx={{ flex: '1 1 45%' }}>
-              <Typography variant="caption" color="text.secondary">Durum</Typography>
+              <Typography variant="caption" color="text.secondary">{t('condition')}</Typography>
               <Typography variant="body2">
                 {CONDITION_LABELS[listing.condition] || listing.condition}
               </Typography>
             </Box>
             <Box sx={{ flex: '1 1 45%' }}>
-              <Typography variant="caption" color="text.secondary">Gorseller</Typography>
+              <Typography variant="caption" color="text.secondary">{t('images')}</Typography>
               <Typography variant="body2">{listing.imageCount}/24</Typography>
             </Box>
             <Box sx={{ flex: '1 1 45%' }}>
-              <Typography variant="caption" color="text.secondary">Saglik Skoru</Typography>
+              <Typography variant="caption" color="text.secondary">{t('healthScore')}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Box
                   sx={{
@@ -346,7 +347,7 @@ function MobileListingCard({
                 '&:hover': { background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' },
               }}
             >
-              Duzenle
+              {t('edit')}
             </Button>
             <Button
               size="small"
@@ -359,7 +360,7 @@ function MobileListingCard({
                 '&:hover': { background: 'linear-gradient(135deg, #dc2626, #b91c1c)' },
               }}
             >
-              Sil
+              {t('deleteBtn')}
             </Button>
           </Box>
 
@@ -372,7 +373,7 @@ function MobileListingCard({
               rel="noopener noreferrer"
               sx={{ mt: 0.5, fontSize: 11 }}
             >
-              eBay&apos;de Gor
+              {t('viewOnEbay')}
             </Button>
           )}
         </Box>
@@ -546,13 +547,13 @@ function EbayListingsPage() {
 
       if (rows.length === 0 && !inventoryRes?.ok && !legacyRes?.ok) {
         const errData = inventoryRes ? await inventoryRes.json().catch(() => ({})) : {};
-        throw new Error(errData.error || 'Listeleme yuklenemedi');
+        throw new Error(errData.error || t('loadFailed'));
       }
 
       setListings(rows);
     } catch (err: any) {
       console.error('Failed to fetch eBay listings:', err);
-      toast.error(`Listelemeler yuklenemedi: ${err.message}`);
+      toast.error(`${t('loadFailed')}: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -689,11 +690,11 @@ function EbayListingsPage() {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || `HTTP ${res.status}`);
         }
-        toast.success('Listeleme silindi');
+        toast.success(t('listingDeleted'));
         setDeleteConfirm(null);
         fetchListings();
       } catch (err: any) {
-        toast.error(`Silinemedi: ${err.message}`);
+        toast.error(`${t('deleteFailed')}: ${err.message}`);
       }
     },
     [userId, fetchListings]
@@ -702,7 +703,7 @@ function EbayListingsPage() {
   // --- CSV Export ---
   const handleExportCSV = () => {
     if (filteredListings.length === 0) {
-      toast.error('Disa aktarilacak listeleme yok');
+      toast.error(t('noListingsToExport'));
       return;
     }
     const rows = filteredListings.map((l) => ({
@@ -794,12 +795,12 @@ function EbayListingsPage() {
         const text = ev.target?.result as string;
         const rows = parseCSV(text);
         if (rows.length === 0) {
-          toast.error('CSV dosyasi bos veya gecersiz format');
+          toast.error(t('csvEmptyOrInvalid'));
           return;
         }
         const validRows = rows.filter((r) => r.sku && r.sku.trim() !== '');
         if (validRows.length === 0) {
-          toast.error('CSV dosyasinda sku sutunu bulunamadi');
+          toast.error(t('csvNoSkuColumn'));
           return;
         }
         setCsvImportRows(validRows);
@@ -898,9 +899,9 @@ function EbayListingsPage() {
     setCsvImportRows([]);
 
     if (failed === 0) {
-      toast.success(`CSV import tamamlandi: ${succeeded} listeleme olusturuldu`);
+      toast.success(t('csvImportSuccess', { count: succeeded }));
     } else {
-      toast.error(`CSV import: ${succeeded} basarili, ${failed} basarisiz`);
+      toast.error(t('csvImportPartial', { succeeded, failed }));
     }
 
     fetchListings();
@@ -934,7 +935,7 @@ function EbayListingsPage() {
   // --- AI handlers ---
   const handleAIBulkOptimize = async () => {
     if (filteredListings.length === 0) {
-      toast.error('Optimize edilecek listeleme yok');
+      toast.error(t('noListingsToOptimize'));
       return;
     }
     setAiDialogMode('titles');
@@ -954,11 +955,11 @@ function EbayListingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ listings: batch, ...(marketResearch ? { marketResearch } : {}) }),
       });
-      if (!res.ok) throw new Error('AI servisi yanit vermedi');
+      if (!res.ok) throw new Error(t('aiNoResponse'));
       const data = await res.json();
       setAiResults(data.results || []);
     } catch (err: any) {
-      toast.error(`AI hatasi: ${err.message}`);
+      toast.error(`${t('aiError')}: ${err.message}`);
       setAiDialogOpen(false);
     } finally {
       setAiLoading(false);
@@ -967,7 +968,7 @@ function EbayListingsPage() {
 
   const handleAIAnalyze = async () => {
     if (filteredListings.length === 0) {
-      toast.error('Analiz edilecek listeleme yok');
+      toast.error(t('noListingsToAnalyze'));
       return;
     }
     setAiDialogMode('analyze');
@@ -991,11 +992,11 @@ function EbayListingsPage() {
           ...(marketResearch ? { marketResearch } : {}),
         }),
       });
-      if (!res.ok) throw new Error('AI servisi yanit vermedi');
+      if (!res.ok) throw new Error(t('aiNoResponse'));
       const data = await res.json();
       setAiResults(data);
     } catch (err: any) {
-      toast.error(`AI hatasi: ${err.message}`);
+      toast.error(`${t('aiError')}: ${err.message}`);
       setAiDialogOpen(false);
     } finally {
       setAiLoading(false);
@@ -1046,7 +1047,7 @@ function EbayListingsPage() {
       },
       {
         field: 'title',
-        headerName: 'Baslik',
+        headerName: t('titleCol'),
         flex: 1,
         minWidth: 250,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => (
@@ -1074,7 +1075,7 @@ function EbayListingsPage() {
       },
       {
         field: 'price',
-        headerName: 'Fiyat',
+        headerName: t('priceCol'),
         width: 100,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => (
           <Typography variant="body2">{formatPrice(params.row.price)}</Typography>
@@ -1089,7 +1090,7 @@ function EbayListingsPage() {
       },
       {
         field: 'quantity',
-        headerName: 'Stok',
+        headerName: t('stockCol'),
         width: 80,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => {
           const qty = params.row.quantity;
@@ -1109,7 +1110,7 @@ function EbayListingsPage() {
       },
       {
         field: 'condition',
-        headerName: 'Durum',
+        headerName: t('conditionCol'),
         width: 100,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => (
           <Chip
@@ -1136,7 +1137,7 @@ function EbayListingsPage() {
       },
       {
         field: 'health',
-        headerName: 'Saglik',
+        headerName: t('healthCol'),
         width: 70,
         sortable: true,
         filterable: false,
@@ -1147,7 +1148,7 @@ function EbayListingsPage() {
               arrow
               title={
                 <Box sx={{ fontSize: 12 }}>
-                  <Box sx={{ fontWeight: 700, mb: 0.5 }}>Saglik Skoru: {h.overall}/100</Box>
+                  <Box sx={{ fontWeight: 700, mb: 0.5 }}>{t('healthScore')}: {h.overall}/100</Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: h.title.color }} />
                     {h.title.label}
@@ -1194,20 +1195,20 @@ function EbayListingsPage() {
       },
       {
         field: 'imageCount',
-        headerName: 'Gorsel',
+        headerName: t('imageCol'),
         width: 70,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) =>
           `${params.row.imageCount}/24`,
       },
       {
         field: 'status',
-        headerName: 'Yayin',
+        headerName: t('statusCol'),
         width: 100,
         renderCell: (params: GridRenderCellParams<EbayListingRow>) => {
           const isPublished = params.row.status === 'PUBLISHED';
           return (
             <Chip
-              label={isPublished ? 'Yayinda' : 'Taslak'}
+              label={isPublished ? t('published') : t('draft')}
               size="small"
               color={isPublished ? 'success' : 'warning'}
               variant="outlined"
@@ -1280,7 +1281,7 @@ function EbayListingsPage() {
       <Box sx={{ display: 'flex', gap: { xs: 1, sm: 2 }, mb: 2, flexWrap: 'wrap', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
         <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
           <Typography variant="caption" color="text.secondary">
-            Toplam Listeleme
+            {t('totalListings')}
           </Typography>
           <Typography variant="h6" fontWeight={700}>
             {totalCount}
@@ -1288,7 +1289,7 @@ function EbayListingsPage() {
         </Paper>
         <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
           <Typography variant="caption" color="text.secondary">
-            Yayinda
+            {t('published')}
           </Typography>
           <Typography variant="h6" fontWeight={700} color="success.main">
             {publishedCount}
@@ -1296,7 +1297,7 @@ function EbayListingsPage() {
         </Paper>
         <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
           <Typography variant="caption" color="text.secondary">
-            Taslak
+            {t('draft')}
           </Typography>
           <Typography variant="h6" fontWeight={700} color="warning.main">
             {unpublishedCount}
@@ -1304,7 +1305,7 @@ function EbayListingsPage() {
         </Paper>
         <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 } }}>
           <Typography variant="caption" color="text.secondary">
-            Stok Biten
+            {t('outOfStock')}
           </Typography>
           <Typography variant="h6" fontWeight={700} color="error">
             {outOfStock}
@@ -1312,7 +1313,7 @@ function EbayListingsPage() {
         </Paper>
         <Paper sx={{ p: 1.5, flex: 1, minWidth: { xs: '45%', sm: 120 }, borderLeft: '3px solid #ff9800' }}>
           <Typography variant="caption" color="text.secondary">
-            Sorunlu
+            {t('needsAttention')}
           </Typography>
           <Typography variant="h6" fontWeight={700} sx={{ color: '#ff9800' }}>
             {needsAttention}
@@ -1329,7 +1330,7 @@ function EbayListingsPage() {
           {/* Search */}
           <TextField
             size="small"
-            placeholder="Listeleme ara..."
+            placeholder={t('searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             sx={{ minWidth: { xs: '100%', sm: 200 }, flex: 1 }}
@@ -1348,9 +1349,9 @@ function EbayListingsPage() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <MenuItem value="all">Tumu</MenuItem>
-              <MenuItem value="PUBLISHED">Yayinda</MenuItem>
-              <MenuItem value="UNPUBLISHED">Taslak</MenuItem>
+              <MenuItem value="all">{t('filterAll')}</MenuItem>
+              <MenuItem value="PUBLISHED">{t('published')}</MenuItem>
+              <MenuItem value="UNPUBLISHED">{t('draft')}</MenuItem>
             </Select>
           </FormControl>
 
@@ -1360,8 +1361,8 @@ function EbayListingsPage() {
               value={conditionFilter}
               onChange={(e) => setConditionFilter(e.target.value)}
             >
-              <MenuItem value="all">Tum Durumlar</MenuItem>
-              <MenuItem value="NEW">Yeni</MenuItem>
+              <MenuItem value="all">{t('allConditions')}</MenuItem>
+              <MenuItem value="NEW">{t('condNew')}</MenuItem>
               <MenuItem value="LIKE_NEW">{t('condLikeNew')}</MenuItem>
               <MenuItem value="VERY_GOOD">{t('condVeryGood')}</MenuItem>
               <MenuItem value="GOOD">{t('condGood')}</MenuItem>
@@ -1376,18 +1377,18 @@ function EbayListingsPage() {
               onChange={(e) => setHealthFilter(e.target.value)}
               displayEmpty
             >
-              <MenuItem value="">Tum Saglik</MenuItem>
+              <MenuItem value="">{t('allHealth')}</MenuItem>
               <MenuItem value="issues">
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <ErrorOutlineIcon sx={{ fontSize: 16, color: '#ff9800' }} />
-                  Sorunlu (&lt;70)
+                  {t('healthIssues')}
                 </Box>
               </MenuItem>
-              <MenuItem value="missing_images">Gorsel Eksik (&lt;5)</MenuItem>
-              <MenuItem value="short_title">Kisa Baslik (&lt;60)</MenuItem>
-              <MenuItem value="no_description">Aciklama Yok (&lt;200)</MenuItem>
-              <MenuItem value="few_aspects">Az Item Specific (&lt;3)</MenuItem>
-              <MenuItem value="no_stock">Stok Yok</MenuItem>
+              <MenuItem value="missing_images">{t('healthMissingImages')}</MenuItem>
+              <MenuItem value="short_title">{t('healthShortTitle')}</MenuItem>
+              <MenuItem value="no_description">{t('healthNoDescription')}</MenuItem>
+              <MenuItem value="few_aspects">{t('healthFewAspects')}</MenuItem>
+              <MenuItem value="no_stock">{t('healthNoStock')}</MenuItem>
             </Select>
           </FormControl>
 
@@ -1412,7 +1413,7 @@ function EbayListingsPage() {
             '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
           }}
         >
-          Yeni Listeleme
+          {t('newListing')}
         </Button>
 
         {/* CSV Download */}
@@ -1428,7 +1429,7 @@ function EbayListingsPage() {
             '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
           }}
         >
-          CSV İndir
+          {t('csvDownload')}
         </Button>
 
         {/* Tools dropdown */}
@@ -1445,7 +1446,7 @@ function EbayListingsPage() {
             '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
           }}
         >
-          Araçlar
+          {t('tools')}
         </Button>
 
         <Menu
@@ -1467,7 +1468,7 @@ function EbayListingsPage() {
           <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIAnalyze(); }}>
             <ListItemIcon><PsychologyIcon fontSize="small" /></ListItemIcon>
             <ListItemText
-              primary="Listeleri Analiz Et"
+              primary={t('analyzeListing')}
               secondary={t('aiAnalysisDesc')}
             />
           </MenuItem>
@@ -1483,8 +1484,8 @@ function EbayListingsPage() {
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setDuplicateDetectorOpen(true); }}>
             <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
             <ListItemText
-              primary="Tekrar Tespit"
-              secondary="Benzer veya kopya listeleri bul"
+              primary={t('duplicateDetection')}
+              secondary={t('duplicateDetectionDesc')}
             />
           </MenuItem>
 
@@ -1504,7 +1505,7 @@ function EbayListingsPage() {
             />
           </MenuItem>
 
-          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>Veri</ListSubheader>
+          <ListSubheader sx={{ lineHeight: '32px', fontWeight: 700 }}>{t('data')}</ListSubheader>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); handleCSVFileSelect(); }}>
             <ListItemIcon><UploadFileIcon fontSize="small" /></ListItemIcon>
             <ListItemText
@@ -1544,7 +1545,7 @@ function EbayListingsPage() {
             </Box>
           ) : paginatedMobileListings.length === 0 ? (
             <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography color="text.secondary">Listeleme bulunamadi</Typography>
+              <Typography color="text.secondary">{t('noListingsFound')}</Typography>
             </Paper>
           ) : (
             <>
@@ -1560,7 +1561,7 @@ function EbayListingsPage() {
               {/* Mobile Pagination */}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, px: 1 }}>
                 <Typography variant="caption" color="text.secondary">
-                  {filteredListings.length} listeleme, Sayfa {paginationModel.page + 1}/
+                  {filteredListings.length} {t('listingsCount')}, {t('page')} {paginationModel.page + 1}/
                   {Math.max(1, Math.ceil(filteredListings.length / paginationModel.pageSize))}
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
@@ -1570,7 +1571,7 @@ function EbayListingsPage() {
                     disabled={paginationModel.page === 0}
                     onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page - 1 }))}
                   >
-                    Onceki
+                    {t('previous')}
                   </Button>
                   <Button
                     size="small"
@@ -1578,7 +1579,7 @@ function EbayListingsPage() {
                     disabled={(paginationModel.page + 1) * paginationModel.pageSize >= filteredListings.length}
                     onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page + 1 }))}
                   >
-                    Sonraki
+                    {t('nextPage')}
                   </Button>
                 </Box>
               </Box>
@@ -1627,7 +1628,7 @@ function EbayListingsPage() {
                   }}
                 >
                   <Typography color="text.secondary">
-                    Listeleme bulunamadi
+                    {t('noListingsFound')}
                   </Typography>
                 </Box>
               ),
@@ -1667,17 +1668,17 @@ function EbayListingsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <Typography variant="h6" gutterBottom>
-              Listeleme Sil
+              {t('deleteListingTitle')}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               <strong>{deleteConfirm.title}</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Bu listelemeyi silmek istediginize emin misiniz? Bu islem geri alinamaz.
+              {t('deleteListingConfirm')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
               <Button size="small" onClick={() => setDeleteConfirm(null)}>
-                Iptal
+                {t('cancelBtn')}
               </Button>
               <Button
                 size="small"
@@ -1685,7 +1686,7 @@ function EbayListingsPage() {
                 color="error"
                 onClick={() => handleDeleteListing(deleteConfirm)}
               >
-                Sil
+                {t('deleteBtn')}
               </Button>
             </Box>
           </Paper>
@@ -1734,7 +1735,7 @@ function EbayListingsPage() {
         fullWidth
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Smart Fiyatlandirma
+          {t('smartPricingTitle')}
           <IconButton size="small" onClick={() => setSmartPricingOpen(false)}>
             <CloseIcon />
           </IconButton>
@@ -1762,7 +1763,7 @@ function EbayListingsPage() {
         fullWidth
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Tekrar Tespit
+          {t('duplicateDetection')}
           <IconButton size="small" onClick={() => setDuplicateDetectorOpen(false)}>
             <CloseIcon />
           </IconButton>
@@ -1792,7 +1793,7 @@ function EbayListingsPage() {
         fullWidth
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Yedek Yonetimi
+          {t('backupManagement')}
           <IconButton size="small" onClick={() => setBackupManagerOpen(false)}>
             <CloseIcon />
           </IconButton>
@@ -1813,7 +1814,7 @@ function EbayListingsPage() {
         fullWidth
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Sablonlar
+          {t('templatesTitle')}
           <IconButton size="small" onClick={() => setTemplatesOpen(false)}>
             <CloseIcon />
           </IconButton>
@@ -1856,33 +1857,33 @@ function EbayListingsPage() {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>CSV Import Onizleme</DialogTitle>
+        <DialogTitle>{t('csvImportPreview')}</DialogTitle>
         <DialogContent>
           {csvImporting ? (
             <Box sx={{ py: 3 }}>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                Import devam ediyor...
+                {t('importInProgress')}
               </Typography>
               <LinearProgress variant="determinate" value={csvImportProgress} />
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                %{Math.round(csvImportProgress)} tamamlandi
+                {Math.round(csvImportProgress)}% {t('completed')}
               </Typography>
             </Box>
           ) : (
             <>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {csvImportRows.length} listeleme olusturulacak. Gerekli sutunlar: sku, title, description, price, quantity, condition
+                {t('csvImportWillCreate', { count: csvImportRows.length })}
               </Typography>
               <TableContainer sx={{ maxHeight: 400 }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
                       <TableCell>SKU</TableCell>
-                      <TableCell>Baslik</TableCell>
-                      <TableCell>Fiyat</TableCell>
-                      <TableCell>Stok</TableCell>
-                      <TableCell>Durum</TableCell>
-                      <TableCell>Aciklama</TableCell>
+                      <TableCell>{t('titleCol')}</TableCell>
+                      <TableCell>{t('priceCol')}</TableCell>
+                      <TableCell>{t('stockCol')}</TableCell>
+                      <TableCell>{t('conditionCol')}</TableCell>
+                      <TableCell>{t('descriptionCol')}</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1905,7 +1906,7 @@ function EbayListingsPage() {
               </TableContainer>
               {csvImportRows.length > 50 && (
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  ... ve {csvImportRows.length - 50} satir daha
+                  {t('andMoreRows', { count: csvImportRows.length - 50 })}
                 </Typography>
               )}
             </>
@@ -1913,10 +1914,10 @@ function EbayListingsPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setCsvImportDialogOpen(false); setCsvImportRows([]); }} disabled={csvImporting}>
-            Iptal
+            {t('cancelBtn')}
           </Button>
           <Button variant="contained" onClick={handleCSVImportConfirm} disabled={csvImporting || csvImportRows.length === 0}>
-            {csvImporting ? 'Import ediliyor...' : `${csvImportRows.length} Listeleme Olustur`}
+            {csvImporting ? t('importingProgress') : t('createListings', { count: csvImportRows.length })}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1942,7 +1943,7 @@ function EbayListingsPage() {
                     }
                   }}
                 >
-                  Tümünü Geri Al
+                  {t('listingOptimizer.undoAll')}
                 </Button>
               ) : (
                 <Button
@@ -1956,7 +1957,7 @@ function EbayListingsPage() {
                     }
                   }}
                 >
-                  Tümünü Uygula
+                  {t('listingOptimizer.applyAll')}
                 </Button>
               )
             )}
@@ -1969,7 +1970,7 @@ function EbayListingsPage() {
           {aiLoading ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4, gap: 2 }}>
               <CircularProgress />
-              <Typography color="text.secondary">AI analiz ediyor...</Typography>
+              <Typography color="text.secondary">{t('aiAnalyzing')}</Typography>
             </Box>
           ) : aiDialogMode === 'titles' && Array.isArray(aiResults) ? (
             <Box>
@@ -1985,7 +1986,7 @@ function EbayListingsPage() {
 
                 return (
                   <Paper key={i} sx={{ p: 2, mb: 1.5, borderLeft: appliedTitles.has(r.id) ? '3px solid #4caf50' : undefined }} variant="outlined">
-                    <Typography variant="caption" color="text.secondary">Mevcut:</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('current')}:</Typography>
                     <Typography variant="body2" sx={{ mb: 1 }}>
                       {origWords.map((w: string, wi: number) => (
                         <span key={wi} style={{ color: optSet.has(w.toLowerCase()) ? undefined : '#f44336', textDecoration: optSet.has(w.toLowerCase()) ? undefined : 'line-through' }}>
@@ -2004,15 +2005,15 @@ function EbayListingsPage() {
                     <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
                       {appliedTitles.has(r.id) ? (
                         <Button size="small" variant="outlined" color="warning" onClick={() => handleUndoAITitle(r.id)}>
-                          Geri Al
+                          {t('undo')}
                         </Button>
                       ) : (
                         <Button size="small" variant="contained" color="primary" onClick={() => handleApplyAITitle(r.id, r.optimized, r.original)}>
-                          Uygula
+                          {t('apply')}
                         </Button>
                       )}
                       <Button size="small" variant="outlined" onClick={() => { navigator.clipboard.writeText(r.optimized); toast.success(t('copied')); }}>
-                        Kopyala
+                        {t('copy')}
                       </Button>
                     </Box>
                   </Paper>
@@ -2041,7 +2042,7 @@ function EbayListingsPage() {
 
               {aiResults.issues?.length > 0 && (
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Sorunlar:</Typography>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>{t('issues')}:</Typography>
                   {aiResults.issues.map((issue: any, i: number) => (
                     <Paper key={i} sx={{ p: 1.5, mb: 1, borderLeft: `3px solid ${issue.severity === 'critical' ? '#f44336' : issue.severity === 'warning' ? '#ff9800' : '#2196f3'}` }} variant="outlined">
                       <Typography variant="body2" fontWeight={600}>{issue.message}</Typography>

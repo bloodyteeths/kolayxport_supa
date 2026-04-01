@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Box,
   Typography,
@@ -122,6 +123,7 @@ interface BackupManagerProps {
 }
 
 export default function BackupManager({ listings, userId }: BackupManagerProps) {
+  const t = useTranslations('common');
   const [backups, setBackups] = useState<EbayBackupEntry[]>([]);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
@@ -444,7 +446,7 @@ export default function BackupManager({ listings, userId }: BackupManagerProps) 
                             <FileDownloadIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Sil">
+                        <Tooltip title={t('delete')}>
                           <IconButton
                             size="small"
                             color="error"

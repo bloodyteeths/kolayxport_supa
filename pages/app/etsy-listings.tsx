@@ -1539,7 +1539,7 @@ function EtsyListingsPage() {
                   <ContentCopyIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Sil" arrow>
+              <Tooltip title={t('delete')} arrow>
                 <IconButton size="small" color="error" onClick={() => setDeleteConfirmId(params.row.listing_id)} sx={{ p: 0.5 }}>
                   <DeleteIcon sx={{ fontSize: 16 }} />
                 </IconButton>

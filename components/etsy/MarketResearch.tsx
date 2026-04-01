@@ -948,21 +948,21 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   // ---------------------------------------------------------------------------
 
   const myTagsSet = useMemo(() => {
-    const tags = myTags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    const tags = myTags.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     if (userListings?.length) {
       userListings.forEach(l => { (l.tags || []).forEach((t: string) => tags.push(t.toLowerCase().trim())); });
     }
     return new Set(tags);
   }, [myTags, userListings]);
 
-  const enrichedTags = useMemo(() => serverTagFreq.map(t => ({ ...t, inMyTags: myTagsSet.has(t.tag) })), [serverTagFreq, myTagsSet]);
+  const enrichedTags = useMemo(() => serverTagFreq.map(tg => ({ ...tg, inMyTags: myTagsSet.has(tg.tag) })), [serverTagFreq, myTagsSet]);
   const tagGaps = useMemo(() => enrichedTags.filter(t => !t.inMyTags && t.pct >= 5), [enrichedTags]);
 
   const tagCombos = useMemo(() => {
     if (items.length === 0) return [];
     const pairFreq: Record<string, { count: number; totalFav: number }> = {};
     items.forEach(item => {
-      const tags = (item.tags || []).map(t => t.toLowerCase().trim()).filter(Boolean);
+      const tags = (item.tags || []).map(s => s.toLowerCase().trim()).filter(Boolean);
       for (let i = 0; i < tags.length; i++) {
         for (let j = i + 1; j < Math.min(tags.length, i + 5); j++) {
           const pair = [tags[i], tags[j]].sort().join(' + ');
@@ -1119,7 +1119,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
     const recommendations: string[] = [];
     const missingKw = top20kw.filter(k => !k.inMyTitle).slice(0, 5);
     if (missingKw.length > 0) recommendations.push(t('recAddMissingKeywords', { keywords: missingKw.map(k => k.keyword).join(', ') }));
-    if (tagGaps.length > 0) recommendations.push(t('recAddMissingTags', { tags: tagGaps.slice(0, 5).map(t => t.tag).join(', ') }));
+    if (tagGaps.length > 0) recommendations.push(t('recAddMissingTags', { tags: tagGaps.slice(0, 5).map(tg => tg.tag).join(', ') }));
     if (myTitle.length < 80) recommendations.push(t('recTitleTooShort', { length: myTitle.length }));
     if (myTagsSet.size < 13) recommendations.push(t('recAddMoreTags', { count: 13 - myTagsSet.size }));
 
@@ -1416,15 +1416,15 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
         scrollButtons="auto"
         sx={pillTabsSx}
       >
-        {SECTIONS[section].tabs.map(t => (
+        {SECTIONS[section].tabs.map(tg => (
           <Tab
-            key={t.idx}
-            value={t.idx}
-            icon={t.icon}
+            key={tg.idx}
+            value={tg.idx}
+            icon={tg.icon}
             iconPosition="start"
             label={
-              <Tooltip title={t.tip} arrow placement="top">
-                <span>{t.label}</span>
+              <Tooltip title={tg.tip} arrow placement="top">
+                <span>{tg.label}</span>
               </Tooltip>
             }
           />
@@ -2123,9 +2123,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     {t('missingTagsDesc')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
-                    {tagGaps.slice(0, 10).map(t => (
-                      <Chip key={t.tag} label={`${t.tag} (%${t.pct})`} size="small" color="warning"
-                        onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(t('copied')); }}
+                    {tagGaps.slice(0, 10).map(tg => (
+                      <Chip key={tg.tag} label={`${tg.tag} (%${tg.pct})`} size="small" color="warning"
+                        onClick={() => { navigator.clipboard.writeText(tg.tag); toast.success(t('copied')); }}
                         sx={{ cursor: 'pointer', borderRadius: '8px' }}
                       />
                     ))}
@@ -2138,26 +2138,26 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   {t('topUsedTags', { count: enrichedTags.length })}
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2.5 }}>
-                  {enrichedTags.slice(0, 40).map(t => (
-                    <Chip key={t.tag}
-                      label={`${t.tag} (%${t.pct})`} size="small"
-                      color={t.inMyTags ? 'success' : t.pct >= 30 ? 'error' : t.pct >= 15 ? 'warning' : 'default'}
-                      variant={t.inMyTags ? 'filled' : 'outlined'}
-                      onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(t('copied')); }}
+                  {enrichedTags.slice(0, 40).map(tg => (
+                    <Chip key={tg.tag}
+                      label={`${tg.tag} (%${tg.pct})`} size="small"
+                      color={tg.inMyTags ? 'success' : tg.pct >= 30 ? 'error' : tg.pct >= 15 ? 'warning' : 'default'}
+                      variant={tg.inMyTags ? 'filled' : 'outlined'}
+                      onClick={() => { navigator.clipboard.writeText(tg.tag); toast.success(t('copied')); }}
                       sx={{ cursor: 'pointer', borderRadius: '8px' }}
                     />
                   ))}
                 </Box>
 
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('tagDensity')}</Typography>
-                {enrichedTags.slice(0, 20).map(t => (
-                  <Box key={t.tag} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    <Typography variant="body2" sx={{ minWidth: 140, fontWeight: t.inMyTags ? 700 : 400 }}>
-                      {t.inMyTags && <CheckCircle size={12} color="#4caf50" style={{ marginRight: 4, verticalAlign: 'middle' }} />}
-                      {t.tag}
+                {enrichedTags.slice(0, 20).map(tg => (
+                  <Box key={tg.tag} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ minWidth: 140, fontWeight: tg.inMyTags ? 700 : 400 }}>
+                      {tg.inMyTags && <CheckCircle size={12} color="#4caf50" style={{ marginRight: 4, verticalAlign: 'middle' }} />}
+                      {tg.tag}
                     </Typography>
-                    <Box sx={{ flex: 1 }}><GradientBar value={t.pct} max={100} /></Box>
-                    <Typography variant="caption" sx={{ minWidth: 35, fontWeight: 600 }}>{t.pct}%</Typography>
+                    <Box sx={{ flex: 1 }}><GradientBar value={tg.pct} max={100} /></Box>
+                    <Typography variant="caption" sx={{ minWidth: 35, fontWeight: 600 }}>{tg.pct}%</Typography>
                   </Box>
                 ))}
               </Paper>
@@ -2267,10 +2267,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 <>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('longTailPhrases')}</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
-                    {trigrams.slice(0, 20).map(t => (
-                      <Chip key={t.phrase} label={`${t.phrase} (${t.count})`} size="small"
+                    {trigrams.slice(0, 20).map(tg => (
+                      <Chip key={tg.phrase} label={`${tg.phrase} (${tg.count})`} size="small"
                         color="secondary" variant="outlined"
-                        onClick={() => { navigator.clipboard.writeText(t.phrase); toast.success(t('copied')); }}
+                        onClick={() => { navigator.clipboard.writeText(tg.phrase); toast.success(t('copied')); }}
                         sx={{ cursor: 'pointer', borderRadius: '8px' }}
                       />
                     ))}
@@ -2447,9 +2447,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('topUsedTagsShort')}</Typography>
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                  {deepDiveStats.topTags.map(t => (
-                    <Chip key={t.tag} label={`${t.tag} (%${t.pct})`} size="small" variant="outlined"
-                      onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(t('copied')); }}
+                  {deepDiveStats.topTags.map(tg => (
+                    <Chip key={tg.tag} label={`${tg.tag} (%${tg.pct})`} size="small" variant="outlined"
+                      onClick={() => { navigator.clipboard.writeText(tg.tag); toast.success(t('copied')); }}
                       sx={{ cursor: 'pointer', borderRadius: '8px' }}
                     />
                   ))}

@@ -70,44 +70,74 @@ export async function fetchTrendyolCategoryProducts(categorySlug: string, page =
 
   const html = await res.text();
 
-  // Extract the products JSON array from SSR HTML.
-  // Products are embedded as "products":[{...},{...},...] in a script/state block.
-  // We find the largest "products":[ array (the main listing, not small carousels).
+  // Extract product data from SSR HTML.
+  // Trendyol embeds data in two possible structures:
+  // 1. "products":[{...},...] — standard category listing
+  // 2. "noResultSuggestions":{"contents":[{...},...]} — suggested products
+  // Both are inside window["__single-search-result__PROPS"]={...}
   const products: TrendyolProduct[] = [];
   const seenIds = new Set<number>();
 
-  // Find all occurrences of "products":[ and extract the array from each
-  let searchFrom = 0;
   let bestRaw: any[] = [];
 
-  while (true) {
-    const marker = '"products":[';
-    const idx = html.indexOf(marker, searchFrom);
-    if (idx === -1) break;
-
-    const arrStart = idx + marker.length - 1; // position of '['
-    // Walk through to find the matching ']'
-    let depth = 0;
-    let arrEnd = arrStart;
-    for (let i = arrStart; i < html.length && i < arrStart + 500000; i++) {
-      if (html[i] === '[') depth++;
-      if (html[i] === ']') {
-        depth--;
-        if (depth === 0) { arrEnd = i + 1; break; }
-      }
-    }
-
-    if (arrEnd > arrStart) {
+  // Strategy 1: Parse the PROPS JSON object (most reliable)
+  const propsMarker = 'window["__single-search-result__PROPS"]=';
+  const propsIdx = html.indexOf(propsMarker);
+  if (propsIdx > -1) {
+    const propsStart = propsIdx + propsMarker.length;
+    const propsEnd = html.indexOf('</script>', propsStart);
+    if (propsEnd > propsStart) {
       try {
-        const raw = JSON.parse(html.substring(arrStart, arrEnd));
-        if (Array.isArray(raw) && raw.length > bestRaw.length) {
-          bestRaw = raw;
+        const propsData = JSON.parse(html.substring(propsStart, propsEnd));
+        // Check standard products location
+        const dataProducts = propsData?.data?.products;
+        if (Array.isArray(dataProducts) && dataProducts.length > 0) {
+          bestRaw = dataProducts;
+        }
+        // Check noResultSuggestions (category redirect/fallback)
+        if (bestRaw.length === 0) {
+          const suggestions = propsData?.noResultSuggestions?.contents;
+          if (Array.isArray(suggestions) && suggestions.length > 0) {
+            bestRaw = suggestions;
+          }
         }
       } catch {
-        // Not valid JSON, skip
+        // PROPS parse failed, fall through to regex
       }
     }
-    searchFrom = idx + marker.length;
+  }
+
+  // Strategy 2: Find largest "products":[ array in raw HTML (fallback)
+  if (bestRaw.length === 0) {
+    let searchFrom = 0;
+    while (true) {
+      const marker = '"products":[';
+      const idx = html.indexOf(marker, searchFrom);
+      if (idx === -1) break;
+
+      const arrStart = idx + marker.length - 1;
+      let depth = 0;
+      let arrEnd = arrStart;
+      for (let i = arrStart; i < html.length && i < arrStart + 500000; i++) {
+        if (html[i] === '[') depth++;
+        if (html[i] === ']') {
+          depth--;
+          if (depth === 0) { arrEnd = i + 1; break; }
+        }
+      }
+
+      if (arrEnd > arrStart) {
+        try {
+          const raw = JSON.parse(html.substring(arrStart, arrEnd));
+          if (Array.isArray(raw) && raw.length > bestRaw.length) {
+            bestRaw = raw;
+          }
+        } catch {
+          // Not valid JSON, skip
+        }
+      }
+      searchFrom = idx + marker.length;
+    }
   }
 
   // Map raw product objects to TrendyolProduct

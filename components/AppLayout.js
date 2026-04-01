@@ -235,7 +235,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
         </div>
       )}
 
-      <div className="min-h-screen flex" style={{ backgroundColor: '#f8fafc' }}>
+      <div className="h-screen flex overflow-hidden" style={{ backgroundColor: '#f8fafc' }}>
 
         {/* ─── Sidebar ─────────────────────────────────────── */}
         <motion.aside
@@ -380,9 +380,9 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
         </motion.aside>
 
         {/* ─── Main Content ─────────────────────────────────── */}
-        <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
+        <div className={`flex-1 flex flex-col h-screen overflow-hidden transition-all duration-300 ease-in-out ${
           isDesktop ? (isOpen ? 'ml-64' : 'ml-16') : 'ml-0'
-        }`} style={{ minWidth: 0, width: '100%' }}>
+        }`} style={{ minWidth: 0 }}>
 
           {/* Mobile overlay */}
           <AnimatePresence>
@@ -401,7 +401,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
 
           {/* ─── Topbar ─────────────────────────────────── */}
           <header
-            className="sticky top-0 z-30 bg-white flex items-center justify-between px-4 sm:px-6 lg:px-8"
+            className="flex-shrink-0 z-30 bg-white flex items-center justify-between px-4 sm:px-6 lg:px-8"
             style={{
               minHeight: '4rem',
               paddingTop: 'env(safe-area-inset-top, 0px)',
@@ -472,7 +472,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           </header>
 
           {/* ─── Page Content ─────────────────────────────── */}
-          <main className={`flex-grow ${
+          <main className={`flex-1 overflow-y-auto ${
             isMobile ? 'p-3' : 'p-4 sm:p-6 lg:p-8'
           }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', backgroundColor: '#f8fafc' }}>
             {children}

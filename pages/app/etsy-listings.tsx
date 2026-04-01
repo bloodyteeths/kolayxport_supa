@@ -814,6 +814,7 @@ function EtsyListingsPage() {
 
   // We cache status counts per shop to show in sidebar without re-fetching
   const statusCountsCacheRef = useRef<Record<string, Record<string, number>>>({});
+  const [statusCountsVersion, setStatusCountsVersion] = useState(0);
 
   const [selectedIds, setSelectedIds] = useState<GridRowSelectionModel>({ type: 'include' as const, ids: new Set<GridRowId>() });
   const [searchTerm, setSearchTerm] = useState('');
@@ -981,10 +982,12 @@ function EtsyListingsPage() {
       setTotalCount(count);
       listingsCacheRef.current[cacheKey] = { listings: rows, total: count, ts: Date.now() };
 
-      // Also fetch counts for all states (for sidebar badges)
-      if (!statusCountsCacheRef.current[selectedShopId]?.fetched) {
-        const states = ['active', 'draft', 'inactive'] as const;
-        const countPromises = states.filter(s => s !== state).map(async (s) => {
+      // Fetch counts for all states (for sidebar badges) — only once per session
+      const existingCounts = statusCountsCacheRef.current[selectedShopId];
+      if (!existingCounts || !existingCounts._fetched) {
+        const allStates = ['active', 'draft', 'inactive'] as const;
+        const otherStates = allStates.filter(s => s !== state);
+        const countPromises = otherStates.map(async (s) => {
           try {
             const r = await fetch(
               `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${s}&limit=1&offset=0`
@@ -997,9 +1000,13 @@ function EtsyListingsPage() {
           return { state: s, count: 0 };
         });
         const otherCounts = await Promise.all(countPromises);
-        const counts: Record<string, number> = { [state]: count, fetched: 1 } as any;
+        const counts: Record<string, number> = { [state]: count, _fetched: 1 };
         for (const c of otherCounts) counts[c.state] = c.count;
         statusCountsCacheRef.current[selectedShopId] = counts;
+        setStatusCountsVersion(v => v + 1);
+      } else {
+        // Update count for current state
+        existingCounts[state] = count;
       }
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
@@ -1113,7 +1120,7 @@ function EtsyListingsPage() {
       inactive: cached.inactive ?? (statusFilter === 'inactive' ? totalCount : 0),
       expired: cached.expired ?? (statusFilter === 'expired' ? totalCount : 0),
     };
-  }, [selectedShopId, totalCount, statusFilter]);
+  }, [selectedShopId, totalCount, statusFilter, statusCountsVersion]);
 
   // --- Section counts from current listings ---
   const sectionCounts = useMemo(() => {
@@ -1222,7 +1229,7 @@ function EtsyListingsPage() {
     const rows = filteredListings.map((l) => ({
       listing_id: l.listing_id,
       title: l.title,
-      description: l.description.substring(0, 200),
+      description: (l.description || '').substring(0, 200),
       tags: l.tags.join('|'),
       price: l.price ? (l.price.amount / l.price.divisor).toFixed(2) : '',
       quantity: l.quantity,
@@ -1345,8 +1352,8 @@ function EtsyListingsPage() {
       if (row.description !== undefined && row.description !== '') body.description = row.description;
       if (row.tags !== undefined && row.tags !== '') body.tags = row.tags.split('|').map((t: string) => t.trim()).filter(Boolean);
       if (row.materials !== undefined && row.materials !== '') body.materials = row.materials.split('|').map((m: string) => m.trim()).filter(Boolean);
-      if (row.price !== undefined && row.price !== '') body.price = parseFloat(row.price);
-      if (row.quantity !== undefined && row.quantity !== '') body.quantity = parseInt(row.quantity, 10);
+      if (row.price !== undefined && row.price !== '') { const p = parseFloat(row.price); if (!isNaN(p)) body.price = p; }
+      if (row.quantity !== undefined && row.quantity !== '') { const q = parseInt(row.quantity, 10); if (!isNaN(q)) body.quantity = q; }
       if (row.state !== undefined && row.state !== '') body.state = row.state;
 
       if (Object.keys(body).length === 0) {
@@ -1515,6 +1522,9 @@ function EtsyListingsPage() {
         item_width: l.item_width,
         item_height: l.item_height,
         item_dimensions_unit: l.item_dimensions_unit,
+        is_personalizable: l.is_personalizable,
+        taxonomy_id: l.taxonomy_id,
+        has_video: l.has_video,
       }));
   }, [selectedIds, filteredListings]);
 

@@ -2766,6 +2766,7 @@ export default async function handler(
                         url_570xN: firstImage.url_570xN,
                     } : null,
                     image_count: listing.images ? listing.images.length : 0,
+                    has_video: listing.has_videos ?? false,
                 };
             });
 

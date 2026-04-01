@@ -4,6 +4,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import AddLinkIcon from '@mui/icons-material/AddLink';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 interface VideoInfo {
   video_id: number;
@@ -20,6 +21,7 @@ interface VideoUploaderProps {
 }
 
 export default function VideoUploader({ listingId, shopId, videos, onVideoChanged }: VideoUploaderProps) {
+  const t = useTranslations('etsy.video');
   const [uploading, setUploading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<VideoInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -28,13 +30,13 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
 
   const handleUploadByUrl = async () => {
     if (!videoUrl.trim()) {
-      toast.error('Lütfen bir video URL\'si girin');
+      toast.error(t('enterVideoUrl'));
       return;
     }
 
     // Check if already has a video
     if (videos.length > 0) {
-      toast.error('Önce mevcut videoyu silmeniz gerekiyor');
+      toast.error(t('deleteExistingFirst'));
       return;
     }
 
@@ -52,15 +54,15 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Video yüklenemedi');
+        throw new Error(err.error || t('uploadFailed'));
       }
 
-      toast.success('Video yüklendi! İşlenmesi birkaç dakika sürebilir.');
+      toast.success(t('uploadSuccess'));
       setUrlDialogOpen(false);
       setVideoUrl('');
       onVideoChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Video yüklenirken hata oluştu');
+      toast.error(err.message || t('uploadError'));
     } finally {
       setUploading(false);
     }
@@ -79,14 +81,14 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Video silinemedi');
+        throw new Error(err.error || t('deleteFailed'));
       }
 
-      toast.success('Video silindi');
+      toast.success(t('deleteSuccess'));
       setDeleteConfirm(null);
       onVideoChanged();
     } catch (err: any) {
-      toast.error(err.message || 'Video silinirken hata oluştu');
+      toast.error(err.message || t('deleteError'));
     } finally {
       setDeleting(false);
     }
@@ -95,7 +97,7 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
   return (
     <Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Video ({videos.length}/1)
+        {t('videoCount', { current: videos.length, max: 1 })}
       </Typography>
 
       {videos.length > 0 ? (
@@ -103,7 +105,7 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
           <VideoLibraryIcon sx={{ fontSize: 40, color: '#6366f1' }} />
           <Box sx={{ flex: 1 }}>
             <Typography variant="body2" fontWeight={600}>
-              Video {videos[0].state === 'processing' ? '(İşleniyor...)' : '(Hazır)'}
+              Video {videos[0].state === 'processing' ? t('processing') : t('ready')}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               ID: {videos[0].video_id}
@@ -132,17 +134,17 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
         >
           <AddLinkIcon sx={{ fontSize: 36, color: '#94a3b8' }} />
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Video URL ile ekle
+            {t('addByUrl')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            MP4/MOV, maks. 100MB, 5-60 saniye
+            {t('formatHint')}
           </Typography>
         </Box>
       )}
 
       {/* URL input dialog */}
       <Dialog open={urlDialogOpen} onClose={() => !uploading && setUrlDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Video URL ile Ekle</DialogTitle>
+        <DialogTitle>{t('addByUrlTitle')}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -153,33 +155,33 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
             onChange={(e) => setVideoUrl(e.target.value)}
             disabled={uploading}
             sx={{ mt: 1 }}
-            helperText="MP4 veya MOV formatında, maksimum 100MB, 5-60 saniye uzunluğunda"
+            helperText={t('formatHelperText')}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => { setUrlDialogOpen(false); setVideoUrl(''); }} disabled={uploading}>
-            İptal
+            {t('cancel')}
           </Button>
           <Button
             onClick={handleUploadByUrl}
             variant="contained"
             disabled={uploading || !videoUrl.trim()}
           >
-            {uploading ? <CircularProgress size={20} /> : 'Ekle'}
+            {uploading ? <CircularProgress size={20} /> : t('add')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete confirmation */}
       <Dialog open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} maxWidth="xs">
-        <DialogTitle>Videoyu Sil</DialogTitle>
+        <DialogTitle>{t('deleteVideoTitle')}</DialogTitle>
         <DialogContent>
-          <Typography>Bu videoyu silmek istediğinize emin misiniz?</Typography>
+          <Typography>{t('deleteConfirm')}</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirm(null)} disabled={deleting}>İptal</Button>
+          <Button onClick={() => setDeleteConfirm(null)} disabled={deleting}>{t('cancel')}</Button>
           <Button onClick={handleDelete} color="error" variant="contained" disabled={deleting}>
-            {deleting ? <CircularProgress size={20} /> : 'Sil'}
+            {deleting ? <CircularProgress size={20} /> : t('delete')}
           </Button>
         </DialogActions>
       </Dialog>

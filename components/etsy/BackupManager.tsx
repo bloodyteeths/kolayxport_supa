@@ -24,6 +24,7 @@ import {
   Backup as BackupIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -111,16 +112,16 @@ export function createBackup(
 // Operation type labels
 // ---------------------------------------------------------------------------
 
-const OPERATION_LABELS: Record<string, string> = {
-  bulk_update: 'Toplu Güncelleme',
-  find_replace: 'Bul ve Değiştir',
-  csv_import: 'CSV İçe Aktarma',
-  merge: 'Birleştirme',
-  bulk_delete: 'Toplu Silme',
-  bulk_price: 'Toplu Fiyat',
-  bulk_tags: 'Toplu Etiket',
-  bulk_state: 'Toplu Durum',
-  bulk_section: 'Toplu Bölüm',
+const OPERATION_KEYS: Record<string, string> = {
+  bulk_update: 'opBulkUpdate',
+  find_replace: 'opFindReplace',
+  csv_import: 'opCsvImport',
+  merge: 'opMerge',
+  bulk_delete: 'opBulkDelete',
+  bulk_price: 'opBulkPrice',
+  bulk_tags: 'opBulkTags',
+  bulk_state: 'opBulkState',
+  bulk_section: 'opBulkSection',
 };
 
 function formatDate(ts: number): string {
@@ -146,6 +147,7 @@ export default function BackupManager({
   shopId,
   onRestored,
 }: BackupManagerProps) {
+  const t = useTranslations('etsy.backup');
   const [backups, setBackups] = useState<BackupEntry[]>([]);
   const [restoring, setRestoring] = useState(false);
   const [restoreProgress, setRestoreProgress] = useState(0);
@@ -160,7 +162,7 @@ export default function BackupManager({
 
   const handleRestore = async (backup: BackupEntry) => {
     if (!shopId) {
-      toast.error('Mağaza seçili değil');
+      toast.error(t('noShopSelected'));
       return;
     }
 
@@ -207,9 +209,9 @@ export default function BackupManager({
     setRestoreProgress(0);
 
     if (failed === 0) {
-      toast.success(`Geri yükleme tamamlandı: ${succeeded} listing geri yüklendi`);
+      toast.success(t('restoreComplete', { count: succeeded }));
     } else {
-      toast.error(`Geri yükleme: ${succeeded} başarılı, ${failed} başarısız`);
+      toast.error(t('restorePartial', { success: succeeded, failed }));
     }
 
     onRestored();
@@ -218,7 +220,7 @@ export default function BackupManager({
   const handleClear = () => {
     localStorage.removeItem(STORAGE_KEY);
     setBackups([]);
-    toast.success('Tüm yedekler temizlendi');
+    toast.success(t('allCleared'));
   };
 
   const handleDeleteOne = (id: string) => {
@@ -231,20 +233,20 @@ export default function BackupManager({
     <Dialog open={open} onClose={restoring ? undefined : onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <BackupIcon sx={{ color: 'info.main' }} />
-        Yedekler
+        {t('title')}
         {backups.length > 0 && (
-          <Chip label={`${backups.length} yedek`} size="small" color="info" sx={{ ml: 1 }} />
+          <Chip label={t('backupCount', { count: backups.length })} size="small" color="info" sx={{ ml: 1 }} />
         )}
       </DialogTitle>
       <DialogContent>
         {restoring && (
           <Box sx={{ mb: 2 }}>
             <Typography variant="caption" color="text.secondary">
-              Geri yükleme devam ediyor...
+              {t('restoreInProgress')}
             </Typography>
             <LinearProgress variant="determinate" value={restoreProgress} sx={{ mt: 0.5 }} />
             <Typography variant="caption" color="text.secondary">
-              %{Math.round(restoreProgress)} tamamlandı
+              {t('percentComplete', { pct: Math.round(restoreProgress) })}
             </Typography>
           </Box>
         )}
@@ -252,10 +254,10 @@ export default function BackupManager({
         {backups.length === 0 ? (
           <Box sx={{ py: 4, textAlign: 'center' }}>
             <Typography variant="body1" color="text.secondary">
-              Henüz yedek bulunmuyor.
+              {t('noBackups')}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Toplu işlemler yapıldığında otomatik yedek oluşturulur.
+              {t('autoBackupHint')}
             </Typography>
           </Box>
         ) : (
@@ -263,10 +265,10 @@ export default function BackupManager({
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Tarih</TableCell>
-                  <TableCell>İşlem Türü</TableCell>
-                  <TableCell>Listing Sayısı</TableCell>
-                  <TableCell align="right">İşlem</TableCell>
+                  <TableCell>{t('dateColumn')}</TableCell>
+                  <TableCell>{t('operationType')}</TableCell>
+                  <TableCell>{t('listingCount')}</TableCell>
+                  <TableCell align="right">{t('actionsColumn')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -278,7 +280,7 @@ export default function BackupManager({
                     <TableCell>
                       <Chip
                         label={
-                          OPERATION_LABELS[backup.operation_type] || backup.operation_type
+                          OPERATION_KEYS[backup.operation_type] ? t(OPERATION_KEYS[backup.operation_type]) : backup.operation_type
                         }
                         size="small"
                         variant="outlined"
@@ -286,12 +288,12 @@ export default function BackupManager({
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {backup.listings.length} listing
+                        {t('listingItem', { count: backup.listings.length })}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
                       <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                        <Tooltip title="Geri Yükle">
+                        <Tooltip title={t('restore')}>
                           <IconButton
                             size="small"
                             color="primary"
@@ -301,7 +303,7 @@ export default function BackupManager({
                             <RestoreIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Sil">
+                        <Tooltip title={t('deleteOne')}>
                           <IconButton
                             size="small"
                             color="error"
@@ -329,11 +331,11 @@ export default function BackupManager({
             startIcon={<DeleteSweepIcon />}
             sx={{ mr: 'auto' }}
           >
-            Temizle
+            {t('clearAll')}
           </Button>
         )}
         <Button onClick={onClose} disabled={restoring}>
-          Kapat
+          {t('close')}
         </Button>
       </DialogActions>
     </Dialog>

@@ -316,7 +316,7 @@ export default function ListingEditorDrawer({
   refreshKey,
 }: ListingEditorDrawerProps) {
   const t = useTranslations('etsy');
-  const { config, formatDate } = useLocale();
+  const { config, formatDate, formatNumber } = useLocale();
 
   // Loading / data state
   const [loading, setLoading] = useState(false);
@@ -745,8 +745,8 @@ export default function ListingEditorDrawer({
           listing_title: fields?.title || '',
         }),
       });
-      if (!res.ok) throw new Error('Takibe alinamadi');
-      toast.success('Takibe alindi');
+      if (!res.ok) throw new Error(t('editor.trackingFailed'));
+      toast.success(t('editor.addedToTracking'));
       setRankKeyword('');
       setRankResult(null);
       fetchTrackedKeywords();
@@ -772,7 +772,7 @@ export default function ListingEditorDrawer({
       setRankAnalysis(data);
       setRankAnalysisOpen(true);
     } catch (err: any) {
-      toast.error(err.message || 'Analiz yapilamadi');
+      toast.error(err.message || t('editor.analysisFailed'));
     } finally {
       setRankAnalysisLoading(null);
     }
@@ -791,7 +791,7 @@ export default function ListingEditorDrawer({
           if (Object.keys(draftChanges).length > 0) {
             setFields(draft);
             setAutoSaveStatus('saved');
-            toast('Kaydedilmemis taslak yuklendi', { icon: '\u270F\uFE0F' });
+            toast(t('editor.draftLoaded'), { icon: '\u270F\uFE0F' });
           }
         }
       });
@@ -932,7 +932,7 @@ export default function ListingEditorDrawer({
     if (f.price !== undefined) updateField('price', f.price);
     if (f.quantity !== undefined) updateField('quantity', f.quantity);
 
-    toast.success(`"${template.name}" profili uygulandi`);
+    toast.success(t('editor.profileApplied', { name: template.name }));
   }, [fields]);
 
   // --------------------------------------------------
@@ -981,14 +981,14 @@ export default function ListingEditorDrawer({
       const min = Number(fields.processing_min);
       const max = Number(fields.processing_max);
       if (min > 0 && max > 0 && min > max) {
-        toast.error('Hazirlama suresi: minimum, maksimumdan buyuk olamaz');
+        toast.error(t('editor.prepTimeError'));
         return;
       }
     }
 
     const changed = getChangedFields(originalFieldsRef.current, fields);
     if (Object.keys(changed).length === 0) {
-      toast('Degisiklik yok', { icon: '\u2139\uFE0F' });
+      toast(t('editor.noChanges'), { icon: '\u2139\uFE0F' });
       return;
     }
 
@@ -1037,7 +1037,7 @@ export default function ListingEditorDrawer({
       if (changed.item_dimensions_unit !== undefined) payload.item_dimensions_unit = changed.item_dimensions_unit;
 
       if (Object.keys(payload).length === 0) {
-        toast('Degisiklik yok', { icon: '\u2139\uFE0F' });
+        toast(t('editor.noChanges'), { icon: '\u2139\uFE0F' });
         setSaving(false);
         return;
       }
@@ -1058,7 +1058,7 @@ export default function ListingEditorDrawer({
         throw new Error(err.error || `HTTP ${res.status}`);
       }
 
-      toast.success('Liste guncellendi');
+      toast.success(t('editor.listingUpdated'));
 
       // Clear the localStorage draft — changes are now on Etsy
       if (listingId) clearDraft(listingId);
@@ -1076,7 +1076,7 @@ export default function ListingEditorDrawer({
       await fetchListing();
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Guncelleme basarisiz');
+      toast.error(err.message || t('editor.updateFailed'));
     } finally {
       setSaving(false);
     }
@@ -1099,14 +1099,14 @@ export default function ListingEditorDrawer({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Yayinlama basarisiz');
+        throw new Error(err.error || t('editor.publishFailed'));
       }
 
-      toast.success('Liste yayinlandi');
+      toast.success(t('editor.publishSuccess'));
       await fetchListing();
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Yayinlama basarisiz');
+      toast.error(err.message || t('editor.publishFailed'));
     } finally {
       setPublishing(false);
     }
@@ -1133,14 +1133,14 @@ export default function ListingEditorDrawer({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Deaktif etme basarisiz');
+        throw new Error(err.error || t('editor.deactivateFailed'));
       }
 
-      toast.success('Liste deaktif edildi');
+      toast.success(t('editor.deactivateSuccess'));
       await fetchListing();
       onSaved();
     } catch (err: any) {
-      toast.error(err.message || 'Deaktif etme basarisiz');
+      toast.error(err.message || t('editor.deactivateFailed'));
     } finally {
       setDeactivating(false);
     }
@@ -1167,7 +1167,7 @@ export default function ListingEditorDrawer({
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || `Kopyalama basarisiz (HTTP ${res.status})`);
+        throw new Error(data.error || t('editor.copyFailed'));
       }
 
       toast.success(t('editor.listingCopied'));
@@ -1178,7 +1178,7 @@ export default function ListingEditorDrawer({
         onOpenListing(String(data.new_listing_id));
       }
     } catch (err: any) {
-      toast.error(err.message || 'Kopyalama basarisiz');
+      toast.error(err.message || t('editor.copyFailed'));
     } finally {
       setCopying(false);
     }
@@ -1204,7 +1204,7 @@ export default function ListingEditorDrawer({
         throw new Error(err.error || err.details || t('editor.deleteFailed'));
       }
 
-      toast.success('Liste silindi');
+      toast.success(t('editor.listingDeleted'));
       setDeleteDialogOpen(false);
       onSaved();
       onClose();
@@ -1232,7 +1232,7 @@ export default function ListingEditorDrawer({
         {fetchError}
       </Typography>
       <Button variant="outlined" onClick={fetchListing}>
-        Tekrar Dene
+        {t('editor.retry')}
       </Button>
     </Box>
   );
@@ -1294,16 +1294,16 @@ export default function ListingEditorDrawer({
             </IconButton>
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography variant="subtitle1" fontWeight={600} noWrap title={listing?.title} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {listing?.title || 'Liste Düzenle'}
+                {listing?.title || t('editor.editListing')}
               </Typography>
               {listing && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25 }}>
                   <Chip
                     label={
-                      listing.state === 'active' ? 'Aktif'
-                        : listing.state === 'draft' ? 'Taslak'
-                        : listing.state === 'inactive' ? 'Deaktif'
-                        : listing.state === 'expired' ? 'Süresi Doldu'
+                      listing.state === 'active' ? t('editor.active')
+                        : listing.state === 'draft' ? t('editor.draft')
+                        : listing.state === 'inactive' ? t('editor.inactive')
+                        : listing.state === 'expired' ? t('editor.expired')
                         : listing.state
                     }
                     size="small"
@@ -1316,7 +1316,7 @@ export default function ListingEditorDrawer({
                     sx={{ height: 20, fontSize: '0.7rem' }}
                   />
                   <Typography variant="caption" color="text.secondary">
-                    {listing.views} görüntülenme · {listing.num_favorers} favori
+                    {listing.views} {t('editor.views')} · {listing.num_favorers} {t('editor.favorites')}
                   </Typography>
                 </Box>
               )}
@@ -1339,7 +1339,7 @@ export default function ListingEditorDrawer({
                 }}
               />
             )}
-            <Tooltip title={history.length > 0 ? `Geri Al (${history.length})` : 'Geçmiş yok'}>
+            <Tooltip title={history.length > 0 ? t('editor.undoTooltip', { count: history.length }) : t('editor.noHistory')}>
               <span>
                 <IconButton size="small" onClick={handleUndo} disabled={history.length === 0}>
                   <UndoIcon fontSize="small" />
@@ -1489,7 +1489,7 @@ export default function ListingEditorDrawer({
                               <Typography variant="caption" sx={{ color: '#bbb' }}>—</Typography>
                             )}
                           </Box>
-                          <Tooltip title="Sıralama analizi">
+                          <Tooltip title={t('editor.rankingAnalysisTooltip')}>
                             <IconButton
                               onClick={() => handleAnalyzeRanking(kw.keyword)}
                               disabled={rankAnalysisLoading === kw.keyword}
@@ -1548,11 +1548,11 @@ export default function ListingEditorDrawer({
                             <strong style={{ color: rankResult.rank <= 10 ? '#11998e' : rankResult.rank <= 48 ? '#F2994A' : '#eb3349', fontSize: '1.1rem' }}>
                               #{rankResult.rank}
                             </strong>
-                            {' '}· {t('editor.page')} {rankResult.page} · {rankResult.totalResults.toLocaleString()} {t('editor.results')}
+                            {' '}· {t('editor.page')} {rankResult.page} · {formatNumber(rankResult.totalResults)} {t('editor.results')}
                           </Typography>
                         ) : (
                           <Typography variant="body2" color="text.secondary">
-                            {t('editor.notFoundIn500')} ({rankResult.totalResults.toLocaleString()} {t('editor.total')})
+                            {t('editor.notFoundIn500')} ({formatNumber(rankResult.totalResults)} {t('editor.total')})
                           </Typography>
                         )}
                       </Box>
@@ -1562,7 +1562,7 @@ export default function ListingEditorDrawer({
                         onClick={handleAddToTracking}
                         sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', whiteSpace: 'nowrap' }}
                       >
-                        Takibe Al
+                        {t('editor.addToTracking')}
                       </Button>
                     </Box>
                   )}
@@ -1690,26 +1690,26 @@ export default function ListingEditorDrawer({
                                 }}
                                 onClick={() => {
                                   if (fields.tags.length >= 13) {
-                                    toast.error('Maksimum 13 etiket eklenebilir');
+                                    toast.error(t('editor.maxTagsError'));
                                     return;
                                   }
                                   if (fields.tags.includes(t.tag)) {
-                                    toast('Bu etiket zaten mevcut', { icon: 'ℹ️' });
+                                    toast(t('editor.tagExists'), { icon: 'ℹ️' });
                                     return;
                                   }
                                   updateField('tags', [...fields.tags, t.tag]);
-                                  toast.success(`"${t.tag}" eklendi`);
+                                  toast.success(`"${t.tag}" ${t('editor.tagAdded')}`);
                                 }}
                               />
                             ))}
                           </Box>
                           {marketResearchData.priceStats && (
                             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                              Fiyat araligi: ${marketResearchData.priceStats.min} - ${marketResearchData.priceStats.max} (ort: ${marketResearchData.priceStats.avg})
+                              {t('editor.priceRange', { min: marketResearchData.priceStats.min, max: marketResearchData.priceStats.max, avg: marketResearchData.priceStats.avg })}
                             </Typography>
                           )}
                           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', fontStyle: 'italic', fontSize: '0.6rem' }}>
-                            Arastirma verileri AI onerilerinde kullaniliyor
+                            {t('editor.marketDataWillBeUsed')}
                           </Typography>
                         </Collapse>
                       </Alert>
@@ -1747,9 +1747,9 @@ export default function ListingEditorDrawer({
                         <TextField
                           {...params}
                           size="small"
-                          placeholder={fields.tags.length < 13 ? 'Virgülle ayırarak toplu ekleyin...' : ''}
+                          placeholder={fields.tags.length < 13 ? t('editor.bulkEditTags') : ''}
                           sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
-                          helperText={`${fields.tags.length}/13 etiket — virgül veya Enter ile ekleyin`}
+                          helperText={t('editor.tagHelperText', { count: fields.tags.length })}
                           onKeyDown={(e) => {
                             if (e.key === ',') {
                               e.preventDefault();
@@ -1826,8 +1826,8 @@ export default function ListingEditorDrawer({
                         }}
                       >
                         {marketResearchData
-                          ? '\uD83D\uDCCA Arastirma verisi mevcut'
-                          : '\u26A0\uFE0F Arastirma verisi yok \u2014 once pazar arastirmasi yapin'}
+                          ? t('editor.hasResearchData')
+                          : t('editor.noResearchData')}
                       </Typography>
                     </Box>
 
@@ -1836,7 +1836,7 @@ export default function ListingEditorDrawer({
                       <Box sx={{ mt: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
                           <Typography variant="caption" color="text.secondary">
-                            Onerilen etiketler:
+                            {t('editor.suggestedTags')}
                           </Typography>
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
                             {fields.tags.length >= 13 && (
@@ -1846,7 +1846,7 @@ export default function ListingEditorDrawer({
                                 onClick={() => {
                                   updateField('tags', aiTagSuggestions.slice(0, 13));
                                   setAiTagSuggestions([]);
-                                  toast.success('Tum etiketler degistirildi');
+                                  toast.success(t('editor.allTagsReplaced'));
                                 }}
                                 sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.5, px: 1, minWidth: 0, minHeight: 32 }}
                               >
@@ -1891,7 +1891,7 @@ export default function ListingEditorDrawer({
                                           const newTags = [...fields.tags];
                                           newTags[newTags.length - 1] = tag;
                                           updateField('tags', newTags);
-                                          toast.success(`Son etiket "${tag}" ile degistirildi`);
+                                          toast.success(t('editor.tagReplacedWith', { tag }));
                                         }
                                       }
                                 }
@@ -1950,13 +1950,13 @@ export default function ListingEditorDrawer({
             )}
 
             {/* ============================================================ */}
-            {/* Fiyat ve Stok */}
+            {/* Price and Stock */}
             {/* ============================================================ */}
             {activeTab === 'pricing' && (
               <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <TextField
-                    label="Fiyat"
+                    label={t('editor.price')}
                     value={fields.price}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -1994,7 +1994,7 @@ export default function ListingEditorDrawer({
             {activeTab === 'images' && (
               <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Typography variant="h6" fontWeight={600}>Görseller</Typography>
+                  <Typography variant="h6" fontWeight={600}>{t('editor.images')}</Typography>
                   <Chip label={listing.images.length} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
                 </Box>
                 <ImageManager
@@ -2200,8 +2200,8 @@ export default function ListingEditorDrawer({
                           const label = rp.description
                             ? rp.description
                             : [
-                                rp.accepts_returns ? 'Iade Var' : 'Iade Yok',
-                                rp.accepts_exchanges ? 'Degisim Var' : 'Degisim Yok',
+                                rp.accepts_returns ? t('editor.acceptsReturnsLabel') : t('editor.noReturnsLabel'),
+                                rp.accepts_exchanges ? t('editor.acceptsExchangesLabel') : t('editor.noExchangesLabel'),
                               ].join(', ');
                           return (
                             <MenuItem key={rp.return_policy_id} value={String(rp.return_policy_id)}>
@@ -2363,7 +2363,7 @@ export default function ListingEditorDrawer({
                       disabled={publishing}
                       fullWidth
                     >
-                      {publishing ? 'Yayinlaniyor...' : 'Yayinla'}
+                      {publishing ? t('editor.publishing') : t('editor.publish')}
                     </Button>
                   )}
 
@@ -2379,7 +2379,7 @@ export default function ListingEditorDrawer({
                       disabled={deactivating}
                       fullWidth
                     >
-                      {deactivating ? 'Deaktif ediliyor...' : 'Deaktif Et'}
+                      {deactivating ? t('editor.deactivating') : t('editor.deactivateButton')}
                     </Button>
                   )}
 
@@ -2391,7 +2391,7 @@ export default function ListingEditorDrawer({
                     disabled={copying}
                     fullWidth
                   >
-                    {copying ? 'Kopyalaniyor...' : 'Kopyala'}
+                    {copying ? t('editor.copying') : t('editor.copy')}
                   </Button>
 
                   {/* Delete */}
@@ -2402,7 +2402,7 @@ export default function ListingEditorDrawer({
                     onClick={() => setDeleteDialogOpen(true)}
                     fullWidth
                   >
-                    Sil
+                    {t('editor.delete')}
                   </Button>
                 </Box>
               </Box>
@@ -2445,7 +2445,7 @@ export default function ListingEditorDrawer({
                 '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
               }}
             >
-              İptal
+              {t('editor.cancel')}
             </Button>
 
             {/* View on Etsy */}
@@ -2468,7 +2468,7 @@ export default function ListingEditorDrawer({
                   display: { xs: 'none', sm: 'inline-flex' },
                 }}
               >
-                Etsy&apos;de Gör
+                {t('editor.viewOnEtsy')}
               </Button>
             )}
 
@@ -2508,7 +2508,7 @@ export default function ListingEditorDrawer({
                 display: { xs: 'none', sm: 'inline-flex' },
               }}
             >
-              Kopyala
+              {t('editor.copy')}
             </Button>
 
             {/* Schedule */}
@@ -2529,7 +2529,7 @@ export default function ListingEditorDrawer({
                 display: { xs: 'none', md: 'inline-flex' },
               }}
             >
-              Zamanla
+              {t('editor.schedule')}
               {pendingScheduleCount > 0 && (
                 <Chip
                   label={pendingScheduleCount}
@@ -2582,7 +2582,7 @@ export default function ListingEditorDrawer({
         <DialogTitle>{t('editor.deleteListing')}</DialogTitle>
         <DialogContent>
           <Typography>
-            Bu listeyi kalici olarak silmek istediginizden emin misiniz? Bu islem geri alinamaz.
+{t('editor.deleteConfirmText')}
           </Typography>
           {listing?.title && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -2887,7 +2887,7 @@ export default function ListingEditorDrawer({
             <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('editor.rankingAnalysis')}</Typography>
             {rankAnalysis?.market && (
               <Typography variant="caption" color="text.secondary">
-                Sıra: #{rankAnalysis.market.userRank ?? '500+'} · {rankAnalysis.market.totalResults?.toLocaleString()} sonuç
+                {t('editor.rankAnalysisTitle', { rank: rankAnalysis.market.userRank ?? '500+', total: formatNumber(rankAnalysis.market.totalResults || 0) })}
               </Typography>
             )}
           </Box>
@@ -2908,15 +2908,15 @@ export default function ListingEditorDrawer({
                     {a.overall_score}
                   </Box>
                   <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Zorluk: {a.estimated_page1_difficulty}</Typography>
+<Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{t('editor.difficulty', { level: a.estimated_page1_difficulty })}</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Rakip ort: {rankAnalysis.market.avgViews} görüntülenme · {rankAnalysis.market.avgFavorites} favori · ${rankAnalysis.market.avgPrice}
+{t('editor.competitorAvg', { views: rankAnalysis.market.avgViews, favorites: rankAnalysis.market.avgFavorites, price: rankAnalysis.market.avgPrice })}
                     </Typography>
                   </Box>
                 </Box>
                 {a.priority_actions?.length > 0 && (
                   <Box sx={{ p: 2, bgcolor: '#e3f2fd', borderRadius: 2, border: '1px solid #bbdefb' }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#1565c0' }}>Öncelikli Aksiyonlar</Typography>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#1565c0' }}>{t('editor.priorityActions')}</Typography>
                     {a.priority_actions.map((action: string, i: number) => (
                       <Box key={i} sx={{ display: 'flex', gap: 1, mb: 0.5 }}>
                         <Typography variant="body2" sx={{ fontWeight: 700, color: '#1565c0', minWidth: 20 }}>{i + 1}.</Typography>
@@ -2927,7 +2927,7 @@ export default function ListingEditorDrawer({
                 )}
                 {a.factors?.length > 0 && (
                   <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Faktör Analizi</Typography>
+<Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('editor.factorAnalysis')}</Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       {a.factors.map((f: any, i: number) => (
                         <Box key={i} sx={{ p: 1.5, borderRadius: 1, border: '1px solid #eee', bgcolor: '#fafafa' }}>
@@ -2948,7 +2948,7 @@ export default function ListingEditorDrawer({
                 )}
                 {(a.missing_keywords?.length > 0 || rankAnalysis.market?.missingTags?.length > 0) && (
                   <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Eksik Anahtar Kelimeler</Typography>
+<Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('editor.missingKeywords')}</Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {(a.missing_keywords || []).map((kw: string, i: number) => (
                         <Chip key={i} label={kw} size="small" variant="outlined" sx={{ fontSize: '0.75rem' }} />
@@ -2961,13 +2961,13 @@ export default function ListingEditorDrawer({
                 )}
                 {a.suggested_title && (
                   <Box sx={{ p: 2, bgcolor: '#f3e5f5', borderRadius: 2, border: '1px solid #ce93d8' }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, color: '#6a1b9a' }}>Önerilen Başlık</Typography>
+<Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5, color: '#6a1b9a' }}>{t('editor.suggestedTitle')}</Typography>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace', wordBreak: 'break-word' }}>{a.suggested_title}</Typography>
                     <Button size="small" sx={{ mt: 1, textTransform: 'none' }} onClick={() => {
                       updateField('title', a.suggested_title);
-                      toast.success('Baslik uygulandi');
+                      toast.success(t('editor.titleApplied'));
                     }}>
-                      Başlığı Uygula
+                      {t('editor.applyTitle')}
                     </Button>
                   </Box>
                 )}

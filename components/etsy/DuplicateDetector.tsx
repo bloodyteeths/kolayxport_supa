@@ -24,6 +24,8 @@ import {
   MergeType as MergeTypeIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,6 +112,8 @@ export default function DuplicateDetector({
   onEdit,
   onCompleted,
 }: DuplicateDetectorProps) {
+  const t = useTranslations('etsy.duplicateDetector');
+  const { formatCurrency, formatNumber } = useLocale();
   const [merging, setMerging] = useState(false);
 
   // Find duplicate groups
@@ -217,11 +221,9 @@ export default function DuplicateDetector({
     setMerging(false);
 
     if (failed === 0) {
-      toast.success(
-        `Birleştirme tamamlandı: ${succeeded} listing deaktif edildi, en iyi listing korundu`
-      );
+      toast.success(t('mergeSuccess', { count: succeeded }));
     } else {
-      toast.error(`Birleştirme: ${succeeded} başarılı, ${failed} başarısız`);
+      toast.error(t('mergePartial', { success: succeeded, failed }));
     }
 
     onCompleted();
@@ -231,10 +233,10 @@ export default function DuplicateDetector({
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <ContentCopyIcon sx={{ color: 'warning.main' }} />
-        Tekrar Tespit
+        {t('title')}
         {duplicateGroups.length > 0 && (
           <Chip
-            label={`${duplicateGroups.length} grup`}
+            label={t('groups', { count: duplicateGroups.length })}
             size="small"
             color="warning"
             sx={{ ml: 1 }}
@@ -246,29 +248,28 @@ export default function DuplicateDetector({
           <Box sx={{ mb: 2 }}>
             <LinearProgress />
             <Typography variant="caption" color="text.secondary">
-              Birleştirme işlemi devam ediyor...
+              {t('merging')}
             </Typography>
           </Box>
         )}
 
         {listings.length < 2 ? (
           <Typography color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-            Karşılaştırma için en az 2 listing gerekli.
+            {t('needAtLeast2')}
           </Typography>
         ) : duplicateGroups.length === 0 ? (
           <Box sx={{ py: 4, textAlign: 'center' }}>
             <Typography variant="h6" color="success.main" gutterBottom>
-              Tekrar bulunamadı
+              {t('noDuplicatesFound')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {listings.length} listing analiz edildi, benzer başlık bulunamadı.
+              {t('analysisResult', { count: listings.length })}
             </Typography>
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <Typography variant="body2" color="text.secondary">
-              {listings.length} listing analiz edildi. {duplicateGroups.length} olası tekrar grubu
-              bulundu (benzerlik eşiği: %{Math.round(SIMILARITY_THRESHOLD * 100)}).
+              {t('analysisResultWithGroups', { count: listings.length, groups: duplicateGroups.length, threshold: Math.round(SIMILARITY_THRESHOLD * 100) })}
             </Typography>
 
             {duplicateGroups.map((group) => (
@@ -292,20 +293,20 @@ export default function DuplicateDetector({
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="subtitle2">Olası Tekrarlar</Typography>
+                    <Typography variant="subtitle2">{t('possibleDuplicates')}</Typography>
                     <Chip
-                      label={`${group.listings.length} listing`}
+                      label={t('listingItem', { count: group.listings.length })}
                       size="small"
                       variant="outlined"
                     />
                     <Chip
-                      label={`Benzerlik: %${Math.round(group.similarity * 100)}`}
+                      label={`${t('similarity')}: %${Math.round(group.similarity * 100)}`}
                       size="small"
                       color={group.similarity >= 0.8 ? 'error' : 'warning'}
                     />
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Tooltip title="Birleştir: En iyi listing korunur, diğerleri deaktif edilir">
+                    <Tooltip title={t('keepBest')}>
                       <Button
                         size="small"
                         variant="contained"
@@ -314,7 +315,7 @@ export default function DuplicateDetector({
                         disabled={merging}
                         onClick={() => handleMerge(group)}
                       >
-                        Birleştir
+                        {t('merge')}
                       </Button>
                     </Tooltip>
                   </Box>
@@ -325,11 +326,11 @@ export default function DuplicateDetector({
                     <TableHead>
                       <TableRow>
                         <TableCell sx={{ width: 40 }}>#</TableCell>
-                        <TableCell>Başlık</TableCell>
-                        <TableCell sx={{ width: 90 }}>Fiyat</TableCell>
-                        <TableCell sx={{ width: 80 }}>Görüntü</TableCell>
-                        <TableCell sx={{ width: 80 }}>Favori</TableCell>
-                        <TableCell sx={{ width: 80 }}>Durum</TableCell>
+                        <TableCell>{t('headerTitle')}</TableCell>
+                        <TableCell sx={{ width: 90 }}>{t('headerPrice')}</TableCell>
+                        <TableCell sx={{ width: 80 }}>{t('headerViews')}</TableCell>
+                        <TableCell sx={{ width: 80 }}>{t('headerFavorites')}</TableCell>
+                        <TableCell sx={{ width: 80 }}>{t('headerStatus')}</TableCell>
                         <TableCell sx={{ width: 50 }} />
                       </TableRow>
                     </TableHead>
@@ -341,7 +342,7 @@ export default function DuplicateDetector({
                         >
                           <TableCell>
                             {idx === 0 ? (
-                              <Chip label="En iyi" size="small" color="success" />
+                              <Chip label={t('best')} size="small" color="success" />
                             ) : (
                               idx + 1
                             )}
@@ -359,8 +360,8 @@ export default function DuplicateDetector({
                             </Tooltip>
                           </TableCell>
                           <TableCell>{formatPrice(listing.price)}</TableCell>
-                          <TableCell>{listing.views.toLocaleString()}</TableCell>
-                          <TableCell>{listing.num_favorers.toLocaleString()}</TableCell>
+                          <TableCell>{formatNumber(listing.views)}</TableCell>
+                          <TableCell>{formatNumber(listing.num_favorers)}</TableCell>
                           <TableCell>
                             <Chip
                               label={listing.state}
@@ -376,7 +377,7 @@ export default function DuplicateDetector({
                             />
                           </TableCell>
                           <TableCell>
-                            <Tooltip title="Farklılaştır">
+                            <Tooltip title={t('differentiate')}>
                               <IconButton
                                 size="small"
                                 onClick={() => {
@@ -400,7 +401,7 @@ export default function DuplicateDetector({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={merging}>
-          Kapat
+          {t('close')}
         </Button>
       </DialogActions>
     </Dialog>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Tooltip, Box, Typography, LinearProgress } from '@mui/material';
+import { useTranslations } from 'next-intl';
 
 interface SEOIndicatorProps {
   tags: string[];
@@ -9,6 +10,7 @@ interface SEOIndicatorProps {
 }
 
 export default function SEOIndicator({ tags, title, description, compact = false }: SEOIndicatorProps) {
+  const t = useTranslations('etsy.seo');
   const tagCount = tags?.length || 0;
   const titleLength = title?.length || 0;
   const descLength = description?.length || 0;
@@ -20,11 +22,11 @@ export default function SEOIndicator({ tags, title, description, compact = false
   const totalScore = Math.round(tagScore + titleScore + descScore);
 
   const color = totalScore >= 80 ? '#22c55e' : totalScore >= 50 ? '#eab308' : '#ef4444';
-  const label = totalScore >= 80 ? 'İyi' : totalScore >= 50 ? 'Orta' : 'Zayıf';
+  const label = totalScore >= 80 ? t('good') : totalScore >= 50 ? t('medium') : t('weak');
 
   if (compact) {
     return (
-      <Tooltip title={`SEO Skoru: ${totalScore}/100 — Etiket: ${tagCount}/13, Başlık: ${titleLength} kar., Açıklama: ${descLength} kar.`}>
+      <Tooltip title={t('tooltip', { score: totalScore, tags: tagCount, titleLen: titleLength, descLen: descLength })}>
         <Box
           sx={{
             width: 12,
@@ -42,7 +44,7 @@ export default function SEOIndicator({ tags, title, description, compact = false
   return (
     <Box sx={{ p: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-        <Typography variant="body2" fontWeight={600}>SEO Skoru</Typography>
+        <Typography variant="body2" fontWeight={600}>{t('seoScore')}</Typography>
         <Typography variant="body2" sx={{ color, fontWeight: 700 }}>{totalScore}/100 — {label}</Typography>
       </Box>
       <LinearProgress
@@ -59,21 +61,21 @@ export default function SEOIndicator({ tags, title, description, compact = false
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" color="text.secondary">Etiketler</Typography>
+          <Typography variant="caption" color="text.secondary">{t('tagsLabel')}</Typography>
           <Typography variant="caption" sx={{ color: tagCount >= 10 ? '#22c55e' : tagCount >= 5 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
             {tagCount}/13
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" color="text.secondary">Başlık uzunluğu</Typography>
+          <Typography variant="caption" color="text.secondary">{t('titleLength')}</Typography>
           <Typography variant="caption" sx={{ color: titleLength >= 100 && titleLength <= 140 ? '#22c55e' : titleLength >= 80 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
             {titleLength}/140
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" color="text.secondary">Açıklama uzunluğu</Typography>
+          <Typography variant="caption" color="text.secondary">{t('descriptionLength')}</Typography>
           <Typography variant="caption" sx={{ color: descLength >= 300 ? '#22c55e' : descLength >= 100 ? '#eab308' : '#ef4444', fontWeight: 600 }}>
-            {descLength} karakter
+            {t('characters', { count: descLength })}
           </Typography>
         </Box>
       </Box>

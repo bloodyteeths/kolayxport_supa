@@ -33,6 +33,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 import SEOIndicator from './SEOIndicator';
 import type { MarketResearchData } from './MarketResearch';
 
@@ -85,26 +86,13 @@ interface FlatTaxonomy {
 // Constants
 // ---------------------------------------------------------------------------
 
-const STEPS = ['Icerik & AI', 'Kategori & Fiyat', 'Gorseller', 'Onizleme'];
+const STEP_KEYS = ['stepContent', 'stepCategoryPrice', 'stepImages', 'stepPreview'] as const;
 
-const WHO_MADE_OPTIONS = [
-  { value: 'i_did', label: 'Ben yaptim' },
-  { value: 'collective', label: 'Kolektif / Atolye' },
-  { value: 'someone_else', label: 'Baskasi yapti' },
-];
+const WHO_MADE_KEYS_CR = ['i_did', 'collective', 'someone_else'] as const;
+const WHO_MADE_I18N_CR: Record<string, string> = { i_did: 'iDid', collective: 'collective', someone_else: 'someoneElse' };
 
-const WHEN_MADE_OPTIONS = [
-  { value: 'made_to_order', label: 'Siparise gore yapiliyor' },
-  { value: '2020_2025', label: '2020-2025' },
-  { value: '2010_2019', label: '2010-2019' },
-  { value: '2004_2009', label: '2004-2009' },
-  { value: 'before_2004', label: '2004 oncesi' },
-  { value: '2000_2003', label: '2000-2003' },
-  { value: '1990s', label: '1990\'lar' },
-  { value: '1980s', label: '1980\'ler' },
-  { value: '1970s', label: '1970\'ler' },
-  { value: '1960s', label: '1960\'lar' },
-];
+const WHEN_MADE_KEYS_CR = ['made_to_order', '2020_2025', '2010_2019', '2004_2009', 'before_2004', '2000_2003', '1990s', '1980s', '1970s', '1960s'] as const;
+const WHEN_MADE_I18N_CR: Record<string, string> = { made_to_order: 'madeToOrder', '2020_2025': '2020_2025', '2010_2019': '2010_2019', '2004_2009': '2004_2009', before_2004: 'before_2004', '2000_2003': '2000_2003', '1990s': '1990s', '1980s': '1980s', '1970s': '1970s', '1960s': '1960s' };
 
 const WEIGHT_UNITS = [
   { value: 'oz', label: 'oz' },
@@ -151,6 +139,8 @@ export default function ListingCreatorDialog({
   marketResearchData,
   copySource,
 }: ListingCreatorDialogProps) {
+  const t = useTranslations('etsy.creator');
+  const tEtsy = useTranslations('etsy');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -241,7 +231,7 @@ export default function ListingCreatorDialog({
           setTaxonomyOptions(flat);
         })
         .catch(() => {
-          toast.error('Kategoriler yuklenemedi');
+          toast.error(t('categoryLoadFailed'));
         })
         .finally(() => setTaxonomyLoading(false));
     }
@@ -319,11 +309,11 @@ export default function ListingCreatorDialog({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `AI istegi basarisiz (HTTP ${res.status})`);
+        throw new Error(err.error || t('aiRequestFailed'));
       }
       return await res.json();
     } catch (err: any) {
-      toast.error(err.message || 'AI istegi basarisiz');
+      toast.error(err.message || t('aiRequestFailed'));
       return null;
     } finally {
       setAiLoading((prev) => ({ ...prev, [action]: false }));
@@ -336,11 +326,11 @@ export default function ListingCreatorDialog({
     if (newTitle && typeof newTitle === 'string') {
       // Sanity check: reject garbled single-character output
       if (newTitle.split(/[\s,]+/).filter(Boolean).every((w: string) => w.length <= 1)) {
-        toast.error('AI bozuk baslik uretti — tekrar deneyin');
+        toast.error(t('aiBrokenTitle'));
         return;
       }
       setTitle(newTitle);
-      toast.success('Baslik optimize edildi');
+      toast.success(t('titleOptimized'));
     }
   }, [callAI]);
 
@@ -348,7 +338,7 @@ export default function ListingCreatorDialog({
     const result = await callAI('generate_description');
     if (result?.description) {
       setDescription(result.description);
-      toast.success('Aciklama olusturuldu');
+      toast.success(t('descriptionCreated'));
     }
   }, [callAI]);
 
@@ -357,7 +347,7 @@ export default function ListingCreatorDialog({
     const suggested = result?.suggestions || result?.tags;
     if (suggested && Array.isArray(suggested)) {
       setAiTagSuggestions(suggested);
-      toast.success(`${suggested.length} etiket onerisi alindi`);
+      toast.success(t('tagSuggestionsReceived', { count: suggested.length }));
     }
   }, [callAI]);
 
@@ -367,7 +357,7 @@ export default function ListingCreatorDialog({
   const handleQuickStart = useCallback(async () => {
     const keyword = quickStartKeyword.trim();
     if (!keyword) {
-      toast.error('Bir urun fikri veya anahtar kelime girin');
+      toast.error(t('enterProductIdea'));
       return;
     }
     setAiLoading((prev) => ({ ...prev, quick_start: true }));
@@ -388,9 +378,9 @@ export default function ListingCreatorDialog({
         setTags(suggested.slice(0, 13));
       }
 
-      toast.success('AI ile icerik olusturuldu! Kontrol edin ve duzenleyin.');
+      toast.success(t('aiContentCreated'));
     } catch {
-      toast.error('AI icerik olusturma basarisiz');
+      toast.error(t('aiContentFailed'));
     } finally {
       setAiLoading((prev) => ({ ...prev, quick_start: false }));
     }
@@ -448,41 +438,41 @@ export default function ListingCreatorDialog({
     switch (step) {
       case 0:
         if (!title.trim()) {
-          toast.error('Baslik zorunludur');
+          toast.error(t('titleRequired'));
           return false;
         }
         if (title.trim().length < 3) {
-          toast.error('Baslik en az 3 karakter olmalidir');
+          toast.error(t('titleMinLength'));
           return false;
         }
         if (!description.trim()) {
-          toast.error('Aciklama zorunludur');
+          toast.error(t('descriptionRequired'));
           return false;
         }
         if (description.trim().length < 10) {
-          toast.error('Aciklama en az 10 karakter olmalidir');
+          toast.error(t('descriptionMinLength'));
           return false;
         }
         return true;
       case 1:
         if (!selectedTaxonomy) {
-          toast.error('Kategori secimi zorunludur');
+          toast.error(t('categoryRequired'));
           return false;
         }
         if (!price || parseFloat(price) <= 0) {
-          toast.error('Gecerli bir fiyat giriniz');
+          toast.error(t('validPriceRequired'));
           return false;
         }
         if (!shippingProfileId) {
-          toast.error('Kargo profili secimi zorunludur');
+          toast.error(t('shippingProfileRequired'));
           return false;
         }
         if (!returnPolicyId) {
-          toast.error('Iade politikasi secimi zorunludur');
+          toast.error(t('returnPolicyRequired'));
           return false;
         }
         if (processingMin && processingMax && Number(processingMin) > Number(processingMax)) {
-          toast.error('Min hazirlama suresi max\'tan buyuk olamaz');
+          toast.error(t('minGreaterThanMax'));
           return false;
         }
         return true;
@@ -511,7 +501,7 @@ export default function ListingCreatorDialog({
   // --------------------------------------------------
   const handleAiImageGenerate = async () => {
     if (!aiImagePrompt.trim()) {
-      toast.error('Bir prompt girin');
+      toast.error(t('enterPrompt'));
       return;
     }
 
@@ -541,18 +531,18 @@ export default function ListingCreatorDialog({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Gorsel olusturulamadi');
+        throw new Error(err.error || t('imageCreateFailed'));
       }
 
       const data = await res.json();
       if (data.image_base64) {
         setAiImageResult({ base64: data.image_base64, mimeType: data.mime_type || 'image/png' });
-        toast.success('Gorsel olusturuldu!');
+        toast.success(t('imageCreated'));
       } else {
-        throw new Error(data.text || 'Gorsel olusturulamadi');
+        throw new Error(data.text || t('imageCreateFailed'));
       }
     } catch (err: any) {
-      toast.error(err.message || 'AI gorsel olusturma hatasi');
+      toast.error(err.message || t('aiImageError'));
     } finally {
       setAiImageGenerating(false);
     }
@@ -571,7 +561,7 @@ export default function ListingCreatorDialog({
     setSelectedFiles((prev) => [...prev, file]);
     setAiImageResult(null);
     setAiImagePrompt('');
-    toast.success('AI gorseli eklendi');
+    toast.success(t('aiImageAdded'));
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -581,14 +571,14 @@ export default function ListingCreatorDialog({
     const newFiles = Array.from(files);
     const total = selectedFiles.length + newFiles.length;
     if (total > 10) {
-      toast.error('Maksimum 10 gorsel secilebilir');
+      toast.error(t('maxImages'));
       return;
     }
 
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     const validFiles = newFiles.filter((f) => {
       if (!validTypes.includes(f.type)) {
-        toast.error(`${f.name}: Desteklenmeyen format`);
+        toast.error(`${f.name}: ${t('unsupportedFormat')}`);
         return false;
       }
       return true;
@@ -648,7 +638,7 @@ export default function ListingCreatorDialog({
 
       if (!createRes.ok) {
         const err = await createRes.json().catch(() => ({}));
-        throw new Error(err.error || 'Listing olusturulamadi');
+        throw new Error(err.error || t('listingCreateFailed'));
       }
 
       const created = await createRes.json();
@@ -683,7 +673,7 @@ export default function ListingCreatorDialog({
           );
 
           if (!uploadRes.ok) {
-            toast.error(`Gorsel ${i + 1} yuklenemedi`);
+            toast.error(t('imageUploadFailed', { index: i + 1 }));
           }
         }
       }
@@ -695,19 +685,19 @@ export default function ListingCreatorDialog({
           { method: 'POST' }
         );
         if (!pubRes.ok) {
-          toast.error('Listing yayinlanamadi, taslak olarak kaydedildi');
+          toast.error(t('publishFailed'));
         } else {
-          toast.success('Listing olusturuldu ve yayinlandi!');
+          toast.success(t('createdAndPublished'));
         }
       } else {
-        toast.success('Listing taslak olarak olusturuldu!');
+        toast.success(t('createdAsDraft'));
       }
 
       onCreated(newId);
       resetForm();
       onClose();
     } catch (err: any) {
-      toast.error(err.message || 'Bir hata olustu');
+      toast.error(err.message || t('errorOccurred'));
     } finally {
       setCreating(false);
     }
@@ -717,9 +707,10 @@ export default function ListingCreatorDialog({
   // Render helpers
   // --------------------------------------------------
   const isAnyAILoading = Object.values(aiLoading).some(Boolean);
+  const STEPS = STEP_KEYS.map((k) => t(k));
 
-  const whoMadeLabel = WHO_MADE_OPTIONS.find((o) => o.value === whoMade)?.label || whoMade;
-  const whenMadeLabel = WHEN_MADE_OPTIONS.find((o) => o.value === whenMade)?.label || whenMade;
+  const whoMadeLabel = WHO_MADE_I18N_CR[whoMade] ? tEtsy(`whoMade.${WHO_MADE_I18N_CR[whoMade]}`) : whoMade;
+  const whenMadeLabel = WHEN_MADE_I18N_CR[whenMade] ? tEtsy(`whenMade.${WHEN_MADE_I18N_CR[whenMade]}`) : whenMade;
 
   // ================================================================
   // Step 1: Content & AI
@@ -739,18 +730,18 @@ export default function ListingCreatorDialog({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <RocketLaunchIcon sx={{ color: 'primary.main', fontSize: 20 }} />
           <Typography variant="subtitle2" color="primary.main">
-            AI ile Hizli Baslangic
+            {t('aiQuickStart')}
           </Typography>
         </Box>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-          Urun fikrinizi yazin, AI baslik, aciklama ve etiketleri otomatik olustursun.
-          {marketResearchData ? ' Pazar arastirma verileri de kullanilacak.' : ''}
+          {t('aiQuickStartDesc')}
+          {marketResearchData ? ` ${t('marketDataWillBeUsed')}` : ''}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <TextField
             size="small"
             fullWidth
-            placeholder="ornek: boho flower girl dress, wooden phone stand..."
+            placeholder={t('quickStartPlaceholder')}
             value={quickStartKeyword}
             onChange={(e) => setQuickStartKeyword(e.target.value)}
             disabled={!!aiLoading.quick_start}
@@ -769,7 +760,7 @@ export default function ListingCreatorDialog({
             startIcon={aiLoading.quick_start ? <CircularProgress size={16} color="inherit" /> : <AutoFixHighIcon />}
             sx={{ whiteSpace: 'nowrap', minWidth: 120 }}
           >
-            {aiLoading.quick_start ? 'Olusturuluyor...' : 'AI ile Doldur'}
+            {aiLoading.quick_start ? t('creating') : t('fillWithAI')}
           </Button>
         </Box>
       </Paper>
@@ -778,7 +769,7 @@ export default function ListingCreatorDialog({
       {marketResearchData && (
         <Alert severity="info" sx={{ '& .MuiAlert-message': { width: '100%' } }}>
           <Typography variant="caption" fontWeight={600}>
-            Pazar Verileri: &quot;{marketResearchData.query}&quot;
+            {t('marketData')}: &quot;{marketResearchData.query}&quot;
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
             {marketResearchData.topTags.slice(0, 8).map((t) => (
@@ -791,7 +782,7 @@ export default function ListingCreatorDialog({
                 onClick={() => {
                   if (tags.length < 13 && !tags.includes(t.tag)) {
                     setTags((prev) => [...prev, t.tag]);
-                    toast.success(`"${t.tag}" eklendi`);
+                    toast.success(t('tagAdded', { tag: t.tag }));
                   }
                 }}
               />
@@ -799,7 +790,7 @@ export default function ListingCreatorDialog({
           </Box>
           {marketResearchData.priceStats && (
             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-              Fiyat araligi: ${marketResearchData.priceStats.min} - ${marketResearchData.priceStats.max} (ort: ${marketResearchData.priceStats.avg})
+              {t('priceRange', { min: marketResearchData.priceStats.min, max: marketResearchData.priceStats.max, avg: marketResearchData.priceStats.avg })}
             </Typography>
           )}
         </Alert>
@@ -811,22 +802,22 @@ export default function ListingCreatorDialog({
       <Box>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
           <TextField
-            label="Baslik"
+            label={t('titleLabel')}
             value={title}
             onChange={(e) => setTitle(e.target.value.slice(0, 140))}
             required
             fullWidth
-            helperText={`${title.length}/140 karakter`}
+            helperText={t('titleHelperText', { count: title.length })}
             inputProps={{ maxLength: 140 }}
           />
-          <Tooltip title="AI ile baslik optimize et">
+          <Tooltip title={t('optimizeTitleAI')}>
             <span>
               <IconButton
                 onClick={handleAIOptimizeTitle}
                 disabled={!!aiLoading.optimize_title || !title.trim()}
                 color="primary"
                 sx={{ mt: 1 }}
-              >
+  >
                 {aiLoading.optimize_title ? <CircularProgress size={20} /> : <AutoFixHighIcon />}
               </IconButton>
             </span>
@@ -837,14 +828,14 @@ export default function ListingCreatorDialog({
       {/* ---- Description ---- */}
       <Box>
         <TextField
-          label="Aciklama"
+          label={t('descriptionLabel')}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           required
           fullWidth
           multiline
           minRows={4}
-          helperText={`${description.length} karakter`}
+          helperText={t('descriptionHelperText', { count: description.length })}
         />
         <Button
           size="small"
@@ -853,7 +844,7 @@ export default function ListingCreatorDialog({
           disabled={!!aiLoading.generate_description || !title.trim()}
           sx={{ mt: 0.5, textTransform: 'none' }}
         >
-          AI ile Aciklama Olustur
+          {t('generateDescriptionAI')}
         </Button>
       </Box>
 
@@ -870,7 +861,7 @@ export default function ListingCreatorDialog({
             );
             const unique = [...new Set(expanded)].map((t) => t.substring(0, 20)).slice(0, 13);
             setTags(unique);
-            if (expanded.length > 13) toast.error('Maksimum 13 etiket — fazlası kesildi');
+            if (expanded.length > 13) toast.error(t('maxTagsTrimmed'));
           }}
           renderTags={(value, getTagProps) =>
             value.map((option, index) => (
@@ -886,8 +877,8 @@ export default function ListingCreatorDialog({
           renderInput={(params) => (
             <TextField
               {...params}
-              label="Etiketler"
-              helperText={`${tags.length}/13 etiket — virgül veya Enter ile ekleyin (maks 20 karakter/etiket)`}
+              label={t('tagsLabel')}
+              helperText={t('tagsHelperText', { count: tags.length })}
               onKeyDown={(e) => {
                 if (e.key === ',') {
                   e.preventDefault();
@@ -923,7 +914,7 @@ export default function ListingCreatorDialog({
           disabled={!!aiLoading.suggest_tags || !title.trim()}
           sx={{ mt: 0.5, textTransform: 'none' }}
         >
-          AI Etiket Oner
+          {t('suggestTagsAI')}
         </Button>
 
         {/* AI Tag Suggestions */}
@@ -931,7 +922,7 @@ export default function ListingCreatorDialog({
           <Box sx={{ mt: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
               <Typography variant="caption" color="text.secondary">
-                Onerilen etiketler:
+                {t('suggestedTags')}:
               </Typography>
               <Button
                 size="small"
@@ -940,12 +931,12 @@ export default function ListingCreatorDialog({
                   const merged = [...tags, ...newTags].slice(0, 13);
                   setTags(merged);
                   setAiTagSuggestions([]);
-                  toast.success(`${merged.length - tags.length} etiket eklendi`);
+                  toast.success(t('tagsAdded', { count: merged.length - tags.length }));
                 }}
                 disabled={aiTagSuggestions.every((t) => tags.includes(t))}
                 sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
-              >
-                Tumunu Ekle
+  >
+                {t('addAll')}
               </Button>
             </Box>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -986,7 +977,7 @@ export default function ListingCreatorDialog({
         value={materials}
         onChange={(_, newVal) => {
           if (newVal.length <= 13) setMaterials(newVal as string[]);
-          else toast.error('Maksimum 13 malzeme eklenebilir');
+          else toast.error(t('maxMaterials'));
         }}
         renderTags={(value, getTagProps) =>
           value.map((option, index) => (
@@ -1001,37 +992,37 @@ export default function ListingCreatorDialog({
         renderInput={(params) => (
           <TextField
             {...params}
-            label="Malzemeler"
-            helperText={`${materials.length}/13 malzeme`}
+            label={t('materialsLabel')}
+            helperText={t('materialsHelperText', { count: materials.length })}
           />
         )}
       />
 
       {/* ---- Who/When/Supply ---- */}
       <FormControl fullWidth required>
-        <InputLabel>Kim yapti?</InputLabel>
+        <InputLabel>{t('whoMadeLabel')}</InputLabel>
         <Select
           value={whoMade}
-          label="Kim yapti?"
+          label={t('whoMadeLabel')}
           onChange={(e) => setWhoMade(e.target.value)}
         >
-          {WHO_MADE_OPTIONS.map((opt) => (
-            <MenuItem key={opt.value} value={opt.value}>
-              {opt.label}
+          {WHO_MADE_KEYS_CR.map((val) => (
+            <MenuItem key={val} value={val}>
+              {tEtsy(`whoMade.${WHO_MADE_I18N_CR[val]}`)}
             </MenuItem>
           ))}
         </Select>
       </FormControl>
       <FormControl fullWidth required>
-        <InputLabel>Ne zaman yapildi?</InputLabel>
+        <InputLabel>{t('whenMadeLabel')}</InputLabel>
         <Select
           value={whenMade}
-          label="Ne zaman yapildi?"
+          label={t('whenMadeLabel')}
           onChange={(e) => setWhenMade(e.target.value)}
         >
-          {WHEN_MADE_OPTIONS.map((opt) => (
-            <MenuItem key={opt.value} value={opt.value}>
-              {opt.label}
+          {WHEN_MADE_KEYS_CR.map((val) => (
+            <MenuItem key={val} value={val}>
+              {tEtsy(`whenMade.${WHEN_MADE_I18N_CR[val]}`)}
             </MenuItem>
           ))}
         </Select>
@@ -1043,7 +1034,7 @@ export default function ListingCreatorDialog({
             onChange={(e) => setIsSupply(e.target.checked)}
           />
         }
-        label="Bu bir malzeme/aractir (supply)"
+        label={t('isSupply')}
       />
 
       {/* ---- Live SEO Indicator ---- */}
@@ -1069,20 +1060,20 @@ export default function ListingCreatorDialog({
         renderInput={(params) => (
           <TextField
             {...params}
-            label="Kategori"
+            label={t('categoryLabel')}
             required
-            helperText="Kategori agacindan arayarak secin"
+            helperText={t('categoryHelperText')}
           />
         )}
         isOptionEqualToValue={(opt, val) => opt.id === val.id}
-        noOptionsText="Kategori bulunamadi"
-        loadingText="Yukleniyor..."
+        noOptionsText={t('categoryNotFound')}
+        loadingText={t('loading')}
       />
 
       {/* Price with market hint */}
       <Box>
         <TextField
-          label="Fiyat (USD)"
+          label={t('priceLabel')}
           type="number"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
@@ -1092,13 +1083,13 @@ export default function ListingCreatorDialog({
         />
         {marketResearchData?.priceStats && !price && (
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-            Pazar ortalamasi: ${marketResearchData.priceStats.avg} (${marketResearchData.priceStats.min} - ${marketResearchData.priceStats.max})
+            {t('marketAverage')}: ${marketResearchData.priceStats.avg} (${marketResearchData.priceStats.min} - ${marketResearchData.priceStats.max})
           </Typography>
         )}
       </Box>
 
       <TextField
-        label="Miktar"
+        label={t('quantityLabel')}
         type="number"
         value={quantity}
         onChange={(e) => setQuantity(e.target.value)}
@@ -1107,14 +1098,14 @@ export default function ListingCreatorDialog({
       />
 
       <FormControl fullWidth>
-        <InputLabel>Magaza Bolumu</InputLabel>
+        <InputLabel>{t('shopSectionLabel')}</InputLabel>
         <Select
           value={shopSectionId}
-          label="Magaza Bolumu"
+          label={t('shopSectionLabel')}
           onChange={(e) => setShopSectionId(e.target.value as number | '')}
         >
           <MenuItem value="">
-            <em>Secim yok</em>
+            <em>{t('noSelection')}</em>
           </MenuItem>
           {shopSections.map((s) => (
             <MenuItem key={s.shop_section_id} value={s.shop_section_id}>
@@ -1125,10 +1116,10 @@ export default function ListingCreatorDialog({
       </FormControl>
 
       <FormControl fullWidth required>
-        <InputLabel>Kargo Profili</InputLabel>
+        <InputLabel>{t('shippingProfileLabel')}</InputLabel>
         <Select
           value={shippingProfileId}
-          label="Kargo Profili"
+          label={t('shippingProfileLabel')}
           onChange={(e) => setShippingProfileId(e.target.value as number)}
         >
           {shippingProfiles.map((s) => (
@@ -1140,34 +1131,34 @@ export default function ListingCreatorDialog({
       </FormControl>
       {shippingProfiles.length === 0 && (
         <Typography variant="caption" color="warning.main">
-          Yuklenemedi — sayfayi yenileyin
+          {t('loadFailed')}
         </Typography>
       )}
 
       <FormControl fullWidth required>
-        <InputLabel>Iade Politikasi</InputLabel>
+        <InputLabel>{t('returnPolicyLabel')}</InputLabel>
         <Select
           value={returnPolicyId}
-          label="Iade Politikasi"
+          label={t('returnPolicyLabel')}
           onChange={(e) => setReturnPolicyId(e.target.value as number)}
         >
           {returnPolicies.map((r) => (
             <MenuItem key={r.return_policy_id} value={r.return_policy_id}>
-              {r.description || `Politika #${r.return_policy_id}`}
+              {r.description || `${t('policy')} #${r.return_policy_id}`}
             </MenuItem>
           ))}
         </Select>
       </FormControl>
       {returnPolicies.length === 0 && (
         <Typography variant="caption" color="warning.main">
-          Yuklenemedi — sayfayi yenileyin
+          {t('loadFailed')}
         </Typography>
       )}
 
       <Divider sx={{ my: 0.5 }} />
 
       {/* Processing time */}
-      <Typography variant="subtitle2" color="text.secondary">Hazirlama Suresi (is gunu)</Typography>
+      <Typography variant="subtitle2" color="text.secondary">{t('processingTime')}</Typography>
       <Box sx={{ display: 'flex', gap: 2 }}>
         <TextField
           label="Min"
@@ -1190,10 +1181,10 @@ export default function ListingCreatorDialog({
       </Box>
 
       {/* Weight & Dimensions */}
-      <Typography variant="subtitle2" color="text.secondary">Agirlik & Boyutlar</Typography>
+      <Typography variant="subtitle2" color="text.secondary">{t('weightAndDimensions')}</Typography>
       <Box sx={{ display: 'flex', gap: 2 }}>
         <TextField
-          label="Agirlik"
+          label={t('weight')}
           type="number"
           value={itemWeight}
           onChange={(e) => setItemWeight(e.target.value)}
@@ -1202,10 +1193,10 @@ export default function ListingCreatorDialog({
           size="small"
         />
         <FormControl sx={{ flex: 1, minWidth: 80 }} size="small">
-          <InputLabel>Birim</InputLabel>
+          <InputLabel>{t('unit')}</InputLabel>
           <Select
             value={itemWeightUnit}
-            label="Birim"
+            label={t('unit')}
             onChange={(e) => setItemWeightUnit(e.target.value)}
           >
             {WEIGHT_UNITS.map((u) => (
@@ -1215,14 +1206,14 @@ export default function ListingCreatorDialog({
         </FormControl>
       </Box>
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <TextField label="Uzunluk" type="number" value={itemLength} onChange={(e) => setItemLength(e.target.value)} size="small" inputProps={{ min: 0 }} sx={{ flex: 1 }} />
-        <TextField label="Genislik" type="number" value={itemWidth} onChange={(e) => setItemWidth(e.target.value)} size="small" inputProps={{ min: 0 }} sx={{ flex: 1 }} />
-        <TextField label="Yukseklik" type="number" value={itemHeight} onChange={(e) => setItemHeight(e.target.value)} size="small" inputProps={{ min: 0 }} sx={{ flex: 1 }} />
+        <TextField label={t('length')} type="number" value={itemLength} onChange={(e) => setItemLength(e.target.value)} size="small" inputProps={{ min: 0 }} sx={{ flex: 1 }} />
+        <TextField label={t('width')} type="number" value={itemWidth} onChange={(e) => setItemWidth(e.target.value)} size="small" inputProps={{ min: 0 }} sx={{ flex: 1 }} />
+        <TextField label={t('height')} type="number" value={itemHeight} onChange={(e) => setItemHeight(e.target.value)} size="small" inputProps={{ min: 0 }} sx={{ flex: 1 }} />
         <FormControl sx={{ minWidth: 70 }} size="small">
-          <InputLabel>Birim</InputLabel>
+          <InputLabel>{t('unit')}</InputLabel>
           <Select
             value={itemDimensionsUnit}
-            label="Birim"
+            label={t('unit')}
             onChange={(e) => setItemDimensionsUnit(e.target.value)}
           >
             {DIMENSION_UNITS.map((u) => (
@@ -1240,7 +1231,7 @@ export default function ListingCreatorDialog({
   const renderStep3 = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="body2" color="text.secondary">
-        Ilk gorsel kapak gorseli olarak kullanilir. Etsy icin 2000x2000px oneriliyor.
+        {t('imageHint')}
       </Typography>
 
       {/* File upload + AI generate buttons */}
@@ -1272,13 +1263,13 @@ export default function ListingCreatorDialog({
           onClick={() => fileInputRef.current?.click()}
           disabled={selectedFiles.length >= 10}
         >
-          Gorsel Sec ({selectedFiles.length}/10)
+          {t('selectImages', { count: selectedFiles.length })}
         </Button>
       </Box>
 
       {selectedFiles.length === 0 && !aiImageResult && (
         <Alert severity="warning">
-          Etsy listingi yayinlamak icin en az 1 gorsel gereklidir. Gorselsiz sadece taslak olusturulabilir.
+          {t('imageRequiredWarning')}
         </Alert>
       )}
 
@@ -1301,10 +1292,10 @@ export default function ListingCreatorDialog({
                 border: i === 0 ? '2px solid' : '1px solid',
                 borderColor: i === 0 ? 'primary.main' : 'divider',
               }}
-            >
+>
               <img
                 src={src}
-                alt={`Gorsel ${i + 1}`}
+                alt={`${t('image')} ${i + 1}`}
                 style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
               />
               <IconButton
@@ -1318,7 +1309,7 @@ export default function ListingCreatorDialog({
                   color: 'white',
                   '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
                 }}
-              >
+  >
                 <DeleteIcon fontSize="small" />
               </IconButton>
               <Typography
@@ -1333,8 +1324,8 @@ export default function ListingCreatorDialog({
                   textAlign: 'center',
                   py: 0.25,
                 }}
-              >
-                {i === 0 ? 'Kapak' : i + 1}
+  >
+                {i === 0 ? t('cover') : i + 1}
               </Typography>
             </Box>
           ))}
@@ -1355,13 +1346,13 @@ export default function ListingCreatorDialog({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
           <AutoFixHighIcon sx={{ color: '#a855f7', fontSize: 20 }} />
           <Typography variant="subtitle2" color="#7c3aed">
-            AI ile Gorsel Olustur
+            {t('aiImageGenTitle')}
           </Typography>
         </Box>
 
         <TextField
           label="Prompt"
-          placeholder="ornek: Professional product photo of a handmade knitted baby blanket on white background"
+          placeholder={t('aiImagePromptPlaceholder')}
           fullWidth
           multiline
           minRows={2}
@@ -1370,13 +1361,13 @@ export default function ListingCreatorDialog({
           onChange={(e) => setAiImagePrompt(e.target.value)}
           disabled={aiImageGenerating}
           sx={{ mb: 1.5 }}
-          helperText="Ingilizce prompt daha iyi sonuc verir. Gorsel 2000x2000px JPEG olarak olusturulur."
+          helperText={t('aiImageHelperText')}
         />
 
         {/* Reference image */}
         <Box sx={{ mb: 1.5 }}>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-            Referans Gorsel (opsiyonel — benzer stil/urun icin)
+            {t('referenceImageDesc')}
           </Typography>
           {!aiImageRefPreview ? (
             <Button
@@ -1386,14 +1377,14 @@ export default function ListingCreatorDialog({
               disabled={aiImageGenerating}
               startIcon={<AddPhotoAlternateIcon />}
               sx={{ borderColor: '#c084fc', color: '#7c3aed' }}
-            >
-              Referans Sec
+>
+              {t('selectReference')}
             </Button>
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <img
                 src={aiImageRefPreview}
-                alt="Referans"
+                alt={t('reference')}
                 style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
               />
               <Button
@@ -1404,8 +1395,8 @@ export default function ListingCreatorDialog({
                   setAiImageRefPreview(null);
                   if (aiImageRefInputRef.current) aiImageRefInputRef.current.value = '';
                 }}
-              >
-                Kaldir
+  >
+                {t('remove')}
               </Button>
             </Box>
           )}
@@ -1419,17 +1410,17 @@ export default function ListingCreatorDialog({
           startIcon={aiImageGenerating ? <CircularProgress size={18} color="inherit" /> : <AutoFixHighIcon />}
           sx={{ bgcolor: '#a855f7', '&:hover': { bgcolor: '#9333ea' } }}
         >
-          {aiImageGenerating ? 'Olusturuluyor...' : 'Gorsel Olustur'}
+          {aiImageGenerating ? t('generating') : t('generateImage')}
         </Button>
 
         {/* AI result preview */}
         {aiImageResult && (
           <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle2" gutterBottom sx={{ textAlign: 'center' }}>Olusturulan Gorsel:</Typography>
+            <Typography variant="subtitle2" gutterBottom sx={{ textAlign: 'center' }}>{t('generatedImage')}:</Typography>
             <Box sx={{ textAlign: 'center' }}>
               <img
                 src={`data:${aiImageResult.mimeType};base64,${aiImageResult.base64}`}
-                alt="AI gorsel"
+                alt="AI image"
                 style={{
                   maxWidth: '100%',
                   maxHeight: 250,
@@ -1442,7 +1433,7 @@ export default function ListingCreatorDialog({
             <TextField
               size="small"
               fullWidth
-              placeholder="Degisiklik istegi: ornek: make background white, add soft shadow..."
+              placeholder={t('followUpPlaceholder')}
               value={aiImageFollowUp}
               onChange={(e) => setAiImageFollowUp(e.target.value)}
               disabled={aiImageGenerating}
@@ -1472,8 +1463,8 @@ export default function ListingCreatorDialog({
                 disabled={aiImageGenerating}
                 size="small"
                 startIcon={aiImageGenerating ? <CircularProgress size={14} /> : null}
-              >
-                {aiImageFollowUp.trim() ? 'Degisiklikle Olustur' : 'Ayni Promptla Olustur'}
+  >
+                {aiImageFollowUp.trim() ? t('generateWithChanges') : t('regenerateSamePrompt')}
               </Button>
               <Button
                 variant="contained"
@@ -1481,8 +1472,8 @@ export default function ListingCreatorDialog({
                 disabled={selectedFiles.length >= 10}
                 color="success"
                 size="small"
-              >
-                Kabul Et ve Ekle
+  >
+                {t('acceptAndAdd')}
               </Button>
             </Box>
           </Box>
@@ -1499,33 +1490,33 @@ export default function ListingCreatorDialog({
     const shippingLabel = shippingProfiles.find((s) => s.shipping_profile_id === shippingProfileId)?.title;
     const returnLabel =
       returnPolicies.find((r) => r.return_policy_id === returnPolicyId)?.description ||
-      (returnPolicyId ? `Politika #${returnPolicyId}` : '');
+      (returnPolicyId ? `${t('policy')} #${returnPolicyId}` : '');
 
     const summaryFields: Array<{ label: string; value: string | number }> = [
-      { label: 'Baslik', value: title },
-      { label: 'Aciklama', value: description.length > 200 ? description.slice(0, 200) + '...' : description },
-      { label: 'Etiketler', value: tags.join(', ') || '-' },
-      { label: 'Malzemeler', value: materials.join(', ') || '-' },
-      { label: 'Kim yapti', value: whoMadeLabel },
-      { label: 'Ne zaman yapildi', value: whenMadeLabel },
-      { label: 'Malzeme/Arac', value: isSupply ? 'Evet' : 'Hayir' },
-      { label: 'Kategori', value: selectedTaxonomy?.label || '-' },
-      { label: 'Fiyat', value: `$${price}` },
-      { label: 'Miktar', value: quantity },
-      { label: 'Magaza Bolumu', value: sectionLabel || '-' },
-      { label: 'Kargo Profili', value: shippingLabel || '-' },
-      { label: 'Iade Politikasi', value: returnLabel || '-' },
-      { label: 'Hazirlama', value: processingMin && processingMax ? `${processingMin}-${processingMax} is gunu` : '-' },
-      { label: 'Agirlik', value: itemWeight ? `${itemWeight} ${itemWeightUnit}` : '-' },
-      { label: 'Boyutlar', value: itemLength ? `${itemLength}x${itemWidth}x${itemHeight} ${itemDimensionsUnit}` : '-' },
-      { label: 'Gorseller', value: `${selectedFiles.length} adet` },
+      { label: t('summaryTitle'), value: title },
+      { label: t('summaryDescription'), value: description.length > 200 ? description.slice(0, 200) + '...' : description },
+      { label: t('summaryTags'), value: tags.join(', ') || '-' },
+      { label: t('summaryMaterials'), value: materials.join(', ') || '-' },
+      { label: t('summaryWhoMade'), value: whoMadeLabel },
+      { label: t('summaryWhenMade'), value: whenMadeLabel },
+      { label: t('summaryIsSupply'), value: isSupply ? t('yes') : t('no') },
+      { label: t('summaryCategory'), value: selectedTaxonomy?.label || '-' },
+      { label: t('summaryPrice'), value: `$${price}` },
+      { label: t('summaryQuantity'), value: quantity },
+      { label: t('shopSectionLabel'), value: sectionLabel || '-' },
+      { label: t('shippingProfileLabel'), value: shippingLabel || '-' },
+      { label: t('returnPolicyLabel'), value: returnLabel || '-' },
+      { label: t('summaryProcessing'), value: processingMin && processingMax ? `${processingMin}-${processingMax} ${t('businessDays')}` : '-' },
+      { label: t('summaryWeight'), value: itemWeight ? `${itemWeight} ${itemWeightUnit}` : '-' },
+      { label: t('summaryDimensions'), value: itemLength ? `${itemLength}x${itemWidth}x${itemHeight} ${itemDimensionsUnit}` : '-' },
+      { label: t('summaryImages'), value: `${selectedFiles.length} ${t('items')}` },
     ];
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="subtitle2" gutterBottom>
-            Listing Ozeti
+            {t('listingSummary')}
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             {summaryFields.map((field) => (
@@ -1539,7 +1530,7 @@ export default function ListingCreatorDialog({
                   borderBottom: '1px solid',
                   borderColor: 'divider',
                 }}
-              >
+  >
                 <Typography variant="body2" color="text.secondary" sx={{ minWidth: 120, flexShrink: 0 }}>
                   {field.label}
                 </Typography>
@@ -1558,7 +1549,7 @@ export default function ListingCreatorDialog({
         {creating && uploadTotal > 0 && (
           <Box sx={{ mt: 1 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              Gorseller yukleniyor: {uploadProgress}/{uploadTotal}
+              {t('uploadingImages', { progress: uploadProgress, total: uploadTotal })}
             </Typography>
             <LinearProgress
               variant="determinate"
@@ -1575,7 +1566,7 @@ export default function ListingCreatorDialog({
             disabled={creating}
             sx={{ flex: 1, minWidth: 180 }}
           >
-            {creating ? 'Olusturuluyor...' : 'Draft Olarak Kaydet'}
+            {creating ? t('creating') : t('saveAsDraft')}
           </Button>
           <Button
             variant="outlined"
@@ -1584,12 +1575,12 @@ export default function ListingCreatorDialog({
             disabled={creating || selectedFiles.length === 0}
             sx={{ flex: 1, minWidth: 180 }}
           >
-            {creating ? 'Olusturuluyor...' : 'Olustur ve Yayinla'}
+            {creating ? t('creating') : t('createAndPublish')}
           </Button>
         </Box>
         {selectedFiles.length === 0 && (
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
-            Yayinlamak icin en az 1 gorsel gereklidir
+            {t('publishRequiresImage')}
           </Typography>
         )}
       </Box>
@@ -1623,7 +1614,7 @@ export default function ListingCreatorDialog({
           borderColor: 'divider',
         }}
       >
-        <Typography variant="h6">Yeni Listing Olustur</Typography>
+        <Typography variant="h6">{t('dialogTitle')}</Typography>
         <IconButton onClick={handleClose} disabled={creating}>
           <CloseIcon />
         </IconButton>
@@ -1657,10 +1648,10 @@ export default function ListingCreatorDialog({
           }}
         >
           <Button disabled={activeStep === 0} onClick={handleBack}>
-            Geri
+            {t('back')}
           </Button>
           <Button variant="contained" onClick={handleNext}>
-            Ileri
+            {t('next')}
           </Button>
         </Box>
       )}
@@ -1677,7 +1668,7 @@ export default function ListingCreatorDialog({
           }}
         >
           <Button disabled={creating} onClick={handleBack}>
-            Geri
+            {t('back')}
           </Button>
         </Box>
       )}

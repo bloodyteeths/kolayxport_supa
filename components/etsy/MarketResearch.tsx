@@ -14,6 +14,8 @@ import {
   Zap, Globe, ShoppingCart, Target, Calendar, ArrowRight,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
+import { useLocale } from '@/lib/i18n/useLocale';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -390,9 +392,13 @@ function TrendChart({ data, height = 200, color = '#667eea' }: {
 // ---------------------------------------------------------------------------
 
 export default function EtsyMarketResearch({ userId, shopId, userListings, onMarketDataChange }: EtsyMarketResearchProps) {
+  const t = useTranslations('etsy.marketResearch');
+  const tr = useTranslations('etsy.research');
+  const { locale, config, formatCurrency, formatDate, formatNumber } = useLocale();
+
   // --- controls ---
-  const [tab, setTab] = useState(9); // Default to Kâr Hesaplama (My Shop)
-  const [section, setSection] = useState(0); // 0=Mağazam, 1=Pazar Araştırma, 2=Keşif
+  const [tab, setTab] = useState(9); // Default to Profit Calculator (My Shop)
+  const [section, setSection] = useState(0); // 0=My Shop, 1=Market Research, 2=Discovery
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [query, setQuery] = useState('');
   const [myTitle, setMyTitle] = useState('');
@@ -432,7 +438,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   const [sellingPrice, setSellingPrice] = useState('');
   const [shippingCost, setShippingCost] = useState('');
   const [includeOffsiteAds, setIncludeOffsiteAds] = useState(false);
-  const [shopRegion, setShopRegion] = useState<'us' | 'tr'>('tr'); // US vs Turkey fee structure
+  const [shopRegion, setShopRegion] = useState<'us' | 'tr'>(config.defaultEtsyFeeRegion as 'us' | 'tr'); // US vs Turkey fee structure
   const [etsyAdsRoas, setEtsyAdsRoas] = useState(''); // Etsy Ads ROAS (e.g. 3 = $3 revenue per $1 spent)
   const [shopDiscoveryFailed, setShopDiscoveryFailed] = useState(false);
 
@@ -530,35 +536,35 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   // --- Section/Tab navigation ---
   const SECTIONS = useMemo(() => [
     {
-      label: 'Mağazam',
+      label: t('myShop'),
       icon: <Store size={16} />,
-      desc: 'Kendi listelemelerinizi optimize edin',
+      desc: t('optimizeYourListings'),
       tabs: [
-        { idx: 9, label: 'Kâr Hesaplama', icon: <Calculator size={14} />, tip: 'Etsy komisyonları dahil net kârınızı hesaplayın' },
-        { idx: 10, label: 'SEO Karşılaştırma', icon: <TrendingUp size={14} />, tip: 'Başlık ve taglarınızı rakiplerle kıyaslayın' },
-        { idx: 11, label: 'Sıralama Takibi', icon: <Target size={14} />, tip: 'Listelerinizin Etsy aramada kaçıncı sırada olduğunu takip edin' },
+        { idx: 9, label: t('profitCalculation'), icon: <Calculator size={14} />, tip: t('profitCalcTip') },
+        { idx: 10, label: t('seoComparisonLabel'), icon: <TrendingUp size={14} />, tip: t('seoComparisonTip') },
+        { idx: 11, label: t('rankTrackingLabel'), icon: <Target size={14} />, tip: t('rankTrackingTip') },
       ],
     },
     {
-      label: 'Pazar Araştırma',
+      label: t('marketResearch'),
       icon: <BarChart2 size={16} />,
-      desc: 'Rakipleri ve piyasayı analiz edin',
+      desc: t('analyzeCompetitors'),
       tabs: [
-        { idx: 100, label: 'Sonuçlar', icon: <BarChart2 size={14} />, tip: 'Fiyat analizi, talep skoru ve rakip ürünleri — tek sayfada' },
-        { idx: 101, label: 'Kelime & Tag', icon: <Hash size={14} />, tip: 'Rakiplerin kullandığı taglar ve anahtar kelime analizi' },
-        { idx: 102, label: 'Mağaza & AI', icon: <Store size={14} />, tip: 'Rakip mağazalar, derinlemesine analiz ve AI önerileri' },
+        { idx: 100, label: t('results'), icon: <BarChart2 size={14} />, tip: t('resultsTip') },
+        { idx: 101, label: t('keywordTag'), icon: <Hash size={14} />, tip: t('keywordTagTip') },
+        { idx: 102, label: t('shopAI'), icon: <Store size={14} />, tip: t('shopAITip') },
       ],
     },
     {
-      label: 'Keşif & Trendler',
+      label: t('discoveryAndTrends'),
       icon: <Compass size={16} />,
-      desc: 'Yeni fırsatlar ve trendler keşfedin',
+      desc: t('discoverOpportunities'),
       tabs: [
-        { idx: 0, label: 'Kelime Keşif', icon: <Compass size={14} />, tip: 'Google + Amazon verileriyle yeni anahtar kelimeler bulun' },
-        { idx: 1, label: 'Trend Analizi', icon: <Activity size={14} />, tip: 'Google Trends ile mevsimsel talep ve yükselen aramaları görün' },
+        { idx: 0, label: t('keywordDiscovery'), icon: <Compass size={14} />, tip: t('keywordDiscoveryTip') },
+        { idx: 1, label: t('trendAnalysis'), icon: <Activity size={14} />, tip: t('trendAnalysisTip') },
       ],
     },
-  ], []);
+  ], [t]);
 
   const handleSectionChange = useCallback((newSection: number) => {
     setSection(newSection);
@@ -590,7 +596,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
     setRankLoading(true);
     try {
       const res = await fetch(`/api/clawd/etsy?action=get_tracked_keywords&shop_id=${shopId}`);
-      if (!res.ok) throw new Error('Takip edilen kelimeler alinamadi');
+      if (!res.ok) throw new Error(t('trackedKeywordsFetchFailed'));
       const data = await res.json();
       setTrackedKeywords(data.keywords || []);
     } catch (err: any) {
@@ -616,13 +622,13 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Eklenemedi');
+        throw new Error(err.error || t('addFailed'));
       }
       const data = await res.json();
       toast.success(
         data.rank != null
-          ? `"${rankKeywordInput}" icin #${data.rank} sirada (Sayfa ${data.page})`
-          : `"${rankKeywordInput}" icin ilk 500'de bulunamadi`
+          ? t('rankFoundAt', { keyword: rankKeywordInput, rank: data.rank, page: data.page })
+          : t('rankNotFound', { keyword: rankKeywordInput })
       );
       setRankKeywordInput('');
       fetchTrackedKeywords();
@@ -639,9 +645,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
         method: 'DELETE',
       });
       setTrackedKeywords((prev) => prev.filter((k) => k.id !== keywordId));
-      toast.success('Takipten kaldirildi');
+      toast.success(t('removedFromTracking'));
     } catch {
-      toast.error('Silinemedi');
+      toast.error(t('deleteFailed'));
     }
   }, [shopId]);
 
@@ -653,7 +659,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
     setExpandedRankId(keywordId);
     try {
       const res = await fetch(`/api/clawd/etsy?action=get_rank_history&keyword_id=${keywordId}&shop_id=${shopId}`);
-      if (!res.ok) throw new Error('Gecmis alinamadi');
+      if (!res.ok) throw new Error(t('historyFetchFailed'));
       const data = await res.json();
       setRankHistory(data.snapshots || []);
     } catch {
@@ -710,14 +716,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       if (maxPrice) params.set('max_price', maxPrice);
 
       const res = await fetch(`/api/clawd/etsy?${params}`);
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Arama basarisiz'); }
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || t('searchFailed')); }
       const data = await res.json();
       setItems(data.items || []);
       setTotalResults(data.total || 0);
       setServerTagFreq(data.tagFrequency || []);
       setServerKeywords(data.titleKeywords || []);
       setServerShopIds(data.shopIds || []);
-      toast.success(`${data.total?.toLocaleString()} sonuc bulundu`);
+      toast.success(t('resultsFound', { count: formatNumber(data.total || 0) }));
       if (data.shopIds?.length > 0) discoverShops(data.shopIds);
     } catch (err: any) { toast.error(err.message); }
     finally { setLoading(false); }
@@ -736,11 +742,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
     try {
       const ids = shopIds.slice(0, 20).join(',');
       const res = await fetch(`/api/clawd/etsy?action=batch_shops&shop_ids=${ids}`);
-      if (!res.ok) throw new Error('Magaza bilgileri alinamadi');
+      if (!res.ok) throw new Error(t('shopInfoFailed'));
       const data = await res.json();
       setDiscoveredShops(data.shops || []);
       setShopDiscoveryFailed(false);
-    } catch (err: any) { console.error('Shop discovery error:', err); toast.error('Mağaza bilgileri alınamadı — tekrar deneyin'); setShopDiscoveryFailed(true); }
+    } catch (err: any) { console.error('Shop discovery error:', err); toast.error(t('shopDiscoveryError')); setShopDiscoveryFailed(true); }
     finally { setShopsLoading(false); }
   }, []);
 
@@ -754,14 +760,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
         fetch(`/api/clawd/etsy?action=get_public_shop&target_shop_id=${deepDiveShopId.trim()}`),
         fetch(`/api/clawd/etsy?action=get_public_shop_listings&target_shop_id=${deepDiveShopId.trim()}&limit=200`),
       ]);
-      if (!shopRes.ok) throw new Error('Magaza bulunamadi');
+      if (!shopRes.ok) throw new Error(t('shopNotFound'));
       const shopData = await shopRes.json();
       setDeepDiveShop(shopData);
       if (listingsRes.ok) {
         const listData = await listingsRes.json();
         setDeepDiveListings(listData.listings || []);
       }
-      toast.success(`${shopData.shop_name} - ${shopData.num_sales} satis`);
+      toast.success(t('shopSalesInfo', { name: shopData.shop_name, sales: formatNumber(shopData.num_sales) }));
     } catch (err: any) { toast.error(err.message); }
     finally { setDeepDiveLoading(false); }
   }, [deepDiveShopId]);
@@ -777,7 +783,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   }, [deepDiveShopId, tab, searchShopDeepDive]);
 
   const generateAiInsights = useCallback(async () => {
-    if (items.length === 0) { toast.error('Oncelikle bir arama yapin'); return; }
+    if (items.length === 0) { toast.error(t('doSearchFirst')); return; }
     setAiLoading(true);
     try {
       const avgFavorites = items.reduce((s, i) => s + i.num_favorers, 0) / items.length;
@@ -803,10 +809,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           topShops: discoveredShops.slice(0, 5),
         }),
       });
-      if (!res.ok) throw new Error('AI analizi basarisiz');
+      if (!res.ok) throw new Error(t('aiAnalysisFailed'));
       const data = await res.json();
       setAiAnalysis(data.analysis);
-      toast.success('AI analizi tamamlandi');
+      toast.success(t('aiAnalysisComplete'));
     } catch (err: any) { toast.error(err.message); }
     finally { setAiLoading(false); }
   }, [items, query, totalResults, serverTagFreq, serverKeywords, discoveredShops, serverShopIds]);
@@ -814,7 +820,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   // --- NEW: Keyword Explorer ---
   const searchKeywords = useCallback(async () => {
     const kw = kwExplorerQuery.trim() || query.trim();
-    if (!kw) { toast.error('Anahtar kelime girin'); return; }
+    if (!kw) { toast.error(t('enterKeyword')); return; }
     setKwExplorerLoading(true);
     try {
       const params = new URLSearchParams({
@@ -822,10 +828,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
         ...(kwAlphabetSoup ? { alphabet: 'true' } : {}),
       });
       const res = await fetch(`/api/trends/etsy?${params}`);
-      if (!res.ok) throw new Error('Anahtar kelime onerisi basarisiz');
+      if (!res.ok) throw new Error(t('keywordSuggestionFailed'));
       const data = await res.json();
       setKwSuggestions(data.suggestions || []);
-      toast.success(`${data.totalFound} oneri bulundu`);
+      toast.success(t('suggestionsFound', { count: data.totalFound }));
     } catch (err: any) { toast.error(err.message); }
     finally { setKwExplorerLoading(false); }
   }, [kwExplorerQuery, query, kwAlphabetSoup]);
@@ -833,7 +839,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   // --- NEW: Trend Analysis ---
   const fetchTrends = useCallback(async () => {
     const kw = query.trim() || kwExplorerQuery.trim();
-    if (!kw) { toast.error('Önce bir anahtar kelime girin'); return; }
+    if (!kw) { toast.error(t('enterKeyword')); return; }
     setTrendLoading(true);
     setSeasonalLoading(true);
     try {
@@ -850,7 +856,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
         const data = await seasonalRes.json();
         setSeasonalData(data);
       }
-      toast.success('Trend verileri yuklendi');
+      toast.success(t('trendDataLoaded'));
     } catch (err: any) { toast.error(err.message); }
     finally { setTrendLoading(false); setSeasonalLoading(false); }
   }, [query, kwExplorerQuery]);
@@ -1112,10 +1118,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
     const recommendations: string[] = [];
     const missingKw = top20kw.filter(k => !k.inMyTitle).slice(0, 5);
-    if (missingKw.length > 0) recommendations.push(`Su eksik anahtar kelimeleri eklemeyi deneyin: ${missingKw.map(k => k.keyword).join(', ')}`);
-    if (tagGaps.length > 0) recommendations.push(`Rakiplerin kullandigi su tagleri ekleyin: ${tagGaps.slice(0, 5).map(t => t.tag).join(', ')}`);
-    if (myTitle.length < 80) recommendations.push(`Basliginiz kisa (${myTitle.length} karakter). Etsy icin en az 100 karakter onerilir.`);
-    if (myTagsSet.size < 13) recommendations.push(`${13 - myTagsSet.size} tag daha ekleyin — Etsy'de 13 tag kullanin.`);
+    if (missingKw.length > 0) recommendations.push(t('recAddMissingKeywords', { keywords: missingKw.map(k => k.keyword).join(', ') }));
+    if (tagGaps.length > 0) recommendations.push(t('recAddMissingTags', { tags: tagGaps.slice(0, 5).map(t => t.tag).join(', ') }));
+    if (myTitle.length < 80) recommendations.push(t('recTitleTooShort', { length: myTitle.length }));
+    if (myTagsSet.size < 13) recommendations.push(t('recAddMoreTags', { count: 13 - myTagsSet.size }));
 
     return {
       score, kwScore, tagScore, lengthScore, hasTagsScore,
@@ -1132,7 +1138,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   // Fee structures by region
   const FEE_PROFILES = useMemo(() => ({
     us: {
-      label: 'ABD Mağaza',
+      label: t('usShop'),
       currency: '$',
       listingFee: 0.20,
       transactionRate: 0.065,     // 6.5%
@@ -1141,10 +1147,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       offsiteAdsRate: 0.15,       // 15% (under $10k annual)
       regulatoryFee: 0,
       vatRate: 0,
-      notes: 'İşlem ücreti %6.5, ödeme işleme %3 + $0.25',
+      notes: t('usShopNotes'),
     },
     tr: {
-      label: 'Türkiye Mağaza',
+      label: t('trShop'),
       currency: '$',
       listingFee: 0.20,
       transactionRate: 0.065,     // 6.5%
@@ -1153,9 +1159,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       offsiteAdsRate: 0.15,       // 15%
       regulatoryFee: 0.0227,      // 2.27% regulatory operating fee (Turkey-specific)
       vatRate: 0,                 // VAT handled separately by seller
-      notes: 'İşlem ücreti %6.5, ödeme işleme %6.5 + 3₺, düzenleyici işletim ücreti %2.27',
+      notes: t('trShopNotes'),
     },
-  }), []);
+  }), [t]);
 
   const profitCalc = useMemo(() => {
     const fees = FEE_PROFILES[shopRegion];
@@ -1182,7 +1188,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       const adCost = roas > 0 ? p / roas : 0;
       const pr = p - cost - ship - fees.listingFee - tf - pp - rf - oa - adCost;
       return {
-        label: delta === 0 ? 'Ortalama' : delta < 0 ? `${delta}%` : `+${delta}%`,
+        label: delta === 0 ? '__avg__' : delta < 0 ? `${delta}%` : `+${delta}%`,
         price: p, profit: pr, margin: p > 0 ? (pr / p) * 100 : 0,
       };
     });
@@ -1198,8 +1204,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
   // ---------------------------------------------------------------------------
 
   const exportCSV = useCallback(() => {
-    if (items.length === 0) { toast.error('Disa aktarilacak veri yok'); return; }
-    const headers = ['Baslik', 'Fiyat', 'Goruntulenme', 'Favori', 'Etkl.Oran', 'Tag Sayisi', 'Stok', 'URL'];
+    if (items.length === 0) { toast.error(t('noDataToExport')); return; }
+    const headers = [t('csvHeaders.title'), t('csvHeaders.price'), t('csvHeaders.views'), t('csvHeaders.favorites'), t('csvHeaders.engagementRate'), t('csvHeaders.tagCount'), t('csvHeaders.stock'), t('csvHeaders.url')];
     const rows = items.map(i => [
       `"${(i.title || '').replace(/"/g, '""')}"`, i.price.toFixed(2), i.views,
       i.num_favorers, i.views > 0 ? ((i.num_favorers / i.views) * 100).toFixed(2) + '%' : '0%',
@@ -1211,14 +1217,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
     const a = document.createElement('a'); a.href = url;
     a.download = `etsy_research_${query.replace(/\s+/g, '_')}.csv`; a.click();
     URL.revokeObjectURL(url);
-    toast.success('CSV indirildi');
+    toast.success(t('csvDownloaded'));
   }, [items, query]);
 
   const saveSearch = useCallback(() => {
     const entry: SavedSearch = { query, minPrice, maxPrice, sortOn, myTitle, myTags, timestamp: Date.now() };
     const updated = [entry, ...savedSearches.filter(s => s.query !== query)].slice(0, 20);
     saveSavedSearches(updated); setSavedSearches(updated);
-    toast.success('Arama kaydedildi');
+    toast.success(t('searchSaved'));
   }, [query, minPrice, maxPrice, sortOn, myTitle, myTags, savedSearches]);
 
   const loadSearch = useCallback((s: SavedSearch) => {
@@ -1280,12 +1286,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
         {SECTIONS[section].desc}
       </Typography>
 
-      {/* Listing picker for Mağazam section */}
+      {/* Listing picker for My Shop section */}
       {section === 0 && userListings && userListings.length > 0 && (
         <Paper sx={{ ...glassCard, p: 2, mb: 2 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
             <ShoppingBag size={16} color="#667eea" />
-            Listelemenizi Seçin
+            {t('selectListing')}
           </Typography>
           <Autocomplete
             options={userListings}
@@ -1323,7 +1329,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                         {opt.title || `Listing #${opt.listing_id || opt.id}`}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {priceStr} · {opt.views || 0} görüntülenme · {opt.num_favorers || 0} favori
+                        {priceStr} · {opt.views || 0} {t('views')} · {opt.num_favorers || 0} {t('favorites')}
                       </Typography>
                     </Box>
                   </Box>
@@ -1334,7 +1340,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               <TextField
                 {...params}
                 size="small"
-                placeholder="Başlık, tag veya ID ile arayın..."
+                placeholder={t('searchPlaceholder')}
                 InputProps={{
                   ...params.InputProps,
                   startAdornment: (
@@ -1347,17 +1353,17 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               />
             )}
             isOptionEqualToValue={(opt: any, val: any) => (opt.listing_id || opt.id) === (val.listing_id || val.id)}
-            noOptionsText="Listeleme bulunamadı"
+            noOptionsText={t('listingNotFound')}
             sx={{ mb: 1 }}
           />
           {selectedListing && (
             <Box sx={{ mt: 1.5 }}>
               <Alert severity="success" sx={{ borderRadius: '10px', py: 0.5, mb: 1.5 }}>
                 <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                  Fiyat ({fmt(profitCalc.sell)}), başlık ve {(selectedListing.tags || []).length} tag dolduruldu.
+                  {t('listingFieldsFilled', { price: fmt(profitCalc.sell), tagCount: (selectedListing.tags || []).length })}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-                  Arama: "<b>{query}</b>" — düzenleyebilirsiniz
+                  {t('searchQueryEditable', { query })}
                 </Typography>
               </Alert>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -1374,7 +1380,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   }}
                   sx={{ background: GRADIENTS.primary, borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
                 >
-                  Rakip Analizi (Fiyat + Mağaza + Talep)
+                  {t('competitorAnalysis')}
                 </Button>
                 <Button
                   variant="outlined"
@@ -1389,14 +1395,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   }}
                   sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
                 >
-                  Tag & Kelime Boşluk Analizi
+                  {t('tagGapAnalysis')}
                 </Button>
               </Box>
             </Box>
           )}
           {!selectedListing && (
             <Typography variant="caption" color="text.secondary">
-              Bir listeleme seçin — fiyat, başlık ve taglar otomatik olarak doldurulur, rakip araştırması başlatabilirsiniz.
+              {t('selectListingHint')}
             </Typography>
           )}
         </Paper>
@@ -1426,7 +1432,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       </Tabs>
 
       {/* ================================================================ */}
-      {/* SEARCH BAR (shown for Pazar Araştırma & Keşif sections)          */}
+      {/* SEARCH BAR (shown for Market Research & Discovery sections)    */}
       {/* ================================================================ */}
       {(section === 1 || section === 2) && (
         <Box sx={{
@@ -1438,7 +1444,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           <Paper sx={{ p: { xs: 1.5, md: 2 }, borderRadius: '12px', position: 'relative', zIndex: 1 }}>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <TextField
-                label="Ne satıyorsunuz? Ürün kategorinizi arayın"
+                label={t('whatAreYouSelling')}
                 value={query} onChange={e => setQuery(e.target.value)}
                 size="small" sx={{ flex: 2, minWidth: 200 }}
                 placeholder="flower girl dress, personalized gift, baby blanket..."
@@ -1447,20 +1453,20 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   startAdornment: <InputAdornment position="start"><Search size={16} color="#667eea" /></InputAdornment>,
                 }}
               />
-              <TextField label="Min $" value={minPrice} onChange={e => setMinPrice(e.target.value)}
+              <TextField label={t('minPrice')} value={minPrice} onChange={e => setMinPrice(e.target.value)}
                 size="small" type="number" sx={{ width: 80 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
               />
-              <TextField label="Max $" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
+              <TextField label={t('maxPrice')} value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
                 size="small" type="number" sx={{ width: 80 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
               />
-              <TextField label="Sıralama" value={sortOn} onChange={e => setSortOn(e.target.value)}
+              <TextField label={t('sorting')} value={sortOn} onChange={e => setSortOn(e.target.value)}
                 size="small" select sx={{ width: 130 }} SelectProps={{ native: true }}>
-                <option value="score">En İyi Eşleşme</option>
-                <option value="price">Fiyat</option>
-                <option value="created">Yeni Eklenen</option>
-                <option value="updated">Son Güncellenen</option>
+                <option value="score">{t('bestMatch')}</option>
+                <option value="price">{t('price')}</option>
+                <option value="created">{t('newlyAdded')}</option>
+                <option value="updated">{t('lastUpdated')}</option>
               </TextField>
               <Button variant="contained" onClick={searchMarket}
                 disabled={loading || !query.trim()}
@@ -1471,7 +1477,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   '&:hover': { boxShadow: '0 6px 16px rgba(102,126,234,0.5)' },
                 }}
               >
-                Araştır
+                {t('research')}
               </Button>
             </Box>
 
@@ -1479,7 +1485,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
             {suggestedKeywords.length > 0 && !query && (
               <Box sx={{ mt: 1.5 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
-                  Mağazanızdan öneriler:
+                  {t('shopSuggestions')}:
                 </Typography>
                 {suggestedKeywords.map(kw => (
                   <Chip
@@ -1507,21 +1513,21 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 endIcon={<ArrowUpDown size={12} />}
               >
                 {selectedListing
-                  ? `✓ "${selectedListing.title?.slice(0, 30)}..." başlık/tagları yüklendi`
-                  : showAdvancedSearch ? 'Gelişmiş ayarları gizle' : 'SEO karşılaştırma için başlık/tag girin'
+                  ? t('listingTitleTagsLoaded', { title: selectedListing.title?.slice(0, 30) })
+                  : showAdvancedSearch ? t('hideAdvancedSettings') : t('enterTitleTagForSeo')
                 }
               </Button>
               {showAdvancedSearch && (
                 <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
-                  <TextField label="Benim Başlığım" value={myTitle}
+                  <TextField label={t('myTitle')} value={myTitle}
                     onChange={e => setMyTitle(e.target.value)} size="small"
-                    sx={{ flex: 2, minWidth: 200 }} placeholder="Listeleme başlığınızı girin..."
-                    helperText={`${myTitle.length}/140 karakter`}
+                    sx={{ flex: 2, minWidth: 200 }} placeholder={t('enterListingTitle')}
+                    helperText={t('charCount', { count: myTitle.length, max: 140 })}
                   />
-                  <TextField label="Benim Taglarım (virgülle)" value={myTags}
+                  <TextField label={t('myTagsComma')} value={myTags}
                     onChange={e => setMyTags(e.target.value)} size="small"
                     sx={{ flex: 2, minWidth: 200 }} placeholder="personalized gift, baby shower..."
-                    helperText={`${myTags.split(',').filter(t => t.trim()).length}/13 tag`}
+                    helperText={t('tagCount', { count: myTags.split(',').filter(t => t.trim()).length, max: 13 })}
                   />
                 </Box>
               )}
@@ -1546,9 +1552,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 <Compass size={18} color="#fff" />
               </Box>
               <Box>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Anahtar Kelime Kesif</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{t('keywordDiscoveryTitle')}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Google + Amazon + Etsy verileriyle anahtar kelime onerisi
+                  {t('keywordDiscoveryDesc')}
                 </Typography>
               </Box>
             </Box>
@@ -1565,14 +1571,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               />
               <FormControlLabel
                 control={<Switch checked={kwAlphabetSoup} onChange={e => setKwAlphabetSoup(e.target.checked)} size="small" />}
-                label={<Typography variant="caption">A-Z Genislet</Typography>}
+                label={<Typography variant="caption">{t('azExpand')}</Typography>}
               />
               <Button variant="contained" onClick={searchKeywords}
                 disabled={kwExplorerLoading}
                 startIcon={kwExplorerLoading ? <CircularProgress size={16} /> : <Zap size={16} />}
                 sx={{ background: GRADIENTS.info, borderRadius: '10px' }}
               >
-                Kesfet
+                {t('discover')}
               </Button>
             </Box>
           </Paper>
@@ -1582,11 +1588,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {kwSuggestions.length > 0 && (
             <>
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                <StatCard label="Toplam Oneri" value={String(kwSuggestions.length)} color="#2196F3"
+                <StatCard label={t('totalSuggestions')} value={String(kwSuggestions.length)} color="#2196F3"
                   icon={<Compass size={18} />} />
-                <StatCard label="Coklu Kaynak" value={String(kwSuggestions.filter(s => s.sourceCount > 1).length)}
+                <StatCard label={t('multiSource')} value={String(kwSuggestions.filter(s => s.sourceCount > 1).length)}
                   color="#4caf50" icon={<Globe size={18} />} />
-                <StatCard label="En Yuksek Skor" value={String(kwSuggestions[0]?.score || 0)}
+                <StatCard label={t('highestScore')} value={String(kwSuggestions[0]?.score || 0)}
                   color="#ff9800" icon={<Target size={18} />} />
               </Box>
 
@@ -1596,18 +1602,18 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <TableHead>
                       <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                         <TableCell>#</TableCell>
-                        <TableCell>Anahtar Kelime</TableCell>
+                        <TableCell>{t('keywordHeader')}</TableCell>
                         <TableCell align="center">
                           <TableSortLabel active={kwSortKey === 'sourceCount'} direction={kwSortKey === 'sourceCount' ? kwSortDir : 'desc'} onClick={() => toggleSort('sourceCount', kwSortKey, kwSortDir, setKwSortKey, setKwSortDir)}>
-                            Kaynaklar
+                            {t('sources')}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell align="center">
                           <TableSortLabel active={kwSortKey === 'score'} direction={kwSortKey === 'score' ? kwSortDir : 'desc'} onClick={() => toggleSort('score', kwSortKey, kwSortDir, setKwSortKey, setKwSortDir)}>
-                            Skor
+                            {t('score')}
                           </TableSortLabel>
                         </TableCell>
-                        <TableCell align="center">Aksiyon</TableCell>
+                        <TableCell align="center">{t('action')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1636,7 +1642,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                           </TableCell>
                           <TableCell align="center">
                             <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
-                              <Tooltip title="Ana aramaya gonder">
+                              <Tooltip title={t('sendToMainSearch')}>
                                 <IconButton size="small" onClick={() => {
                                   pendingSearchRef.current = true;
                                   setQuery(s.keyword);
@@ -1645,10 +1651,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                                   <ArrowRight size={14} />
                                 </IconButton>
                               </Tooltip>
-                              <Tooltip title="Kopyala">
+                              <Tooltip title={t('copyTooltip')}>
                                 <IconButton size="small" onClick={() => {
                                   navigator.clipboard.writeText(s.keyword);
-                                  toast.success(`"${s.keyword}" kopyalandi`);
+                                  toast.success(t('copied'));
                                 }}>
                                   <Copy size={14} />
                                 </IconButton>
@@ -1667,9 +1673,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {!kwExplorerLoading && kwSuggestions.length === 0 && (
             <PremiumEmptyState
               icon={<Compass size={48} />}
-              title="Anahtar Kelime Keşfet"
-              desc="Hangi kelimeleri kullanmalısınız? Google ve Amazon'dan öneriler alın."
-              steps={['Yukarıya satmak istediğiniz ürünü yazın (ör. "baby blanket")', '"A-Z Genişlet" ile uzun kuyruk kelimeler bulun', 'Yüksek skorlu kelimeleri başlık ve taglarınıza ekleyin']}
+              title={t('kwExploreTitle')}
+              desc={t('kwExploreDesc')}
+              steps={[t('kwExploreStep1'), t('kwExploreStep2'), t('kwExploreStep3')]}
             />
           )}
         </Box>
@@ -1688,21 +1694,21 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               }}>
                 <Activity size={18} color="#fff" />
               </Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Trend Analizi</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{t('trendAnalysis')}</Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Google Trends + Wikipedia verileri ile arama trendleri ve mevsimsel analiz
+              {t('trendAnalysisDesc')}
             </Typography>
             <Button variant="contained" onClick={fetchTrends}
               disabled={trendLoading || (!query.trim() && !kwExplorerQuery.trim())} size="large"
               startIcon={trendLoading ? <CircularProgress size={16} /> : <TrendingUp size={16} />}
               sx={{ background: GRADIENTS.success, borderRadius: '12px', px: 4, boxShadow: '0 4px 12px rgba(17,153,142,0.3)' }}
             >
-              {trendLoading ? 'Analiz ediliyor...' : 'Trend Analizi Baslat'}
+              {trendLoading ? t('analyzing') : t('startTrendAnalysis')}
             </Button>
             {!query.trim() && !kwExplorerQuery.trim() && (
               <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-                Önce "Kelime Keşif" sekmesinde bir anahtar kelime arayın
+                {t('searchKeywordFirst')}
               </Typography>
             )}
           </Paper>
@@ -1713,15 +1719,15 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
             <>
               {/* Trend summary cards */}
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                <StatCard label="Ort. Ilgi" value={String(trendData.averageInterest)} color="#2196F3"
+                <StatCard label={t('avgInterest')} value={String(trendData.averageInterest)} color="#2196F3"
                   icon={<BarChart2 size={18} />} />
-                <StatCard label="Zirve Degeri" value={String(trendData.peakValue)} color="#4caf50"
+                <StatCard label={t('peakValue')} value={String(trendData.peakValue)} color="#4caf50"
                   icon={<TrendingUp size={18} />} />
-                <StatCard label="Zirve Tarihi" value={trendData.peakDate || '-'} color="#ff9800"
+                <StatCard label={t('peakDate')} value={trendData.peakDate || '-'} color="#ff9800"
                   icon={<Calendar size={18} />} />
-                <StatCard label="Yon" value={
-                  trendData.trendDirection === 'rising' ? 'Yukselis' :
-                  trendData.trendDirection === 'declining' ? 'Dusus' : 'Stabil'
+                <StatCard label={t('direction')} value={
+                  trendData.trendDirection === 'rising' ? t('rising') :
+                  trendData.trendDirection === 'declining' ? t('declining') : t('stable')
                 } color={
                   trendData.trendDirection === 'rising' ? '#4caf50' :
                   trendData.trendDirection === 'declining' ? '#f44336' : '#ff9800'
@@ -1734,7 +1740,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               {trendData.timeline.length > 0 && (
                 <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-                    12 Aylik Google Trends (Alisveris Kategorisi)
+                    {t('googleTrends12m')}
                   </Typography>
                   <TrendChart data={trendData.timeline} />
                 </Paper>
@@ -1745,13 +1751,13 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 {trendData.risingQueries.length > 0 && (
                   <Paper sx={{ ...glassCard, p: 2 }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#4caf50' }}>
-                      Yukselen Aramalar
+                      {t('risingSearches')}
                     </Typography>
                     {trendData.risingQueries.map(q => (
                       <Box key={q.query} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, alignItems: 'center' }}>
                         <Typography variant="body2" sx={{
                           cursor: 'pointer', '&:hover': { color: 'primary.main' },
-                        }} onClick={() => { setQuery(q.query); toast.success(`"${q.query}" arama alanina eklendi`); }}>
+                        }} onClick={() => { setQuery(q.query); toast.success(t('queryAdded')); }}>
                           {q.query}
                         </Typography>
                         <Chip label={q.value} size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 600 }} />
@@ -1763,13 +1769,13 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 {trendData.topQueries.length > 0 && (
                   <Paper sx={{ ...glassCard, p: 2 }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#2196F3' }}>
-                      En Populer Iliskili Aramalar
+                      {t('topRelatedSearches')}
                     </Typography>
                     {trendData.topQueries.map(q => (
                       <Box key={q.query} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, alignItems: 'center' }}>
                         <Typography variant="body2" sx={{
                           cursor: 'pointer', '&:hover': { color: 'primary.main' },
-                        }} onClick={() => { setQuery(q.query); toast.success(`"${q.query}" arama alanina eklendi`); }}>
+                        }} onClick={() => { setQuery(q.query); toast.success(t('queryAdded')); }}>
                           {q.query}
                         </Typography>
                         <GradientBar value={q.value} max={100} height={6} />
@@ -1785,11 +1791,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {seasonalData && seasonalData.hasData && (
             <Paper sx={{ ...glassCard, p: 2.5 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-                Mevsimsel Takvim
+                {t('seasonalCalendar')}
               </Typography>
               {seasonalData.peakMonth && (
                 <Alert severity="success" sx={{ mb: 2, borderRadius: '12px' }}>
-                  Zirve ay: <strong>{seasonalData.peakMonth}</strong> | Dusuk ay: <strong>{seasonalData.lowMonth}</strong>
+                  {t('peakMonth')}: <strong>{seasonalData.peakMonth}</strong> | {t('lowMonth')}: <strong>{seasonalData.lowMonth}</strong>
                 </Alert>
               )}
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: 1 }}>
@@ -1820,27 +1826,27 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {!trendLoading && !trendData && (
             <PremiumEmptyState
               icon={<Activity size={48} />}
-              title="Trend Analizi"
-              desc="Ürün kategoriniz yılın hangi aylarında popüler? Ne zaman stok yapmalısınız?"
-              steps={['Önce "Pazar Araştırma" bölümünde bir anahtar kelime arayın', 'Bu sekmeye gelin ve "Trend Analizi Başlat" butonuna tıklayın', 'Mevsimsel takvim ve yükselen aramaları görün']}
+              title={t('trendAnalysis')}
+              desc={t('trendEmptyDesc')}
+              steps={[t('trendStep1'), t('trendStep2'), t('trendStep3')]}
             />
           )}
         </Box>
       )}
 
       {/* ================================================================ */}
-      {/* TAB 100: SONUÇLAR (Price + Demand + Competitors combined)         */}
+      {/* TAB 100: RESULTS (Price + Demand + Competitors combined)       */}
       {/* ================================================================ */}
       {tab === 100 && (
         <Box>
           {priceStats ? (
             <>
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                <StatCard label="Minimum" value={fmt(priceStats.min)} color="#11998e" icon={<DollarSign size={18} />} />
-                <StatCard label="Ortalama" value={fmt(priceStats.avg)} color="#2196F3" icon={<BarChart2 size={18} />} />
-                <StatCard label="Medyan" value={fmt(priceStats.median)} color="#ff9800" icon={<Target size={18} />} />
-                <StatCard label="Maksimum" value={fmt(priceStats.max)} color="#f44336" icon={<TrendingUp size={18} />} />
-                <StatCard label="Sonuc" value={`${priceStats.count}`} color="#9c27b0" icon={<ShoppingBag size={18} />} />
+                <StatCard label={t('minimum')} value={fmt(priceStats.min)} color="#11998e" icon={<DollarSign size={18} />} />
+                <StatCard label={t('average')} value={fmt(priceStats.avg)} color="#2196F3" icon={<BarChart2 size={18} />} />
+                <StatCard label={t('median')} value={fmt(priceStats.median)} color="#ff9800" icon={<Target size={18} />} />
+                <StatCard label={t('maximum')} value={fmt(priceStats.max)} color="#f44336" icon={<TrendingUp size={18} />} />
+                <StatCard label={t('resultCount')} value={`${priceStats.count}`} color="#9c27b0" icon={<ShoppingBag size={18} />} />
               </Box>
 
               {sweetSpot && (
@@ -1849,10 +1855,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   border: '1px solid rgba(17,153,142,0.2)',
                 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Fiyat Tatli Noktasi: {sweetSpot.label}
+                    {t('sweetSpotTitle')}: {sweetSpot.label}
                   </Typography>
                   <Typography variant="body2">
-                    Bu fiyat araligindaki urunler ortalama <strong>{sweetSpot.avgFav}</strong> favori aliyor ({sweetSpot.count} urun).
+                    {t('sweetSpotDesc', { avgFav: sweetSpot.avgFav, count: sweetSpot.count })}
                   </Typography>
                 </Alert>
               )}
@@ -1860,10 +1866,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               {/* Gradient Histogram */}
               {histogram.length > 1 && (
                 <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Fiyat Dagilimi</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>{t('priceDistribution')}</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: 140 }}>
                     {histogram.map((b, i) => (
-                      <Tooltip key={i} title={`${b.label}: ${b.count} urun`}>
+                      <Tooltip key={i} title={`${b.label}: ${b.count} ${t('products')}`}>
                         <Box sx={{
                           flex: 1, minWidth: 0,
                           height: `${Math.max((b.count / maxBucketCount) * 100, 3)}%`,
@@ -1888,11 +1894,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   <Table size="small">
                     <TableHead>
                       <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
-                        <TableCell>Fiyat Araligi</TableCell>
-                        <TableCell align="center">Urun</TableCell>
-                        <TableCell align="center">Oran</TableCell>
-                        <TableCell align="center">Ort. Favori</TableCell>
-                        <TableCell sx={{ width: '25%' }}>Dagilim</TableCell>
+                        <TableCell>{t('priceRange')}</TableCell>
+                        <TableCell align="center">{t('products')}</TableCell>
+                        <TableCell align="center">{t('ratio')}</TableCell>
+                        <TableCell align="center">{t('avgFavorites')}</TableCell>
+                        <TableCell sx={{ width: '25%' }}>{t('distribution')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1918,9 +1924,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 </TableContainer>
               </Paper>
             </>
-          ) : !loading && <PremiumEmptyState icon={<BarChart2 size={48} />} title="Pazar Sonuçları"
-              desc="Fiyat analizi, talep skoru ve rakip ürünleri tek sayfada."
-              steps={['Yukarıdaki arama çubuğuna ürün kategorinizi yazın (ör. "personalized necklace")', 'Araştır butonuna tıklayın', 'Fiyat dağılımı, talep skoru ve rakip listesi otomatik görünür']}
+          ) : !loading && <PremiumEmptyState icon={<BarChart2 size={48} />} title={t('marketResults')}
+              desc={t('marketResultsDesc')}
+              steps={[t('marketResultsStep1'), t('marketResultsStep2'), t('marketResultsStep3')]}
             />}
 
           {/* --- Demand Score (merged from tab 8) --- */}
@@ -1928,25 +1934,23 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
             <Box sx={{ mt: 3 }}>
               <Divider sx={{ mb: 2 }} />
               <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Gauge size={18} color="#667eea" /> Talep & Fırsat Skoru
+                <Gauge size={18} color="#667eea" /> {t('demandOpportunityScore')}
               </Typography>
               <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
-                <ScoreRing score={demandScore.score} size={120} label="Firsat" />
+                <ScoreRing score={demandScore.score} size={120} label={t('opportunity')} />
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
-                  {demandScore.score >= 70 ? 'Bu niş iyi bir fırsat! Rekabet makul ve talep yüksek.' :
-                    demandScore.score >= 40 ? 'Orta seviye fırsat. Rekabet analizi yaparak stratejinizi belirleyin.' :
-                      'Bu pazar çok rekabetçi veya doygun olabilir. Niş bir alt kategori bulmaya çalışın.'}
+                  {demandScore.score >= 70 ? t('scoreHigh') : demandScore.score >= 40 ? t('scoreMedium') : t('scoreLow')}
                 </Typography>
 
                 {/* Score Breakdown Bars */}
                 {(() => {
                   const bd = demandScore.breakdown;
                   const components = [
-                    { key: 'supply', label: 'Arz Skoru', value: bd.supplyScore, max: 25, weakness: 'Çok fazla rakip listing var — niş daraltmayı deneyin' },
-                    { key: 'competition', label: 'Rekabet Skoru', value: bd.compScore, max: 25, weakness: 'Az sayıda mağaza bu alanı domine ediyor' },
-                    { key: 'demand', label: 'Talep Skoru', value: bd.demandPts, max: 20, weakness: 'Talep düşük — farklı anahtar kelimeler deneyin' },
-                    { key: 'engagement', label: 'Etkileşim Skoru', value: bd.engScore, max: 15, weakness: 'Alıcılar ilgilenmiyor — görsel/fiyat iyileştirin' },
-                    { key: 'variety', label: 'Fiyat Çeşitliliği', value: bd.spreadScore, max: 15, weakness: 'Fiyat çeşitliliği az — fiyatlandırma fırsatı' },
+                    { key: 'supply', label: t('supplyScore'), value: bd.supplyScore, max: 25, weakness: t('supplyWeakness') },
+                    { key: 'competition', label: t('competitionScore'), value: bd.compScore, max: 25, weakness: t('competitionWeakness') },
+                    { key: 'demand', label: t('demandScore'), value: bd.demandPts, max: 20, weakness: t('demandWeakness') },
+                    { key: 'engagement', label: t('engagementScore'), value: bd.engScore, max: 15, weakness: t('engagementWeakness') },
+                    { key: 'variety', label: t('priceVariety'), value: bd.spreadScore, max: 15, weakness: t('priceVarietyWeakness') },
                   ];
                   const weakest = components.reduce((min, c) => (c.value / c.max) < (min.value / min.max) ? c : min, components[0]);
 
@@ -1972,7 +1976,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                         );
                       })}
                       <Alert severity="info" icon={<Info size={16} />} sx={{ mt: 1.5, borderRadius: '10px', py: 0.3, '& .MuiAlert-message': { fontSize: '0.78rem' } }}>
-                        <strong>En zayıf alan:</strong> {weakest.label} — {weakest.weakness}
+                        <strong>{t('weakestArea')}:</strong> {weakest.label} — {weakest.weakness}
                       </Alert>
                     </Box>
                   );
@@ -1980,12 +1984,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               </Paper>
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
                 {[
-                  { label: 'Toplam Sonuç', value: demandScore.totalResults.toLocaleString(), desc: 'Arz miktarı' },
-                  { label: 'Benzersiz Mağaza', value: String(demandScore.uniqueShops), desc: 'Rekabet' },
-                  { label: 'Ort. Favori', value: String(demandScore.avgFavorites), desc: 'Talep sinyali' },
-                  { label: 'Ort. Görüntülenme', value: String(demandScore.avgViews), desc: 'Görünürlük' },
-                  { label: 'Etkileşim', value: `${demandScore.avgEngagement}%`, desc: 'Fav/Görünt.' },
-                  { label: 'Fiyat Yayılımı', value: `${demandScore.priceSpread}x`, desc: 'Çeşitlilik' },
+                  { label: t('totalResults'), value: formatNumber(demandScore.totalResults), desc: t('supplyAmount') },
+                  { label: t('uniqueShops'), value: String(demandScore.uniqueShops), desc: t('competition') },
+                  { label: t('avgFavoritesLabel'), value: String(demandScore.avgFavorites), desc: t('demandSignal') },
+                  { label: t('avgViewsLabel'), value: String(demandScore.avgViews), desc: t('visibility') },
+                  { label: t('engagement'), value: `${demandScore.avgEngagement}%`, desc: t('favPerViews') },
+                  { label: t('priceSpread'), value: `${demandScore.priceSpread}x`, desc: t('variety') },
                 ].map(m => (
                   <Paper key={m.label} sx={{ ...glassCard, p: 1.5, flex: 1, minWidth: 100 }}>
                     <Typography variant="caption" sx={{ opacity: 0.7, fontWeight: 500 }}>{m.label}</Typography>
@@ -2002,12 +2006,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
             <Box sx={{ mt: 3 }}>
               <Divider sx={{ mb: 2 }} />
               <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <ShoppingBag size={18} color="#667eea" /> Rakip Ürünleri ({items.length})
+                <ShoppingBag size={18} color="#667eea" /> {t('competitorProducts', { count: items.length })}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, mb: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
                 {(['none', 'price_asc', 'price_desc', 'favorites', 'views', 'engagement'] as const).map(s => (
                   <Chip key={s}
-                    label={{ none: 'Varsayılan', price_asc: 'Fiyat ↑', price_desc: 'Fiyat ↓', favorites: 'Favori', views: 'Görüntülenme', engagement: 'Etkileşim' }[s]}
+                    label={{ none: t('sortDefault'), price_asc: t('sortPriceAsc'), price_desc: t('sortPriceDesc'), favorites: t('sortFavorites'), views: t('sortViews'), engagement: t('sortEngagement') }[s]}
                     size="small" variant={compSort === s ? 'filled' : 'outlined'}
                     color={compSort === s ? 'primary' : 'default'}
                     onClick={() => setCompSort(s)} sx={{ cursor: 'pointer', borderRadius: '8px' }}
@@ -2020,10 +2024,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <TableHead>
                       <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                         <TableCell sx={{ width: 50 }} />
-                        <TableCell>Başlık</TableCell>
+                        <TableCell>{t('titleHeader')}</TableCell>
                         <TableCell align="right">
                           <TableSortLabel active={compSort === 'price_asc' || compSort === 'price_desc'} direction={compSort === 'price_asc' ? 'asc' : 'desc'} onClick={() => setCompSort(compSort === 'price_desc' ? 'price_asc' : 'price_desc')}>
-                            Fiyat
+                            {t('priceHeader')}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell align="center">
@@ -2033,7 +2037,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                         </TableCell>
                         <TableCell align="center">
                           <TableSortLabel active={compSort === 'engagement'} direction="desc" onClick={() => setCompSort('engagement')}>
-                            Etkl.
+                            {t('engagementShort')}
                           </TableSortLabel>
                         </TableCell>
                         <TableCell sx={{ width: 40 }} />
@@ -2065,7 +2069,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                             </TableCell>
                             <TableCell align="center">
                               <Typography variant="body2" sx={{ fontWeight: 700, color: item.num_favorers > 100 ? '#11998e' : 'text.secondary' }}>
-                                {item.num_favorers.toLocaleString()}
+                                {formatNumber(item.num_favorers)}
                               </Typography>
                             </TableCell>
                             <TableCell align="center">
@@ -2091,7 +2095,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 <Box sx={{ textAlign: 'center', mt: 1.5 }}>
                   <Button variant="outlined" size="small" onClick={() => setVisibleCount(c => c + 20)}
                     sx={{ borderRadius: '10px' }}>
-                    Daha Fazla ({items.length - visibleCount} kalan)
+                    {t('showMore', { remaining: items.length - visibleCount })}
                   </Button>
                 </Box>
               )}
@@ -2101,7 +2105,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       )}
 
       {/* ================================================================ */}
-      {/* TAB 101: KELIME & TAG (Tags + Keywords combined)                 */}
+      {/* TAB 101: KEYWORD & TAG (Tags + Keywords combined)             */}
       {/* ================================================================ */}
       {tab === 101 && (
         <Box>
@@ -2113,15 +2117,15 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   border: '1px solid rgba(242,153,74,0.2)',
                 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    {tagGaps.length} Eksik Tag Tespit Edildi!
+                    {t('missingTagsDetected', { count: tagGaps.length })}
                   </Typography>
                   <Typography variant="body2">
-                    Rakiplerin kullandigi ama sizde olmayan tagler:
+                    {t('missingTagsDesc')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
                     {tagGaps.slice(0, 10).map(t => (
                       <Chip key={t.tag} label={`${t.tag} (%${t.pct})`} size="small" color="warning"
-                        onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(`"${t.tag}" kopyalandi`); }}
+                        onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(t('copied')); }}
                         sx={{ cursor: 'pointer', borderRadius: '8px' }}
                       />
                     ))}
@@ -2131,7 +2135,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
-                  En Cok Kullanilan Tagler ({enrichedTags.length} benzersiz)
+                  {t('topUsedTags', { count: enrichedTags.length })}
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2.5 }}>
                   {enrichedTags.slice(0, 40).map(t => (
@@ -2139,13 +2143,13 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                       label={`${t.tag} (%${t.pct})`} size="small"
                       color={t.inMyTags ? 'success' : t.pct >= 30 ? 'error' : t.pct >= 15 ? 'warning' : 'default'}
                       variant={t.inMyTags ? 'filled' : 'outlined'}
-                      onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(`"${t.tag}" kopyalandi`); }}
+                      onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(t('copied')); }}
                       sx={{ cursor: 'pointer', borderRadius: '8px' }}
                     />
                   ))}
                 </Box>
 
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Tag Yogunlugu</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('tagDensity')}</Typography>
                 {enrichedTags.slice(0, 20).map(t => (
                   <Box key={t.tag} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                     <Typography variant="body2" sx={{ minWidth: 140, fontWeight: t.inMyTags ? 700 : 400 }}>
@@ -2162,20 +2166,20 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
                   <Box sx={{ p: 2 }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      Populer Tag Kombinasyonlari
+                      {t('popularTagCombos')}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Birlikte en cok kullanilan tag ciftleri ve ortalama favori sayilari
+                      {t('tagCombosDesc')}
                     </Typography>
                   </Box>
                   <TableContainer sx={{ maxHeight: 400 }}>
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
-                          <TableCell>Tag Cifti</TableCell>
-                          <TableCell align="center"><TableSortLabel active={tagComboSortKey==='count'} direction={tagComboSortKey==='count'?tagComboSortDir:'desc'} onClick={()=>toggleSort('count',tagComboSortKey,tagComboSortDir,setTagComboSortKey,setTagComboSortDir)}>Kullanim</TableSortLabel></TableCell>
-                          <TableCell align="center"><TableSortLabel active={tagComboSortKey==='avgFav'} direction={tagComboSortKey==='avgFav'?tagComboSortDir:'desc'} onClick={()=>toggleSort('avgFav',tagComboSortKey,tagComboSortDir,setTagComboSortKey,setTagComboSortDir)}>Ort. Favori</TableSortLabel></TableCell>
-                          <TableCell align="center">Kopyala</TableCell>
+                          <TableCell>{t('tagPair')}</TableCell>
+                          <TableCell align="center"><TableSortLabel active={tagComboSortKey==='count'} direction={tagComboSortKey==='count'?tagComboSortDir:'desc'} onClick={()=>toggleSort('count',tagComboSortKey,tagComboSortDir,setTagComboSortKey,setTagComboSortDir)}>{t('usage')}</TableSortLabel></TableCell>
+                          <TableCell align="center"><TableSortLabel active={tagComboSortKey==='avgFav'} direction={tagComboSortKey==='avgFav'?tagComboSortDir:'desc'} onClick={()=>toggleSort('avgFav',tagComboSortKey,tagComboSortDir,setTagComboSortKey,setTagComboSortDir)}>{t('avgFavorites')}</TableSortLabel></TableCell>
+                          <TableCell align="center">{t('copy')}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -2191,7 +2195,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                             <TableCell align="center">
                               <IconButton size="small" onClick={() => {
                                 navigator.clipboard.writeText(c.pair.replace(' + ', ', '));
-                                toast.success('Kopyalandi');
+                                toast.success(t('copied'));
                               }}><Copy size={14} /></IconButton>
                             </TableCell>
                           </TableRow>
@@ -2204,10 +2208,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
             </>
           ) : !loading && (
             hasData
-              ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Aramanızda tag verisi bulunamadı. Farklı bir anahtar kelime deneyin.</Alert>
-              : <PremiumEmptyState icon={<Hash size={48} />} title="Kelime & Tag Analizi"
-                  desc="Rakiplerin kullandığı tagları ve anahtar kelimeleri keşfedin."
-                  steps={['Önce bir anahtar kelime araması yapın', 'Rakiplerin en çok kullandığı taglar ve kelimeler listelenir', 'Eksiklerinizi görün — tıklayarak kopyalayın']}
+              ? <Alert severity="info" sx={{ borderRadius: '12px' }}>{t('noTagData')}</Alert>
+              : <PremiumEmptyState icon={<Hash size={48} />} title={t('keywordTagAnalysis')}
+                  desc={t('keywordTagAnalysisDesc')}
+                  steps={[t('tagStep1'), t('tagStep2'), t('tagStep3')]}
                 />
           )}
 
@@ -2216,29 +2220,29 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
             <Box sx={{ mt: 3 }}>
               <Divider sx={{ mb: 2 }} />
               <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Tag size={18} color="#667eea" /> Anahtar Kelimeler
+                <Tag size={18} color="#667eea" /> {t('keywords')}
               </Typography>
               <Alert severity="info" sx={{ mb: 2, borderRadius: '12px' }}>
-                Rakiplerin başlıklarından çıkarılan en popüler anahtar kelimeler. Tıklayın ve kopyalayın.
+                {t('keywordsDesc')}
               </Alert>
 
               {myTitle && (
                 <Box sx={{ mb: 1.5 }}>
                   <Button size="small" variant={kwShowMissing ? 'contained' : 'outlined'}
                     onClick={() => setKwShowMissing(!kwShowMissing)} sx={{ mr: 1, borderRadius: '8px' }}>
-                    {kwShowMissing ? 'Tum Kelimeler' : 'Basligimda Olmayanlar'}
+                    {kwShowMissing ? t('allKeywords') : t('missingFromTitle')}
                   </Button>
                 </Box>
               )}
 
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Tek Kelimeler</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('singleWords')}</Typography>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
                 {(kwShowMissing ? enrichedKeywords.filter(k => !k.inMyTitle) : enrichedKeywords).map(kw => (
                   <Chip key={kw.keyword}
                     label={`${kw.keyword} (${kw.pct}%)`} size="small"
                     color={kw.pct >= 40 ? 'error' : kw.pct >= 20 ? 'warning' : 'default'}
                     variant={kw.inMyTitle ? 'filled' : 'outlined'}
-                    onClick={() => { navigator.clipboard.writeText(kw.keyword); toast.success(`"${kw.keyword}" kopyalandi`); }}
+                    onClick={() => { navigator.clipboard.writeText(kw.keyword); toast.success(t('copied')); }}
                     sx={{ cursor: 'pointer', borderRadius: '8px' }}
                   />
                 ))}
@@ -2246,12 +2250,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
               {bigrams.length > 0 && (
                 <>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>2 Kelimelik Ifadeler</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('bigramPhrases')}</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
                     {bigrams.slice(0, 25).map(b => (
                       <Chip key={b.phrase} label={`${b.phrase} (${b.count})`} size="small"
                         color={b.percentage >= 30 ? 'primary' : 'default'} variant="outlined"
-                        onClick={() => { navigator.clipboard.writeText(b.phrase); toast.success(`"${b.phrase}" kopyalandi`); }}
+                        onClick={() => { navigator.clipboard.writeText(b.phrase); toast.success(t('copied')); }}
                         sx={{ cursor: 'pointer', borderRadius: '8px' }}
                       />
                     ))}
@@ -2261,12 +2265,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
               {trigrams.length > 0 && (
                 <>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Uzun Kuyruk (3+ kelime)</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('longTailPhrases')}</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
                     {trigrams.slice(0, 20).map(t => (
                       <Chip key={t.phrase} label={`${t.phrase} (${t.count})`} size="small"
                         color="secondary" variant="outlined"
-                        onClick={() => { navigator.clipboard.writeText(t.phrase); toast.success(`"${t.phrase}" kopyalandi`); }}
+                        onClick={() => { navigator.clipboard.writeText(t.phrase); toast.success(t('copied')); }}
                         sx={{ cursor: 'pointer', borderRadius: '8px' }}
                       />
                     ))}
@@ -2276,7 +2280,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
               {/* Keyword density */}
               <Paper sx={{ ...glassCard, p: 2.5 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Anahtar Kelime Yogunlugu</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>{t('keywordDensity')}</Typography>
                 {enrichedKeywords.slice(0, 15).map(kw => (
                   <Box key={kw.keyword} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                     <Typography variant="body2" sx={{ minWidth: 100, fontWeight: kw.inMyTitle ? 700 : 400 }}>
@@ -2295,7 +2299,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
       )}
 
       {/* ================================================================ */}
-      {/* TAB 102: MAĞAZA & AI (Shops + Deep Dive + AI combined)           */}
+      {/* TAB 102: SHOP & AI (Shops + Deep Dive + AI combined)          */}
       {/* ================================================================ */}
       {tab === 102 && (
         <Box>
@@ -2303,11 +2307,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {shopStats && shopStats.shops.length > 0 ? (
             <>
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Magaza Yogunlugu</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>{t('shopConcentration')}</Typography>
                 <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                  <StatCard label="Toplam Magaza" value={String(shopStats.shops.length)} color="#667eea" icon={<Store size={18} />} />
-                  <StatCard label="Ort. Puan" value={`${shopStats.avgRating}`} color="#ff9800" icon={<Star size={18} />} />
-                  <StatCard label="Top 5 Payi" value={shopStats.totalListings > 0 ? pct((shopStats.top5Sales / shopStats.totalListings) * 100) : '0%'} color="#9c27b0" icon={<Users size={18} />} />
+                  <StatCard label={t('totalShops')} value={String(shopStats.shops.length)} color="#667eea" icon={<Store size={18} />} />
+                  <StatCard label={t('avgRating')} value={`${shopStats.avgRating}`} color="#ff9800" icon={<Star size={18} />} />
+                  <StatCard label={t('top5Share')} value={shopStats.totalListings > 0 ? pct((shopStats.top5Sales / shopStats.totalListings) * 100) : '0%'} color="#9c27b0" icon={<Users size={18} />} />
                 </Box>
 
                 {/* Concentration bar */}
@@ -2319,7 +2323,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem', fontWeight: 600 }}>Top 5</Typography>
                   </Box>
                   <Box sx={{ flex: 1, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>Diger</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>{t('other')}</Typography>
                   </Box>
                 </Box>
               </Paper>
@@ -2330,12 +2334,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <TableHead>
                       <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                         <TableCell>#</TableCell>
-                        <TableCell>Magaza</TableCell>
-                        <TableCell align="center"><TableSortLabel active={shopSortKey==='num_sales'} direction={shopSortKey==='num_sales'?shopSortDir:'desc'} onClick={()=>toggleSort('num_sales',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Satis</TableSortLabel></TableCell>
-                        <TableCell align="center"><TableSortLabel active={shopSortKey==='review_average'} direction={shopSortKey==='review_average'?shopSortDir:'desc'} onClick={()=>toggleSort('review_average',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Puan</TableSortLabel></TableCell>
-                        <TableCell align="center"><TableSortLabel active={shopSortKey==='review_count'} direction={shopSortKey==='review_count'?shopSortDir:'desc'} onClick={()=>toggleSort('review_count',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Yorum</TableSortLabel></TableCell>
-                        <TableCell align="center"><TableSortLabel active={shopSortKey==='listingCount'} direction={shopSortKey==='listingCount'?shopSortDir:'desc'} onClick={()=>toggleSort('listingCount',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Urun</TableSortLabel></TableCell>
-                        <TableCell align="center"><TableSortLabel active={shopSortKey==='avgPrice'} direction={shopSortKey==='avgPrice'?shopSortDir:'desc'} onClick={()=>toggleSort('avgPrice',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>Ort. Fiyat</TableSortLabel></TableCell>
+                        <TableCell>{t('shopHeader')}</TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='num_sales'} direction={shopSortKey==='num_sales'?shopSortDir:'desc'} onClick={()=>toggleSort('num_sales',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('salesHeader')}</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='review_average'} direction={shopSortKey==='review_average'?shopSortDir:'desc'} onClick={()=>toggleSort('review_average',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('ratingHeader')}</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='review_count'} direction={shopSortKey==='review_count'?shopSortDir:'desc'} onClick={()=>toggleSort('review_count',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('reviewsHeader')}</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='listingCount'} direction={shopSortKey==='listingCount'?shopSortDir:'desc'} onClick={()=>toggleSort('listingCount',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('productsHeader')}</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={shopSortKey==='avgPrice'} direction={shopSortKey==='avgPrice'?shopSortDir:'desc'} onClick={()=>toggleSort('avgPrice',shopSortKey,shopSortDir,setShopSortKey,setShopSortDir)}>{t('avgPriceHeader')}</TableSortLabel></TableCell>
                         <TableCell sx={{ width: 40 }} />
                       </TableRow>
                     </TableHead>
@@ -2358,13 +2362,13 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                               {s.shop_name}
                             </Typography>
                           </TableCell>
-                          <TableCell align="center"><Typography variant="body2" sx={{ fontWeight: 700 }}>{s.num_sales.toLocaleString()}</Typography></TableCell>
+                          <TableCell align="center"><Typography variant="body2" sx={{ fontWeight: 700 }}>{formatNumber(s.num_sales)}</Typography></TableCell>
                           <TableCell align="center">
                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.3 }}>
                               <Star size={12} color="#ff9800" fill="#ff9800" /> {s.review_average.toFixed(1)}
                             </Box>
                           </TableCell>
-                          <TableCell align="center">{s.review_count.toLocaleString()}</TableCell>
+                          <TableCell align="center">{formatNumber(s.review_count)}</TableCell>
                           <TableCell align="center">{s.listing_active_count}</TableCell>
                           <TableCell align="center">{s.avgPrice ? fmt(s.avgPrice) : '-'}</TableCell>
                           <TableCell>
@@ -2382,25 +2386,25 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           ) : !shopsLoading && (
             shopDiscoveryFailed && serverShopIds.length > 0
               ? <Alert severity="error" sx={{ borderRadius: '12px', mb: 2 }}
-                  action={<Button color="inherit" size="small" onClick={() => discoverShops(serverShopIds)}>Tekrar Dene</Button>}
+                  action={<Button color="inherit" size="small" onClick={() => discoverShops(serverShopIds)}>{t('retry')}</Button>}
                 >
-                  Mağaza bilgileri alınamadı. Tekrar deneyin.
+                  {t('shopInfoFailed')}
                 </Alert>
               : hasData
-                ? <Alert severity="info" sx={{ borderRadius: '12px' }}>Mağaza bilgileri yükleniyor...</Alert>
-                : <PremiumEmptyState icon={<Users size={48} />} title="Mağaza Analizi"
-                    desc="Aynı nişte satan mağazaları keşfedin."
-                    steps={['Bir anahtar kelime araması yapın', 'Aramanızla ilgili mağazalar otomatik bulunur', 'Satış sayısı, puan ve ortalama fiyatlarını karşılaştırın']}
+                ? <Alert severity="info" sx={{ borderRadius: '12px' }}>{t('shopInfoLoading')}</Alert>
+                : <PremiumEmptyState icon={<Users size={48} />} title={t('shopAnalysis')}
+                    desc={t('shopAnalysisDesc')}
+                    steps={[t('shopStep1'), t('shopStep2'), t('shopStep3')]}
                   />
           )}
           {/* --- Shop Deep Dive (merged from tab 7) --- */}
           <Divider sx={{ my: 3 }} />
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Mağaza Derinlemesine Analiz</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('shopDeepAnalysis')}</Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-              <TextField label="Magaza ID" value={deepDiveShopId}
+              <TextField label={t('shopId')} value={deepDiveShopId}
                 onChange={e => setDeepDiveShopId(e.target.value)} size="small"
-                sx={{ flex: 1, minWidth: 200 }} placeholder="Magaza ID girin..."
+                sx={{ flex: 1, minWidth: 200 }} placeholder={t('enterShopId')}
                 onKeyDown={e => e.key === 'Enter' && searchShopDeepDive()}
               />
               <Button variant="contained" onClick={searchShopDeepDive}
@@ -2408,11 +2412,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 startIcon={deepDiveLoading ? <CircularProgress size={16} /> : <Search size={16} />}
                 sx={{ background: GRADIENTS.primary, borderRadius: '10px' }}
               >
-                Analiz Et
+                {t('analyze')}
               </Button>
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-              Magaza Analizi tabindan magaza adina tiklayarak da gelebilirsiniz.
+              {t('shopAnalysisHint')}
             </Typography>
           </Paper>
 
@@ -2422,10 +2426,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
             <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>{deepDiveShop.shop_name}</Typography>
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                <StatCard label="Toplam Satis" value={deepDiveShop.num_sales.toLocaleString()} color="#11998e" icon={<ShoppingCart size={18} />} />
-                <StatCard label="Puan" value={`${deepDiveShop.review_average.toFixed(1)}`} color="#ff9800" icon={<Star size={18} />} />
-                <StatCard label="Yorum" value={deepDiveShop.review_count.toLocaleString()} color="#2196F3" icon={<Eye size={18} />} />
-                <StatCard label="Aktif Urun" value={String(deepDiveShop.listing_active_count)} color="#9c27b0" icon={<ShoppingBag size={18} />} />
+                <StatCard label={t('totalSales')} value={formatNumber(deepDiveShop.num_sales)} color="#11998e" icon={<ShoppingCart size={18} />} />
+                <StatCard label={t('rating')} value={`${deepDiveShop.review_average.toFixed(1)}`} color="#ff9800" icon={<Star size={18} />} />
+                <StatCard label={t('reviews')} value={formatNumber(deepDiveShop.review_count)} color="#2196F3" icon={<Eye size={18} />} />
+                <StatCard label={t('activeProducts')} value={String(deepDiveShop.listing_active_count)} color="#9c27b0" icon={<ShoppingBag size={18} />} />
               </Box>
             </Paper>
           )}
@@ -2433,19 +2437,19 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {deepDiveStats && (
             <>
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
-                <StatCard label="Min Fiyat" value={fmt(deepDiveStats.priceMin)} color="#11998e" />
-                <StatCard label="Ort. Fiyat" value={fmt(deepDiveStats.priceAvg)} color="#2196F3" />
-                <StatCard label="Max Fiyat" value={fmt(deepDiveStats.priceMax)} color="#f44336" />
-                <StatCard label="Ort. Favori" value={String(deepDiveStats.avgFav)} color="#e91e63" icon={<Heart size={18} />} />
-                <StatCard label="Ort. Grnm" value={String(deepDiveStats.avgViews)} color="#ff9800" icon={<Eye size={18} />} />
+                <StatCard label={t('minPrice')} value={fmt(deepDiveStats.priceMin)} color="#11998e" />
+                <StatCard label={t('avgPrice')} value={fmt(deepDiveStats.priceAvg)} color="#2196F3" />
+                <StatCard label={t('maxPrice')} value={fmt(deepDiveStats.priceMax)} color="#f44336" />
+                <StatCard label={t('avgFavLabel')} value={String(deepDiveStats.avgFav)} color="#e91e63" icon={<Heart size={18} />} />
+                <StatCard label={t('avgViewsShort')} value={String(deepDiveStats.avgViews)} color="#ff9800" icon={<Eye size={18} />} />
               </Box>
 
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>En Cok Kullanilan Tagler</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('topUsedTagsShort')}</Typography>
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                   {deepDiveStats.topTags.map(t => (
                     <Chip key={t.tag} label={`${t.tag} (%${t.pct})`} size="small" variant="outlined"
-                      onClick={() => { navigator.clipboard.writeText(t.tag); toast.success('Kopyalandi'); }}
+                      onClick={() => { navigator.clipboard.writeText(t.tag); toast.success(t('copied')); }}
                       sx={{ cursor: 'pointer', borderRadius: '8px' }}
                     />
                   ))}
@@ -2454,17 +2458,17 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
               <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
                 <Box sx={{ p: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>En Populer Urunler</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('topProducts')}</Typography>
                 </Box>
                 <TableContainer sx={{ maxHeight: 400 }}>
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                         <TableCell>#</TableCell>
-                        <TableCell>Baslik</TableCell>
-                        <TableCell align="right"><TableSortLabel active={bestListingSortKey==='price'} direction={bestListingSortKey==='price'?bestListingSortDir:'desc'} onClick={()=>toggleSort('price',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Fiyat</TableSortLabel></TableCell>
-                        <TableCell align="center"><TableSortLabel active={bestListingSortKey==='num_favorers'} direction={bestListingSortKey==='num_favorers'?bestListingSortDir:'desc'} onClick={()=>toggleSort('num_favorers',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Favori</TableSortLabel></TableCell>
-                        <TableCell align="center"><TableSortLabel active={bestListingSortKey==='views'} direction={bestListingSortKey==='views'?bestListingSortDir:'desc'} onClick={()=>toggleSort('views',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>Grnm</TableSortLabel></TableCell>
+                        <TableCell>{t('titleHeader')}</TableCell>
+                        <TableCell align="right"><TableSortLabel active={bestListingSortKey==='price'} direction={bestListingSortKey==='price'?bestListingSortDir:'desc'} onClick={()=>toggleSort('price',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('priceHeader')}</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={bestListingSortKey==='num_favorers'} direction={bestListingSortKey==='num_favorers'?bestListingSortDir:'desc'} onClick={()=>toggleSort('num_favorers',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('favoriteHeader')}</TableSortLabel></TableCell>
+                        <TableCell align="center"><TableSortLabel active={bestListingSortKey==='views'} direction={bestListingSortKey==='views'?bestListingSortDir:'desc'} onClick={()=>toggleSort('views',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('viewsHeader')}</TableSortLabel></TableCell>
                         <TableCell sx={{ width: 40 }} />
                       </TableRow>
                     </TableHead>
@@ -2485,10 +2489,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                           <TableCell align="right">{fmt(l.price)}</TableCell>
                           <TableCell align="center">
                             <Typography sx={{ fontWeight: 700, color: l.num_favorers > 100 ? '#11998e' : '#ff9800' }}>
-                              {l.num_favorers.toLocaleString()}
+                              {formatNumber(l.num_favorers)}
                             </Typography>
                           </TableCell>
-                          <TableCell align="center">{l.views.toLocaleString()}</TableCell>
+                          <TableCell align="center">{formatNumber(l.views)}</TableCell>
                           <TableCell>
                             <IconButton size="small" onClick={() => window.open(l.url, '_blank')}><ExternalLink size={14} /></IconButton>
                           </TableCell>
@@ -2502,9 +2506,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           )}
 
           {!deepDiveLoading && !deepDiveShop && !discoveredShops.length && !shopsLoading && (
-            <PremiumEmptyState icon={<Store size={48} />} title="Mağaza & AI Analizi"
-              desc="Rakip mağazaları keşfedin ve AI ile pazar analizi alın."
-              steps={['Önce bir anahtar kelime araması yapın', 'Rakip mağazalar otomatik keşfedilir', 'Bir mağazayı derinlemesine analiz edin veya AI özeti alın']} />
+            <PremiumEmptyState icon={<Store size={48} />} title={t('shopAIAnalysis')}
+              desc={t('shopAIAnalysisDesc')}
+              steps={[t('shopAIStep1'), t('shopAIStep2'), t('shopAIStep3')]} />
           )}
         </Box>
       )}
@@ -2517,7 +2521,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                Etsy Kâr Hesaplayıcı
+                {tr('etsyProfitCalculator')}
                 {selectedListing && (
                   <Typography component="span" variant="caption" color="primary" sx={{ ml: 1, fontWeight: 500 }}>
                     — {selectedListing.title?.slice(0, 40)}...
@@ -2535,7 +2539,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     ...(shopRegion === 'tr' ? { background: GRADIENTS.primary } : {}),
                   }}
                 >
-                  Türkiye Mağaza
+                  {tr('turkeyShop')}
                 </Button>
                 <Button
                   size="small"
@@ -2546,7 +2550,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     ...(shopRegion === 'us' ? { background: GRADIENTS.primary } : {}),
                   }}
                 >
-                  ABD Mağaza
+                  {tr('usShop')}
                 </Button>
               </Box>
             </Box>
@@ -2554,18 +2558,18 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               <Typography variant="caption">{profitCalc.fees.notes}</Typography>
             </Alert>
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-              <TextField label="Alış Maliyeti ($)" value={purchaseCost}
+              <TextField label={tr('purchaseCost')} value={purchaseCost}
                 onChange={e => setPurchaseCost(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
               />
-              <TextField label="Satış Fiyatı ($)" value={sellingPrice || (priceStats?.avg.toFixed(2) || '')}
+              <TextField label={tr('sellingPrice')} value={sellingPrice || (priceStats?.avg.toFixed(2) || '')}
                 onChange={e => setSellingPrice(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-                helperText={selectedListing ? 'Listelemedeki fiyat' : priceStats ? `Pazar ortalaması: ${fmt(priceStats.avg)}` : 'Fiyat girin veya üstten listeleme seçin'}
+                helperText={selectedListing ? t('listingPrice') : priceStats ? `${tr('marketAverage')}: ${fmt(priceStats.avg)}` : tr('enterPrice')}
               />
-              <TextField label="Kargo Maliyeti ($)" value={shippingCost}
+              <TextField label={tr('shippingCost')} value={shippingCost}
                 onChange={e => setShippingCost(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
@@ -2575,36 +2579,36 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               <TextField label="Etsy Ads ROAS" value={etsyAdsRoas}
                 onChange={e => setEtsyAdsRoas(e.target.value)}
                 size="small" type="number" sx={{ flex: 1, minWidth: 140 }}
-                placeholder="ör: 3"
+                placeholder={tr('roasExample')}
                 helperText={etsyAdsRoas && parseFloat(etsyAdsRoas) > 0
-                  ? `Her $1 reklam harcamasına $${etsyAdsRoas} gelir → satış başı reklam maliyeti: ${fmt(profitCalc.etsyAdsCost)}`
-                  : 'ROAS girin (ör: 3 = $3 gelir / $1 harcama). Boş bırakırsanız reklam maliyeti hesaplanmaz.'
+                  ? tr('roasHintWithValue', { roas: etsyAdsRoas, cost: fmt(profitCalc.etsyAdsCost) })
+                  : tr('roasHint')
                 }
               />
             </Box>
             <FormControlLabel
               control={<Switch checked={includeOffsiteAds} onChange={e => setIncludeOffsiteAds(e.target.checked)} size="small" />}
-              label={<Typography variant="body2">Offsite Ads dahil et (%15) — yıllık $10K altında zorunlu</Typography>}
+              label={<Typography variant="body2">{tr('offsiteAdsSwitch')}</Typography>}
             />
           </Paper>
 
           <Paper sx={{ ...glassCard, overflow: 'hidden', mb: 2 }}>
             <Box sx={{ p: 2 }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                Etsy Ücret Detayları ({shopRegion === 'tr' ? 'Türkiye' : 'ABD'} Mağaza)
+                {tr('feeDetails')} ({shopRegion === 'tr' ? tr('turkeyLabel') : tr('usLabel')} {tr('feeDetailsSuffix')})
               </Typography>
             </Box>
             <TableContainer>
               <Table size="small">
                 <TableBody>
                   <TableRow>
-                    <TableCell>Satış Fiyatı</TableCell>
+                    <TableCell>{tr('salePrice')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>{fmt(profitCalc.sell)}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        Listeleme Ücreti <Tooltip title="Her listeleme için $0.20 (4 ay geçerli)"><Info size={14} color="#999" /></Tooltip>
+                        {tr('listingFee')} <Tooltip title={tr('listingFeeTooltip')}><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.listingFee)}</TableCell>
@@ -2612,7 +2616,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        İşlem Komisyonu (%6.5) <Tooltip title="Her satış için fiyatın %6.5'i"><Info size={14} color="#999" /></Tooltip>
+                        {tr('transactionCommission')} <Tooltip title={tr('transactionCommissionTooltip')}><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.transactionFee)}</TableCell>
@@ -2620,10 +2624,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   <TableRow>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        Ödeme İşleme ({shopRegion === 'tr' ? '%6.5 + 3₺' : '%3 + $0.25'})
+                        {tr('paymentProcessing')} ({shopRegion === 'tr' ? '%6.5 + 3₺' : '%3 + $0.25'})
                         <Tooltip title={shopRegion === 'tr'
-                          ? 'Türkiye mağazaları için %6.5 + 3₺ sabit ücret'
-                          : 'ABD mağazaları için %3 + $0.25'
+                          ? tr('paymentProcessingTooltipTR')
+                          : tr('paymentProcessingTooltipUS')
                         }><Info size={14} color="#999" /></Tooltip>
                       </Box>
                     </TableCell>
@@ -2633,8 +2637,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <TableRow>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          Düzenleyici İşletim Ücreti (%2.27)
-                          <Tooltip title="Türkiye'ye özel düzenleyici işletim ücreti — Dijital Hizmet Vergisi kapsamında"><Info size={14} color="#999" /></Tooltip>
+                          {tr('regulatoryFee')}
+                          <Tooltip title={tr('regulatoryFeeTooltip')}><Info size={14} color="#999" /></Tooltip>
                         </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.regulatoryFee)}</TableCell>
@@ -2644,8 +2648,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <TableRow>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          Offsite Ads (%15)
-                          <Tooltip title="Etsy'nin dış site reklamları üzerinden satış olursa kesilir"><Info size={14} color="#999" /></Tooltip>
+                          {tr('offsiteAds')}
+                          <Tooltip title={tr('offsiteAdsTooltip')}><Info size={14} color="#999" /></Tooltip>
                         </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.offsiteAdsFee)}</TableCell>
@@ -2655,21 +2659,21 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <TableRow>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          Etsy Ads Maliyeti (ROAS: {profitCalc.roas}x)
-                          <Tooltip title={`ROAS ${profitCalc.roas}x = her $1 reklam harcamasına $${profitCalc.roas} gelir. Satış başı reklam maliyeti: ${fmt(profitCalc.sell)} / ${profitCalc.roas} = ${fmt(profitCalc.etsyAdsCost)}`}><Info size={14} color="#999" /></Tooltip>
+                          {tr('etsyAdsCost')} (ROAS: {profitCalc.roas}x)
+                          <Tooltip title={tr('etsyAdsCostTooltip', { roas: String(profitCalc.roas), sell: fmt(profitCalc.sell), cost: fmt(profitCalc.etsyAdsCost) })}><Info size={14} color="#999" /></Tooltip>
                         </Box>
                       </TableCell>
                       <TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.etsyAdsCost)}</TableCell>
                     </TableRow>
                   )}
-                  <TableRow><TableCell>Alış Maliyeti</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.cost)}</TableCell></TableRow>
-                  <TableRow><TableCell>Kargo Maliyeti</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.ship)}</TableCell></TableRow>
+                  <TableRow><TableCell>{tr('purchaseCostLabel')}</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.cost)}</TableCell></TableRow>
+                  <TableRow><TableCell>{tr('shippingCostLabel')}</TableCell><TableCell align="right" sx={{ color: 'error.main' }}>-{fmt(profitCalc.ship)}</TableCell></TableRow>
                   <TableRow sx={{
                     background: profitCalc.profit >= 0
                       ? 'linear-gradient(135deg, rgba(17,153,142,0.08) 0%, rgba(56,239,125,0.08) 100%)'
                       : 'linear-gradient(135deg, rgba(235,51,73,0.08) 0%, rgba(244,92,67,0.08) 100%)',
                   }}>
-                    <TableCell sx={{ fontWeight: 800 }}>Net Kâr</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>{tr('netProfit')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: profitCalc.profit >= 0 ? '#11998e' : '#eb3349' }}>
                       {fmt(profitCalc.profit)}
                     </TableCell>
@@ -2679,7 +2683,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                       ? 'linear-gradient(135deg, rgba(17,153,142,0.08) 0%, rgba(56,239,125,0.08) 100%)'
                       : 'linear-gradient(135deg, rgba(235,51,73,0.08) 0%, rgba(244,92,67,0.08) 100%)',
                   }}>
-                    <TableCell sx={{ fontWeight: 800 }}>Kâr Marjı</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>{tr('profitMargin')}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 800, color: profitCalc.profit >= 0 ? '#11998e' : '#eb3349' }}>
                       {pct(profitCalc.margin)}
                     </TableCell>
@@ -2691,22 +2695,22 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
           <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
             <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Farklı Fiyat Noktaları</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{tr('differentPricePoints')}</Typography>
             </Box>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
-                    <TableCell>Senaryo</TableCell>
-                    <TableCell align="right">Fiyat</TableCell>
-                    <TableCell align="right">Kâr</TableCell>
-                    <TableCell align="right">Marj</TableCell>
+                    <TableCell>{tr('scenario')}</TableCell>
+                    <TableCell align="right">{tr('priceLabel')}</TableCell>
+                    <TableCell align="right">{tr('profitLabel')}</TableCell>
+                    <TableCell align="right">{tr('marginLabel')}</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {profitCalc.compare.map(c => (
                     <TableRow key={c.label} hover sx={{ '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' } }}>
-                      <TableCell sx={{ fontWeight: 600 }}>{c.label}</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{c.label === '__avg__' ? tr('averageLabel') : c.label}</TableCell>
                       <TableCell align="right">{fmt(c.price)}</TableCell>
                       <TableCell align="right" sx={{ color: c.profit >= 0 ? '#11998e' : '#eb3349', fontWeight: 700 }}>
                         {fmt(c.profit)}
@@ -2733,17 +2737,17 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
                 <ScoreRing score={seoResult.score} size={140} label="SEO" />
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Kelime ({seoResult.coveredKw}/{seoResult.totalKw}) + Tag ({seoResult.coveredTags}/{seoResult.totalTags}) kapsami
+                  {t('seoCoverage', { coveredKw: seoResult.coveredKw, totalKw: seoResult.totalKw, coveredTags: seoResult.coveredTags, totalTags: seoResult.totalTags })}
                 </Typography>
               </Paper>
 
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Skor Detayi</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>{t('scoreDetail')}</Typography>
                 {[
-                  { label: 'Kelime Kapsami', score: seoResult.kwScore, max: 30 },
-                  { label: 'Tag Kapsami', score: seoResult.tagScore, max: 30 },
-                  { label: 'Baslik Uzunlugu', score: seoResult.lengthScore, max: 20 },
-                  { label: 'Tag Sayisi', score: seoResult.hasTagsScore, max: 20 },
+                  { label: t('kwCoverage'), score: seoResult.kwScore, max: 30 },
+                  { label: t('tagCoverage'), score: seoResult.tagScore, max: 30 },
+                  { label: t('titleLength'), score: seoResult.lengthScore, max: 20 },
+                  { label: t('tagCount'), score: seoResult.hasTagsScore, max: 20 },
                 ].map(b => (
                   <Box key={b.label} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                     <Typography variant="body2" sx={{ minWidth: 120, fontWeight: 500 }}>{b.label}</Typography>
@@ -2761,15 +2765,15 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               </Paper>
 
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Baslik Uzunlugu</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('titleLength')}</Typography>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120, borderRadius: '12px' }}>
-                    <Typography variant="caption" color="text.secondary">Benim</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{myTitle.length} kr</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('mine')}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{myTitle.length} {t('chars')}</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120, borderRadius: '12px' }}>
-                    <Typography variant="caption" color="text.secondary">Rakip Ort.</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{seoResult.avgLen} kr</Typography>
+                    <Typography variant="caption" color="text.secondary">{t('competitorAvg')}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>{seoResult.avgLen} {t('chars')}</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, flex: 1, minWidth: 120, borderRadius: '12px' }}>
                     <Typography variant="caption" color="text.secondary">Optimal</Typography>
@@ -2780,7 +2784,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
 
               {seoResult.recommendations.length > 0 && (
                 <Alert severity={seoResult.score >= 70 ? 'success' : 'warning'} sx={{ mb: 2, borderRadius: '12px' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>Oneriler</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>{t('recommendations')}</Typography>
                   {seoResult.recommendations.map((rec, i) => (
                     <Typography key={i} variant="body2">• {rec}</Typography>
                   ))}
@@ -2793,10 +2797,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
-                          <TableCell>Kelime</TableCell>
-                          <TableCell align="center">Kullanim %</TableCell>
-                          <TableCell align="center">Basligimda</TableCell>
-                          <TableCell align="center">Kopyala</TableCell>
+                          <TableCell>{t('keywordHeader')}</TableCell>
+                          <TableCell align="center">{t('usagePct')}</TableCell>
+                          <TableCell align="center">{t('inMyTitle')}</TableCell>
+                          <TableCell align="center">{t('copy')}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -2819,7 +2823,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                             <TableCell align="center">
                               {!kw.inMyTitle && (
                                 <IconButton size="small" onClick={() => {
-                                  navigator.clipboard.writeText(kw.keyword); toast.success(`"${kw.keyword}" kopyalandi`);
+                                  navigator.clipboard.writeText(kw.keyword); toast.success(t('copied'));
                                 }}><Copy size={14} /></IconButton>
                               )}
                             </TableCell>
@@ -2834,23 +2838,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           ) : !loading && (
             <PremiumEmptyState
               icon={<TrendingUp size={48} />}
-              title="SEO Karşılaştırma"
+              title={t('seoComparison')}
               desc={userListings?.length
-                ? 'Üstten bir listeleme seçin, sonra "Pazar Araştırma" bölümünden arama yapın — başlık ve taglar otomatik doldurulur.'
-                : 'Başlığınız ve taglarınız rakiplere kıyasla ne kadar güçlü?'
+                ? t('seoCompDescWithListings')
+                : t('seoCompDescNoListings')
               }
               steps={userListings?.length
-                ? [
-                    'Üstteki "Listelemenizi Seçin" kutusundan bir ürün seçin',
-                    '"Pazar Araştırma" bölümüne geçip rakiplerinizi aratın',
-                    'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
-                  ]
-                : [
-                    '"Pazar Araştırma" bölümüne geçin ve bir anahtar kelime arayın',
-                    'Arama çubuğundaki "SEO karşılaştırma için başlık/tag girin" bölümünü açın',
-                    'Kendi listeleme başlığınızı ve taglarınızı girin',
-                    'Bu sekmeye dönün — SEO skorunuz otomatik hesaplanır',
-                  ]
+                ? [t('seoStepWithListing1'), t('seoStepWithListing2'), t('seoStepWithListing3')]
+                : [t('seoStepNoListing1'), t('seoStepNoListing2'), t('seoStepNoListing3'), t('seoStepNoListing4')]
               }
             />
           )}
@@ -2865,7 +2860,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {/* Add keyword form */}
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Target size={16} color="#667eea" /> Anahtar Kelime Takibe Al
+              <Target size={16} color="#667eea" /> {t('addKeywordToTrack')}
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <Autocomplete
@@ -2890,14 +2885,14 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   </li>
                 )}
                 renderInput={(params) => (
-                  <TextField {...params} size="small" label="Listeleme Seçin" placeholder="Listeleme ara..." />
+                  <TextField {...params} size="small" label={t('selectListing')} placeholder={t('searchListing')} />
                 )}
                 isOptionEqualToValue={(opt: any, val: any) => (opt.listing_id || opt.id) === (val.listing_id || val.id)}
                 sx={{ flex: 2, minWidth: 200 }}
               />
               <TextField
                 size="small"
-                label="Anahtar Kelime"
+                label={t('keyword')}
                 placeholder="baby blanket, crochet dress..."
                 value={rankKeywordInput}
                 onChange={(e) => setRankKeywordInput(e.target.value)}
@@ -2913,9 +2908,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   background: GRADIENTS.primary, borderRadius: '10px', textTransform: 'none',
                   fontWeight: 600, whiteSpace: 'nowrap',
                 }}
-              >
-                Takip Et
-              </Button>
+              >{t('track')}</Button>
             </Box>
           </Paper>
 
@@ -2925,14 +2918,9 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           ) : trackedKeywords.length === 0 ? (
             <PremiumEmptyState
               icon={<Target size={64} />}
-              title="Sıralama Takibi"
-              desc="Listelerinizin Etsy aramada kaçıncı sırada olduğunu takip edin"
-              steps={[
-                'Yukarıdan bir listeleme seçin',
-                'Takip etmek istediğiniz anahtar kelimeyi girin',
-                '"Takip Et" butonuna basın — anında sıralama sonucunu görün',
-                'Her 12 saatte otomatik güncellenir',
-              ]}
+              title={t('rankTracking')}
+              desc={t('rankTrackingDesc')}
+              steps={[t('rankStep1'), t('rankStep2'), t('rankStep3'), t('rankStep4')]}
             />
           ) : (
             <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
@@ -2940,12 +2928,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'rgba(102,126,234,0.06)' }}>
-                      <TableCell sx={{ fontWeight: 700 }}>Anahtar Kelime</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Listeleme</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Sıra</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Sayfa</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Değişim</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }} align="center">Son Kontrol</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>{t('keyword')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>{t('listing')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">{t('rank')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">{t('page')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">{t('change')}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }} align="center">{t('lastCheck')}</TableCell>
                       <TableCell sx={{ fontWeight: 700 }} align="center" />
                     </TableRow>
                   </TableHead>
@@ -2979,7 +2967,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                             </TableCell>
                             <TableCell align="center">
                               <Chip
-                                label={kw.rank != null ? `#${kw.rank}` : 'Yok'}
+                                label={kw.rank != null ? `#${kw.rank}` : t('notFound')}
                                 size="small"
                                 sx={{
                                   bgcolor: rankColor, color: '#fff', fontWeight: 700,
@@ -2999,7 +2987,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                             </TableCell>
                             <TableCell align="center">
                               <Typography variant="caption" color="text.secondary">
-                                {kw.checkedAt ? new Date(kw.checkedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                {kw.checkedAt ? formatDate(new Date(kw.checkedAt)) : '—'}
                               </Typography>
                             </TableCell>
                             <TableCell align="center">
@@ -3015,12 +3003,12 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                                 {rankHistory.length > 1 ? (
                                   <Box>
                                     <Typography variant="caption" fontWeight={700} sx={{ mb: 1, display: 'block' }}>
-                                      Son 30 gün sıralama geçmişi (düşük = daha iyi)
+                                      {t('rankHistoryTitle')}
                                     </Typography>
                                     <Box sx={{ height: 120 }}>
                                       <TrendChart
                                         data={rankHistory.map((s: any) => ({
-                                          date: new Date(s.checkedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }),
+                                          date: formatDate(new Date(s.checkedAt)),
                                           value: s.rank != null ? Math.max(1, 500 - s.rank) : 0,
                                         }))}
                                         height={120}
@@ -3033,7 +3021,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                                           key={i}
                                           size="small"
                                           variant="outlined"
-                                          label={`${new Date(s.checkedAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}: ${s.rank != null ? `#${s.rank}` : 'Yok'}`}
+                                          label={`${formatDate(new Date(s.checkedAt))}: ${s.rank != null ? `#${s.rank}` : t('notFound')}`}
                                           sx={{ fontSize: '0.7rem' }}
                                         />
                                       ))}
@@ -3041,7 +3029,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                                   </Box>
                                 ) : (
                                   <Typography variant="caption" color="text.secondary">
-                                    Henüz yeterli veri yok — 12 saat sonra ilk güncelleme gelecek
+                                    {t('notEnoughData')}
                                   </Typography>
                                 )}
                               </TableCell>
@@ -3059,8 +3047,8 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {/* Rank legend */}
           <Box sx={{ display: 'flex', gap: 1.5, mt: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
             {[
-              { label: 'Sayfa 1 (1-48)', color: '#11998e' },
-              { label: 'Sayfa 2 (49-96)', color: '#e67e22' },
+              { label: t('page1Legend'), color: '#11998e' },
+              { label: t('page2Legend'), color: '#e67e22' },
               { label: '96+', color: '#eb3349' },
             ].map((item) => (
               <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -3079,11 +3067,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
         <Box sx={{ mt: 3 }}>
           <Divider sx={{ mb: 2 }} />
           <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Sparkles size={18} color="#9c27b0" /> AI Pazar Analizi
+            <Sparkles size={18} color="#9c27b0" /> {t('aiMarketAnalysis')}
           </Typography>
           <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Gemini AI ile pazar verilerinizi analiz edin
+              {t('aiAnalysisDesc')}
             </Typography>
             <Button variant="contained" onClick={generateAiInsights}
               disabled={aiLoading || items.length === 0} size="large"
@@ -3093,11 +3081,11 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                 boxShadow: '0 4px 12px rgba(123,31,162,0.3)',
               }}
             >
-              {aiLoading ? 'Analiz ediliyor...' : 'AI Analizi Baslat'}
+              {aiLoading ? t('analyzing') : t('startAIAnalysis')}
             </Button>
             {items.length === 0 && (
               <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-                Oncelikle bir arama yapin
+                {t('searchFirst')}
               </Typography>
             )}
           </Paper>
@@ -3107,23 +3095,23 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           {aiAnalysis && (
             <>
               <Paper sx={{ ...glassCard, p: 3, mb: 2, textAlign: 'center' }}>
-                <ScoreRing score={aiAnalysis.opportunity_score} size={140} label="Firsat" />
+                <ScoreRing score={aiAnalysis.opportunity_score} size={140} label={t('opportunity')} />
                 <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-                  Seviye: <strong>{aiAnalysis.opportunity_level}</strong>
+                  {t('level')}: <strong>{aiAnalysis.opportunity_level}</strong>
                 </Typography>
               </Paper>
 
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Pazar Ozeti</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('marketSummary')}</Typography>
                 <Typography variant="body2">{aiAnalysis.market_summary}</Typography>
               </Paper>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
                 {[
-                  { title: 'Fiyatlandirma Stratejisi', text: aiAnalysis.pricing_strategy, color: '#2196F3', icon: <DollarSign size={16} /> },
-                  { title: 'Nis Pozisyonlama', text: aiAnalysis.niche_positioning, color: '#9c27b0', icon: <Target size={16} /> },
-                  { title: 'Rekabet Analizi', text: aiAnalysis.competition_analysis, color: '#eb3349', icon: <Users size={16} /> },
-                  { title: 'Mevsimsel Tavsiyeler', text: aiAnalysis.seasonal_advice, color: '#ff9800', icon: <Calendar size={16} /> },
+                  { title: t('pricingStrategy'), text: aiAnalysis.pricing_strategy, color: '#2196F3', icon: <DollarSign size={16} /> },
+                  { title: t('nichePositioning'), text: aiAnalysis.niche_positioning, color: '#9c27b0', icon: <Target size={16} /> },
+                  { title: t('competitionAnalysis'), text: aiAnalysis.competition_analysis, color: '#eb3349', icon: <Users size={16} /> },
+                  { title: t('seasonalAdvice'), text: aiAnalysis.seasonal_advice, color: '#ff9800', icon: <Calendar size={16} /> },
                 ].map(card => (
                   <Paper key={card.title} sx={{ ...glassCard, p: 2.5 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -3139,17 +3127,17 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               </Box>
 
               <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Baslik Optimizasyonu</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('titleOptimization')}</Typography>
                 <Typography variant="body2">{aiAnalysis.title_recommendations}</Typography>
               </Paper>
 
               {aiAnalysis.tag_recommendations?.length > 0 && (
                 <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Onerilen Tagler</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('suggestedTags')}</Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                     {aiAnalysis.tag_recommendations.map((tag, i) => (
                       <Chip key={i} label={tag} size="small" variant="outlined"
-                        onClick={() => { navigator.clipboard.writeText(tag); toast.success('Kopyalandi'); }}
+                        onClick={() => { navigator.clipboard.writeText(tag); toast.success(t('copied')); }}
                         sx={{ cursor: 'pointer', borderRadius: '8px', borderColor: '#9c27b0', color: '#9c27b0' }}
                       />
                     ))}
@@ -3160,7 +3148,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               {aiAnalysis.action_items?.length > 0 && (
                 <Paper sx={{ ...glassCard, p: 2.5 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: '#11998e' }}>
-                    Yapilacaklar Listesi
+                    {t('actionItems')}
                   </Typography>
                   {aiAnalysis.action_items.map((item, i) => (
                     <Box key={i} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
@@ -3191,17 +3179,17 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
         <Button variant="outlined" size="small" startIcon={<Download size={14} />}
           onClick={exportCSV} disabled={items.length === 0}
           sx={{ borderRadius: '8px' }}>
-          CSV Indir
+          {t('downloadCSV')}
         </Button>
         <Button variant="outlined" size="small" startIcon={<Bookmark size={14} />}
           onClick={saveSearch} disabled={!query.trim()}
           sx={{ borderRadius: '8px' }}>
-          Aramayi Kaydet
+          {t('saveSearch')}
         </Button>
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
         {savedSearches.map((s, i) => (
           <Chip key={`${s.query}-${s.timestamp}`}
-            label={`${s.query} (${new Date(s.timestamp).toLocaleDateString('tr-TR')})`}
+            label={`${s.query} (${formatDate(new Date(s.timestamp))})`}
             size="small" variant="outlined"
             onClick={() => loadSearch(s)}
             onDelete={() => deleteSaved(i)}
@@ -3210,7 +3198,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
           />
         ))}
         {savedSearches.length === 0 && (
-          <Typography variant="caption" color="text.secondary">Kayitli arama yok</Typography>
+          <Typography variant="caption" color="text.secondary">{t('noSavedSearches')}</Typography>
         )}
       </Paper>
     </Box>

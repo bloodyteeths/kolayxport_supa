@@ -235,7 +235,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
         </div>
       )}
 
-      <div className="min-h-screen flex" style={{ overflowX: 'hidden', maxWidth: '100%', backgroundColor: '#f8fafc' }}>
+      <div className="min-h-screen flex" style={{ backgroundColor: '#f8fafc' }}>
 
         {/* ─── Sidebar ─────────────────────────────────────── */}
         <motion.aside
@@ -382,7 +382,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
         {/* ─── Main Content ─────────────────────────────────── */}
         <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
           isDesktop ? (isOpen ? 'ml-64' : 'ml-16') : 'ml-0'
-        }`} style={{ overflowX: 'hidden', maxWidth: '100%', width: '100%' }}>
+        }`} style={{ minWidth: 0, width: '100%' }}>
 
           {/* Mobile overlay */}
           <AnimatePresence>
@@ -405,7 +405,6 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
             style={{
               minHeight: '4rem',
               paddingTop: 'env(safe-area-inset-top, 0px)',
-              overflow: 'hidden',
               borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
             }}
           >
@@ -475,7 +474,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           {/* ─── Page Content ─────────────────────────────── */}
           <main className={`flex-grow ${
             isMobile ? 'p-3' : 'p-4 sm:p-6 lg:p-8'
-          }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', overflowX: 'hidden', maxWidth: '100%', backgroundColor: '#f8fafc' }}>
+          }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', backgroundColor: '#f8fafc' }}>
             {children}
           </main>
         </div>

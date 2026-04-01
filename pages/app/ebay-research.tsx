@@ -27,6 +27,7 @@ import FinancialIntelligence from '@/components/ebay/research/FinancialIntellige
 import ArbitrageScanner from '@/components/ebay/research/ArbitrageScanner';
 import SeoAnalyzer from '@/components/ebay/research/SeoAnalyzer';
 import AiOptimizationHub from '@/components/ebay/research/AiOptimizationHub';
+import MarketplaceComparison from '@/components/ebay/research/MarketplaceComparison';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -207,27 +208,140 @@ const SCORE_COLOR = (score: number, invert = false) => {
 // Utility Components
 // ---------------------------------------------------------------------------
 
-function MiniPriceChart({ snapshots }: { snapshots: { price: number; timestamp: string }[] }) {
+function ExpandedPriceChart({ snapshots, title, onClose }: { snapshots: { price: number; soldQuantity?: number; timestamp: string }[]; title?: string; onClose: () => void }) {
+  if (!snapshots || snapshots.length < 2) return null;
+  const data = snapshots.slice(-30);
+  const prices = data.map(s => s.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || 1;
+  const latest = data[data.length - 1];
+  const oldest = data[0];
+  const changeVal = oldest.price > 0 ? ((latest.price - oldest.price) / oldest.price) * 100 : 0;
+  const svgW = 560;
+  const svgH = 200;
+  const padX = 40;
+  const padY = 20;
+  const chartW = svgW - padX * 2;
+  const chartH = svgH - padY * 2;
+  const points = data.map((s, i) => ({
+    x: padX + (i / (data.length - 1)) * chartW,
+    y: padY + chartH - ((s.price - min) / range) * chartH,
+    ...s,
+  }));
+  const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const areaD = pathD + ` L ${points[points.length - 1].x.toFixed(1)} ${svgH - padY} L ${padX} ${svgH - padY} Z`;
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 0 }}>
+        <Box>
+          <Typography variant="subtitle1" fontWeight={700}>Fiyat Gecmisi</Typography>
+          {title && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', maxWidth: 350, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</Typography>}
+        </Box>
+        <IconButton size="small" onClick={onClose}><X size={18} /></IconButton>
+      </DialogTitle>
+      <DialogContent>
+        <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+          <Chip label={`Son: $${latest.price.toFixed(2)}`} color="primary" size="small" />
+          <Chip label={`Min: $${min.toFixed(2)}`} size="small" variant="outlined" />
+          <Chip label={`Max: $${max.toFixed(2)}`} size="small" variant="outlined" />
+          <Chip
+            label={`${changeVal >= 0 ? '+' : ''}${changeVal.toFixed(1)}%`}
+            size="small"
+            sx={{ bgcolor: changeVal >= 0 ? '#e8f5e9' : '#ffebee', color: changeVal >= 0 ? '#2e7d32' : '#c62828', fontWeight: 600 }}
+          />
+        </Box>
+        <Box sx={{ width: '100%', overflowX: 'auto' }}>
+          <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{ width: '100%', maxHeight: 220 }}>
+            <defs>
+              <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#1976d2" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#1976d2" stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+            {/* Grid lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map(pct => {
+              const y = padY + chartH * (1 - pct);
+              const val = min + range * pct;
+              return (
+                <g key={pct}>
+                  <line x1={padX} y1={y} x2={svgW - padX} y2={y} stroke="#e0e0e0" strokeDasharray="4" />
+                  <text x={padX - 4} y={y + 4} textAnchor="end" fontSize="10" fill="#999">${val.toFixed(0)}</text>
+                </g>
+              );
+            })}
+            {/* Area fill */}
+            <path d={areaD} fill="url(#priceGrad)" />
+            {/* Price line */}
+            <path d={pathD} fill="none" stroke="#1976d2" strokeWidth="2" strokeLinejoin="round" />
+            {/* Data points */}
+            {points.map((p, i) => (
+              <g key={i}>
+                <circle cx={p.x} cy={p.y} r={i === points.length - 1 ? 5 : 3} fill={i === points.length - 1 ? '#1976d2' : '#90caf9'} stroke="#fff" strokeWidth="1.5" />
+                {(i === 0 || i === points.length - 1 || i === Math.floor(points.length / 2)) && (
+                  <text x={p.x} y={svgH - 4} textAnchor="middle" fontSize="9" fill="#999">
+                    {new Date(p.timestamp).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' })}
+                  </text>
+                )}
+              </g>
+            ))}
+          </svg>
+        </Box>
+        {/* Sold quantity trend if available */}
+        {data.some(d => d.soldQuantity != null && d.soldQuantity > 0) && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" fontWeight={700} color="text.secondary">Satis Trendi:</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: 40, mt: 0.5 }}>
+              {data.map((s, i) => {
+                const maxSold = Math.max(...data.map(d => d.soldQuantity || 0), 1);
+                return (
+                  <Tooltip key={i} title={`${s.soldQuantity || 0} satis - ${new Date(s.timestamp).toLocaleDateString('tr-TR')}`}>
+                    <Box sx={{
+                      flex: 1, minWidth: 3,
+                      height: `${Math.max(((s.soldQuantity || 0) / maxSold) * 100, 3)}%`,
+                      bgcolor: '#66bb6a', borderRadius: '1px 1px 0 0',
+                      '&:hover': { bgcolor: '#43a047' },
+                    }} />
+                  </Tooltip>
+                );
+              })}
+            </Box>
+          </Box>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MiniPriceChart({ snapshots, title, expandable = true }: { snapshots: { price: number; soldQuantity?: number; timestamp: string }[]; title?: string; expandable?: boolean }) {
+  const [expanded, setExpanded] = useState(false);
   if (!snapshots || snapshots.length < 2) return <Typography variant="caption" color="text.secondary">Veri yok</Typography>;
   const prices = snapshots.map(s => s.price);
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const range = max - min || 1;
   return (
-    <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: '1px', height: 30, minWidth: 60 }}>
-      {snapshots.slice(-30).map((s, i, arr) => (
-        <Tooltip key={i} title={`$${s.price.toFixed(2)} - ${new Date(s.timestamp).toLocaleDateString('tr-TR')}`}>
-          <Box sx={{
-            flex: 1, minWidth: 2, maxWidth: 6,
-            height: `${Math.max(((s.price - min) / range) * 100, 5)}%`,
-            bgcolor: i === arr.length - 1 ? '#1976d2' : '#90caf9',
-            borderRadius: '1px 1px 0 0',
-            cursor: 'pointer',
-            '&:hover': { bgcolor: '#1565c0' },
-          }} />
-        </Tooltip>
-      ))}
-    </Box>
+    <>
+      <Box
+        sx={{ display: 'flex', alignItems: 'flex-end', gap: '1px', height: 30, minWidth: 60, cursor: expandable ? 'pointer' : 'default', '&:hover': expandable ? { opacity: 0.8 } : {} }}
+        onClick={() => expandable && setExpanded(true)}
+        title={expandable ? 'Tikla: Detayli grafik' : undefined}
+      >
+        {snapshots.slice(-30).map((s, i, arr) => (
+          <Tooltip key={i} title={`$${s.price.toFixed(2)} - ${new Date(s.timestamp).toLocaleDateString('tr-TR')}`}>
+            <Box sx={{
+              flex: 1, minWidth: 2, maxWidth: 6,
+              height: `${Math.max(((s.price - min) / range) * 100, 5)}%`,
+              bgcolor: i === arr.length - 1 ? '#1976d2' : '#90caf9',
+              borderRadius: '1px 1px 0 0',
+              '&:hover': { bgcolor: '#1565c0' },
+            }} />
+          </Tooltip>
+        ))}
+      </Box>
+      {expanded && <ExpandedPriceChart snapshots={snapshots} title={title} onClose={() => setExpanded(false)} />}
+    </>
   );
 }
 
@@ -2238,6 +2352,7 @@ const SECTIONS = [
       { label: 'Kategori & Nis Bulucu', icon: <Gauge size={14} /> },
       { label: 'Anahtar Kelime Analizi', icon: <Tag size={14} /> },
       { label: 'Arbitraj Bulucu', icon: <Globe size={14} /> },
+      { label: 'Pazar Karsilastirma', icon: <Globe size={14} /> },
     ],
   },
   {
@@ -2593,6 +2708,7 @@ function EbayResearchPage() {
       {mainTab === 0 && subTab === 1 && <NicheFinder userId={userId} userListings={userListings} onNavigate={handleNavigate} />}
       {mainTab === 0 && subTab === 2 && <KeywordIntelligence userId={userId} marketplace="EBAY_US" userListings={userListings} />}
       {mainTab === 0 && subTab === 3 && <ArbitrageScanner userId={userId} />}
+      {mainTab === 0 && subTab === 4 && <MarketplaceComparison userId={userId} onNavigate={handleNavigate} />}
 
       {/* Section 1: Takip */}
       {mainTab === 1 && subTab === 0 && <ProductTracker userId={userId} userListings={userListings} />}

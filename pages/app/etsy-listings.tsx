@@ -970,21 +970,47 @@ function EtsyListingsPage() {
     setLoading(true);
     try {
       const state = statusFilter || 'active';
+      const LIMIT = 100;
+      let allRows: EtsyListingRow[] = [];
+      let totalFromApi = 0;
+      let offset = 0;
+
+      // Fetch first page
       const apiRes = await fetch(
-        `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${state}&limit=100&offset=0`
+        `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${state}&limit=${LIMIT}&offset=0`
       );
       if (!apiRes.ok) throw new Error(`HTTP ${apiRes.status}`);
       const apiData = await apiRes.json();
-      const rows = (apiData.listings || []).map(mapListing);
-      const count = apiData.count || rows.length;
+      allRows = (apiData.listings || []).map(mapListing);
+      totalFromApi = apiData.count || allRows.length;
 
-      setListings(rows);
-      setTotalCount(count);
-      listingsCacheRef.current[cacheKey] = { listings: rows, total: count, ts: Date.now() };
+      // Show first page immediately while fetching rest
+      setListings(allRows);
+      setTotalCount(totalFromApi);
+
+      // Fetch remaining pages if more exist
+      if (totalFromApi > LIMIT) {
+        offset = LIMIT;
+        while (offset < totalFromApi) {
+          const nextRes = await fetch(
+            `/api/clawd/etsy?action=listings_with_images&shop_id=${selectedShopId}&state=${state}&limit=${LIMIT}&offset=${offset}`
+          );
+          if (!nextRes.ok) break;
+          const nextData = await nextRes.json();
+          const nextRows = (nextData.listings || []).map(mapListing);
+          if (nextRows.length === 0) break;
+          allRows = [...allRows, ...nextRows];
+          setListings(allRows);
+          offset += LIMIT;
+        }
+      }
+
+      setTotalCount(allRows.length);
+      listingsCacheRef.current[cacheKey] = { listings: allRows, total: allRows.length, ts: Date.now() };
 
       // Update current state count immediately
       const existingCounts = statusCountsCacheRef.current[selectedShopId] || {};
-      existingCounts[state] = count;
+      existingCounts[state] = allRows.length;
       statusCountsCacheRef.current[selectedShopId] = existingCounts;
     } catch (err: any) {
       console.error('Failed to fetch listings:', err);
@@ -998,7 +1024,7 @@ function EtsyListingsPage() {
     if (!selectedShopId) return;
     if (statusCountsCacheRef.current[selectedShopId]?._fetched) return;
 
-    const allStates = ['active', 'draft', 'inactive'] as const;
+    const allStates = ['active', 'draft', 'inactive', 'expired'] as const;
     const countPromises = allStates.map(async (s) => {
       // Reuse already-known count from listings fetch
       const known = statusCountsCacheRef.current[selectedShopId]?.[s];

@@ -693,6 +693,8 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
           <TextField
             size="small"
             label="Anahtar Kelime"
+            placeholder="or: wireless earbuds, bluetooth speaker, yoga mat"
+            helperText="Anahtar kelime veya eBay URL yapistirin — en az 2 karakter"
             value={filters.keyword}
             onChange={e => updateFilter('keyword', e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -1255,8 +1257,8 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
       {/* Product List */}
       {tracked.length === 0 ? (
         <EmptyState
-          message="Henüz takip edilen ürün yok"
-          sub="Ürün Veritabanı'ndan ürün ekleyin veya URL/ID ile ekleyin."
+          message="Henuz takip ettiginiz urun yok"
+          sub="Urun Veritabani'nda bir urun bulup 'Takip Et' butonuna tiklayin. Fiyat ve stok degisikliklerini otomatik izleyin."
         />
       ) : isMobile ? (
         /* Mobile Card View */
@@ -1811,6 +1813,8 @@ function NicheFinder({ userId, userListings, onNavigate, navigateData, onConsume
           <TextField
             size="small"
             label="Anahtar Kelime veya Kategori"
+            placeholder="or: vintage jewelry, phone case, led lights"
+            helperText="Nis analizi icin bir urun kategorisi veya anahtar kelime girin"
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAnalyze()}
@@ -2234,7 +2238,9 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
         <Box sx={{ display: 'flex', gap: 1 }}>
           <TextField
             size="small"
-            label="eBay Kullanıcı Adı"
+            label="eBay Kullanici Adi"
+            placeholder="or: top_seller_2024, best.deals.shop"
+            helperText="Takip etmek istediginiz saticinin eBay kullanici adini girin"
             value={username}
             onChange={e => setUsername(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAddSeller()}
@@ -2257,8 +2263,8 @@ function SellerTracker({ userId, userListings, onNavigate }: { userId: string; u
       {/* Seller List */}
       {sellers.length === 0 ? (
         <EmptyState
-          message="Henüz takip edilen satıcı yok"
-          sub="Yukarıdaki alana eBay kullanıcı adı girerek satıcı takip edin."
+          message="Henuz takip ettiginiz satici yok"
+          sub="Rakip saticilari ekleyerek fiyat ve stok degisikliklerini izleyin. Yukaridaki alana eBay kullanici adi girin."
         />
       ) : isMobile ? (
         /* Mobile Card View */
@@ -2715,7 +2721,8 @@ function EbayResearchPage() {
         <TextField
           size="small"
           fullWidth
-          placeholder="Anahtar kelime ara, eBay URL yapistir veya @satici_adi gir..."
+          placeholder="Anahtar kelime, eBay URL veya @satici adi girin..."
+          helperText="Arama: kelime → Urun DB | eBay URL → Listing Analiz | @satici → Satici Takip"
           value={globalSearch}
           onChange={e => setGlobalSearch(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleGlobalSearch()}

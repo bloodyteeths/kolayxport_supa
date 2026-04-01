@@ -659,7 +659,8 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
           <TextField
             size="small"
             fullWidth
-            placeholder="eBay URL veya Item ID yapistirin..."
+            placeholder="ör: https://www.ebay.com/itm/123456789"
+            helperText="eBay listing URL'si yapıştırın — otomatik sağlık analizi yapılacak"
             value={manualUrl}
             onChange={e => setManualUrl(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && analyzeByUrl()}

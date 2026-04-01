@@ -1288,7 +1288,8 @@ export default function KeywordIntelligence({ userId, marketplace, userListings,
               <TextField
                 fullWidth
                 size="small"
-                placeholder="Mevcut basliginizi buraya yapistiriniz..."
+                placeholder="ör: Mevcut eBay listing başlığınızı buraya yapıştırın..."
+                helperText="Mevcut başlığınızı yapıştırarak yeni başlıkla karşılaştırma yapın"
                 value={currentTitle}
                 onChange={(e) => setCurrentTitle(e.target.value)}
                 sx={{ mb: 2 }}

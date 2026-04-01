@@ -210,7 +210,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
           Kategori Keşfet
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Popüler kategorileri keşfedin ve en çok satanları görün
+          Popüler kategorileri keşfedin, en çok satanları görün ve niş fırsatlarını yakalayın. Aşağıdan bir kategori seçerek başlayın.
         </Typography>
       </Paper>
 
@@ -292,7 +292,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
               ))}
             </Box>
           ) : treeLoaded ? (
-            <Alert severity="info" sx={{ mt: 1.5 }}>Kategori verisi bulunamadı.</Alert>
+            <Alert severity="info" sx={{ mt: 1.5 }}>Kategori ağacı verisi bulunamadı. Lütfen daha sonra tekrar deneyin.</Alert>
           ) : null}
         </Collapse>
       </Paper>
@@ -438,7 +438,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
           )}
 
           {!bestsellersLoading && bestsellers.length === 0 && (
-            <Alert severity="info" sx={{ mt: 2 }}>Bu kategoride çok satan ürün bulunamadı.</Alert>
+            <Alert severity="info" sx={{ mt: 2 }}>Bu kategoride henüz çok satan ürün bulunamadı. Farklı bir kategori deneyebilir veya alt kategorilere göz atabilirsiniz.</Alert>
           )}
         </Paper>
       )}

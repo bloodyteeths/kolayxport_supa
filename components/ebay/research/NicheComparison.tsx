@@ -312,7 +312,8 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      placeholder="Kaydedilmis nis sec veya yeni kelime yaz"
+                      placeholder="ör: wireless earbuds, baby monitor"
+                      helperText="Karşılaştırmak istediğiniz nişi girin veya kayıtlı nişlerden seçin"
                       onKeyDown={e => {
                         if (e.key === 'Enter' && slot.keyword.trim()) {
                           e.preventDefault();
@@ -533,7 +534,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
       {/* No data state */}
       {!canCompare && !anyLoading && loadedSlots.length > 0 && (
         <Alert severity="info">
-          Karsilastirma icin en az 2 nis analiz edin.
+          Karşılaştırma tablosunu görmek için en az 2 niş analiz edin. Yukarıdaki alanlara anahtar kelime yazıp &quot;Analiz Et&quot; butonuna tıklayın.
         </Alert>
       )}
     </Box>

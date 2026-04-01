@@ -409,7 +409,8 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            placeholder="Anahtar kelime girin (orn: baby monitor, wireless earbuds)..."
+            placeholder="ör: bluetooth speaker, baby monitor"
+            helperText="Rakip analizi yapmak istediğiniz ürün kelimesini girin"
             value={kwInput}
             onChange={e => setKwInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && searchByKeyword()}
@@ -590,7 +591,8 @@ function SellerSpy({ userId, marketplace, userListings, onNavigate }: { userId: 
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            placeholder="Satıcı kullanıcı adı girin..."
+            placeholder="ör: top_electronics_store"
+            helperText="eBay satıcı adını girin — mağaza analizi ve ürün listesi görüntülenir"
             value={sellerInput}
             onChange={e => setSellerInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && searchSeller()}
@@ -882,7 +884,8 @@ function ListingComparison({ marketplace }: { marketplace: string }) {
             <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               <TextField
                 size="small" fullWidth
-                placeholder="eBay listeleme URL veya ID girin..."
+                placeholder="ör: https://www.ebay.com/itm/123456789"
+                helperText={idx === 0 ? "Karşılaştırmak istediğiniz eBay listing URL veya ID'lerini girin" : undefined}
                 value={val}
                 onChange={e => updateInput(idx, e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && fetchItem(idx)}
@@ -1237,7 +1240,8 @@ function MarketTrends({ marketplace, onNavigate, userId }: { marketplace: string
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             size="small"
-            placeholder="Takip edilecek anahtar kelime..."
+            placeholder="ör: wireless earbuds, phone case"
+            helperText="Pazar trendlerini takip etmek istediğiniz ürün kelimesini girin"
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && searchMarket()}

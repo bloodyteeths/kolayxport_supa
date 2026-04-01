@@ -339,6 +339,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
               value={sellingPrice}
               onChange={(e) => setSellingPrice(e.target.value)}
               InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              helperText="eBay'de listeleyeceğiniz satış fiyatı"
               fullWidth
             />
             {avgUserPrice > 0 && (
@@ -360,6 +361,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
             value={shippingCharged}
             onChange={(e) => setShippingCharged(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Alıcının ödeyeceği kargo ücreti (ücretsiz kargo için 0)"
           />
 
           <TextField
@@ -369,6 +371,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
             value={actualShippingCost}
             onChange={(e) => setActualShippingCost(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Sizin ödediğiniz gerçek kargo maliyeti"
           />
 
           <TextField
@@ -378,6 +381,7 @@ function RevenueCalculator({ userListings }: { userListings?: any[] }) {
             value={productCost}
             onChange={(e) => setProductCost(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Ürünü tedarik etme maliyetiniz"
           />
         </Box>
 
@@ -720,6 +724,8 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
         <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
           <TextField
             label="Ürün Anahtar Kelimesi"
+            placeholder="ör: wireless earbuds, phone case"
+            helperText="Pazar fiyatlarını araştırmak istediğiniz ürünü girin"
             size="small"
             fullWidth
             value={keyword}
@@ -773,6 +779,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
             value={sourcingCost}
             onChange={(e) => setSourcingCost(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Ürünü tedarikçiden satın alma maliyeti"
           />
 
           <TextField
@@ -782,6 +789,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
             value={shippingToBuyer}
             onChange={(e) => setShippingToBuyer(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Alıcıya gönderim maliyetiniz"
           />
 
           <TextField
@@ -791,6 +799,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
             value={shippingFromSupplier}
             onChange={(e) => setShippingFromSupplier(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Tedarikçiden size gelen kargo ücreti"
           />
 
           <TextField
@@ -800,6 +809,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
             value={targetMargin}
             onChange={(e) => setTargetMargin(e.target.value)}
             InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }}
+            helperText="Hedeflediğiniz minimum kâr yüzdesi"
           />
 
           <TextField
@@ -809,6 +819,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
             value={targetMonthlyIncome}
             onChange={(e) => setTargetMonthlyIncome(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Aylık ulaşmak istediğiniz net gelir"
           />
         </Box>
       </Paper>
@@ -1318,6 +1329,8 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2, mb: 2 }}>
           <TextField
             label="Ürün Adı"
+            placeholder="ör: Wireless Earbuds"
+            helperText="Takip etmek istediğiniz ürünün adı"
             size="small"
             fullWidth
             value={productName}
@@ -1330,6 +1343,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
             value={sellingPrice}
             onChange={(e) => setSellingPrice(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="eBay'deki satış fiyatınız"
           />
           <TextField
             label="Ürün Maliyeti"
@@ -1338,6 +1352,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
             value={productCost}
             onChange={(e) => setProductCost(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Tedarik maliyeti"
           />
           <TextField
             label="Kargo Maliyeti"
@@ -1346,6 +1361,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
             value={shippingCost}
             onChange={(e) => setShippingCost(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Toplam kargo gideriniz"
           />
           <FormControl fullWidth size="small">
             <InputLabel>Kategori (Ücret Hesabı)</InputLabel>
@@ -1366,6 +1382,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
             value={otherCosts}
             onChange={(e) => setOtherCosts(e.target.value)}
             InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+            helperText="Paketleme, reklam vb. ek maliyetler"
           />
         </Box>
         <Button

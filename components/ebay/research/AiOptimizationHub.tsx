@@ -707,6 +707,8 @@ function BulkTitleOptimizer({ userId }: { userId: string }) {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <TextField
         label="Her satıra bir başlık girin (max 10)"
+        placeholder={"Her satıra bir başlık yazın:\nWireless Earbuds Bluetooth\nPhone Case iPhone 15\nYoga Mat Non Slip"}
+        helperText="Her satıra bir başlık girin (maks 10). AI hepsini tek seferde optimize edecek."
         value={input}
         onChange={e => setInput(e.target.value)}
         fullWidth

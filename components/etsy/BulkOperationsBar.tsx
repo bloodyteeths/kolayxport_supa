@@ -937,22 +937,28 @@ export default function BulkOperationsBar({
         </Paper>
       )}
 
-      {/* Main bar — always visible inline */}
+      {/* Main bar — slides up from bottom when items selected */}
         <Paper
-          elevation={hasSelection ? 3 : 0}
+          elevation={0}
           sx={{
+            position: 'fixed',
+            bottom: hasSelection ? 0 : -80,
+            left: 0,
+            right: 0,
+            zIndex: 1300,
             px: { xs: 1.5, md: 2 },
             py: 1,
-            mb: 1,
             display: 'flex',
             alignItems: 'center',
             gap: 1,
             overflow: 'hidden',
-            borderRadius: 2,
-            border: '1px solid',
-            borderColor: hasSelection ? 'primary.main' : 'divider',
-            bgcolor: hasSelection ? 'primary.50' : 'background.paper',
-            transition: 'all 0.2s ease',
+            borderRadius: 0,
+            borderTop: '1px solid rgba(226,232,240,0.8)',
+            background: 'rgba(255,255,255,0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.08)',
+            transition: 'bottom 0.3s cubic-bezier(0.4,0,0.2,1)',
             opacity: processing ? 0.6 : 1,
           }}
         >

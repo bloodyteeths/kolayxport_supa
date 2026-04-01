@@ -607,7 +607,7 @@ export default function BulkOperationsBar({
       {/* Main bar */}
       <Slide direction="up" in={visible} mountOnEnter unmountOnExit>
         <Paper
-          elevation={8}
+          elevation={0}
           sx={{
             position: 'fixed',
             bottom: 0,
@@ -620,8 +620,11 @@ export default function BulkOperationsBar({
             alignItems: 'center',
             gap: { xs: 0.5, sm: 1 },
             flexWrap: 'wrap',
-            borderTop: '2px solid',
-            borderColor: 'primary.main',
+            borderTop: '1px solid rgba(226,232,240,0.8)',
+            background: 'rgba(255,255,255,0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.08)',
           }}
         >
           <Typography variant="body2" fontWeight={600} sx={{ mr: { xs: 0.5, sm: 2 } }}>

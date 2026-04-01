@@ -167,32 +167,49 @@ const formatNumber = (value: number): string => value.toLocaleString('tr-TR');
 // ---------------------------------------------------------------------------
 
 const SectionCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-6 overflow-hidden min-w-0 ${className}`}>{children}</div>
+  <div className={`card-premium p-3 sm:p-4 lg:p-6 overflow-hidden min-w-0 ${className}`}>{children}</div>
 );
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="text-lg font-semibold text-gray-900 mb-4">{children}</h3>
+  <h3 className="text-base font-semibold text-slate-900 mb-4" style={{ letterSpacing: '-0.01em' }}>{children}</h3>
 );
 
 const EmptyState = ({ message = 'Veri yok' }: { message?: string }) => (
-  <div className="flex items-center justify-center py-8 text-gray-400 text-sm">{message}</div>
+  <div className="flex items-center justify-center py-10 text-slate-400 text-sm">{message}</div>
 );
 
 const MarketplaceBadge = ({ name }: { name: string | null | undefined }) => {
   const safeName = name || 'Unknown';
   const key = safeName.toLowerCase();
-  const cls = MARKETPLACE_BG[key] || 'bg-gray-100 text-gray-800';
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{safeName}</span>;
+  const color = MARKETPLACE_COLORS_FIXED[key] || '#94a3b8';
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+      style={{ backgroundColor: `${color}15`, color }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+      {safeName}
+    </span>
+  );
 };
 
 const StatusBadge = ({ status }: { status: string | null | undefined }) => {
   const s = (status || '').toLowerCase();
-  let cls = 'bg-gray-100 text-gray-800';
-  if (s.includes('deliver') || s.includes('teslim')) cls = 'bg-green-100 text-green-800';
-  else if (s.includes('ship') || s.includes('kargo')) cls = 'bg-blue-100 text-blue-800';
-  else if (s.includes('pending') || s.includes('bekle')) cls = 'bg-yellow-100 text-yellow-800';
-  else if (s.includes('cancel') || s.includes('iptal')) cls = 'bg-red-100 text-red-800';
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{status || '-'}</span>;
+  let color = '#64748b';
+  let bg = '#f8fafc';
+  if (s.includes('deliver') || s.includes('teslim')) { color = '#16a34a'; bg = '#f0fdf4'; }
+  else if (s.includes('ship') || s.includes('kargo')) { color = '#2563eb'; bg = '#eff6ff'; }
+  else if (s.includes('pending') || s.includes('bekle')) { color = '#d97706'; bg = '#fffbeb'; }
+  else if (s.includes('cancel') || s.includes('iptal')) { color = '#dc2626'; bg = '#fef2f2'; }
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+      style={{ backgroundColor: bg, color }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+      {status || '-'}
+    </span>
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -215,35 +232,43 @@ const StatCard = ({
   color?: string;
 }) => {
   const trendPositive = trend !== undefined && trend >= 0;
-  const trendColor = trendPositive ? 'text-green-600' : 'text-red-600';
-  const TrendIcon = trendPositive ? TrendingUp : TrendingDown;
 
-  const colorMap: Record<string, { bg: string; text: string }> = {
-    blue: { bg: 'bg-blue-100', text: 'text-blue-600' },
-    green: { bg: 'bg-green-100', text: 'text-green-600' },
-    purple: { bg: 'bg-purple-100', text: 'text-purple-600' },
-    orange: { bg: 'bg-orange-100', text: 'text-orange-600' },
+  const colorMap: Record<string, { bg: string; icon: string; trendBg: string; trendColor: string }> = {
+    blue: { bg: 'linear-gradient(135deg, #eff6ff, #dbeafe)', icon: '#2563eb', trendBg: trendPositive ? '#f0fdf4' : '#fef2f2', trendColor: trendPositive ? '#059669' : '#dc2626' },
+    green: { bg: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', icon: '#16a34a', trendBg: trendPositive ? '#f0fdf4' : '#fef2f2', trendColor: trendPositive ? '#059669' : '#dc2626' },
+    purple: { bg: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', icon: '#7c3aed', trendBg: trendPositive ? '#f0fdf4' : '#fef2f2', trendColor: trendPositive ? '#059669' : '#dc2626' },
+    orange: { bg: 'linear-gradient(135deg, #fff7ed, #ffedd5)', icon: '#ea580c', trendBg: trendPositive ? '#f0fdf4' : '#fef2f2', trendColor: trendPositive ? '#059669' : '#dc2626' },
   };
 
+  const c = colorMap[color] || colorMap.blue;
+
   return (
-    <div className="bg-white p-2 sm:p-5 rounded-lg shadow-sm border border-gray-200 overflow-hidden min-w-0">
-      <div className="flex items-center justify-between">
-        <div className={`p-1.5 sm:p-3 rounded-lg ${colorMap[color]?.bg ?? 'bg-blue-100'}`}>
-          <Icon className={`h-3.5 w-3.5 sm:h-6 sm:w-6 ${colorMap[color]?.text ?? 'text-blue-600'}`} />
+    <div className="card-premium p-3 sm:p-5 overflow-hidden min-w-0 group">
+      <div className="flex items-start justify-between">
+        <div
+          className="p-2 sm:p-2.5 rounded-xl transition-transform duration-200 group-hover:scale-105"
+          style={{ background: c.bg }}
+        >
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: c.icon }} />
         </div>
         {trend !== undefined && (
-          <div className={`flex items-center ${trendColor}`}>
-            <TrendIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5" />
-            <span className="text-[10px] sm:text-sm font-medium">{Math.abs(trend).toFixed(1)}%</span>
-          </div>
+          <span
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold"
+            style={{ backgroundColor: c.trendBg, color: c.trendColor }}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className="hidden sm:block">
+              {trendPositive ? <path d="M5 2L8 6H2L5 2Z" /> : <path d="M5 8L2 4H8L5 8Z" />}
+            </svg>
+            {Math.abs(trend).toFixed(1)}%
+          </span>
         )}
       </div>
-      <div className="mt-1.5 sm:mt-4 min-w-0">
-        <h3 className="text-sm sm:text-lg font-semibold text-gray-900 truncate">
+      <div className="mt-2.5 sm:mt-4 min-w-0">
+        <h3 className="text-sm sm:text-xl font-bold text-slate-900 truncate" style={{ letterSpacing: '-0.025em' }}>
           {typeof value === 'number' ? formatNumber(value) : value}
         </h3>
-        <p className="text-[10px] sm:text-sm text-gray-600 truncate">{title}</p>
-        {trendLabel && <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 truncate">{trendLabel}</p>}
+        <p className="text-[10px] sm:text-[13px] font-medium text-slate-500 truncate mt-0.5">{title}</p>
+        {trendLabel && <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">{trendLabel}</p>}
       </div>
     </div>
   );
@@ -254,7 +279,7 @@ const StatCard = ({
 // ---------------------------------------------------------------------------
 
 const SkeletonBlock = ({ className = '' }: { className?: string }) => (
-  <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+  <div className={`animate-shimmer rounded-xl ${className}`} />
 );
 
 const LoadingSkeleton = () => (
@@ -407,8 +432,8 @@ export default function AnalyticsPage() {
     ) || [];
 
   const revenueChartOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'area', height: 280, toolbar: { show: false } },
-    colors: ['#3B82F6', '#10B981'],
+    chart: { type: 'area', height: 280, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
+    colors: ['#2563eb', '#10b981'],
     dataLabels: { enabled: false },
     stroke: { curve: 'smooth', width: [0, 3] },
     xaxis: { categories: dailyLabels },
@@ -462,9 +487,9 @@ export default function AnalyticsPage() {
   });
 
   const monthlyChartOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'bar', height: 280, toolbar: { show: false } },
-    colors: ['#3B82F6', '#10B981'],
-    plotOptions: { bar: { borderRadius: 4, columnWidth: '50%' } },
+    chart: { type: 'bar', height: 280, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
+    colors: ['#2563eb', '#10b981'],
+    plotOptions: { bar: { borderRadius: 6, columnWidth: '50%' } },
     dataLabels: { enabled: false },
     stroke: { width: [0, 3], curve: 'smooth' },
     xaxis: { categories: monthlyLabels },
@@ -491,9 +516,9 @@ export default function AnalyticsPage() {
   const hourlyLabels = hourlyData.map((h) => `${String(h.hour).padStart(2, '0')}:00`);
 
   const hourlyChartOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'bar', height: 300, toolbar: { show: false } },
-    colors: ['#3B82F6', '#94A3B8'],
-    plotOptions: { bar: { borderRadius: 3, columnWidth: '60%' } },
+    chart: { type: 'bar', height: 300, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
+    colors: ['#2563eb', '#cbd5e1'],
+    plotOptions: { bar: { borderRadius: 5, columnWidth: '60%' } },
     dataLabels: { enabled: false },
     xaxis: { categories: hourlyLabels, labels: { style: { fontSize: '10px' } } },
     yaxis: { title: { text: 'Siparis' }, labels: { formatter: (v: number) => Math.round(v).toString() } },
@@ -509,8 +534,8 @@ export default function AnalyticsPage() {
   ];
 
   const hourlyRevenueChartOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'area', height: 300, toolbar: { show: false } },
-    colors: ['#10B981', '#94A3B8'],
+    chart: { type: 'area', height: 300, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
+    colors: ['#10b981', '#cbd5e1'],
     dataLabels: { enabled: false },
     stroke: { curve: 'smooth', width: 2 },
     fill: { type: 'gradient', opacity: [0.4, 0.1], gradient: { shadeIntensity: 1, stops: [0, 100] } },
@@ -546,22 +571,22 @@ export default function AnalyticsPage() {
     <AppLayout title="Analitik - KolayXport Dashboard">
       <div className="space-y-6 overflow-x-hidden max-w-full">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
+            <h1 className="text-lg sm:text-2xl font-bold text-slate-900 truncate" style={{ letterSpacing: '-0.025em' }}>
               {dateRange === 'day' ? 'Gunun Analizi' : 'Analitik Dashboard'}
             </h1>
-            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-600 truncate">
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500 truncate">
               {dateRange === 'day' ? selectedDayLabel : 'Pazaryeri satis performansinizi takip edin'}
             </p>
           </div>
-          <div className="mt-2 sm:mt-0 flex items-center space-x-3 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="flex items-center px-2.5 py-1.5 sm:px-3 sm:py-2 bg-blue-600 text-white rounded-md text-xs sm:text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="btn-primary text-xs sm:text-sm !py-2 !px-3 sm:!px-4 disabled:opacity-50"
             >
-              <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${refreshing ? 'animate-spin' : ''}`} />
               Yenile
             </button>
           </div>
@@ -617,7 +642,7 @@ export default function AnalyticsPage() {
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="px-2 py-1.5 sm:px-3 sm:py-2 border border-gray-300 rounded-md text-xs sm:text-sm focus:ring-blue-500 focus:border-blue-500"
+              className="px-2 py-1.5 sm:px-3 sm:py-2 border border-slate-200 rounded-xl text-xs sm:text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
             >
               <option value="day">Gunun Analizi</option>
               <option value="month">Aya Gore</option>
@@ -629,7 +654,7 @@ export default function AnalyticsPage() {
               <option value="all">Tum Zamanlar</option>
             </select>
             {dateRange === 'day' && (
-              <div className="flex items-center bg-white border border-gray-300 rounded-md">
+              <div className="flex items-center bg-white border border-slate-200 rounded-xl">
                 <button
                   onClick={() => navigateDay(-1)}
                   className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-l-md transition-colors"
@@ -649,7 +674,7 @@ export default function AnalyticsPage() {
               </div>
             )}
             {dateRange === 'month' && (
-              <div className="flex items-center bg-white border border-gray-300 rounded-md">
+              <div className="flex items-center bg-white border border-slate-200 rounded-xl">
                 <button
                   onClick={() => navigateMonth(-1)}
                   className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-l-md transition-colors"
@@ -671,7 +696,7 @@ export default function AnalyticsPage() {
           </div>
 
           {data?.exchangeRates && (
-            <div className="flex-1 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg border border-blue-200">
+            <div className="flex-1 p-3 rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.04), rgba(79,70,229,0.06))', border: '1px solid rgba(37,99,235,0.12)' }}>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6">
                 <div className="flex items-center gap-2">
                   <CurrencyIcon className="h-4 w-4 text-blue-600" />

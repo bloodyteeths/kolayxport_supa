@@ -807,7 +807,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
           />
 
           <TextField
-            label="Hedef {t('profitMargin')} (%)"
+            label={`${t('targetMarginHelper')} (%)`}
             size="small"
             type="number"
             value={targetMargin}
@@ -862,7 +862,7 @@ function SourcingCalculator({ marketplace }: { marketplace: string }) {
                         {t('unitsForTarget')}
                       </TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        {unitsForTargetIncome === Infinity ? t('unprofitable') : `${unitsForTargetIncome} t('unitsPerMonth')`}
+                        {unitsForTargetIncome === Infinity ? t('unprofitable') : `${unitsForTargetIncome} ${t('unitsPerMonth')}`}
                       </TableCell>
                     </TableRow>
                   </>
@@ -1004,7 +1004,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
     const price = parseFloat(listing.price?.value || listing.currentPrice || '0');
     if (title) setProductName(title.slice(0, 80));
     if (price > 0) setSellingPrice(price.toFixed(2));
-    toast.success(`"${title.slice(0, 40)}..." {t('listingLoaded')}`);
+    toast.success(`"${title.slice(0, 40)}..." ${t('listingLoaded')}`);
   }, [userListings]);
 
   // Load from localStorage
@@ -1547,7 +1547,7 @@ function ROITracker({ userListings }: { userListings?: any[] }) {
                   <SortHeader field="productName" label={t('productName')} />
                   <SortHeader field="sellingPrice" label="Gelir" />
                   <SortHeader field="productCost" label="Maliyet" />
-                  <SortHeader field="ebayFees" label="{t('fees')}" />
+                  <SortHeader field="ebayFees" label={t('fees')} />
                   <SortHeader field="profit" label="Kâr" />
                   <SortHeader field="margin" label="Marj" />
                   <SortHeader field="roi" label="ROI" />

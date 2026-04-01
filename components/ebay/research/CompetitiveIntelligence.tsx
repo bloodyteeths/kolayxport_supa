@@ -1647,7 +1647,7 @@ export default function CompetitiveIntelligence({ userId, marketplace, userListi
           sx={{ '& .Mui-selected': { color: '#6366f1' }, '& .MuiTabs-indicator': { bgcolor: '#6366f1' } }}>
           <Tab icon={<Eye size={16} />} iconPosition="start" label={t('tabSellerSpy')} sx={{ textTransform: 'none', minHeight: 48 }} />
           <Tab icon={<ArrowUpDown size={16} />} iconPosition="start" label={t('tabListingComparison')} sx={{ textTransform: 'none', minHeight: 48 }} />
-          <Tab icon={<TrendingUp size={16} />} iconPosition="start" label="{t('marketTrends')}" sx={{ textTransform: 'none', minHeight: 48 }} />
+          <Tab icon={<TrendingUp size={16} />} iconPosition="start" label={t('marketTrends')} sx={{ textTransform: 'none', minHeight: 48 }} />
         </Tabs>
       </Paper>
 

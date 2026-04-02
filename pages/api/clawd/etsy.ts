@@ -485,8 +485,8 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
 
         for (let page = 0; page < pages; page++) {
             const data = page === 0
-                ? await callEtsyPublicAPI(`/shops/${shopId}/listings?state=active&limit=100&offset=${page * 100}&includes=images`)
-                : await rateLimitedPublicCall(`/shops/${shopId}/listings?state=active&limit=100&offset=${page * 100}&includes=images`);
+                ? await callEtsyPublicAPI(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}`)
+                : await rateLimitedPublicCall(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}`);
 
             const results = data.results || [];
             allListings.push(...results.map((l: any) => ({
@@ -500,11 +500,29 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
                 quantity: l.quantity || 0,
                 url: l.url || '',
                 created_timestamp: l.created_timestamp || 0,
-                image_url: l.images?.[0]?.url_170x135 || '',
+                image_url: '',
             })));
 
             if (results.length < 100) break;
         }
+
+        // Fetch images for first 25 listings (first page visible)
+        const imageListings = allListings.slice(0, 25);
+        const imageResults = await Promise.allSettled(
+            imageListings.map((l, i) =>
+                new Promise<{ listing_id: number; url: string }>(resolve =>
+                    setTimeout(async () => {
+                        try {
+                            const imgData = await callEtsyPublicAPI(`/listings/${l.listing_id}/images?limit=1`);
+                            resolve({ listing_id: l.listing_id, url: imgData.results?.[0]?.url_170x135 || '' });
+                        } catch { resolve({ listing_id: l.listing_id, url: '' }); }
+                    }, i * 50)
+                )
+            )
+        );
+        const imageMap = new Map<number, string>();
+        imageResults.forEach(r => { if (r.status === 'fulfilled' && r.value.url) imageMap.set(r.value.listing_id, r.value.url); });
+        allListings.forEach(l => { if (imageMap.has(l.listing_id)) l.image_url = imageMap.get(l.listing_id)!; });
 
         return res.status(200).json({
             total: allListings.length,

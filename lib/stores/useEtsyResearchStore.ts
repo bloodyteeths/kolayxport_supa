@@ -474,7 +474,7 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
       });
       if (!res.ok) throw new Error('Duygu analizi başarısız');
       const data = await res.json();
-      set({ reviewSentiment: data.report });
+      set({ reviewSentiment: data.sentiment || data.report });
       toast.success('Yorum duygu analizi hazır');
     } catch (err: any) { toast.error(err.message); }
     finally { set({ reviewSentimentLoading: false }); }

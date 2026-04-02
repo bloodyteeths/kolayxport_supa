@@ -1050,6 +1050,49 @@ async function handleEbaySync(userId: string, body: any, res: NextApiResponse) {
 
   logger.info('eBay finance: fetched transactions', { total: allTransactions.length });
 
+  // ---- PHASE 1b: Fetch item titles from Fulfillment API ----
+  // Collect unique orderIds from SALE transactions to get real product names
+  const orderIds = [...new Set(
+    allTransactions
+      .filter(tx => tx.transactionType === 'SALE' && tx.orderId)
+      .map(tx => tx.orderId as string)
+  )];
+
+  // Map: lineItemId → item title
+  const itemTitleMap = new Map<string, string>();
+
+  // Fetch orders in batches of 10 to avoid rate limits
+  const ORDER_BATCH = 10;
+  for (let i = 0; i < orderIds.length; i += ORDER_BATCH) {
+    const batch = orderIds.slice(i, i + ORDER_BATCH);
+    const results = await Promise.allSettled(
+      batch.map(async (orderId) => {
+        try {
+          const resp = await fetch(`https://api.ebay.com/sell/fulfillment/v1/order/${orderId}`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          });
+          if (!resp.ok) return null;
+          const order = await resp.json();
+          if (Array.isArray(order.lineItems)) {
+            for (const li of order.lineItems) {
+              if (li.lineItemId && li.title) {
+                itemTitleMap.set(String(li.lineItemId), li.title);
+              }
+            }
+          }
+        } catch {
+          // Skip — product name will fall back to buyer username
+        }
+      })
+    );
+  }
+
+  logger.info('eBay finance: fetched item titles', { orders: orderIds.length, titles: itemTitleMap.size });
+
   // ---- PHASE 2: Process transactions ----
   const upsertBatch: Array<{
     externalId: string;
@@ -1083,12 +1126,16 @@ async function handleEbaySync(userId: string, body: any, res: NextApiResponse) {
         const lineItem = Array.isArray(tx.orderLineItems) && tx.orderLineItems[0];
         const lineItemId = lineItem?.lineItemId || null;
 
+        // Get real product name: fulfillment API title > buyer username > null
+        const itemTitle = lineItemId ? itemTitleMap.get(String(lineItemId)) : undefined;
+        const productLabel = itemTitle || (tx.buyer?.username ? `Order from ${tx.buyer.username}` : null);
+
         upsertBatch.push({
           externalId: txId,
           transactionType: 'Sale',
           orderNumber: tx.orderId || txId,
           barcode: lineItemId ? String(lineItemId) : null,
-          productName: memo || (tx.buyer?.username ? `Order from ${tx.buyer.username}` : null),
+          productName: productLabel,
           quantity: Array.isArray(tx.orderLineItems) ? tx.orderLineItems.length : 1,
           amount: gross,
           currency,

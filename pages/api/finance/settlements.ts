@@ -41,28 +41,42 @@ async function callTrendyolSettlements(
     page: String(params.page),
     size: String(params.size),
   });
-  const url = `${TRENDYOL_API_BASE}/finance/sellers/${credentials.supplierId}/settlements?${qs}`;
+  // Try both endpoint paths — Trendyol uses /finance/che/ for some accounts
+  const paths = [
+    `/finance/che/sellers/${credentials.supplierId}/settlements`,
+    `/finance/sellers/${credentials.supplierId}/settlements`,
+  ];
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      Authorization: auth,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'User-Agent': `${credentials.supplierId} - SelfIntegration`,
-    },
-  });
+  let lastError: any = null;
+  for (const path of paths) {
+    const url = `${TRENDYOL_API_BASE}${path}?${qs}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': `${credentials.supplierId} - SelfIntegration`,
+      },
+    });
 
-  if (!response.ok) {
+    if (response.ok) {
+      const text = await response.text();
+      if (!text) return { content: [], totalPages: 0, totalElements: 0 };
+      try { return JSON.parse(text); } catch { return { content: [], totalPages: 0, totalElements: 0 }; }
+    }
+
     const errorText = await response.text();
     let errorBody;
     try { errorBody = JSON.parse(errorText); } catch { errorBody = { rawError: errorText }; }
+    lastError = { status: response.status, path, details: errorBody };
+    // If 556 or 404, try next path
+    if (response.status === 556 || response.status === 404) continue;
+    // Other errors — don't retry
     throw { status: response.status, message: `Trendyol API error: ${response.status}`, details: errorBody };
   }
 
-  const text = await response.text();
-  if (!text) return { content: [], totalPages: 0, totalElements: 0 };
-  try { return JSON.parse(text); } catch { return { content: [], totalPages: 0, totalElements: 0 }; }
+  throw { status: lastError?.status || 500, message: `Trendyol API error: ${lastError?.status} on both paths`, details: lastError?.details }
 }
 
 /**

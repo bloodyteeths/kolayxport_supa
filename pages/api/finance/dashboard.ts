@@ -59,18 +59,21 @@ function getDateTruncExpression(groupBy: string): string {
  * Classify Trendyol transaction types into financial categories.
  */
 function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'other' {
-  const t = (type || '').toLowerCase();
+  // Normalize: strip diacritics so Turkish İ→i, ş→s, etc. work with plain includes()
+  const t = (type || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  // Also check original for exact Turkish matches
+  const orig = (type || '').trim();
+
   // Order matters — more specific patterns first
-  // Turkish: Satış=Sale, İade=Return, İndirim=Discount, İndirim İptal=DiscountCancel, Kupon=Coupon, Komisyon=Commission
-  if (t.includes('sale') || t.includes('satış')) return 'revenue';
+  if (t.includes('sale') || orig === 'Satış' || t.includes('satis')) return 'revenue';
   if (t.includes('shipping') || t.includes('cargo') || t.includes('kargo')) return 'shipping';
   if (t.includes('commission') || t.includes('komisyon') || t.includes('service')) return 'commission';
-  // Discount cancel (İndirim İptal / DiscountCancel) — revenue recovery, treat as revenue
-  if ((t.includes('indirim') && t.includes('iptal')) || t.includes('discountcancel')) return 'revenue';
+  // Discount cancel (İndirim İptal / DiscountCancel) — revenue recovery
+  if (orig === 'İndirim İptal' || t.includes('discountcancel') || (t.includes('indirim') && t.includes('iptal'))) return 'revenue';
   // Returns (İade / Return)
-  if (t.includes('return') || t.includes('iade')) return 'return';
+  if (orig.startsWith('İade') || t.includes('return') || t.includes('iade')) return 'return';
   // Discounts/coupons (İndirim / Kupon)
-  if (t.includes('discount') || t.includes('indirim') || t.includes('coupon') || t.includes('kupon')) return 'discount';
+  if (orig.startsWith('İndirim') || t.includes('discount') || t.includes('indirim') || t.includes('coupon') || t.includes('kupon')) return 'discount';
   // Provision (weight/deci adjustments) — treat as shipping adjustment
   if (t.includes('provision')) return 'shipping';
   if (t.includes('sellerrevenue') || t.includes('manualrefund')) return 'other';

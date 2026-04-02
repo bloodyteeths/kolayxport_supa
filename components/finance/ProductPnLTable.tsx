@@ -79,9 +79,9 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
   const handleExportCSV = () => {
     const headers = [t('product'), t('barcode'), t('sales'), t('revenue'), t('commission'), t('shipping'), t('cost'), t('profit'), t('margin')];
     const rows = filtered.map(p => [
-      p.productName, p.barcode, p.quantity, p.revenue.toFixed(2),
-      p.commissions.toFixed(2), p.shipping.toFixed(2), p.cogs.toFixed(2),
-      p.netProfit.toFixed(2), getMargin(p).toFixed(1),
+      p.productName, p.barcode, p.quantity, Number(p.revenue).toFixed(2),
+      Number(p.commissions).toFixed(2), Number(p.shipping).toFixed(2), Number(p.cogs).toFixed(2),
+      Number(p.netProfit).toFixed(2), getMargin(p).toFixed(1),
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

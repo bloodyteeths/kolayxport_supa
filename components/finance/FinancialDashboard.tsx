@@ -7,7 +7,7 @@ import {
 import {
   Banknote, TrendingUp, TrendingDown, Truck, RotateCcw,
   Package, PieChart, ChevronDown, ChevronUp, List, BarChart3,
-  Percent, Edit3,
+  Percent, Edit3, Megaphone,
 } from 'lucide-react';
 import useFinanceStore, { DashboardData, DashboardSummary } from '@/lib/stores/useFinanceStore';
 import dynamic from 'next/dynamic';
@@ -36,6 +36,7 @@ const CARDS: CardDef[] = [
   { key: 'returns', tKey: 'returns', icon: <RotateCcw size={20} />, color: '#ef4444', gradient: 'linear-gradient(135deg, #fef2f2, #fecaca)', format: 'currency' },
   { key: '_netRevenue', tKey: 'netRevenue', getValue: (s) => s.grossRevenue - s.returns, icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency' },
   { key: 'commissions', tKey: 'commissions', icon: <Percent size={20} />, color: '#f59e0b', gradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)', format: 'currency' },
+  { key: 'adSpend', tKey: 'adSpend', icon: <Megaphone size={20} />, color: '#ec4899', gradient: 'linear-gradient(135deg, #fdf2f8, #fce7f3)', format: 'currency' },
   { key: 'shipping', tKey: 'shippingCosts', icon: <Truck size={20} />, color: '#3b82f6', gradient: 'linear-gradient(135deg, #eff6ff, #dbeafe)', format: 'currency' },
   { key: 'cogs', tKey: 'productCost', icon: <Package size={20} />, color: '#8b5cf6', gradient: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', format: 'currency' },
   { key: 'netProfit', tKey: 'netProfit', icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency', invertColor: true },
@@ -163,7 +164,7 @@ function ProfitCharts({ data, marketplace }: { data: DashboardData; marketplace:
     colors: ['#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899'],
     legend: { position: 'bottom', fontSize: '12px' },
     dataLabels: { enabled: true, formatter: (val: number) => `%${val.toFixed(0)}` },
-    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: t('totalExpense'), formatter: () => formatCurrency(Math.abs(summary.commissions + summary.shipping + summary.returns + summary.discounts), cs) } } } } },
+    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: t('totalExpense'), formatter: () => formatCurrency(Math.abs(summary.commissions + summary.shipping + summary.returns + summary.discounts + (summary.adSpend || 0)), cs) } } } } },
   };
 
   return (
@@ -214,7 +215,7 @@ export default function FinancialDashboard() {
     return (
       <Box>
         <Grid container spacing={1.5} sx={{ mb: 2 }}>
-          {[1, 2, 3, 4, 5, 6, 7].map(i => (
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
             <Grid item xs={6} sm={4} md={2} key={i}>
               <Skeleton variant="rounded" height={100} sx={{ borderRadius: '12px' }} />
             </Grid>

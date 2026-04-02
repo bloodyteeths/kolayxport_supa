@@ -687,6 +687,88 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
     totalUpserted += batch.length;
   }
 
+  // ---- PHASE 4: Fetch ledger entries for ad spend ----
+  let adSpendTotal = 0;
+  let adSpendEntries = 0;
+  try {
+    let ledgerOffset = 0;
+    let ledgerHasMore = true;
+
+    while (ledgerHasMore) {
+      const ledgerData = await client.getLedgerEntries({
+        min_created: minCreated,
+        max_created: maxCreated,
+        limit: PAGE_LIMIT,
+        offset: ledgerOffset,
+      });
+
+      const entries = Array.isArray(ledgerData.results) ? ledgerData.results : [];
+
+      for (const entry of entries) {
+        const ledgerType = (entry.ledger_type || '').toLowerCase();
+        const description = (entry.description || '').toLowerCase();
+        // Match: prolist (Etsy Ads), offsite_ads_fee, or description-based matching
+        const isAdSpend = ledgerType === 'prolist'
+          || ledgerType === 'offsite_ads_fee'
+          || description.includes('offsite ads')
+          || description.includes('etsy ads')
+          || description.includes('promoted listing');
+
+        if (isAdSpend) {
+          const amount = EtsyClient.etsyMoney(entry.amount || { amount: 0, divisor: 100 });
+          adSpendTotal += Math.abs(amount);
+          adSpendEntries++;
+        }
+      }
+
+      if (entries.length < PAGE_LIMIT) {
+        ledgerHasMore = false;
+      } else {
+        ledgerOffset += PAGE_LIMIT;
+      }
+    }
+
+    // Upsert a single AdSpend summary transaction for the period
+    if (adSpendTotal > 0) {
+      const adSpendId = `adspend_${minCreated}_${maxCreated}`;
+      await prisma.financialTransaction.upsert({
+        where: {
+          userId_marketplace_externalId: {
+            userId,
+            marketplace: 'etsy',
+            externalId: adSpendId,
+          },
+        },
+        update: {
+          amount: -adSpendTotal,
+          quantity: adSpendEntries,
+          syncedAt: new Date(),
+        },
+        create: {
+          userId,
+          marketplace: 'etsy',
+          externalId: adSpendId,
+          transactionType: 'AdSpend',
+          orderNumber: null,
+          barcode: null,
+          productName: 'Etsy Ads + Offsite Ads',
+          quantity: adSpendEntries,
+          amount: -adSpendTotal,
+          currency: 'USD',
+          commission: null,
+          shippingAmount: null,
+          transactionDate: new Date(endMs),
+        },
+      });
+      totalUpserted++;
+    }
+  } catch (err) {
+    logger.warn('Failed to fetch Etsy ledger entries for ad spend', {
+      error: err instanceof Error ? err.message : String(err),
+      shopId: etsyCreds.shopId,
+    });
+  }
+
   // Update sync cursor
   await prisma.financialSyncCursor.upsert({
     where: {
@@ -709,6 +791,8 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
     totalFetched,
     totalUpserted,
     paymentsWithFees: paymentMap.size,
+    adSpendTotal: Math.round(adSpendTotal * 100) / 100,
+    adSpendEntries,
     shopId: etsyCreds.shopId,
   });
 
@@ -717,6 +801,7 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
     totalFetched,
     totalUpserted,
     paymentsWithFees: paymentMap.size,
+    adSpend: Math.round(adSpendTotal * 100) / 100,
     syncedTo: new Date(endMs).toISOString(),
   });
 }

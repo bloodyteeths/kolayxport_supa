@@ -6,6 +6,7 @@ export interface DashboardSummary {
   shipping: number;
   returns: number;
   discounts: number;
+  adSpend: number;
   cogs: number;
   netProfit: number;
   margin: number;
@@ -213,7 +214,7 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
       }
       set({
         dashboardData: {
-          summary: data.summary || { grossRevenue: 0, commissions: 0, shipping: 0, returns: 0, discounts: 0, cogs: 0, netProfit: 0, margin: 0, orderCount: 0, returnCount: 0 },
+          summary: data.summary || { grossRevenue: 0, commissions: 0, shipping: 0, returns: 0, discounts: 0, adSpend: 0, cogs: 0, netProfit: 0, margin: 0, orderCount: 0, returnCount: 0 },
           timeSeries: Array.isArray(data.timeSeries) ? data.timeSeries : [],
           productBreakdown: Array.isArray(data.productBreakdown) ? data.productBreakdown : [],
           transactionTypeSummary: txSummary,

@@ -13,6 +13,7 @@ interface DashboardSummary {
   shipping: number;
   returns: number;
   discounts: number;
+  adSpend: number;
   cogs: number;
   netProfit: number;
   margin: number;
@@ -60,7 +61,7 @@ function getDateTruncExpression(groupBy: string): string {
 /**
  * Classify Trendyol transaction types into financial categories.
  */
-function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'other' {
+function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'adspend' | 'other' {
   // Normalize: strip diacritics so Turkish İ→i, ş→s, etc. work with plain includes()
   const t = (type || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   // Also check original for exact Turkish matches
@@ -78,6 +79,7 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   if (orig.startsWith('İndirim') || t.includes('discount') || t.includes('indirim') || t.includes('coupon') || t.includes('kupon')) return 'discount';
   // Provision (weight/deci adjustments) — treat as shipping adjustment
   if (t.includes('provision')) return 'shipping';
+  if (t.includes('adspend') || t.includes('promoted') || t.includes('offsite ads') || t.includes('etsy ads')) return 'adspend';
   if (t.includes('sellerrevenue') || t.includes('manualrefund')) return 'other';
   return 'other';
 }
@@ -130,6 +132,7 @@ async function buildDashboard(
   let shipping = 0;
   let returns = 0;
   let discounts = 0;
+  let adSpend = 0;
   let cogs = 0;
   let orderCount = 0;
   let returnCount = 0;
@@ -188,6 +191,9 @@ async function buildDashboard(
         break;
       case 'discount':
         discounts += Math.abs(amount);
+        break;
+      case 'adspend':
+        adSpend += Math.abs(amount);
         break;
       default:
         // Other types — add to revenue if positive, ignore if negative
@@ -252,7 +258,7 @@ async function buildDashboard(
     }
   }
 
-  const netProfit = grossRevenue - commissions - shipping - returns - discounts - cogs;
+  const netProfit = grossRevenue - commissions - shipping - returns - discounts - adSpend - cogs;
   const margin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
 
   // Build time series array
@@ -287,6 +293,7 @@ async function buildDashboard(
       shipping: round2(shipping),
       returns: round2(returns),
       discounts: round2(discounts),
+      adSpend: round2(adSpend),
       cogs: round2(cogs),
       netProfit: round2(netProfit),
       margin: round2(margin),

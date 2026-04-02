@@ -161,13 +161,23 @@ async function buildDashboard(
         shipping += shippingAmt;
         break;
       case 'commission':
-        commissions += Math.abs(amount);
+        // CommissionPositive = refund (subtract), CommissionNegative = charge (add)
+        // But since amount sign already reflects this, just add the signed amount
+        if (amount > 0) {
+          commissions -= amount; // commission refund reduces commissions
+        } else {
+          commissions += Math.abs(amount);
+        }
         break;
       case 'shipping':
         shipping += Math.abs(amount);
         break;
       case 'return':
         returns += Math.abs(amount);
+        // Return transactions may carry commission refund — subtract from commissions
+        if (commissionAmt < 0) {
+          commissions += commissionAmt; // negative value reduces commissions
+        }
         break;
       case 'discount':
         discounts += Math.abs(amount);
@@ -357,7 +367,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           transactionDate: { gte: startDate, lte: endDate },
         },
         _count: true,
-        _sum: { amount: true },
+        _sum: { amount: true, commission: true, shippingAmount: true },
       });
       return res.status(200).json({
         debug: true,
@@ -366,6 +376,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           type: t.transactionType,
           count: t._count,
           totalAmount: t._sum.amount ? Number(t._sum.amount) : 0,
+          totalCommission: t._sum.commission ? Number(t._sum.commission) : 0,
+          totalShipping: t._sum.shippingAmount ? Number(t._sum.shippingAmount) : 0,
           classifiedAs: classifyTransactionType(t.transactionType),
         })),
       });

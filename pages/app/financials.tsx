@@ -38,7 +38,7 @@ const DATE_PRESETS = [
 
 const MARKETPLACE_TABS = [
   { key: 'trendyol' as const, label: 'Trendyol', icon: <Store size={16} />, color: '#F59E0B', enabled: true },
-  { key: 'etsy' as const, label: 'Etsy', icon: <Store size={16} />, color: '#F97316', enabled: false },
+  { key: 'etsy' as const, label: 'Etsy', icon: <Store size={16} />, color: '#F97316', enabled: true },
   { key: 'ebay' as const, label: 'eBay', icon: <Store size={16} />, color: '#3B82F6', enabled: false },
 ];
 

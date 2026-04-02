@@ -258,7 +258,7 @@ export class EtsyClient {
    */
   async validateCredentials(): Promise<boolean> {
     const url = `${this.baseUrl}/application/shops/${this.shopId}`;
-    
+
     try {
       const response = await this.makeAuthenticatedRequest(url, {
         method: 'GET',
@@ -267,11 +267,201 @@ export class EtsyClient {
 
       return response.ok;
     } catch (error) {
-      logger.error('Etsy credentials validation failed', 
+      logger.error('Etsy credentials validation failed',
         error instanceof Error ? error : new Error(String(error)), {
           shopId: this.shopId
         });
       return false;
+    }
+  }
+
+  // ─── Finance API Methods ───────────────────────────────────────────
+
+  /**
+   * Convert Etsy money object ({ amount, divisor }) to a plain number.
+   * Returns 0 if the input is null/undefined.
+   */
+  static etsyMoney(money: { amount: number; divisor: number }): number {
+    return money ? money.amount / money.divisor : 0;
+  }
+
+  /**
+   * Fetch shop receipts (orders) with pagination.
+   * Endpoint: GET /v3/application/shops/{shopId}/receipts
+   */
+  async getReceipts(params: {
+    min_created?: number;
+    max_created?: number;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<any> {
+    const query = new URLSearchParams();
+    if (params.min_created != null) query.set('min_created', String(params.min_created));
+    if (params.max_created != null) query.set('max_created', String(params.max_created));
+    if (params.limit != null) query.set('limit', String(Math.min(params.limit, 100)));
+    if (params.offset != null) query.set('offset', String(params.offset));
+
+    const url = `${this.baseUrl}/application/shops/${this.shopId}/receipts?${query.toString()}`;
+
+    logger.info('Fetching Etsy receipts', {
+      shopId: this.shopId,
+      ...params
+    });
+
+    try {
+      const response = await this.makeAuthenticatedRequest(url, {
+        method: 'GET',
+        headers: {}
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        const errorMessage = `Etsy API error: ${response.status} - ${response.statusText}: ${errorBody}`;
+
+        logger.error('Etsy getReceipts failed', undefined, {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          shopId: this.shopId
+        });
+
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+
+      logger.info('Etsy receipts fetched successfully', {
+        shopId: this.shopId,
+        count: result.count
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to fetch Etsy receipts',
+        error instanceof Error ? error : new Error(String(error)), {
+          shopId: this.shopId
+        });
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch payment records for the shop.
+   * Endpoint: GET /v3/application/shops/{shopId}/payments
+   */
+  async getShopPayments(params: {
+    min_created?: number;
+    max_created?: number;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<any> {
+    const query = new URLSearchParams();
+    if (params.min_created != null) query.set('min_created', String(params.min_created));
+    if (params.max_created != null) query.set('max_created', String(params.max_created));
+    if (params.limit != null) query.set('limit', String(Math.min(params.limit, 100)));
+    if (params.offset != null) query.set('offset', String(params.offset));
+
+    const url = `${this.baseUrl}/application/shops/${this.shopId}/payments?${query.toString()}`;
+
+    logger.info('Fetching Etsy shop payments', {
+      shopId: this.shopId,
+      ...params
+    });
+
+    try {
+      const response = await this.makeAuthenticatedRequest(url, {
+        method: 'GET',
+        headers: {}
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        const errorMessage = `Etsy API error: ${response.status} - ${response.statusText}: ${errorBody}`;
+
+        logger.error('Etsy getShopPayments failed', undefined, {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          shopId: this.shopId
+        });
+
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+
+      logger.info('Etsy shop payments fetched successfully', {
+        shopId: this.shopId,
+        count: result.count
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to fetch Etsy shop payments',
+        error instanceof Error ? error : new Error(String(error)), {
+          shopId: this.shopId
+        });
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch ledger entries for the shop.
+   * Endpoint: GET /v3/application/shops/{shopId}/ledger/entries
+   */
+  async getLedgerEntries(params: {
+    min_created?: number;
+    max_created?: number;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<any> {
+    const query = new URLSearchParams();
+    if (params.min_created != null) query.set('min_created', String(params.min_created));
+    if (params.max_created != null) query.set('max_created', String(params.max_created));
+    if (params.limit != null) query.set('limit', String(Math.min(params.limit, 100)));
+    if (params.offset != null) query.set('offset', String(params.offset));
+
+    const url = `${this.baseUrl}/application/shops/${this.shopId}/ledger/entries?${query.toString()}`;
+
+    logger.info('Fetching Etsy ledger entries', {
+      shopId: this.shopId,
+      ...params
+    });
+
+    try {
+      const response = await this.makeAuthenticatedRequest(url, {
+        method: 'GET',
+        headers: {}
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        const errorMessage = `Etsy API error: ${response.status} - ${response.statusText}: ${errorBody}`;
+
+        logger.error('Etsy getLedgerEntries failed', undefined, {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          shopId: this.shopId
+        });
+
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+
+      logger.info('Etsy ledger entries fetched successfully', {
+        shopId: this.shopId,
+        count: result.count
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to fetch Etsy ledger entries',
+        error instanceof Error ? error : new Error(String(error)), {
+          shopId: this.shopId
+        });
+      throw error;
     }
   }
 }

@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getSupabaseServerClient } from '../../../lib/supabase';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
+import { EtsyClient } from '../../../lib/integrations/etsyClient';
+import type { EtsyCredentials } from '../../../lib/integrations/etsyClient';
 
 const TRENDYOL_API_BASE = 'https://apigw.trendyol.com/integration';
 
@@ -433,6 +435,275 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
 }
 
 // ---------------------------------------------------------------------------
+// Etsy — credentials & settlement sync
+// ---------------------------------------------------------------------------
+
+interface EtsyShopCredentials {
+  accessToken: string;
+  refreshToken: string;
+  shopId: string;
+  tokenExpiresAt: Date | null;
+  dbId: string; // EtsyShop record id for token refresh updates
+}
+
+async function getEtsyCredentials(userId: string): Promise<EtsyShopCredentials> {
+  const shop = await prisma.etsyShop.findFirst({
+    where: { userId, isActive: true, isDefault: true },
+  });
+
+  // Fallback: if no default shop, try any active shop for this user
+  const resolved = shop || await prisma.etsyShop.findFirst({
+    where: { userId, isActive: true },
+  });
+
+  if (!resolved?.accessToken || !resolved?.shopId) {
+    throw {
+      status: 400,
+      message: 'Etsy credentials not configured. Please connect your Etsy shop in settings.',
+    };
+  }
+
+  if (!resolved.refreshToken) {
+    throw {
+      status: 400,
+      message: 'Etsy refresh token missing. Please reconnect your Etsy shop in settings.',
+    };
+  }
+
+  return {
+    accessToken: resolved.accessToken,
+    refreshToken: resolved.refreshToken,
+    shopId: resolved.shopId,
+    tokenExpiresAt: resolved.tokenExpiresAt,
+    dbId: resolved.id,
+  };
+}
+
+async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
+  const { startDate, endDate } = body;
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'startDate and endDate are required (epoch ms)' });
+  }
+
+  const startMs = Number(startDate);
+  const endMs = Number(endDate);
+  if (isNaN(startMs) || isNaN(endMs) || startMs >= endMs) {
+    return res.status(400).json({ error: 'Invalid date range. startDate must be before endDate (epoch ms).' });
+  }
+
+  const etsyCreds = await getEtsyCredentials(userId);
+
+  // Token refresh callback — persists new tokens to DB
+  const onTokenRefresh = async (newCreds: EtsyCredentials) => {
+    await prisma.etsyShop.update({
+      where: { id: etsyCreds.dbId },
+      data: {
+        accessToken: newCreds.accessToken,
+        refreshToken: newCreds.refreshToken || undefined,
+        tokenExpiresAt: newCreds.tokenExpiresAt || undefined,
+      },
+    });
+    logger.info('Etsy token refreshed and saved to DB', { shopId: etsyCreds.shopId });
+  };
+
+  const client = new EtsyClient(
+    {
+      accessToken: etsyCreds.accessToken,
+      refreshToken: etsyCreds.refreshToken,
+      shopId: etsyCreds.shopId,
+      tokenExpiresAt: etsyCreds.tokenExpiresAt || undefined,
+    },
+    onTokenRefresh
+  );
+
+  // Convert epoch ms → unix seconds for Etsy API
+  const minCreated = Math.floor(startMs / 1000);
+  const maxCreated = Math.floor(endMs / 1000);
+
+  // ---- PHASE 1: Fetch all receipts with pagination ----
+  const allReceipts: any[] = [];
+  let offset = 0;
+  const PAGE_LIMIT = 100;
+  let hasMore = true;
+
+  while (hasMore) {
+    const data = await client.getReceipts({
+      min_created: minCreated,
+      max_created: maxCreated,
+      limit: PAGE_LIMIT,
+      offset,
+    });
+
+    const results = Array.isArray(data.results) ? data.results : [];
+    allReceipts.push(...results);
+
+    if (results.length < PAGE_LIMIT) {
+      hasMore = false;
+    } else {
+      offset += PAGE_LIMIT;
+    }
+  }
+
+  const totalFetched = allReceipts.length;
+
+  // ---- PHASE 2: Fetch payments in parallel for fee data ----
+  const paymentMap = new Map<string, { amount_gross: number; amount_fees: number; amount_net: number }>();
+
+  try {
+    let paymentOffset = 0;
+    let paymentHasMore = true;
+    const allPayments: any[] = [];
+
+    while (paymentHasMore) {
+      const paymentData = await client.getShopPayments({
+        min_created: minCreated,
+        max_created: maxCreated,
+        limit: PAGE_LIMIT,
+        offset: paymentOffset,
+      });
+
+      const paymentResults = Array.isArray(paymentData.results) ? paymentData.results : [];
+      allPayments.push(...paymentResults);
+
+      if (paymentResults.length < PAGE_LIMIT) {
+        paymentHasMore = false;
+      } else {
+        paymentOffset += PAGE_LIMIT;
+      }
+    }
+
+    for (const payment of allPayments) {
+      const receiptId = String(payment.receipt_id);
+      const existing = paymentMap.get(receiptId);
+      const gross = EtsyClient.etsyMoney(payment.amount_gross || { amount: 0, divisor: 100 });
+      const fees = EtsyClient.etsyMoney(payment.amount_fees || { amount: 0, divisor: 100 });
+      const net = EtsyClient.etsyMoney(payment.amount_net || { amount: 0, divisor: 100 });
+
+      if (existing) {
+        existing.amount_gross += gross;
+        existing.amount_fees += fees;
+        existing.amount_net += net;
+      } else {
+        paymentMap.set(receiptId, { amount_gross: gross, amount_fees: fees, amount_net: net });
+      }
+    }
+  } catch (err) {
+    // Payment data is supplementary — log and continue
+    logger.warn('Failed to fetch Etsy payments (continuing without fee data)', {
+      error: err instanceof Error ? err.message : String(err),
+      shopId: etsyCreds.shopId,
+    });
+  }
+
+  // ---- PHASE 3: Map receipts to FinancialTransaction records & upsert ----
+  let totalUpserted = 0;
+  const UPSERT_BATCH = 20;
+
+  for (let i = 0; i < allReceipts.length; i += UPSERT_BATCH) {
+    const batch = allReceipts.slice(i, i + UPSERT_BATCH);
+    await Promise.all(batch.map(receipt => {
+      const receiptId = String(receipt.receipt_id);
+      const status = (receipt.status || '').toLowerCase();
+
+      // Determine transaction type from receipt status
+      const isRefund = status === 'refunded' || status === 'returned';
+      const transactionType = isRefund ? 'Return' : 'Sale';
+
+      // Product name: first transaction title or concatenated
+      let productName: string | null = null;
+      if (Array.isArray(receipt.transactions) && receipt.transactions.length > 0) {
+        if (receipt.transactions.length === 1) {
+          productName = receipt.transactions[0].title || null;
+        } else {
+          productName = receipt.transactions.map((t: any) => t.title).filter(Boolean).join(', ') || null;
+        }
+      }
+
+      // Amount from grandtotal
+      let amount = EtsyClient.etsyMoney(receipt.grandtotal || { amount: 0, divisor: 100 });
+      if (isRefund) amount = -Math.abs(amount);
+
+      // Shipping cost
+      const shippingAmount = EtsyClient.etsyMoney(receipt.total_shipping_cost || { amount: 0, divisor: 100 });
+
+      // Fees from payment map
+      const paymentInfo = paymentMap.get(receiptId);
+      const commission = paymentInfo ? Math.abs(paymentInfo.amount_fees) : null;
+
+      // Currency
+      const currency = receipt.grandtotal?.currency_code || 'USD';
+
+      // Transaction date
+      const transactionDate = receipt.create_timestamp
+        ? new Date(receipt.create_timestamp * 1000)
+        : new Date();
+
+      const txData = {
+        transactionType,
+        orderNumber: receiptId,
+        barcode: null,
+        productName,
+        quantity: Array.isArray(receipt.transactions)
+          ? receipt.transactions.reduce((sum: number, t: any) => sum + (t.quantity || 1), 0)
+          : 1,
+        amount,
+        currency,
+        commission,
+        shippingAmount: shippingAmount || null,
+        transactionDate,
+        rawData: receipt,
+      };
+
+      return prisma.financialTransaction.upsert({
+        where: {
+          userId_marketplace_externalId: {
+            userId,
+            marketplace: 'etsy',
+            externalId: receiptId,
+          },
+        },
+        update: { ...txData, syncedAt: new Date() },
+        create: { userId, marketplace: 'etsy', externalId: receiptId, ...txData },
+      });
+    }));
+    totalUpserted += batch.length;
+  }
+
+  // Update sync cursor
+  await prisma.financialSyncCursor.upsert({
+    where: {
+      userId_marketplace: { userId, marketplace: 'etsy' },
+    },
+    update: {
+      lastSyncedTo: new Date(endMs),
+      totalSynced: { increment: totalUpserted },
+    },
+    create: {
+      userId,
+      marketplace: 'etsy',
+      lastSyncedTo: new Date(endMs),
+      totalSynced: totalUpserted,
+    },
+  });
+
+  logger.info('Etsy settlement sync complete', {
+    userId,
+    totalFetched,
+    totalUpserted,
+    paymentsWithFees: paymentMap.size,
+    shopId: etsyCreds.shopId,
+  });
+
+  return res.status(200).json({
+    success: true,
+    totalFetched,
+    totalUpserted,
+    paymentsWithFees: paymentMap.size,
+    syncedTo: new Date(endMs).toISOString(),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // GET — query cached transactions from DB
 // ---------------------------------------------------------------------------
 
@@ -501,6 +772,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'POST') {
       const { action } = req.body || {};
       if (action === 'sync') {
+        const marketplace = req.body.marketplace || 'trendyol';
+        if (marketplace === 'etsy') {
+          return await handleEtsySync(userId, req.body, res);
+        }
         return await handleSync(userId, req.body, res);
       }
       return res.status(400).json({ error: 'Unknown action. Use action: "sync".' });

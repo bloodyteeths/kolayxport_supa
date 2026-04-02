@@ -704,19 +704,43 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
 
       const entries = Array.isArray(ledgerData.results) ? ledgerData.results : [];
 
+      // Log first batch of ledger types for debugging
+      if (ledgerOffset === 0 && entries.length > 0) {
+        const typeSample = new Map<string, number>();
+        for (const e of entries) {
+          const lt = e.ledger_type || 'unknown';
+          typeSample.set(lt, (typeSample.get(lt) || 0) + 1);
+        }
+        logger.info('Etsy ledger entry types sample', {
+          types: Object.fromEntries(typeSample),
+          sampleEntry: {
+            ledger_type: entries[0].ledger_type,
+            description: entries[0].description,
+            amount: entries[0].amount,
+            currency_code: entries[0].currency_code,
+          },
+          totalInBatch: entries.length,
+        });
+      }
+
       for (const entry of entries) {
         const ledgerType = (entry.ledger_type || '').toLowerCase();
         const description = (entry.description || '').toLowerCase();
         // Match: prolist (Etsy Ads), offsite_ads_fee, or description-based matching
         const isAdSpend = ledgerType === 'prolist'
           || ledgerType === 'offsite_ads_fee'
+          || ledgerType.includes('ad')
           || description.includes('offsite ads')
           || description.includes('etsy ads')
-          || description.includes('promoted listing');
+          || description.includes('promoted listing')
+          || description.includes('advertising');
 
         if (isAdSpend) {
-          const amount = EtsyClient.etsyMoney(entry.amount || { amount: 0, divisor: 100 });
-          adSpendTotal += Math.abs(amount);
+          // Ledger amounts are plain integers in cents, not Money objects
+          const rawAmount = typeof entry.amount === 'object'
+            ? EtsyClient.etsyMoney(entry.amount)
+            : (Number(entry.amount) || 0) / 100;
+          adSpendTotal += Math.abs(rawAmount);
           adSpendEntries++;
         }
       }

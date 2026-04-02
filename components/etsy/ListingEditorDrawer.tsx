@@ -1293,7 +1293,7 @@ export default function ListingEditorDrawer({
               <ArrowBackIcon />
             </IconButton>
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography variant="subtitle1" fontWeight={600} noWrap title={listing?.title} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Typography variant="h6" fontWeight={700} noWrap title={listing?.title} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {listing?.title || t('editor.editListing')}
               </Typography>
               {listing && (
@@ -1313,7 +1313,7 @@ export default function ListingEditorDrawer({
                         : listing.state === 'inactive' ? 'error'
                         : 'warning'
                     }
-                    sx={{ height: 26, fontSize: '0.85rem' }}
+                    sx={{ height: 28, fontSize: '0.85rem' }}
                   />
                   <Typography variant="caption" color="text.secondary">
                     {listing.views} {t('editor.views')} · {listing.num_favorers} {t('editor.favorites')}
@@ -1329,7 +1329,7 @@ export default function ListingEditorDrawer({
             {fields && (
               <Box
                 sx={{
-                  width: 8, height: 8, borderRadius: '50%', mr: 0.5,
+                  width: 10, height: 10, borderRadius: '50%', mr: 0.5,
                   bgcolor:
                     autoSaveStatus === 'unsaved' ? 'warning.main'
                     : autoSaveStatus === 'saving' ? 'info.main'
@@ -1341,14 +1341,14 @@ export default function ListingEditorDrawer({
             )}
             <Tooltip title={history.length > 0 ? t('editor.undoTooltip', { count: history.length }) : t('editor.noHistory')}>
               <span>
-                <IconButton size="small" onClick={handleUndo} disabled={history.length === 0}>
+                <IconButton onClick={handleUndo} disabled={history.length === 0} sx={{ minWidth: 44, minHeight: 44 }}>
                   <UndoIcon fontSize="small" />
                 </IconButton>
               </span>
             </Tooltip>
             {fields && (
               <Tooltip title={t('editor.applyProfile')}>
-                <IconButton size="small" onClick={() => setLoadTemplateOpen(true)}>
+                <IconButton onClick={() => setLoadTemplateOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
                   <FolderOpenIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
@@ -1385,9 +1385,9 @@ export default function ListingEditorDrawer({
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 0.75,
-                    px: { xs: 1.5, md: 2 },
-                    py: 1.25,
+                    gap: 1,
+                    px: { xs: 1.5, md: 2.5 },
+                    py: 1.5,
                     cursor: 'pointer',
                     flexShrink: 0,
                     borderBottom: '2px solid',
@@ -1402,7 +1402,7 @@ export default function ListingEditorDrawer({
                   }}
                 >
                   {tab.icon}
-                  <Typography variant="body2" sx={{ fontWeight: 'inherit', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'inherit', fontSize: '0.875rem', whiteSpace: 'nowrap' }}>
                     {tab.label}
                   </Typography>
                 </Box>
@@ -1410,12 +1410,12 @@ export default function ListingEditorDrawer({
             </Box>
 
             {/* Main content area */}
-            <Box sx={{ flex: 1, overflow: 'auto', pb: 10 }}>
+            <Box sx={{ flex: 1, overflow: 'auto', pb: 8, '& .MuiFormHelperText-root': { fontSize: '0.8125rem', mt: 0.75 } }}>
             {/* ============================================================ */}
             {/* SEO Analizi */}
             {/* ============================================================ */}
             {activeTab === 'seo' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
                 <SEOIndicator
                   tags={fields.tags}
                   title={fields.title}
@@ -1493,7 +1493,7 @@ export default function ListingEditorDrawer({
                             <IconButton
                               onClick={() => handleAnalyzeRanking(kw.keyword)}
                               disabled={rankAnalysisLoading === kw.keyword}
-                              sx={{ color: '#666', '&:hover': { color: '#1976d2' }, minWidth: 40, minHeight: 40 }}
+                              sx={{ color: '#666', '&:hover': { color: '#1976d2' }, minWidth: 44, minHeight: 44 }}
                             >
                               {rankAnalysisLoading === kw.keyword ? <CircularProgress size={18} /> : <AutoFixHighIcon fontSize="small" />}
                             </IconButton>
@@ -1505,7 +1505,7 @@ export default function ListingEditorDrawer({
                                 setTrackedKeywords(prev => prev.filter(k => k.id !== kw.id));
                               } catch { /* silent */ }
                             }}
-                            sx={{ color: '#999', '&:hover': { color: '#eb3349' }, minWidth: 40, minHeight: 40 }}
+                            sx={{ color: '#999', '&:hover': { color: '#eb3349' }, minWidth: 44, minHeight: 44 }}
                           >
                             <CloseIcon fontSize="small" />
                           </IconButton>
@@ -1521,12 +1521,12 @@ export default function ListingEditorDrawer({
                   {/* Inline rank check */}
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                     <TextField
-                      size="small"
+                      size="medium"
                       placeholder={t('editor.enterKeyword')}
                       value={rankKeyword}
                       onChange={(e) => setRankKeyword(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleRankCheck(); }}
-                      sx={{ flex: 1, '& .MuiInputBase-root': { minHeight: 44 } }}
+                      sx={{ flex: 1 }}
                     />
                     <Button
                       variant="contained"
@@ -1574,18 +1574,18 @@ export default function ListingEditorDrawer({
             {/* Temel Bilgiler */}
             {/* ============================================================ */}
             {activeTab === 'basics' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                   {/* Title */}
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{t('editor.titleLabel')}</Typography>
+                      <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1 }}>{t('editor.titleLabel')}</Typography>
                       <Button
-                        size="small"
+                        size="medium"
                         startIcon={aiLoading.optimize_title ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                         onClick={handleAIOptimizeTitle}
                         disabled={!!aiLoading.optimize_title || !fields.title}
-                        sx={{ textTransform: 'none', fontSize: '0.875rem', minWidth: 0, py: 1, px: 2 }}
+                        sx={{ textTransform: 'none', fontSize: '0.875rem', minWidth: 0, minHeight: 40 }}
                       >
                         AI ile Optimize Et
                       </Button>
@@ -1598,23 +1598,22 @@ export default function ListingEditorDrawer({
                         }
                       }}
                       fullWidth
-                      size="small"
+                      size="medium"
                       helperText={`${fields.title.length}/140 karakter`}
                       inputProps={{ maxLength: 140 }}
-                      sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
                     />
                   </Box>
 
                   {/* Description */}
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{t('editor.descriptionLabel')}</Typography>
+                      <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1 }}>{t('editor.descriptionLabel')}</Typography>
                       <Button
-                        size="small"
+                        size="medium"
                         startIcon={aiLoading.generate_description ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                         onClick={handleAIGenerateDescription}
                         disabled={!!aiLoading.generate_description || !fields.title}
-                        sx={{ textTransform: 'none', fontSize: '0.875rem', minWidth: 0, py: 1, px: 2 }}
+                        sx={{ textTransform: 'none', fontSize: '0.875rem', minWidth: 0, minHeight: 40 }}
                       >
                         AI ile Olustur
                       </Button>
@@ -1624,17 +1623,16 @@ export default function ListingEditorDrawer({
                       onChange={(e) => updateField('description', e.target.value)}
                       fullWidth
                       multiline
-                      rows={6}
-                      size="small"
+                      rows={8}
+                      size="medium"
                       helperText={`${fields.description.length} karakter`}
-                      sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
                     />
                   </Box>
 
                   {/* Tags */}
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                      <Typography variant="subtitle2" fontWeight={600}>
                         Etiketler
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -1746,9 +1744,8 @@ export default function ListingEditorDrawer({
                       renderInput={(params) => (
                         <TextField
                           {...params}
-                          size="small"
+                          size="medium"
                           placeholder={fields.tags.length < 13 ? t('editor.bulkEditTags') : ''}
-                          sx={{ '& .MuiInputBase-root': { minHeight: 44 } }}
                           helperText={t('editor.tagHelperText', { count: fields.tags.length })}
                           onKeyDown={(e) => {
                             if (e.key === ',') {
@@ -1784,18 +1781,18 @@ export default function ListingEditorDrawer({
                     {/* AI Tag Buttons — right under the tags field */}
                     <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                       <Button
-                        size="small"
+                        size="medium"
                         variant="outlined"
                         startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                         onClick={handleAISuggestTags}
                         disabled={!!aiLoading.suggest_tags || !fields.title}
-                        sx={{ textTransform: 'none', fontSize: '0.875rem', py: 1, px: 2 }}
+                        sx={{ textTransform: 'none', fontSize: '0.875rem', minHeight: 40 }}
                       >
                         AI Etiket Oner
                       </Button>
                       {fields.tags.length > 0 && (
                         <Button
-                          size="small"
+                          size="medium"
                           variant="outlined"
                           color="secondary"
                           startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
@@ -1808,7 +1805,7 @@ export default function ListingEditorDrawer({
                             }
                           }}
                           disabled={!!aiLoading.suggest_tags || !fields.title}
-                          sx={{ textTransform: 'none', fontSize: '0.875rem', py: 1, px: 2 }}
+                          sx={{ textTransform: 'none', fontSize: '0.875rem', minHeight: 40 }}
                         >
                           {t('editor.aiReplaceAll')}
                         </Button>
@@ -1841,14 +1838,14 @@ export default function ListingEditorDrawer({
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
                             {fields.tags.length >= 13 && (
                               <Button
-                                size="small"
+                                size="medium"
                                 color="secondary"
                                 onClick={() => {
                                   updateField('tags', aiTagSuggestions.slice(0, 13));
                                   setAiTagSuggestions([]);
                                   toast.success(t('editor.allTagsReplaced'));
                                 }}
-                                sx={{ textTransform: 'none', fontSize: '0.85rem', py: 1, px: 2, minWidth: 0, minHeight: 36 }}
+                                sx={{ textTransform: 'none', fontSize: '0.875rem', minWidth: 0, minHeight: 40 }}
                               >
                                 {t('editor.replaceAll')}
                               </Button>
@@ -1863,7 +1860,7 @@ export default function ListingEditorDrawer({
                                 toast.success(t('editor.tagsAdded', { count: merged.length - fields.tags.length }));
                               }}
                               disabled={fields.tags.length >= 13 || aiTagSuggestions.every((t) => fields.tags.includes(t))}
-                              sx={{ textTransform: 'none', fontSize: '0.85rem', py: 1, px: 2, minWidth: 0, minHeight: 36 }}
+                              sx={{ textTransform: 'none', fontSize: '0.875rem', minWidth: 0, minHeight: 40 }}
                             >
                               {t('editor.addToGaps')}
                             </Button>
@@ -1939,7 +1936,7 @@ export default function ListingEditorDrawer({
                       <TextField
                         {...params}
                         label={t('editor.materialsLabel')}
-                        size="small"
+                        size="medium"
                         placeholder={fields.materials.length < 13 ? t('editor.materialsPlaceholder') : ''}
                         helperText={t('editor.materialsHelperText', { count: fields.materials.length })}
                       />
@@ -1953,7 +1950,7 @@ export default function ListingEditorDrawer({
             {/* Price and Stock */}
             {/* ============================================================ */}
             {activeTab === 'pricing' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <TextField
                     label={t('editor.price')}
@@ -1965,7 +1962,7 @@ export default function ListingEditorDrawer({
                         updateField('price', val);
                       }
                     }}
-                    size="small"
+                    size="medium"
                     sx={{ flex: 1 }}
                     InputProps={{
                       endAdornment: (
@@ -1980,7 +1977,7 @@ export default function ListingEditorDrawer({
                     type="number"
                     value={fields.quantity}
                     onChange={(e) => updateField('quantity', Math.max(0, parseInt(e.target.value) || 0))}
-                    size="small"
+                    size="medium"
                     sx={{ width: 120 }}
                     inputProps={{ min: 0 }}
                   />
@@ -1992,7 +1989,7 @@ export default function ListingEditorDrawer({
             {/* Gorseller */}
             {/* ============================================================ */}
             {activeTab === 'images' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <Typography variant="h6" fontWeight={600}>{t('editor.images')}</Typography>
                   <Chip label={listing.images.length} size="small" sx={{ height: 26, fontSize: '0.85rem' }} />
@@ -2010,7 +2007,7 @@ export default function ListingEditorDrawer({
             {/* Video */}
             {/* ============================================================ */}
             {activeTab === 'video' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <Typography variant="h6" fontWeight={600}>Video</Typography>
                   {videos.length > 0 && (
@@ -2036,7 +2033,7 @@ export default function ListingEditorDrawer({
             {/* Kişiselleştirme */}
             {/* ============================================================ */}
             {activeTab === 'personalization' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
                 <PersonalizationEditor
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
@@ -2056,7 +2053,7 @@ export default function ListingEditorDrawer({
             {/* Varyasyonlar ve Envanter */}
             {/* ============================================================ */}
             {activeTab === 'variations' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
+              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
                 <VariationEditor
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
@@ -2069,10 +2066,10 @@ export default function ListingEditorDrawer({
             {/* Liste Detayları */}
             {/* ============================================================ */}
             {activeTab === 'details' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 }, '& .MuiInputBase-root': { minHeight: 44 } }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                   {/* Who made */}
-                  <FormControl size="small" fullWidth>
+                  <FormControl size="medium" fullWidth>
                     <InputLabel>{t('editor.whoMadeLabel')}</InputLabel>
                     <Select
                       value={fields.who_made}
@@ -2088,7 +2085,7 @@ export default function ListingEditorDrawer({
                   </FormControl>
 
                   {/* When made */}
-                  <FormControl size="small" fullWidth>
+                  <FormControl size="medium" fullWidth>
                     <InputLabel>{t('editor.whenMadeLabel')}</InputLabel>
                     <Select
                       value={fields.when_made}
@@ -2114,11 +2111,11 @@ export default function ListingEditorDrawer({
                     label={t('editor.isSupplyLabel')}
                   />
 
-                  <Divider sx={{ my: 0.5 }} />
+                  <Divider sx={{ my: 2 }} />
 
                   {/* Shop section */}
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                    <FormControl size="small" fullWidth>
+                    <FormControl size="medium" fullWidth>
                       <InputLabel>{t('editor.shopSection')}</InputLabel>
                       <Select
                         value={String(fields.shop_section_id)}
@@ -2151,7 +2148,7 @@ export default function ListingEditorDrawer({
 
                   {/* Shipping profile */}
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                    <FormControl size="small" fullWidth>
+                    <FormControl size="medium" fullWidth>
                       <InputLabel>{t('editor.shippingProfile')}</InputLabel>
                       <Select
                         value={String(fields.shipping_profile_id)}
@@ -2184,7 +2181,7 @@ export default function ListingEditorDrawer({
 
                   {/* Return policy */}
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                    <FormControl size="small" fullWidth>
+                    <FormControl size="medium" fullWidth>
                       <InputLabel>{t('editor.returnPolicy')}</InputLabel>
                       <Select
                         value={String(fields.return_policy_id)}
@@ -2223,13 +2220,13 @@ export default function ListingEditorDrawer({
                     </Typography>
                   )}
 
-                  <Divider sx={{ my: 0.5 }} />
+                  <Divider sx={{ my: 2 }} />
 
                   {/* Processing time */}
-                  <Typography variant="body2" fontWeight={500}>
+                  <Typography variant="subtitle2" fontWeight={600}>
                     {t('editor.processingTimeDays')}
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
                     <TextField
                       label={t('editor.minLabel')}
                       type="number"
@@ -2237,7 +2234,7 @@ export default function ListingEditorDrawer({
                       onChange={(e) =>
                         updateField('processing_min', e.target.value ? parseInt(e.target.value) : '')
                       }
-                      size="small"
+                      size="medium"
                       sx={{ flex: 1 }}
                       inputProps={{ min: 1 }}
                     />
@@ -2248,16 +2245,16 @@ export default function ListingEditorDrawer({
                       onChange={(e) =>
                         updateField('processing_max', e.target.value ? parseInt(e.target.value) : '')
                       }
-                      size="small"
+                      size="medium"
                       sx={{ flex: 1 }}
                       inputProps={{ min: 1 }}
                     />
                   </Box>
 
-                  <Divider sx={{ my: 0.5 }} />
+                  <Divider sx={{ my: 2 }} />
 
                   {/* Weight */}
-                  <Typography variant="body2" fontWeight={500}>
+                  <Typography variant="subtitle2" fontWeight={600}>
                     {t('editor.weightTitle')}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 2 }}>
@@ -2268,11 +2265,11 @@ export default function ListingEditorDrawer({
                       onChange={(e) =>
                         updateField('item_weight', e.target.value ? parseFloat(e.target.value) : '')
                       }
-                      size="small"
+                      size="medium"
                       sx={{ flex: 1 }}
                       inputProps={{ min: 0, step: 0.1 }}
                     />
-                    <FormControl size="small" sx={{ minWidth: 80 }}>
+                    <FormControl size="medium" sx={{ minWidth: 80 }}>
                       <InputLabel>{t('editor.unitLabel')}</InputLabel>
                       <Select
                         value={fields.item_weight_unit}
@@ -2289,10 +2286,10 @@ export default function ListingEditorDrawer({
                   </Box>
 
                   {/* Dimensions */}
-                  <Typography variant="body2" fontWeight={500}>
+                  <Typography variant="subtitle2" fontWeight={600}>
                     {t('editor.dimensionsTitle')}
                   </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr auto' }, gap: 1.5 }}>
                     <TextField
                       label={t('editor.lengthLabel')}
                       type="number"
@@ -2300,8 +2297,7 @@ export default function ListingEditorDrawer({
                       onChange={(e) =>
                         updateField('item_length', e.target.value ? parseFloat(e.target.value) : '')
                       }
-                      size="small"
-                      sx={{ flex: 1, minWidth: 80 }}
+                      size="medium"
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <TextField
@@ -2311,8 +2307,7 @@ export default function ListingEditorDrawer({
                       onChange={(e) =>
                         updateField('item_width', e.target.value ? parseFloat(e.target.value) : '')
                       }
-                      size="small"
-                      sx={{ flex: 1, minWidth: 80 }}
+                      size="medium"
                       inputProps={{ min: 0, step: 0.1 }}
                     />
                     <TextField
@@ -2322,11 +2317,10 @@ export default function ListingEditorDrawer({
                       onChange={(e) =>
                         updateField('item_height', e.target.value ? parseFloat(e.target.value) : '')
                       }
-                      size="small"
-                      sx={{ flex: 1, minWidth: 80 }}
+                      size="medium"
                       inputProps={{ min: 0, step: 0.1 }}
                     />
-                    <FormControl size="small" sx={{ minWidth: 70 }}>
+                    <FormControl size="medium" sx={{ minWidth: 70 }}>
                       <InputLabel>{t('editor.unitLabel')}</InputLabel>
                       <Select
                         value={fields.item_dimensions_unit}
@@ -2351,8 +2345,8 @@ export default function ListingEditorDrawer({
             {/* İşlemler */}
             {/* ============================================================ */}
             {activeTab === 'actions' && (
-              <Box sx={{ p: { xs: 1.5, md: 3 } }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {/* Publish — only for draft/inactive */}
                   {(listing.state === 'draft' || listing.state === 'inactive') && (
                     <Button
@@ -2362,6 +2356,7 @@ export default function ListingEditorDrawer({
                       onClick={() => setPublishDialogOpen(true)}
                       disabled={publishing}
                       fullWidth
+                      sx={{ minHeight: 48, fontSize: '1rem' }}
                     >
                       {publishing ? t('editor.publishing') : t('editor.publish')}
                     </Button>
@@ -2378,6 +2373,7 @@ export default function ListingEditorDrawer({
                       onClick={() => setDeactivateDialogOpen(true)}
                       disabled={deactivating}
                       fullWidth
+                      sx={{ minHeight: 48, fontSize: '1rem' }}
                     >
                       {deactivating ? t('editor.deactivating') : t('editor.deactivateButton')}
                     </Button>
@@ -2390,6 +2386,7 @@ export default function ListingEditorDrawer({
                     onClick={handleCopy}
                     disabled={copying}
                     fullWidth
+                    sx={{ minHeight: 48, fontSize: '1rem' }}
                   >
                     {copying ? t('editor.copying') : t('editor.copy')}
                   </Button>
@@ -2401,6 +2398,7 @@ export default function ListingEditorDrawer({
                     startIcon={<DeleteIcon />}
                     onClick={() => setDeleteDialogOpen(true)}
                     fullWidth
+                    sx={{ minHeight: 48, fontSize: '1rem' }}
                   >
                     {t('editor.delete')}
                   </Button>
@@ -2419,7 +2417,7 @@ export default function ListingEditorDrawer({
             sx={{
               position: 'sticky',
               bottom: 0,
-              px: { xs: 1.5, md: 3 },
+              px: { xs: 1.5, md: 2.5 },
               py: 1.5,
               borderTop: '1px solid',
               borderColor: 'divider',
@@ -2442,6 +2440,7 @@ export default function ListingEditorDrawer({
                 borderRadius: '8px',
                 borderColor: '#e2e8f0',
                 color: '#475569',
+                minHeight: 44,
                 '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
               }}
             >
@@ -2464,8 +2463,9 @@ export default function ListingEditorDrawer({
                   borderRadius: '8px',
                   borderColor: '#e2e8f0',
                   color: '#475569',
+                  minHeight: 44,
                   '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
-                  display: { xs: 'none', sm: 'inline-flex' },
+                  display: { xs: 'none', md: 'inline-flex' },
                 }}
               >
                 {t('editor.viewOnEtsy')}
@@ -2484,8 +2484,9 @@ export default function ListingEditorDrawer({
                 borderRadius: '8px',
                 borderColor: '#e2e8f0',
                 color: '#475569',
+                minHeight: 44,
                 '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
-                display: { xs: 'none', sm: 'inline-flex' },
+                display: { xs: 'none', lg: 'inline-flex' },
               }}
             >
               {t('editor.saveProfile')}
@@ -2504,8 +2505,9 @@ export default function ListingEditorDrawer({
                 borderRadius: '8px',
                 borderColor: '#e2e8f0',
                 color: '#475569',
+                minHeight: 44,
                 '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
-                display: { xs: 'none', sm: 'inline-flex' },
+                display: { xs: 'none', lg: 'inline-flex' },
               }}
             >
               {t('editor.copy')}
@@ -2524,6 +2526,7 @@ export default function ListingEditorDrawer({
                 borderRadius: '8px',
                 borderColor: '#e2e8f0',
                 color: '#475569',
+                minHeight: 44,
                 position: 'relative',
                 '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' },
                 display: { xs: 'none', md: 'inline-flex' },

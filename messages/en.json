@@ -420,6 +420,8 @@
     "pageTitle": "Financial Dashboard",
     "subtitle": "Revenue, expenses, commissions & profit analysis",
     "grossRevenue": "Gross Revenue",
+    "beforeReturns": "before returns",
+    "netRevenue": "Net Revenue",
     "commissions": "Commissions",
     "shippingCosts": "Shipping Costs",
     "returns": "Returns",

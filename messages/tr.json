@@ -380,6 +380,8 @@
     "pageTitle": "Finansal Dashboard",
     "subtitle": "Gelir, gider, komisyon ve kâr analizi",
     "grossRevenue": "Brüt Gelir",
+    "beforeReturns": "iade öncesi",
+    "netRevenue": "Net Gelir",
     "commissions": "Komisyonlar",
     "shippingCosts": "Kargo Giderleri",
     "returns": "İadeler",

@@ -20,20 +20,23 @@ const TransactionLog = lazy(() => import('./TransactionLog'));
 // ---- Summary Cards ----
 
 interface CardDef {
-  key: keyof DashboardSummary;
+  key: keyof DashboardSummary | '_netRevenue';
   tKey: string;
+  subtKey?: string;
   icon: React.ReactNode;
   color: string;
   gradient: string;
   format: 'currency' | 'percent' | 'number';
   invertColor?: boolean;
+  getValue?: (s: DashboardSummary) => number;
 }
 
 const CARDS: CardDef[] = [
-  { key: 'grossRevenue', tKey: 'grossRevenue', icon: <Banknote size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency' },
+  { key: 'grossRevenue', tKey: 'grossRevenue', subtKey: 'beforeReturns', icon: <Banknote size={20} />, color: '#6b7280', gradient: 'linear-gradient(135deg, #f9fafb, #f3f4f6)', format: 'currency' },
+  { key: 'returns', tKey: 'returns', icon: <RotateCcw size={20} />, color: '#ef4444', gradient: 'linear-gradient(135deg, #fef2f2, #fecaca)', format: 'currency' },
+  { key: '_netRevenue', tKey: 'netRevenue', getValue: (s) => s.grossRevenue - s.returns, icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency' },
   { key: 'commissions', tKey: 'commissions', icon: <Percent size={20} />, color: '#f59e0b', gradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)', format: 'currency' },
   { key: 'shipping', tKey: 'shippingCosts', icon: <Truck size={20} />, color: '#3b82f6', gradient: 'linear-gradient(135deg, #eff6ff, #dbeafe)', format: 'currency' },
-  { key: 'returns', tKey: 'returns', icon: <RotateCcw size={20} />, color: '#ef4444', gradient: 'linear-gradient(135deg, #fef2f2, #fecaca)', format: 'currency' },
   { key: 'cogs', tKey: 'productCost', icon: <Package size={20} />, color: '#8b5cf6', gradient: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', format: 'currency' },
   { key: 'netProfit', tKey: 'netProfit', icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency', invertColor: true },
 ];
@@ -51,13 +54,13 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
   return (
     <Grid container spacing={1.5} sx={{ mb: 2 }}>
       {CARDS.map(card => {
-        const value = (summary[card.key] as number) ?? 0;
+        const value = card.getValue ? card.getValue(summary) : ((summary[card.key as keyof DashboardSummary] as number) ?? 0);
         const isNegative = card.invertColor && value < 0;
         const cardColor = isNegative ? '#ef4444' : card.color;
         const cardGradient = isNegative ? 'linear-gradient(135deg, #fef2f2, #fecaca)' : card.gradient;
 
         return (
-          <Grid item xs={6} sm={4} md={2} key={card.key}>
+          <Grid item xs={6} sm={4} md key={card.key}>
             <Paper sx={{
               p: 1.5, borderRadius: '12px', border: '1px solid',
               borderColor: 'rgba(0,0,0,0.04)', transition: 'all 0.2s',
@@ -72,18 +75,30 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                 {t(card.tKey)}
               </Typography>
+              {card.subtKey && (
+                <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.6rem', display: 'block' }}>
+                  {t(card.subtKey)}
+                </Typography>
+              )}
               {card.key === 'grossRevenue' && summary.orderCount > 0 && (
                 <Chip
                   label={`${summary.orderCount} ${t('orders')}`}
                   size="small"
-                  sx={{ ml: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#dcfce7', color: '#15803d' }}
+                  sx={{ mt: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#f3f4f6', color: '#6b7280' }}
+                />
+              )}
+              {card.key === '_netRevenue' && summary.orderCount > 0 && (
+                <Chip
+                  label={`${summary.orderCount - summary.returnCount} ${t('orders')}`}
+                  size="small"
+                  sx={{ mt: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#dcfce7', color: '#15803d' }}
                 />
               )}
               {card.key === 'returns' && summary.returnCount > 0 && (
                 <Chip
                   label={`${summary.returnCount} ${t('orders')}`}
                   size="small"
-                  sx={{ ml: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#fecaca', color: '#dc2626' }}
+                  sx={{ mt: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#fecaca', color: '#dc2626' }}
                 />
               )}
               {card.key === 'netProfit' && (
@@ -91,7 +106,7 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
                   label={`%${(summary.margin ?? 0).toFixed(1)}`}
                   size="small"
                   sx={{
-                    ml: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700,
+                    mt: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700,
                     bgcolor: value >= 0 ? '#dcfce7' : '#fecaca',
                     color: value >= 0 ? '#15803d' : '#dc2626',
                   }}
@@ -191,7 +206,7 @@ export default function FinancialDashboard() {
     return (
       <Box>
         <Grid container spacing={1.5} sx={{ mb: 2 }}>
-          {[1, 2, 3, 4, 5, 6].map(i => (
+          {[1, 2, 3, 4, 5, 6, 7].map(i => (
             <Grid item xs={6} sm={4} md={2} key={i}>
               <Skeleton variant="rounded" height={100} sx={{ borderRadius: '12px' }} />
             </Grid>

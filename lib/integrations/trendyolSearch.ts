@@ -85,6 +85,117 @@ export const TRENDYOL_CATEGORIES = [
   { slug: 'seramik-cini-x-c104165', label: 'Iznik Ceramics', labelTr: 'Çini', ebaySearch: 'Turkish Iznik tile ceramic', group: 'Hediyelik' },
 ];
 
+/**
+ * Trendyol category node from the public categories API.
+ */
+export interface TrendyolCategoryTreeNode {
+  id: number;
+  name: string;
+  parentId?: number;
+  subCategories?: TrendyolCategoryTreeNode[];
+}
+
+export interface FlatCategory {
+  id: number;
+  name: string;
+  slug: string;
+  parentId?: number;
+  parentPath: string; // e.g. "Ev & Mobilya > Ev Tekstili > Havlu"
+  depth: number;
+}
+
+// In-memory cache for the full category tree (refreshes every 24h)
+let cachedCategoryTree: FlatCategory[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+/**
+ * Fetch all Trendyol categories from the public API.
+ * Returns ~3800 leaf categories with full parent paths.
+ * No authentication required.
+ */
+export async function fetchTrendyolCategoryTree(): Promise<FlatCategory[]> {
+  // Return cached if fresh
+  if (cachedCategoryTree && (Date.now() - cacheTimestamp) < CACHE_TTL) {
+    return cachedCategoryTree;
+  }
+
+  try {
+    const res = await fetch('https://apigw.trendyol.com/integration/product/product-categories', {
+      headers: {
+        'User-Agent': 'KolayXport/1.0',
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    const categories = data?.categories;
+    if (!Array.isArray(categories) || categories.length === 0) {
+      throw new Error('Empty categories response');
+    }
+
+    const flat: FlatCategory[] = [];
+    flattenTree(categories, flat, '', 0);
+
+    cachedCategoryTree = flat;
+    cacheTimestamp = Date.now();
+    return flat;
+  } catch (err) {
+    // Fallback to hardcoded categories
+    console.warn('Failed to fetch Trendyol category tree, using hardcoded fallback:', err);
+    return TRENDYOL_CATEGORIES.map(cat => ({
+      id: parseInt(cat.slug.split('-x-c')[1] || '0'),
+      name: cat.labelTr,
+      slug: cat.slug,
+      parentPath: cat.group,
+      depth: 1,
+    }));
+  }
+}
+
+function flattenTree(
+  nodes: TrendyolCategoryTreeNode[],
+  result: FlatCategory[],
+  parentPath: string,
+  depth: number
+): void {
+  for (const node of nodes) {
+    const path = parentPath ? `${parentPath} > ${node.name}` : node.name;
+    const hasChildren = node.subCategories && node.subCategories.length > 0;
+
+    // Build slug from name + id
+    const slug = buildCategorySlug(node.name, node.id);
+
+    // Add all categories (both parent and leaf) so users can browse any level
+    result.push({
+      id: node.id,
+      name: node.name,
+      slug,
+      parentId: node.parentId,
+      parentPath: path,
+      depth,
+    });
+
+    if (hasChildren) {
+      flattenTree(node.subCategories!, result, path, depth + 1);
+    }
+  }
+}
+
+function buildCategorySlug(name: string, id: number): string {
+  const slugified = name
+    .toLowerCase()
+    .replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's')
+    .replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .replace(/â/g, 'a').replace(/î/g, 'i').replace(/û/g, 'u')
+    .replace(/&/g, '-ve-')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `${slugified}-x-c${id}`;
+}
+
 interface TrendyolSearchResult {
   products: TrendyolProduct[];
   totalCount: number;
@@ -289,7 +400,7 @@ export async function fetchTrendyolCategoryProducts(categorySlug: string, page =
  */
 export async function searchTrendyolByCategories(
   categorySlugs: string[],
-  maxPerCategory = 30
+  maxPerCategory = 100
 ): Promise<{ products: TrendyolProduct[]; totalCount: number }> {
   const allProducts: TrendyolProduct[] = [];
 
@@ -298,7 +409,7 @@ export async function searchTrendyolByCategories(
     let page = 1;
     let collected = 0;
 
-    while (collected < maxPerCategory && page <= 5) {
+    while (collected < maxPerCategory && page <= 10) {
       try {
         const result = await fetchTrendyolCategoryProducts(slug, page);
         if (result.products.length === 0) break;

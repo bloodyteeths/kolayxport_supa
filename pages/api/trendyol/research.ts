@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // MULTI-CATEGORY BROWSE
     // ================================================================
     if (action === 'multi_category' && req.method === 'POST') {
-      const { slugs, maxPerCategory = 30 } = req.body;
+      const { slugs, maxPerCategory = 100 } = req.body;
       if (!slugs || !Array.isArray(slugs)) {
         return res.status(400).json({ error: 'slugs array is required' });
       }
@@ -70,6 +70,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         groups[cat.group].push(cat);
       }
       return res.status(200).json({ categories: TRENDYOL_CATEGORIES, groups });
+    }
+
+    // ================================================================
+    // FULL CATEGORY TREE (dynamic from Trendyol API)
+    // ================================================================
+    if (action === 'category_tree') {
+      const { fetchTrendyolCategoryTree } = await import('../../../lib/integrations/trendyolSearch');
+      const allCategories = await fetchTrendyolCategoryTree();
+
+      // Group by top-level parent
+      const tree: Record<string, typeof allCategories> = {};
+      for (const cat of allCategories) {
+        const topLevel = cat.parentPath.split(' > ')[0];
+        if (!tree[topLevel]) tree[topLevel] = [];
+        tree[topLevel].push(cat);
+      }
+
+      // Also support search query
+      const q = (req.query.q as string || '').toLowerCase().trim();
+      if (q) {
+        const filtered = allCategories.filter(cat =>
+          cat.name.toLowerCase().includes(q) ||
+          cat.parentPath.toLowerCase().includes(q)
+        );
+        return res.status(200).json({
+          categories: filtered.slice(0, 100),
+          totalCount: filtered.length,
+          source: 'search',
+        });
+      }
+
+      res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=3600');
+      return res.status(200).json({
+        categories: allCategories,
+        tree,
+        totalCount: allCategories.length,
+        source: 'api',
+      });
     }
 
     // ================================================================

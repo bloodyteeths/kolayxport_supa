@@ -4,11 +4,9 @@ import { getCached, setCache, cacheKey, TTL } from './cache';
 import { logger } from '../logger';
 import type { TrendyolCategoryNode } from './types';
 
-const TRENDYOL_API_BASE = 'https://api.trendyol.com/sapigw';
-
 /**
  * Discover Trendyol categories.
- * Strategy 1: Use Trendyol seller API (requires credentials)
+ * Strategy 1: Use Trendyol public API (no auth needed)
  * Strategy 2: Fall back to expanded hardcoded list
  */
 export async function discoverTrendyolCategories(): Promise<TrendyolCategoryNode[]> {
@@ -18,25 +16,20 @@ export async function discoverTrendyolCategories(): Promise<TrendyolCategoryNode
 
   let categories: TrendyolCategoryNode[] = [];
 
-  // Try Trendyol API if credentials available
-  const apiKey = process.env.TRENDYOL_API_KEY;
-  const apiSecret = process.env.TRENDYOL_API_SECRET;
-
-  if (apiKey && apiSecret) {
-    try {
-      const auth = 'Basic ' + Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
-      const res = await fetch(`${TRENDYOL_API_BASE}/product/product-categories`, {
-        headers: { 'Authorization': auth, 'Content-Type': 'application/json' },
-      });
-      if (res.ok) {
-        const data: any = await res.json();
-        if (Array.isArray(data)) {
-          categories = flattenCategoryTree(data);
-        }
+  // Public API - no auth needed
+  try {
+    const res = await fetch('https://apigw.trendyol.com/integration/product/product-categories', {
+      headers: { 'Accept': 'application/json' },
+    });
+    if (res.ok) {
+      const data: any = await res.json();
+      const catArray = data?.categories;
+      if (Array.isArray(catArray) && catArray.length > 0) {
+        categories = flattenCategoryTree(catArray);
       }
-    } catch (err) {
-      logger.warn('Trendyol categories API failed, using hardcoded list', { error: String(err) });
     }
+  } catch (err) {
+    logger.warn('Trendyol categories API failed, using hardcoded list', { error: String(err) });
   }
 
   // Fallback to hardcoded categories

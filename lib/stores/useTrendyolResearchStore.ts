@@ -6,6 +6,15 @@ import type { TrendyolProduct } from '../arbitrage/types';
 // TYPES
 // ================================================================
 
+export interface FlatCategory {
+  id: number;
+  name: string;
+  slug: string;
+  parentId?: number;
+  parentPath: string;
+  depth: number;
+}
+
 interface PriceStats {
   min: number;
   max: number;
@@ -76,6 +85,12 @@ interface TrendyolResearchState {
   loading: boolean;
   currentPage: number;
 
+  // Category tree
+  categoryTree: FlatCategory[];
+  categoryTreeLoading: boolean;
+  categorySearchQuery: string;
+  selectedTopLevel: string;
+
   // Analysis
   analysis: ProductAnalysis | null;
 
@@ -99,6 +114,10 @@ interface TrendyolResearchState {
   loadSavedSearches: () => void;
   setSortBy: (sort: TrendyolResearchState['sortBy']) => void;
   setBrandFilter: (brand: string) => void;
+  fetchCategoryTree: () => Promise<void>;
+  searchCategories: (query: string) => Promise<void>;
+  setSelectedTopLevel: (topLevel: string) => void;
+  setCategorySearchQuery: (query: string) => void;
   reset: () => void;
 }
 
@@ -115,12 +134,45 @@ export const useTrendyolResearchStore = create<TrendyolResearchState>((set, get)
   totalCount: 0,
   loading: false,
   currentPage: 1,
+  categoryTree: [],
+  categoryTreeLoading: false,
+  categorySearchQuery: '',
+  selectedTopLevel: '',
   analysis: null,
   aiReport: null,
   aiReportLoading: false,
   savedSearches: [],
   sortBy: 'default',
   brandFilter: '',
+
+  fetchCategoryTree: async () => {
+    const state = get();
+    if (state.categoryTree.length > 0) return; // already loaded
+    set({ categoryTreeLoading: true });
+    try {
+      const res = await fetch('/api/trendyol/research?action=category_tree');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      set({ categoryTree: data.categories || [], categoryTreeLoading: false });
+    } catch (err: any) {
+      toast.error('Kategori ağacı yüklenemedi');
+      set({ categoryTreeLoading: false });
+    }
+  },
+
+  searchCategories: async (query: string) => {
+    set({ categorySearchQuery: query });
+    if (!query.trim()) return;
+    try {
+      const res = await fetch(`/api/trendyol/research?action=category_tree&q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      set({ categoryTree: data.categories || [] });
+    } catch {}
+  },
+
+  setSelectedTopLevel: (topLevel: string) => set({ selectedTopLevel: topLevel }),
+  setCategorySearchQuery: (query: string) => set({ categorySearchQuery: query }),
 
   browseCategory: async (slug, label, page = 1) => {
     set({ loading: true, selectedSlug: slug, selectedLabel: label, currentPage: page });
@@ -156,7 +208,7 @@ export const useTrendyolResearchStore = create<TrendyolResearchState>((set, get)
     }
   },
 
-  loadMorePages: async (maxPages = 3) => {
+  loadMorePages: async (maxPages = 5) => {
     const { selectedSlug, selectedLabel, currentPage } = get();
     if (!selectedSlug) return;
 

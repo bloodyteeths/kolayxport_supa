@@ -1,6 +1,6 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Box, Typography, Paper, Chip, Button, Divider,
+  Box, Typography, Paper, Chip, Button, Divider, TextField,
   Select, MenuItem, FormControl, InputLabel, Tooltip,
   CircularProgress, Skeleton, Collapse, Rating,
   useMediaQuery, IconButton,
@@ -10,46 +10,54 @@ import {
   Heart, ShoppingCart, Eye, Star, Truck, Zap, Shield,
   ChevronDown, ChevronUp, Bookmark, BookmarkCheck, Sparkles,
   Package, Users, Tag, BarChart2, TrendingUp, Store,
-  ExternalLink, BadgeCheck, Timer,
+  ExternalLink, BadgeCheck, Timer, Search, X, Home,
+  Shirt, Smartphone, Baby, Wrench, Car, BookOpen, Gamepad2,
+  Pencil, Hammer, Dumbbell,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
-import { TRENDYOL_CATEGORIES } from '@/lib/integrations/trendyolSearch';
 import { useTrendyolResearchStore, useSortedProducts } from '@/lib/stores/useTrendyolResearchStore';
+import type { FlatCategory } from '@/lib/stores/useTrendyolResearchStore';
 import type { TrendyolProduct } from '@/lib/arbitrage/types';
 
 // ================================================================
 // CONSTANTS
 // ================================================================
 
-const CATEGORY_GROUPS = [
-  'Ev & Dekor',
-  'Mutfak',
-  'Takı & Aksesuar',
-  'Tekstil',
-  'Yiyecek',
-  'Kozmetik',
-  'Hediyelik',
-] as const;
-
 const GROUP_ICONS: Record<string, React.ReactNode> = {
-  'Ev & Dekor': <Package size={14} />,
-  'Mutfak': <ShoppingCart size={14} />,
-  'Takı & Aksesuar': <Star size={14} />,
-  'Tekstil': <Tag size={14} />,
-  'Yiyecek': <Store size={14} />,
-  'Kozmetik': <Sparkles size={14} />,
-  'Hediyelik': <Heart size={14} />,
+  'Aksesuar': <Tag size={14} />,
+  'Anne & Bebek & Cocuk': <Baby size={14} />,
+  'Ayakkabi': <ShoppingCart size={14} />,
+  'Bahce & Elektrikli El Aletleri': <Wrench size={14} />,
+  'Banyo Yapi & Hirdavat': <Hammer size={14} />,
+  'Elektronik': <Smartphone size={14} />,
+  'Ev & Mobilya': <Home size={14} />,
+  'Giyim': <Shirt size={14} />,
+  'Hobi & Eglence': <Gamepad2 size={14} />,
+  'Kirtasiye & Ofis Malzemeleri': <Pencil size={14} />,
+  'Kitap': <BookOpen size={14} />,
+  'Kozmetik & Kisisel Bakim': <Sparkles size={14} />,
+  'Otomobil & Motosiklet': <Car size={14} />,
+  'Spor & Outdoor': <Dumbbell size={14} />,
+  'Supermarket': <Store size={14} />,
 };
 
 const GROUP_COLORS: Record<string, string> = {
-  'Ev & Dekor': '#667eea',
-  'Mutfak': '#f2994a',
-  'Takı & Aksesuar': '#e91e63',
-  'Tekstil': '#2196f3',
-  'Yiyecek': '#4caf50',
-  'Kozmetik': '#9c27b0',
-  'Hediyelik': '#ff5722',
+  'Aksesuar': '#e91e63',
+  'Anne & Bebek & Cocuk': '#4caf50',
+  'Ayakkabi': '#795548',
+  'Bahce & Elektrikli El Aletleri': '#607d8b',
+  'Banyo Yapi & Hirdavat': '#9e9e9e',
+  'Elektronik': '#2196f3',
+  'Ev & Mobilya': '#667eea',
+  'Giyim': '#f44336',
+  'Hobi & Eglence': '#ff9800',
+  'Kirtasiye & Ofis Malzemeleri': '#00bcd4',
+  'Kitap': '#8bc34a',
+  'Kozmetik & Kisisel Bakim': '#9c27b0',
+  'Otomobil & Motosiklet': '#455a64',
+  'Spor & Outdoor': '#ff5722',
+  'Supermarket': '#f2994a',
 };
 
 const glassCard = {
@@ -397,8 +405,9 @@ export default function CategoryExplorer() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const [activeGroup, setActiveGroup] = useState<string>(CATEGORY_GROUPS[0]);
   const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
+  const [localSearch, setLocalSearch] = useState('');
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Store
   const selectedSlug = useTrendyolResearchStore(s => s.selectedSlug);
@@ -411,6 +420,9 @@ export default function CategoryExplorer() {
   const sortBy = useTrendyolResearchStore(s => s.sortBy);
   const brandFilter = useTrendyolResearchStore(s => s.brandFilter);
   const savedSearches = useTrendyolResearchStore(s => s.savedSearches);
+  const categoryTree = useTrendyolResearchStore(s => s.categoryTree);
+  const categoryTreeLoading = useTrendyolResearchStore(s => s.categoryTreeLoading);
+  const selectedTopLevel = useTrendyolResearchStore(s => s.selectedTopLevel);
 
   const browseCategory = useTrendyolResearchStore(s => s.browseCategory);
   const loadMorePages = useTrendyolResearchStore(s => s.loadMorePages);
@@ -419,19 +431,56 @@ export default function CategoryExplorer() {
   const loadSavedSearches = useTrendyolResearchStore(s => s.loadSavedSearches);
   const setSortBy = useTrendyolResearchStore(s => s.setSortBy);
   const setBrandFilter = useTrendyolResearchStore(s => s.setBrandFilter);
+  const fetchCategoryTree = useTrendyolResearchStore(s => s.fetchCategoryTree);
+  const setSelectedTopLevel = useTrendyolResearchStore(s => s.setSelectedTopLevel);
 
   const sortedProducts = useSortedProducts();
 
-  // Load saved searches on mount
+  // Load saved searches and category tree on mount
   useEffect(() => {
     loadSavedSearches();
-  }, [loadSavedSearches]);
+    fetchCategoryTree();
+  }, [loadSavedSearches, fetchCategoryTree]);
 
-  // Categories for the active group
-  const groupCategories = useMemo(
-    () => TRENDYOL_CATEGORIES.filter(c => c.group === activeGroup),
-    [activeGroup],
+  // Top-level categories (depth 0)
+  const topLevelCategories = useMemo(
+    () => categoryTree.filter(c => c.depth === 0),
+    [categoryTree],
   );
+
+  // Auto-select first top-level when tree loads
+  useEffect(() => {
+    if (topLevelCategories.length > 0 && !selectedTopLevel) {
+      setSelectedTopLevel(topLevelCategories[0].name);
+    }
+  }, [topLevelCategories, selectedTopLevel, setSelectedTopLevel]);
+
+  // Subcategories of selected top-level (depth 1 = direct children)
+  const subcategories = useMemo(() => {
+    if (!selectedTopLevel) return [];
+    return categoryTree.filter(c =>
+      c.depth === 1 && c.parentPath.startsWith(selectedTopLevel + ' > ')
+    );
+  }, [categoryTree, selectedTopLevel]);
+
+  // Deep subcategories for expanded sub-group
+  const [expandedSubGroup, setExpandedSubGroup] = useState<string | null>(null);
+
+  const subGroupChildren = useMemo(() => {
+    if (!expandedSubGroup) return [];
+    return categoryTree.filter(c =>
+      c.depth >= 2 && c.parentPath.startsWith(expandedSubGroup + ' > ')
+    );
+  }, [categoryTree, expandedSubGroup]);
+
+  // Search results (local filter, debounced)
+  const filteredCategories = useMemo(() => {
+    if (!localSearch.trim() || localSearch.length < 2) return [];
+    const q = localSearch.toLowerCase();
+    return categoryTree.filter(c =>
+      c.name.toLowerCase().includes(q) || c.parentPath.toLowerCase().includes(q)
+    ).slice(0, 50);
+  }, [categoryTree, localSearch]);
 
   // Unique brands for filter dropdown
   const uniqueBrands = useMemo(() => {
@@ -444,12 +493,17 @@ export default function CategoryExplorer() {
   const isSaved = savedSearches.some(s => s.slug === selectedSlug);
 
   // Handle category click
-  const handleCategoryClick = (slug: string, label: string) => {
+  const handleCategoryClick = useCallback((slug: string, label: string) => {
     setBrandFilter('');
     setSortBy('default');
     setExpandedCardId(null);
+    setLocalSearch('');
     browseCategory(slug, label, 1);
-  };
+  }, [setBrandFilter, setSortBy, browseCategory]);
+
+  // Get color for top-level category
+  const getGroupColor = (name: string) => GROUP_COLORS[name] || '#F27A1A';
+  const getGroupIcon = (name: string) => GROUP_ICONS[name] || <Package size={14} />;
 
   return (
     <Box>
@@ -478,74 +532,186 @@ export default function CategoryExplorer() {
         </Box>
       )}
 
-      {/* ---- Category Group Selector ---- */}
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-        {CATEGORY_GROUPS.map(group => (
-          <Chip
-            key={group}
-            icon={GROUP_ICONS[group] as React.ReactElement}
-            label={group}
-            onClick={() => setActiveGroup(group)}
-            sx={{
-              fontWeight: 700, fontSize: '0.78rem',
-              bgcolor: activeGroup === group ? GROUP_COLORS[group] : undefined,
-              color: activeGroup === group ? '#fff' : undefined,
-              border: activeGroup === group ? 'none' : '1px solid #e0e0e0',
-              '& .MuiChip-icon': {
-                color: activeGroup === group ? '#fff' : GROUP_COLORS[group],
-              },
-              transition: 'all 0.2s',
-              '&:hover': {
-                bgcolor: activeGroup === group ? GROUP_COLORS[group] : 'rgba(0,0,0,0.04)',
-              },
-            }}
-          />
-        ))}
-      </Box>
+      {/* ---- Category Search ---- */}
+      <TextField
+        fullWidth
+        size="small"
+        placeholder={t('searchCategories')}
+        value={localSearch}
+        onChange={(e) => setLocalSearch(e.target.value)}
+        InputProps={{
+          startAdornment: <Search size={16} style={{ marginRight: 8, opacity: 0.5 }} />,
+          endAdornment: localSearch ? (
+            <IconButton size="small" onClick={() => setLocalSearch('')}>
+              <X size={14} />
+            </IconButton>
+          ) : categoryTree.length > 0 ? (
+            <Typography variant="caption" sx={{ color: 'text.disabled', whiteSpace: 'nowrap' }}>
+              {categoryTree.length.toLocaleString('tr-TR')} {t('categories').toLowerCase()}
+            </Typography>
+          ) : null,
+        }}
+        sx={{ mb: 2 }}
+      />
 
-      {/* ---- Category Cards for Selected Group ---- */}
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(160px, 1fr))',
-        gap: 1,
-        mb: 2,
-      }}>
-        {groupCategories.map(cat => (
-          <Paper
-            key={cat.slug}
-            onClick={() => handleCategoryClick(cat.slug, cat.labelTr)}
-            sx={{
-              ...glassCard,
-              p: 1.5,
-              cursor: 'pointer',
-              textAlign: 'center',
-              bgcolor: selectedSlug === cat.slug ? GROUP_COLORS[activeGroup] : undefined,
-              color: selectedSlug === cat.slug ? '#fff' : undefined,
-              '&:hover': {
-                ...glassCard['&:hover'],
-                bgcolor: selectedSlug === cat.slug
-                  ? GROUP_COLORS[activeGroup]
-                  : `${GROUP_COLORS[activeGroup]}10`,
-              },
-            }}
-          >
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>
-              {cat.labelTr}
+      {/* ---- Search Results ---- */}
+      {localSearch.trim().length >= 2 && (
+        <Box sx={{ mb: 2, maxHeight: 400, overflowY: 'auto' }}>
+          {filteredCategories.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+              {t('noSearchResults')}
             </Typography>
-            <Typography variant="caption" sx={{
-              opacity: selectedSlug === cat.slug ? 0.85 : 0.6,
-              fontSize: '0.65rem',
+          ) : (
+            <>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1, display: 'block' }}>
+                {t('searchResultCount', { count: filteredCategories.length })}
+              </Typography>
+              {filteredCategories.map(cat => (
+                <Paper
+                  key={cat.id}
+                  onClick={() => handleCategoryClick(cat.slug, cat.name)}
+                  sx={{
+                    p: 1.5, mb: 0.5, cursor: 'pointer', borderRadius: '8px',
+                    border: '1px solid', borderColor: 'divider',
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={600}>{cat.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {cat.parentPath}
+                  </Typography>
+                </Paper>
+              ))}
+            </>
+          )}
+        </Box>
+      )}
+
+      {/* ---- Loading Categories ---- */}
+      {categoryTreeLoading && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, justifyContent: 'center', py: 3 }}>
+          <CircularProgress size={20} sx={{ color: '#F27A1A' }} />
+          <Typography variant="body2" color="text.secondary">{t('loadingCategories')}</Typography>
+        </Box>
+      )}
+
+      {/* ---- Top-Level Category Tabs ---- */}
+      {!localSearch.trim() && topLevelCategories.length > 0 && (
+        <>
+          <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 2 }}>
+            {topLevelCategories.map(cat => {
+              const color = getGroupColor(cat.name);
+              const isActive = selectedTopLevel === cat.name;
+              const childCount = categoryTree.filter(c => c.depth === 1 && c.parentPath.startsWith(cat.name + ' > ')).length;
+              return (
+                <Chip
+                  key={cat.id}
+                  icon={getGroupIcon(cat.name) as React.ReactElement}
+                  label={`${cat.name} (${childCount})`}
+                  onClick={() => {
+                    setSelectedTopLevel(cat.name);
+                    setExpandedSubGroup(null);
+                  }}
+                  sx={{
+                    fontWeight: 700, fontSize: '0.75rem',
+                    bgcolor: isActive ? color : undefined,
+                    color: isActive ? '#fff' : undefined,
+                    border: isActive ? 'none' : '1px solid #e0e0e0',
+                    '& .MuiChip-icon': { color: isActive ? '#fff' : color },
+                    transition: 'all 0.2s',
+                    '&:hover': { bgcolor: isActive ? color : 'rgba(0,0,0,0.04)' },
+                  }}
+                />
+              );
+            })}
+          </Box>
+
+          {/* ---- Subcategories of Selected Top-Level ---- */}
+          {subcategories.length > 0 && (
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: 1, mb: 2,
             }}>
-              {cat.label}
-            </Typography>
-          </Paper>
-        ))}
-      </Box>
+              {subcategories.map(cat => {
+                const color = getGroupColor(selectedTopLevel);
+                const isSelected = selectedSlug === cat.slug;
+                const deepChildren = categoryTree.filter(c =>
+                  c.depth >= 2 && c.parentPath.startsWith(cat.parentPath + ' > ')
+                ).length;
+                const isExpanded = expandedSubGroup === cat.parentPath;
+
+                return (
+                  <Paper
+                    key={cat.id}
+                    sx={{
+                      ...glassCard,
+                      p: 1.5, cursor: 'pointer', textAlign: 'center',
+                      bgcolor: isSelected ? color : isExpanded ? `${color}10` : undefined,
+                      color: isSelected ? '#fff' : undefined,
+                      borderColor: isExpanded ? color : undefined,
+                      '&:hover': {
+                        ...glassCard['&:hover'],
+                        bgcolor: isSelected ? color : `${color}10`,
+                      },
+                    }}
+                    onClick={() => {
+                      if (deepChildren > 0) {
+                        setExpandedSubGroup(isExpanded ? null : cat.parentPath);
+                      } else {
+                        handleCategoryClick(cat.slug, cat.name);
+                      }
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.8rem' }}>
+                      {cat.name}
+                    </Typography>
+                    {deepChildren > 0 && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, mt: 0.5 }}>
+                        <Typography variant="caption" sx={{ opacity: 0.7, fontSize: '0.65rem' }}>
+                          {deepChildren} {t('subcategories').toLowerCase()}
+                        </Typography>
+                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </Box>
+                    )}
+                  </Paper>
+                );
+              })}
+            </Box>
+          )}
+
+          {/* ---- Deep Subcategories (when a sub-group is expanded) ---- */}
+          {expandedSubGroup && subGroupChildren.length > 0 && (
+            <Paper sx={{ ...glassCard, p: 2, mb: 2, borderLeft: `4px solid ${getGroupColor(selectedTopLevel)}` }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>
+                {expandedSubGroup.split(' > ').pop()} — {t('subcategories')}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                {subGroupChildren.map(cat => (
+                  <Chip
+                    key={cat.id}
+                    label={cat.name}
+                    size="small"
+                    onClick={() => handleCategoryClick(cat.slug, cat.name)}
+                    sx={{
+                      cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
+                      bgcolor: selectedSlug === cat.slug ? getGroupColor(selectedTopLevel) : undefined,
+                      color: selectedSlug === cat.slug ? '#fff' : undefined,
+                      border: selectedSlug === cat.slug ? 'none' : '1px solid #e0e0e0',
+                      '&:hover': { bgcolor: `${getGroupColor(selectedTopLevel)}20` },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Paper>
+          )}
+        </>
+      )}
 
       {/* ---- Loading Skeleton ---- */}
       {loading && sortedProducts.length === 0 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4, gap: 2 }}>
-          <CircularProgress sx={{ color: GROUP_COLORS[activeGroup] }} />
+          <CircularProgress sx={{ color: getGroupColor(selectedTopLevel) }} />
           <Typography variant="body2" color="text.secondary">{t('loadingProducts')}</Typography>
           <Box sx={{
             display: 'grid',
@@ -715,7 +881,7 @@ export default function CategoryExplorer() {
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
             <Button
               variant="outlined"
-              onClick={() => loadMorePages(3)}
+              onClick={() => loadMorePages(5)}
               disabled={loading}
               startIcon={loading ? <CircularProgress size={16} /> : <ChevronDown size={16} />}
               sx={{

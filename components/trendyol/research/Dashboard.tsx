@@ -1,66 +1,55 @@
 import React, { useEffect, useMemo } from 'react';
 import {
   Box, Typography, Paper, Chip, Grid, IconButton, Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import {
   Bookmark, Trash2, ShoppingBag, Tag, Shirt, Home, Smartphone,
   Sparkles, Baby, UtensilsCrossed, TrendingUp, Package, Users,
+  BookOpen, Gamepad2, Pencil, Wrench, Hammer, Car, Dumbbell, Store,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 import { useTrendyolResearchStore } from '@/lib/stores/useTrendyolResearchStore';
 
 // ================================================================
-// TYPES & CONSTANTS
+// CONSTANTS
 // ================================================================
 
-interface PredefinedCategory {
-  slug: string;
-  label: string;
-  group: string;
-}
-
-const PREDEFINED_CATEGORIES: PredefinedCategory[] = [
-  // Moda
-  { slug: 'kadin-giyim-x-c89', label: 'Kadin Giyim', group: 'Moda' },
-  { slug: 'erkek-giyim-x-c114', label: 'Erkek Giyim', group: 'Moda' },
-  { slug: 'ayakkabi-x-c56', label: 'Ayakkabi', group: 'Moda' },
-  // Ev & Yasam
-  { slug: 'havlu-x-c104073', label: 'Havlu', group: 'Ev & Yasam' },
-  { slug: 'nevresim-x-c104047', label: 'Nevresim', group: 'Ev & Yasam' },
-  { slug: 'dekorasyon-x-c104000', label: 'Dekorasyon', group: 'Ev & Yasam' },
-  // Elektronik
-  { slug: 'telefon-x-c103866', label: 'Telefon', group: 'Elektronik' },
-  { slug: 'kulaklik-x-c103922', label: 'Kulaklik', group: 'Elektronik' },
-  { slug: 'tablet-x-c103862', label: 'Tablet', group: 'Elektronik' },
-  // Kozmetik
-  { slug: 'parfum-x-c104166', label: 'Parfum', group: 'Kozmetik' },
-  { slug: 'makyaj-x-c104152', label: 'Makyaj', group: 'Kozmetik' },
-  { slug: 'cilt-bakimi-x-c104189', label: 'Cilt Bakimi', group: 'Kozmetik' },
-  // Bebek
-  { slug: 'bebek-giyim-x-c104292', label: 'Bebek Giyim', group: 'Bebek' },
-  { slug: 'bebek-bakim-x-c104310', label: 'Bebek Bakim', group: 'Bebek' },
-  // Mutfak
-  { slug: 'tencere-x-c104087', label: 'Tencere', group: 'Mutfak' },
-  { slug: 'bardak-x-c104113', label: 'Bardak', group: 'Mutfak' },
-];
-
 const GROUP_ICONS: Record<string, React.ReactNode> = {
-  'Moda': <Shirt size={16} />,
-  'Ev & Yasam': <Home size={16} />,
+  'Aksesuar': <Tag size={16} />,
+  'Anne & Bebek & Cocuk': <Baby size={16} />,
+  'Ayakkabi': <ShoppingBag size={16} />,
+  'Bahce & Elektrikli El Aletleri': <Wrench size={16} />,
+  'Banyo Yapi & Hirdavat': <Hammer size={16} />,
   'Elektronik': <Smartphone size={16} />,
-  'Kozmetik': <Sparkles size={16} />,
-  'Bebek': <Baby size={16} />,
-  'Mutfak': <UtensilsCrossed size={16} />,
+  'Ev & Mobilya': <Home size={16} />,
+  'Giyim': <Shirt size={16} />,
+  'Hobi & Eglence': <Gamepad2 size={16} />,
+  'Kirtasiye & Ofis Malzemeleri': <Pencil size={16} />,
+  'Kitap': <BookOpen size={16} />,
+  'Kozmetik & Kisisel Bakim': <Sparkles size={16} />,
+  'Otomobil & Motosiklet': <Car size={16} />,
+  'Spor & Outdoor': <Dumbbell size={16} />,
+  'Supermarket': <Store size={16} />,
 };
 
 const GROUP_COLORS: Record<string, string> = {
-  'Moda': '#e91e63',
-  'Ev & Yasam': '#667eea',
+  'Aksesuar': '#e91e63',
+  'Anne & Bebek & Cocuk': '#4caf50',
+  'Ayakkabi': '#795548',
+  'Bahce & Elektrikli El Aletleri': '#607d8b',
+  'Banyo Yapi & Hirdavat': '#9e9e9e',
   'Elektronik': '#2196f3',
-  'Kozmetik': '#9c27b0',
-  'Bebek': '#4caf50',
-  'Mutfak': '#f2994a',
+  'Ev & Mobilya': '#667eea',
+  'Giyim': '#f44336',
+  'Hobi & Eglence': '#ff9800',
+  'Kirtasiye & Ofis Malzemeleri': '#00bcd4',
+  'Kitap': '#8bc34a',
+  'Kozmetik & Kisisel Bakim': '#9c27b0',
+  'Otomobil & Motosiklet': '#455a64',
+  'Spor & Outdoor': '#ff5722',
+  'Supermarket': '#f2994a',
 };
 
 const TRENDYOL_ORANGE = '#F27A1A';
@@ -104,24 +93,34 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     savedSearches,
     products,
     analysis,
+    categoryTree,
+    categoryTreeLoading,
     loadSavedSearches,
     removeSavedSearch,
     browseCategory,
+    fetchCategoryTree,
   } = useTrendyolResearchStore();
 
   useEffect(() => {
     loadSavedSearches();
-  }, [loadSavedSearches]);
+    fetchCategoryTree();
+  }, [loadSavedSearches, fetchCategoryTree]);
 
-  // Group predefined categories
+  // Group categories by top-level (depth 0 → their depth 1 children)
   const groupedCategories = useMemo(() => {
-    const groups: Record<string, PredefinedCategory[]> = {};
-    for (const cat of PREDEFINED_CATEGORIES) {
-      if (!groups[cat.group]) groups[cat.group] = [];
-      groups[cat.group].push(cat);
+    const topLevel = categoryTree.filter(c => c.depth === 0);
+    const groups: Record<string, Array<{ slug: string; name: string }>> = {};
+    for (const parent of topLevel) {
+      const children = categoryTree
+        .filter(c => c.depth === 1 && c.parentPath.startsWith(parent.name + ' > '))
+        .slice(0, 6) // Show first 6 subcategories per group
+        .map(c => ({ slug: c.slug, name: c.name }));
+      if (children.length > 0) {
+        groups[parent.name] = children;
+      }
     }
     return groups;
-  }, []);
+  }, [categoryTree]);
 
   // Quick stats from analysis
   const stats = useMemo(() => {
@@ -226,61 +225,89 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </Typography>
         </Box>
 
-        <Grid container spacing={2}>
-          {Object.entries(groupedCategories).map(([group, categories]) => {
-            const color = GROUP_COLORS[group] || TRENDYOL_ORANGE;
-            const icon = GROUP_ICONS[group] || <Tag size={16} />;
+        {categoryTreeLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress size={24} sx={{ color: TRENDYOL_ORANGE }} />
+          </Box>
+        ) : (
+          <Grid container spacing={2}>
+            {Object.entries(groupedCategories).map(([group, categories]) => {
+              const color = GROUP_COLORS[group] || TRENDYOL_ORANGE;
+              const icon = GROUP_ICONS[group] || <Tag size={16} />;
+              const totalChildren = categoryTree.filter(c =>
+                c.depth === 1 && c.parentPath.startsWith(group + ' > ')
+              ).length;
 
-            return (
-              <Grid item xs={12} sm={6} md={4} key={group}>
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    borderRadius: '12px',
-                    borderColor: `${color}40`,
-                    height: '100%',
-                  }}
-                >
-                  <Box
+              return (
+                <Grid item xs={12} sm={6} md={4} key={group}>
+                  <Paper
+                    variant="outlined"
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                      mb: 1.5,
+                      p: 2,
+                      borderRadius: '12px',
+                      borderColor: `${color}40`,
+                      height: '100%',
                     }}
                   >
-                    <Box sx={{ color }}>{icon}</Box>
-                    <Typography variant="subtitle2" fontWeight={600}>
-                      {group}
-                    </Typography>
-                  </Box>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        mb: 1.5,
+                      }}
+                    >
+                      <Box sx={{ color }}>{icon}</Box>
+                      <Typography variant="subtitle2" fontWeight={600}>
+                        {group}
+                      </Typography>
+                      <Typography variant="caption" sx={{ ml: 'auto', color: 'text.disabled' }}>
+                        {totalChildren}
+                      </Typography>
+                    </Box>
 
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                    {categories.map((cat) => (
-                      <Chip
-                        key={cat.slug}
-                        label={cat.label}
-                        size="small"
-                        onClick={() => handleBrowse(cat.slug, cat.label)}
-                        sx={{
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          borderColor: `${color}60`,
-                          color,
-                          '&:hover': {
-                            backgroundColor: `${color}15`,
-                          },
-                        }}
-                        variant="outlined"
-                      />
-                    ))}
-                  </Box>
-                </Paper>
-              </Grid>
-            );
-          })}
-        </Grid>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                      {categories.map((cat) => (
+                        <Chip
+                          key={cat.slug}
+                          label={cat.name}
+                          size="small"
+                          onClick={() => handleBrowse(cat.slug, cat.name)}
+                          sx={{
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            borderColor: `${color}60`,
+                            color,
+                            '&:hover': {
+                              backgroundColor: `${color}15`,
+                            },
+                          }}
+                          variant="outlined"
+                        />
+                      ))}
+                      {totalChildren > 6 && (
+                        <Chip
+                          label={`+${totalChildren - 6}`}
+                          size="small"
+                          onClick={() => {
+                            onNavigate?.('category');
+                          }}
+                          sx={{
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            color: 'text.secondary',
+                          }}
+                          variant="outlined"
+                        />
+                      )}
+                    </Box>
+                  </Paper>
+                </Grid>
+              );
+            })}
+          </Grid>
+        )}
       </Paper>
 
       {/* ── Section 3: Quick Overview Stats ── */}

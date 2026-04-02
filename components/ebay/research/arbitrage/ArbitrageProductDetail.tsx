@@ -49,7 +49,7 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
               label={matchTier === 'gtin' ? 'GTIN' : matchTier === 'gemini' ? ta('aiMatch') : ta('fallback')}
               size="small"
               variant="outlined"
-              sx={{ fontSize: '0.65rem' }}
+              sx={{ fontSize: '0.8rem' }}
             />
           )}
         </Box>
@@ -58,7 +58,7 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
 
       {/* Trendyol Product */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+        <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
           {ta('trendyolProduct')}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
@@ -85,7 +85,7 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
           href={trendyol.url}
           target="_blank"
           startIcon={<OpenInNewIcon />}
-          sx={{ mt: 1, fontSize: '0.7rem' }}
+          sx={{ mt: 1, fontSize: '0.82rem' }}
         >
           {ta('openOnTrendyol')}
         </Button>
@@ -93,7 +93,7 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
 
       {/* eBay Comparables */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+        <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
           {ta('ebayComparison', { count: ebay.totalListings })}
         </Typography>
         {translatedQuery && (
@@ -136,7 +136,7 @@ export default function ArbitrageProductDetail({ result, open, onClose }: Props)
 
       {/* Financial Breakdown */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+        <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
           {ta('financialAnalysis')}
         </Typography>
 

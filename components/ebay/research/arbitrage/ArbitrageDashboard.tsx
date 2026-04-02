@@ -54,10 +54,10 @@ export default function ArbitrageDashboard({ response }: Props) {
       }}>
         {kpis.map((kpi) => (
           <Paper key={kpi.label} sx={{ p: 1.5, textAlign: 'center' }} variant="outlined">
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
               {kpi.label}
             </Typography>
-            <Typography variant="h6" sx={{ color: kpi.color, fontWeight: 700, fontSize: isMobile ? '1rem' : '1.2rem' }}>
+            <Typography variant="h6" sx={{ color: kpi.color, fontWeight: 700, fontSize: isMobile ? '1.1rem' : '1.35rem' }}>
               {kpi.value}
             </Typography>
           </Paper>

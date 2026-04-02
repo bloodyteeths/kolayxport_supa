@@ -319,7 +319,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
               variant="outlined"
               onClick={() => handleScan(preset.slugs as unknown as string[])}
               disabled={loading}
-              sx={{ fontSize: '0.75rem', textTransform: 'none' }}
+              sx={{ fontSize: '0.9rem', textTransform: 'none' }}
               startIcon={<Zap size={14} />}
             >
               {preset.label}
@@ -332,7 +332,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
           variant="contained"
           onClick={() => setShowCategoryBrowser(true)}
           disabled={loading}
-          sx={{ fontSize: '0.75rem', textTransform: 'none', ml: 'auto' }}
+          sx={{ fontSize: '0.9rem', textTransform: 'none', ml: 'auto' }}
           startIcon={<Search size={14} />}
         >
           <Badge badgeContent={selectedCategories.length} color="error" sx={{ '& .MuiBadge-badge': { top: -4, right: -4 } }}>
@@ -347,7 +347,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
             color="warning"
             onClick={() => handleScan(TRENDYOL_CATEGORIES.map(c => c.slug))}
             disabled={loading}
-            sx={{ fontSize: '0.75rem', textTransform: 'none', fontWeight: 700 }}
+            sx={{ fontSize: '0.9rem', textTransform: 'none', fontWeight: 700 }}
           >
             {ta('scanAll', { count: TRENDYOL_CATEGORIES.length })}
           </Button>
@@ -383,9 +383,9 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
             onChange={(_, v) => setActiveTab(v)}
             sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
           >
-            <Tab label={`${ta('resultsTab')} (${filteredResults.length})`} sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
-            <Tab label={ta('chartsTab')} sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
-            <Tab label={ta('historyTab')} sx={{ textTransform: 'none', fontSize: '0.85rem' }} />
+            <Tab label={`${ta('resultsTab')} (${filteredResults.length})`} sx={{ textTransform: 'none', fontSize: '0.9rem' }} />
+            <Tab label={ta('chartsTab')} sx={{ textTransform: 'none', fontSize: '0.9rem' }} />
+            <Tab label={ta('historyTab')} sx={{ textTransform: 'none', fontSize: '0.9rem' }} />
           </Tabs>
 
           {activeTab === 0 && (

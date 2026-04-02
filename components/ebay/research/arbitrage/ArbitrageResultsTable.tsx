@@ -94,7 +94,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                       <Chip
                         label={`${ta(vc.label)} ${r.score}`}
                         size="small"
-                        sx={{ fontSize: '0.65rem', height: 20, bgcolor: vc.bg, color: vc.color, fontWeight: 700 }}
+                        sx={{ fontSize: '0.8rem', height: 20, bgcolor: vc.bg, color: vc.color, fontWeight: 700 }}
                       />
                     </Box>
                   </Box>
@@ -110,7 +110,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                 </Box>
 
                 <Collapse in={isExpanded}>
-                  <Box sx={{ px: 1.5, pb: 1.5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5, fontSize: '0.75rem' }}>
+                  <Box sx={{ px: 1.5, pb: 1.5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5, fontSize: '0.85rem' }}>
                     <Typography variant="caption">{ta("costLabel")}: {formatCurrency(r.financials.costUsd, 'USD', locale)}</Typography>
                     <Typography variant="caption">{ta("shippingLabel")}: {formatCurrency(r.financials.shippingUsd, 'USD', locale)}</Typography>
                     <Typography variant="caption">{ta("ebayFeeLabel")}: {formatCurrency(r.financials.ebayFeeUsd, 'USD', locale)}</Typography>
@@ -129,7 +129,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                         size="small"
                         variant="outlined"
                         onClick={() => onViewDetail(globalIdx)}
-                        sx={{ fontSize: '0.7rem' }}
+                        sx={{ fontSize: '0.82rem' }}
                       />
                       <Chip
                         label="Trendyol"
@@ -139,7 +139,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                         href={r.trendyol.url}
                         target="_blank"
                         clickable
-                        sx={{ fontSize: '0.7rem' }}
+                        sx={{ fontSize: '0.82rem' }}
                       />
                     </Box>
                   </Box>
@@ -153,7 +153,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ '& th': { fontWeight: 700, fontSize: '0.75rem' } }}>
+              <TableRow sx={{ '& th': { fontWeight: 700, fontSize: '0.875rem' } }}>
                 <TableCell sx={{ width: 48 }} />
                 <TableCell>{ta("product")}</TableCell>
                 <TableCell>{ta("brand")}</TableCell>
@@ -207,11 +207,11 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                       <Avatar src={r.trendyol.imageUrl} variant="rounded" sx={{ width: 40, height: 40 }} />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" noWrap sx={{ maxWidth: 200, fontSize: '0.8rem' }}>
+                      <Typography variant="body2" noWrap sx={{ maxWidth: 260, fontSize: '0.875rem' }}>
                         {r.trendyol.name}
                       </Typography>
                       {r.translatedQuery && (
-                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 200, display: 'block' }}>
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 260, display: 'block', fontSize: '0.8rem' }}>
                           {r.translatedQuery}
                         </Typography>
                       )}
@@ -220,18 +220,18 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                       <Typography variant="caption">{r.trendyol.brand}</Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
                         {formatCurrency(r.trendyol.priceTry, 'TRY', locale)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
                         {formatCurrency(r.ebay.medianPrice, 'USD', locale)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" sx={{
-                        fontWeight: 700, fontSize: '0.8rem',
+                        fontWeight: 700, fontSize: '0.875rem',
                         color: r.financials.profitUsd > 0 ? '#2e7d32' : '#c62828',
                       }}>
                         {formatCurrency(r.financials.profitUsd, 'USD', locale)}
@@ -239,7 +239,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" sx={{
-                        fontSize: '0.8rem',
+                        fontSize: '0.875rem',
                         color: r.financials.roiPercent > 0 ? '#2e7d32' : '#c62828',
                       }}>
                         {formatPercent(r.financials.roiPercent)}
@@ -249,7 +249,7 @@ export default function ArbitrageResultsTable({ results, onViewDetail }: Props) 
                       <Chip
                         label={`${r.score}`}
                         size="small"
-                        sx={{ fontSize: '0.7rem', height: 22, bgcolor: vc.bg, color: vc.color, fontWeight: 700, minWidth: 40 }}
+                        sx={{ fontSize: '0.8rem', height: 24, bgcolor: vc.bg, color: vc.color, fontWeight: 700, minWidth: 44 }}
                       />
                     </TableCell>
                     <TableCell align="center" onClick={(e) => e.stopPropagation()}>

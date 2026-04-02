@@ -1841,7 +1841,7 @@ function EtsyListingsPage() {
   }, [sectionFilter, healthFilter, excludeTerm]);
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1800, mx: 'auto', overflowX: 'hidden' }}>
+    <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', overflowX: 'hidden' }}>
       <Toaster position="top-right" />
 
       {/* No shops message */}

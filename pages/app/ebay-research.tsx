@@ -3036,7 +3036,7 @@ function EbayResearchPage() {
   const currentSection = SECTIONS[mainTab];
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: 'auto', px: isMobile ? 1 : 3, py: 2, width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <Box sx={{ maxWidth: 1800, mx: 'auto', px: isMobile ? 0.5 : 1, py: 1, width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
       <Toaster position="top-right" />
 
       {/* Header */}

@@ -240,7 +240,7 @@ function EtsyResearchPage() {
         )}
 
         {/* Main content */}
-        <Box sx={{ flex: 1, p: { xs: 1.5, sm: 2, md: 3 }, maxWidth: 1400, mx: 'auto', width: '100%' }}>
+        <Box sx={{ flex: 1, p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
           {/* Mobile header with menu button */}
           {isMobile && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>

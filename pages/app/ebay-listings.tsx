@@ -1274,7 +1274,7 @@ function EbayListingsPage() {
   }, [filteredListings, paginationModel]);
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2, md: 3 }, maxWidth: 1600, mx: 'auto', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', width: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
       <Toaster position="top-right" />
 
       {/* Statistics Bar */}

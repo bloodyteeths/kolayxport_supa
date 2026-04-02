@@ -120,7 +120,7 @@ export default function ArbitrageCategoryBrowser({ open, onClose, onScan }: Prop
                 variant={groupCount === groupCats.length ? 'filled' : 'outlined'}
                 onClick={() => selectGroup(g.key)}
                 color={groupCount > 0 ? 'primary' : 'default'}
-                sx={{ fontSize: '0.7rem' }}
+                sx={{ fontSize: '0.82rem' }}
               />
             );
           })}
@@ -138,7 +138,7 @@ export default function ArbitrageCategoryBrowser({ open, onClose, onScan }: Prop
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {groupInfo?.icon} {group}
                   </Typography>
-                  <Chip label={`${selectedInGroup}/${cats.length}`} size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
+                  <Chip label={`${selectedInGroup}/${cats.length}`} size="small" sx={{ height: 20, fontSize: '0.8rem' }} />
                 </Box>
               </AccordionSummary>
               <AccordionDetails sx={{ pt: 0, pb: 1 }}>
@@ -156,7 +156,7 @@ export default function ArbitrageCategoryBrowser({ open, onClose, onScan }: Prop
                     <Typography variant="body2" sx={{ flex: 1, fontSize: '0.8rem' }}>
                       {cat.labelTr}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
                       {cat.label}
                     </Typography>
                   </Box>

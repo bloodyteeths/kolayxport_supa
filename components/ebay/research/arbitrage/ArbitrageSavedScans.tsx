@@ -48,7 +48,7 @@ export default function ArbitrageSavedScans() {
                   size="small"
                   color="success"
                   variant="outlined"
-                  sx={{ fontSize: '0.65rem', height: 20 }}
+                  sx={{ fontSize: '0.8rem', height: 20 }}
                 />
                 <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.25 }}>
                   {ta('best')}: {formatCurrency(scan.bestProfit)} | {formatPercent(scan.bestRoi)}

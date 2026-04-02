@@ -56,6 +56,7 @@ model User {
   productCosts          ProductCost[]
   financialTransactions FinancialTransaction[]
   financialSyncCursors  FinancialSyncCursor[]
+  trendyolProducts      TrendyolProduct[]
 }
 
 model Account {
@@ -324,7 +325,7 @@ model SenkronOrderData {
   orderId      String   @unique
   userId       String
   internalNote String? // User's internal notes for the order
-  customStatus String? // User's custom status (İptal, Üretimde, etc.)
+  customStatus String? // User's custom status (cancelled, inProduction, shipped, etc.)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   order        Order    @relation("OrderSenkronData", fields: [orderId], references: [id], onDelete: Cascade)
@@ -859,4 +860,69 @@ model FinancialSyncCursor {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, marketplace])
+}
+
+// ---------------------------------------------------------------------------
+// Trendyol Product Cache (seller's own products synced from Trendyol API)
+// ---------------------------------------------------------------------------
+
+model TrendyolProduct {
+  id        String @id @default(cuid())
+  userId    String
+  supplierId String
+
+  // Trendyol identifiers
+  barcode       String
+  stockCode     String?
+  productMainId String?
+  trendyolId    String?   // Trendyol's internal product ID
+
+  // Content
+  title       String
+  description String?  @db.Text
+  brandId     Int?
+  brandName   String?
+  categoryId  Int?
+  categoryName String?
+
+  // Pricing
+  listPrice    Decimal? @db.Decimal(10, 2)
+  salePrice    Decimal? @db.Decimal(10, 2)
+  currencyType String   @default("TRY")
+  quantity     Int      @default(0)
+  vatRate      Int?     @default(10)
+
+  // Images (JSON array of {url})
+  images       Json?
+  thumbnailUrl String?
+  imageCount   Int     @default(0)
+
+  // Category attributes (JSON array of {attributeId, attributeValueId, customValue})
+  attributes Json?
+
+  // Status flags from Trendyol
+  approved    Boolean @default(false)
+  onSale      Boolean @default(false)
+  rejected    Boolean @default(false)
+  blacklisted Boolean @default(false)
+  archived    Boolean @default(false)
+  rejectReasons Json?
+
+  // Shipping
+  dimensionalWeight Float?
+  cargoCompanyId    Int?
+
+  // Timestamps
+  trendyolCreatedDate DateTime?
+  trendyolLastUpdate  DateTime?
+  syncedAt            DateTime  @default(now())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, supplierId, barcode])
+  @@index([userId, supplierId])
+  @@index([userId, onSale])
+  @@index([userId, categoryId])
 }

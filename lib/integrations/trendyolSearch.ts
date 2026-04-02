@@ -207,19 +207,72 @@ export async function fetchTrendyolCategoryProducts(categorySlug: string, page =
     const productUrl = (p.url || '')
       .replace(/\\u002F/g, '/');
 
+    // Extract social proof data (favorites, orders, views, basket count)
+    const socialProof: Record<string, string> = {};
+    if (Array.isArray(p.socialProof)) {
+      for (const sp of p.socialProof) {
+        if (sp.key && sp.value) socialProof[sp.key] = sp.value;
+      }
+    }
+
+    // Extract images array
+    const imageUrls = Array.isArray(p.images)
+      ? p.images.map((img: string) => {
+          const cleaned = img.replace(/\\u002F/g, '/');
+          return cleaned.startsWith('http') ? cleaned : `https://cdn.dsmcdn.com${cleaned}`;
+        })
+      : [];
+
+    // Extract seller badge type
+    let sellerBadgeType: string | undefined;
+    if (p.badges) {
+      const badgeEntry = Object.values(p.badges)[0] as any;
+      if (badgeEntry?.type) sellerBadgeType = badgeEntry.type;
+    }
+    if (!sellerBadgeType && p.stripBadge?.type) {
+      sellerBadgeType = p.stripBadge.type;
+    }
+
+    // Extract product card attributes
+    const productAttributes = Array.isArray(p.productCardAttributes?.attributes)
+      ? p.productCardAttributes.attributes.map((a: any) => ({
+          attributeName: a.attributeName || '',
+          attributeValueName: a.attributeValueName || '',
+        }))
+      : undefined;
+
     products.push({
       id,
       name: p.name || '',
       brand: p.brand || '',
+      brandId: p.brandId || undefined,
       priceTry: discountedPrice,
       originalPriceTry: originalPrice,
       imageUrl: imgUrl.startsWith('http') ? imgUrl : `https://cdn.dsmcdn.com${imgUrl}`,
+      images: imageUrls.length > 0 ? imageUrls : undefined,
       url: productUrl.startsWith('http') ? productUrl : `https://www.trendyol.com${productUrl}`,
       categoryName: p.category?.name || categorySlug.split('-x-c')[0].replace(/-/g, ' '),
+      categoryId: p.category?.id || undefined,
       ratingScore: p.ratingScore?.averageRating || 0,
       ratingCount: p.ratingScore?.totalCount || 0,
-      merchantName: '',
+      merchantName: '', // Not available in category listing HTML
+      merchantId: p.merchantId || undefined,
       freeShipping: p.freeCargo || false,
+      // Social proof
+      favoriteCount: socialProof.favoriteCount || undefined,
+      orderCount: socialProof.orderCount || undefined,
+      basketCount: socialProof.basketCount || undefined,
+      pageViewCount: socialProof.pageViewCount || undefined,
+      // Badges & delivery
+      rushDelivery: p.rushDelivery || false,
+      sameDayShipping: p.sameDayShipping || false,
+      hasOfficialSellerBadge: p.hasOfficialSellerBadge || false,
+      sellerBadgeType,
+      // Variant info
+      groupId: p.groupId || undefined,
+      variantValue: p.variantValue || undefined,
+      // Attributes
+      productAttributes,
     });
   }
 

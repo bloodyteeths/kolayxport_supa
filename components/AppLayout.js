@@ -61,6 +61,8 @@ function getNavGroups(t) {
         { href: '/app/etsy-research', icon: Target, label: t('etsyResearch') },
         { href: '/app/ebay-listings', icon: ShoppingBag, label: 'eBay Listings' },
         { href: '/app/ebay-research', icon: Target, label: 'eBay Research' },
+        { href: '/app/trendyol-urunler', icon: Package, label: 'Trendyol Ürünler' },
+        { href: '/app/trendyol-arastirma', icon: Target, label: 'Trendyol Araştırma' },
       ],
     },
     {

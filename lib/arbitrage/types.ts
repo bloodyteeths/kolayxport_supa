@@ -13,18 +13,40 @@ export interface TrendyolProduct {
   id: number;
   name: string;
   brand: string;
+  brandId?: number;
   priceTry: number;
   originalPriceTry: number;
   imageUrl: string;
+  images?: string[];
   url: string;
   categoryName: string;
+  categoryId?: number;
   ratingScore: number;
   ratingCount: number;
   merchantName: string;
+  merchantId?: number;
   freeShipping: boolean;
   barcode?: string;
   stockCode?: string;
   quantity?: number;
+  // Social proof (from HTML PROPS socialProof array)
+  favoriteCount?: string;   // e.g. "31K"
+  orderCount?: string;      // e.g. "200+"
+  basketCount?: string;     // e.g. "4K"
+  pageViewCount?: string;   // e.g. "1K"
+  // Badges & delivery
+  rushDelivery?: boolean;
+  sameDayShipping?: boolean;
+  hasOfficialSellerBadge?: boolean;
+  sellerBadgeType?: string; // e.g. "FAST_SELLER", "AUTHORIZED_SELLER"
+  // Variant info
+  groupId?: number;
+  variantValue?: string;
+  // Attributes from productCardAttributes
+  productAttributes?: Array<{
+    attributeName: string;
+    attributeValueName: string;
+  }>;
 }
 
 export interface EbayComparable {

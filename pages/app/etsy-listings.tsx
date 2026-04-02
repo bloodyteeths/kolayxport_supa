@@ -235,28 +235,32 @@ function gradeColor(grade: string): string {
 }
 
 function calculateHealth(listing: EtsyListingRow): HealthBreakdown {
+  // Tags: 0-13 → 0-25 (proportional)
   const tagCount = listing.tags?.length || 0;
-  const tagsScore = tagCount >= 13 ? 25 : tagCount >= 10 ? 15 : 5;
-  const tagsColor = tagCount >= 13 ? '#4caf50' : tagCount >= 10 ? '#ff9800' : '#f44336';
+  const tagsScore = Math.round(Math.min(tagCount / 13, 1) * 25);
+  const tagsColor = tagsScore >= 20 ? '#4caf50' : tagsScore >= 12 ? '#ff9800' : '#f44336';
   const tagsLabel = `${tagCount}/13`;
 
+  // Images: 0-10 → 0-25 (proportional)
   const imgCount = listing.image_count || 0;
-  const imagesScore = imgCount >= 10 ? 25 : imgCount >= 5 ? 15 : 5;
-  const imagesColor = imgCount >= 10 ? '#4caf50' : imgCount >= 5 ? '#ff9800' : '#f44336';
+  const imagesScore = Math.round(Math.min(imgCount / 10, 1) * 25);
+  const imagesColor = imagesScore >= 20 ? '#4caf50' : imagesScore >= 12 ? '#ff9800' : '#f44336';
   const imagesLabel = `${imgCount}`;
 
+  // Title: 0-140 → 0-25 (proportional, target 140 chars)
   const titleLen = listing.title?.length || 0;
-  const titleScore = titleLen >= 100 ? 25 : titleLen >= 60 ? 15 : 5;
-  const titleColor = titleLen >= 100 ? '#4caf50' : titleLen >= 60 ? '#ff9800' : '#f44336';
+  const titleScore = Math.round(Math.min(titleLen / 140, 1) * 25);
+  const titleColor = titleScore >= 20 ? '#4caf50' : titleScore >= 12 ? '#ff9800' : '#f44336';
   const titleLabel = `${titleLen}`;
 
+  // Description: 0-500 → 0-25 (proportional, target 500 chars)
   const descLen = listing.description?.length || 0;
-  const descScore = descLen >= 500 ? 25 : descLen >= 200 ? 15 : 5;
-  const descColor = descLen >= 500 ? '#4caf50' : descLen >= 200 ? '#ff9800' : '#f44336';
+  const descScore = Math.round(Math.min(descLen / 500, 1) * 25);
+  const descColor = descScore >= 20 ? '#4caf50' : descScore >= 12 ? '#ff9800' : '#f44336';
   const descLabel = `${descLen}`;
 
   const overall = tagsScore + imagesScore + titleScore + descScore;
-  const color = overall >= 80 ? '#4caf50' : overall >= 60 ? '#ff9800' : '#f44336';
+  const color = overall >= 75 ? '#4caf50' : overall >= 50 ? '#ff9800' : '#f44336';
   const grade = scoreToGrade(overall);
 
   return {
@@ -394,17 +398,17 @@ function MobileEtsyListingCard({
               variant="outlined"
               sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.5 } }}
             />
-            {/* Grade badge */}
+            {/* Score badge */}
             <Chip
-              label={health.grade}
+              label={health.overall}
               size="small"
               sx={{
                 height: 20,
                 fontSize: 10,
                 fontWeight: 700,
-                bgcolor: `${gradeColor(health.grade)}15`,
-                color: gradeColor(health.grade),
-                border: `1px solid ${gradeColor(health.grade)}`,
+                bgcolor: `${health.color}15`,
+                color: health.color,
+                border: `1px solid ${health.color}`,
                 '& .MuiChip-label': { px: 0.5 },
               }}
             />
@@ -1755,7 +1759,7 @@ function EtsyListingsPage() {
         filterable: false,
         renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
           const h = calculateHealth(params.row);
-          const gc = gradeColor(h.grade);
+          const gc = h.color;
           return (
             <Tooltip
               arrow
@@ -1782,7 +1786,7 @@ function EtsyListingsPage() {
               }
             >
               <Chip
-                label={h.grade}
+                label={h.overall}
                 size="small"
                 sx={{
                   fontWeight: 700,

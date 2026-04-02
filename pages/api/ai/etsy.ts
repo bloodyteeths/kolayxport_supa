@@ -2,6 +2,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getSupabaseServerClient } from '../../../lib/supabase';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Allow up to 60s for AI responses (Vercel default is 10s)
+export const config = { maxDuration: 60 };
+
 // ---------------------------------------------------------------------------
 // Rate limiter – simple in-memory, max 30 req/min per user
 // ---------------------------------------------------------------------------

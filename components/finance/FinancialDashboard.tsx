@@ -153,18 +153,27 @@ function ProfitCharts({ data, marketplace }: { data: DashboardData; marketplace:
     { name: t('profit'), data: timeSeries.map(p => p.netProfit) },
   ];
 
-  // Donut for cost breakdown
-  const txSummaryArr = Array.isArray(transactionTypeSummary) ? transactionTypeSummary : [];
-  const donutLabels = txSummaryArr.filter(tx => tx.total < 0 || ['Commission', 'Return', 'Cargo'].some(k => tx.type.includes(k))).map(tx => tx.type);
-  const donutValues = txSummaryArr.filter(tx => tx.total < 0 || ['Commission', 'Return', 'Cargo'].some(k => tx.type.includes(k))).map(tx => Math.abs(tx.total));
+  // Donut for cost breakdown — use summary values (works across all marketplaces)
+  const costItems = [
+    { label: t('commissions'), value: summary.commissions, color: '#f59e0b' },
+    { label: t('adSpend'), value: summary.adSpend || 0, color: '#ec4899' },
+    { label: t('shippingCosts'), value: summary.shipping, color: '#3b82f6' },
+    { label: t('returns'), value: summary.returns, color: '#ef4444' },
+    { label: t('productCost'), value: summary.cogs, color: '#8b5cf6' },
+  ].filter(item => item.value > 0);
+
+  const donutLabels = costItems.map(item => item.label);
+  const donutValues = costItems.map(item => item.value);
+  const donutColors = costItems.map(item => item.color);
+  const totalExpense = costItems.reduce((sum, item) => sum + item.value, 0);
 
   const donutOptions: ApexCharts.ApexOptions = {
     chart: { type: 'donut', height: 300, fontFamily: 'Inter, sans-serif' },
-    labels: donutLabels.length > 0 ? donutLabels : [t('commission'), t('shipping'), t('return')],
-    colors: ['#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899'],
+    labels: donutLabels.length > 0 ? donutLabels : [t('commissions')],
+    colors: donutColors.length > 0 ? donutColors : ['#f59e0b'],
     legend: { position: 'bottom', fontSize: '12px' },
     dataLabels: { enabled: true, formatter: (val: number) => `%${val.toFixed(0)}` },
-    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: t('totalExpense'), formatter: () => formatCurrency(Math.abs(summary.commissions + summary.shipping + summary.returns + summary.discounts + (summary.adSpend || 0)), cs) } } } } },
+    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: t('totalExpense'), formatter: () => formatCurrency(totalExpense, cs) } } } } },
   };
 
   return (

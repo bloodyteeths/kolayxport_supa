@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box, Tabs, Tab, Button, TextField, Chip, CircularProgress,
-  Typography, Paper, IconButton, Tooltip,
+  Typography, Paper, Tooltip,
 } from '@mui/material';
-import { RefreshCw, Download, Calendar, Wallet, TrendingUp, Store } from 'lucide-react';
+import { RefreshCw, Calendar, Wallet, Store } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
@@ -14,34 +14,27 @@ import dynamic from 'next/dynamic';
 const FinancialDashboard = dynamic(() => import('@/components/finance/FinancialDashboard'), { ssr: false });
 
 const DATE_PRESETS = [
-  { key: 'thisMonth', getRange: () => {
+  { key: 'thisMonth', tKey: 'thisMonth', getRange: () => {
     const now = new Date();
     return { start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0], end: now.toISOString().split('T')[0] };
   }},
-  { key: 'lastMonth', getRange: () => {
+  { key: 'lastMonth', tKey: 'lastMonth', getRange: () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const end = new Date(now.getFullYear(), now.getMonth(), 0);
     return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
   }},
-  { key: 'last30', getRange: () => {
+  { key: 'last30', tKey: 'last30Days', getRange: () => {
     const now = new Date();
     const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     return { start: start.toISOString().split('T')[0], end: now.toISOString().split('T')[0] };
   }},
-  { key: 'last90', getRange: () => {
+  { key: 'last90', tKey: 'last90Days', getRange: () => {
     const now = new Date();
     const start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     return { start: start.toISOString().split('T')[0], end: now.toISOString().split('T')[0] };
   }},
 ];
-
-const PRESET_LABELS: Record<string, Record<string, string>> = {
-  thisMonth: { tr: 'Bu Ay', en: 'This Month' },
-  lastMonth: { tr: 'Geçen Ay', en: 'Last Month' },
-  last30: { tr: 'Son 30 Gün', en: 'Last 30 Days' },
-  last90: { tr: 'Son 90 Gün', en: 'Last 90 Days' },
-};
 
 const MARKETPLACE_TABS = [
   { key: 'trendyol' as const, label: 'Trendyol', icon: <Store size={16} />, color: '#F59E0B', enabled: true },
@@ -50,23 +43,20 @@ const MARKETPLACE_TABS = [
 ];
 
 function FinancialsPage() {
-  const t = useTranslations('nav');
+  const t = useTranslations('financials');
   const {
     marketplace, dateRange, syncStatus, syncMessage,
     setMarketplace, setDateRange, syncSettlements, fetchDashboard,
-    dashboardLoading,
   } = useFinanceStore();
 
   const [activePreset, setActivePreset] = useState('thisMonth');
   const [customStart, setCustomStart] = useState(dateRange.start);
   const [customEnd, setCustomEnd] = useState(dateRange.end);
 
-  // Fetch dashboard data on mount and when marketplace/dateRange changes
   useEffect(() => {
     fetchDashboard();
   }, [marketplace, dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Show sync status toasts
   useEffect(() => {
     if (syncStatus === 'done' && syncMessage) toast.success(syncMessage);
     if (syncStatus === 'error' && syncMessage) toast.error(syncMessage);
@@ -88,12 +78,8 @@ function FinancialsPage() {
     setDateRange({ start: customStart, end: customEnd });
   };
 
-  const handleSync = () => {
-    syncSettlements();
-  };
-
   return (
-    <AppLayout title="Finansal Dashboard">
+    <AppLayout title={t('pageTitle')}>
       <Toaster position="top-right" />
       <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
         {/* Header */}
@@ -107,10 +93,10 @@ function FinancialsPage() {
           </Box>
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: '-0.02em' }}>
-              Finansal Dashboard
+              {t('pageTitle')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Gelir, gider, komisyon ve kâr analizi
+              {t('subtitle')}
             </Typography>
           </Box>
         </Box>
@@ -118,14 +104,14 @@ function FinancialsPage() {
         {/* Marketplace Tabs */}
         <Paper sx={{ mb: 2, borderRadius: '12px', overflow: 'hidden' }}>
           <Tabs
-            value={MARKETPLACE_TABS.findIndex(t => t.key === marketplace)}
+            value={MARKETPLACE_TABS.findIndex(mt => mt.key === marketplace)}
             onChange={(_, idx) => {
               const tab = MARKETPLACE_TABS[idx];
               if (tab.enabled) setMarketplace(tab.key);
             }}
             sx={{
               '& .MuiTab-root': { minHeight: 48, textTransform: 'none', fontWeight: 600 },
-              '& .Mui-selected': { color: MARKETPLACE_TABS.find(t => t.key === marketplace)?.color },
+              '& .Mui-selected': { color: MARKETPLACE_TABS.find(mt => mt.key === marketplace)?.color },
             }}
           >
             {MARKETPLACE_TABS.map(tab => (
@@ -136,7 +122,7 @@ function FinancialsPage() {
                     {tab.icon}
                     <span>{tab.label}</span>
                     {!tab.enabled && (
-                      <Chip label="Yakında" size="small" sx={{ height: 20, fontSize: '0.65rem', ml: 0.5 }} />
+                      <Chip label={t('comingSoon')} size="small" sx={{ height: 20, fontSize: '0.65rem', ml: 0.5 }} />
                     )}
                   </Box>
                 }
@@ -150,11 +136,10 @@ function FinancialsPage() {
         <Paper sx={{ p: 1.5, mb: 2, borderRadius: '12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
           <Calendar size={18} color="#6b7280" />
 
-          {/* Presets */}
           {DATE_PRESETS.map(preset => (
             <Chip
               key={preset.key}
-              label={PRESET_LABELS[preset.key]?.tr || preset.key}
+              label={t(preset.tKey)}
               size="small"
               variant={activePreset === preset.key ? 'filled' : 'outlined'}
               color={activePreset === preset.key ? 'primary' : 'default'}
@@ -164,47 +149,27 @@ function FinancialsPage() {
           ))}
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
-            <TextField
-              type="date"
-              size="small"
-              value={customStart}
-              onChange={e => setCustomStart(e.target.value)}
-              sx={{ width: 140, '& input': { fontSize: '0.8rem' } }}
-            />
+            <TextField type="date" size="small" value={customStart} onChange={e => setCustomStart(e.target.value)} sx={{ width: 140, '& input': { fontSize: '0.8rem' } }} />
             <Typography variant="body2" color="text.secondary">—</Typography>
-            <TextField
-              type="date"
-              size="small"
-              value={customEnd}
-              onChange={e => setCustomEnd(e.target.value)}
-              sx={{ width: 140, '& input': { fontSize: '0.8rem' } }}
-            />
+            <TextField type="date" size="small" value={customEnd} onChange={e => setCustomEnd(e.target.value)} sx={{ width: 140, '& input': { fontSize: '0.8rem' } }} />
             <Button size="small" variant="outlined" onClick={handleCustomRange} sx={{ minWidth: 'auto', px: 1.5 }}>
-              Uygula
+              {t('apply')}
             </Button>
           </Box>
 
-          {/* Sync Button */}
-          <Tooltip title="Trendyol'dan verileri senkronize et">
+          <Tooltip title={t('syncTooltip')}>
             <Button
-              size="small"
-              variant="contained"
-              onClick={handleSync}
+              size="small" variant="contained"
+              onClick={() => syncSettlements()}
               disabled={syncStatus === 'syncing'}
               startIcon={syncStatus === 'syncing' ? <CircularProgress size={16} /> : <RefreshCw size={16} />}
-              sx={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                borderRadius: '10px',
-                textTransform: 'none',
-                fontWeight: 600,
-              }}
+              sx={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
             >
-              {syncStatus === 'syncing' ? 'Senkronize...' : 'Senkronize Et'}
+              {syncStatus === 'syncing' ? t('syncing') : t('syncData')}
             </Button>
           </Tooltip>
         </Paper>
 
-        {/* Dashboard Content */}
         <FinancialDashboard />
       </Box>
     </AppLayout>

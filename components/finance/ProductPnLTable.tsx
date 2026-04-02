@@ -5,6 +5,7 @@ import {
   Tooltip, useMediaQuery, useTheme, Paper, Collapse,
 } from '@mui/material';
 import { Search, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import useFinanceStore, { ProductBreakdown } from '@/lib/stores/useFinanceStore';
 
 type SortKey = keyof ProductBreakdown;
@@ -30,6 +31,7 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { updateProductCost } = useFinanceStore();
+  const t = useTranslations('financials');
 
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('revenue');
@@ -71,7 +73,7 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
   };
 
   const handleExportCSV = () => {
-    const headers = ['Ürün', 'Barkod', 'Satış', 'Gelir', 'Komisyon', 'Kargo', 'Maliyet', 'Kâr', 'Marj %'];
+    const headers = [t('product'), t('barcode'), t('sales'), t('revenue'), t('commission'), t('shipping'), t('cost'), t('profit'), t('margin')];
     const rows = filtered.map(p => [
       p.productName, p.barcode, p.unitsSold, p.revenue.toFixed(2),
       p.commission.toFixed(2), p.shipping.toFixed(2), p.cogs.toFixed(2),
@@ -91,7 +93,7 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
         <Typography variant="body2" color="text.secondary">
-          Henüz ürün verisi yok. Önce verileri senkronize edin.
+          {t('noProductData')}
         </Typography>
       </Box>
     );
@@ -102,7 +104,7 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
     return (
       <Box sx={{ p: 1 }}>
         <TextField
-          size="small" fullWidth placeholder="Ürün ara..."
+          size="small" fullWidth placeholder={t('searchProduct')}
           value={search} onChange={e => setSearch(e.target.value)}
           InputProps={{ startAdornment: <InputAdornment position="start"><Search size={16} /></InputAdornment> }}
           sx={{ mb: 1 }}
@@ -117,7 +119,7 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                 <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.productName}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">{p.unitsSold} satış</Typography>
+                <Typography variant="caption" color="text.secondary">{p.unitsSold} {t('sales')}</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" sx={{ fontWeight: 700, color: p.profit >= 0 ? '#15803d' : '#dc2626' }}>
@@ -133,10 +135,10 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
             </Box>
             <Collapse in={expandedRow === p.barcode}>
               <Box sx={{ px: 1.5, pb: 1.5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5 }}>
-                <Box><Typography variant="caption" color="text.secondary">Gelir</Typography><Typography variant="body2" fontWeight={600}>{formatTRY(p.revenue)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">Komisyon</Typography><Typography variant="body2" fontWeight={600} color="warning.main">{formatTRY(p.commission)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">Kargo</Typography><Typography variant="body2" fontWeight={600} color="info.main">{formatTRY(p.shipping)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">Maliyet</Typography><Typography variant="body2" fontWeight={600} color="secondary.main">{formatTRY(p.cogs)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">{t('revenue')}</Typography><Typography variant="body2" fontWeight={600}>{formatTRY(p.revenue)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">{t('commission')}</Typography><Typography variant="body2" fontWeight={600} color="warning.main">{formatTRY(p.commission)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">{t('shipping')}</Typography><Typography variant="body2" fontWeight={600} color="info.main">{formatTRY(p.shipping)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">{t('cost')}</Typography><Typography variant="body2" fontWeight={600} color="secondary.main">{formatTRY(p.cogs)}</Typography></Box>
               </Box>
             </Collapse>
           </Paper>
@@ -150,15 +152,15 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
     <Box>
       <Box sx={{ px: 2, pt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
         <TextField
-          size="small" placeholder="Ürün ara..."
+          size="small" placeholder={t('searchProduct')}
           value={search} onChange={e => setSearch(e.target.value)}
           InputProps={{ startAdornment: <InputAdornment position="start"><Search size={16} /></InputAdornment> }}
           sx={{ width: 250 }}
         />
         <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-          {filtered.length} ürün
+          {filtered.length} {t('products')}
         </Typography>
-        <Tooltip title="CSV İndir">
+        <Tooltip title={t('downloadCSV')}>
           <IconButton size="small" onClick={handleExportCSV}><Download size={16} /></IconButton>
         </Tooltip>
       </Box>
@@ -166,15 +168,15 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Ürün</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>{t('product')}</TableCell>
               {[
-                { key: 'unitsSold' as SortKey, label: 'Satış' },
-                { key: 'revenue' as SortKey, label: 'Gelir' },
-                { key: 'commission' as SortKey, label: 'Komisyon' },
-                { key: 'shipping' as SortKey, label: 'Kargo' },
-                { key: 'cogs' as SortKey, label: 'Maliyet' },
-                { key: 'profit' as SortKey, label: 'Kâr' },
-                { key: 'margin' as SortKey, label: 'Marj %' },
+                { key: 'unitsSold' as SortKey, label: t('sales') },
+                { key: 'revenue' as SortKey, label: t('revenue') },
+                { key: 'commission' as SortKey, label: t('commission') },
+                { key: 'shipping' as SortKey, label: t('shipping') },
+                { key: 'cogs' as SortKey, label: t('cost') },
+                { key: 'profit' as SortKey, label: t('profit') },
+                { key: 'margin' as SortKey, label: t('margin') },
               ].map(col => (
                 <TableCell key={col.key} align="right" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>
                   <TableSortLabel

@@ -1,4 +1,5 @@
 import React, { useState, lazy, Suspense } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Box, Typography, Paper, Skeleton, Grid, Chip, Button,
   CircularProgress, Collapse, IconButton,
@@ -20,7 +21,7 @@ const TransactionLog = lazy(() => import('./TransactionLog'));
 
 interface CardDef {
   key: keyof DashboardSummary;
-  label: string;
+  tKey: string;
   icon: React.ReactNode;
   color: string;
   gradient: string;
@@ -29,12 +30,12 @@ interface CardDef {
 }
 
 const CARDS: CardDef[] = [
-  { key: 'grossRevenue', label: 'Brüt Gelir', icon: <DollarSign size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency' },
-  { key: 'commissions', label: 'Komisyonlar', icon: <Receipt size={20} />, color: '#f59e0b', gradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)', format: 'currency' },
-  { key: 'shippingCosts', label: 'Kargo Giderleri', icon: <Truck size={20} />, color: '#3b82f6', gradient: 'linear-gradient(135deg, #eff6ff, #dbeafe)', format: 'currency' },
-  { key: 'returns', label: 'İadeler', icon: <RotateCcw size={20} />, color: '#ef4444', gradient: 'linear-gradient(135deg, #fef2f2, #fecaca)', format: 'currency' },
-  { key: 'cogs', label: 'Ürün Maliyeti', icon: <Package size={20} />, color: '#8b5cf6', gradient: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', format: 'currency' },
-  { key: 'netProfit', label: 'Net Kâr', icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency', invertColor: true },
+  { key: 'grossRevenue', tKey: 'grossRevenue', icon: <DollarSign size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency' },
+  { key: 'commissions', tKey: 'commissions', icon: <Receipt size={20} />, color: '#f59e0b', gradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)', format: 'currency' },
+  { key: 'shippingCosts', tKey: 'shippingCosts', icon: <Truck size={20} />, color: '#3b82f6', gradient: 'linear-gradient(135deg, #eff6ff, #dbeafe)', format: 'currency' },
+  { key: 'returns', tKey: 'returns', icon: <RotateCcw size={20} />, color: '#ef4444', gradient: 'linear-gradient(135deg, #fef2f2, #fecaca)', format: 'currency' },
+  { key: 'cogs', tKey: 'productCost', icon: <Package size={20} />, color: '#8b5cf6', gradient: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', format: 'currency' },
+  { key: 'netProfit', tKey: 'netProfit', icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency', invertColor: true },
 ];
 
 function formatCurrency(val: number, currency = '₺'): string {
@@ -46,6 +47,7 @@ function formatCurrency(val: number, currency = '₺'): string {
 }
 
 function SummaryCards({ summary }: { summary: DashboardSummary }) {
+  const t = useTranslations('financials');
   return (
     <Grid container spacing={1.5} sx={{ mb: 2 }}>
       {CARDS.map(card => {
@@ -68,7 +70,7 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
                 {formatCurrency(value)}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                {card.label}
+                {t(card.tKey)}
               </Typography>
               {card.key === 'netProfit' && (
                 <Chip
@@ -92,6 +94,7 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
 // ---- Charts ----
 
 function ProfitCharts({ data }: { data: DashboardData }) {
+  const t = useTranslations('financials');
   const { timeSeries, summary, transactionTypeSummary } = data;
 
   const barOptions: ApexCharts.ApexOptions = {
@@ -107,22 +110,22 @@ function ProfitCharts({ data }: { data: DashboardData }) {
   };
 
   const barSeries = [
-    { name: 'Gelir', data: timeSeries.map(p => p.revenue) },
-    { name: 'Giderler', data: timeSeries.map(p => p.costs) },
-    { name: 'Kâr', data: timeSeries.map(p => p.profit) },
+    { name: t('revenue'), data: timeSeries.map(p => p.revenue) },
+    { name: t('expenses'), data: timeSeries.map(p => p.costs) },
+    { name: t('profit'), data: timeSeries.map(p => p.profit) },
   ];
 
   // Donut for cost breakdown
-  const donutLabels = transactionTypeSummary.filter(t => t.amount < 0 || ['Commission', 'Return', 'Cargo'].some(k => t.type.includes(k))).map(t => t.type);
-  const donutValues = transactionTypeSummary.filter(t => t.amount < 0 || ['Commission', 'Return', 'Cargo'].some(k => t.type.includes(k))).map(t => Math.abs(t.amount));
+  const donutLabels = transactionTypeSummary.filter(tx => tx.amount < 0 || ['Commission', 'Return', 'Cargo'].some(k => tx.type.includes(k))).map(tx => tx.type);
+  const donutValues = transactionTypeSummary.filter(tx => tx.amount < 0 || ['Commission', 'Return', 'Cargo'].some(k => tx.type.includes(k))).map(tx => Math.abs(tx.amount));
 
   const donutOptions: ApexCharts.ApexOptions = {
     chart: { type: 'donut', height: 300, fontFamily: 'Inter, sans-serif' },
-    labels: donutLabels.length > 0 ? donutLabels : ['Komisyon', 'Kargo', 'İade'],
+    labels: donutLabels.length > 0 ? donutLabels : [t('commission'), t('shipping'), t('return')],
     colors: ['#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899'],
     legend: { position: 'bottom', fontSize: '12px' },
     dataLabels: { enabled: true, formatter: (val: number) => `%${val.toFixed(0)}` },
-    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: 'Toplam Gider', formatter: () => formatCurrency(Math.abs(summary.commissions + summary.shippingCosts + summary.returns + summary.discounts)) } } } } },
+    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: t('totalExpense'), formatter: () => formatCurrency(Math.abs(summary.commissions + summary.shippingCosts + summary.returns + summary.discounts)) } } } } },
   };
 
   return (
@@ -131,13 +134,13 @@ function ProfitCharts({ data }: { data: DashboardData }) {
         <Paper sx={{ p: 2, borderRadius: '12px' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
             <BarChart3 size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            Gelir & Gider Trendi
+            {t('revenueAndCostTrend')}
           </Typography>
           {timeSeries.length > 0 ? (
             <Chart options={barOptions} series={barSeries} type="bar" height={280} />
           ) : (
             <Box sx={{ py: 6, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">Grafik için veri yok</Typography>
+              <Typography variant="body2" color="text.secondary">{t('noChartData')}</Typography>
             </Box>
           )}
         </Paper>
@@ -146,13 +149,13 @@ function ProfitCharts({ data }: { data: DashboardData }) {
         <Paper sx={{ p: 2, borderRadius: '12px' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
             <PieChart size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            Gider Dağılımı
+            {t('costBreakdown')}
           </Typography>
           {donutValues.length > 0 ? (
             <Chart options={donutOptions} series={donutValues} type="donut" height={280} />
           ) : (
             <Box sx={{ py: 6, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">Gider verisi yok</Typography>
+              <Typography variant="body2" color="text.secondary">{t('noExpenseData')}</Typography>
             </Box>
           )}
         </Paper>
@@ -164,6 +167,7 @@ function ProfitCharts({ data }: { data: DashboardData }) {
 // ---- Main Dashboard ----
 
 export default function FinancialDashboard() {
+  const t = useTranslations('financials');
   const { dashboardData, dashboardLoading, marketplace } = useFinanceStore();
   const [costDrawerOpen, setCostDrawerOpen] = useState(false);
   const [txLogOpen, setTxLogOpen] = useState(false);
@@ -201,11 +205,10 @@ export default function FinancialDashboard() {
           <DollarSign size={28} color="#10b981" />
         </Box>
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-          Finansal verilerinizi senkronize edin
+          {t('syncPrompt')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Üst taraftaki "Senkronize Et" butonuna tıklayarak {marketplace === 'trendyol' ? 'Trendyol' : marketplace} hesabınızdan
-          gelir, komisyon ve kargo verilerini çekin.
+          {t('syncDescription')}
         </Typography>
       </Paper>
     );
@@ -229,7 +232,7 @@ export default function FinancialDashboard() {
         }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
             <Package size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            Ürün Bazlı Kâr/Zarar
+            {t('productPnL')}
           </Typography>
           <Button
             size="small"
@@ -238,7 +241,7 @@ export default function FinancialDashboard() {
             onClick={() => setCostDrawerOpen(true)}
             sx={{ textTransform: 'none', borderRadius: '8px' }}
           >
-            Maliyet Gir
+            {t('enterCost')}
           </Button>
         </Box>
         <Suspense fallback={<Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress size={24} /></Box>}>
@@ -257,7 +260,7 @@ export default function FinancialDashboard() {
         >
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
             <List size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            İşlem Günlüğü
+            {t('transactionLog')}
           </Typography>
           <IconButton size="small">
             {txLogOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}

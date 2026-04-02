@@ -5,6 +5,7 @@ import {
   IconButton, CircularProgress, useMediaQuery, useTheme, Paper, Collapse,
 } from '@mui/material';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import useFinanceStore from '@/lib/stores/useFinanceStore';
 
 const TYPE_COLORS: Record<string, { bg: string; color: string }> = {
@@ -26,6 +27,7 @@ function getTypeColor(type: string) {
 export default function TransactionLog() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const t = useTranslations('financials');
   const {
     transactions, transactionsLoading, transactionsTotal,
     fetchTransactions,
@@ -50,18 +52,18 @@ export default function TransactionLog() {
       {/* Filters */}
       <Box sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
         <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel>İşlem Tipi</InputLabel>
-          <Select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(0); }} label="İşlem Tipi">
-            <MenuItem value="">Tümü</MenuItem>
-            <MenuItem value="Sale">Satış</MenuItem>
-            <MenuItem value="Commission">Komisyon</MenuItem>
-            <MenuItem value="Return">İade</MenuItem>
-            <MenuItem value="Cargo">Kargo</MenuItem>
-            <MenuItem value="Discount">İndirim</MenuItem>
+          <InputLabel>{t('transactionType')}</InputLabel>
+          <Select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(0); }} label={t('transactionType')}>
+            <MenuItem value="">{t('all')}</MenuItem>
+            <MenuItem value="Sale">{t('sale')}</MenuItem>
+            <MenuItem value="Commission">{t('commission')}</MenuItem>
+            <MenuItem value="Return">{t('return')}</MenuItem>
+            <MenuItem value="Cargo">{t('cargo')}</MenuItem>
+            <MenuItem value="Discount">{t('discount')}</MenuItem>
           </Select>
         </FormControl>
         <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-          {transactionsTotal} işlem
+          {transactionsTotal} {t('transactions')}
         </Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <IconButton size="small" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
@@ -76,7 +78,7 @@ export default function TransactionLog() {
 
       {transactions.length === 0 ? (
         <Box sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary">İşlem bulunamadı</Typography>
+          <Typography variant="body2" color="text.secondary">{t('noTransactions')}</Typography>
         </Box>
       ) : isMobile ? (
         /* Mobile cards */
@@ -108,10 +110,10 @@ export default function TransactionLog() {
                 </Box>
                 <Collapse in={expandedRow === tx.id}>
                   <Box sx={{ px: 1.5, pb: 1.5, fontSize: '0.75rem' }}>
-                    {tx.productName && <Typography variant="caption" display="block">Ürün: {tx.productName}</Typography>}
-                    {tx.orderNumber && <Typography variant="caption" display="block">Sipariş: {tx.orderNumber}</Typography>}
-                    {tx.barcode && <Typography variant="caption" display="block">Barkod: {tx.barcode}</Typography>}
-                    {tx.commission != null && <Typography variant="caption" display="block">Komisyon: ₺{tx.commission}</Typography>}
+                    {tx.productName && <Typography variant="caption" display="block">{t('product')}: {tx.productName}</Typography>}
+                    {tx.orderNumber && <Typography variant="caption" display="block">{t('order')}: {tx.orderNumber}</Typography>}
+                    {tx.barcode && <Typography variant="caption" display="block">{t('barcode')}: {tx.barcode}</Typography>}
+                    {tx.commission != null && <Typography variant="caption" display="block">{t('commission')}: ₺{tx.commission}</Typography>}
                   </Box>
                 </Collapse>
               </Paper>
@@ -124,12 +126,12 @@ export default function TransactionLog() {
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>Tarih</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>Tip</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>Ürün</TableCell>
-                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>Sipariş</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.7rem' }}>Tutar</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.7rem' }}>Komisyon</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>{t('date')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>{t('type')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>{t('product')}</TableCell>
+                <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>{t('order')}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.7rem' }}>{t('amount')}</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.7rem' }}>{t('commission')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

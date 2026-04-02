@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { X, Search, Save, Upload, Plus, Package } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useTranslations } from 'next-intl';
 import useFinanceStore from '@/lib/stores/useFinanceStore';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function CostEntryDrawer({ open, onClose }: Props) {
+  const t = useTranslations('financials');
   const {
     marketplace, productCosts, costsLoading,
     fetchProductCosts, createProductCost, updateProductCost, bulkCreateCosts,
@@ -47,7 +49,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
 
   const handleCreate = async () => {
     if (!newBarcode.trim() || !newCost.trim()) {
-      toast.error('Barkod ve maliyet zorunlu');
+      toast.error(t('barcodeAndCostRequired'));
       return;
     }
     try {
@@ -59,28 +61,28 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
         shippingCost: newShipping ? parseFloat(newShipping) : null,
         notes: newNotes || null,
       });
-      toast.success('Maliyet eklendi');
+      toast.success(t('costAdded'));
       setNewBarcode(''); setNewName(''); setNewCost(''); setNewShipping(''); setNewNotes('');
       fetchProductCosts(search);
     } catch {
-      toast.error('Maliyet eklenemedi');
+      toast.error(t('costAddFailed'));
     }
   };
 
   const handleInlineSave = async (id: string) => {
     try {
       await updateProductCost(id, parseFloat(editCost), editShipping ? parseFloat(editShipping) : undefined);
-      toast.success('Güncellendi');
+      toast.success(t('updated'));
       setEditingId(null);
       fetchProductCosts(search);
     } catch {
-      toast.error('Güncellenemedi');
+      toast.error(t('updateFailed'));
     }
   };
 
   const handleBulkImport = async () => {
     const lines = csvText.trim().split('\n').filter(l => l.trim());
-    if (lines.length === 0) { toast.error('CSV boş'); return; }
+    if (lines.length === 0) { toast.error(t('csvEmpty')); return; }
 
     const items = lines.map(line => {
       const parts = line.split(',').map(s => s.trim());
@@ -93,15 +95,15 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
       };
     }).filter(item => item.barcode && !isNaN(item.costAmount));
 
-    if (items.length === 0) { toast.error('Geçerli satır bulunamadı'); return; }
+    if (items.length === 0) { toast.error(t('noValidRows')); return; }
 
     try {
       await bulkCreateCosts(items);
-      toast.success(`${items.length} maliyet kaydedildi`);
+      toast.success(`${items.length} ${t('bulkSaved')}`);
       setCsvText('');
       fetchProductCosts(search);
     } catch {
-      toast.error('Toplu kayıt başarısız');
+      toast.error(t('bulkFailed'));
     }
   };
 
@@ -120,15 +122,15 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Package size={20} color="#8b5cf6" />
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Ürün Maliyetleri</Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{t('productCosts')}</Typography>
         </Box>
         <IconButton size="small" onClick={onClose}><X size={18} /></IconButton>
       </Box>
 
       {/* Tabs */}
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2, borderBottom: '1px solid #f1f5f9' }}>
-        <Tab label="Tek Tek" sx={{ textTransform: 'none', fontWeight: 600 }} />
-        <Tab label="Toplu CSV" sx={{ textTransform: 'none', fontWeight: 600 }} />
+        <Tab label={t('individual')} sx={{ textTransform: 'none', fontWeight: 600 }} />
+        <Tab label={t('bulkCSV')} sx={{ textTransform: 'none', fontWeight: 600 }} />
       </Tabs>
 
       <Box sx={{ overflow: 'auto', flex: 1 }}>
@@ -136,30 +138,30 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
           <Box sx={{ p: 2 }}>
             {/* New Entry Form */}
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, mb: 1, display: 'block' }}>
-              Yeni Maliyet Ekle
+              {t('addNewCost')}
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mb: 1.5 }}>
-              <TextField size="small" label="Barkod *" value={newBarcode} onChange={e => setNewBarcode(e.target.value)} />
-              <TextField size="small" label="Ürün Adı" value={newName} onChange={e => setNewName(e.target.value)} />
+              <TextField size="small" label={t('barcodeRequired')} value={newBarcode} onChange={e => setNewBarcode(e.target.value)} />
+              <TextField size="small" label={t('productName')} value={newName} onChange={e => setNewName(e.target.value)} />
               <TextField
-                size="small" label="Maliyet *" type="number" value={newCost}
+                size="small" label={t('costRequired')} type="number" value={newCost}
                 onChange={e => setNewCost(e.target.value)}
                 InputProps={{ startAdornment: <InputAdornment position="start">₺</InputAdornment> }}
               />
               <TextField
-                size="small" label="Kargo Maliyeti" type="number" value={newShipping}
+                size="small" label={t('shippingCostLabel')} type="number" value={newShipping}
                 onChange={e => setNewShipping(e.target.value)}
                 InputProps={{ startAdornment: <InputAdornment position="start">₺</InputAdornment> }}
               />
               <FormControl size="small">
-                <InputLabel>Para Birimi</InputLabel>
-                <Select value={newCurrency} onChange={e => setNewCurrency(e.target.value)} label="Para Birimi">
+                <InputLabel>{t('currency')}</InputLabel>
+                <Select value={newCurrency} onChange={e => setNewCurrency(e.target.value)} label={t('currency')}>
                   <MenuItem value="TRY">₺ TRY</MenuItem>
                   <MenuItem value="USD">$ USD</MenuItem>
                   <MenuItem value="EUR">€ EUR</MenuItem>
                 </Select>
               </FormControl>
-              <TextField size="small" label="Not" value={newNotes} onChange={e => setNewNotes(e.target.value)} />
+              <TextField size="small" label={t('note')} value={newNotes} onChange={e => setNewNotes(e.target.value)} />
             </Box>
             <Button
               size="small" variant="contained" fullWidth
@@ -167,7 +169,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
               onClick={handleCreate}
               sx={{ mb: 2, background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', borderRadius: '8px', textTransform: 'none' }}
             >
-              Ekle
+              {t('add')}
             </Button>
 
             <Divider sx={{ mb: 2 }} />
@@ -175,13 +177,13 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
             {/* Existing Costs */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
               <TextField
-                size="small" fullWidth placeholder="Ürün veya barkod ara..."
+                size="small" fullWidth placeholder={t('searchProductOrBarcode')}
                 value={search} onChange={e => setSearch(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 InputProps={{ startAdornment: <InputAdornment position="start"><Search size={14} /></InputAdornment> }}
               />
               <Button size="small" variant="outlined" onClick={handleSearch} sx={{ minWidth: 'auto', px: 1.5 }}>
-                Ara
+                {t('search')}
               </Button>
             </Box>
 
@@ -189,16 +191,16 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
               <Box sx={{ py: 3, textAlign: 'center' }}><CircularProgress size={24} /></Box>
             ) : productCosts.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
-                Henüz maliyet kaydı yok
+                {t('noCostRecords')}
               </Typography>
             ) : (
               <TableContainer sx={{ maxHeight: 400 }}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>Ürün</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.7rem' }}>Maliyet</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.7rem' }}>Kargo</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: '0.7rem' }}>{t('product')}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.7rem' }}>{t('cost')}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.7rem' }}>{t('shipping')}</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 700, fontSize: '0.7rem' }}></TableCell>
                     </TableRow>
                   </TableHead>
@@ -262,10 +264,10 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
           /* Bulk CSV Tab */
           <Box sx={{ p: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Her satıra bir ürün: <strong>barkod, ürün adı, maliyet, kargo maliyeti</strong>
+              {t('csvHelp')}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
-              Örnek: 8680001234567, Bebek Battaniye, 45.00, 12.50
+              {t('csvExample')}
             </Typography>
             <TextField
               multiline rows={10} fullWidth
@@ -280,7 +282,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
               disabled={!csvText.trim()}
               sx={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', borderRadius: '8px', textTransform: 'none' }}
             >
-              Toplu İçe Aktar
+              {t('bulkImport')}
             </Button>
           </Box>
         )}

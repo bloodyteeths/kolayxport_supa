@@ -102,9 +102,11 @@ const TRENDYOL_ORANGE = '#F27A1A';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatPrice(value: number | null | undefined, currency?: string): string {
+function formatPrice(value: any, currency?: string): string {
   if (value == null) return '\u2014';
-  return `\u20ba${value.toFixed(2)}`;
+  const num = typeof value === 'number' ? value : parseFloat(String(value));
+  if (isNaN(num)) return '\u2014';
+  return `\u20ba${num.toFixed(2)}`;
 }
 
 function formatDate(dateStr: string | null | undefined): string {

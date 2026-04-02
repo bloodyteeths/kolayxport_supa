@@ -6,6 +6,7 @@ import { logger } from '../../../lib/logger';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },
+  maxDuration: 60,
 };
 
 async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
@@ -174,90 +175,88 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // ================================================================
-    // FULL SYNC (all products to DB cache)
+    // FULL SYNC (all products to DB cache — batched for speed)
     // ================================================================
     if (action === 'sync' && req.method === 'POST') {
       let totalSynced = 0;
       let page = 0;
       let totalPages = 1;
+      const MAX_PAGES = 25; // Safety limit to stay within serverless timeout
+      const allProducts: any[] = [];
 
-      while (page < totalPages) {
+      // Phase 1: Fetch all products from Trendyol API
+      while (page < totalPages && page < MAX_PAGES) {
         const data = await client.getProducts({ page, size: 200 });
         totalPages = data.totalPages || 1;
+        if (data.content?.length) allProducts.push(...data.content);
+        page++;
+      }
 
-        for (const p of data.content || []) {
-          const barcode = p.barcode || p.stockCode;
-          if (!barcode) continue;
+      logger.info(`Trendyol sync: fetched ${allProducts.length} products from ${page} pages`);
 
-          try {
-            await prisma.trendyolProduct.upsert({
+      // Phase 2: Batch upsert to DB (chunks of 50 to avoid huge transactions)
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < allProducts.length; i += CHUNK_SIZE) {
+        const chunk = allProducts.slice(i, i + CHUNK_SIZE);
+        const upserts = chunk
+          .filter((p: any) => p.barcode || p.stockCode)
+          .map((p: any) => {
+            const barcode = p.barcode || p.stockCode;
+            const productData = {
+              stockCode: p.stockCode || null,
+              productMainId: p.productMainId || null,
+              trendyolId: p.id ? String(p.id) : null,
+              title: p.title || '',
+              description: p.description || null,
+              brandId: p.brandId || null,
+              brandName: p.brand || null,
+              categoryId: p.categoryId || null,
+              categoryName: p.categoryName || null,
+              listPrice: p.listPrice || null,
+              salePrice: p.salePrice || null,
+              currencyType: p.currencyType || 'TRY',
+              quantity: p.quantity || 0,
+              vatRate: p.vatRate || 10,
+              images: p.images || null,
+              thumbnailUrl: p.images?.[0]?.url || null,
+              imageCount: p.images?.length || 0,
+              attributes: p.attributes || null,
+              approved: p.approved || false,
+              onSale: p.onSale || false,
+              rejected: p.rejected || false,
+              blacklisted: p.blacklisted || false,
+              archived: p.archived || false,
+              rejectReasons: p.rejectReasonDetails || null,
+              dimensionalWeight: p.dimensionalWeight || null,
+              cargoCompanyId: p.cargoCompanyId || null,
+              syncedAt: new Date(),
+            };
+            return prisma.trendyolProduct.upsert({
               where: {
                 userId_supplierId_barcode: { userId, supplierId, barcode },
               },
-              create: {
-                userId,
-                supplierId,
-                barcode,
-                stockCode: p.stockCode || null,
-                productMainId: p.productMainId || null,
-                trendyolId: p.id ? String(p.id) : null,
-                title: p.title || '',
-                description: p.description || null,
-                brandId: p.brandId || null,
-                brandName: p.brand || null,
-                categoryId: p.categoryId || null,
-                categoryName: p.categoryName || null,
-                listPrice: p.listPrice || null,
-                salePrice: p.salePrice || null,
-                currencyType: p.currencyType || 'TRY',
-                quantity: p.quantity || 0,
-                vatRate: p.vatRate || 10,
-                images: p.images || null,
-                thumbnailUrl: p.images?.[0]?.url || null,
-                imageCount: p.images?.length || 0,
-                attributes: p.attributes || null,
-                approved: p.approved || false,
-                onSale: p.onSale || false,
-                rejected: p.rejected || false,
-                blacklisted: p.blacklisted || false,
-                archived: p.archived || false,
-                rejectReasons: p.rejectReasonDetails || null,
-                syncedAt: new Date(),
-              },
-              update: {
-                title: p.title || '',
-                description: p.description || null,
-                brandId: p.brandId || null,
-                brandName: p.brand || null,
-                listPrice: p.listPrice || null,
-                salePrice: p.salePrice || null,
-                quantity: p.quantity || 0,
-                images: p.images || null,
-                thumbnailUrl: p.images?.[0]?.url || null,
-                imageCount: p.images?.length || 0,
-                attributes: p.attributes || null,
-                approved: p.approved || false,
-                onSale: p.onSale || false,
-                rejected: p.rejected || false,
-                blacklisted: p.blacklisted || false,
-                archived: p.archived || false,
-                rejectReasons: p.rejectReasonDetails || null,
-                syncedAt: new Date(),
-              },
+              create: { userId, supplierId, barcode, ...productData },
+              update: productData,
             });
-            totalSynced++;
-          } catch (err) {
-            logger.warn('Failed to sync product', { barcode, error: String(err) });
+          });
+
+        try {
+          await prisma.$transaction(upserts);
+          totalSynced += upserts.length;
+        } catch (err) {
+          logger.warn('Batch upsert failed, falling back to individual', { error: String(err) });
+          // Fallback: try individually
+          for (const op of upserts) {
+            try { await op; totalSynced++; } catch {}
           }
         }
-
-        page++;
       }
 
       return res.status(200).json({
         success: true,
         totalSynced,
         totalPages,
+        pagesProcessed: page,
       });
     }
 

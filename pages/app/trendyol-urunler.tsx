@@ -442,13 +442,31 @@ function TrendyolListingsPage() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/trendyol/products?action=list&fromCache=true&size=500');
-      if (!res.ok) throw new Error('Failed to fetch products');
-      const data = await res.json();
-      setProducts(Array.isArray(data?.content) ? data.content : data.products || []);
-    } catch (err) {
+      // Try cache first
+      const cacheRes = await fetch('/api/trendyol/products?action=list&fromCache=true&size=500');
+      if (cacheRes.ok) {
+        const cacheData = await cacheRes.json();
+        const cached = Array.isArray(cacheData?.content) ? cacheData.content : [];
+        if (cached.length > 0) {
+          setProducts(cached);
+          setLoading(false);
+          return;
+        }
+      }
+      // Cache empty — fetch first page from Trendyol API directly
+      const apiRes = await fetch('/api/trendyol/products?action=list&size=200');
+      if (!apiRes.ok) {
+        const errData = await apiRes.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${apiRes.status}`);
+      }
+      const apiData = await apiRes.json();
+      const products = Array.isArray(apiData?.content) ? apiData.content : [];
+      setProducts(products);
+    } catch (err: any) {
       console.error('Failed to fetch Trendyol products:', err);
-      toast.error(t('syncFailed'));
+      if (err.message?.includes('credentials')) {
+        toast.error(t('connectTrendyol'));
+      }
     } finally {
       setLoading(false);
     }
@@ -466,11 +484,21 @@ function TrendyolListingsPage() {
     setSyncing(true);
     try {
       const res = await fetch('/api/trendyol/products?action=sync', { method: 'POST' });
-      if (!res.ok) throw new Error();
-      toast.success(t('syncComplete'));
-      await fetchProducts();
-    } catch {
-      toast.error(t('syncFailed'));
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      toast.success(`${t('syncComplete')} (${data.totalSynced || 0})`);
+      // Refetch from cache (now populated)
+      const cacheRes = await fetch('/api/trendyol/products?action=list&fromCache=true&size=500');
+      if (cacheRes.ok) {
+        const cacheData = await cacheRes.json();
+        setProducts(Array.isArray(cacheData?.content) ? cacheData.content : []);
+      }
+    } catch (err: any) {
+      console.error('Sync failed:', err);
+      toast.error(`${t('syncFailed')}: ${err.message || 'Unknown error'}`);
     } finally {
       setSyncing(false);
     }

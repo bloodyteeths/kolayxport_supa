@@ -173,13 +173,13 @@ export default function CompetitorIntelligence() {
   // Estimated monthly revenue
   const estMonthlyRevenue = useMemo(() => {
     if (!deepDiveListings || deepDiveListings.length === 0 || !deepDiveShop) return 0;
-    const totalEstSales = allListingsSorted.reduce((s, l) => s + (l.estMonthlySales || 0), 0);
+    const totalEstSales = allListingsSorted.reduce((s, l) => s + Math.max(0, l.estMonthlySales || 0), 0);
     const avgPrice = deepDiveListings.reduce((s, l) => s + l.price, 0) / deepDiveListings.length;
-    return Math.round(totalEstSales * avgPrice);
+    return Math.max(0, Math.round(totalEstSales * avgPrice));
   }, [deepDiveListings, deepDiveShop, allListingsSorted]);
 
   const estMonthlySales = useMemo(() => {
-    return Math.round(allListingsSorted.reduce((s, l) => s + (l.estMonthlySales || 0), 0));
+    return Math.max(0, Math.round(allListingsSorted.reduce((s, l) => s + Math.max(0, l.estMonthlySales || 0), 0)));
   }, [allListingsSorted]);
 
   // Handle analyze with scroll

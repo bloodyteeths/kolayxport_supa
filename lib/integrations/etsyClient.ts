@@ -421,7 +421,7 @@ export class EtsyClient {
     if (params.limit != null) query.set('limit', String(Math.min(params.limit, 100)));
     if (params.offset != null) query.set('offset', String(params.offset));
 
-    const url = `${this.baseUrl}/application/shops/${this.shopId}/ledger/entries?${query.toString()}`;
+    const url = `${this.baseUrl}/application/shops/${this.shopId}/payment-account/ledger-entries?${query.toString()}`;
 
     logger.info('Fetching Etsy ledger entries', {
       shopId: this.shopId,

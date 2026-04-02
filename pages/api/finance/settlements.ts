@@ -31,12 +31,16 @@ async function getTrendyolCredentials(userId: string): Promise<TrendyolCredentia
 }
 
 // Settlement transaction types — queried separately (Trendyol requires single transactionType param)
-const SETTLEMENT_TYPES = [
-  'Sale', 'Return', 'Discount', 'DiscountCancel', 'Coupon', 'CouponCancel',
+// Primary types that commonly have data:
+const SETTLEMENT_TYPES_PRIMARY = [
+  'Sale', 'Return', 'Discount', 'Coupon',
   'CommissionPositive', 'CommissionNegative',
+];
+// Secondary types — less common, fetched in parallel with primary
+const SETTLEMENT_TYPES_SECONDARY = [
+  'DiscountCancel', 'CouponCancel',
   'ProvisionPositive', 'ProvisionNegative',
-  'ManualRefund', 'ManualRefundCancel',
-  'TYDiscount', 'TYDiscountCancel', 'TYCoupon', 'TYCouponCancel',
+  'ManualRefund', 'TYDiscount', 'TYCoupon',
 ];
 
 async function callTrendyolSettlements(
@@ -204,8 +208,8 @@ async function syncCargoInvoices(
         return txType.includes('kargo') || txType.includes('cargo');
       });
 
-      // Fetch line items for each cargo invoice in parallel (batched)
-      const BATCH = 5;
+      // Fetch line items for each cargo invoice in parallel
+      const BATCH = 10;
       for (let i = 0; i < cargoInvoices.length; i += BATCH) {
         const batch = cargoInvoices.slice(i, i + BATCH);
         const results = await Promise.allSettled(
@@ -258,8 +262,8 @@ async function fetchProductNamesByBarcodes(
   };
 
   // Trendyol products API supports single barcode filter per request.
-  // Batch in parallel with concurrency limit to avoid rate-limiting.
-  const BATCH_SIZE = 10;
+  // Batch in parallel — 20 concurrent for speed.
+  const BATCH_SIZE = 20;
   for (let i = 0; i < barcodes.length; i += BATCH_SIZE) {
     const batch = barcodes.slice(i, i + BATCH_SIZE);
     const results = await Promise.allSettled(
@@ -310,33 +314,38 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
   const windows = splitDateRange(startMs, endMs);
 
   let totalUpserted = 0;
-  let totalFetched = 0;
 
-  // First pass: collect all settlement items across all windows
+  // ---- PHASE 1: Fetch all data in parallel ----
+  // Build all settlement fetch promises across ALL windows × ALL types at once
+  const allTypes = [...SETTLEMENT_TYPES_PRIMARY, ...SETTLEMENT_TYPES_SECONDARY];
+  const settlementPromises = windows.flatMap(window =>
+    allTypes.map(txType =>
+      callTrendyolSettlements(credentials, {
+        startDate: window.startDate,
+        endDate: window.endDate,
+        transactionType: txType,
+        page: 0,
+        size: 500,
+      }).catch(() => ({ content: [], totalPages: 0, totalElements: 0 }))
+    )
+  );
+
+  // Fetch settlements + cargo invoices in parallel
+  const [settlementResults, cargoResult] = await Promise.all([
+    Promise.all(settlementPromises),
+    syncCargoInvoices(credentials, windows),
+  ]);
+
+  // Collect all settlement items
   const allSettlementItems: any[] = [];
-
-  for (const window of windows) {
-    // Fetch all transaction types in parallel for this window
-    const results = await Promise.all(
-      SETTLEMENT_TYPES.map(txType =>
-        callTrendyolSettlements(credentials, {
-          startDate: window.startDate,
-          endDate: window.endDate,
-          transactionType: txType,
-          page: 0,
-          size: 500,
-        }).catch(() => ({ content: [], totalPages: 0, totalElements: 0 }))
-      )
-    );
-
-    for (const data of results) {
-      const items = Array.isArray(data.content) ? data.content : [];
-      allSettlementItems.push(...items);
-    }
+  for (const data of settlementResults) {
+    const items = Array.isArray(data.content) ? data.content : [];
+    allSettlementItems.push(...items);
   }
-  totalFetched = allSettlementItems.length;
+  const totalFetched = allSettlementItems.length;
+  const { orderShippingMap, totalCargoItems } = cargoResult;
 
-  // Collect unique barcodes and resolve product names from Trendyol Products API
+  // ---- PHASE 2: Resolve product names (parallel with bigger batches) ----
   const uniqueBarcodes = [...new Set(
     allSettlementItems
       .map((item: any) => item.barcode)
@@ -345,54 +354,46 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
 
   const productNameMap = await fetchProductNamesByBarcodes(credentials, uniqueBarcodes);
 
-  // Fetch cargo/shipping costs from Other Financials API
-  const { orderShippingMap, totalCargoItems } = await syncCargoInvoices(credentials, windows);
+  // ---- PHASE 3: Bulk upsert (batched for speed) ----
+  const UPSERT_BATCH = 20;
+  for (let i = 0; i < allSettlementItems.length; i += UPSERT_BATCH) {
+    const batch = allSettlementItems.slice(i, i + UPSERT_BATCH);
+    await Promise.all(batch.map(item => {
+      const externalId = item.id ? String(item.id) : `${item.transactionType}_${item.orderNumber || ''}_${item.transactionDate || Date.now()}`;
+      const credit = Number(item.credit || 0);
+      const debt = Number(item.debt || 0);
+      const amount = credit - debt;
+      const resolvedName = item.barcode ? productNameMap.get(item.barcode) : undefined;
+      const orderNum = item.orderNumber ? String(item.orderNumber) : null;
+      const shippingFromCargo = orderNum ? (orderShippingMap.get(orderNum) || null) : null;
 
-  logger.info('Cargo invoice sync', {
-    totalCargoItems,
-    ordersWithShipping: orderShippingMap.size,
-  });
+      const txData = {
+        transactionType: item.transactionType || 'unknown',
+        orderNumber: orderNum,
+        barcode: item.barcode || null,
+        productName: resolvedName || item.productName || item.description || null,
+        quantity: item.quantity ?? 1,
+        amount,
+        currency: 'TRY',
+        commission: item.commissionAmount != null ? Number(item.commissionAmount) : null,
+        shippingAmount: shippingFromCargo,
+        transactionDate: item.transactionDate ? new Date(item.transactionDate) : new Date(),
+        rawData: item,
+      };
 
-  // Upsert all items with resolved product names + shipping costs
-  for (const item of allSettlementItems) {
-    const externalId = item.id ? String(item.id) : `${item.transactionType}_${item.orderNumber || ''}_${item.transactionDate || Date.now()}`;
-    const credit = Number(item.credit || 0);
-    const debt = Number(item.debt || 0);
-    const amount = credit - debt;
-
-    // Use resolved product name from Trendyol Products API, fall back to description
-    const resolvedName = item.barcode ? productNameMap.get(item.barcode) : undefined;
-
-    // Attach shipping cost from cargo invoices (matched by orderNumber)
-    const orderNum = item.orderNumber ? String(item.orderNumber) : null;
-    const shippingFromCargo = orderNum ? (orderShippingMap.get(orderNum) || null) : null;
-
-    const txData = {
-      transactionType: item.transactionType || 'unknown',
-      orderNumber: orderNum,
-      barcode: item.barcode || null,
-      productName: resolvedName || item.productName || item.description || null,
-      quantity: item.quantity ?? 1,
-      amount,
-      currency: 'TRY',
-      commission: item.commissionAmount != null ? Number(item.commissionAmount) : null,
-      shippingAmount: shippingFromCargo,
-      transactionDate: item.transactionDate ? new Date(item.transactionDate) : new Date(),
-      rawData: item,
-    };
-
-    await prisma.financialTransaction.upsert({
-      where: {
-        userId_marketplace_externalId: {
-          userId,
-          marketplace: 'trendyol',
-          externalId,
+      return prisma.financialTransaction.upsert({
+        where: {
+          userId_marketplace_externalId: {
+            userId,
+            marketplace: 'trendyol',
+            externalId,
+          },
         },
-      },
-      update: { ...txData, syncedAt: new Date() },
-      create: { userId, marketplace: 'trendyol', externalId, ...txData },
-    });
-    totalUpserted++;
+        update: { ...txData, syncedAt: new Date() },
+        create: { userId, marketplace: 'trendyol', externalId, ...txData },
+      });
+    }));
+    totalUpserted += batch.length;
   }
 
   // Update sync cursor

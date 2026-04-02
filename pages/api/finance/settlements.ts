@@ -1000,6 +1000,276 @@ async function callEbayFinancesAPI(endpoint: string, accessToken: string): Promi
   return response.json();
 }
 
+// ---------------------------------------------------------------------------
+// eBay settlement sync
+// ---------------------------------------------------------------------------
+
+function ebayAmount(money: { value: string; currency: string } | null | undefined): number {
+  if (!money || !money.value) return 0;
+  return parseFloat(money.value) || 0;
+}
+
+async function handleEbaySync(userId: string, body: any, res: NextApiResponse) {
+  const { startDate, endDate } = body;
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'startDate and endDate are required (epoch ms)' });
+  }
+
+  const startMs = Number(startDate);
+  const endMs = Number(endDate);
+  if (isNaN(startMs) || isNaN(endMs) || startMs >= endMs) {
+    return res.status(400).json({ error: 'Invalid date range.' });
+  }
+
+  const accessToken = await getEbayAccessToken(userId);
+
+  const startISO = new Date(startMs).toISOString();
+  const endISO = new Date(endMs).toISOString();
+  const filter = `transactionDate:[${startISO}..${endISO}]`;
+
+  // ---- PHASE 1: Fetch all transactions with pagination ----
+  const allTransactions: any[] = [];
+  let offset = 0;
+  const PAGE_LIMIT = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const data = await callEbayFinancesAPI(
+      `/sell/finances/v1/transaction?filter=${encodeURIComponent(filter)}&limit=${PAGE_LIMIT}&offset=${offset}`,
+      accessToken
+    );
+    const txs = Array.isArray(data.transactions) ? data.transactions : [];
+    allTransactions.push(...txs);
+
+    if (txs.length < PAGE_LIMIT) {
+      hasMore = false;
+    } else {
+      offset += PAGE_LIMIT;
+    }
+  }
+
+  logger.info('eBay finance: fetched transactions', { total: allTransactions.length });
+
+  // ---- PHASE 2: Process transactions ----
+  const upsertBatch: Array<{
+    externalId: string;
+    transactionType: string;
+    orderNumber: string | null;
+    barcode: string | null;
+    productName: string | null;
+    quantity: number;
+    amount: number;
+    currency: string;
+    commission: number | null;
+    shippingAmount: number | null;
+    transactionDate: Date;
+    rawData: any;
+  }> = [];
+
+  let adSpendTotal = 0;
+  let adSpendCount = 0;
+
+  for (const tx of allTransactions) {
+    const txType = tx.transactionType || '';
+    const txId = tx.transactionId || '';
+    const txDate = tx.transactionDate ? new Date(tx.transactionDate) : new Date();
+    const currency = tx.amount?.currency || 'USD';
+    const memo = tx.transactionMemo || '';
+
+    switch (txType) {
+      case 'SALE': {
+        const gross = ebayAmount(tx.totalFeeBasisAmount);
+        const totalFees = ebayAmount(tx.totalFeeAmount);
+        const lineItem = Array.isArray(tx.orderLineItems) && tx.orderLineItems[0];
+        const lineItemId = lineItem?.lineItemId || null;
+
+        upsertBatch.push({
+          externalId: txId,
+          transactionType: 'Sale',
+          orderNumber: tx.orderId || txId,
+          barcode: lineItemId ? String(lineItemId) : null,
+          productName: memo || (tx.buyer?.username ? `Order from ${tx.buyer.username}` : null),
+          quantity: Array.isArray(tx.orderLineItems) ? tx.orderLineItems.length : 1,
+          amount: gross,
+          currency,
+          commission: totalFees > 0 ? totalFees : null,
+          shippingAmount: null, // buyer-paid on eBay
+          transactionDate: txDate,
+          rawData: tx,
+        });
+        break;
+      }
+
+      case 'REFUND': {
+        const refundAmt = ebayAmount(tx.amount);
+        upsertBatch.push({
+          externalId: txId,
+          transactionType: 'Return',
+          orderNumber: tx.orderId || null,
+          barcode: null,
+          productName: memo || 'Refund',
+          quantity: 1,
+          amount: -Math.abs(refundAmt), // ensure negative
+          currency,
+          commission: null,
+          shippingAmount: null,
+          transactionDate: txDate,
+          rawData: tx,
+        });
+        break;
+      }
+
+      case 'NON_SALE_CHARGE': {
+        const chargeAmt = ebayAmount(tx.amount);
+        const feeType = tx.feeType || '';
+
+        if (feeType === 'PREMIUM_AD_FEES' || feeType === 'AD_FEE' || memo.toLowerCase().includes('promoted listing')) {
+          // Ad spend — accumulate
+          adSpendTotal += Math.abs(chargeAmt);
+          adSpendCount++;
+        } else {
+          // Store subscription, insertion fees, etc.
+          upsertBatch.push({
+            externalId: txId,
+            transactionType: 'StoreFee',
+            orderNumber: null,
+            barcode: null,
+            productName: memo || feeType || 'eBay Fee',
+            quantity: 1,
+            amount: -Math.abs(chargeAmt),
+            currency,
+            commission: null,
+            shippingAmount: null,
+            transactionDate: txDate,
+            rawData: tx,
+          });
+        }
+        break;
+      }
+
+      case 'SHIPPING_LABEL': {
+        const labelAmt = ebayAmount(tx.amount);
+        upsertBatch.push({
+          externalId: txId,
+          transactionType: 'ShippingLabel',
+          orderNumber: tx.orderId || null,
+          barcode: null,
+          productName: memo || 'eBay Shipping Label',
+          quantity: 1,
+          amount: -Math.abs(labelAmt),
+          currency,
+          commission: null,
+          shippingAmount: Math.abs(labelAmt),
+          transactionDate: txDate,
+          rawData: tx,
+        });
+        break;
+      }
+
+      case 'CREDIT': {
+        const creditAmt = ebayAmount(tx.amount);
+        upsertBatch.push({
+          externalId: txId,
+          transactionType: 'Credit',
+          orderNumber: tx.orderId || null,
+          barcode: null,
+          productName: memo || 'eBay Credit',
+          quantity: 1,
+          amount: Math.abs(creditAmt),
+          currency,
+          commission: null,
+          shippingAmount: null,
+          transactionDate: txDate,
+          rawData: tx,
+        });
+        break;
+      }
+
+      // TRANSFER, DISPUTE, etc. — skip for now
+      default:
+        break;
+    }
+  }
+
+  // ---- PHASE 3: Batch upsert to DB ----
+  let totalUpserted = 0;
+  const UPSERT_BATCH = 20;
+
+  for (let i = 0; i < upsertBatch.length; i += UPSERT_BATCH) {
+    const batch = upsertBatch.slice(i, i + UPSERT_BATCH);
+    await Promise.all(batch.map(txData =>
+      prisma.financialTransaction.upsert({
+        where: {
+          userId_marketplace_externalId: {
+            userId,
+            marketplace: 'ebay',
+            externalId: txData.externalId,
+          },
+        },
+        update: { ...txData, syncedAt: new Date() },
+        create: { userId, marketplace: 'ebay', ...txData },
+      })
+    ));
+    totalUpserted += batch.length;
+  }
+
+  // ---- PHASE 4: Upsert ad spend summary ----
+  if (adSpendTotal > 0) {
+    const startSec = Math.floor(startMs / 1000);
+    const endSec = Math.floor(endMs / 1000);
+    const adSpendId = `adspend_${startSec}_${endSec}`;
+    await prisma.financialTransaction.upsert({
+      where: {
+        userId_marketplace_externalId: { userId, marketplace: 'ebay', externalId: adSpendId },
+      },
+      update: {
+        amount: -adSpendTotal,
+        quantity: adSpendCount,
+        syncedAt: new Date(),
+      },
+      create: {
+        userId,
+        marketplace: 'ebay',
+        externalId: adSpendId,
+        transactionType: 'AdSpend',
+        orderNumber: null,
+        barcode: null,
+        productName: 'eBay Promoted Listings',
+        quantity: adSpendCount,
+        amount: -adSpendTotal,
+        currency: 'USD',
+        commission: null,
+        shippingAmount: null,
+        transactionDate: new Date(endMs),
+      },
+    });
+    totalUpserted++;
+  }
+
+  // Update sync cursor
+  await prisma.financialSyncCursor.upsert({
+    where: { userId_marketplace: { userId, marketplace: 'ebay' } },
+    update: { lastSyncedTo: new Date(endMs), totalSynced: { increment: totalUpserted } },
+    create: { userId, marketplace: 'ebay', lastSyncedTo: new Date(endMs), totalSynced: totalUpserted },
+  });
+
+  logger.info('eBay settlement sync complete', {
+    userId,
+    totalFetched: allTransactions.length,
+    totalUpserted,
+    adSpend: Math.round(adSpendTotal * 100) / 100,
+    adSpendCount,
+  });
+
+  return res.status(200).json({
+    success: true,
+    totalFetched: allTransactions.length,
+    totalUpserted,
+    adSpend: Math.round(adSpendTotal * 100) / 100,
+    syncedTo: new Date(endMs).toISOString(),
+  });
+}
+
 // Debug: inspect real eBay Finances API response
 async function handleDebugEbayFinances(userId: string, body: any, res: NextApiResponse) {
   const accessToken = await getEbayAccessToken(userId);
@@ -1051,6 +1321,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const marketplace = req.body.marketplace || 'trendyol';
         if (marketplace === 'etsy') {
           return await handleEtsySync(userId, req.body, res);
+        }
+        if (marketplace === 'ebay') {
+          return await handleEbaySync(userId, req.body, res);
         }
         return await handleSync(userId, req.body, res);
       }

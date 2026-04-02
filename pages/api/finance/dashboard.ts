@@ -80,6 +80,10 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   // Provision (weight/deci adjustments) — treat as shipping adjustment
   if (t.includes('provision')) return 'shipping';
   if (t.includes('adspend') || t.includes('promoted') || t.includes('offsite ads') || t.includes('etsy ads')) return 'adspend';
+  // eBay-specific types
+  if (t.includes('shippinglabel')) return 'shipping';
+  if (t.includes('credit')) return 'revenue'; // eBay credits = revenue adjustment
+  if (t.includes('storefee')) return 'other'; // eBay store subscription — don't mix with commissions
   if (t.includes('sellerrevenue') || t.includes('manualrefund')) return 'other';
   return 'other';
 }

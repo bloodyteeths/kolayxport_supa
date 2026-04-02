@@ -5,9 +5,9 @@ import {
   CircularProgress, Collapse, IconButton,
 } from '@mui/material';
 import {
-  DollarSign, TrendingUp, TrendingDown, Truck, RotateCcw,
+  Banknote, TrendingUp, TrendingDown, Truck, RotateCcw,
   Package, PieChart, ChevronDown, ChevronUp, List, BarChart3,
-  Receipt, Edit3,
+  Percent, Edit3,
 } from 'lucide-react';
 import useFinanceStore, { DashboardData, DashboardSummary } from '@/lib/stores/useFinanceStore';
 import dynamic from 'next/dynamic';
@@ -30,8 +30,8 @@ interface CardDef {
 }
 
 const CARDS: CardDef[] = [
-  { key: 'grossRevenue', tKey: 'grossRevenue', icon: <DollarSign size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency' },
-  { key: 'commissions', tKey: 'commissions', icon: <Receipt size={20} />, color: '#f59e0b', gradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)', format: 'currency' },
+  { key: 'grossRevenue', tKey: 'grossRevenue', icon: <Banknote size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency' },
+  { key: 'commissions', tKey: 'commissions', icon: <Percent size={20} />, color: '#f59e0b', gradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)', format: 'currency' },
   { key: 'shipping', tKey: 'shippingCosts', icon: <Truck size={20} />, color: '#3b82f6', gradient: 'linear-gradient(135deg, #eff6ff, #dbeafe)', format: 'currency' },
   { key: 'returns', tKey: 'returns', icon: <RotateCcw size={20} />, color: '#ef4444', gradient: 'linear-gradient(135deg, #fef2f2, #fecaca)', format: 'currency' },
   { key: 'cogs', tKey: 'productCost', icon: <Package size={20} />, color: '#8b5cf6', gradient: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', format: 'currency' },
@@ -203,7 +203,7 @@ export default function FinancialDashboard() {
           background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <DollarSign size={28} color="#10b981" />
+          <Banknote size={28} color="#10b981" />
         </Box>
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
           {t('syncPrompt')}

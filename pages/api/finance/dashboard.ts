@@ -60,11 +60,16 @@ function getDateTruncExpression(groupBy: string): string {
  */
 function classifyTransactionType(type: string): 'revenue' | 'commission' | 'shipping' | 'return' | 'discount' | 'other' {
   const t = (type || '').toLowerCase();
-  // English and Turkish transaction type names from Trendyol
-  if (t.includes('sale') || t.includes('satış') || t.includes('cashing') || t === 'payment') return 'revenue';
-  if (t.includes('commission') || t.includes('komisyon') || t.includes('service')) return 'commission';
+  // Order matters — more specific patterns first
+  // Turkish: Satış=Sale, İade=Return, İndirim=Discount, İndirim İptal=DiscountCancel, Kupon=Coupon, Komisyon=Commission
+  if (t.includes('sale') || t.includes('satış')) return 'revenue';
   if (t.includes('shipping') || t.includes('cargo') || t.includes('kargo')) return 'shipping';
-  if (t.includes('return') || t.includes('iade') || t.includes('cancel') || t.includes('iptal')) return 'return';
+  if (t.includes('commission') || t.includes('komisyon') || t.includes('service')) return 'commission';
+  // Discount cancel (İndirim İptal / DiscountCancel) — revenue recovery, treat as revenue
+  if ((t.includes('indirim') && t.includes('iptal')) || t.includes('discountcancel')) return 'revenue';
+  // Returns (İade / Return)
+  if (t.includes('return') || t.includes('iade')) return 'return';
+  // Discounts/coupons (İndirim / Kupon)
   if (t.includes('discount') || t.includes('indirim') || t.includes('coupon') || t.includes('kupon')) return 'discount';
   if (t.includes('provision') || t.includes('sellerrevenue') || t.includes('manualrefund')) return 'other';
   return 'other';

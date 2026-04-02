@@ -439,6 +439,54 @@ export default async function handler(
       return res.status(200).json(data);
     }
 
+    // GET /api/clawd/trendyol?action=test_settlements - Debug: raw settlements response
+    if (action === 'test_settlements' && req.method === 'GET') {
+      const now = Date.now();
+      const fifteenDaysAgo = now - (15 * 24 * 60 * 60 * 1000);
+
+      // Try both endpoint paths
+      let data;
+      let endpointUsed = '';
+      try {
+        data = await callTrendyolAPI('GET', `/finance/che/sellers/${supplierId}/settlements?startDate=${fifteenDaysAgo}&endDate=${now}&page=0&size=10`);
+        endpointUsed = `/finance/che/sellers/{supplierId}/settlements`;
+      } catch (e1: any) {
+        logger.info('test_settlements: /finance/che/ path failed, trying /finance/ path', { error: e1.message || e1.status });
+        try {
+          data = await callTrendyolAPI('GET', `/finance/sellers/${supplierId}/settlements?startDate=${fifteenDaysAgo}&endDate=${now}&page=0&size=10`);
+          endpointUsed = `/finance/sellers/{supplierId}/settlements`;
+        } catch (e2: any) {
+          return res.status(502).json({
+            error: 'Both settlement endpoints failed',
+            che_path_error: e1.body || e1.message || String(e1),
+            standard_path_error: e2.body || e2.message || String(e2),
+          });
+        }
+      }
+
+      const items = data.content || data.items || data.results || [];
+      const sampleItems = items.slice(0, 3);
+
+      logger.info('test_settlements: raw response', {
+        endpointUsed,
+        totalElements: data.totalElements,
+        rawKeys: Object.keys(data),
+        sampleCount: sampleItems.length,
+        sampleItems,
+      });
+
+      return res.status(200).json({
+        endpoint_used: endpointUsed,
+        query_params: { startDate: fifteenDaysAgo, endDate: now, page: 0, size: 10 },
+        total_elements: data.totalElements ?? data.total ?? 'unknown',
+        total_pages: data.totalPages ?? 'unknown',
+        raw_keys: Object.keys(data),
+        full_response_keys: items[0] ? Object.keys(items[0]) : [],
+        sample_items: sampleItems,
+        full_raw_response: data,
+      });
+    }
+
     // ================================================================
     // SUPPLIER INFO
     // ================================================================
@@ -485,6 +533,7 @@ export default async function handler(
         questions: 'GET - Get customer questions',
         answer_question: 'POST - Answer customer question',
         settlements: 'GET - Get account statements',
+        test_settlements: 'GET - Debug: raw settlements response (last 15 days, tries both endpoint paths)',
         addresses: 'GET - Get seller addresses',
         cargo_companies: 'GET - List cargo companies',
       },

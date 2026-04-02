@@ -29,7 +29,8 @@ import {
   Store,
   ShoppingBag,
   Target,
-  Package
+  Package,
+  Wallet
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -50,6 +51,7 @@ function getNavGroups(t) {
       items: [
         { href: '/app', icon: LayoutDashboard, label: t('overview') },
         { href: '/app/analytics', icon: TrendingUp, label: t('analytics') },
+        { href: '/app/financials', icon: Wallet, label: t('financials') },
       ],
     },
     {
@@ -486,7 +488,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
 
           {/* ─── Page Content ─────────────────────────────── */}
           <main className={`flex-1 overflow-y-auto ${
-            isMobile ? 'p-3' : 'p-4 sm:p-6 lg:p-8'
+            isMobile ? 'p-2' : 'p-3 sm:p-4 lg:p-5'
           }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', backgroundColor: '#f8fafc' }}>
             {children}
           </main>

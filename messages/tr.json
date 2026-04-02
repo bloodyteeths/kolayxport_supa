@@ -430,6 +430,7 @@
     "productName": "Ürün Adı",
     "costRequired": "Maliyet *",
     "shippingCostLabel": "Kargo Maliyeti",
+    "shippingCostPerItem": "Ürün Başı Kargo",
     "currency": "Para Birimi",
     "note": "Not",
     "add": "Ekle",

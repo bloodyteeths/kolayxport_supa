@@ -470,6 +470,7 @@
     "productName": "Product Name",
     "costRequired": "Cost *",
     "shippingCostLabel": "Shipping Cost",
+    "shippingCostPerItem": "Shipping Cost / Item",
     "currency": "Currency",
     "note": "Note",
     "add": "Add",

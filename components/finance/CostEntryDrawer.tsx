@@ -34,6 +34,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
   const [selectedProduct, setSelectedProduct] = useState<SoldProduct | null>(null);
   const [newName, setNewName] = useState('');
   const [newCost, setNewCost] = useState('');
+  const [newShippingCost, setNewShippingCost] = useState('');
   const [newCurrency, setNewCurrency] = useState(marketplace === 'trendyol' ? 'TRY' : 'USD');
   const [newNotes, setNewNotes] = useState('');
 
@@ -69,11 +70,11 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
         productName,
         costAmount: parseFloat(newCost),
         costCurrency: newCurrency,
-        shippingCost: null,
+        shippingCost: newShippingCost ? parseFloat(newShippingCost) : null,
         notes: newNotes || null,
       });
       toast.success(t('costAdded'));
-      setNewBarcode(''); setNewName(''); setNewCost(''); setNewNotes('');
+      setNewBarcode(''); setNewName(''); setNewCost(''); setNewShippingCost(''); setNewNotes('');
       setSelectedProduct(null);
       fetchProductCosts(search);
     } catch {
@@ -209,8 +210,15 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
               <TextField
                 size="small" label={t('costRequired')} type="number" value={newCost}
                 onChange={e => setNewCost(e.target.value)}
-                InputProps={{ startAdornment: <InputAdornment position="start">{marketplace === 'etsy' ? '$' : marketplace === 'ebay' ? '$' : '₺'}</InputAdornment> }}
+                InputProps={{ startAdornment: <InputAdornment position="start">{marketplace === 'trendyol' ? '₺' : '$'}</InputAdornment> }}
               />
+              {marketplace !== 'trendyol' && (
+                <TextField
+                  size="small" label={t('shippingCostPerItem')} type="number" value={newShippingCost}
+                  onChange={e => setNewShippingCost(e.target.value)}
+                  InputProps={{ startAdornment: <InputAdornment position="start">{marketplace === 'trendyol' ? '₺' : '$'}</InputAdornment> }}
+                />
+              )}
               <FormControl size="small">
                 <InputLabel>{t('currency')}</InputLabel>
                 <Select value={newCurrency} onChange={e => setNewCurrency(e.target.value)} label={t('currency')}>

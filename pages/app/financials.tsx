@@ -58,8 +58,8 @@ function FinancialsPage() {
   }, [marketplace, dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (syncStatus === 'done' && syncMessage) toast.success(syncMessage);
-    if (syncStatus === 'error' && syncMessage) toast.error(syncMessage);
+    if (syncStatus === 'done' && syncMessage) toast.success(`${syncMessage} ${t('synchronized')}`);
+    if (syncStatus === 'error' && syncMessage) toast.error(`${t('syncError')}: ${syncMessage}`);
   }, [syncStatus, syncMessage]);
 
   const handlePreset = (key: string) => {

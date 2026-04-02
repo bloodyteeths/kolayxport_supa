@@ -147,7 +147,7 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
 
   syncSettlements: async (startDate, endDate) => {
     const { marketplace, dateRange } = get();
-    set({ syncStatus: 'syncing', syncMessage: 'Veriler senkronize ediliyor...' });
+    set({ syncStatus: 'syncing', syncMessage: '' });
     try {
       const res = await fetch('/api/finance/settlements', {
         method: 'POST',
@@ -155,8 +155,8 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
         body: JSON.stringify({
           action: 'sync',
           marketplace,
-          startDate: startDate || dateRange.start,
-          endDate: endDate || dateRange.end,
+          startDate: new Date(startDate || dateRange.start).getTime(),
+          endDate: new Date(endDate || dateRange.end).getTime(),
         }),
       });
       if (!res.ok) {
@@ -164,11 +164,11 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
         throw new Error(err.error || 'Sync failed');
       }
       const data = await res.json();
-      set({ syncStatus: 'done', syncMessage: `${data.synced || 0} işlem senkronize edildi` });
+      set({ syncStatus: 'done', syncMessage: String(data.totalUpserted || 0) });
       // Auto-refresh dashboard after sync
       get().fetchDashboard();
     } catch (err: any) {
-      set({ syncStatus: 'error', syncMessage: err.message || 'Senkronizasyon hatası' });
+      set({ syncStatus: 'error', syncMessage: err.message || 'Sync error' });
     }
   },
 
@@ -294,7 +294,7 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
       if (!res.ok) throw new Error('Transactions fetch failed');
       const data = await res.json();
       set({
-        transactions: data.items || [],
+        transactions: data.transactions || data.items || [],
         transactionsTotal: data.total || 0,
       });
     } catch (err) {

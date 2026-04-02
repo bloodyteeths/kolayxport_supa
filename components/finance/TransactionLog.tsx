@@ -102,8 +102,8 @@ export default function TransactionLog() {
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: tx.amount >= 0 ? '#15803d' : '#dc2626' }}>
-                      {tx.amount >= 0 ? '+' : ''}₺{tx.amount.toFixed(2)}
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: Number(tx.amount) >= 0 ? '#15803d' : '#dc2626' }}>
+                      {Number(tx.amount) >= 0 ? '+' : ''}₺{Number(tx.amount).toFixed(2)}
                     </Typography>
                     {expandedRow === tx.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </Box>
@@ -156,12 +156,12 @@ export default function TransactionLog() {
                     </TableCell>
                     <TableCell sx={{ fontSize: '0.75rem' }}>{tx.orderNumber || '—'}</TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: tx.amount >= 0 ? '#15803d' : '#dc2626' }}>
-                        {tx.amount >= 0 ? '+' : ''}₺{tx.amount.toFixed(2)}
+                      <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: Number(tx.amount) >= 0 ? '#15803d' : '#dc2626' }}>
+                        {Number(tx.amount) >= 0 ? '+' : ''}₺{Number(tx.amount).toFixed(2)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right" sx={{ fontSize: '0.75rem' }}>
-                      {tx.commission != null ? `₺${tx.commission}` : '—'}
+                      {tx.commission != null ? `₺${Number(tx.commission).toFixed(2)}` : '—'}
                     </TableCell>
                   </TableRow>
                 );

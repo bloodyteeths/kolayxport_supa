@@ -216,7 +216,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
                 <TextField
                   size="small" label={t('shippingCostPerItem')} type="number" value={newShippingCost}
                   onChange={e => setNewShippingCost(e.target.value)}
-                  InputProps={{ startAdornment: <InputAdornment position="start">{marketplace === 'trendyol' ? '₺' : '$'}</InputAdornment> }}
+                  InputProps={{ startAdornment: <InputAdornment position="start">{(marketplace as string) === 'trendyol' ? '₺' : '$'}</InputAdornment> }}
                 />
               )}
               <FormControl size="small">

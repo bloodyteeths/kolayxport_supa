@@ -30,12 +30,10 @@ async function getTrendyolCredentials(userId: string): Promise<TrendyolCredentia
   };
 }
 
-// Transaction types to fetch — each queried separately (Trendyol requires single transactionType param)
+// Core transaction types — queried separately (Trendyol requires single transactionType param)
+// Only types that commonly have data. Others (ManualRefund, TYDiscount, etc.) are very rare.
 const SETTLEMENT_TYPES = [
-  'Sale', 'Return', 'Discount', 'DiscountCancel', 'Coupon', 'CouponCancel',
-  'ProvisionPositive', 'ProvisionNegative', 'ManualRefund', 'ManualRefundCancel',
-  'TYDiscount', 'TYDiscountCancel', 'TYCoupon', 'TYCouponCancel',
-  'SellerRevenuePositive', 'SellerRevenueNegative',
+  'Sale', 'Return', 'Discount', 'Coupon',
   'CommissionPositive', 'CommissionNegative',
 ];
 
@@ -122,64 +120,61 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
   let totalFetched = 0;
 
   for (const window of windows) {
-    for (const txType of SETTLEMENT_TYPES) {
-    let page = 0;
-    let hasMore = true;
+    // Fetch all transaction types in parallel for this window
+    const results = await Promise.all(
+      SETTLEMENT_TYPES.map(txType =>
+        callTrendyolSettlements(credentials, {
+          startDate: window.startDate,
+          endDate: window.endDate,
+          transactionType: txType,
+          page: 0,
+          size: 500,
+        }).catch(() => ({ content: [], totalPages: 0, totalElements: 0 }))
+      )
+    );
 
-    while (hasMore) {
-      const data = await callTrendyolSettlements(credentials, {
-        startDate: window.startDate,
-        endDate: window.endDate,
-        transactionType: txType,
-        page,
-        size: 500,
-      });
-
+    // Collect all items from all types
+    const allItems: any[] = [];
+    for (const data of results) {
       const items = Array.isArray(data.content) ? data.content : [];
-      totalFetched += items.length;
-
-      // Upsert each transaction
-      for (const item of items) {
-        const externalId = item.id ? String(item.id) : `${item.transactionType}_${item.orderNumber || ''}_${item.transactionDate || Date.now()}`;
-        // Trendyol uses credit (income) and debt (expense) — compute net amount
-        const credit = Number(item.credit || 0);
-        const debt = Number(item.debt || 0);
-        const amount = credit - debt;
-
-        const txData = {
-          transactionType: item.transactionType || 'unknown',
-          orderNumber: item.orderNumber ? String(item.orderNumber) : null,
-          barcode: item.barcode || null,
-          productName: item.description || item.productName || null,
-          quantity: item.quantity ?? 1,
-          amount,
-          currency: 'TRY',
-          commission: item.commissionAmount != null ? Number(item.commissionAmount) : null,
-          shippingAmount: null as number | null,
-          transactionDate: item.transactionDate ? new Date(item.transactionDate) : new Date(),
-          rawData: item,
-        };
-
-        await prisma.financialTransaction.upsert({
-          where: {
-            userId_marketplace_externalId: {
-              userId,
-              marketplace: 'trendyol',
-              externalId,
-            },
-          },
-          update: { ...txData, syncedAt: new Date() },
-          create: { userId, marketplace: 'trendyol', externalId, ...txData },
-        });
-        totalUpserted++;
-      }
-
-      // Check if more pages
-      const totalPages = data.totalPages ?? 0;
-      page++;
-      hasMore = items.length === 500 && page < totalPages;
+      allItems.push(...items);
     }
-    } // end txType loop
+    totalFetched += allItems.length;
+
+    // Upsert all items
+    for (const item of allItems) {
+      const externalId = item.id ? String(item.id) : `${item.transactionType}_${item.orderNumber || ''}_${item.transactionDate || Date.now()}`;
+      const credit = Number(item.credit || 0);
+      const debt = Number(item.debt || 0);
+      const amount = credit - debt;
+
+      const txData = {
+        transactionType: item.transactionType || 'unknown',
+        orderNumber: item.orderNumber ? String(item.orderNumber) : null,
+        barcode: item.barcode || null,
+        productName: item.description || item.productName || null,
+        quantity: item.quantity ?? 1,
+        amount,
+        currency: 'TRY',
+        commission: item.commissionAmount != null ? Number(item.commissionAmount) : null,
+        shippingAmount: null as number | null,
+        transactionDate: item.transactionDate ? new Date(item.transactionDate) : new Date(),
+        rawData: item,
+      };
+
+      await prisma.financialTransaction.upsert({
+        where: {
+          userId_marketplace_externalId: {
+            userId,
+            marketplace: 'trendyol',
+            externalId,
+          },
+        },
+        update: { ...txData, syncedAt: new Date() },
+        create: { userId, marketplace: 'trendyol', externalId, ...txData },
+      });
+      totalUpserted++;
+    }
   }
 
   // Update sync cursor

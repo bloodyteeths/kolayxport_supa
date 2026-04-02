@@ -472,8 +472,8 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
 
         for (let page = 0; page < pages; page++) {
             const data = page === 0
-                ? await callEtsyPublicAPI(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}&includes=images`)
-                : await rateLimitedPublicCall(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}&includes=images`);
+                ? await callEtsyPublicAPI(`/shops/${shopId}/listings?state=active&limit=100&offset=${page * 100}&includes=images`)
+                : await rateLimitedPublicCall(`/shops/${shopId}/listings?state=active&limit=100&offset=${page * 100}&includes=images`);
 
             const results = data.results || [];
             allListings.push(...results.map((l: any) => ({

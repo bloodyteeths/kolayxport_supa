@@ -447,7 +447,7 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
     if (!deepDiveShopId.trim()) return;
     set({ shopReviewsLoading: true, shopReviews: null, reviewSentiment: null });
     try {
-      const res = await fetch(`/api/clawd/etsy?action=get_shop_reviews&shop_id=${deepDiveShopId.trim()}&limit=50`);
+      const res = await fetch(`/api/clawd/etsy?action=get_shop_reviews&target_shop_id=${encodeURIComponent(deepDiveShopId.trim())}&limit=50`);
       if (!res.ok) throw new Error('Yorumlar alınamadı');
       const data = await res.json();
       set({ shopReviews: data });

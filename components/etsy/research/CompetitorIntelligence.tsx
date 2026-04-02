@@ -56,19 +56,21 @@ function buildPriceBuckets(listings: any[]): { range: string; count: number; rev
   const maxP = prices[prices.length - 1];
   const span = maxP - minP;
   if (span === 0) return [{ range: `$${minP.toFixed(0)}`, count: prices.length, revenue: prices.reduce((s, p) => s + p, 0), min: minP, max: maxP }];
-  const bucketSize = Math.max(1, Math.ceil(span / 6));
+  // Aim for 6-8 buckets with nice round sizes
+  const rawSize = span / 7;
+  const bucketSize = rawSize <= 5 ? 5 : rawSize <= 10 ? 10 : rawSize <= 25 ? 25 : rawSize <= 50 ? 50 : Math.ceil(rawSize / 10) * 10;
   const buckets: { range: string; count: number; revenue: number; min: number; max: number }[] = [];
-  for (let start = Math.floor(minP); start < maxP; start += bucketSize) {
+  const startFloor = Math.floor(minP / bucketSize) * bucketSize;
+  for (let start = startFloor; start < maxP + bucketSize; start += bucketSize) {
     const end = start + bucketSize;
     const inBucket = listings.filter(l => l.price >= start && l.price < end);
-    if (inBucket.length > 0) {
-      buckets.push({
-        range: `$${start}-$${end}`,
-        count: inBucket.length,
-        revenue: inBucket.reduce((s, l) => s + l.price, 0),
-        min: start, max: end,
-      });
-    }
+    buckets.push({
+      range: `$${start}-$${end}`,
+      count: inBucket.length,
+      revenue: inBucket.reduce((s, l) => s + l.price, 0),
+      min: start, max: end,
+    });
+    if (buckets.length >= 10) break; // safety cap
   }
   return buckets;
 }
@@ -488,25 +490,29 @@ export default function CompetitorIntelligence() {
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <BarChart3 size={16} color="#2196F3" /> {t('priceDistribution')}
               </Typography>
-              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end', height: 120 }}>
-                {priceBuckets.map((b, i) => {
-                  const maxCount = Math.max(...priceBuckets.map(bb => bb.count));
-                  const height = maxCount > 0 ? (b.count / maxCount) * 100 : 0;
-                  return (
-                    <Tooltip key={i} title={`${b.range}: ${b.count} ${t('listings')} — $${Math.round(b.revenue)} ${t('revenue')}`}>
-                      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                        <Typography variant="caption" sx={{ fontSize: '0.6rem', fontWeight: 600 }}>{b.count}</Typography>
-                        <Box sx={{
-                          width: '100%', height: `${height}%`, minHeight: 4,
-                          background: GRADIENTS.primary, borderRadius: '4px 4px 0 0',
-                          transition: 'height 0.3s',
-                        }} />
-                        <Typography variant="caption" sx={{ fontSize: '0.55rem', whiteSpace: 'nowrap' }}>{b.range}</Typography>
-                      </Box>
-                    </Tooltip>
-                  );
-                })}
-              </Box>
+              {(() => {
+                const maxCount = Math.max(...priceBuckets.map(bb => bb.count));
+                const BAR_AREA = 100; // px available for bars
+                return (
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end', pt: 2, pb: 1 }}>
+                    {priceBuckets.map((b, i) => {
+                      const barH = maxCount > 0 ? Math.max(6, Math.round((b.count / maxCount) * BAR_AREA)) : 6;
+                      return (
+                        <Tooltip key={i} title={`${b.range}: ${b.count} ${t('listings')} — $${Math.round(b.revenue)} ${t('revenue')}`}>
+                          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>{b.count}</Typography>
+                            <Box sx={{
+                              width: '80%', height: barH, minHeight: 6,
+                              background: GRADIENTS.primary, borderRadius: '6px 6px 0 0',
+                            }} />
+                            <Typography variant="caption" sx={{ fontSize: '0.65rem', mt: 0.5, whiteSpace: 'nowrap', color: 'text.secondary' }}>{b.range}</Typography>
+                          </Box>
+                        </Tooltip>
+                      );
+                    })}
+                  </Box>
+                );
+              })()}
             </Paper>
           )}
 

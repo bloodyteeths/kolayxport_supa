@@ -344,7 +344,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={t('titlePreview', { value: template.fields.title.substring(0, 30) + (template.fields.title.length > 30 ? '...' : '') })}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.condition && (
@@ -352,7 +352,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={CONDITION_KEYS[template.fields.condition] ? t(CONDITION_KEYS[template.fields.condition]) : template.fields.condition}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.price != null && (
@@ -360,7 +360,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={t('pricePreview', { value: template.fields.price.toFixed(2) })}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.categoryName && (
@@ -368,7 +368,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={t('categoryPreview', { value: template.fields.categoryName.substring(0, 25) + (template.fields.categoryName.length > 25 ? '...' : '') })}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.aspects && Object.keys(template.fields.aspects).length > 0 && (
@@ -376,7 +376,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={t('aspectsCount', { count: Object.keys(template.fields.aspects).length })}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.format && (
@@ -384,7 +384,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={FORMAT_KEYS[template.fields.format] ? t(FORMAT_KEYS[template.fields.format]) : template.fields.format}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.listingPolicies && (
@@ -392,7 +392,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={t('hasPolicies')}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.description && (
@@ -400,7 +400,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={t('hasDescription')}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                   </Box>
@@ -418,7 +418,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                       onApply(template);
                       onClose();
                     }}
-                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                    sx={{ textTransform: 'none', fontSize: '0.85rem' }}
                   >
                     {t('apply')}
                   </Button>
@@ -541,7 +541,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
         variant="outlined"
         startIcon={<StyleIcon sx={{ fontSize: 16 }} />}
         onClick={handleOpenMenu}
-        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+        sx={{ textTransform: 'none', fontSize: '0.85rem' }}
       >
         {t('aspectProfileBtn')}
       </Button>
@@ -595,7 +595,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
                       key={key}
                       label={`${key}: ${values[0]}${values.length > 1 ? ` +${values.length - 1}` : ''}`}
                       size="small"
-                      sx={{ fontSize: '0.6rem', height: 18 }}
+                      sx={{ fontSize: '0.8rem', height: 24 }}
                     />
                   ))}
                 {Object.keys(profile.aspects).length > 4 && (
@@ -617,7 +617,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
                     e.stopPropagation();
                     handleApply(profile);
                   }}
-                  sx={{ textTransform: 'none', fontSize: '0.65rem', py: 0, minHeight: 24, flex: 1 }}
+                  sx={{ textTransform: 'none', fontSize: '0.82rem', py: 0, minHeight: 24, flex: 1 }}
                 >
                   {t('apply')}
                 </Button>
@@ -628,7 +628,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
                     e.stopPropagation();
                     handleMerge(profile);
                   }}
-                  sx={{ textTransform: 'none', fontSize: '0.65rem', py: 0, minHeight: 24, flex: 1 }}
+                  sx={{ textTransform: 'none', fontSize: '0.82rem', py: 0, minHeight: 24, flex: 1 }}
                 >
                   {t('mergeBtn')}
                 </Button>
@@ -660,7 +660,7 @@ export function AspectProfileMenu({ currentAspects, categoryId, onApplyAspects }
                 key={key}
                 label={`${key}: ${values.join(', ')}`}
                 size="small"
-                sx={{ fontSize: '0.7rem' }}
+                sx={{ fontSize: '0.85rem' }}
               />
             ))}
           </Box>
@@ -777,7 +777,7 @@ function ManageAspectProfilesDialog({ open, onClose }: ManageAspectProfilesDialo
                         key={key}
                         label={`${key}: ${values.join(', ')}`}
                         size="small"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     ))}
                   </Box>
@@ -886,21 +886,21 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                           <Chip
                             label={CONDITION_KEYS[listing.condition] ? t(CONDITION_KEYS[listing.condition]) : listing.condition}
                             size="small"
-                            sx={{ fontSize: '0.6rem', height: 18 }}
+                            sx={{ fontSize: '0.8rem', height: 24 }}
                           />
                         )}
                         {listing.price != null && (
                           <Chip
                             label={`$${listing.price.toFixed(2)}`}
                             size="small"
-                            sx={{ fontSize: '0.6rem', height: 18 }}
+                            sx={{ fontSize: '0.8rem', height: 24 }}
                           />
                         )}
                         {listing.categoryName && (
                           <Chip
                             label={listing.categoryName}
                             size="small"
-                            sx={{ fontSize: '0.6rem', height: 18 }}
+                            sx={{ fontSize: '0.8rem', height: 24 }}
                           />
                         )}
                       </Box>
@@ -940,7 +940,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                         label={t('titlePreview', { value: template.fields.title.substring(0, 25) + '...' })}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.6rem', height: 18 }}
+                        sx={{ fontSize: '0.8rem', height: 24 }}
                       />
                     )}
                     {template.fields.condition && (
@@ -948,7 +948,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                         label={CONDITION_KEYS[template.fields.condition] ? t(CONDITION_KEYS[template.fields.condition]) : template.fields.condition}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.6rem', height: 18 }}
+                        sx={{ fontSize: '0.8rem', height: 24 }}
                       />
                     )}
                     {template.fields.categoryName && (
@@ -956,7 +956,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                         label={template.fields.categoryName}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.6rem', height: 18 }}
+                        sx={{ fontSize: '0.8rem', height: 24 }}
                       />
                     )}
                   </Box>
@@ -970,7 +970,7 @@ export default function ListingTemplates({ onApply, listings }: ListingTemplates
                     variant="contained"
                     startIcon={<ApplyIcon />}
                     onClick={() => onApply(template)}
-                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                    sx={{ textTransform: 'none', fontSize: '0.85rem' }}
                   >
                     {t('apply')}
                   </Button>

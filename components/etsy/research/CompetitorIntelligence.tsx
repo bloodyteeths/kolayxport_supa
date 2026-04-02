@@ -266,10 +266,10 @@ export default function CompetitorIntelligence() {
                 width: `${shopStats.totalListings ? (shopStats.top5Sales / shopStats.totalListings) * 100 : 0}%`,
                 background: GRADIENTS.primary, display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem', fontWeight: 600 }}>Top 5</Typography>
+                <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.82rem', fontWeight: 600 }}>Top 5</Typography>
               </Box>
               <Box sx={{ flex: 1, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>{t('other')}</Typography>
+                <Typography variant="caption" sx={{ fontSize: '0.82rem' }}>{t('other')}</Typography>
               </Box>
             </Box>
           </Paper>
@@ -305,7 +305,7 @@ export default function CompetitorIntelligence() {
                         </Box>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleAnalyzeShop(String(s.shop_id)); }}
-                            sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('analyze')}</Button>
+                            sx={{ borderRadius: '8px', fontSize: '0.85rem' }}>{t('analyze')}</Button>
                           <IconButton size="small" onClick={(e) => { e.stopPropagation(); window.open(s.url, '_blank'); }}>
                             <ExternalLink size={14} />
                           </IconButton>
@@ -413,8 +413,8 @@ export default function CompetitorIntelligence() {
                               {niche.query}
                             </Typography>
                             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 1 }}>
-                              <Chip label={`${niche.totalResults?.toLocaleString()} ${t('resultsLabel')}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
-                              <Chip label={`$${niche.priceStats?.avg?.toFixed(2)} ${t('avgLabel')}`} size="small" variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                              <Chip label={`${niche.totalResults?.toLocaleString()} ${t('resultsLabel')}`} size="small" variant="outlined" sx={{ fontSize: '0.85rem', height: 26 }} />
+                              <Chip label={`$${niche.priceStats?.avg?.toFixed(2)} ${t('avgLabel')}`} size="small" variant="outlined" sx={{ fontSize: '0.85rem', height: 26 }} />
                             </Box>
                             {niche.topItems?.slice(0, 3).map((item: any) => (
                               <Box key={item.listing_id} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -499,15 +499,15 @@ export default function CompetitorIntelligence() {
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 0.5 }}>
                 {deepDiveShop.created_timestamp && (
                   <Chip size="small" icon={<Clock size={12} />} label={shopAge(deepDiveShop.created_timestamp)}
-                    variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                    variant="outlined" sx={{ fontSize: '0.85rem', height: 26 }} />
                 )}
                 {estMonthlyRevenue > 0 && (
                   <Chip size="small" icon={<TrendingUp size={12} />} label={`~$${estMonthlyRevenue.toLocaleString()}/mo`}
-                    sx={{ fontSize: '0.7rem', height: 22, bgcolor: 'rgba(76,175,80,0.1)', color: '#4caf50', fontWeight: 700 }} />
+                    sx={{ fontSize: '0.85rem', height: 26, bgcolor: 'rgba(76,175,80,0.1)', color: '#4caf50', fontWeight: 700 }} />
                 )}
                 {estMonthlySales > 0 && (
                   <Chip size="small" icon={<ShoppingCart size={12} />} label={`~${estMonthlySales} sales/mo`}
-                    sx={{ fontSize: '0.7rem', height: 22, bgcolor: 'rgba(33,150,243,0.1)', color: '#2196F3', fontWeight: 700 }} />
+                    sx={{ fontSize: '0.85rem', height: 26, bgcolor: 'rgba(33,150,243,0.1)', color: '#2196F3', fontWeight: 700 }} />
                 )}
               </Box>
             </Box>
@@ -549,12 +549,12 @@ export default function CompetitorIntelligence() {
                       return (
                         <Tooltip key={i} title={`${b.range}: ${b.count} ${t('listings')} — $${Math.round(b.revenue)} ${t('revenue')}`}>
                           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>{b.count}</Typography>
+                            <Typography variant="caption" sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 0.5 }}>{b.count}</Typography>
                             <Box sx={{
                               width: '80%', height: barH, minHeight: 6,
                               background: GRADIENTS.primary, borderRadius: '6px 6px 0 0',
                             }} />
-                            <Typography variant="caption" sx={{ fontSize: '0.65rem', mt: 0.5, whiteSpace: 'nowrap', color: 'text.secondary' }}>{b.range}</Typography>
+                            <Typography variant="caption" sx={{ fontSize: '0.82rem', mt: 0.5, whiteSpace: 'nowrap', color: 'text.secondary' }}>{b.range}</Typography>
                           </Box>
                         </Tooltip>
                       );
@@ -577,7 +577,7 @@ export default function CompetitorIntelligence() {
                     navigator.clipboard.writeText(allTags.map(t => t.tag).join(', '));
                     toast.success(t('tagsCopied'));
                   }}
-                  sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>
+                  sx={{ borderRadius: '8px', fontSize: '0.85rem' }}>
                   {t('copyAllTags')}
                 </Button>
               )}
@@ -652,9 +652,9 @@ export default function CompetitorIntelligence() {
                           </Box>
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
                             <Button size="small" variant="contained" onClick={(e) => { e.stopPropagation(); openListingDrawer(l.listing_id); }}
-                              startIcon={<Search size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem', background: GRADIENTS.primary }}>{t('analyze')}</Button>
+                              startIcon={<Search size={12} />} sx={{ borderRadius: '8px', fontSize: '0.85rem', background: GRADIENTS.primary }}>{t('analyze')}</Button>
                             <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); window.open(l.url, '_blank'); }}
-                              startIcon={<ExternalLink size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Etsy</Button>
+                              startIcon={<ExternalLink size={12} />} sx={{ borderRadius: '8px', fontSize: '0.85rem' }}>Etsy</Button>
                           </Box>
                         </Box>
                       </Collapse>
@@ -825,7 +825,7 @@ export default function CompetitorIntelligence() {
                         {section.icon} {section.title}
                       </Typography>
                       {(section.items || []).map((item: string, i: number) => (
-                        <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {item}</Typography>
+                        <Typography key={i} variant="body2" sx={{ fontSize: '0.875rem', mb: 0.3 }}>• {item}</Typography>
                       ))}
                     </Paper>
                   ))}
@@ -903,7 +903,7 @@ export default function CompetitorIntelligence() {
                         <ThumbsUp size={12} />{t('buyersLove')}
                       </Typography>
                       {(reviewSentiment.buyer_loves || []).map((item: string, i: number) => (
-                        <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {item}</Typography>
+                        <Typography key={i} variant="body2" sx={{ fontSize: '0.875rem', mb: 0.3 }}>• {item}</Typography>
                       ))}
                     </Paper>
                     <Paper sx={{ ...glassCard, p: 1.5 }}>
@@ -911,7 +911,7 @@ export default function CompetitorIntelligence() {
                         <ThumbsDown size={12} />{t('complaints')}
                       </Typography>
                       {(reviewSentiment.buyer_complaints || []).map((item: string, i: number) => (
-                        <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {item}</Typography>
+                        <Typography key={i} variant="body2" sx={{ fontSize: '0.875rem', mb: 0.3 }}>• {item}</Typography>
                       ))}
                     </Paper>
                   </Box>
@@ -1029,11 +1029,11 @@ export default function CompetitorIntelligence() {
                 {aiAnalysis.action_items.map((item: string, i: number) => (
                   <Box key={i} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
                     <Box sx={{
-                      width: 22, height: 22, borderRadius: '6px', display: 'flex',
+                      width: 22, height: 26, borderRadius: '6px', display: 'flex',
                       alignItems: 'center', justifyContent: 'center', background: GRADIENTS.success,
                       flexShrink: 0, mt: 0.2,
                     }}>
-                      <Typography variant="caption" sx={{ color: '#fff', fontWeight: 700, fontSize: '0.65rem' }}>{i + 1}</Typography>
+                      <Typography variant="caption" sx={{ color: '#fff', fontWeight: 700, fontSize: '0.82rem' }}>{i + 1}</Typography>
                     </Box>
                     <Typography variant="body2">{item}</Typography>
                   </Box>
@@ -1081,10 +1081,10 @@ export default function CompetitorIntelligence() {
               <Box sx={{ display: 'flex', gap: 0.5, mb: 2, flexWrap: 'wrap' }}>
                 <Button size="small" variant="outlined" startIcon={<Copy size={12} />}
                   onClick={() => { navigator.clipboard.writeText(drawerData.title); toast.success(t('copied')); }}
-                  sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('copyTitle')}</Button>
+                  sx={{ borderRadius: '8px', fontSize: '0.85rem' }}>{t('copyTitle')}</Button>
                 <Button size="small" variant="outlined" startIcon={<ExternalLink size={12} />}
                   onClick={() => window.open(drawerData.url, '_blank')}
-                  sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('viewOnEtsy')}</Button>
+                  sx={{ borderRadius: '8px', fontSize: '0.85rem' }}>{t('viewOnEtsy')}</Button>
               </Box>
 
               {/* Stats grid */}
@@ -1145,13 +1145,13 @@ export default function CompetitorIntelligence() {
                     </Typography>
                     <Button size="small" variant="outlined" startIcon={<Copy size={12} />}
                       onClick={() => { navigator.clipboard.writeText(drawerData.tags.join(', ')); toast.success(t('tagsCopied')); }}
-                      sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('copyTags')}</Button>
+                      sx={{ borderRadius: '8px', fontSize: '0.85rem' }}>{t('copyTags')}</Button>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                     {drawerData.tags.map((tag: string) => (
                       <Chip key={tag} label={tag} size="small" variant="outlined"
                         onClick={() => { navigator.clipboard.writeText(tag); toast.success(t('copied')); }}
-                        sx={{ cursor: 'pointer', borderRadius: '8px', fontSize: '0.72rem' }}
+                        sx={{ cursor: 'pointer', borderRadius: '8px', fontSize: '0.85rem' }}
                       />
                     ))}
                   </Box>
@@ -1229,7 +1229,7 @@ export default function CompetitorIntelligence() {
                           <ThumbsUp size={12} /> {t('strengths')}
                         </Typography>
                         {drawerAudit.strengths.map((s: string, i: number) => (
-                          <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {s}</Typography>
+                          <Typography key={i} variant="body2" sx={{ fontSize: '0.875rem', mb: 0.3 }}>• {s}</Typography>
                         ))}
                       </Paper>
                     )}
@@ -1239,7 +1239,7 @@ export default function CompetitorIntelligence() {
                           <ThumbsDown size={12} /> {t('weaknesses')}
                         </Typography>
                         {drawerAudit.weaknesses.map((s: string, i: number) => (
-                          <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {s}</Typography>
+                          <Typography key={i} variant="body2" sx={{ fontSize: '0.875rem', mb: 0.3 }}>• {s}</Typography>
                         ))}
                       </Paper>
                     )}

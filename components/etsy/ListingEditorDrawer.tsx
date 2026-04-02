@@ -1313,7 +1313,7 @@ export default function ListingEditorDrawer({
                         : listing.state === 'inactive' ? 'error'
                         : 'warning'
                     }
-                    sx={{ height: 20, fontSize: '0.7rem' }}
+                    sx={{ height: 26, fontSize: '0.85rem' }}
                   />
                   <Typography variant="caption" color="text.secondary">
                     {listing.views} {t('editor.views')} · {listing.num_favorers} {t('editor.favorites')}
@@ -1585,7 +1585,7 @@ export default function ListingEditorDrawer({
                         startIcon={aiLoading.optimize_title ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                         onClick={handleAIOptimizeTitle}
                         disabled={!!aiLoading.optimize_title || !fields.title}
-                        sx={{ textTransform: 'none', fontSize: '0.8rem', minWidth: 0, py: 0.75, px: 1.5 }}
+                        sx={{ textTransform: 'none', fontSize: '0.875rem', minWidth: 0, py: 1, px: 2 }}
                       >
                         AI ile Optimize Et
                       </Button>
@@ -1614,7 +1614,7 @@ export default function ListingEditorDrawer({
                         startIcon={aiLoading.generate_description ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                         onClick={handleAIGenerateDescription}
                         disabled={!!aiLoading.generate_description || !fields.title}
-                        sx={{ textTransform: 'none', fontSize: '0.8rem', minWidth: 0, py: 0.75, px: 1.5 }}
+                        sx={{ textTransform: 'none', fontSize: '0.875rem', minWidth: 0, py: 1, px: 2 }}
                       >
                         AI ile Olustur
                       </Button>
@@ -1683,8 +1683,8 @@ export default function ListingEditorDrawer({
                                 size="small"
                                 variant="outlined"
                                 sx={{
-                                  fontSize: '0.65rem',
-                                  height: 22,
+                                  fontSize: '0.82rem',
+                                  height: 26,
                                   cursor: 'pointer',
                                   '&:hover': { bgcolor: 'action.hover' },
                                 }}
@@ -1708,7 +1708,7 @@ export default function ListingEditorDrawer({
                               {t('editor.priceRange', { min: marketResearchData.priceStats.min, max: marketResearchData.priceStats.max, avg: marketResearchData.priceStats.avg })}
                             </Typography>
                           )}
-                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', fontStyle: 'italic', fontSize: '0.6rem' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block', fontStyle: 'italic', fontSize: '0.875rem' }}>
                             {t('editor.marketDataWillBeUsed')}
                           </Typography>
                         </Collapse>
@@ -1789,7 +1789,7 @@ export default function ListingEditorDrawer({
                         startIcon={aiLoading.suggest_tags ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
                         onClick={handleAISuggestTags}
                         disabled={!!aiLoading.suggest_tags || !fields.title}
-                        sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75, px: 1.5 }}
+                        sx={{ textTransform: 'none', fontSize: '0.875rem', py: 1, px: 2 }}
                       >
                         AI Etiket Oner
                       </Button>
@@ -1808,7 +1808,7 @@ export default function ListingEditorDrawer({
                             }
                           }}
                           disabled={!!aiLoading.suggest_tags || !fields.title}
-                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75, px: 1.5 }}
+                          sx={{ textTransform: 'none', fontSize: '0.875rem', py: 1, px: 2 }}
                         >
                           {t('editor.aiReplaceAll')}
                         </Button>
@@ -1817,7 +1817,7 @@ export default function ListingEditorDrawer({
                       <Typography
                         variant="caption"
                         sx={{
-                          fontSize: '0.7rem',
+                          fontSize: '0.85rem',
                           display: 'flex',
                           alignItems: 'center',
                           gap: 0.5,
@@ -1848,7 +1848,7 @@ export default function ListingEditorDrawer({
                                   setAiTagSuggestions([]);
                                   toast.success(t('editor.allTagsReplaced'));
                                 }}
-                                sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.5, px: 1, minWidth: 0, minHeight: 32 }}
+                                sx={{ textTransform: 'none', fontSize: '0.85rem', py: 1, px: 2, minWidth: 0, minHeight: 36 }}
                               >
                                 {t('editor.replaceAll')}
                               </Button>
@@ -1863,7 +1863,7 @@ export default function ListingEditorDrawer({
                                 toast.success(t('editor.tagsAdded', { count: merged.length - fields.tags.length }));
                               }}
                               disabled={fields.tags.length >= 13 || aiTagSuggestions.every((t) => fields.tags.includes(t))}
-                              sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.5, px: 1, minWidth: 0, minHeight: 32 }}
+                              sx={{ textTransform: 'none', fontSize: '0.85rem', py: 1, px: 2, minWidth: 0, minHeight: 36 }}
                             >
                               {t('editor.addToGaps')}
                             </Button>
@@ -1995,7 +1995,7 @@ export default function ListingEditorDrawer({
               <Box sx={{ p: { xs: 1.5, md: 3 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <Typography variant="h6" fontWeight={600}>{t('editor.images')}</Typography>
-                  <Chip label={listing.images.length} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
+                  <Chip label={listing.images.length} size="small" sx={{ height: 26, fontSize: '0.85rem' }} />
                 </Box>
                 <ImageManager
                   listingId={String(listing.listing_id)}
@@ -2014,7 +2014,7 @@ export default function ListingEditorDrawer({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <Typography variant="h6" fontWeight={600}>Video</Typography>
                   {videos.length > 0 && (
-                    <Chip label={videos.length} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
+                    <Chip label={videos.length} size="small" sx={{ height: 26, fontSize: '0.85rem' }} />
                   )}
                 </Box>
                 {videosLoading ? (
@@ -2539,9 +2539,9 @@ export default function ListingEditorDrawer({
                     position: 'absolute',
                     top: -8,
                     right: -8,
-                    height: 20,
+                    height: 26,
                     minWidth: 20,
-                    fontSize: '0.7rem',
+                    fontSize: '0.85rem',
                   }}
                 />
               )}
@@ -2934,7 +2934,7 @@ export default function ListingEditorDrawer({
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
                             <Typography variant="body2" sx={{ fontWeight: 700 }}>{f.name}</Typography>
                             <Chip label={`${f.score}/10`} size="small" sx={{
-                              fontWeight: 700, height: 22,
+                              fontWeight: 700, height: 26,
                               bgcolor: f.status === 'iyi' ? '#e8f5e9' : f.status === 'orta' ? '#fff3e0' : '#fce4ec',
                               color: f.status === 'iyi' ? '#2e7d32' : f.status === 'orta' ? '#e65100' : '#c62828',
                             }} />
@@ -2951,10 +2951,10 @@ export default function ListingEditorDrawer({
 <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('editor.missingKeywords')}</Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {(a.missing_keywords || []).map((kw: string, i: number) => (
-                        <Chip key={i} label={kw} size="small" variant="outlined" sx={{ fontSize: '0.75rem' }} />
+                        <Chip key={i} label={kw} size="small" variant="outlined" sx={{ fontSize: '0.85rem' }} />
                       ))}
                       {(rankAnalysis.market?.missingTags || []).map((tag: string, i: number) => (
-                        <Chip key={`t${i}`} label={tag} size="small" color="primary" variant="outlined" sx={{ fontSize: '0.75rem' }} />
+                        <Chip key={`t${i}`} label={tag} size="small" color="primary" variant="outlined" sx={{ fontSize: '0.85rem' }} />
                       ))}
                     </Box>
                   </Box>

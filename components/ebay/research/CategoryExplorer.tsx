@@ -363,7 +363,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                   variant="outlined"
                   endIcon={<ArrowRight size={14} />}
                   onClick={() => onNavigate('product_database', { categoryId: selectedCategory.id })}
-                  sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', fontWeight: 600, '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' } }}
+                  sx={{ textTransform: 'none', fontSize: '0.85rem', color: '#6366f1', borderColor: 'rgba(99,102,241,0.3)', fontWeight: 600, '&:hover': { bgcolor: '#6366f1', color: '#fff', borderColor: '#6366f1' } }}
                 >
                   {t('searchInCategory')}
                 </Button>
@@ -372,7 +372,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                   variant="outlined"
                   endIcon={<BarChart2 size={14} />}
                   onClick={() => onNavigate('niche_finder', { categoryId: selectedCategory.id })}
-                  sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)', fontWeight: 600, '&:hover': { bgcolor: '#8b5cf6', color: '#fff', borderColor: '#8b5cf6' } }}
+                  sx={{ textTransform: 'none', fontSize: '0.85rem', color: '#8b5cf6', borderColor: 'rgba(139,92,246,0.3)', fontWeight: 600, '&:hover': { bgcolor: '#8b5cf6', color: '#fff', borderColor: '#8b5cf6' } }}
                 >
                   {t('nicheAnalysis')}
                 </Button>
@@ -498,7 +498,7 @@ export default function CategoryExplorer({ userId, onNavigate }: CategoryExplore
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
                           <Typography variant="body2" fontWeight={700} sx={{ color: '#6366f1' }}>{getItemPrice(item)}</Typography>
-                          {item.condition && <Chip label={item.condition} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
+                          {item.condition && <Chip label={item.condition} size="small" variant="outlined" sx={{ height: 26, fontSize: '0.82rem' }} />}
                         </Box>
                       </Box>
                     </Box>

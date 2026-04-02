@@ -388,7 +388,7 @@ function MobileEtsyListingCard({
             <Typography variant="body2" fontWeight={600} fontSize="0.82rem">
               {formatPrice(listing.price)}
             </Typography>
-            <Typography variant="caption" color="text.secondary" fontSize="0.72rem">
+            <Typography variant="caption" color="text.secondary">
               {t('stockLabel')}: {listing.quantity}
             </Typography>
             <Chip
@@ -396,7 +396,7 @@ function MobileEtsyListingCard({
               size="small"
               color={STATE_COLORS[listing.state] || 'default'}
               variant="outlined"
-              sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.5 } }}
+              sx={{ height: 24, '& .MuiChip-label': { px: 0.75 } }}
             />
             {/* Score badge */}
             <Chip
@@ -642,7 +642,7 @@ function LeftSidebar({
 
       {/* Etsy - Status Filters */}
       <Paper sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
-        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontSize: 10, mb: 0.5, display: 'block' }}>
+        <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, mb: 0.5, display: 'block' }}>
           Etsy
         </Typography>
         {(['active', 'draft', 'inactive', 'expired'] as const).map((state) => {
@@ -1897,10 +1897,10 @@ function EtsyListingsPage() {
               </Typography>
               {!isMobile && (
                 <>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.78rem' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
                     ·&nbsp;&nbsp;{quickStats.totalViews.toLocaleString()} {t('views')}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.78rem' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
                     ·&nbsp;&nbsp;{quickStats.totalFavs.toLocaleString()} {t('favorites')}
                   </Typography>
                 </>
@@ -1908,7 +1908,7 @@ function EtsyListingsPage() {
               {quickStats.outOfStock > 0 && (
                 <Typography
                   variant="body2"
-                  sx={{ fontSize: '0.78rem', color: 'error.main', fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                  sx={{ fontSize: '0.875rem', color: 'error.main', fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
                   onClick={() => setHealthFilter('no_stock')}
                 >
                   ·&nbsp;&nbsp;{t('outOfStockCount', { count: quickStats.outOfStock })}
@@ -1917,7 +1917,7 @@ function EtsyListingsPage() {
               {quickStats.withIssues > 0 && (
                 <Typography
                   variant="body2"
-                  sx={{ fontSize: '0.78rem', color: 'warning.main', fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                  sx={{ fontSize: '0.875rem', color: 'warning.main', fontWeight: 600, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
                   onClick={() => setHealthFilter('issues')}
                 >
                   ·&nbsp;&nbsp;{t('issuesCount', { count: quickStats.withIssues })}
@@ -1991,7 +1991,7 @@ function EtsyListingsPage() {
                 </Button>
               </Tooltip>
               {lastSyncAt && !isMobile && (
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
                   {t('lastSync')}: {(() => {
                     const diff = Math.round((Date.now() - new Date(lastSyncAt).getTime()) / 60000);
                     if (diff < 1) return t('justNow');
@@ -2254,7 +2254,7 @@ function EtsyListingsPage() {
                     size="small"
                     onClick={() => setColumnVisibilityModel(preset.model)}
                     sx={{
-                      height: 26, fontSize: '0.75rem', fontWeight: isActive ? 700 : 400,
+                      height: 26, fontSize: '0.85rem', fontWeight: isActive ? 700 : 400,
                       bgcolor: isActive ? 'primary.main' : 'transparent',
                       color: isActive ? 'white' : 'text.secondary',
                       border: '1px solid', borderColor: isActive ? 'primary.main' : 'divider',

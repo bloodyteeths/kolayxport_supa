@@ -232,7 +232,7 @@ export default function ItemSpecificsEditor({
                   onChange({ ...aspects, ...result });
                 }
               }}
-              sx={{ fontSize: '0.7rem', py: 0.75 }}
+              sx={{ fontSize: '0.85rem', py: 0.75 }}
             >
               {t('aiFill')}
             </Button>
@@ -241,7 +241,7 @@ export default function ItemSpecificsEditor({
             label={t('aspectsFilled', { filled: filledAspects, total: totalAspects })}
             size="small"
             color={filledAspects === totalAspects ? 'success' : filledAspects > 0 ? 'warning' : 'default'}
-            sx={{ height: 22, fontSize: '0.75rem' }}
+            sx={{ height: 26, fontSize: '0.85rem' }}
           />
         </Box>
       </Box>

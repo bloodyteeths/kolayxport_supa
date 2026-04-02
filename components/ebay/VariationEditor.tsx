@@ -256,7 +256,7 @@ export default function VariationEditor({ sku, userId, onSaved }: VariationEdito
                       label={variation.status === 'PUBLISHED' ? t('statusPublished') : t('statusUnpublished')}
                       size="small"
                       color={variation.status === 'PUBLISHED' ? 'success' : 'default'}
-                      sx={{ height: 20, fontSize: '0.7rem' }}
+                      sx={{ height: 26, fontSize: '0.85rem' }}
                     />
                   )}
                 </TableCell>

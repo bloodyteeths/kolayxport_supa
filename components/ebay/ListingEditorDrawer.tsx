@@ -897,7 +897,7 @@ export default function ListingEditorDrawer({
                     ? 'warning'
                     : 'default'
                 }
-                sx={{ height: 20, fontSize: '0.7rem' }}
+                sx={{ height: 26, fontSize: '0.85rem' }}
               />
               <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
                 SKU: {sku}
@@ -1022,9 +1022,9 @@ export default function ListingEditorDrawer({
                         {marketLoading && <CircularProgress size={12} />}
                         {marketResearch && (
                           <>
-                            <Chip label={`${t('avg')} ${marketResearch.avgPrice?.toFixed(0) || '?'} ${fields.currency}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                            <Chip label={`${t('demand')} ${marketResearch.demandScore || '?'}`} size="small" color={marketResearch.demandScore > 60 ? 'success' : 'warning'} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-                            <Chip label={`${t('competition')} ${marketResearch.competitionScore || '?'}`} size="small" color={marketResearch.competitionScore < 50 ? 'success' : 'error'} variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                            <Chip label={`${t('avg')} ${marketResearch.avgPrice?.toFixed(0) || '?'} ${fields.currency}`} size="small" variant="outlined" sx={{ height: 26, fontSize: '0.82rem' }} />
+                            <Chip label={`${t('demand')} ${marketResearch.demandScore || '?'}`} size="small" color={marketResearch.demandScore > 60 ? 'success' : 'warning'} variant="outlined" sx={{ height: 26, fontSize: '0.82rem' }} />
+                            <Chip label={`${t('competition')} ${marketResearch.competitionScore || '?'}`} size="small" color={marketResearch.competitionScore < 50 ? 'success' : 'error'} variant="outlined" sx={{ height: 26, fontSize: '0.82rem' }} />
                           </>
                         )}
                       </Box>
@@ -1138,7 +1138,7 @@ export default function ListingEditorDrawer({
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Typography fontWeight={600}>{t('images')}</Typography>
-                  <Chip label={fields.images.length} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
+                  <Chip label={fields.images.length} size="small" sx={{ height: 26, fontSize: '0.85rem' }} />
                 </Box>
               </AccordionSummary>
               <AccordionDetails>
@@ -1165,7 +1165,7 @@ export default function ListingEditorDrawer({
                   <Chip
                     label={Object.keys(fields.aspects).length}
                     size="small"
-                    sx={{ height: 20, fontSize: '0.7rem' }}
+                    sx={{ height: 26, fontSize: '0.85rem' }}
                   />
                 </Box>
               </AccordionSummary>
@@ -1528,7 +1528,7 @@ export default function ListingEditorDrawer({
                       label={`${aiAnalysis.score}/100`}
                       size="small"
                       color={aiAnalysis.score >= 80 ? 'success' : aiAnalysis.score >= 50 ? 'warning' : 'error'}
-                      sx={{ height: 20, fontSize: '0.7rem' }}
+                      sx={{ height: 26, fontSize: '0.85rem' }}
                     />
                   )}
                 </Box>
@@ -1572,7 +1572,7 @@ export default function ListingEditorDrawer({
                             <Alert
                               key={i}
                               severity={issue.severity === 'critical' ? 'error' : issue.severity === 'warning' ? 'warning' : 'info'}
-                              sx={{ py: 0, '& .MuiAlert-message': { fontSize: '0.75rem' } }}
+                              sx={{ py: 0, '& .MuiAlert-message': { fontSize: '0.85rem' } }}
                             >
                               <strong>{issue.message}</strong>{issue.fix ? ` — ${issue.fix}` : ''}
                             </Alert>

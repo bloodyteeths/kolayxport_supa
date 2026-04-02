@@ -351,7 +351,7 @@ export default function NicheComparison({ userId, onNavigate }: NicheComparisonP
                               color: '#fff',
                               bgcolor: scoreColor(option.opportunityScore),
                               minWidth: 36,
-                              height: 22,
+                              height: 26,
                             }}
                           />
                         )}

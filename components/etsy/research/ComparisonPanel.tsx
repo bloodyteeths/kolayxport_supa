@@ -17,7 +17,7 @@ function pctDiff(val: number, avg: number): { pct: number; dir: 'up' | 'down' | 
 function DiffChip({ val, avg, higherIsBetter = true }: { val: number; avg: number; higherIsBetter?: boolean }) {
   const { pct, dir } = pctDiff(val, avg);
   const t = useTranslations('etsy.comparisonPanel');
-  if (dir === 'same') return <Chip size="small" label={`≈ ${t('average')}`} sx={{ fontSize: '0.7rem' }} />;
+  if (dir === 'same') return <Chip size="small" label={`≈ ${t('average')}`} sx={{ fontSize: '0.85rem' }} />;
   const isGood = (dir === 'up') === higherIsBetter;
   const Icon = dir === 'up' ? TrendingUp : TrendingDown;
   return (
@@ -26,7 +26,7 @@ function DiffChip({ val, avg, higherIsBetter = true }: { val: number; avg: numbe
       icon={<Icon size={12} />}
       label={`${dir === 'up' ? '+' : '-'}${pct.toFixed(0)}%`}
       sx={{
-        fontSize: '0.7rem', fontWeight: 600,
+        fontSize: '0.85rem', fontWeight: 600,
         bgcolor: isGood ? 'rgba(17,153,142,0.1)' : 'rgba(235,51,73,0.1)',
         color: isGood ? '#11998e' : '#eb3349',
         '& .MuiChip-icon': { color: 'inherit' },
@@ -56,7 +56,7 @@ function StatRow({ label, icon: Icon, yours, market, higherIsBetter = true, form
       </Box>
       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
         <Box sx={{ flex: 1 }}>
-          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: '#999' }}>{t('yours')}</Typography>
+          <Typography variant="caption" sx={{ fontSize: '0.82rem', color: '#999' }}>{t('yours')}</Typography>
           <LinearProgress
             variant="determinate"
             value={(yours / max) * 100}
@@ -66,10 +66,10 @@ function StatRow({ label, icon: Icon, yours, market, higherIsBetter = true, form
               '& .MuiLinearProgress-bar': { background: GRADIENTS.primary, borderRadius: 3 },
             }}
           />
-          <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>{format(yours)}</Typography>
+          <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>{format(yours)}</Typography>
         </Box>
         <Box sx={{ flex: 1 }}>
-          <Typography variant="caption" sx={{ fontSize: '0.65rem', color: '#999' }}>{t('marketAvg')}</Typography>
+          <Typography variant="caption" sx={{ fontSize: '0.82rem', color: '#999' }}>{t('marketAvg')}</Typography>
           <LinearProgress
             variant="determinate"
             value={(market / max) * 100}
@@ -79,7 +79,7 @@ function StatRow({ label, icon: Icon, yours, market, higherIsBetter = true, form
               '& .MuiLinearProgress-bar': { bgcolor: '#999', borderRadius: 3 },
             }}
           />
-          <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.75rem', color: '#666' }}>{format(market)}</Typography>
+          <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#666' }}>{format(market)}</Typography>
         </Box>
       </Box>
     </Box>
@@ -200,7 +200,7 @@ export default function ComparisonPanel() {
                     label={tag}
                     size="small"
                     sx={{
-                      fontSize: '0.65rem', height: 22,
+                      fontSize: '0.82rem', height: 26,
                       bgcolor: isCommon ? 'rgba(102,126,234,0.1)' : 'rgba(235,51,73,0.08)',
                       color: isCommon ? '#667eea' : '#eb3349',
                       fontWeight: isCommon ? 500 : 600,
@@ -209,7 +209,7 @@ export default function ComparisonPanel() {
                 );
               })}
             </Box>
-            <Typography variant="caption" sx={{ color: '#999', mt: 0.5, display: 'block', fontSize: '0.6rem' }}>
+            <Typography variant="caption" sx={{ color: '#999', mt: 0.5, display: 'block', fontSize: '0.8rem' }}>
               {t('tagLegend')}
             </Typography>
           </Box>

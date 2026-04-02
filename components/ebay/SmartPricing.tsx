@@ -441,7 +441,7 @@ export default function SmartPricing({ listings, userId, onPriceUpdate }: SmartP
                         label={`${m.competitorCount}`}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     </TableCell>
                   </TableRow>

@@ -390,7 +390,7 @@ function ScoreDisplay({ label, score, invert = false }: { label: string; score: 
           <Typography sx={{ fontWeight: 900, fontSize: '1.75rem', color, lineHeight: 1 }}>
             {score}
           </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>/100</Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.82rem' }}>/100</Typography>
         </Box>
       </Box>
     </Box>
@@ -460,7 +460,7 @@ function SoldBadge({ count }: { count: number }) {
     <Chip
       label={`${count} ${t('sales')}`}
       size="small"
-      sx={{ bgcolor: bg, color, fontWeight: 600, fontSize: '0.75rem', boxShadow: count > 0 ? '0 1px 4px rgba(0,0,0,0.06)' : 'none' }}
+      sx={{ bgcolor: bg, color, fontWeight: 600, fontSize: '0.85rem', boxShadow: count > 0 ? '0 1px 4px rgba(0,0,0,0.06)' : 'none' }}
     />
   );
 }
@@ -481,7 +481,7 @@ function SimpleHistogram({ data }: { data: { range: string; count: number }[] })
               transition: 'all 0.2s ease',
               '&:hover': { background: 'linear-gradient(180deg, #4f46e5 0%, #7c3aed 100%)', transform: 'scaleY(1.05)' },
             }} />
-            <Typography variant="caption" sx={{ fontSize: '0.6rem', mt: 0.5, writingMode: 'vertical-lr', transform: 'rotate(180deg)', maxHeight: 50, overflow: 'hidden', color: '#64748b' }}>
+            <Typography variant="caption" sx={{ fontSize: '0.8rem', mt: 0.5, writingMode: 'vertical-lr', transform: 'rotate(180deg)', maxHeight: 50, overflow: 'hidden', color: '#64748b' }}>
               {d.range}
             </Typography>
           </Box>
@@ -927,7 +927,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                   setFilters(prev => ({ ...prev, keyword: kw.word }));
                 }}
                 sx={{
-                  fontSize: '0.7rem', height: 24,
+                  fontSize: '0.85rem', height: 24,
                   fontWeight: i < 5 ? 700 : 400,
                   transition: 'all 0.2s ease',
                   ...(i < 3 ? {
@@ -1023,7 +1023,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                       {product.title}
                     </Typography>
                     {product.topRated && (
-                      <Chip icon={<Star size={12} />} label={t('topRated')} size="small" color="warning" sx={{ mt: 0.5, height: 20, fontSize: '0.65rem' }} />
+                      <Chip icon={<Star size={12} />} label={t('topRated')} size="small" color="warning" sx={{ mt: 0.5, height: 26, fontSize: '0.82rem' }} />
                     )}
                   </TableCell>
                   <TableCell align="right">
@@ -1051,7 +1051,7 @@ function ProductDatabase({ userId, userListings = [], userListingsLoading = fals
                   </TableCell>
                   <TableCell>
                     {product.freeShipping ? (
-                      <Chip label={t('free')} size="small" color="success" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+                      <Chip label={t('free')} size="small" color="success" variant="outlined" sx={{ height: 26, fontSize: '0.82rem' }} />
                     ) : product.shippingCost != null ? (
                       <Typography variant="caption">${product.shippingCost.toFixed(2)}</Typography>
                     ) : (
@@ -1412,7 +1412,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
               label={`${t('lastUpdate')}: ${formatDateTime(lastUpdateTime, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`}
               size="small"
               variant="outlined"
-              sx={{ height: 24, fontSize: '0.7rem', borderColor: 'rgba(99,102,241,0.2)', color: '#6366f1' }}
+              sx={{ height: 24, fontSize: '0.85rem', borderColor: 'rgba(99,102,241,0.2)', color: '#6366f1' }}
             />
           )}
           <Typography variant="caption" sx={{ color: '#6366f1', fontWeight: 600 }}>
@@ -1557,7 +1557,7 @@ function ProductTracker({ userId, userListings, onNavigate }: { userId: string; 
                   <TableCell>
                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
                       {(product.tags || []).slice(0, 3).map(tag => (
-                        <Chip key={tag} label={tag} size="small" sx={{ height: 20, fontSize: '0.65rem' }} />
+                        <Chip key={tag} label={tag} size="small" sx={{ height: 26, fontSize: '0.82rem' }} />
                       ))}
                       <IconButton size="small" onClick={() => setTagDialog({ id: product.id, tags: product.tags || [] })}>
                         <Tag size={12} />
@@ -1721,7 +1721,7 @@ function TrackedProductMobileCard({ product, onRemove, onEditNotes, onOpenTags, 
           </Box>
           <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
             {(product.tags || []).slice(0, 2).map(tag => (
-              <Chip key={tag} label={tag} size="small" sx={{ height: 18, fontSize: '0.6rem' }} />
+              <Chip key={tag} label={tag} size="small" sx={{ height: 24, fontSize: '0.8rem' }} />
             ))}
           </Box>
         </Box>
@@ -2861,11 +2861,11 @@ function SectionWelcome({ section, userListings = [], sectionIndex }: { section:
 
   const personalizedMessage = hasListings
     ? sectionIndex === 0
-      ? `${userListings.length} aktif listelemeniz var. Araclarimiz senin kategorilerin ve urunlerin uzerinden otomatik analiz yapacak.`
+      ? t('welcomeListingsAnalysis', { count: userListings.length })
       : sectionIndex === 1
-        ? 'Rakiplerini otomatik tespit ettik. Takip etmeye basla.'
+        ? t('welcomeCompetitorDetected')
         : sectionIndex === 2
-          ? 'Listelerinizi analiz ettik. Iyilestirme onerilerimizi gorun.'
+          ? t('welcomeListingsOptimization')
           : null
     : null;
 
@@ -3065,7 +3065,7 @@ function EbayResearchPage() {
           sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#fff', '& fieldset': { border: 'none' } }, '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.7)' } }}
         />
         <Button variant="contained" onClick={handleGlobalSearch} disabled={!globalSearch.trim()} sx={{ minWidth: isMobile ? 50 : 80, borderRadius: 2, bgcolor: '#fff', color: '#6366f1', fontWeight: 700, '&:hover': { bgcolor: '#f0edff' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)', color: 'rgba(99,102,241,0.4)' } }}>
-          {isMobile ? <Search size={18} /> : 'Ara'}
+          {isMobile ? <Search size={18} /> : t('searchBtn')}
         </Button>
       </Paper>
 
@@ -3098,7 +3098,7 @@ function EbayResearchPage() {
                     <span style={{ fontWeight: 700, fontSize: isMobile ? '0.8rem' : '0.95rem', whiteSpace: 'nowrap' }}>{t(section.labelKey)}</span>
                   </Box>
                   {!isMobile && (
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', lineHeight: 1.2 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.85rem', lineHeight: 1.2 }}>
                       {t(section.descriptionKey)}
                     </Typography>
                   )}
@@ -3153,14 +3153,14 @@ function EbayResearchPage() {
         <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0f7ff', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
           <CircularProgress size={16} sx={{ flexShrink: 0 }} />
           <Typography variant="body2" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            eBay listeleriniz yukleniyor...
+            {t('listingsLoading')}
           </Typography>
         </Paper>
       )}
       {!userListingsLoading && userListings.length > 0 && (
         <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', gap: 1, bgcolor: '#f0fff4', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}>
           <Typography variant="body2" color="success.main" fontWeight={600} sx={{ wordBreak: 'break-word' }}>
-            {userListings.length} aktif listelemeniz yuklendi — araclar otomatik olarak verilerinizi kullanacak.
+            {t('listingsLoadedStatus', { count: userListings.length })}
           </Typography>
         </Paper>
       )}
@@ -3168,8 +3168,8 @@ function EbayResearchPage() {
         <Paper sx={{ p: 1.5, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: userListingsError === 'auth' ? '#fff0f0' : '#fff8f0', overflow: 'hidden', width: '100%', maxWidth: '100%', boxSizing: 'border-box', flexWrap: 'wrap', gap: 1 }}>
           <Typography variant="body2" color={userListingsError === 'auth' ? 'error.main' : 'warning.main'} sx={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
             {userListingsError === 'auth'
-              ? 'eBay hesabiniz bagli degil. Ayarlardan eBay hesabinizi baglayiniz.'
-              : 'eBay listeleriniz yuklenemedi. Tum araclar manual arama ile calisir.'}
+              ? t('listingsAuthError')
+              : t('listingsLoadError')}
           </Typography>
           <Button size="small" variant="outlined" onClick={() => {
             setUserListingsLoading(true);

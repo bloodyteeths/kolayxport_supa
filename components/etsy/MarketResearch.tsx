@@ -161,7 +161,7 @@ const pillTabsSx = {
   '& .MuiTabs-flexContainer': { gap: '6px' },
   '& .MuiTab-root': {
     minHeight: 36, borderRadius: '20px', textTransform: 'none',
-    fontSize: '0.78rem', fontWeight: 500, px: 1.5, py: 0.5,
+    fontSize: '0.875rem', fontWeight: 500, px: 1.5, py: 0.5,
     border: '1px solid #e0e0e0', color: '#666',
     transition: 'all 0.2s',
     '&.Mui-selected': {
@@ -296,7 +296,7 @@ function SourceBadge({ source }: { source: string }) {
   return (
     <Box component="span" sx={{
       display: 'inline-block', px: 0.8, py: 0.1, borderRadius: 1,
-      fontSize: '0.65rem', fontWeight: 600, color: '#fff', mr: 0.3,
+      fontSize: '0.82rem', fontWeight: 600, color: '#fff', mr: 0.3,
       bgcolor: colors[source] || '#999',
     }}>
       {source === 'google' ? 'G' : source === 'amazon' ? 'A' : 'E'}
@@ -1276,7 +1276,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
             }}
           >
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>{s.label}</Box>
-            <Box sx={{ display: { xs: 'block', sm: 'none' }, fontSize: '0.75rem' }}>{s.label.split(' ')[0]}</Box>
+            <Box sx={{ display: { xs: 'block', sm: 'none' }, fontSize: '0.85rem' }}>{s.label.split(' ')[0]}</Box>
           </Button>
         ))}
       </Box>
@@ -1496,7 +1496,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     onClick={() => setQuery(kw)}
                     sx={{
                       mr: 0.5, mb: 0.5, cursor: 'pointer', borderRadius: '8px',
-                      fontSize: '0.72rem', borderColor: '#667eea', color: '#667eea',
+                      fontSize: '0.85rem', borderColor: '#667eea', color: '#667eea',
                       '&:hover': { bgcolor: 'rgba(102,126,234,0.08)' },
                     }}
                   />
@@ -1509,7 +1509,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
               <Button
                 size="small"
                 onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                sx={{ textTransform: 'none', fontSize: '0.75rem', color: selectedListing ? '#667eea' : '#999', px: 0, fontWeight: selectedListing ? 600 : 400 }}
+                sx={{ textTransform: 'none', fontSize: '0.85rem', color: selectedListing ? '#667eea' : '#999', px: 0, fontWeight: selectedListing ? 600 : 400 }}
                 endIcon={<ArrowUpDown size={12} />}
               >
                 {selectedListing
@@ -1810,7 +1810,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                       border: isPeak ? '2px solid #4caf50' : isLow ? '2px solid #f44336' : '1px solid #eee',
                       bgcolor: `rgba(102,126,234,${intensity * 0.15})`,
                     }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.7rem' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>
                         {m.month}
                       </Typography>
                       <Typography variant="body2" sx={{ fontWeight: 700, color: isPeak ? '#4caf50' : isLow ? '#f44336' : '#333' }}>
@@ -1975,7 +1975,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                           </Box>
                         );
                       })}
-                      <Alert severity="info" icon={<Info size={16} />} sx={{ mt: 1.5, borderRadius: '10px', py: 0.3, '& .MuiAlert-message': { fontSize: '0.78rem' } }}>
+                      <Alert severity="info" icon={<Info size={16} />} sx={{ mt: 1.5, borderRadius: '10px', py: 0.3, '& .MuiAlert-message': { fontSize: '0.875rem' } }}>
                         <strong>{t('weakestArea')}:</strong> {weakest.label} — {weakest.weakness}
                       </Alert>
                     </Box>
@@ -2320,10 +2320,10 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                     width: `${shopStats.totalListings ? (shopStats.top5Sales / shopStats.totalListings) * 100 : 0}%`,
                     background: GRADIENTS.primary, display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem', fontWeight: 600 }}>Top 5</Typography>
+                    <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.82rem', fontWeight: 600 }}>Top 5</Typography>
                   </Box>
                   <Box sx={{ flex: 1, bgcolor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>{t('other')}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.82rem' }}>{t('other')}</Typography>
                   </Box>
                 </Box>
               </Paper>
@@ -2535,7 +2535,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   variant={shopRegion === 'tr' ? 'contained' : 'outlined'}
                   onClick={() => setShopRegion('tr')}
                   sx={{
-                    borderRadius: '10px', textTransform: 'none', fontSize: '0.75rem', px: 2,
+                    borderRadius: '10px', textTransform: 'none', fontSize: '0.85rem', px: 2,
                     ...(shopRegion === 'tr' ? { background: GRADIENTS.primary } : {}),
                   }}
                 >
@@ -2546,7 +2546,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                   variant={shopRegion === 'us' ? 'contained' : 'outlined'}
                   onClick={() => setShopRegion('us')}
                   sx={{
-                    borderRadius: '10px', textTransform: 'none', fontSize: '0.75rem', px: 2,
+                    borderRadius: '10px', textTransform: 'none', fontSize: '0.85rem', px: 2,
                     ...(shopRegion === 'us' ? { background: GRADIENTS.primary } : {}),
                   }}
                 >
@@ -2971,7 +2971,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                                 size="small"
                                 sx={{
                                   bgcolor: rankColor, color: '#fff', fontWeight: 700,
-                                  fontSize: '0.75rem', minWidth: 48,
+                                  fontSize: '0.85rem', minWidth: 48,
                                 }}
                               />
                             </TableCell>
@@ -3022,7 +3022,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                                           size="small"
                                           variant="outlined"
                                           label={`${formatDate(new Date(s.checkedAt))}: ${s.rank != null ? `#${s.rank}` : t('notFound')}`}
-                                          sx={{ fontSize: '0.7rem' }}
+                                          sx={{ fontSize: '0.85rem' }}
                                         />
                                       ))}
                                     </Box>
@@ -3157,7 +3157,7 @@ export default function EtsyMarketResearch({ userId, shopId, userListings, onMar
                         alignItems: 'center', justifyContent: 'center', background: GRADIENTS.success,
                         flexShrink: 0, mt: 0.2,
                       }}>
-                        <Typography variant="caption" sx={{ color: '#fff', fontWeight: 700, fontSize: '0.65rem' }}>{i + 1}</Typography>
+                        <Typography variant="caption" sx={{ color: '#fff', fontWeight: 700, fontSize: '0.82rem' }}>{i + 1}</Typography>
                       </Box>
                       <Typography variant="body2">{item}</Typography>
                     </Box>
@@ -3235,7 +3235,7 @@ function PremiumEmptyState({ icon, title, desc, steps }: {
               <Box sx={{
                 width: 24, height: 24, borderRadius: '50%', display: 'flex',
                 alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                background: GRADIENTS.primary, color: '#fff', fontSize: '0.7rem', fontWeight: 700,
+                background: GRADIENTS.primary, color: '#fff', fontSize: '0.85rem', fontWeight: 700,
               }}>
                 {i + 1}
               </Box>

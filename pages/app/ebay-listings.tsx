@@ -264,7 +264,7 @@ function MobileListingCard({
               size="small"
               color={isPublished ? 'success' : 'warning'}
               variant="outlined"
-              sx={{ height: 20, fontSize: 11 }}
+              sx={{ height: 26, fontSize: 11 }}
             />
           </Box>
         </Box>
@@ -306,7 +306,7 @@ function MobileListingCard({
                     justifyContent: 'center',
                   }}
                 >
-                  <Typography variant="caption" sx={{ fontWeight: 700, fontSize: 10, color: health.color }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.8rem', color: health.color }}>
                     {health.overall}
                   </Typography>
                 </Box>
@@ -323,8 +323,8 @@ function MobileListingCard({
                 label={item.label}
                 size="small"
                 sx={{
-                  height: 20,
-                  fontSize: 10,
+                  height: 26,
+                  fontSize: '0.8rem',
                   bgcolor: `${item.color}15`,
                   color: item.color,
                   borderColor: item.color,
@@ -1524,7 +1524,7 @@ function EbayListingsPage() {
           </MenuItem>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); setScheduledOpen(true); }}>
             <ListItemIcon>
-              <Badge badgeContent={scheduledCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: 10 } }}>
+              <Badge badgeContent={scheduledCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.8rem' } }}>
                 <ScheduleIcon fontSize="small" />
               </Badge>
             </ListItemIcon>

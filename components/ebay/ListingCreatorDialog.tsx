@@ -779,10 +779,10 @@ export default function ListingCreatorDialog({
           {marketLoading && <CircularProgress size={14} />}
           {marketResearch && (
             <>
-              <Chip label={`${t('avg')} ${marketResearch.avgPrice?.toFixed(0) || '?'} ${currency}`} size="small" color="info" variant="outlined" sx={{ height: 22, fontSize: '0.7rem' }} />
-              <Chip label={`${t('demand')}: ${marketResearch.demandScore || '?'}/100`} size="small" color={marketResearch.demandScore > 60 ? 'success' : 'warning'} variant="outlined" sx={{ height: 22, fontSize: '0.7rem' }} />
-              <Chip label={`${t('competition')}: ${marketResearch.competitionScore || '?'}/100`} size="small" color={marketResearch.competitionScore < 50 ? 'success' : 'error'} variant="outlined" sx={{ height: 22, fontSize: '0.7rem' }} />
-              <Button size="small" sx={{ minWidth: 0, fontSize: '0.7rem', p: 0.5 }} onClick={() => setShowMarketInsights(!showMarketInsights)}>
+              <Chip label={`${t('avg')} ${marketResearch.avgPrice?.toFixed(0) || '?'} ${currency}`} size="small" color="info" variant="outlined" sx={{ height: 26, fontSize: '0.85rem' }} />
+              <Chip label={`${t('demand')}: ${marketResearch.demandScore || '?'}/100`} size="small" color={marketResearch.demandScore > 60 ? 'success' : 'warning'} variant="outlined" sx={{ height: 26, fontSize: '0.85rem' }} />
+              <Chip label={`${t('competition')}: ${marketResearch.competitionScore || '?'}/100`} size="small" color={marketResearch.competitionScore < 50 ? 'success' : 'error'} variant="outlined" sx={{ height: 26, fontSize: '0.85rem' }} />
+              <Button size="small" sx={{ minWidth: 0, fontSize: '0.85rem', p: 0.5 }} onClick={() => setShowMarketInsights(!showMarketInsights)}>
                 {showMarketInsights ? t('hide') : t('details')}
               </Button>
             </>
@@ -1372,7 +1372,7 @@ export default function ListingCreatorDialog({
                 <Alert
                   key={i}
                   severity={issue.severity === 'critical' ? 'error' : issue.severity === 'warning' ? 'warning' : 'info'}
-                  sx={{ py: 0, '& .MuiAlert-message': { fontSize: '0.75rem' } }}
+                  sx={{ py: 0, '& .MuiAlert-message': { fontSize: '0.85rem' } }}
                 >
                   <strong>{issue.message}</strong>{issue.fix ? ` — ${issue.fix}` : ''}
                 </Alert>

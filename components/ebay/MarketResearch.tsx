@@ -1294,12 +1294,12 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                     width: `${sellerConcentration.total ? (sellerConcentration.top5 / sellerConcentration.total) * 100 : 0}%`,
                     bgcolor: '#1976d2', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.65rem' }}>{t('top5')}</Typography>
+                    <Typography variant="caption" sx={{ color: '#fff', fontSize: '0.82rem' }}>{t('top5')}</Typography>
                   </Box>
                   <Box sx={{
                     flex: 1, bgcolor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.65rem' }}>{t('others')}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.82rem' }}>{t('others')}</Typography>
                   </Box>
                 </Box>
               </Paper>
@@ -1906,7 +1906,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                       size="small"
                       variant="outlined"
                       onClick={() => searchCategoryBestsellers(cat.categoryId, cat.categoryName)}
-                      sx={{ fontSize: '0.7rem', py: 0.3, minWidth: 0 }}
+                      sx={{ fontSize: '0.85rem', py: 0.3, minWidth: 0 }}
                     >
                       {t('bestsellers')}
                     </Button>
@@ -1920,11 +1920,11 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
                           size="small"
                           variant="outlined"
                           onClick={() => searchCategoryBestsellers(child.categoryId, child.categoryName)}
-                          sx={{ cursor: 'pointer', fontSize: '0.7rem' }}
+                          sx={{ cursor: 'pointer', fontSize: '0.85rem' }}
                         />
                       ))}
                       {cat.children.length > 8 && (
-                        <Chip label={t('andMore', { count: cat.children.length - 8 })} size="small" color="default" sx={{ fontSize: '0.7rem' }} />
+                        <Chip label={t('andMore', { count: cat.children.length - 8 })} size="small" color="default" sx={{ fontSize: '0.85rem' }} />
                       )}
                     </Box>
                   )}

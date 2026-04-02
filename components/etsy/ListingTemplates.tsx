@@ -332,7 +332,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={`${t('titleChip')}: ${template.fields.title.substring(0, 30)}${template.fields.title.length > 30 ? '...' : ''}`}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.tags && template.fields.tags.length > 0 && (
@@ -340,7 +340,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={`${template.fields.tags.length} ${t('tagsChip')}`}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.materials && template.fields.materials.length > 0 && (
@@ -348,7 +348,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={`${template.fields.materials.length} ${t('materialsChip')}`}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.who_made && (
@@ -356,7 +356,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={getWhoMadeLabel(template.fields.who_made)}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.when_made && (
@@ -364,7 +364,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={getWhenMadeLabel(template.fields.when_made)}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                     {template.fields.description && (
@@ -372,7 +372,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                         label={t('descriptionChip')}
                         size="small"
                         variant="outlined"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     )}
                   </Box>
@@ -390,7 +390,7 @@ export function LoadTemplateDialog({ open, onClose, onApply }: LoadTemplateDialo
                       onApply(template);
                       onClose();
                     }}
-                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                    sx={{ textTransform: 'none', fontSize: '0.85rem' }}
                   >
                     {t('apply')}
                   </Button>
@@ -494,7 +494,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
         variant="outlined"
         startIcon={<StyleIcon sx={{ fontSize: 16 }} />}
         onClick={handleOpenMenu}
-        sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+        sx={{ textTransform: 'none', fontSize: '0.85rem' }}
       >
         {t('tagProfile')}
       </Button>
@@ -546,7 +546,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
                     key={tag}
                     label={tag}
                     size="small"
-                    sx={{ fontSize: '0.6rem', height: 18 }}
+                    sx={{ fontSize: '0.8rem', height: 24 }}
                   />
                 ))}
                 {profile.tags.length > 5 && (
@@ -563,7 +563,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
                     e.stopPropagation();
                     handleApply(profile);
                   }}
-                  sx={{ textTransform: 'none', fontSize: '0.65rem', py: 0, minHeight: 24, flex: 1 }}
+                  sx={{ textTransform: 'none', fontSize: '0.82rem', py: 0, minHeight: 30, flex: 1 }}
                 >
                   {t('applyLabel')}
                 </Button>
@@ -575,7 +575,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
                     e.stopPropagation();
                     handleMerge(profile);
                   }}
-                  sx={{ textTransform: 'none', fontSize: '0.65rem', py: 0, minHeight: 24, flex: 1 }}
+                  sx={{ textTransform: 'none', fontSize: '0.82rem', py: 0, minHeight: 30, flex: 1 }}
                 >
                   {t('mergeLabel')}
                 </Button>
@@ -603,7 +603,7 @@ export function TagProfileMenu({ currentTags, onApplyTags }: TagProfileMenuProps
           />
           <Box sx={{ mt: 1.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             {currentTags.map((tag) => (
-              <Chip key={tag} label={tag} size="small" sx={{ fontSize: '0.7rem' }} />
+              <Chip key={tag} label={tag} size="small" sx={{ fontSize: '0.85rem' }} />
             ))}
           </Box>
           {currentTags.length === 0 && (
@@ -720,7 +720,7 @@ function ManageTagProfilesDialog({ open, onClose }: ManageTagProfilesDialogProps
                         key={tag}
                         label={tag}
                         size="small"
-                        sx={{ fontSize: '0.65rem', height: 20 }}
+                        sx={{ fontSize: '0.82rem', height: 26 }}
                       />
                     ))}
                   </Box>

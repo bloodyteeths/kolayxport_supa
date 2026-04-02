@@ -408,7 +408,7 @@ function InlineTagEditor({
               label={
                 <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
                   {tag}
-                  <Typography component="span" variant="caption" sx={{ opacity: 0.6, fontSize: '0.65rem', ml: 0.3 }}>
+                  <Typography component="span" variant="caption" sx={{ opacity: 0.6, fontSize: '0.82rem', ml: 0.3 }}>
                     {tag.length}
                   </Typography>
                 </Box>
@@ -418,7 +418,7 @@ function InlineTagEditor({
               onDelete={() => onChange(tags.filter((_, idx) => idx !== i))}
               sx={{
                 height: 28,
-                fontSize: '0.78rem',
+                fontSize: '0.875rem',
                 '& .MuiChip-deleteIcon': { fontSize: '0.9rem' },
               }}
             />
@@ -485,7 +485,7 @@ function InlineMaterialEditor({
             label={mat}
             size="small"
             onDelete={() => onChange(materials.filter((_, idx) => idx !== i))}
-            sx={{ height: 26, fontSize: '0.78rem' }}
+            sx={{ height: 26, fontSize: '0.875rem' }}
           />
         ))}
       </Box>
@@ -1250,7 +1250,7 @@ export default function BulkEditor({
             >
               <Typography
                 variant="caption"
-                sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.65rem' }}
+                sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.82rem' }}
               >
                 {t(group)}
               </Typography>
@@ -1310,7 +1310,7 @@ export default function BulkEditor({
                       <Badge
                         badgeContent={fieldChangeCount}
                         color="primary"
-                        sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}
+                        sx={{ '& .MuiBadge-badge': { fontSize: '0.8rem', height: 16, minWidth: 16 } }}
                       />
                     )}
                   </ListItemButton>
@@ -2174,7 +2174,7 @@ export default function BulkEditor({
                   variant="caption"
                   sx={{
                     fontWeight: 700,
-                    fontSize: '0.75rem',
+                    fontSize: '0.85rem',
                     color: (value as string).length >= 100 && (value as string).length <= 140 ? 'success.main'
                       : (value as string).length >= 60 ? 'warning.main' : 'error.main',
                   }}
@@ -2195,7 +2195,7 @@ export default function BulkEditor({
                   variant="caption"
                   sx={{
                     fontWeight: 700,
-                    fontSize: '0.75rem',
+                    fontSize: '0.85rem',
                     color: (value as string[]).length >= 13 ? 'success.main'
                       : (value as string[]).length >= 10 ? 'warning.main' : 'error.main',
                   }}
@@ -2240,7 +2240,7 @@ export default function BulkEditor({
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {shopName && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2, fontSize: '0.7rem' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2, fontSize: '0.85rem' }}>
               {t('shopLabel')} &middot; {shopName}
             </Typography>
           )}

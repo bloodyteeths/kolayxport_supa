@@ -821,7 +821,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                     <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>{t('image')}</TableCell>
                     <TableCell sx={{ fontWeight: 700, fontSize: 12 }}>{t('titleLabel')}</TableCell>
                     <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'center' }}>Skor</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'right' }}>Fiyat</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'right' }}>{t('price')}</TableCell>
                     <TableCell sx={{ fontWeight: 700, fontSize: 12, textAlign: 'right' }}>{t('sold')}</TableCell>
                   </TableRow>
                 </TableHead>
@@ -858,7 +858,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                             <Typography variant="body2" sx={{ fontSize: 12, fontWeight: 500, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {listing.title}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: '#999', fontSize: 10 }}>
+                            <Typography variant="caption" sx={{ color: '#999', fontSize: '0.8rem' }}>
                               {listing.titleLength} karakter
                             </Typography>
                           </TableCell>
@@ -1241,14 +1241,14 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                   <Typography variant="h5" sx={{ fontWeight: 700, color: selectedListing.imageCount >= 8 ? '#4caf50' : '#ff9800' }}>
                     {selectedListing.imageCount}
                   </Typography>
-                  <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>{t('currentLabel')}</Typography>
+                  <Typography variant="caption" sx={{ fontSize: '0.8rem', color: '#666' }}>{t('currentLabel')}</Typography>
                 </Box>
                 <ArrowRight size={20} color="#999" />
                 <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', minWidth: 80 }}>
                   <Typography variant="h5" sx={{ fontWeight: 700, color: '#6366f1' }}>
                     {marketAvgImages || '-'}
                   </Typography>
-                  <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>{t('competitorAvgLabel')}</Typography>
+                  <Typography variant="caption" sx={{ fontSize: '0.8rem', color: '#666' }}>{t('competitorAvgLabel')}</Typography>
                 </Box>
               </Box>
 
@@ -1268,7 +1268,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <TrendingUp size={16} color="#1976d2" />
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
-                  Fiyat Analizi
+                  {t('priceAnalysis')}
                 </Typography>
               </Box>
 
@@ -1280,14 +1280,14 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         {selectedListing.price?.currency === 'USD' ? '$' : selectedListing.price?.currency}
                         {selectedListing.price?.value}
                       </Typography>
-                      <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>{t('yourPrice')}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '0.8rem', color: '#666' }}>{t('yourPrice')}</Typography>
                     </Box>
                     <ArrowRight size={20} color="#999" />
                     <Box sx={{ textAlign: 'center', p: 1, bgcolor: '#f8faff', borderRadius: 2, border: '1px solid rgba(99,102,241,0.08)', minWidth: 100 }}>
                       <Typography variant="h6" sx={{ fontWeight: 700, color: '#6366f1' }}>
                         {fmt(marketAvgPrice)}
                       </Typography>
-                      <Typography variant="caption" sx={{ fontSize: 10, color: '#666' }}>{t('marketAverage')}</Typography>
+                      <Typography variant="caption" sx={{ fontSize: '0.8rem', color: '#666' }}>{t('marketAverage')}</Typography>
                     </Box>
                   </Box>
 
@@ -1476,7 +1476,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
               />
 
               <ComparisonBar
-                label="Fiyat"
+                label={t('price')}
                 myValue={parseFloat(benchmarkListing.price?.value || '0')}
                 avgValue={competitorMetrics.avgPrice}
                 unit="$"
@@ -1530,7 +1530,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         win: benchmarkListing.titleLength >= competitorMetrics.avgTitleLength,
                       },
                       {
-                        label: 'Fiyat',
+                        label: t('price'),
                         my: `${benchmarkListing.price?.currency === 'USD' ? '$' : ''}${benchmarkListing.price?.value}`,
                         avg: fmt(competitorMetrics.avgPrice),
                         win: parseFloat(benchmarkListing.price?.value || '0') <= competitorMetrics.avgPrice,
@@ -1560,9 +1560,9 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                         <TableCell sx={{ fontSize: 12, textAlign: 'center', color: '#666' }}>{row.avg}</TableCell>
                         <TableCell sx={{ textAlign: 'center' }}>
                           {row.win ? (
-                            <Chip label={t('winning')} size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontSize: 10, fontWeight: 600, height: 22 }} />
+                            <Chip label={t('winning')} size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontSize: '0.8rem', fontWeight: 600, height: 26 }} />
                           ) : (
-                            <Chip label="Geride" size="small" sx={{ bgcolor: '#ffebee', color: '#c62828', fontSize: 10, fontWeight: 600, height: 22 }} />
+                            <Chip label="Geride" size="small" sx={{ bgcolor: '#ffebee', color: '#c62828', fontSize: '0.8rem', fontWeight: 600, height: 26 }} />
                           )}
                         </TableCell>
                       </TableRow>
@@ -1633,7 +1633,7 @@ export default function ListingOptimizer({ userId, marketplace, userListings, on
                     <TableRow sx={{ '& th': { background: 'linear-gradient(135deg, #f8faff 0%, #f0f4ff 100%)', borderBottom: '2px solid rgba(99,102,241,0.12)' } }}>
                       <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>{t('image')}</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 11 }}>{t('titleLabel')}</TableCell>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: 'right' }}>Fiyat</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: 'right' }}>{t('price')}</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: 'center' }}>{t('sellerScore')}</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 11, textAlign: 'center' }}></TableCell>
                     </TableRow>

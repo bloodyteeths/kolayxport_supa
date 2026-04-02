@@ -409,7 +409,7 @@ export default function ScheduledUpdateDialog({
                           label={update.changes.action_type === 'update_offer' ? t('actionOffer') : t('actionInventory')}
                           size="small"
                           variant="outlined"
-                          sx={{ fontSize: '0.6rem', height: 18 }}
+                          sx={{ fontSize: '0.8rem', height: 24 }}
                         />
                       </Box>
                     }

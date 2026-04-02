@@ -778,7 +778,7 @@ export default function ListingCreatorDialog({
                 label={`${tagItem.tag} (${tagItem.pct}%)`}
                 size="small"
                 variant="outlined"
-                sx={{ fontSize: '0.65rem', height: 22, cursor: 'pointer' }}
+                sx={{ fontSize: '0.82rem', height: 26, cursor: 'pointer' }}
                 onClick={() => {
                   if (tags.length < 13 && !tags.includes(tagItem.tag)) {
                     setTags((prev) => [...prev, tagItem.tag]);
@@ -934,7 +934,7 @@ export default function ListingCreatorDialog({
                   toast.success(t('tagsAdded', { count: merged.length - tags.length }));
                 }}
                 disabled={aiTagSuggestions.every((tag) => tags.includes(tag))}
-                sx={{ textTransform: 'none', fontSize: '0.7rem', py: 0, minWidth: 0 }}
+                sx={{ textTransform: 'none', fontSize: '0.85rem', py: 0, minWidth: 0 }}
               >
                 {t('addAllTags')}
               </Button>

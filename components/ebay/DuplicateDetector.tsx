@@ -329,7 +329,7 @@ export default function DuplicateDetector({ listings, onSelect }: DuplicateDetec
                                     : 'default'
                               }
                               variant="outlined"
-                              sx={{ fontSize: '0.65rem' }}
+                              sx={{ fontSize: '0.82rem' }}
                             />
                           </TableCell>
                           <TableCell>

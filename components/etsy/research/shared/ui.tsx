@@ -31,7 +31,7 @@ export const pillTabsSx = {
   '& .MuiTabs-flexContainer': { gap: '6px' },
   '& .MuiTab-root': {
     minHeight: 36, borderRadius: '20px', textTransform: 'none',
-    fontSize: '0.78rem', fontWeight: 500, px: 1.5, py: 0.5,
+    fontSize: '0.875rem', fontWeight: 500, px: 1.5, py: 0.5,
     border: '1px solid #e0e0e0', color: '#666',
     transition: 'all 0.2s',
     '&.Mui-selected': {
@@ -138,7 +138,7 @@ export function SourceBadge({ source }: { source: string }) {
   return (
     <Box component="span" sx={{
       display: 'inline-block', px: 0.8, py: 0.1, borderRadius: 1,
-      fontSize: '0.65rem', fontWeight: 600, color: '#fff', mr: 0.3,
+      fontSize: '0.82rem', fontWeight: 600, color: '#fff', mr: 0.3,
       bgcolor: colors[source] || '#999',
     }}>
       {source === 'google' ? 'G' : source === 'amazon' ? 'A' : 'E'}
@@ -242,7 +242,7 @@ export function PremiumEmptyState({ icon, title, desc, steps }: {
               <Box sx={{
                 width: 24, height: 24, borderRadius: '50%', display: 'flex',
                 alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                background: GRADIENTS.primary, color: '#fff', fontSize: '0.7rem', fontWeight: 700,
+                background: GRADIENTS.primary, color: '#fff', fontSize: '0.85rem', fontWeight: 700,
               }}>
                 {i + 1}
               </Box>

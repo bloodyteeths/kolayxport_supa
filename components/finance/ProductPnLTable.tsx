@@ -12,7 +12,7 @@ type SortKey = keyof ProductBreakdown;
 type SortDir = 'asc' | 'desc';
 
 function formatTRY(val: number): string {
-  return `₺${val.toFixed(2)}`;
+  return `₺${(val ?? 0).toFixed(2)}`;
 }
 
 function marginColor(margin: number): string {
@@ -25,6 +25,10 @@ function marginBg(margin: number): string {
   if (margin >= 20) return '#dcfce7';
   if (margin >= 10) return '#fef9c3';
   return '#fecaca';
+}
+
+function getMargin(p: ProductBreakdown): number {
+  return p.revenue > 0 ? (p.netProfit / p.revenue) * 100 : 0;
 }
 
 export default function ProductPnLTable({ products }: { products: ProductBreakdown[] }) {
@@ -44,7 +48,7 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
     let list = products;
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter(p => p.productName.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q));
+      list = list.filter(p => (p.productName || '').toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q));
     }
     list = [...list].sort((a, b) => {
       const av = a[sortKey] as number;
@@ -75,9 +79,9 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
   const handleExportCSV = () => {
     const headers = [t('product'), t('barcode'), t('sales'), t('revenue'), t('commission'), t('shipping'), t('cost'), t('profit'), t('margin')];
     const rows = filtered.map(p => [
-      p.productName, p.barcode, p.unitsSold, p.revenue.toFixed(2),
-      p.commission.toFixed(2), p.shipping.toFixed(2), p.cogs.toFixed(2),
-      p.profit.toFixed(2), p.margin.toFixed(1),
+      p.productName, p.barcode, p.quantity, p.revenue.toFixed(2),
+      p.commissions.toFixed(2), p.shipping.toFixed(2), p.cogs.toFixed(2),
+      p.netProfit.toFixed(2), getMargin(p).toFixed(1),
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -119,16 +123,16 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                 <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.productName}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">{p.unitsSold} {t('sales')}</Typography>
+                <Typography variant="caption" color="text.secondary">{p.quantity} {t('sales')}</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 700, color: p.profit >= 0 ? '#15803d' : '#dc2626' }}>
-                  {formatTRY(p.profit)}
+                <Typography variant="body2" sx={{ fontWeight: 700, color: p.netProfit >= 0 ? '#15803d' : '#dc2626' }}>
+                  {formatTRY(p.netProfit)}
                 </Typography>
                 <Chip
-                  label={`%${p.margin.toFixed(0)}`}
+                  label={`%${getMargin(p).toFixed(0)}`}
                   size="small"
-                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700, bgcolor: marginBg(p.margin), color: marginColor(p.margin) }}
+                  sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700, bgcolor: marginBg(getMargin(p)), color: marginColor(getMargin(p)) }}
                 />
                 {expandedRow === p.barcode ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </Box>
@@ -136,7 +140,7 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
             <Collapse in={expandedRow === p.barcode}>
               <Box sx={{ px: 1.5, pb: 1.5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5 }}>
                 <Box><Typography variant="caption" color="text.secondary">{t('revenue')}</Typography><Typography variant="body2" fontWeight={600}>{formatTRY(p.revenue)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">{t('commission')}</Typography><Typography variant="body2" fontWeight={600} color="warning.main">{formatTRY(p.commission)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">{t('commission')}</Typography><Typography variant="body2" fontWeight={600} color="warning.main">{formatTRY(p.commissions)}</Typography></Box>
                 <Box><Typography variant="caption" color="text.secondary">{t('shipping')}</Typography><Typography variant="body2" fontWeight={600} color="info.main">{formatTRY(p.shipping)}</Typography></Box>
                 <Box><Typography variant="caption" color="text.secondary">{t('cost')}</Typography><Typography variant="body2" fontWeight={600} color="secondary.main">{formatTRY(p.cogs)}</Typography></Box>
               </Box>
@@ -170,13 +174,13 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
             <TableRow>
               <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>{t('product')}</TableCell>
               {[
-                { key: 'unitsSold' as SortKey, label: t('sales') },
+                { key: 'quantity' as SortKey, label: t('sales') },
                 { key: 'revenue' as SortKey, label: t('revenue') },
-                { key: 'commission' as SortKey, label: t('commission') },
+                { key: 'commissions' as SortKey, label: t('commission') },
                 { key: 'shipping' as SortKey, label: t('shipping') },
                 { key: 'cogs' as SortKey, label: t('cost') },
-                { key: 'profit' as SortKey, label: t('profit') },
-                { key: 'margin' as SortKey, label: t('margin') },
+                { key: 'netProfit' as SortKey, label: t('profit') },
+                { key: 'netProfit' as SortKey, label: t('margin') },
               ].map(col => (
                 <TableCell key={col.key} align="right" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>
                   <TableSortLabel
@@ -201,9 +205,9 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                     {p.barcode}
                   </Typography>
                 </TableCell>
-                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem">{p.unitsSold}</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem">{p.quantity}</Typography></TableCell>
                 <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" fontWeight={600}>{formatTRY(p.revenue)}</Typography></TableCell>
-                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" color="warning.main">{formatTRY(p.commission)}</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" color="warning.main">{formatTRY(p.commissions)}</Typography></TableCell>
                 <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" color="info.main">{formatTRY(p.shipping)}</Typography></TableCell>
                 <TableCell align="right">
                   {editingCost === p.barcode ? (
@@ -211,8 +215,8 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                       size="small" autoFocus
                       value={costValue}
                       onChange={e => setCostValue(e.target.value)}
-                      onBlur={() => handleCostSave(p.barcode)}
-                      onKeyDown={e => e.key === 'Enter' && handleCostSave(p.barcode)}
+                      onBlur={() => handleCostSave(p.barcode || '')}
+                      onKeyDown={e => e.key === 'Enter' && handleCostSave(p.barcode || '')}
                       sx={{ width: 80, '& input': { fontSize: '0.8rem', textAlign: 'right' } }}
                       InputProps={{ startAdornment: <InputAdornment position="start" sx={{ '& p': { fontSize: '0.75rem' } }}>₺</InputAdornment> }}
                     />
@@ -227,17 +231,17 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                   )}
                 </TableCell>
                 <TableCell align="right">
-                  <Typography variant="body2" fontSize="0.8rem" fontWeight={700} sx={{ color: p.profit >= 0 ? '#15803d' : '#dc2626' }}>
-                    {formatTRY(p.profit)}
+                  <Typography variant="body2" fontSize="0.8rem" fontWeight={700} sx={{ color: p.netProfit >= 0 ? '#15803d' : '#dc2626' }}>
+                    {formatTRY(p.netProfit)}
                   </Typography>
                 </TableCell>
                 <TableCell align="right">
                   <Chip
-                    label={`%${p.margin.toFixed(1)}`}
+                    label={`%${getMargin(p).toFixed(1)}`}
                     size="small"
                     sx={{
                       height: 22, fontSize: '0.7rem', fontWeight: 700,
-                      bgcolor: marginBg(p.margin), color: marginColor(p.margin),
+                      bgcolor: marginBg(getMargin(p)), color: marginColor(getMargin(p)),
                     }}
                   />
                 </TableCell>

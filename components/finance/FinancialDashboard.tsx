@@ -32,7 +32,7 @@ interface CardDef {
 const CARDS: CardDef[] = [
   { key: 'grossRevenue', tKey: 'grossRevenue', icon: <DollarSign size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency' },
   { key: 'commissions', tKey: 'commissions', icon: <Receipt size={20} />, color: '#f59e0b', gradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)', format: 'currency' },
-  { key: 'shippingCosts', tKey: 'shippingCosts', icon: <Truck size={20} />, color: '#3b82f6', gradient: 'linear-gradient(135deg, #eff6ff, #dbeafe)', format: 'currency' },
+  { key: 'shipping', tKey: 'shippingCosts', icon: <Truck size={20} />, color: '#3b82f6', gradient: 'linear-gradient(135deg, #eff6ff, #dbeafe)', format: 'currency' },
   { key: 'returns', tKey: 'returns', icon: <RotateCcw size={20} />, color: '#ef4444', gradient: 'linear-gradient(135deg, #fef2f2, #fecaca)', format: 'currency' },
   { key: 'cogs', tKey: 'productCost', icon: <Package size={20} />, color: '#8b5cf6', gradient: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', format: 'currency' },
   { key: 'netProfit', tKey: 'netProfit', icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency', invertColor: true },
@@ -51,7 +51,7 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
   return (
     <Grid container spacing={1.5} sx={{ mb: 2 }}>
       {CARDS.map(card => {
-        const value = summary[card.key] as number;
+        const value = (summary[card.key] as number) ?? 0;
         const isNegative = card.invertColor && value < 0;
         const cardColor = isNegative ? '#ef4444' : card.color;
         const cardGradient = isNegative ? 'linear-gradient(135deg, #fef2f2, #fecaca)' : card.gradient;
@@ -74,7 +74,7 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
               </Typography>
               {card.key === 'netProfit' && (
                 <Chip
-                  label={`%${summary.profitMargin.toFixed(1)}`}
+                  label={`%${(summary.margin ?? 0).toFixed(1)}`}
                   size="small"
                   sx={{
                     ml: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700,
@@ -102,7 +102,7 @@ function ProfitCharts({ data }: { data: DashboardData }) {
     colors: ['#10b981', '#f59e0b', '#ef4444'],
     plotOptions: { bar: { borderRadius: 4, columnWidth: '60%' } },
     dataLabels: { enabled: false },
-    xaxis: { categories: timeSeries.map(p => p.date), labels: { style: { fontSize: '10px' }, rotate: -45 } },
+    xaxis: { categories: timeSeries.map(p => p.period), labels: { style: { fontSize: '10px' }, rotate: -45 } },
     yaxis: { labels: { formatter: (v: number) => `₺${Math.round(v)}` } },
     legend: { position: 'top' },
     tooltip: { y: { formatter: (v: number) => `₺${v.toFixed(2)}` } },
@@ -111,13 +111,14 @@ function ProfitCharts({ data }: { data: DashboardData }) {
 
   const barSeries = [
     { name: t('revenue'), data: timeSeries.map(p => p.revenue) },
-    { name: t('expenses'), data: timeSeries.map(p => p.costs) },
-    { name: t('profit'), data: timeSeries.map(p => p.profit) },
+    { name: t('expenses'), data: timeSeries.map(p => p.commissions + p.shipping + p.returns + p.cogs) },
+    { name: t('profit'), data: timeSeries.map(p => p.netProfit) },
   ];
 
   // Donut for cost breakdown
-  const donutLabels = transactionTypeSummary.filter(tx => tx.amount < 0 || ['Commission', 'Return', 'Cargo'].some(k => tx.type.includes(k))).map(tx => tx.type);
-  const donutValues = transactionTypeSummary.filter(tx => tx.amount < 0 || ['Commission', 'Return', 'Cargo'].some(k => tx.type.includes(k))).map(tx => Math.abs(tx.amount));
+  const txSummaryArr = Array.isArray(transactionTypeSummary) ? transactionTypeSummary : [];
+  const donutLabels = txSummaryArr.filter(tx => tx.total < 0 || ['Commission', 'Return', 'Cargo'].some(k => tx.type.includes(k))).map(tx => tx.type);
+  const donutValues = txSummaryArr.filter(tx => tx.total < 0 || ['Commission', 'Return', 'Cargo'].some(k => tx.type.includes(k))).map(tx => Math.abs(tx.total));
 
   const donutOptions: ApexCharts.ApexOptions = {
     chart: { type: 'donut', height: 300, fontFamily: 'Inter, sans-serif' },
@@ -125,7 +126,7 @@ function ProfitCharts({ data }: { data: DashboardData }) {
     colors: ['#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899'],
     legend: { position: 'bottom', fontSize: '12px' },
     dataLabels: { enabled: true, formatter: (val: number) => `%${val.toFixed(0)}` },
-    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: t('totalExpense'), formatter: () => formatCurrency(Math.abs(summary.commissions + summary.shippingCosts + summary.returns + summary.discounts)) } } } } },
+    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: t('totalExpense'), formatter: () => formatCurrency(Math.abs(summary.commissions + summary.shipping + summary.returns + summary.discounts)) } } } } },
   };
 
   return (

@@ -3,37 +3,38 @@ import { create } from 'zustand';
 export interface DashboardSummary {
   grossRevenue: number;
   commissions: number;
-  shippingCosts: number;
+  shipping: number;
   returns: number;
   discounts: number;
   cogs: number;
   netProfit: number;
-  profitMargin: number;
-  orderCount: number;
+  margin: number;
 }
 
 export interface TimeSeriesPoint {
-  date: string;
+  period: string;
   revenue: number;
-  costs: number;
-  profit: number;
+  commissions: number;
+  shipping: number;
+  returns: number;
+  cogs: number;
+  netProfit: number;
 }
 
 export interface ProductBreakdown {
-  barcode: string;
-  productName: string;
-  unitsSold: number;
+  barcode: string | null;
+  productName: string | null;
   revenue: number;
-  commission: number;
+  quantity: number;
+  commissions: number;
   shipping: number;
   cogs: number;
-  profit: number;
-  margin: number;
+  netProfit: number;
 }
 
 export interface TransactionTypeSummary {
   type: string;
-  amount: number;
+  total: number;
   count: number;
 }
 
@@ -184,7 +185,25 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
       const res = await fetch(`/api/finance/dashboard?${params}`);
       if (!res.ok) throw new Error('Dashboard fetch failed');
       const data = await res.json();
-      set({ dashboardData: data });
+      // Normalize transactionTypeSummary from object to array
+      let txSummary: TransactionTypeSummary[] = [];
+      if (data.transactionTypeSummary) {
+        if (Array.isArray(data.transactionTypeSummary)) {
+          txSummary = data.transactionTypeSummary;
+        } else {
+          txSummary = Object.entries(data.transactionTypeSummary).map(
+            ([type, val]: [string, any]) => ({ type, total: val.total ?? 0, count: val.count ?? 0 })
+          );
+        }
+      }
+      set({
+        dashboardData: {
+          summary: data.summary || { grossRevenue: 0, commissions: 0, shipping: 0, returns: 0, discounts: 0, cogs: 0, netProfit: 0, margin: 0 },
+          timeSeries: Array.isArray(data.timeSeries) ? data.timeSeries : [],
+          productBreakdown: Array.isArray(data.productBreakdown) ? data.productBreakdown : [],
+          transactionTypeSummary: txSummary,
+        },
+      });
     } catch (err) {
       console.error('[Finance Dashboard]', err);
     } finally {

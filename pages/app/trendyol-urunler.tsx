@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   Box,
   Button,
@@ -21,6 +21,7 @@ import {
   Checkbox,
   useMediaQuery,
   useTheme,
+  Badge,
 } from '@mui/material';
 import {
   DataGrid,
@@ -44,6 +45,8 @@ import {
   PriceChange as PriceChangeIcon,
   Inventory as InventoryIcon,
   Close as CloseIcon,
+  UnfoldMore as UnfoldMoreIcon,
+  UnfoldLess as UnfoldLessIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -51,6 +54,11 @@ import withAuth from '@/components/withAuth';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslations } from 'next-intl';
 import TrendyolListingEditorDrawer from '@/components/trendyol/listings/TrendyolListingEditorDrawer';
+
+// Lazy load heavy components
+const TrendyolBulkOpsBar = lazy(() => import('@/components/trendyol/listings/TrendyolBulkOpsBar'));
+const TrendyolFindReplace = lazy(() => import('@/components/trendyol/listings/TrendyolFindReplace'));
+const TrendyolBackupManager = lazy(() => import('@/components/trendyol/listings/TrendyolBackupManager'));
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,8 +76,8 @@ interface TrendyolProductRow {
   brandName: string;
   categoryId: number;
   categoryName: string;
-  listPrice: number;
-  salePrice: number;
+  listPrice: any;
+  salePrice: any;
   currencyType: string;
   quantity: number;
   vatRate: number;
@@ -88,12 +96,17 @@ interface TrendyolProductRow {
   syncedAt: string;
   createdAt: string;
   updatedAt: string;
+  // Virtual fields for grouped rows
+  _isGroupParent?: boolean;
+  _variantCount?: number;
+  _variants?: TrendyolProductRow[];
+  _expanded?: boolean;
 }
 
 type StatusFilter = 'all' | 'approved' | 'onSale' | 'rejected' | 'archived' | 'pending';
 
 // ---------------------------------------------------------------------------
-// Trendyol Orange Accent
+// Constants
 // ---------------------------------------------------------------------------
 
 const TRENDYOL_ORANGE = '#F27A1A';
@@ -102,28 +115,12 @@ const TRENDYOL_ORANGE = '#F27A1A';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatPrice(value: any, currency?: string): string {
+function formatPrice(value: any): string {
   if (value == null) return '\u2014';
   const num = typeof value === 'number' ? value : parseFloat(String(value));
   if (isNaN(num)) return '\u2014';
   return `\u20ba${num.toFixed(2)}`;
 }
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '\u2014';
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '\u2014';
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)}`;
-  } catch {
-    return '\u2014';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Status Helpers
-// ---------------------------------------------------------------------------
 
 function getProductStatus(product: TrendyolProductRow): StatusFilter {
   if (product.archived) return 'archived';
@@ -133,56 +130,116 @@ function getProductStatus(product: TrendyolProductRow): StatusFilter {
   return 'pending';
 }
 
-function getStatusChip(product: TrendyolProductRow): { label: string; color: 'success' | 'info' | 'error' | 'default' | 'warning' } {
-  const status = getProductStatus(product);
+function getStatusColor(status: StatusFilter): 'success' | 'info' | 'error' | 'default' | 'warning' {
   switch (status) {
-    case 'onSale': return { label: 'On Sale', color: 'success' };
-    case 'approved': return { label: 'Approved', color: 'info' };
-    case 'rejected': return { label: 'Rejected', color: 'error' };
-    case 'archived': return { label: 'Archived', color: 'default' };
-    case 'pending': return { label: 'Pending', color: 'warning' };
-    default: return { label: 'Unknown', color: 'default' };
+    case 'onSale': return 'success';
+    case 'approved': return 'info';
+    case 'rejected': return 'error';
+    case 'archived': return 'default';
+    case 'pending': return 'warning';
+    default: return 'default';
   }
 }
 
 // ---------------------------------------------------------------------------
-// Health Score + Letter Grade
+// Health Score (100 points, 10 factors)
 // ---------------------------------------------------------------------------
 
-function scoreToGrade(score: number): string {
-  if (score >= 95) return 'A+';
-  if (score >= 90) return 'A';
-  if (score >= 85) return 'A-';
-  if (score >= 80) return 'B+';
-  if (score >= 75) return 'B';
-  if (score >= 70) return 'B-';
-  if (score >= 65) return 'C+';
-  if (score >= 60) return 'C';
-  if (score >= 55) return 'C-';
-  if (score >= 50) return 'D+';
-  if (score >= 45) return 'D';
-  if (score >= 40) return 'D-';
-  return 'F';
+interface HealthResult {
+  overall: number;
+  grade: string;
+  color: string;
+  factors: { label: string; score: number; max: number }[];
 }
 
-function gradeColor(grade: string): string {
-  if (grade.startsWith('A')) return '#4caf50';
-  if (grade.startsWith('B')) return '#8bc34a';
-  if (grade.startsWith('C')) return '#ff9800';
-  if (grade.startsWith('D')) return '#ff5722';
-  return '#f44336';
-}
-
-function calculateTrendyolHealth(product: TrendyolProductRow): { overall: number; grade: string; color: string } {
+function calculateTrendyolHealth(product: TrendyolProductRow): HealthResult {
   const titleLen = product.title?.length || 0;
-  const titleScore = titleLen >= 80 && titleLen <= 150 ? 25 : Math.round(Math.min(titleLen / 150, 1) * 25);
-  const imgScore = Math.round(Math.min((product.imageCount || 0) / 5, 1) * 25);
-  const descScore = Math.round(Math.min((product.description?.length || 0) / 300, 1) * 25);
-  const attrScore = (product.attributes?.length || 0) > 0 ? 25 : 0;
-  const overall = titleScore + imgScore + descScore + attrScore;
-  const grade = scoreToGrade(overall);
-  const color = gradeColor(grade);
-  return { overall, grade, color };
+  const titleLength = titleLen >= 80 && titleLen <= 150 ? 15 : titleLen >= 60 ? 10 : titleLen >= 40 ? 5 : 0;
+
+  const brandLower = (product.brandName || '').toLowerCase();
+  const titleLower = (product.title || '').toLowerCase();
+  const titleBrand = brandLower && titleLower.includes(brandLower) ? 5 : 0;
+
+  const catWords = (product.categoryName || '').toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const titleCategory = catWords.length > 0 && catWords.some(w => titleLower.includes(w)) ? 5 : 0;
+
+  const imgCount = product.imageCount || product.images?.length || 0;
+  const images = imgCount >= 5 ? 20 : imgCount * 4;
+
+  const descLen = product.description?.length || 0;
+  const description = descLen >= 300 ? 15 : descLen >= 200 ? 10 : descLen >= 100 ? 5 : 0;
+
+  const attrCount = product.attributes?.length || 0;
+  const attributes = attrCount >= 5 ? 15 : attrCount >= 3 ? 12 : attrCount >= 1 ? 8 : 0;
+
+  const lp = parseFloat(String(product.listPrice)) || 0;
+  const sp = parseFloat(String(product.salePrice)) || 0;
+  const priceSanity = sp > 0 && lp > sp ? 10 : sp > 0 && lp === sp ? 5 : 0;
+
+  const stock = (product.quantity || 0) > 0 ? 5 : 0;
+  const notRejected = product.approved && !product.rejected ? 5 : 0;
+  const dimWeight = product.dimensionalWeight ? 5 : 0;
+
+  const overall = titleLength + titleBrand + titleCategory + images + description + attributes + priceSanity + stock + notRejected + dimWeight;
+
+  const grade = overall >= 95 ? 'A+' : overall >= 85 ? 'A' : overall >= 75 ? 'B+' : overall >= 65 ? 'B' : overall >= 55 ? 'C+' : overall >= 45 ? 'C' : overall >= 35 ? 'D' : 'F';
+  const color = grade.startsWith('A') ? '#4caf50' : grade.startsWith('B') ? '#8bc34a' : grade.startsWith('C') ? '#ff9800' : grade.startsWith('D') ? '#ff5722' : '#f44336';
+
+  return {
+    overall, grade, color,
+    factors: [
+      { label: 'Title', score: titleLength, max: 15 },
+      { label: 'Brand in title', score: titleBrand, max: 5 },
+      { label: 'Category words', score: titleCategory, max: 5 },
+      { label: 'Images', score: images, max: 20 },
+      { label: 'Description', score: description, max: 15 },
+      { label: 'Attributes', score: attributes, max: 15 },
+      { label: 'Discount', score: priceSanity, max: 10 },
+      { label: 'Stock', score: stock, max: 5 },
+      { label: 'Approved', score: notRejected, max: 5 },
+      { label: 'Weight', score: dimWeight, max: 5 },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Variation Grouping
+// ---------------------------------------------------------------------------
+
+function groupByVariations(products: TrendyolProductRow[], expandedGroups: Set<string>): TrendyolProductRow[] {
+  const groups = new Map<string, TrendyolProductRow[]>();
+  const standalone: TrendyolProductRow[] = [];
+
+  for (const p of products) {
+    if (p.productMainId) {
+      const existing = groups.get(p.productMainId);
+      if (existing) existing.push(p);
+      else groups.set(p.productMainId, [p]);
+    } else {
+      standalone.push(p);
+    }
+  }
+
+  const result: TrendyolProductRow[] = [];
+
+  for (const [mainId, variants] of groups) {
+    if (variants.length === 1) {
+      // Single variant — show as regular row
+      result.push(variants[0]);
+    } else {
+      // Group parent: use first variant as representative
+      const parent = { ...variants[0], _isGroupParent: true, _variantCount: variants.length, _variants: variants };
+      result.push(parent);
+      if (expandedGroups.has(mainId)) {
+        for (const v of variants) {
+          result.push({ ...v, _expanded: true });
+        }
+      }
+    }
+  }
+
+  result.push(...standalone);
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,143 +247,71 @@ function calculateTrendyolHealth(product: TrendyolProductRow): { overall: number
 // ---------------------------------------------------------------------------
 
 function MobileTrendyolCard({
-  product,
-  onEdit,
-  onArchive,
-  selected,
-  onToggleSelect,
-  t,
+  product, onEdit, selected, onToggleSelect, t,
 }: {
   product: TrendyolProductRow;
   onEdit: (id: string) => void;
-  onArchive: (id: string) => void;
   selected: boolean;
   onToggleSelect: (id: string) => void;
   t: (key: string, values?: Record<string, any>) => string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const health = calculateTrendyolHealth(product);
-  const statusChip = getStatusChip(product);
+  const status = getProductStatus(product);
+  const lp = parseFloat(String(product.listPrice)) || 0;
+  const sp = parseFloat(String(product.salePrice)) || 0;
+  const discountPct = lp > 0 && sp > 0 && lp > sp ? Math.round((1 - sp / lp) * 100) : 0;
 
   return (
     <Paper
       sx={{
-        mb: 1,
-        overflow: 'hidden',
-        borderRadius: 2,
-        maxWidth: '100%',
-        width: '100%',
+        mb: 1, overflow: 'hidden', borderRadius: 2, maxWidth: '100%', width: '100%',
         border: selected ? '2px solid' : '1px solid',
         borderColor: selected ? TRENDYOL_ORANGE : 'divider',
       }}
     >
-      {/* Always-visible header */}
-      <Box
-        sx={{
-          display: 'flex',
-          gap: 1,
-          p: 1.5,
-          cursor: 'pointer',
-          alignItems: 'center',
-          minHeight: 44,
-          overflow: 'hidden',
-          maxWidth: '100%',
-        }}
+      <Box sx={{ display: 'flex', gap: 1, p: 1.5, cursor: 'pointer', alignItems: 'center', minHeight: 44 }}
         onClick={() => setExpanded(!expanded)}
       >
-        {/* Checkbox */}
-        <Checkbox
-          checked={selected}
+        <Checkbox checked={selected}
           onChange={(e) => { e.stopPropagation(); onToggleSelect(product.id); }}
-          onClick={(e) => e.stopPropagation()}
-          size="small"
-          sx={{ p: 0.5, flexShrink: 0, '&.Mui-checked': { color: TRENDYOL_ORANGE } }}
+          onClick={e => e.stopPropagation()}
+          size="small" sx={{ p: 0.5, flexShrink: 0, '&.Mui-checked': { color: TRENDYOL_ORANGE } }}
         />
-
-        {/* Thumbnail */}
         {product.thumbnailUrl ? (
-          <Box
-            component="img"
-            src={product.thumbnailUrl}
-            alt=""
+          <Box component="img" src={product.thumbnailUrl} alt=""
             sx={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
           />
         ) : (
-          <Box
-            sx={{
-              width: 52,
-              height: 52,
-              borderRadius: 1,
-              backgroundColor: '#e0e0e0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
+          <Box sx={{ width: 52, height: 52, borderRadius: 1, bgcolor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Typography variant="caption" color="text.disabled">N/A</Typography>
           </Box>
         )}
-
-        {/* Main info */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 600,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              lineHeight: 1.3,
-              wordBreak: 'break-word',
-              maxWidth: '100%',
-              fontSize: '0.82rem',
-            }}
-          >
+          <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.3, fontSize: '0.82rem' }}>
+            {product._isGroupParent && <Badge badgeContent={product._variantCount} color="primary" sx={{ mr: 1 }} />}
             {product.title}
           </Typography>
           <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
-            <Typography variant="body2" fontWeight={600} fontSize="0.82rem">
-              {formatPrice(product.salePrice)}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" fontSize="0.72rem">
-              {t('quantity')}: {product.quantity}
-            </Typography>
-            <Chip
-              label={t(getProductStatus(product))}
-              size="small"
-              color={statusChip.color}
-              variant="outlined"
+            <Typography variant="body2" fontWeight={600} fontSize="0.82rem">{formatPrice(product.salePrice)}</Typography>
+            {discountPct > 0 && (
+              <Chip label={`-${discountPct}%`} size="small" sx={{ height: 16, fontSize: 9, bgcolor: '#4caf5015', color: '#4caf50', fontWeight: 700 }} />
+            )}
+            <Chip label={t(status)} size="small" color={getStatusColor(status)} variant="outlined"
               sx={{ height: 18, fontSize: 10, '& .MuiChip-label': { px: 0.5 } }}
             />
-            <Chip
-              label={health.grade}
-              size="small"
-              sx={{
-                height: 20,
-                fontSize: 10,
-                fontWeight: 700,
-                bgcolor: `${health.color}15`,
-                color: health.color,
-                border: `1px solid ${health.color}`,
-                '& .MuiChip-label': { px: 0.5 },
-              }}
+            <Chip label={health.grade} size="small"
+              sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: `${health.color}15`, color: health.color, border: `1px solid ${health.color}`, '& .MuiChip-label': { px: 0.5 } }}
             />
           </Box>
         </Box>
-
-        {/* Expand icon */}
         <IconButton size="small" sx={{ flexShrink: 0, minWidth: 40, minHeight: 40 }}>
           {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
         </IconButton>
       </Box>
 
-      {/* Expandable details */}
       <Collapse in={expanded}>
-        <Box sx={{ px: 1.5, pb: 1.5, borderTop: '1px solid', borderColor: 'divider', overflow: 'hidden', maxWidth: '100%' }}>
-          {/* Info grid */}
+        <Box sx={{ px: 1.5, pb: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
             <Box sx={{ flex: '1 1 45%' }}>
               <Typography variant="caption" color="text.secondary">{t('brand')}</Typography>
@@ -346,7 +331,9 @@ function MobileTrendyolCard({
             </Box>
             <Box sx={{ flex: '1 1 45%' }}>
               <Typography variant="caption" color="text.secondary">{t('quantity')}</Typography>
-              <Typography variant="body2">{product.quantity}</Typography>
+              <Typography variant="body2" sx={{ color: product.quantity === 0 ? '#f44336' : 'inherit', fontWeight: product.quantity === 0 ? 700 : 400 }}>
+                {product.quantity}
+              </Typography>
             </Box>
             <Box sx={{ flex: '1 1 45%' }}>
               <Typography variant="caption" color="text.secondary">{t('healthScore')}</Typography>
@@ -355,8 +342,6 @@ function MobileTrendyolCard({
               </Typography>
             </Box>
           </Box>
-
-          {/* Reject reasons */}
           {product.rejected && product.rejectReasons?.length > 0 && (
             <Box sx={{ mt: 1.5 }}>
               <Typography variant="caption" color="error" fontWeight={600}>{t('rejectReason')}:</Typography>
@@ -367,46 +352,13 @@ function MobileTrendyolCard({
               ))}
             </Box>
           )}
-
-          {/* Actions */}
           <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
-            <Button
-              size="small"
-              variant="contained"
+            <Button size="small" variant="contained"
               startIcon={<EditIcon sx={{ fontSize: '16px !important' }} />}
-              onClick={(e) => { e.stopPropagation(); onEdit(product.id); }}
-              sx={{
-                flex: 1,
-                minHeight: 42,
-                borderRadius: '10px',
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.8rem',
-                background: `linear-gradient(135deg, ${TRENDYOL_ORANGE}, #e06a10)`,
-                boxShadow: `0 2px 8px rgba(242,122,26,0.25)`,
-                '&:hover': { background: `linear-gradient(135deg, #e06a10, #cc5a00)` },
-              }}
+              onClick={e => { e.stopPropagation(); onEdit(product.id); }}
+              sx={{ flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem', background: `linear-gradient(135deg, ${TRENDYOL_ORANGE}, #e06a10)` }}
             >
               {t('editProduct')}
-            </Button>
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<ArchiveIcon sx={{ fontSize: '16px !important' }} />}
-              onClick={(e) => { e.stopPropagation(); onArchive(product.id); }}
-              sx={{
-                flex: 1,
-                minHeight: 42,
-                borderRadius: '10px',
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.8rem',
-                background: 'linear-gradient(135deg, #78909c, #607d8b)',
-                boxShadow: '0 2px 8px rgba(96,125,139,0.25)',
-                '&:hover': { background: 'linear-gradient(135deg, #607d8b, #546e7a)' },
-              }}
-            >
-              {t('archiveProduct')}
             </Button>
           </Box>
         </Box>
@@ -436,6 +388,9 @@ function TrendyolListingsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 25 });
   const [toolsMenuAnchor, setToolsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [findReplaceOpen, setFindReplaceOpen] = useState(false);
+  const [backupOpen, setBackupOpen] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Fetch Products
@@ -444,7 +399,6 @@ function TrendyolListingsPage() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      // Try cache first
       const cacheRes = await fetch('/api/trendyol/products?action=list&fromCache=true&size=500');
       if (cacheRes.ok) {
         const cacheData = await cacheRes.json();
@@ -455,28 +409,22 @@ function TrendyolListingsPage() {
           return;
         }
       }
-      // Cache empty — fetch first page from Trendyol API directly
       const apiRes = await fetch('/api/trendyol/products?action=list&size=200');
       if (!apiRes.ok) {
         const errData = await apiRes.json().catch(() => ({}));
         throw new Error(errData.error || `HTTP ${apiRes.status}`);
       }
       const apiData = await apiRes.json();
-      const products = Array.isArray(apiData?.content) ? apiData.content : [];
-      setProducts(products);
+      setProducts(Array.isArray(apiData?.content) ? apiData.content : []);
     } catch (err: any) {
       console.error('Failed to fetch Trendyol products:', err);
-      if (err.message?.includes('credentials')) {
-        toast.error(t('connectTrendyol'));
-      }
+      if (err.message?.includes('credentials')) toast.error(t('connectTrendyol'));
     } finally {
       setLoading(false);
     }
   }, [t]);
 
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
   // ---------------------------------------------------------------------------
   // Sync
@@ -492,14 +440,12 @@ function TrendyolListingsPage() {
       }
       const data = await res.json();
       toast.success(`${t('syncComplete')} (${data.totalSynced || 0})`);
-      // Refetch from cache (now populated)
       const cacheRes = await fetch('/api/trendyol/products?action=list&fromCache=true&size=500');
       if (cacheRes.ok) {
         const cacheData = await cacheRes.json();
         setProducts(Array.isArray(cacheData?.content) ? cacheData.content : []);
       }
     } catch (err: any) {
-      console.error('Sync failed:', err);
       toast.error(`${t('syncFailed')}: ${err.message || 'Unknown error'}`);
     } finally {
       setSyncing(false);
@@ -507,38 +453,37 @@ function TrendyolListingsPage() {
   };
 
   // ---------------------------------------------------------------------------
-  // Filtering
+  // Filtering + Variation Grouping
   // ---------------------------------------------------------------------------
 
   const filteredProducts = useMemo(() => {
     let result = products;
-
-    // Status filter
     if (statusFilter !== 'all') {
-      result = result.filter((p) => getProductStatus(p) === statusFilter);
+      result = result.filter(p => getProductStatus(p) === statusFilter);
     }
-
-    // Search
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
-      result = result.filter(
-        (p) =>
-          p.title?.toLowerCase().includes(term) ||
-          p.barcode?.toLowerCase().includes(term) ||
-          p.brandName?.toLowerCase().includes(term) ||
-          p.stockCode?.toLowerCase().includes(term)
+      result = result.filter(p =>
+        p.title?.toLowerCase().includes(term) ||
+        p.barcode?.toLowerCase().includes(term) ||
+        p.brandName?.toLowerCase().includes(term) ||
+        p.stockCode?.toLowerCase().includes(term)
       );
     }
-
     return result;
   }, [products, statusFilter, searchTerm]);
+
+  const displayProducts = useMemo(() =>
+    groupByVariations(filteredProducts, expandedGroups),
+    [filteredProducts, expandedGroups]
+  );
 
   // ---------------------------------------------------------------------------
   // Selection
   // ---------------------------------------------------------------------------
 
   const handleToggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
+    setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -554,8 +499,26 @@ function TrendyolListingsPage() {
 
   const clearSelection = () => setSelectedIds(new Set());
 
+  const selectedProducts = useMemo(() =>
+    products.filter(p => selectedIds.has(p.id)),
+    [products, selectedIds]
+  );
+
   // ---------------------------------------------------------------------------
-  // Placeholder Actions
+  // Toggle variant group expansion
+  // ---------------------------------------------------------------------------
+
+  const toggleGroup = (mainId: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(mainId)) next.delete(mainId);
+      else next.add(mainId);
+      return next;
+    });
+  };
+
+  // ---------------------------------------------------------------------------
+  // Actions
   // ---------------------------------------------------------------------------
 
   const handleEdit = (id: string) => {
@@ -563,13 +526,13 @@ function TrendyolListingsPage() {
     setDrawerOpen(true);
   };
 
-  const handleArchive = (id: string) => {
-    toast(t('archiveProduct') + ' (coming soon)');
-  };
-
-  const handleCreate = () => {
-    toast(t('createProduct') + ' (coming soon)');
-  };
+  // Get sibling variants for the editor drawer
+  const drawerSiblings = useMemo(() => {
+    if (!drawerProductId) return [];
+    const product = products.find(p => p.id === drawerProductId);
+    if (!product?.productMainId) return [];
+    return products.filter(p => p.productMainId === product.productMainId);
+  }, [drawerProductId, products]);
 
   // ---------------------------------------------------------------------------
   // DataGrid Columns
@@ -578,32 +541,15 @@ function TrendyolListingsPage() {
   const columns: GridColDef[] = useMemo(
     () => [
       {
-        field: 'thumbnail',
-        headerName: '',
-        width: 60,
-        sortable: false,
-        filterable: false,
+        field: 'thumbnail', headerName: '', width: 60, sortable: false, filterable: false,
         renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => (
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
             {params.row.thumbnailUrl ? (
-              <Box
-                component="img"
-                src={params.row.thumbnailUrl}
-                alt=""
+              <Box component="img" src={params.row.thumbnailUrl} alt=""
                 sx={{ width: 42, height: 42, objectFit: 'cover', borderRadius: 1 }}
               />
             ) : (
-              <Box
-                sx={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 1,
-                  bgcolor: '#e0e0e0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
+              <Box sx={{ width: 42, height: 42, borderRadius: 1, bgcolor: '#e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Typography variant="caption" color="text.disabled">N/A</Typography>
               </Box>
             )}
@@ -611,150 +557,114 @@ function TrendyolListingsPage() {
         ),
       },
       {
-        field: 'title',
-        headerName: 'Title',
-        flex: 1,
-        minWidth: 200,
+        field: 'title', headerName: 'Title', flex: 1, minWidth: 200,
         renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => (
-          <Tooltip title={params.row.title} arrow>
-            <Typography
-              variant="body2"
-              sx={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                fontWeight: 500,
-                cursor: 'pointer',
-                '&:hover': { color: TRENDYOL_ORANGE },
-              }}
-              onClick={() => handleEdit(params.row.id)}
-            >
-              {params.row.title}
-            </Typography>
-          </Tooltip>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: '100%' }}>
+            {params.row._isGroupParent && (
+              <IconButton size="small" onClick={e => { e.stopPropagation(); toggleGroup(params.row.productMainId); }}
+                sx={{ p: 0.25 }}
+              >
+                {expandedGroups.has(params.row.productMainId) ? <UnfoldLessIcon sx={{ fontSize: 16 }} /> : <UnfoldMoreIcon sx={{ fontSize: 16 }} />}
+              </IconButton>
+            )}
+            {params.row._expanded && <Box sx={{ width: 20, flexShrink: 0 }} />}
+            <Tooltip title={params.row.title} arrow>
+              <Typography variant="body2"
+                sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, cursor: 'pointer', '&:hover': { color: TRENDYOL_ORANGE } }}
+                onClick={() => handleEdit(params.row.id)}
+              >
+                {params.row.title}
+              </Typography>
+            </Tooltip>
+            {params.row._isGroupParent && params.row._variantCount && params.row._variantCount > 1 && (
+              <Chip label={`${params.row._variantCount} var`} size="small"
+                sx={{ height: 18, fontSize: 9, fontWeight: 700, bgcolor: '#e3f2fd', color: '#1976d2' }}
+              />
+            )}
+          </Box>
+        ),
+      },
+      { field: 'brandName', headerName: t('brand'), width: 110 },
+      { field: 'barcode', headerName: t('barcode'), width: 130 },
+      {
+        field: 'listPrice', headerName: t('listPrice'), width: 95, align: 'right', headerAlign: 'right',
+        renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => (
+          <Typography variant="body2" color="text.secondary">{formatPrice(params.row.listPrice)}</Typography>
         ),
       },
       {
-        field: 'brandName',
-        headerName: t('brand'),
-        width: 120,
-      },
-      {
-        field: 'categoryName',
-        headerName: t('category'),
-        width: 150,
-      },
-      {
-        field: 'listPrice',
-        headerName: t('listPrice'),
-        width: 100,
-        align: 'right',
-        headerAlign: 'right',
+        field: 'salePrice', headerName: t('salePrice'), width: 95, align: 'right', headerAlign: 'right',
         renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => (
-          <Typography variant="body2" color="text.secondary">
-            {formatPrice(params.row.listPrice)}
-          </Typography>
+          <Typography variant="body2" fontWeight={600}>{formatPrice(params.row.salePrice)}</Typography>
         ),
       },
       {
-        field: 'salePrice',
-        headerName: t('salePrice'),
-        width: 100,
-        align: 'right',
-        headerAlign: 'right',
-        renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => (
-          <Typography variant="body2" fontWeight={600}>
-            {formatPrice(params.row.salePrice)}
-          </Typography>
-        ),
+        field: 'discount', headerName: '%', width: 55, align: 'center', headerAlign: 'center', sortable: true,
+        valueGetter: (_: any, row: TrendyolProductRow) => {
+          const lp = parseFloat(String(row.listPrice)) || 0;
+          const sp = parseFloat(String(row.salePrice)) || 0;
+          return lp > 0 && sp > 0 && lp > sp ? Math.round((1 - sp / lp) * 100) : 0;
+        },
+        renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => {
+          const lp = parseFloat(String(params.row.listPrice)) || 0;
+          const sp = parseFloat(String(params.row.salePrice)) || 0;
+          const pct = lp > 0 && sp > 0 && lp > sp ? Math.round((1 - sp / lp) * 100) : 0;
+          return pct > 0 ? (
+            <Chip label={`-${pct}%`} size="small"
+              sx={{ height: 20, fontSize: 10, fontWeight: 700, bgcolor: '#4caf5015', color: '#4caf50', border: '1px solid #4caf50' }}
+            />
+          ) : <Typography variant="caption" color="text.disabled">—</Typography>;
+        },
       },
       {
-        field: 'quantity',
-        headerName: t('quantity'),
-        width: 80,
-        align: 'center',
-        headerAlign: 'center',
+        field: 'quantity', headerName: t('quantity'), width: 70, align: 'center', headerAlign: 'center',
         renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => (
-          <Chip
-            label={params.row.quantity}
-            size="small"
-            color={params.row.quantity > 0 ? 'default' : 'error'}
-            variant="outlined"
-            sx={{ minWidth: 40 }}
+          <Chip label={params.row.quantity} size="small"
+            color={params.row.quantity > 0 ? (params.row.quantity < 5 ? 'warning' : 'default') : 'error'}
+            variant="outlined" sx={{ minWidth: 36, fontWeight: params.row.quantity === 0 ? 700 : 400 }}
           />
         ),
       },
       {
-        field: 'status',
-        headerName: t('filterByStatus'),
-        width: 110,
-        sortable: false,
+        field: 'status', headerName: t('filterByStatus'), width: 100, sortable: false,
         renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => {
-          const chip = getStatusChip(params.row);
-          return (
-            <Chip
-              label={t(getProductStatus(params.row))}
-              size="small"
-              color={chip.color}
-              variant="filled"
-              sx={{ fontWeight: 600, fontSize: 11 }}
-            />
-          );
+          const status = getProductStatus(params.row);
+          return <Chip label={t(status)} size="small" color={getStatusColor(status)} variant="filled" sx={{ fontWeight: 600, fontSize: 11 }} />;
         },
       },
       {
-        field: 'health',
-        headerName: t('healthScore'),
-        width: 90,
-        align: 'center',
-        headerAlign: 'center',
-        sortable: true,
-        valueGetter: (_value: any, row: TrendyolProductRow) => calculateTrendyolHealth(row).overall,
+        field: 'health', headerName: t('healthScore'), width: 80, align: 'center', headerAlign: 'center', sortable: true,
+        valueGetter: (_: any, row: TrendyolProductRow) => calculateTrendyolHealth(row).overall,
         renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => {
           const health = calculateTrendyolHealth(params.row);
           return (
-            <Tooltip
-              title={`${health.overall}/100 - Title: ${params.row.title?.length || 0} chars, Images: ${params.row.imageCount || 0}, Desc: ${params.row.description?.length || 0} chars, Attrs: ${params.row.attributes?.length || 0}`}
-              arrow
-            >
-              <Chip
-                label={health.grade}
-                size="small"
-                sx={{
-                  fontWeight: 700,
-                  bgcolor: `${health.color}15`,
-                  color: health.color,
-                  border: `1px solid ${health.color}`,
-                  minWidth: 40,
-                }}
+            <Tooltip arrow title={
+              <Box sx={{ fontSize: '0.7rem' }}>
+                {health.factors.map((f, i) => (
+                  <Box key={i}>{f.label}: {f.score}/{f.max}</Box>
+                ))}
+                <Box sx={{ mt: 0.5, fontWeight: 700 }}>Total: {health.overall}/100</Box>
+              </Box>
+            }>
+              <Chip label={health.grade} size="small"
+                sx={{ fontWeight: 700, bgcolor: `${health.color}15`, color: health.color, border: `1px solid ${health.color}`, minWidth: 36 }}
               />
             </Tooltip>
           );
         },
       },
       {
-        field: 'actions',
-        headerName: '',
-        width: 90,
-        sortable: false,
-        filterable: false,
+        field: 'actions', headerName: '', width: 60, sortable: false, filterable: false,
         renderCell: (params: GridRenderCellParams<TrendyolProductRow>) => (
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            <Tooltip title={t('editProduct')}>
-              <IconButton size="small" onClick={() => handleEdit(params.row.id)} sx={{ color: TRENDYOL_ORANGE }}>
-                <EditIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title={t('archiveProduct')}>
-              <IconButton size="small" onClick={() => handleArchive(params.row.id)}>
-                <ArchiveIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
+          <Tooltip title={t('editProduct')}>
+            <IconButton size="small" onClick={() => handleEdit(params.row.id)} sx={{ color: TRENDYOL_ORANGE }}>
+              <EditIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
         ),
       },
     ],
-    [t]
+    [t, expandedGroups]
   );
 
   // ---------------------------------------------------------------------------
@@ -766,41 +676,15 @@ function TrendyolListingsPage() {
       <Toaster position="top-right" />
       <Box sx={{ p: { xs: 1.5, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
         {/* Toolbar */}
-        <Paper
-          sx={{
-            p: { xs: 1.5, md: 2 },
-            mb: 2,
-            borderRadius: 2,
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 1.5,
-            alignItems: 'center',
-          }}
-        >
-          {/* Search */}
-          <TextField
-            size="small"
-            placeholder={t('searchProducts')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
-                </InputAdornment>
-              ),
-            }}
+        <Paper sx={{ p: { xs: 1.5, md: 2 }, mb: 2, borderRadius: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+          <TextField size="small" placeholder={t('searchProducts')} value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ fontSize: 20, color: 'text.secondary' }} /></InputAdornment> }}
             sx={{ flex: '1 1 200px', minWidth: 180 }}
           />
-
-          {/* Status Filter */}
           <FormControl size="small" sx={{ minWidth: 140 }}>
             <InputLabel>{t('filterByStatus')}</InputLabel>
-            <Select
-              value={statusFilter}
-              label={t('filterByStatus')}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            >
+            <Select value={statusFilter} label={t('filterByStatus')} onChange={e => setStatusFilter(e.target.value as StatusFilter)}>
               <MenuItem value="all">{t('all')}</MenuItem>
               <MenuItem value="approved">{t('approved')}</MenuItem>
               <MenuItem value="onSale">{t('onSale')}</MenuItem>
@@ -809,129 +693,68 @@ function TrendyolListingsPage() {
               <MenuItem value="pending">{t('pending')}</MenuItem>
             </Select>
           </FormControl>
-
-          {/* Sync Button */}
-          <Button
-            variant="contained"
+          <Button variant="contained"
             startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-            onClick={handleSync}
-            disabled={syncing}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              bgcolor: TRENDYOL_ORANGE,
-              '&:hover': { bgcolor: '#e06a10' },
-              minWidth: 100,
-            }}
+            onClick={handleSync} disabled={syncing}
+            sx={{ textTransform: 'none', fontWeight: 600, bgcolor: TRENDYOL_ORANGE, '&:hover': { bgcolor: '#e06a10' }, minWidth: 100 }}
           >
             {syncing ? t('syncing') : t('sync')}
           </Button>
-
-          {/* Create Product */}
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={handleCreate}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              borderColor: TRENDYOL_ORANGE,
-              color: TRENDYOL_ORANGE,
-              '&:hover': { borderColor: '#e06a10', bgcolor: `${TRENDYOL_ORANGE}08` },
-            }}
-          >
-            {t('createProduct')}
-          </Button>
-
           {/* Tools Menu */}
-          <IconButton
-            onClick={(e) => setToolsMenuAnchor(e.currentTarget)}
+          <IconButton onClick={e => setToolsMenuAnchor(e.currentTarget)}
             sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5 }}
           >
             <MoreVertIcon />
           </IconButton>
-          <Menu
-            anchorEl={toolsMenuAnchor}
-            open={Boolean(toolsMenuAnchor)}
-            onClose={() => setToolsMenuAnchor(null)}
-          >
-            <MenuItem onClick={() => { setToolsMenuAnchor(null); toast(t('findReplace') + ' (coming soon)'); }}>
+          <Menu anchorEl={toolsMenuAnchor} open={Boolean(toolsMenuAnchor)} onClose={() => setToolsMenuAnchor(null)}>
+            <MenuItem onClick={() => { setToolsMenuAnchor(null); setFindReplaceOpen(true); }}>
               <ListItemIcon><FindReplaceIcon fontSize="small" /></ListItemIcon>
               <ListItemText>{t('findReplace')}</ListItemText>
             </MenuItem>
-            <MenuItem onClick={() => { setToolsMenuAnchor(null); toast(t('backup') + ' (coming soon)'); }}>
+            <MenuItem onClick={() => { setToolsMenuAnchor(null); setBackupOpen(true); }}>
               <ListItemIcon><FileDownloadIcon fontSize="small" /></ListItemIcon>
               <ListItemText>{t('backup')}</ListItemText>
-            </MenuItem>
-            <MenuItem onClick={() => { setToolsMenuAnchor(null); toast(t('restore') + ' (coming soon)'); }}>
-              <ListItemIcon><FileUploadIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>{t('restore')}</ListItemText>
             </MenuItem>
           </Menu>
         </Paper>
 
         {/* Summary bar */}
         <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-          <Chip
-            label={`${filteredProducts.length} ${t('title').toLowerCase()}`}
-            size="small"
-            sx={{ fontWeight: 600 }}
-          />
+          <Chip label={`${filteredProducts.length} ${t('title').toLowerCase()}`} size="small" sx={{ fontWeight: 600 }} />
           {statusFilter !== 'all' && (
-            <Chip
-              label={t(statusFilter)}
-              size="small"
-              color="primary"
-              onDelete={() => setStatusFilter('all')}
-              sx={{ fontWeight: 600 }}
-            />
+            <Chip label={t(statusFilter)} size="small" color="primary" onDelete={() => setStatusFilter('all')} sx={{ fontWeight: 600 }} />
           )}
         </Box>
 
-        {/* Loading */}
+        {/* Content */}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
             <CircularProgress sx={{ color: TRENDYOL_ORANGE }} />
           </Box>
         ) : filteredProducts.length === 0 ? (
-          /* Empty State */
           <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
             <InventoryIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              {t('noProducts')}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              {t('connectTrendyol')}
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<RefreshIcon />}
-              onClick={handleSync}
+            <Typography variant="h6" color="text.secondary" gutterBottom>{t('noProducts')}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{t('connectTrendyol')}</Typography>
+            <Button variant="contained" startIcon={<RefreshIcon />} onClick={handleSync}
               sx={{ bgcolor: TRENDYOL_ORANGE, '&:hover': { bgcolor: '#e06a10' } }}
             >
               {t('sync')}
             </Button>
           </Paper>
         ) : isMobile ? (
-          /* Mobile: Expandable Cards */
           <Box>
-            {filteredProducts.map((product) => (
-              <MobileTrendyolCard
-                key={product.id}
-                product={product}
-                onEdit={handleEdit}
-                onArchive={handleArchive}
-                selected={selectedIds.has(product.id)}
-                onToggleSelect={handleToggleSelect}
-                t={t}
+            {displayProducts.map(product => (
+              <MobileTrendyolCard key={product.id + (product._expanded ? '_exp' : '')}
+                product={product} onEdit={handleEdit} selected={selectedIds.has(product.id)}
+                onToggleSelect={handleToggleSelect} t={t}
               />
             ))}
           </Box>
         ) : (
-          /* Desktop: DataGrid */
           <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
             <DataGrid
-              rows={filteredProducts}
+              rows={displayProducts}
               columns={columns}
               checkboxSelection
               disableRowSelectionOnClick
@@ -941,23 +764,13 @@ function TrendyolListingsPage() {
               onPaginationModelChange={setPaginationModel}
               pageSizeOptions={[10, 25, 50, 100]}
               rowHeight={56}
-              getRowId={(row) => row.id}
+              getRowId={row => row.id + (row._expanded ? '_exp' : '')}
               sx={{
                 border: 'none',
-                '& .MuiDataGrid-columnHeaders': {
-                  bgcolor: '#fafafa',
-                  borderBottom: '2px solid',
-                  borderColor: 'divider',
-                },
-                '& .MuiDataGrid-row:hover': {
-                  bgcolor: `${TRENDYOL_ORANGE}05`,
-                },
-                '& .MuiDataGrid-cell': {
-                  borderColor: '#f0f0f0',
-                },
-                '& .MuiCheckbox-root.Mui-checked': {
-                  color: TRENDYOL_ORANGE,
-                },
+                '& .MuiDataGrid-columnHeaders': { bgcolor: '#fafafa', borderBottom: '2px solid', borderColor: 'divider' },
+                '& .MuiDataGrid-row:hover': { bgcolor: `${TRENDYOL_ORANGE}05` },
+                '& .MuiDataGrid-cell': { borderColor: '#f0f0f0' },
+                '& .MuiCheckbox-root.Mui-checked': { color: TRENDYOL_ORANGE },
               }}
               autoHeight
             />
@@ -966,75 +779,49 @@ function TrendyolListingsPage() {
 
         {/* Bulk Operations Bar */}
         {selectedIds.size > 0 && (
-          <Paper
-            sx={{
-              position: 'fixed',
-              bottom: 0,
-              left: { xs: 0, md: 240 },
-              right: 0,
-              p: { xs: 1.5, md: 2 },
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.5,
-              flexWrap: 'wrap',
-              borderRadius: 0,
-              borderTop: '2px solid',
-              borderColor: TRENDYOL_ORANGE,
-              zIndex: 1200,
-              bgcolor: 'background.paper',
-              boxShadow: '0 -4px 12px rgba(0,0,0,0.1)',
-            }}
-          >
-            <Typography variant="body2" fontWeight={700} sx={{ color: TRENDYOL_ORANGE }}>
-              {t('selected', { count: selectedIds.size })}
-            </Typography>
-
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<PriceChangeIcon />}
-              onClick={() => toast(t('bulkPriceUpdate') + ' (coming soon)')}
-              sx={{ textTransform: 'none', fontWeight: 600 }}
-            >
-              {t('bulkPriceUpdate')}
-            </Button>
-
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<InventoryIcon />}
-              onClick={() => toast(t('bulkStockUpdate') + ' (coming soon)')}
-              sx={{ textTransform: 'none', fontWeight: 600 }}
-            >
-              {t('bulkStockUpdate')}
-            </Button>
-
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<ArchiveIcon />}
-              onClick={() => toast(t('bulkArchive') + ' (coming soon)')}
-              sx={{ textTransform: 'none', fontWeight: 600 }}
-            >
-              {t('bulkArchive')}
-            </Button>
-
-            <Box sx={{ flex: 1 }} />
-
-            <IconButton size="small" onClick={clearSelection}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Paper>
+          <Suspense fallback={null}>
+            <TrendyolBulkOpsBar
+              selectedProducts={selectedProducts}
+              onClearSelection={clearSelection}
+              onRefresh={fetchProducts}
+              allProducts={products}
+            />
+          </Suspense>
         )}
       </Box>
 
-      {/* Listing Editor Drawer */}
+      {/* Editor Drawer */}
       <TrendyolListingEditorDrawer
         open={drawerOpen}
         onClose={() => { setDrawerOpen(false); setDrawerProductId(null); }}
         productId={drawerProductId}
         onSaved={() => { setDrawerOpen(false); setDrawerProductId(null); fetchProducts(); }}
+        siblingProducts={drawerSiblings}
       />
+
+      {/* Find & Replace Dialog */}
+      <Suspense fallback={null}>
+        {findReplaceOpen && (
+          <TrendyolFindReplace
+            open={findReplaceOpen}
+            onClose={() => setFindReplaceOpen(false)}
+            products={products}
+            onRefresh={fetchProducts}
+          />
+        )}
+      </Suspense>
+
+      {/* Backup Manager Dialog */}
+      <Suspense fallback={null}>
+        {backupOpen && (
+          <TrendyolBackupManager
+            open={backupOpen}
+            onClose={() => setBackupOpen(false)}
+            products={products}
+            onRefresh={fetchProducts}
+          />
+        )}
+      </Suspense>
     </AppLayout>
   );
 }

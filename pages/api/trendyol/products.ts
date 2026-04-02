@@ -311,13 +311,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ================================================================
     // BATCH STATUS
     // ================================================================
-    if (action === 'batch_status' && req.method === 'GET') {
+    if ((action === 'batch_status' || action === 'batch-status') && req.method === 'GET') {
       const batchRequestId = req.query.batchRequestId as string;
       if (!batchRequestId) {
         return res.status(400).json({ error: 'batchRequestId is required' });
       }
       const data = await client.getBatchStatus(batchRequestId);
       return res.status(200).json(data);
+    }
+
+    // ================================================================
+    // BULK UPDATE CACHE (local DB only, no Trendyol API call)
+    // Used by find/replace and backup restore
+    // ================================================================
+    if (action === 'update_cache' && req.method === 'PUT') {
+      const { items } = req.body;
+      if (!items || !Array.isArray(items)) {
+        return res.status(400).json({ error: 'items array is required' });
+      }
+      let updated = 0;
+      for (const item of items) {
+        if (!item.barcode) continue;
+        try {
+          await prisma.trendyolProduct.updateMany({
+            where: { userId, supplierId, barcode: item.barcode },
+            data: {
+              ...(item.title !== undefined && { title: item.title }),
+              ...(item.description !== undefined && { description: item.description }),
+              ...(item.stockCode !== undefined && { stockCode: item.stockCode }),
+              ...(item.listPrice !== undefined && { listPrice: item.listPrice }),
+              ...(item.salePrice !== undefined && { salePrice: item.salePrice }),
+              ...(item.quantity !== undefined && { quantity: item.quantity }),
+              ...(item.vatRate !== undefined && { vatRate: item.vatRate }),
+            },
+          });
+          updated++;
+        } catch {}
+      }
+      return res.status(200).json({ success: true, updated });
     }
 
     return res.status(400).json({ error: `Unknown action: ${action}` });

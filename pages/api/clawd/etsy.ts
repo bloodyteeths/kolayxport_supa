@@ -422,20 +422,24 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         if (!shopId) return res.status(400).json({ error: 'target_shop_id is required' });
 
         let data: any;
-        const isNumeric = /^\d+$/.test(shopId.trim());
+        const trimmed = shopId.trim();
 
-        if (isNumeric) {
-            // Numeric ID — direct lookup
-            data = await callEtsyPublicAPI(`/shops/${shopId.trim()}`);
-        } else {
-            // Shop name — search by name first, then get full details
-            const searchRes = await callEtsyPublicAPI(`/shops?shop_name=${encodeURIComponent(shopId.trim())}`);
-            const results = searchRes.results || [];
-            if (results.length === 0) {
+        try {
+            // Try direct lookup — works for both numeric IDs and shop name slugs
+            data = await callEtsyPublicAPI(`/shops/${encodeURIComponent(trimmed)}`);
+        } catch (directErr: any) {
+            // If direct lookup fails and it's not numeric, try findShops API
+            if (/^\d+$/.test(trimmed)) throw directErr;
+            try {
+                const searchRes = await callEtsyPublicAPI(`/shops?shop_name=${encodeURIComponent(trimmed)}`);
+                const results = searchRes.results || [];
+                if (results.length === 0) {
+                    return res.status(404).json({ error: 'Shop not found' });
+                }
+                data = await callEtsyPublicAPI(`/shops/${results[0].shop_id}`);
+            } catch {
                 return res.status(404).json({ error: 'Shop not found' });
             }
-            // Get full shop details using the found shop_id
-            data = await callEtsyPublicAPI(`/shops/${results[0].shop_id}`);
         }
 
         return res.status(200).json({
@@ -460,10 +464,19 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         // Resolve shop name to numeric ID if needed
         let shopId = shopIdRaw.trim();
         if (!/^\d+$/.test(shopId)) {
-            const searchRes = await callEtsyPublicAPI(`/shops?shop_name=${encodeURIComponent(shopId)}`);
-            const results = searchRes.results || [];
-            if (results.length === 0) return res.status(404).json({ error: 'Shop not found' });
-            shopId = String(results[0].shop_id);
+            try {
+                const shopData = await callEtsyPublicAPI(`/shops/${encodeURIComponent(shopId)}`);
+                shopId = String(shopData.shop_id);
+            } catch {
+                try {
+                    const searchRes = await callEtsyPublicAPI(`/shops?shop_name=${encodeURIComponent(shopId)}`);
+                    const results = searchRes.results || [];
+                    if (results.length === 0) return res.status(404).json({ error: 'Shop not found' });
+                    shopId = String(results[0].shop_id);
+                } catch {
+                    return res.status(404).json({ error: 'Shop not found' });
+                }
+            }
         }
 
         const requestedLimit = Math.min(parseInt((req.query.limit as string) || '100'), 500);
@@ -857,10 +870,10 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         const avgRating = reviews.length > 0
             ? Math.round((reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length) * 10) / 10
             : 0;
-        const ratingDist = [5, 4, 3, 2, 1].map(r => ({
-            rating: r,
-            count: reviews.filter((rv: any) => rv.rating === r).length,
-        }));
+        const ratingDist: Record<number, number> = {};
+        [5, 4, 3, 2, 1].forEach(r => {
+            ratingDist[r] = reviews.filter((rv: any) => rv.rating === r).length;
+        });
 
         return res.status(200).json({
             total: data.count || reviews.length,

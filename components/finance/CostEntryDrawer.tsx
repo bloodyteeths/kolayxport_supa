@@ -34,7 +34,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
   const [selectedProduct, setSelectedProduct] = useState<SoldProduct | null>(null);
   const [newName, setNewName] = useState('');
   const [newCost, setNewCost] = useState('');
-  const [newCurrency, setNewCurrency] = useState('TRY');
+  const [newCurrency, setNewCurrency] = useState(marketplace === 'trendyol' ? 'TRY' : 'USD');
   const [newNotes, setNewNotes] = useState('');
 
   // Inline edit
@@ -209,7 +209,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
               <TextField
                 size="small" label={t('costRequired')} type="number" value={newCost}
                 onChange={e => setNewCost(e.target.value)}
-                InputProps={{ startAdornment: <InputAdornment position="start">₺</InputAdornment> }}
+                InputProps={{ startAdornment: <InputAdornment position="start">{marketplace === 'etsy' ? '$' : marketplace === 'ebay' ? '$' : '₺'}</InputAdornment> }}
               />
               <FormControl size="small">
                 <InputLabel>{t('currency')}</InputLabel>
@@ -286,7 +286,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
                               variant="body2" sx={{ fontSize: '0.75rem', cursor: 'pointer', '&:hover': { color: '#8b5cf6' } }}
                               onClick={() => { setEditingId(pc.id); setEditCost(String(pc.costAmount)); setEditShipping(String(pc.shippingCost || 0)); }}
                             >
-                              ₺{pc.costAmount}
+                              {marketplace === 'trendyol' ? '₺' : '$'}{pc.costAmount}
                             </Typography>
                           )}
                         </TableCell>
@@ -300,7 +300,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
                             />
                           ) : (
                             <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                              {pc.shippingCost ? `₺${pc.shippingCost}` : '—'}
+                              {pc.shippingCost ? `${marketplace === 'trendyol' ? '₺' : '$'}${pc.shippingCost}` : '—'}
                             </Typography>
                           )}
                         </TableCell>

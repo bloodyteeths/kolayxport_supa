@@ -595,6 +595,12 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
     });
   }
 
+  logger.info('Etsy sync phase 2 complete', {
+    receipts: allReceipts.length,
+    paymentsWithFees: paymentMap.size,
+    sampleFee: paymentMap.size > 0 ? Array.from(paymentMap.values())[0] : null,
+  });
+
   // ---- PHASE 3: Map receipts to FinancialTransaction records & upsert ----
   let totalUpserted = 0;
   const UPSERT_BATCH = 20;
@@ -619,16 +625,23 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
         }
       }
 
-      // Amount from grandtotal
+      // Amount from grandtotal (includes buyer-paid shipping)
       let amount = EtsyClient.etsyMoney(receipt.grandtotal || { amount: 0, divisor: 100 });
       if (isRefund) amount = -Math.abs(amount);
 
-      // Shipping cost
-      const shippingAmount = EtsyClient.etsyMoney(receipt.total_shipping_cost || { amount: 0, divisor: 100 });
+      // Etsy shipping is buyer-paid — NOT a seller expense. Don't store as shippingAmount.
+      // shippingAmount is for seller-paid shipping costs (deductions). Etsy doesn't charge shipping to sellers.
 
       // Fees from payment map
       const paymentInfo = paymentMap.get(receiptId);
-      const commission = paymentInfo ? Math.abs(paymentInfo.amount_fees) : null;
+      // Etsy fees = listing fee + transaction fee (6.5%) + payment processing (3%+$0.25) + offsite ads (if applicable)
+      let commission: number | null = null;
+      if (paymentInfo && paymentInfo.amount_fees !== 0) {
+        commission = Math.abs(paymentInfo.amount_fees);
+      } else if (!isRefund && amount > 0) {
+        // Fallback: estimate Etsy fees (~13% total: 6.5% transaction + 3%+$0.25 processing + ~1.5% regulatory + listing)
+        commission = Math.round((amount * 0.13 + 0.20) * 100) / 100;
+      }
 
       // Currency
       const currency = receipt.grandtotal?.currency_code || 'USD';
@@ -638,10 +651,15 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
         ? new Date(receipt.create_timestamp * 1000)
         : new Date();
 
+      // Use first listing_id as barcode for product P&L breakdown
+      const barcode = Array.isArray(receipt.transactions) && receipt.transactions.length > 0
+        ? String(receipt.transactions[0].listing_id || '')
+        : null;
+
       const txData = {
         transactionType,
         orderNumber: receiptId,
-        barcode: null,
+        barcode: barcode || null,
         productName,
         quantity: Array.isArray(receipt.transactions)
           ? receipt.transactions.reduce((sum: number, t: any) => sum + (t.quantity || 1), 0)
@@ -649,7 +667,7 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
         amount,
         currency,
         commission,
-        shippingAmount: shippingAmount || null,
+        shippingAmount: null as number | null, // Etsy shipping is buyer-paid, not a seller expense
         transactionDate,
         rawData: receipt,
       };

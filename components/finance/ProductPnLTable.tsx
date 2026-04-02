@@ -11,8 +11,14 @@ import useFinanceStore, { ProductBreakdown } from '@/lib/stores/useFinanceStore'
 type SortKey = keyof ProductBreakdown;
 type SortDir = 'asc' | 'desc';
 
-function formatTRY(val: number): string {
-  return `₺${(val ?? 0).toFixed(2)}`;
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  trendyol: '₺',
+  etsy: '$',
+  ebay: '$',
+};
+
+function formatMoney(val: number, symbol = '₺'): string {
+  return `${symbol}${(val ?? 0).toFixed(2)}`;
 }
 
 function marginColor(margin: number): string {
@@ -34,8 +40,10 @@ function getMargin(p: ProductBreakdown): number {
 export default function ProductPnLTable({ products }: { products: ProductBreakdown[] }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { updateProductCost } = useFinanceStore();
+  const { updateProductCost, marketplace } = useFinanceStore();
   const t = useTranslations('financials');
+  const cs = CURRENCY_SYMBOLS[marketplace] || '$';
+  const fmt = (val: number) => formatMoney(val, cs);
 
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('revenue');
@@ -127,7 +135,7 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant="body2" sx={{ fontWeight: 700, color: p.netProfit >= 0 ? '#15803d' : '#dc2626' }}>
-                  {formatTRY(p.netProfit)}
+                  {fmt(p.netProfit)}
                 </Typography>
                 <Chip
                   label={`%${getMargin(p).toFixed(0)}`}
@@ -139,10 +147,10 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
             </Box>
             <Collapse in={expandedRow === p.barcode}>
               <Box sx={{ px: 1.5, pb: 1.5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.5 }}>
-                <Box><Typography variant="caption" color="text.secondary">{t('revenue')}</Typography><Typography variant="body2" fontWeight={600}>{formatTRY(p.revenue)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">{t('commission')}</Typography><Typography variant="body2" fontWeight={600} color="warning.main">{formatTRY(p.commissions)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">{t('shipping')}</Typography><Typography variant="body2" fontWeight={600} color="info.main">{formatTRY(p.shipping)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">{t('cost')}</Typography><Typography variant="body2" fontWeight={600} color="secondary.main">{formatTRY(p.cogs)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">{t('revenue')}</Typography><Typography variant="body2" fontWeight={600}>{fmt(p.revenue)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">{t('commission')}</Typography><Typography variant="body2" fontWeight={600} color="warning.main">{fmt(p.commissions)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">{t('shipping')}</Typography><Typography variant="body2" fontWeight={600} color="info.main">{fmt(p.shipping)}</Typography></Box>
+                <Box><Typography variant="caption" color="text.secondary">{t('cost')}</Typography><Typography variant="body2" fontWeight={600} color="secondary.main">{fmt(p.cogs)}</Typography></Box>
               </Box>
             </Collapse>
           </Paper>
@@ -206,9 +214,9 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                   </Typography>
                 </TableCell>
                 <TableCell align="right"><Typography variant="body2" fontSize="0.8rem">{p.quantity}</Typography></TableCell>
-                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" fontWeight={600}>{formatTRY(p.revenue)}</Typography></TableCell>
-                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" color="warning.main">{formatTRY(p.commissions)}</Typography></TableCell>
-                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" color="info.main">{formatTRY(p.shipping)}</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" fontWeight={600}>{fmt(p.revenue)}</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" color="warning.main">{fmt(p.commissions)}</Typography></TableCell>
+                <TableCell align="right"><Typography variant="body2" fontSize="0.8rem" color="info.main">{fmt(p.shipping)}</Typography></TableCell>
                 <TableCell align="right">
                   {editingCost === p.barcode ? (
                     <TextField
@@ -218,7 +226,7 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                       onBlur={() => handleCostSave(p.barcode || '')}
                       onKeyDown={e => e.key === 'Enter' && handleCostSave(p.barcode || '')}
                       sx={{ width: 80, '& input': { fontSize: '0.8rem', textAlign: 'right' } }}
-                      InputProps={{ startAdornment: <InputAdornment position="start" sx={{ '& p': { fontSize: '0.75rem' } }}>₺</InputAdornment> }}
+                      InputProps={{ startAdornment: <InputAdornment position="start" sx={{ '& p': { fontSize: '0.75rem' } }}>{cs}</InputAdornment> }}
                     />
                   ) : (
                     <Typography
@@ -226,13 +234,13 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                       sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
                       onClick={() => { setEditingCost(p.barcode); setCostValue(String(p.cogs || 0)); }}
                     >
-                      {p.cogs > 0 ? formatTRY(p.cogs) : '—'}
+                      {p.cogs > 0 ? fmt(p.cogs) : '—'}
                     </Typography>
                   )}
                 </TableCell>
                 <TableCell align="right">
                   <Typography variant="body2" fontSize="0.8rem" fontWeight={700} sx={{ color: p.netProfit >= 0 ? '#15803d' : '#dc2626' }}>
-                    {formatTRY(p.netProfit)}
+                    {fmt(p.netProfit)}
                   </Typography>
                 </TableCell>
                 <TableCell align="right">

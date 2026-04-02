@@ -41,6 +41,12 @@ const CARDS: CardDef[] = [
   { key: 'netProfit', tKey: 'netProfit', icon: <TrendingUp size={20} />, color: '#10b981', gradient: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', format: 'currency', invertColor: true },
 ];
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  trendyol: '₺',
+  etsy: '$',
+  ebay: '$',
+};
+
 function formatCurrency(val: number, currency = '₺'): string {
   const abs = Math.abs(val);
   const formatted = abs >= 1000
@@ -49,8 +55,9 @@ function formatCurrency(val: number, currency = '₺'): string {
   return `${val < 0 ? '-' : ''}${currency}${formatted}`;
 }
 
-function SummaryCards({ summary }: { summary: DashboardSummary }) {
+function SummaryCards({ summary, marketplace }: { summary: DashboardSummary; marketplace: string }) {
   const t = useTranslations('financials');
+  const currencySymbol = CURRENCY_SYMBOLS[marketplace] || '$';
   return (
     <Grid container spacing={1.5} sx={{ mb: 2 }}>
       {CARDS.map(card => {
@@ -70,7 +77,7 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
                 <Box sx={{ color: cardColor }}>{card.icon}</Box>
               </Box>
               <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '1.1rem', color: cardColor }}>
-                {formatCurrency(value)}
+                {formatCurrency(value, currencySymbol)}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                 {t(card.tKey)}
@@ -122,9 +129,10 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
 
 // ---- Charts ----
 
-function ProfitCharts({ data }: { data: DashboardData }) {
+function ProfitCharts({ data, marketplace }: { data: DashboardData; marketplace: string }) {
   const t = useTranslations('financials');
   const { timeSeries, summary, transactionTypeSummary } = data;
+  const cs = CURRENCY_SYMBOLS[marketplace] || '$';
 
   const barOptions: ApexCharts.ApexOptions = {
     chart: { type: 'bar', height: 300, toolbar: { show: false }, fontFamily: 'Inter, sans-serif', stacked: true },
@@ -132,9 +140,9 @@ function ProfitCharts({ data }: { data: DashboardData }) {
     plotOptions: { bar: { borderRadius: 4, columnWidth: '60%' } },
     dataLabels: { enabled: false },
     xaxis: { categories: timeSeries.map(p => p.period), labels: { style: { fontSize: '10px' }, rotate: -45 } },
-    yaxis: { labels: { formatter: (v: number) => `₺${Math.round(v)}` } },
+    yaxis: { labels: { formatter: (v: number) => `${cs}${Math.round(v)}` } },
     legend: { position: 'top' },
-    tooltip: { y: { formatter: (v: number) => `₺${v.toFixed(2)}` } },
+    tooltip: { y: { formatter: (v: number) => `${cs}${v.toFixed(2)}` } },
     grid: { borderColor: '#f1f5f9' },
   };
 
@@ -155,7 +163,7 @@ function ProfitCharts({ data }: { data: DashboardData }) {
     colors: ['#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899'],
     legend: { position: 'bottom', fontSize: '12px' },
     dataLabels: { enabled: true, formatter: (val: number) => `%${val.toFixed(0)}` },
-    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: t('totalExpense'), formatter: () => formatCurrency(Math.abs(summary.commissions + summary.shipping + summary.returns + summary.discounts)) } } } } },
+    plotOptions: { pie: { donut: { size: '60%', labels: { show: true, total: { show: true, label: t('totalExpense'), formatter: () => formatCurrency(Math.abs(summary.commissions + summary.shipping + summary.returns + summary.discounts), cs) } } } } },
   };
 
   return (
@@ -249,10 +257,10 @@ export default function FinancialDashboard() {
   return (
     <Box>
       {/* Summary Cards */}
-      <SummaryCards summary={summary} />
+      <SummaryCards summary={summary} marketplace={marketplace} />
 
       {/* Charts */}
-      <ProfitCharts data={dashboardData} />
+      <ProfitCharts data={dashboardData} marketplace={marketplace} />
 
       {/* Product P&L Section */}
       <Paper sx={{ borderRadius: '12px', overflow: 'hidden', mb: 2 }}>

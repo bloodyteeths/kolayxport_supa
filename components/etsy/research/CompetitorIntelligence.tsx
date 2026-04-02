@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Box, Typography, Paper, Chip, Alert, Divider, Button, TextField,
-  CircularProgress, LinearProgress, Tooltip, Pagination,
+  CircularProgress, LinearProgress, Tooltip, Pagination, Drawer,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
   IconButton, useMediaQuery, Collapse, Skeleton, Card, CardContent,
 } from '@mui/material';
@@ -82,6 +82,11 @@ export default function CompetitorIntelligence() {
   const [expandedShopIdx, setExpandedShopIdx] = useState<number | null>(null);
   const [expandedListingIdx, setExpandedListingIdx] = useState<number | null>(null);
   const deepDiveRef = useRef<HTMLDivElement>(null);
+  const [drawerListingId, setDrawerListingId] = useState<number | null>(null);
+  const [drawerData, setDrawerData] = useState<any>(null);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [drawerAudit, setDrawerAudit] = useState<any>(null);
+  const [drawerAuditLoading, setDrawerAuditLoading] = useState(false);
   // ---------------------------------------------------------------------------
   // Store
   // ---------------------------------------------------------------------------
@@ -191,6 +196,50 @@ export default function CompetitorIntelligence() {
       deepDiveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 200);
   }, [analyzeShop]);
+
+  // Open listing detail drawer
+  const openListingDrawer = useCallback(async (listingId: number) => {
+    setDrawerListingId(listingId);
+    setDrawerData(null);
+    setDrawerAudit(null);
+    setDrawerLoading(true);
+    try {
+      const res = await fetch(`/api/clawd/etsy?action=analyze_listing_url&listing_id=${listingId}`);
+      if (!res.ok) throw new Error('Failed to load listing');
+      const data = await res.json();
+      setDrawerData(data);
+    } catch (err: any) { toast.error(err.message); }
+    finally { setDrawerLoading(false); }
+  }, []);
+
+  // AI strategy analysis for drawer listing
+  const analyzeDrawerStrategy = useCallback(async () => {
+    if (!drawerData) return;
+    setDrawerAuditLoading(true);
+    try {
+      const res = await fetch('/api/ai/etsy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'listing_audit',
+          title: drawerData.title,
+          description: drawerData.description || '',
+          tags: drawerData.tags,
+          price: drawerData.price,
+          favorites: drawerData.num_favorers,
+          views: drawerData.views,
+          imageCount: drawerData.imageCount,
+          seoScore: drawerData.seoScore?.total,
+          marketAvgPrice: deepDiveStats?.priceAvg || null,
+          marketAvgFavorites: deepDiveStats?.avgFav || null,
+        }),
+      });
+      if (!res.ok) throw new Error('AI analysis failed');
+      const data = await res.json();
+      setDrawerAudit(data.report);
+    } catch (err: any) { toast.error(err.message); }
+    finally { setDrawerAuditLoading(false); }
+  }, [drawerData, deepDiveStats]);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -601,8 +650,12 @@ export default function CompetitorIntelligence() {
                             <Typography variant="caption" color="text.secondary">{t('viewsLabel')}: {l.views.toLocaleString()}</Typography>
                             <Typography variant="caption" color="text.secondary">{listingAgeLabel(l.created_timestamp)}</Typography>
                           </Box>
-                          <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); window.open(l.url, '_blank'); }}
-                            startIcon={<ExternalLink size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Etsy</Button>
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
+                            <Button size="small" variant="contained" onClick={(e) => { e.stopPropagation(); openListingDrawer(l.listing_id); }}
+                              startIcon={<Search size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem', background: GRADIENTS.primary }}>{t('analyze')}</Button>
+                            <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); window.open(l.url, '_blank'); }}
+                              startIcon={<ExternalLink size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Etsy</Button>
+                          </Box>
                         </Box>
                       </Collapse>
                     </Paper>
@@ -647,7 +700,8 @@ export default function CompetitorIntelligence() {
                   {pagedListings.map((l, i) => {
                     const globalIdx = (listingPage - 1) * LISTINGS_PER_PAGE + i;
                     return (
-                      <TableRow key={l.listing_id} hover sx={{
+                      <TableRow key={l.listing_id} hover onClick={() => openListingDrawer(l.listing_id)} sx={{
+                        cursor: 'pointer',
                         '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
                         borderLeft: globalIdx < 3 ? '3px solid #667eea' : 'none',
                       }}>
@@ -989,6 +1043,222 @@ export default function CompetitorIntelligence() {
           </>
         )}
       </Box>
+
+      {/* ================================================================ */}
+      {/* LISTING DETAIL DRAWER                                             */}
+      {/* ================================================================ */}
+      <Drawer
+        anchor={isMobile ? 'bottom' : 'right'}
+        open={drawerListingId !== null}
+        onClose={() => { setDrawerListingId(null); setDrawerData(null); setDrawerAudit(null); }}
+        PaperProps={{ sx: {
+          width: isMobile ? '100%' : 520,
+          maxHeight: isMobile ? '90vh' : '100vh',
+          borderRadius: isMobile ? '16px 16px 0 0' : 0,
+        }}}
+      >
+        <Box sx={{ p: 2.5, overflowY: 'auto' }}>
+          {/* Header */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{t('listingDetails')}</Typography>
+            <IconButton size="small" onClick={() => { setDrawerListingId(null); setDrawerData(null); setDrawerAudit(null); }}>
+              <Typography sx={{ fontSize: 18, lineHeight: 1 }}>✕</Typography>
+            </IconButton>
+          </Box>
+
+          {drawerLoading && (
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <CircularProgress size={32} />
+            </Box>
+          )}
+
+          {drawerData && (
+            <>
+              {/* Title + actions */}
+              <Typography variant="body1" sx={{ fontWeight: 700, mb: 1, lineHeight: 1.4 }}>
+                {drawerData.title}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.5, mb: 2, flexWrap: 'wrap' }}>
+                <Button size="small" variant="outlined" startIcon={<Copy size={12} />}
+                  onClick={() => { navigator.clipboard.writeText(drawerData.title); toast.success(t('copied')); }}
+                  sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('copyTitle')}</Button>
+                <Button size="small" variant="outlined" startIcon={<ExternalLink size={12} />}
+                  onClick={() => window.open(drawerData.url, '_blank')}
+                  sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('viewOnEtsy')}</Button>
+              </Box>
+
+              {/* Stats grid */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1, mb: 2 }}>
+                <StatCard label={t('priceCol')} value={fmt(drawerData.price)} color="#2196F3" icon={<DollarSign size={14} />} />
+                <StatCard label={t('favoriteCol')} value={drawerData.num_favorers?.toLocaleString()} color="#e91e63" icon={<Heart size={14} />} />
+                <StatCard label={t('viewsCol')} value={drawerData.views?.toLocaleString()} color="#ff9800" icon={<Eye size={14} />} />
+              </Box>
+
+              {/* SEO Score breakdown */}
+              {drawerData.seoScore && (
+                <Paper sx={{ ...glassCard, p: 2, mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('seoScoreLabel')}</Typography>
+                    <Chip label={`${drawerData.seoScore.total}/100`} size="small"
+                      sx={{
+                        fontWeight: 700,
+                        bgcolor: drawerData.seoScore.total >= 70 ? 'rgba(76,175,80,0.1)' : drawerData.seoScore.total >= 40 ? 'rgba(255,152,0,0.1)' : 'rgba(244,67,54,0.1)',
+                        color: drawerData.seoScore.total >= 70 ? '#4caf50' : drawerData.seoScore.total >= 40 ? '#ff9800' : '#f44336',
+                      }}
+                    />
+                  </Box>
+                  {[
+                    { label: t('titleScoreLabel'), score: drawerData.seoScore.title, max: 25 },
+                    { label: t('tagScoreLabel'), score: drawerData.seoScore.tags, max: 25 },
+                    { label: t('descScoreLabel'), score: drawerData.seoScore.description, max: 25 },
+                    { label: t('imageScoreLabel'), score: drawerData.seoScore.images, max: 25 },
+                  ].map(item => (
+                    <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      <Typography variant="caption" sx={{ minWidth: 80 }}>{item.label}</Typography>
+                      <Box sx={{ flex: 1, bgcolor: '#f0f0f0', borderRadius: 3, height: 6, overflow: 'hidden' }}>
+                        <Box sx={{
+                          width: `${(item.score / item.max) * 100}%`, height: 6, borderRadius: 3,
+                          bgcolor: item.score >= item.max * 0.8 ? '#4caf50' : item.score >= item.max * 0.5 ? '#ff9800' : '#f44336',
+                        }} />
+                      </Box>
+                      <Typography variant="caption" sx={{ minWidth: 30, textAlign: 'right', fontWeight: 600 }}>{item.score}/{item.max}</Typography>
+                    </Box>
+                  ))}
+                </Paper>
+              )}
+
+              {/* Velocity */}
+              {drawerData.velocity && (
+                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, mb: 2 }}>
+                  <StatCard label={t('favRate')} value={String(drawerData.velocity.favRate)} color="#e91e63" />
+                  <StatCard label={t('estSalesMonth')} value={String(drawerData.velocity.estMonthlySales)} color="#4caf50" />
+                  <StatCard label={t('listingAgeMonths')} value={`${drawerData.ageMonths}m`} color="#9e9e9e" icon={<Clock size={14} />} />
+                </Box>
+              )}
+
+              {/* Tags */}
+              {drawerData.tags?.length > 0 && (
+                <Paper sx={{ ...glassCard, p: 2, mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      {t('topUsedTags')} ({drawerData.tags.length})
+                    </Typography>
+                    <Button size="small" variant="outlined" startIcon={<Copy size={12} />}
+                      onClick={() => { navigator.clipboard.writeText(drawerData.tags.join(', ')); toast.success(t('tagsCopied')); }}
+                      sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('copyTags')}</Button>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    {drawerData.tags.map((tag: string) => (
+                      <Chip key={tag} label={tag} size="small" variant="outlined"
+                        onClick={() => { navigator.clipboard.writeText(tag); toast.success(t('copied')); }}
+                        sx={{ cursor: 'pointer', borderRadius: '8px', fontSize: '0.72rem' }}
+                      />
+                    ))}
+                  </Box>
+                </Paper>
+              )}
+
+              {/* Description */}
+              <Paper sx={{ ...glassCard, p: 2, mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('description')}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem', whiteSpace: 'pre-wrap' }}>
+                  {drawerData.description || t('noDescription')}
+                </Typography>
+              </Paper>
+
+              {/* AI Strategy Analysis */}
+              <Divider sx={{ my: 2 }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Zap size={16} color="#ff9800" /> {t('aiStrategyAnalysis')}
+                </Typography>
+                <Button size="small" variant="contained" onClick={analyzeDrawerStrategy}
+                  disabled={drawerAuditLoading}
+                  startIcon={drawerAuditLoading ? <CircularProgress size={14} /> : <Sparkles size={14} />}
+                  sx={{ background: GRADIENTS.primary, borderRadius: '10px' }}>
+                  {t('analyzeStrategy')}
+                </Button>
+              </Box>
+
+              {drawerAuditLoading && (
+                <Box sx={{ mb: 2 }}>
+                  <LinearProgress sx={{ mb: 0.5, borderRadius: 4, height: 3 }} />
+                  <Typography variant="caption" color="text.secondary">{t('strategyLoading')}</Typography>
+                </Box>
+              )}
+
+              {drawerAudit && (
+                <Box>
+                  {drawerAudit.overall_assessment && (
+                    <Alert severity="info" sx={{ mb: 2, borderRadius: '12px' }}>
+                      <Typography variant="body2">{drawerAudit.overall_assessment}</Typography>
+                    </Alert>
+                  )}
+
+                  {drawerAudit.title_analysis && (
+                    <Paper sx={{ ...glassCard, p: 1.5, mb: 1.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#2196F3', mb: 0.5, display: 'block' }}>
+                        {t('titleScoreLabel')}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{drawerAudit.title_analysis}</Typography>
+                    </Paper>
+                  )}
+
+                  {drawerAudit.tag_analysis && (
+                    <Paper sx={{ ...glassCard, p: 1.5, mb: 1.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#9c27b0', mb: 0.5, display: 'block' }}>
+                        {t('tagScoreLabel')}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{drawerAudit.tag_analysis}</Typography>
+                    </Paper>
+                  )}
+
+                  {drawerAudit.pricing_analysis && (
+                    <Paper sx={{ ...glassCard, p: 1.5, mb: 1.5 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#11998e', mb: 0.5, display: 'block' }}>
+                        {t('pricingStrategy')}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{drawerAudit.pricing_analysis}</Typography>
+                    </Paper>
+                  )}
+
+                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 1.5 }}>
+                    {drawerAudit.strengths?.length > 0 && (
+                      <Paper sx={{ ...glassCard, p: 1.5 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#4caf50', display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                          <ThumbsUp size={12} /> {t('strengths')}
+                        </Typography>
+                        {drawerAudit.strengths.map((s: string, i: number) => (
+                          <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {s}</Typography>
+                        ))}
+                      </Paper>
+                    )}
+                    {drawerAudit.weaknesses?.length > 0 && (
+                      <Paper sx={{ ...glassCard, p: 1.5 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#f44336', display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                          <ThumbsDown size={12} /> {t('weaknesses')}
+                        </Typography>
+                        {drawerAudit.weaknesses.map((s: string, i: number) => (
+                          <Typography key={i} variant="body2" sx={{ fontSize: '0.78rem', mb: 0.3 }}>• {s}</Typography>
+                        ))}
+                      </Paper>
+                    )}
+                  </Box>
+
+                  {drawerAudit.recommendations?.length > 0 && (
+                    <Alert severity="success" sx={{ borderRadius: '12px' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('whatToLearn')}</Typography>
+                      {drawerAudit.recommendations.map((r: string, i: number) => (
+                        <Typography key={i} variant="body2" sx={{ fontSize: '0.8rem' }}>• {r}</Typography>
+                      ))}
+                    </Alert>
+                  )}
+                </Box>
+              )}
+            </>
+          )}
+        </Box>
+      </Drawer>
     </Box>
   );
 }

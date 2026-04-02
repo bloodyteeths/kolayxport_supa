@@ -344,6 +344,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Invalid date format. Use epoch ms or ISO string.' });
     }
 
+    // Debug mode: show raw transaction type distribution
+    if (req.query.debug === 'true') {
+      const txTypes = await prisma.financialTransaction.groupBy({
+        by: ['transactionType'],
+        where: {
+          userId,
+          marketplace,
+          transactionDate: { gte: startDate, lte: endDate },
+        },
+        _count: true,
+        _sum: { amount: true },
+      });
+      return res.status(200).json({
+        debug: true,
+        dateRange: { start: startDate.toISOString(), end: endDate.toISOString() },
+        transactionTypes: txTypes.map(t => ({
+          type: t.transactionType,
+          count: t._count,
+          totalAmount: t._sum.amount ? Number(t._sum.amount) : 0,
+          classifiedAs: classifyTransactionType(t.transactionType),
+        })),
+      });
+    }
+
     const dashboard = await buildDashboard(userId, marketplace, startDate, endDate, groupBy);
 
     return res.status(200).json({

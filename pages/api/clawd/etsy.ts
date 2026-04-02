@@ -447,8 +447,8 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
 
         for (let page = 0; page < pages; page++) {
             const data = page === 0
-                ? await callEtsyPublicAPI(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}`)
-                : await rateLimitedPublicCall(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}`);
+                ? await callEtsyPublicAPI(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}&includes=images`)
+                : await rateLimitedPublicCall(`/shops/${shopId}/listings/active?limit=100&offset=${page * 100}&includes=images`);
 
             const results = data.results || [];
             allListings.push(...results.map((l: any) => ({
@@ -462,6 +462,7 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
                 quantity: l.quantity || 0,
                 url: l.url || '',
                 created_timestamp: l.created_timestamp || 0,
+                image_url: l.images?.[0]?.url_170x135 || '',
             })));
 
             if (results.length < 100) break;

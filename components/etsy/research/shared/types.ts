@@ -29,7 +29,8 @@ export interface KeywordData { keyword: string; count: number; pct: number; inMy
 export interface ShopData {
   shop_id: number; shop_name: string; num_sales: number;
   review_count: number; review_average: number; listing_active_count: number;
-  url: string; icon_url: string; avgPrice?: number; listingCount?: number;
+  url: string; icon_url: string; icon_url_fullxfull?: string;
+  created_timestamp?: number; avgPrice?: number; listingCount?: number;
 }
 
 export interface SavedSearch {

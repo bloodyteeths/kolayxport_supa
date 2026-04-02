@@ -135,6 +135,7 @@ interface EtsyResearchState {
   fetchNicheAiReport: () => Promise<void>;
   fetchListingAnalysis: (listingId: string) => Promise<void>;
   fetchListingAudit: () => Promise<void>;
+  analyzeShop: (shopId: string) => Promise<void>;
   fetchShopSpyReport: () => Promise<void>;
   fetchShopReviews: () => Promise<void>;
   fetchReviewSentiment: () => Promise<void>;
@@ -381,6 +382,23 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
       toast.success('AI niş raporu hazır');
     } catch (err: any) { toast.error(err.message); }
     finally { set({ nicheAiReportLoading: false }); }
+  },
+
+  analyzeShop: async (shopId: string) => {
+    set({ deepDiveShopId: shopId });
+    // Run deep dive, then auto-chain reviews + AI report
+    await get().searchShopDeepDive();
+    const { deepDiveShop, deepDiveListings } = get();
+    if (deepDiveShop) {
+      // Parallel: fetch reviews + AI report
+      const reviewsPromise = get().fetchShopReviews();
+      const spyPromise = deepDiveListings.length > 0 ? get().fetchShopSpyReport() : Promise.resolve();
+      await Promise.all([reviewsPromise, spyPromise]);
+      // After reviews load, auto-run sentiment
+      if (get().shopReviews?.reviews?.length > 0) {
+        get().fetchReviewSentiment();
+      }
+    }
   },
 
   fetchShopSpyReport: async () => {

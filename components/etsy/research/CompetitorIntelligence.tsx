@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Box, Typography, Paper, Chip, Alert, Divider, Button, TextField,
-  CircularProgress, LinearProgress,
+  CircularProgress, LinearProgress, Tooltip, Pagination,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel,
   IconButton, useMediaQuery, Collapse, Skeleton, Card, CardContent,
 } from '@mui/material';
@@ -9,7 +9,8 @@ import { useTheme } from '@mui/material/styles';
 import {
   Store, Star, Users, ExternalLink, Search, ShoppingCart,
   Eye, Heart, ShoppingBag, Sparkles, DollarSign, Target, Calendar,
-  Zap, MessageSquare, ThumbsUp, ThumbsDown, Flame,
+  Zap, MessageSquare, ThumbsUp, ThumbsDown, Flame, Copy, Clock,
+  TrendingUp, BarChart3, Link,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -19,22 +20,77 @@ import { StatCard, ScoreRing, GradientBar, PremiumEmptyState, GRADIENTS, glassCa
 import { fmt, pct, sortArray } from './shared/utils';
 import type { SortDir } from './shared/types';
 
+const LISTINGS_PER_PAGE = 25;
+
+function shopAge(createdTimestamp: number): string {
+  if (!createdTimestamp) return '-';
+  const created = new Date(createdTimestamp * 1000);
+  const now = new Date();
+  const months = (now.getFullYear() - created.getFullYear()) * 12 + (now.getMonth() - created.getMonth());
+  if (months >= 12) {
+    const years = Math.floor(months / 12);
+    const rem = months % 12;
+    return rem > 0 ? `${years}y ${rem}m` : `${years}y`;
+  }
+  return `${months}m`;
+}
+
+function estimateMonthlySales(listing: any): number {
+  if (!listing.created_timestamp) return 0;
+  const ageMonths = Math.max(1, (Date.now() / 1000 - listing.created_timestamp) / (30 * 86400));
+  return Math.round((listing.num_favorers / ageMonths) * 0.03 * 10) / 10;
+}
+
+function listingAgeLabel(ts: number): string {
+  if (!ts) return '-';
+  const days = Math.floor((Date.now() / 1000 - ts) / 86400);
+  if (days < 30) return `${days}d`;
+  if (days < 365) return `${Math.floor(days / 30)}m`;
+  return `${Math.floor(days / 365)}y ${Math.floor((days % 365) / 30)}m`;
+}
+
+function buildPriceBuckets(listings: any[]): { range: string; count: number; revenue: number; min: number; max: number }[] {
+  const prices = listings.map(l => l.price).filter(p => p > 0).sort((a, b) => a - b);
+  if (prices.length === 0) return [];
+  const minP = prices[0];
+  const maxP = prices[prices.length - 1];
+  const span = maxP - minP;
+  if (span === 0) return [{ range: `$${minP.toFixed(0)}`, count: prices.length, revenue: prices.reduce((s, p) => s + p, 0), min: minP, max: maxP }];
+  const bucketSize = Math.max(1, Math.ceil(span / 6));
+  const buckets: { range: string; count: number; revenue: number; min: number; max: number }[] = [];
+  for (let start = Math.floor(minP); start < maxP; start += bucketSize) {
+    const end = start + bucketSize;
+    const inBucket = listings.filter(l => l.price >= start && l.price < end);
+    if (inBucket.length > 0) {
+      buckets.push({
+        range: `$${start}-$${end}`,
+        count: inBucket.length,
+        revenue: inBucket.reduce((s, l) => s + l.price, 0),
+        min: start, max: end,
+      });
+    }
+  }
+  return buckets;
+}
+
 export default function CompetitorIntelligence() {
   const t = useTranslations('etsy.competitor');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [expandedShopIdx, setExpandedShopIdx] = useState<number | null>(null);
   const [expandedListingIdx, setExpandedListingIdx] = useState<number | null>(null);
+  const deepDiveRef = useRef<HTMLDivElement>(null);
   // ---------------------------------------------------------------------------
   // Store
   // ---------------------------------------------------------------------------
   const {
     shopsLoading, shopDiscoveryFailed, serverShopIds,
-    deepDiveShopId, deepDiveShop, deepDiveLoading,
+    deepDiveShopId, deepDiveShop, deepDiveLoading, deepDiveListings,
     aiAnalysis, aiLoading, items, discoveredShops,
     discoverShops, setDeepDiveShopId, searchShopDeepDive, generateAiInsights,
   } = useEtsyResearchStore();
 
+  const analyzeShop = useEtsyResearchStore(s => s.analyzeShop);
   const shopSpyReport = useEtsyResearchStore(s => s.shopSpyReport);
   const shopSpyReportLoading = useEtsyResearchStore(s => s.shopSpyReportLoading);
   const shopReviews = useEtsyResearchStore(s => s.shopReviews);
@@ -61,6 +117,7 @@ export default function CompetitorIntelligence() {
   const [shopSortDir, setShopSortDir] = useState<SortDir>('desc');
   const [bestListingSortKey, setBestListingSortKey] = useState('num_favorers');
   const [bestListingSortDir, setBestListingSortDir] = useState<SortDir>('desc');
+  const [listingPage, setListingPage] = useState(1);
 
   const toggleSort = useCallback((key: string, currentKey: string, currentDir: SortDir, setKey: (k: string) => void, setDir: (d: SortDir) => void) => {
     if (currentKey === key) setDir(currentDir === 'asc' ? 'desc' : 'asc');
@@ -72,10 +129,66 @@ export default function CompetitorIntelligence() {
     [shopStats, shopSortKey, shopSortDir],
   );
 
-  const sortedBestListings = useMemo(
-    () => deepDiveStats ? sortArray(deepDiveStats.bestListings, bestListingSortKey, bestListingSortDir) : [],
-    [deepDiveStats, bestListingSortKey, bestListingSortDir],
+  // All listings (not top 10), sorted + paginated
+  const allListingsSorted = useMemo(() => {
+    if (!deepDiveListings || deepDiveListings.length === 0) return [];
+    const withEstSales = deepDiveListings.map(l => ({ ...l, estMonthlySales: estimateMonthlySales(l) }));
+    return sortArray(withEstSales, bestListingSortKey, bestListingSortDir);
+  }, [deepDiveListings, bestListingSortKey, bestListingSortDir]);
+
+  const totalListingPages = Math.ceil(allListingsSorted.length / LISTINGS_PER_PAGE);
+  const pagedListings = useMemo(
+    () => allListingsSorted.slice((listingPage - 1) * LISTINGS_PER_PAGE, listingPage * LISTINGS_PER_PAGE),
+    [allListingsSorted, listingPage],
   );
+
+  // Reset page when listings change
+  useEffect(() => { setListingPage(1); }, [deepDiveListings]);
+
+  // Tag cloud data (all tags, not just 20)
+  const allTags = useMemo(() => {
+    if (!deepDiveListings || deepDiveListings.length === 0) return [];
+    const tagMap: Record<string, { count: number; totalFav: number }> = {};
+    deepDiveListings.forEach(l => {
+      (l.tags || []).forEach((t: string) => {
+        const key = t.toLowerCase();
+        if (!tagMap[key]) tagMap[key] = { count: 0, totalFav: 0 };
+        tagMap[key].count++;
+        tagMap[key].totalFav += l.num_favorers || 0;
+      });
+    });
+    return Object.entries(tagMap)
+      .sort(([, a], [, b]) => b.count - a.count)
+      .map(([tag, data]) => ({
+        tag,
+        count: data.count,
+        pct: Math.round((data.count / deepDiveListings.length) * 100),
+        avgFav: Math.round(data.totalFav / data.count),
+      }));
+  }, [deepDiveListings]);
+
+  // Price distribution buckets
+  const priceBuckets = useMemo(() => buildPriceBuckets(deepDiveListings || []), [deepDiveListings]);
+
+  // Estimated monthly revenue
+  const estMonthlyRevenue = useMemo(() => {
+    if (!deepDiveListings || deepDiveListings.length === 0 || !deepDiveShop) return 0;
+    const totalEstSales = allListingsSorted.reduce((s, l) => s + (l.estMonthlySales || 0), 0);
+    const avgPrice = deepDiveListings.reduce((s, l) => s + l.price, 0) / deepDiveListings.length;
+    return Math.round(totalEstSales * avgPrice);
+  }, [deepDiveListings, deepDiveShop, allListingsSorted]);
+
+  const estMonthlySales = useMemo(() => {
+    return Math.round(allListingsSorted.reduce((s, l) => s + (l.estMonthlySales || 0), 0));
+  }, [allListingsSorted]);
+
+  // Handle analyze with scroll
+  const handleAnalyzeShop = useCallback(async (shopId: string) => {
+    analyzeShop(shopId);
+    setTimeout(() => {
+      deepDiveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+  }, [analyzeShop]);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -140,7 +253,7 @@ export default function CompetitorIntelligence() {
                           <Typography variant="caption" color="text.secondary">{t('products')}: {s.listing_active_count}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); setDeepDiveShopId(String(s.shop_id)); }}
+                          <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); handleAnalyzeShop(String(s.shop_id)); }}
                             sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>{t('analyze')}</Button>
                           <IconButton size="small" onClick={(e) => { e.stopPropagation(); window.open(s.url, '_blank'); }}>
                             <ExternalLink size={14} />
@@ -183,7 +296,7 @@ export default function CompetitorIntelligence() {
                         <Typography variant="body2" sx={{
                           fontWeight: 600, cursor: 'pointer',
                           '&:hover': { textDecoration: 'underline', color: 'primary.main' },
-                        }} onClick={() => { setDeepDiveShopId(String(s.shop_id)); }}>
+                        }} onClick={() => handleAnalyzeShop(String(s.shop_id))}>
                           {s.shop_name}
                         </Typography>
                       </TableCell>
@@ -282,15 +395,16 @@ export default function CompetitorIntelligence() {
       {/* SHOP DEEP DIVE                                                    */}
       {/* ================================================================ */}
       <Divider sx={{ my: 3 }} />
+      <div ref={deepDiveRef} />
       <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('shopDeepAnalysis')}</Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <TextField label={t('shopId')} value={deepDiveShopId}
             onChange={e => setDeepDiveShopId(e.target.value)} size="small"
             sx={{ flex: 1, minWidth: isMobile ? 0 : 200 }} placeholder={t('shopIdPlaceholder')}
-            onKeyDown={e => e.key === 'Enter' && searchShopDeepDive()}
+            onKeyDown={e => e.key === 'Enter' && handleAnalyzeShop(deepDiveShopId)}
           />
-          <Button variant="contained" onClick={searchShopDeepDive}
+          <Button variant="contained" onClick={() => handleAnalyzeShop(deepDiveShopId)}
             disabled={deepDiveLoading || !deepDiveShopId.trim()}
             startIcon={deepDiveLoading ? <CircularProgress size={16} /> : <Search size={16} />}
             sx={{ background: GRADIENTS.primary, borderRadius: '10px', ...(isMobile && { width: '100%' }) }}
@@ -303,11 +417,50 @@ export default function CompetitorIntelligence() {
         </Typography>
       </Paper>
 
-      {deepDiveLoading && <LinearProgress sx={{ mb: 2, borderRadius: 4, height: 4 }} />}
+      {deepDiveLoading && (
+        <Box sx={{ mb: 2 }}>
+          <LinearProgress sx={{ mb: 1, borderRadius: 4, height: 4 }} />
+          <Typography variant="caption" color="text.secondary">{t('autoAnalyzing')}</Typography>
+        </Box>
+      )}
 
+      {/* ================================================================ */}
+      {/* ENHANCED SHOP HEADER                                              */}
+      {/* ================================================================ */}
       {deepDiveShop && (
         <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>{deepDiveShop.shop_name}</Typography>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
+            {deepDiveShop.icon_url && (
+              <Box component="img" src={deepDiveShop.icon_url} alt={deepDiveShop.shop_name}
+                sx={{ width: 64, height: 64, borderRadius: '16px', objectFit: 'cover', border: '2px solid rgba(102,126,234,0.2)' }}
+              />
+            )}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>{deepDiveShop.shop_name}</Typography>
+                {deepDiveShop.url && (
+                  <IconButton size="small" onClick={() => window.open(deepDiveShop.url, '_blank')}
+                    sx={{ bgcolor: 'rgba(102,126,234,0.08)', '&:hover': { bgcolor: 'rgba(102,126,234,0.15)' } }}>
+                    <Link size={14} color="#667eea" />
+                  </IconButton>
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 0.5 }}>
+                {deepDiveShop.created_timestamp && (
+                  <Chip size="small" icon={<Clock size={12} />} label={shopAge(deepDiveShop.created_timestamp)}
+                    variant="outlined" sx={{ fontSize: '0.7rem', height: 22 }} />
+                )}
+                {estMonthlyRevenue > 0 && (
+                  <Chip size="small" icon={<TrendingUp size={12} />} label={`~$${estMonthlyRevenue.toLocaleString()}/mo`}
+                    sx={{ fontSize: '0.7rem', height: 22, bgcolor: 'rgba(76,175,80,0.1)', color: '#4caf50', fontWeight: 700 }} />
+                )}
+                {estMonthlySales > 0 && (
+                  <Chip size="small" icon={<ShoppingCart size={12} />} label={`~${estMonthlySales} sales/mo`}
+                    sx={{ fontSize: '0.7rem', height: 22, bgcolor: 'rgba(33,150,243,0.1)', color: '#2196F3', fontWeight: 700 }} />
+                )}
+              </Box>
+            </Box>
+          </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 1.5 }}>
             <StatCard label={t('totalSales')} value={deepDiveShop.num_sales.toLocaleString()} color="#11998e" icon={<ShoppingCart size={18} />} />
             <StatCard label={t('rating')} value={`${deepDiveShop.review_average.toFixed(1)}`} color="#ff9800" icon={<Star size={18} />} />
@@ -327,47 +480,121 @@ export default function CompetitorIntelligence() {
             <StatCard label={t('avgViews')} value={String(deepDiveStats.avgViews)} color="#ff9800" icon={<Eye size={18} />} />
           </Box>
 
+          {/* ================================================================ */}
+          {/* PRICE DISTRIBUTION                                               */}
+          {/* ================================================================ */}
+          {priceBuckets.length > 1 && (
+            <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <BarChart3 size={16} color="#2196F3" /> {t('priceDistribution')}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end', height: 120 }}>
+                {priceBuckets.map((b, i) => {
+                  const maxCount = Math.max(...priceBuckets.map(bb => bb.count));
+                  const height = maxCount > 0 ? (b.count / maxCount) * 100 : 0;
+                  return (
+                    <Tooltip key={i} title={`${b.range}: ${b.count} ${t('listings')} — $${Math.round(b.revenue)} ${t('revenue')}`}>
+                      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                        <Typography variant="caption" sx={{ fontSize: '0.6rem', fontWeight: 600 }}>{b.count}</Typography>
+                        <Box sx={{
+                          width: '100%', height: `${height}%`, minHeight: 4,
+                          background: GRADIENTS.primary, borderRadius: '4px 4px 0 0',
+                          transition: 'height 0.3s',
+                        }} />
+                        <Typography variant="caption" sx={{ fontSize: '0.55rem', whiteSpace: 'nowrap' }}>{b.range}</Typography>
+                      </Box>
+                    </Tooltip>
+                  );
+                })}
+              </Box>
+            </Paper>
+          )}
+
+          {/* ================================================================ */}
+          {/* TAG CLOUD                                                         */}
+          {/* ================================================================ */}
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('topUsedTags')}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('topUsedTags')}</Typography>
+              {allTags.length > 0 && (
+                <Button size="small" variant="outlined" startIcon={<Copy size={12} />}
+                  onClick={() => {
+                    navigator.clipboard.writeText(allTags.map(t => t.tag).join(', '));
+                    toast.success(t('tagsCopied'));
+                  }}
+                  sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>
+                  {t('copyAllTags')}
+                </Button>
+              )}
+            </Box>
             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-              {deepDiveStats.topTags.map(tg => (
-                <Chip key={tg.tag} label={`${tg.tag} (%${tg.pct})`} size="small" variant="outlined"
-                  onClick={() => { navigator.clipboard.writeText(tg.tag); toast.success(t('copied')); }}
-                  sx={{ cursor: 'pointer', borderRadius: '8px' }}
-                />
-              ))}
+              {allTags.map(tg => {
+                const isHigh = tg.avgFav > (deepDiveStats?.avgFav || 0);
+                const sizeScale = Math.min(1.2, 0.7 + (tg.count / (deepDiveListings?.length || 1)) * 2);
+                return (
+                  <Chip key={tg.tag} label={`${tg.tag} (${tg.pct}%)`} size="small" variant="outlined"
+                    onClick={() => { navigator.clipboard.writeText(tg.tag); toast.success(t('copied')); }}
+                    sx={{
+                      cursor: 'pointer', borderRadius: '8px',
+                      fontSize: `${sizeScale * 0.75}rem`,
+                      height: Math.round(sizeScale * 24),
+                      borderColor: isHigh ? '#4caf50' : '#bdbdbd',
+                      color: isHigh ? '#2e7d32' : 'text.secondary',
+                      fontWeight: isHigh ? 600 : 400,
+                    }}
+                  />
+                );
+              })}
             </Box>
           </Paper>
 
+          {/* ================================================================ */}
+          {/* ALL LISTINGS TABLE (with images, pagination, sort)               */}
+          {/* ================================================================ */}
           {isMobile ? (
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>{t('topProducts')}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  {t('allListings')} ({allListingsSorted.length})
+                </Typography>
+              </Box>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {sortedBestListings.map((l, i) => {
-                  const isExpanded = expandedListingIdx === i;
+                {pagedListings.map((l, i) => {
+                  const globalIdx = (listingPage - 1) * LISTINGS_PER_PAGE + i;
+                  const isExpanded = expandedListingIdx === globalIdx;
                   return (
                     <Paper key={l.listing_id} sx={{
                       ...glassCard, p: 1.5, cursor: 'pointer',
-                      borderLeft: i < 3 ? '3px solid #667eea' : 'none',
-                    }} onClick={() => setExpandedListingIdx(isExpanded ? null : i)}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      borderLeft: globalIdx < 3 ? '3px solid #667eea' : 'none',
+                    }} onClick={() => setExpandedListingIdx(isExpanded ? null : globalIdx)}>
+                      <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                        {l.image_url && (
+                          <Box component="img" src={l.image_url} alt="" loading="lazy"
+                            sx={{ width: 48, height: 48, borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />
+                        )}
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {l.title}
                           </Typography>
-                          <Box sx={{ display: 'flex', gap: 1, mt: 0.3, alignItems: 'center' }}>
+                          <Box sx={{ display: 'flex', gap: 1, mt: 0.3, alignItems: 'center', flexWrap: 'wrap' }}>
                             <Typography variant="body2" sx={{ fontWeight: 700 }}>{fmt(l.price)}</Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
                               <Heart size={10} color="#e91e63" />
                               <Typography variant="caption" sx={{ fontWeight: 600 }}>{l.num_favorers.toLocaleString()}</Typography>
                             </Box>
+                            {l.estMonthlySales > 0 && (
+                              <Typography variant="caption" sx={{ color: '#4caf50', fontWeight: 600 }}>~{l.estMonthlySales}/mo</Typography>
+                            )}
                           </Box>
                         </Box>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: i < 3 ? '#667eea' : '#999' }}>#{i + 1}</Typography>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: globalIdx < 3 ? '#667eea' : '#999' }}>#{globalIdx + 1}</Typography>
                       </Box>
                       <Collapse in={isExpanded}>
                         <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Typography variant="caption" color="text.secondary">{t('viewsLabel')}: {l.views.toLocaleString()}</Typography>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Typography variant="caption" color="text.secondary">{t('viewsLabel')}: {l.views.toLocaleString()}</Typography>
+                            <Typography variant="caption" color="text.secondary">{listingAgeLabel(l.created_timestamp)}</Typography>
+                          </Box>
                           <Button size="small" variant="outlined" onClick={(e) => { e.stopPropagation(); window.open(l.url, '_blank'); }}
                             startIcon={<ExternalLink size={12} />} sx={{ borderRadius: '8px', fontSize: '0.7rem' }}>Etsy</Button>
                         </Box>
@@ -376,59 +603,104 @@ export default function CompetitorIntelligence() {
                   );
                 })}
               </Box>
+              {totalListingPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                  <Pagination count={totalListingPages} page={listingPage} onChange={(_, p) => setListingPage(p)}
+                    size="small" color="primary" />
+                </Box>
+              )}
             </Box>
           ) : (
-          <Paper sx={{ ...glassCard, overflow: 'hidden' }}>
-            <Box sx={{ p: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{t('topProducts')}</Typography>
+          <Paper sx={{ ...glassCard, overflow: 'hidden', mb: 2 }}>
+            <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                {t('allListings')} ({allListingsSorted.length})
+              </Typography>
+              {totalListingPages > 1 && (
+                <Typography variant="caption" color="text.secondary">
+                  {t('page')} {listingPage} {t('of')} {totalListingPages}
+                </Typography>
+              )}
             </Box>
-            <TableContainer sx={{ maxHeight: 400 }}>
+            <TableContainer sx={{ maxHeight: 600 }}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#fafbfe', fontWeight: 700 } }}>
                     <TableCell>#</TableCell>
+                    <TableCell sx={{ width: 50 }}>{t('image')}</TableCell>
                     <TableCell>{t('titleCol')}</TableCell>
                     <TableCell align="right"><TableSortLabel active={bestListingSortKey==='price'} direction={bestListingSortKey==='price'?bestListingSortDir:'desc'} onClick={()=>toggleSort('price',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('priceCol')}</TableSortLabel></TableCell>
                     <TableCell align="center"><TableSortLabel active={bestListingSortKey==='num_favorers'} direction={bestListingSortKey==='num_favorers'?bestListingSortDir:'desc'} onClick={()=>toggleSort('num_favorers',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('favoriteCol')}</TableSortLabel></TableCell>
                     <TableCell align="center"><TableSortLabel active={bestListingSortKey==='views'} direction={bestListingSortKey==='views'?bestListingSortDir:'desc'} onClick={()=>toggleSort('views',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('viewsCol')}</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={bestListingSortKey==='estMonthlySales'} direction={bestListingSortKey==='estMonthlySales'?bestListingSortDir:'desc'} onClick={()=>toggleSort('estMonthlySales',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('estSales')}</TableSortLabel></TableCell>
+                    <TableCell align="center"><TableSortLabel active={bestListingSortKey==='created_timestamp'} direction={bestListingSortKey==='created_timestamp'?bestListingSortDir:'desc'} onClick={()=>toggleSort('created_timestamp',bestListingSortKey,bestListingSortDir,setBestListingSortKey,setBestListingSortDir)}>{t('listingAge')}</TableSortLabel></TableCell>
                     <TableCell sx={{ width: 40 }} />
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {sortedBestListings.map((l, i) => (
-                    <TableRow key={l.listing_id} hover sx={{
-                      '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
-                      borderLeft: i < 3 ? '3px solid #667eea' : 'none',
-                    }}>
-                      <TableCell>
-                        <Typography variant="caption" sx={{ fontWeight: 700, color: i < 3 ? '#667eea' : '#999' }}>{i + 1}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {l.title}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">{fmt(l.price)}</TableCell>
-                      <TableCell align="center">
-                        <Typography sx={{ fontWeight: 700, color: l.num_favorers > 100 ? '#11998e' : '#ff9800' }}>
-                          {l.num_favorers.toLocaleString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="center">{l.views.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <IconButton size="small" onClick={() => window.open(l.url, '_blank')}><ExternalLink size={14} /></IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {pagedListings.map((l, i) => {
+                    const globalIdx = (listingPage - 1) * LISTINGS_PER_PAGE + i;
+                    return (
+                      <TableRow key={l.listing_id} hover sx={{
+                        '&:hover': { bgcolor: 'rgba(102,126,234,0.04)' },
+                        borderLeft: globalIdx < 3 ? '3px solid #667eea' : 'none',
+                      }}>
+                        <TableCell>
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: globalIdx < 3 ? '#667eea' : '#999' }}>{globalIdx + 1}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          {l.image_url ? (
+                            <Box component="img" src={l.image_url} alt="" loading="lazy"
+                              sx={{ width: 40, height: 40, borderRadius: '6px', objectFit: 'cover' }} />
+                          ) : (
+                            <Box sx={{ width: 40, height: 40, borderRadius: '6px', bgcolor: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <ShoppingBag size={16} color="#ccc" />
+                            </Box>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {l.title}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">{fmt(l.price)}</TableCell>
+                        <TableCell align="center">
+                          <Typography sx={{ fontWeight: 700, color: l.num_favorers > 100 ? '#11998e' : '#ff9800' }}>
+                            {l.num_favorers.toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">{l.views.toLocaleString()}</TableCell>
+                        <TableCell align="center">
+                          <Typography variant="body2" sx={{ color: '#4caf50', fontWeight: 600 }}>
+                            {l.estMonthlySales > 0 ? l.estMonthlySales : '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Typography variant="caption" color="text.secondary">{listingAgeLabel(l.created_timestamp)}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <IconButton size="small" onClick={() => window.open(l.url, '_blank')}><ExternalLink size={14} /></IconButton>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
+            {totalListingPages > 1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 1.5 }}>
+                <Pagination count={totalListingPages} page={listingPage} onChange={(_, p) => setListingPage(p)}
+                  size="small" color="primary" />
+              </Box>
+            )}
           </Paper>
           )}
         </>
       )}
 
-      {/* Shop Spy AI Report */}
+      {/* ================================================================ */}
+      {/* SHOP SPY AI REPORT + REVIEWS (auto-triggered)                    */}
+      {/* ================================================================ */}
       {deepDiveShop && (
         <Box sx={{ mt: 2 }}>
           <Paper sx={{ ...glassCard, p: 2.5, mb: 2 }}>
@@ -452,7 +724,16 @@ export default function CompetitorIntelligence() {
               </Box>
             </Box>
 
-            {(shopSpyReportLoading || shopReviewsLoading) && <LinearProgress sx={{ mt: 1, mb: 1, borderRadius: 4, height: 3 }} />}
+            {(shopSpyReportLoading || shopReviewsLoading) && (
+              <Box sx={{ mb: 1 }}>
+                <LinearProgress sx={{ mb: 0.5, borderRadius: 4, height: 3 }} />
+                <Typography variant="caption" color="text.secondary">
+                  {shopSpyReportLoading && t('loadingAiReport')}
+                  {shopSpyReportLoading && shopReviewsLoading && ' + '}
+                  {shopReviewsLoading && t('loadingReviews')}
+                </Typography>
+              </Box>
+            )}
 
             {shopSpyReport && (
               <Box>

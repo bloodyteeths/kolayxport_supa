@@ -16,6 +16,8 @@ interface DashboardSummary {
   cogs: number;
   netProfit: number;
   margin: number;
+  orderCount: number;
+  returnCount: number;
 }
 
 interface TimeSeriesPoint {
@@ -129,6 +131,8 @@ async function buildDashboard(
   let returns = 0;
   let discounts = 0;
   let cogs = 0;
+  let orderCount = 0;
+  let returnCount = 0;
 
   // Transaction type summary
   const transactionTypeSummary: Record<string, { count: number; total: number }> = {};
@@ -159,6 +163,7 @@ async function buildDashboard(
         grossRevenue += amount;
         commissions += commissionAmt;
         shipping += shippingAmt;
+        orderCount++;
         break;
       case 'commission':
         // CommissionPositive = refund (subtract), CommissionNegative = charge (add)
@@ -174,9 +179,11 @@ async function buildDashboard(
         break;
       case 'return':
         returns += Math.abs(amount);
-        // Return transactions may carry commission refund — subtract from commissions
-        if (commissionAmt < 0) {
-          commissions += commissionAmt; // negative value reduces commissions
+        returnCount++;
+        // Return transactions carry commission that should be refunded — subtract from total
+        // Trendyol stores commissionAmount as positive even on returns
+        if (commissionAmt > 0) {
+          commissions -= commissionAmt;
         }
         break;
       case 'discount':
@@ -283,6 +290,8 @@ async function buildDashboard(
       cogs: round2(cogs),
       netProfit: round2(netProfit),
       margin: round2(margin),
+      orderCount,
+      returnCount,
     },
     timeSeries,
     productBreakdown,

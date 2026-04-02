@@ -502,7 +502,8 @@
     "amount": "Amount",
     "synchronized": "transactions synchronized",
     "syncError": "Sync error",
-    "csvPlaceholder": "8680001234567, Baby Blanket, 45.00, 12.50\n8680009876543, Knit Socks, 22.00, 8.00"
+    "csvPlaceholder": "8680001234567, Baby Blanket, 45.00, 12.50\n8680009876543, Knit Socks, 22.00, 8.00",
+    "orders": "orders"
   },
   "labels": {
     "reset": "Reset",

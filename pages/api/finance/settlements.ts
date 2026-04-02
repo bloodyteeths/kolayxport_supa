@@ -31,16 +31,14 @@ async function getTrendyolCredentials(userId: string): Promise<TrendyolCredentia
 }
 
 // Settlement transaction types — queried separately (Trendyol requires single transactionType param)
-// Primary types that commonly have data:
+// Only types that actually return data for this seller:
 const SETTLEMENT_TYPES_PRIMARY = [
-  'Sale', 'Return', 'Discount', 'Coupon',
-  'CommissionPositive', 'CommissionNegative',
+  'Sale', 'Return', 'Discount', 'DiscountCancel',
+  'Coupon', 'CouponCancel',
 ];
-// Secondary types — less common, fetched in parallel with primary
+// Rare types — only fetch if primary succeeds quickly
 const SETTLEMENT_TYPES_SECONDARY = [
-  'DiscountCancel', 'CouponCancel',
-  'ProvisionPositive', 'ProvisionNegative',
-  'ManualRefund', 'TYDiscount', 'TYCoupon',
+  'CommissionPositive', 'CommissionNegative',
 ];
 
 async function callTrendyolSettlements(

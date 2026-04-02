@@ -462,7 +462,8 @@
     "amount": "Tutar",
     "synchronized": "işlem senkronize edildi",
     "syncError": "Senkronizasyon hatası",
-    "csvPlaceholder": "8680001234567, Bebek Battaniye, 45.00, 12.50\n8680009876543, Örgü Çorap, 22.00, 8.00"
+    "csvPlaceholder": "8680001234567, Bebek Battaniye, 45.00, 12.50\n8680009876543, Örgü Çorap, 22.00, 8.00",
+    "orders": "sipariş"
   },
   "labels": {
     "reset": "Sıfırla",

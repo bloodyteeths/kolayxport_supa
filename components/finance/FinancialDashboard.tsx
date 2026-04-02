@@ -72,6 +72,20 @@ function SummaryCards({ summary }: { summary: DashboardSummary }) {
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                 {t(card.tKey)}
               </Typography>
+              {card.key === 'grossRevenue' && summary.orderCount > 0 && (
+                <Chip
+                  label={`${summary.orderCount} ${t('orders')}`}
+                  size="small"
+                  sx={{ ml: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#dcfce7', color: '#15803d' }}
+                />
+              )}
+              {card.key === 'returns' && summary.returnCount > 0 && (
+                <Chip
+                  label={`${summary.returnCount} ${t('orders')}`}
+                  size="small"
+                  sx={{ ml: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#fecaca', color: '#dc2626' }}
+                />
+              )}
               {card.key === 'netProfit' && (
                 <Chip
                   label={`%${(summary.margin ?? 0).toFixed(1)}`}

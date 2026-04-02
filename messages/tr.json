@@ -423,7 +423,7 @@
     "individual": "Tek Tek",
     "bulkCSV": "Toplu CSV",
     "addNewCost": "Yeni Maliyet Ekle",
-    "barcodeRequired": "Barkod *",
+    "barcodeRequired": "Barkod",
     "productName": "Ürün Adı",
     "costRequired": "Maliyet *",
     "shippingCostLabel": "Kargo Maliyeti",
@@ -437,7 +437,10 @@
     "costAddFailed": "Maliyet eklenemedi",
     "updated": "Güncellendi",
     "updateFailed": "Güncellenemedi",
-    "barcodeAndCostRequired": "Barkod ve maliyet zorunlu",
+    "barcodeAndCostRequired": "Maliyet zorunlu",
+    "selectOrTypeProduct": "Ürün seçin veya yazın",
+    "loadingSoldProducts": "Ürünler yükleniyor...",
+    "noSoldProducts": "Satılan ürün bulunamadı",
     "csvEmpty": "CSV boş",
     "noValidRows": "Geçerli satır bulunamadı",
     "bulkSaved": "maliyet kaydedildi",
@@ -458,7 +461,8 @@
     "order": "Sipariş",
     "amount": "Tutar",
     "synchronized": "işlem senkronize edildi",
-    "syncError": "Senkronizasyon hatası"
+    "syncError": "Senkronizasyon hatası",
+    "csvPlaceholder": "8680001234567, Bebek Battaniye, 45.00, 12.50\n8680009876543, Örgü Çorap, 22.00, 8.00"
   },
   "labels": {
     "reset": "Sıfırla",

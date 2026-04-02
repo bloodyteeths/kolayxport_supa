@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Drawer, Box, Typography, TextField, Button, IconButton,
   InputAdornment, Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, Chip, CircularProgress, Divider,
-  Select, MenuItem, FormControl, InputLabel, Tabs, Tab,
+  TableHead, TableRow, CircularProgress, Divider,
+  Select, MenuItem, FormControl, InputLabel, Tabs, Tab, Autocomplete,
 } from '@mui/material';
 import { X, Search, Save, Upload, Plus, Package } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import useFinanceStore from '@/lib/stores/useFinanceStore';
+import type { SoldProduct } from '@/lib/stores/useFinanceStore';
 
 interface Props {
   open: boolean;
@@ -19,7 +20,9 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
   const t = useTranslations('financials');
   const {
     marketplace, productCosts, costsLoading,
+    soldProducts, soldProductsLoading,
     fetchProductCosts, createProductCost, updateProductCost, bulkCreateCosts,
+    fetchSoldProducts,
   } = useFinanceStore();
 
   const [search, setSearch] = useState('');
@@ -28,9 +31,9 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
 
   // New entry form
   const [newBarcode, setNewBarcode] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<SoldProduct | null>(null);
   const [newName, setNewName] = useState('');
   const [newCost, setNewCost] = useState('');
-  const [newShipping, setNewShipping] = useState('');
   const [newCurrency, setNewCurrency] = useState('TRY');
   const [newNotes, setNewNotes] = useState('');
 
@@ -40,7 +43,10 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
   const [editShipping, setEditShipping] = useState('');
 
   useEffect(() => {
-    if (open) fetchProductCosts(search);
+    if (open) {
+      fetchProductCosts(search);
+      fetchSoldProducts();
+    }
   }, [open, marketplace]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = useCallback(() => {
@@ -48,21 +54,27 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
   }, [search, fetchProductCosts]);
 
   const handleCreate = async () => {
-    if (!newBarcode.trim() || !newCost.trim()) {
+    if (!newCost.trim()) {
+      toast.error(t('barcodeAndCostRequired'));
+      return;
+    }
+    const productName = newName.trim() || newBarcode.trim() || '';
+    if (!productName) {
       toast.error(t('barcodeAndCostRequired'));
       return;
     }
     try {
       await createProductCost({
-        barcode: newBarcode.trim(),
-        productName: newName.trim() || newBarcode.trim(),
+        barcode: newBarcode.trim() || null,
+        productName,
         costAmount: parseFloat(newCost),
         costCurrency: newCurrency,
-        shippingCost: newShipping ? parseFloat(newShipping) : null,
+        shippingCost: null,
         notes: newNotes || null,
       });
       toast.success(t('costAdded'));
-      setNewBarcode(''); setNewName(''); setNewCost(''); setNewShipping(''); setNewNotes('');
+      setNewBarcode(''); setNewName(''); setNewCost(''); setNewNotes('');
+      setSelectedProduct(null);
       fetchProductCosts(search);
     } catch {
       toast.error(t('costAddFailed'));
@@ -141,16 +153,62 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
               {t('addNewCost')}
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mb: 1.5 }}>
+              <Autocomplete
+                sx={{ gridColumn: '1 / -1' }}
+                size="small"
+                freeSolo
+                options={soldProducts}
+                loading={soldProductsLoading}
+                loadingText={t('loadingSoldProducts')}
+                noOptionsText={t('noSoldProducts')}
+                value={selectedProduct}
+                inputValue={newName}
+                onInputChange={(_, value) => setNewName(value)}
+                onChange={(_, value) => {
+                  if (value && typeof value !== 'string') {
+                    setSelectedProduct(value);
+                    setNewName(value.productName);
+                    if (value.barcode) setNewBarcode(value.barcode);
+                  } else {
+                    setSelectedProduct(null);
+                    if (typeof value === 'string') setNewName(value);
+                  }
+                }}
+                getOptionLabel={(option) =>
+                  typeof option === 'string' ? option : option.productName
+                }
+                renderOption={(props, option) => (
+                  <li {...props} key={`${option.barcode}-${option.productName}`}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {option.productName}
+                      </Typography>
+                      {option.barcode && (
+                        <Typography variant="caption" color="text.secondary">
+                          {option.barcode}
+                        </Typography>
+                      )}
+                    </Box>
+                  </li>
+                )}
+                isOptionEqualToValue={(option, value) =>
+                  option.barcode === value.barcode && option.productName === value.productName
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label={t('selectOrTypeProduct')}
+                    placeholder={t('productName')}
+                  />
+                )}
+                slotProps={{
+                  popper: { sx: { zIndex: 1500 } },
+                }}
+              />
               <TextField size="small" label={t('barcodeRequired')} value={newBarcode} onChange={e => setNewBarcode(e.target.value)} />
-              <TextField size="small" label={t('productName')} value={newName} onChange={e => setNewName(e.target.value)} />
               <TextField
                 size="small" label={t('costRequired')} type="number" value={newCost}
                 onChange={e => setNewCost(e.target.value)}
-                InputProps={{ startAdornment: <InputAdornment position="start">₺</InputAdornment> }}
-              />
-              <TextField
-                size="small" label={t('shippingCostLabel')} type="number" value={newShipping}
-                onChange={e => setNewShipping(e.target.value)}
                 InputProps={{ startAdornment: <InputAdornment position="start">₺</InputAdornment> }}
               />
               <FormControl size="small">
@@ -271,7 +329,7 @@ export default function CostEntryDrawer({ open, onClose }: Props) {
             </Typography>
             <TextField
               multiline rows={10} fullWidth
-              placeholder={`8680001234567, Bebek Battaniye, 45.00, 12.50\n8680009876543, Örgü Çorap, 22.00, 8.00`}
+              placeholder={t('csvPlaceholder')}
               value={csvText} onChange={e => setCsvText(e.target.value)}
               sx={{ mb: 2, '& textarea': { fontFamily: 'monospace', fontSize: '0.8rem' } }}
             />

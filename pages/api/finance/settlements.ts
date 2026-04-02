@@ -30,11 +30,13 @@ async function getTrendyolCredentials(userId: string): Promise<TrendyolCredentia
   };
 }
 
-// Core transaction types — queried separately (Trendyol requires single transactionType param)
-// Only types that commonly have data. Others (ManualRefund, TYDiscount, etc.) are very rare.
+// Settlement transaction types — queried separately (Trendyol requires single transactionType param)
 const SETTLEMENT_TYPES = [
-  'Sale', 'Return', 'Discount', 'Coupon',
+  'Sale', 'Return', 'Discount', 'DiscountCancel', 'Coupon', 'CouponCancel',
   'CommissionPositive', 'CommissionNegative',
+  'ProvisionPositive', 'ProvisionNegative',
+  'ManualRefund', 'ManualRefundCancel',
+  'TYDiscount', 'TYDiscountCancel', 'TYCoupon', 'TYCouponCancel',
 ];
 
 async function callTrendyolSettlements(
@@ -98,6 +100,197 @@ function splitDateRange(startMs: number, endMs: number): Array<{ startDate: stri
 }
 
 // ---------------------------------------------------------------------------
+// Other Financials — cargo invoices live here
+// ---------------------------------------------------------------------------
+
+async function callTrendyolOtherFinancials(
+  credentials: TrendyolCredentials,
+  params: { startDate: string; endDate: string; transactionType: string; page: number; size: number }
+): Promise<any> {
+  const auth = 'Basic ' + Buffer.from(`${credentials.apiKey}:${credentials.apiSecret}`).toString('base64');
+  const qs = new URLSearchParams({
+    startDate: params.startDate,
+    endDate: params.endDate,
+    transactionType: params.transactionType,
+    page: String(params.page),
+    size: String(params.size),
+  });
+
+  const url = `${TRENDYOL_API_BASE}/finance/che/sellers/${credentials.supplierId}/otherfinancials?${qs}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: auth,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'User-Agent': `${credentials.supplierId} - SelfIntegration`,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 400) return { content: [], totalPages: 0 };
+    return { content: [], totalPages: 0 };
+  }
+
+  const text = await response.text();
+  if (!text) return { content: [], totalPages: 0 };
+  try { return JSON.parse(text); } catch { return { content: [], totalPages: 0 }; }
+}
+
+/**
+ * Fetch cargo invoice line items for a given invoice serial number.
+ * Returns per-order shipping costs with fields: orderNumber, amount, shipmentPackageType, desi.
+ */
+async function fetchCargoInvoiceItems(
+  credentials: TrendyolCredentials,
+  invoiceSerialNumber: string
+): Promise<any[]> {
+  const auth = 'Basic ' + Buffer.from(`${credentials.apiKey}:${credentials.apiSecret}`).toString('base64');
+  const url = `${TRENDYOL_API_BASE}/finance/che/sellers/${credentials.supplierId}/cargo-invoice/${encodeURIComponent(invoiceSerialNumber)}/items`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: auth,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'User-Agent': `${credentials.supplierId} - SelfIntegration`,
+    },
+  });
+
+  if (!response.ok) return [];
+  const text = await response.text();
+  if (!text) return [];
+  try {
+    const data = JSON.parse(text);
+    return Array.isArray(data) ? data : (data.content || data.items || []);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Sync cargo/shipping costs from Trendyol's Other Financials + Cargo Invoice APIs.
+ * Returns a map of orderNumber → total shipping cost.
+ */
+async function syncCargoInvoices(
+  credentials: TrendyolCredentials,
+  windows: Array<{ startDate: string; endDate: string }>
+): Promise<{ orderShippingMap: Map<string, number>; totalCargoItems: number }> {
+  const orderShippingMap = new Map<string, number>();
+  let totalCargoItems = 0;
+
+  for (const window of windows) {
+    // Fetch DeductionInvoices from otherfinancials
+    let page = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const data = await callTrendyolOtherFinancials(credentials, {
+        startDate: window.startDate,
+        endDate: window.endDate,
+        transactionType: 'DeductionInvoices',
+        page,
+        size: 500,
+      });
+
+      const items = Array.isArray(data.content) ? data.content : [];
+      if (items.length === 0) { hasMore = false; break; }
+
+      // Filter for cargo invoices (Kargo Faturasi / Kargo Fatura)
+      const cargoInvoices = items.filter((item: any) => {
+        const txType = (item.transactionType || '').toLowerCase();
+        return txType.includes('kargo') || txType.includes('cargo');
+      });
+
+      // Fetch line items for each cargo invoice in parallel (batched)
+      const BATCH = 5;
+      for (let i = 0; i < cargoInvoices.length; i += BATCH) {
+        const batch = cargoInvoices.slice(i, i + BATCH);
+        const results = await Promise.allSettled(
+          batch.map((inv: any) => {
+            const serialNo = inv.id || inv.invoiceSerialNumber || inv.Id;
+            if (!serialNo) return Promise.resolve([]);
+            return fetchCargoInvoiceItems(credentials, String(serialNo));
+          })
+        );
+
+        for (const result of results) {
+          if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+            for (const lineItem of result.value) {
+              totalCargoItems++;
+              const orderNum = lineItem.orderNumber ? String(lineItem.orderNumber) : null;
+              const amount = Math.abs(Number(lineItem.amount || 0));
+              if (orderNum && amount > 0) {
+                orderShippingMap.set(orderNum, (orderShippingMap.get(orderNum) || 0) + amount);
+              }
+            }
+          }
+        }
+      }
+
+      hasMore = page < (data.totalPages || 0) - 1;
+      page++;
+    }
+  }
+
+  return { orderShippingMap, totalCargoItems };
+}
+
+// ---------------------------------------------------------------------------
+// Resolve product names from Trendyol Products API by barcode
+// ---------------------------------------------------------------------------
+
+async function fetchProductNamesByBarcodes(
+  credentials: TrendyolCredentials,
+  barcodes: string[]
+): Promise<Map<string, string>> {
+  const nameMap = new Map<string, string>();
+  if (barcodes.length === 0) return nameMap;
+
+  const auth = 'Basic ' + Buffer.from(`${credentials.apiKey}:${credentials.apiSecret}`).toString('base64');
+  const headers = {
+    Authorization: auth,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    'User-Agent': `${credentials.supplierId} - SelfIntegration`,
+  };
+
+  // Trendyol products API supports single barcode filter per request.
+  // Batch in parallel with concurrency limit to avoid rate-limiting.
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < barcodes.length; i += BATCH_SIZE) {
+    const batch = barcodes.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map(async (barcode) => {
+        const qs = new URLSearchParams({ barcode, size: '1' });
+        const url = `${TRENDYOL_API_BASE}/product/sellers/${credentials.supplierId}/products?${qs}`;
+        const response = await fetch(url, { method: 'GET', headers });
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.content && data.content.length > 0) {
+          const product = data.content[0];
+          // Trendyol product title is in the 'title' field
+          const name = product.title || product.productName || product.name || null;
+          if (name) return { barcode, name };
+        }
+        return null;
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) {
+        nameMap.set(result.value.barcode, result.value.name);
+      }
+    }
+  }
+
+  logger.info('Resolved product names from barcodes', { total: barcodes.length, resolved: nameMap.size });
+  return nameMap;
+}
+
+// ---------------------------------------------------------------------------
 // Sync action — fetch from Trendyol and upsert into DB
 // ---------------------------------------------------------------------------
 
@@ -119,6 +312,9 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
   let totalUpserted = 0;
   let totalFetched = 0;
 
+  // First pass: collect all settlement items across all windows
+  const allSettlementItems: any[] = [];
+
   for (const window of windows) {
     // Fetch all transaction types in parallel for this window
     const results = await Promise.all(
@@ -133,48 +329,70 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
       )
     );
 
-    // Collect all items from all types
-    const allItems: any[] = [];
     for (const data of results) {
       const items = Array.isArray(data.content) ? data.content : [];
-      allItems.push(...items);
+      allSettlementItems.push(...items);
     }
-    totalFetched += allItems.length;
+  }
+  totalFetched = allSettlementItems.length;
 
-    // Upsert all items
-    for (const item of allItems) {
-      const externalId = item.id ? String(item.id) : `${item.transactionType}_${item.orderNumber || ''}_${item.transactionDate || Date.now()}`;
-      const credit = Number(item.credit || 0);
-      const debt = Number(item.debt || 0);
-      const amount = credit - debt;
+  // Collect unique barcodes and resolve product names from Trendyol Products API
+  const uniqueBarcodes = [...new Set(
+    allSettlementItems
+      .map((item: any) => item.barcode)
+      .filter((b: any): b is string => !!b)
+  )];
 
-      const txData = {
-        transactionType: item.transactionType || 'unknown',
-        orderNumber: item.orderNumber ? String(item.orderNumber) : null,
-        barcode: item.barcode || null,
-        productName: item.description || item.productName || null,
-        quantity: item.quantity ?? 1,
-        amount,
-        currency: 'TRY',
-        commission: item.commissionAmount != null ? Number(item.commissionAmount) : null,
-        shippingAmount: null as number | null,
-        transactionDate: item.transactionDate ? new Date(item.transactionDate) : new Date(),
-        rawData: item,
-      };
+  const productNameMap = await fetchProductNamesByBarcodes(credentials, uniqueBarcodes);
 
-      await prisma.financialTransaction.upsert({
-        where: {
-          userId_marketplace_externalId: {
-            userId,
-            marketplace: 'trendyol',
-            externalId,
-          },
+  // Fetch cargo/shipping costs from Other Financials API
+  const { orderShippingMap, totalCargoItems } = await syncCargoInvoices(credentials, windows);
+
+  logger.info('Cargo invoice sync', {
+    totalCargoItems,
+    ordersWithShipping: orderShippingMap.size,
+  });
+
+  // Upsert all items with resolved product names + shipping costs
+  for (const item of allSettlementItems) {
+    const externalId = item.id ? String(item.id) : `${item.transactionType}_${item.orderNumber || ''}_${item.transactionDate || Date.now()}`;
+    const credit = Number(item.credit || 0);
+    const debt = Number(item.debt || 0);
+    const amount = credit - debt;
+
+    // Use resolved product name from Trendyol Products API, fall back to description
+    const resolvedName = item.barcode ? productNameMap.get(item.barcode) : undefined;
+
+    // Attach shipping cost from cargo invoices (matched by orderNumber)
+    const orderNum = item.orderNumber ? String(item.orderNumber) : null;
+    const shippingFromCargo = orderNum ? (orderShippingMap.get(orderNum) || null) : null;
+
+    const txData = {
+      transactionType: item.transactionType || 'unknown',
+      orderNumber: orderNum,
+      barcode: item.barcode || null,
+      productName: resolvedName || item.productName || item.description || null,
+      quantity: item.quantity ?? 1,
+      amount,
+      currency: 'TRY',
+      commission: item.commissionAmount != null ? Number(item.commissionAmount) : null,
+      shippingAmount: shippingFromCargo,
+      transactionDate: item.transactionDate ? new Date(item.transactionDate) : new Date(),
+      rawData: item,
+    };
+
+    await prisma.financialTransaction.upsert({
+      where: {
+        userId_marketplace_externalId: {
+          userId,
+          marketplace: 'trendyol',
+          externalId,
         },
-        update: { ...txData, syncedAt: new Date() },
-        create: { userId, marketplace: 'trendyol', externalId, ...txData },
-      });
-      totalUpserted++;
-    }
+      },
+      update: { ...txData, syncedAt: new Date() },
+      create: { userId, marketplace: 'trendyol', externalId, ...txData },
+    });
+    totalUpserted++;
   }
 
   // Update sync cursor
@@ -194,13 +412,23 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
     },
   });
 
-  logger.info('Settlement sync complete', { userId, totalFetched, totalUpserted, windows: windows.length });
+  logger.info('Settlement sync complete', {
+    userId, totalFetched, totalUpserted,
+    windows: windows.length,
+    uniqueBarcodes: uniqueBarcodes.length,
+    resolvedNames: productNameMap.size,
+    cargoItems: totalCargoItems,
+    ordersWithShipping: orderShippingMap.size,
+  });
 
   return res.status(200).json({
     success: true,
     totalFetched,
     totalUpserted,
     windows: windows.length,
+    productsResolved: productNameMap.size,
+    cargoItemsSynced: totalCargoItems,
+    ordersWithShipping: orderShippingMap.size,
     syncedTo: new Date(endMs).toISOString(),
   });
 }

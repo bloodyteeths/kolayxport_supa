@@ -74,6 +74,11 @@ export interface FinancialTransactionRow {
   transactionDate: string;
 }
 
+export interface SoldProduct {
+  barcode: string;
+  productName: string;
+}
+
 type Marketplace = 'trendyol' | 'etsy' | 'ebay';
 
 interface FinanceState {
@@ -94,6 +99,10 @@ interface FinanceState {
   productCosts: ProductCostEntry[];
   costsLoading: boolean;
 
+  // Sold products (for autocomplete)
+  soldProducts: SoldProduct[];
+  soldProductsLoading: boolean;
+
   // Transactions
   transactions: FinancialTransactionRow[];
   transactionsLoading: boolean;
@@ -110,6 +119,7 @@ interface FinanceState {
   createProductCost: (data: Partial<ProductCostEntry>) => Promise<void>;
   bulkCreateCosts: (items: Partial<ProductCostEntry>[]) => Promise<void>;
   fetchTransactions: (page?: number, typeFilter?: string) => Promise<void>;
+  fetchSoldProducts: () => Promise<void>;
 }
 
 function getDefaultDateRange() {
@@ -135,12 +145,15 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
   productCosts: [],
   costsLoading: false,
 
+  soldProducts: [],
+  soldProductsLoading: false,
+
   transactions: [],
   transactionsLoading: false,
   transactionsTotal: 0,
 
   setMarketplace: (m) => {
-    set({ marketplace: m, dashboardData: null, productCosts: [], transactions: [] });
+    set({ marketplace: m, dashboardData: null, productCosts: [], soldProducts: [], transactions: [] });
   },
   setDateRange: (range) => set({ dateRange: range }),
   setGroupBy: (g) => set({ groupBy: g }),
@@ -275,6 +288,22 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
     } catch (err) {
       console.error('[Finance Bulk Cost]', err);
       throw err;
+    }
+  },
+
+  fetchSoldProducts: async () => {
+    const { marketplace } = get();
+    set({ soldProductsLoading: true });
+    try {
+      const params = new URLSearchParams({ marketplace, action: 'sold_products' });
+      const res = await fetch(`/api/finance/product-costs?${params}`);
+      if (!res.ok) throw new Error('Sold products fetch failed');
+      const data = await res.json();
+      set({ soldProducts: Array.isArray(data.products) ? data.products : [] });
+    } catch (err) {
+      console.error('[Finance Sold Products]', err);
+    } finally {
+      set({ soldProductsLoading: false });
     }
   },
 

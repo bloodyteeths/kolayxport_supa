@@ -211,6 +211,39 @@ async function handleUpdate(userId: string, body: any, res: NextApiResponse) {
 }
 
 // ---------------------------------------------------------------------------
+// GET action: "sold_products" — distinct barcode+productName from transactions
+// ---------------------------------------------------------------------------
+
+async function handleSoldProducts(userId: string, query: NextApiRequest['query'], res: NextApiResponse) {
+  const marketplace = (query.marketplace as string) || undefined;
+
+  const where: any = {
+    userId,
+    productName: { not: null },
+  };
+
+  if (marketplace) {
+    where.marketplace = marketplace;
+  }
+
+  // Use groupBy to get distinct barcode+productName pairs
+  const rows = await prisma.financialTransaction.groupBy({
+    by: ['barcode', 'productName'],
+    where,
+    _count: { id: true },
+    orderBy: { _count: { id: 'desc' } },
+    take: 500,
+  });
+
+  const products = rows.map((r) => ({
+    barcode: r.barcode || '',
+    productName: r.productName || '',
+  }));
+
+  return res.status(200).json({ products });
+}
+
+// ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 
@@ -226,6 +259,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const userId = user.id;
 
     if (req.method === 'GET') {
+      const action = req.query.action as string | undefined;
+      if (action === 'sold_products') {
+        return await handleSoldProducts(userId, req.query, res);
+      }
       return await handleGet(userId, req.query, res);
     }
 

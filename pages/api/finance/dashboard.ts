@@ -71,7 +71,9 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   if (t.includes('return') || t.includes('iade')) return 'return';
   // Discounts/coupons (İndirim / Kupon)
   if (t.includes('discount') || t.includes('indirim') || t.includes('coupon') || t.includes('kupon')) return 'discount';
-  if (t.includes('provision') || t.includes('sellerrevenue') || t.includes('manualrefund')) return 'other';
+  // Provision (weight/deci adjustments) — treat as shipping adjustment
+  if (t.includes('provision')) return 'shipping';
+  if (t.includes('sellerrevenue') || t.includes('manualrefund')) return 'other';
   return 'other';
 }
 

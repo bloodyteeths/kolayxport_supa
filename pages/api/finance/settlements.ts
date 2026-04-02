@@ -4,8 +4,10 @@ import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { EtsyClient } from '../../../lib/integrations/etsyClient';
 import type { EtsyCredentials } from '../../../lib/integrations/etsyClient';
+import { refreshUserToken } from '../../../lib/integrations/ebayClient';
 
 const TRENDYOL_API_BASE = 'https://apigw.trendyol.com/integration';
+const EBAY_FINANCES_BASE = 'https://apiz.ebay.com';
 
 // Allow longer timeout for settlement sync (can take a while with many windows)
 export const config = { maxDuration: 120 };
@@ -950,6 +952,88 @@ async function handleDebugLedger(userId: string, body: any, res: NextApiResponse
   });
 }
 
+// ---------------------------------------------------------------------------
+// eBay helpers
+// ---------------------------------------------------------------------------
+
+async function getEbayAccessToken(userId: string): Promise<string> {
+  const credential = await prisma.credential.findUnique({
+    where: { userId },
+    select: { ebayAccessToken: true, ebayRefreshToken: true, ebayTokenExpiresAt: true },
+  });
+  if (!credential?.ebayAccessToken) {
+    throw { status: 400, message: 'eBay not connected. Please connect your eBay account in settings.' };
+  }
+  const now = new Date();
+  const expiresAt = credential.ebayTokenExpiresAt;
+  if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
+    if (!credential.ebayRefreshToken) {
+      throw { status: 400, message: 'eBay refresh token not available. Please reconnect.' };
+    }
+    const data = await refreshUserToken(credential.ebayRefreshToken);
+    await prisma.credential.update({
+      where: { userId },
+      data: {
+        ebayAccessToken: data.access_token,
+        ebayRefreshToken: data.refresh_token || credential.ebayRefreshToken,
+        ebayTokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+      },
+    });
+    return data.access_token;
+  }
+  return credential.ebayAccessToken;
+}
+
+async function callEbayFinancesAPI(endpoint: string, accessToken: string): Promise<any> {
+  const url = endpoint.startsWith('http') ? endpoint : `${EBAY_FINANCES_BASE}${endpoint}`;
+  const response = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`eBay Finances API error: ${response.status} - ${errorText}`);
+  }
+  return response.json();
+}
+
+// Debug: inspect real eBay Finances API response
+async function handleDebugEbayFinances(userId: string, body: any, res: NextApiResponse) {
+  const accessToken = await getEbayAccessToken(userId);
+
+  const endDate = new Date().toISOString();
+  const startDate = new Date(Date.now() - 30 * 86400000).toISOString();
+  const filter = `transactionDate:[${startDate}..${endDate}]`;
+
+  // Fetch 5 transactions to inspect structure
+  const txData = await callEbayFinancesAPI(
+    `/sell/finances/v1/transaction?filter=${encodeURIComponent(filter)}&limit=5`,
+    accessToken
+  );
+
+  // Also try summary
+  let summaryData: any = null;
+  try {
+    const summaryFilter = `transactionDate:[${startDate}..${endDate}],transactionStatus:{PAYOUT|FUNDS_PROCESSING|FUNDS_AVAILABLE_FOR_PAYOUT}`;
+    summaryData = await callEbayFinancesAPI(
+      `/sell/finances/v1/transaction_summary?filter=${encodeURIComponent(summaryFilter)}`,
+      accessToken
+    );
+  } catch (err: any) {
+    summaryData = { error: err.message };
+  }
+
+  return res.status(200).json({
+    debug: 'ebay_finances',
+    totalTransactions: txData.total,
+    transactions: txData.transactions || [],
+    summary: summaryData,
+  });
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const supabase = getSupabaseServerClient(req, res);
@@ -972,6 +1056,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       if (action === 'debug_ledger') {
         return await handleDebugLedger(userId, req.body, res);
+      }
+      if (action === 'debug_ebay_finances') {
+        return await handleDebugEbayFinances(userId, req.body, res);
       }
       return res.status(400).json({ error: 'Unknown action. Use action: "sync".' });
     }

@@ -286,13 +286,17 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
     if (!deepDiveShopId.trim()) return;
     set({ deepDiveLoading: true, deepDiveShop: null, deepDiveListings: [], shopSpyReport: null, shopReviews: null, reviewSentiment: null });
     try {
-      const [shopRes, listingsRes] = await Promise.all([
-        fetch(`/api/clawd/etsy?action=get_public_shop&target_shop_id=${deepDiveShopId.trim()}`),
-        fetch(`/api/clawd/etsy?action=get_public_shop_listings&target_shop_id=${deepDiveShopId.trim()}&limit=200`),
-      ]);
+      // Step 1: Get shop info (API resolves name→ID if needed)
+      const shopRes = await fetch(`/api/clawd/etsy?action=get_public_shop&target_shop_id=${encodeURIComponent(deepDiveShopId.trim())}`);
       if (!shopRes.ok) throw new Error('Magaza bulunamadi');
       const shopData = await shopRes.json();
       set({ deepDiveShop: shopData });
+      // Update to numeric ID for subsequent calls
+      const resolvedId = String(shopData.shop_id);
+      set({ deepDiveShopId: resolvedId });
+
+      // Step 2: Get listings using resolved numeric ID
+      const listingsRes = await fetch(`/api/clawd/etsy?action=get_public_shop_listings&target_shop_id=${resolvedId}&limit=500`);
       if (listingsRes.ok) {
         const listData = await listingsRes.json();
         set({ deepDiveListings: listData.listings || [] });
@@ -390,6 +394,8 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
     await get().searchShopDeepDive();
     const { deepDiveShop, deepDiveListings } = get();
     if (deepDiveShop) {
+      // Update deepDiveShopId to resolved numeric ID for subsequent API calls (reviews etc.)
+      if (deepDiveShop.shop_id) set({ deepDiveShopId: String(deepDiveShop.shop_id) });
       // Parallel: fetch reviews + AI report
       const reviewsPromise = get().fetchShopReviews();
       const spyPromise = deepDiveListings.length > 0 ? get().fetchShopSpyReport() : Promise.resolve();

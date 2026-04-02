@@ -421,7 +421,23 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
         const shopId = req.query.target_shop_id as string;
         if (!shopId) return res.status(400).json({ error: 'target_shop_id is required' });
 
-        const data = await callEtsyPublicAPI(`/shops/${shopId}`);
+        let data: any;
+        const isNumeric = /^\d+$/.test(shopId.trim());
+
+        if (isNumeric) {
+            // Numeric ID — direct lookup
+            data = await callEtsyPublicAPI(`/shops/${shopId.trim()}`);
+        } else {
+            // Shop name — search by name first, then get full details
+            const searchRes = await callEtsyPublicAPI(`/shops?shop_name=${encodeURIComponent(shopId.trim())}`);
+            const results = searchRes.results || [];
+            if (results.length === 0) {
+                return res.status(404).json({ error: 'Shop not found' });
+            }
+            // Get full shop details using the found shop_id
+            data = await callEtsyPublicAPI(`/shops/${results[0].shop_id}`);
+        }
+
         return res.status(200).json({
             shop_id: data.shop_id,
             shop_name: data.shop_name || '',
@@ -438,8 +454,17 @@ async function handlePublicAction(req: NextApiRequest, res: NextApiResponse, act
 
     // --- get_public_shop_listings: Get listings from a shop (public) ---
     if (action === 'get_public_shop_listings' && req.method === 'GET') {
-        const shopId = req.query.target_shop_id as string;
-        if (!shopId) return res.status(400).json({ error: 'target_shop_id is required' });
+        const shopIdRaw = req.query.target_shop_id as string;
+        if (!shopIdRaw) return res.status(400).json({ error: 'target_shop_id is required' });
+
+        // Resolve shop name to numeric ID if needed
+        let shopId = shopIdRaw.trim();
+        if (!/^\d+$/.test(shopId)) {
+            const searchRes = await callEtsyPublicAPI(`/shops?shop_name=${encodeURIComponent(shopId)}`);
+            const results = searchRes.results || [];
+            if (results.length === 0) return res.status(404).json({ error: 'Shop not found' });
+            shopId = String(results[0].shop_id);
+        }
 
         const requestedLimit = Math.min(parseInt((req.query.limit as string) || '100'), 500);
         const pages = Math.ceil(requestedLimit / 100);

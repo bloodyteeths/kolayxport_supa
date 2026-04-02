@@ -885,6 +885,71 @@ async function handleGet(userId: string, query: NextApiRequest['query'], res: Ne
 // Main handler
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Debug: fetch raw ledger entries to inspect types
+// ---------------------------------------------------------------------------
+async function handleDebugLedger(userId: string, body: any, res: NextApiResponse) {
+  const etsyCreds = await getEtsyCredentials(userId);
+  const onTokenRefresh = async (newCreds: EtsyCredentials) => {
+    await prisma.etsyShop.update({
+      where: { id: etsyCreds.dbId },
+      data: {
+        accessToken: newCreds.accessToken,
+        refreshToken: newCreds.refreshToken || undefined,
+        tokenExpiresAt: newCreds.tokenExpiresAt || undefined,
+      },
+    });
+  };
+
+  const client = new EtsyClient(
+    {
+      accessToken: etsyCreds.accessToken,
+      refreshToken: etsyCreds.refreshToken,
+      shopId: etsyCreds.shopId,
+      tokenExpiresAt: etsyCreds.tokenExpiresAt || undefined,
+    },
+    onTokenRefresh
+  );
+
+  const startMs = Number(body.startDate || Date.now() - 30 * 86400000);
+  const endMs = Number(body.endDate || Date.now());
+  const minCreated = Math.floor(startMs / 1000);
+  const maxCreated = Math.floor(endMs / 1000);
+
+  const ledgerData = await client.getLedgerEntries({
+    min_created: minCreated,
+    max_created: maxCreated,
+    limit: 25,
+    offset: 0,
+  });
+
+  const entries = Array.isArray(ledgerData.results) ? ledgerData.results : [];
+
+  // Summarize types
+  const typeCounts: Record<string, number> = {};
+  for (const e of entries) {
+    const t = e.ledger_type || 'unknown';
+    typeCounts[t] = (typeCounts[t] || 0) + 1;
+  }
+
+  return res.status(200).json({
+    debug: 'ledger',
+    totalEntries: ledgerData.count || entries.length,
+    returnedEntries: entries.length,
+    typeCounts,
+    sample: entries.slice(0, 10).map((e: any) => ({
+      entry_id: e.entry_id,
+      ledger_type: e.ledger_type,
+      description: e.description,
+      amount: e.amount,
+      currency_code: e.currency_code,
+      balance: e.balance,
+      create_date: e.create_date,
+      ledger_id: e.ledger_id,
+    })),
+  });
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const supabase = getSupabaseServerClient(req, res);
@@ -904,6 +969,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return await handleEtsySync(userId, req.body, res);
         }
         return await handleSync(userId, req.body, res);
+      }
+      if (action === 'debug_ledger') {
+        return await handleDebugLedger(userId, req.body, res);
       }
       return res.status(400).json({ error: 'Unknown action. Use action: "sync".' });
     }

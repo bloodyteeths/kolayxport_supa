@@ -39,6 +39,7 @@ interface ProductBreakdownItem {
   commissions: number;
   shipping: number;
   cogs: number;
+  unitCost: number;
   netProfit: number;
 }
 
@@ -247,6 +248,7 @@ async function buildDashboard(
           commissions: 0,
           shipping: 0,
           cogs: 0,
+          unitCost: 0,
           netProfit: 0,
         });
       }
@@ -257,6 +259,7 @@ async function buildDashboard(
       p.shipping += shippingAmt;
       const cost = costMap.get(key);
       if (cost) {
+        p.unitCost = cost.costAmount;
         p.cogs += (cost.costAmount + cost.shippingCost) * quantity;
       }
     }

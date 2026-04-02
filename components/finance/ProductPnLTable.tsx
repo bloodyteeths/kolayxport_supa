@@ -40,7 +40,7 @@ function getMargin(p: ProductBreakdown): number {
 export default function ProductPnLTable({ products }: { products: ProductBreakdown[] }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { updateProductCost, marketplace } = useFinanceStore();
+  const { upsertCostByBarcode, marketplace } = useFinanceStore();
   const t = useTranslations('financials');
   const cs = CURRENCY_SYMBOLS[marketplace] || '$';
   const fmt = (val: number) => formatMoney(val, cs);
@@ -75,11 +75,12 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
     }
   };
 
-  const handleCostSave = async (barcode: string) => {
+  const handleCostSave = async (product: ProductBreakdown) => {
     const val = parseFloat(costValue);
     if (isNaN(val) || val < 0) return;
+    if (!product.barcode) return;
     try {
-      await updateProductCost(barcode, val);
+      await upsertCostByBarcode(product.barcode, product.productName || product.barcode, val);
       setEditingCost(null);
     } catch { /* toast handled in store */ }
   };
@@ -150,7 +151,29 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                 <Box><Typography variant="caption" color="text.secondary">{t('revenue')}</Typography><Typography variant="body2" fontWeight={600}>{fmt(p.revenue)}</Typography></Box>
                 <Box><Typography variant="caption" color="text.secondary">{t('commission')}</Typography><Typography variant="body2" fontWeight={600} color="warning.main">{fmt(p.commissions)}</Typography></Box>
                 <Box><Typography variant="caption" color="text.secondary">{t('shipping')}</Typography><Typography variant="body2" fontWeight={600} color="info.main">{fmt(p.shipping)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">{t('cost')}</Typography><Typography variant="body2" fontWeight={600} color="secondary.main">{fmt(p.cogs)}</Typography></Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">{t('cost')}</Typography>
+                  {editingCost === p.barcode ? (
+                    <TextField
+                      size="small" autoFocus
+                      value={costValue}
+                      onChange={e => setCostValue(e.target.value)}
+                      onBlur={() => handleCostSave(p)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleCostSave(p); if (e.key === 'Escape') setEditingCost(null); }}
+                      placeholder={t('perUnit')}
+                      sx={{ width: 80, '& input': { fontSize: '0.8rem' } }}
+                      InputProps={{ startAdornment: <InputAdornment position="start" sx={{ '& p': { fontSize: '0.7rem' } }}>{cs}</InputAdornment> }}
+                    />
+                  ) : (
+                    <Typography
+                      variant="body2" fontWeight={600} color="secondary.main"
+                      sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                      onClick={(e) => { e.stopPropagation(); setEditingCost(p.barcode); setCostValue(String(p.unitCost || '')); }}
+                    >
+                      {p.unitCost > 0 ? fmt(p.unitCost) : '—'}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
             </Collapse>
           </Paper>
@@ -223,18 +246,19 @@ export default function ProductPnLTable({ products }: { products: ProductBreakdo
                       size="small" autoFocus
                       value={costValue}
                       onChange={e => setCostValue(e.target.value)}
-                      onBlur={() => handleCostSave(p.barcode || '')}
-                      onKeyDown={e => e.key === 'Enter' && handleCostSave(p.barcode || '')}
-                      sx={{ width: 80, '& input': { fontSize: '0.8rem', textAlign: 'right' } }}
+                      onBlur={() => handleCostSave(p)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleCostSave(p); if (e.key === 'Escape') setEditingCost(null); }}
+                      placeholder={t('perUnit')}
+                      sx={{ width: 90, '& input': { fontSize: '0.8rem', textAlign: 'right' } }}
                       InputProps={{ startAdornment: <InputAdornment position="start" sx={{ '& p': { fontSize: '0.75rem' } }}>{cs}</InputAdornment> }}
                     />
                   ) : (
                     <Typography
                       variant="body2" fontSize="0.8rem" color="secondary.main"
-                      sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                      onClick={() => { setEditingCost(p.barcode); setCostValue(String(p.cogs || 0)); }}
+                      sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline', color: '#8b5cf6' } }}
+                      onClick={() => { setEditingCost(p.barcode); setCostValue(String(p.unitCost || '')); }}
                     >
-                      {p.cogs > 0 ? fmt(p.cogs) : '—'}
+                      {p.unitCost > 0 ? fmt(p.unitCost) : '—'}
                     </Typography>
                   )}
                 </TableCell>

@@ -32,6 +32,7 @@ export interface ProductBreakdown {
   commissions: number;
   shipping: number;
   cogs: number;
+  unitCost: number;
   netProfit: number;
 }
 
@@ -119,6 +120,7 @@ interface FinanceState {
   fetchDashboard: () => Promise<void>;
   fetchProductCosts: (search?: string) => Promise<void>;
   updateProductCost: (id: string, costAmount: number, shippingCost?: number) => Promise<void>;
+  upsertCostByBarcode: (barcode: string, productName: string, costAmount: number) => Promise<void>;
   createProductCost: (data: Partial<ProductCostEntry>) => Promise<void>;
   bulkCreateCosts: (items: Partial<ProductCostEntry>[]) => Promise<void>;
   fetchTransactions: (page?: number, typeFilter?: string) => Promise<void>;
@@ -257,6 +259,22 @@ const useFinanceStore = create<FinanceState>((set, get) => ({
       get().fetchDashboard();
     } catch (err) {
       console.error('[Finance Update Cost]', err);
+      throw err;
+    }
+  },
+
+  upsertCostByBarcode: async (barcode, productName, costAmount) => {
+    const { marketplace } = get();
+    try {
+      const res = await fetch('/api/finance/product-costs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'upsert_by_barcode', marketplace, barcode, productName, costAmount }),
+      });
+      if (!res.ok) throw new Error('Upsert failed');
+      get().fetchDashboard();
+    } catch (err) {
+      console.error('[Finance Upsert Cost]', err);
       throw err;
     }
   },

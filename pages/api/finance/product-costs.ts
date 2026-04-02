@@ -211,6 +211,43 @@ async function handleUpdate(userId: string, body: any, res: NextApiResponse) {
 }
 
 // ---------------------------------------------------------------------------
+// POST action: "upsert_by_barcode" — upsert per-unit cost from P&L table
+// ---------------------------------------------------------------------------
+
+async function handleUpsertByBarcode(userId: string, body: any, res: NextApiResponse) {
+  const { marketplace, barcode, productName, costAmount } = body;
+
+  if (!marketplace || !barcode || costAmount === undefined) {
+    return res.status(400).json({ error: 'marketplace, barcode, and costAmount are required.' });
+  }
+
+  const existing = await prisma.productCost.findFirst({
+    where: { userId, marketplace, barcode },
+  });
+
+  if (existing) {
+    const updated = await prisma.productCost.update({
+      where: { id: existing.id },
+      data: { costAmount: parseFloat(costAmount) },
+    });
+    return res.status(200).json(updated);
+  }
+
+  const cost = await prisma.productCost.create({
+    data: {
+      userId,
+      marketplace,
+      barcode,
+      productName: productName || barcode,
+      costAmount: parseFloat(costAmount),
+      costCurrency: marketplace === 'trendyol' ? 'TRY' : 'USD',
+    },
+  });
+
+  return res.status(201).json(cost);
+}
+
+// ---------------------------------------------------------------------------
 // GET action: "sold_products" — distinct barcode+productName from transactions
 // ---------------------------------------------------------------------------
 
@@ -270,6 +307,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { action } = req.body || {};
       if (action === 'bulk') {
         return await handleBulk(userId, req.body, res);
+      }
+      if (action === 'upsert_by_barcode') {
+        return await handleUpsertByBarcode(userId, req.body, res);
       }
       return await handleCreate(userId, req.body, res);
     }

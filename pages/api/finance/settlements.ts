@@ -30,53 +30,52 @@ async function getTrendyolCredentials(userId: string): Promise<TrendyolCredentia
   };
 }
 
+// Transaction types to fetch — each queried separately (Trendyol requires single transactionType param)
+const SETTLEMENT_TYPES = [
+  'Sale', 'Return', 'Discount', 'DiscountCancel', 'Coupon', 'CouponCancel',
+  'ProvisionPositive', 'ProvisionNegative', 'ManualRefund', 'ManualRefundCancel',
+  'TYDiscount', 'TYDiscountCancel', 'TYCoupon', 'TYCouponCancel',
+  'SellerRevenuePositive', 'SellerRevenueNegative',
+  'CommissionPositive', 'CommissionNegative',
+];
+
 async function callTrendyolSettlements(
   credentials: TrendyolCredentials,
-  params: { startDate: string; endDate: string; page: number; size: number }
+  params: { startDate: string; endDate: string; transactionType: string; page: number; size: number }
 ): Promise<any> {
   const auth = 'Basic ' + Buffer.from(`${credentials.apiKey}:${credentials.apiSecret}`).toString('base64');
   const qs = new URLSearchParams({
     startDate: params.startDate,
     endDate: params.endDate,
+    transactionType: params.transactionType,
     page: String(params.page),
     size: String(params.size),
   });
-  // Try both endpoint paths — Trendyol uses /finance/che/ for some accounts
-  const paths = [
-    `/finance/che/sellers/${credentials.supplierId}/settlements`,
-    `/finance/sellers/${credentials.supplierId}/settlements`,
-  ];
 
-  let lastError: any = null;
-  for (const path of paths) {
-    const url = `${TRENDYOL_API_BASE}${path}?${qs}`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: auth,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'User-Agent': `${credentials.supplierId} - SelfIntegration`,
-      },
-    });
+  const url = `${TRENDYOL_API_BASE}/finance/che/sellers/${credentials.supplierId}/settlements?${qs}`;
 
-    if (response.ok) {
-      const text = await response.text();
-      if (!text) return { content: [], totalPages: 0, totalElements: 0 };
-      try { return JSON.parse(text); } catch { return { content: [], totalPages: 0, totalElements: 0 }; }
-    }
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: auth,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'User-Agent': `${credentials.supplierId} - SelfIntegration`,
+    },
+  });
 
+  if (!response.ok) {
     const errorText = await response.text();
     let errorBody;
     try { errorBody = JSON.parse(errorText); } catch { errorBody = { rawError: errorText }; }
-    lastError = { status: response.status, path, details: errorBody };
-    // If 556 or 404, try next path
-    if (response.status === 556 || response.status === 404) continue;
-    // Other errors — don't retry
+    // Skip 400 errors for unsupported transaction types
+    if (response.status === 400) return { content: [], totalPages: 0, totalElements: 0 };
     throw { status: response.status, message: `Trendyol API error: ${response.status}`, details: errorBody };
   }
 
-  throw { status: lastError?.status || 500, message: `Trendyol API error: ${lastError?.status} on both paths`, details: lastError?.details }
+  const text = await response.text();
+  if (!text) return { content: [], totalPages: 0, totalElements: 0 };
+  try { return JSON.parse(text); } catch { return { content: [], totalPages: 0, totalElements: 0 }; }
 }
 
 /**
@@ -123,6 +122,7 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
   let totalFetched = 0;
 
   for (const window of windows) {
+    for (const txType of SETTLEMENT_TYPES) {
     let page = 0;
     let hasMore = true;
 
@@ -130,8 +130,9 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
       const data = await callTrendyolSettlements(credentials, {
         startDate: window.startDate,
         endDate: window.endDate,
+        transactionType: txType,
         page,
-        size: 200,
+        size: 500,
       });
 
       const items = Array.isArray(data.content) ? data.content : [];
@@ -140,6 +141,24 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
       // Upsert each transaction
       for (const item of items) {
         const externalId = item.id ? String(item.id) : `${item.transactionType}_${item.orderNumber || ''}_${item.transactionDate || Date.now()}`;
+        // Trendyol uses credit (income) and debt (expense) — compute net amount
+        const credit = Number(item.credit || 0);
+        const debt = Number(item.debt || 0);
+        const amount = credit - debt;
+
+        const txData = {
+          transactionType: item.transactionType || 'unknown',
+          orderNumber: item.orderNumber ? String(item.orderNumber) : null,
+          barcode: item.barcode || null,
+          productName: item.description || item.productName || null,
+          quantity: item.quantity ?? 1,
+          amount,
+          currency: 'TRY',
+          commission: item.commissionAmount != null ? Number(item.commissionAmount) : null,
+          shippingAmount: null as number | null,
+          transactionDate: item.transactionDate ? new Date(item.transactionDate) : new Date(),
+          rawData: item,
+        };
 
         await prisma.financialTransaction.upsert({
           where: {
@@ -149,36 +168,8 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
               externalId,
             },
           },
-          update: {
-            transactionType: item.transactionType || 'unknown',
-            orderNumber: item.orderNumber || null,
-            barcode: item.barcode || null,
-            productName: item.productName || null,
-            quantity: item.quantity ?? 1,
-            amount: item.amount ?? 0,
-            currency: item.currency || 'TRY',
-            commission: item.commissionAmount ?? null,
-            shippingAmount: item.shippingAmount ?? null,
-            transactionDate: item.transactionDate ? new Date(item.transactionDate) : new Date(),
-            rawData: item,
-            syncedAt: new Date(),
-          },
-          create: {
-            userId,
-            marketplace: 'trendyol',
-            externalId,
-            transactionType: item.transactionType || 'unknown',
-            orderNumber: item.orderNumber || null,
-            barcode: item.barcode || null,
-            productName: item.productName || null,
-            quantity: item.quantity ?? 1,
-            amount: item.amount ?? 0,
-            currency: item.currency || 'TRY',
-            commission: item.commissionAmount ?? null,
-            shippingAmount: item.shippingAmount ?? null,
-            transactionDate: item.transactionDate ? new Date(item.transactionDate) : new Date(),
-            rawData: item,
-          },
+          update: { ...txData, syncedAt: new Date() },
+          create: { userId, marketplace: 'trendyol', externalId, ...txData },
         });
         totalUpserted++;
       }
@@ -186,8 +177,9 @@ async function handleSync(userId: string, body: any, res: NextApiResponse) {
       // Check if more pages
       const totalPages = data.totalPages ?? 0;
       page++;
-      hasMore = items.length === 200 && page < totalPages;
+      hasMore = items.length === 500 && page < totalPages;
     }
+    } // end txType loop
   }
 
   // Update sync cursor

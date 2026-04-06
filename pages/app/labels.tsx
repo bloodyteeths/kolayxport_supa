@@ -248,6 +248,35 @@ export interface LabelRow {
 
 
 /** Build a marketplace order URL from marketplace name + order number */
+function getProductListingUrl(marketplace: string, title: string, channel?: string): string | null {
+  if (!title || title === '—' || title === 'N/A (Order Level)') return null;
+  const mp = (marketplace || '').toLowerCase();
+  const ch = (channel || '').toLowerCase();
+  const q = encodeURIComponent(title.slice(0, 120));
+
+  // Etsy
+  if (mp.includes('etsy') || ch.includes('etsy')) {
+    return `https://www.etsy.com/search?q=${q}`;
+  }
+  // eBay
+  if (mp.includes('ebay')) {
+    return `https://www.ebay.com/sch/i.html?_nkw=${q}`;
+  }
+  // Trendyol
+  if (mp.includes('trendyol')) {
+    return `https://www.trendyol.com/sr?q=${q}`;
+  }
+  // Amazon
+  if (mp.includes('amazon')) {
+    return `https://www.amazon.com/s?k=${q}`;
+  }
+  // Hepsiburada
+  if (mp.includes('hepsiburada')) {
+    return `https://www.hepsiburada.com/ara?q=${q}`;
+  }
+  return null;
+}
+
 function getMarketplaceOrderUrl(marketplace: string, orderNumber: string, channel?: string): string | null {
   if (!orderNumber || orderNumber === '—') return null;
   const mp = (marketplace || '').toLowerCase();
@@ -1691,36 +1720,61 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         </Box>
       )
     },
-    { 
+    {
       field: 'title',
       headerName: t('columnProductName'),
       minWidth: 180,
       flex: 2,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => (
-        <Tooltip title={params.value || ''} placement="bottom-start">
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              height: '100%',
-              cursor: 'pointer',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}
-            onClick={() => {
-              if (params.value) {
-                navigator.clipboard.writeText(params.value as string);
-                toast.success(t('productNameCopied'));
-              }
-            }}
-          >
-            <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {params.value || '—'}
-            </Typography>
-          </Box>
-        </Tooltip>
-      )
+      renderCell: (params: GridRenderCellParams<LabelRow>) => {
+        const listingUrl = getProductListingUrl(params.row.marketplace, params.value as string, params.row.channel);
+        return (
+          <Tooltip title={params.value || ''} placement="bottom-start">
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                height: '100%',
+                gap: 0.5,
+                overflow: 'hidden',
+                minWidth: 0,
+              }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  flex: 1,
+                  minWidth: 0,
+                }}
+                onClick={() => {
+                  if (params.value) {
+                    navigator.clipboard.writeText(params.value as string);
+                    toast.success(t('productNameCopied'));
+                  }
+                }}
+              >
+                {params.value || '—'}
+              </Typography>
+              {listingUrl && (
+                <IconButton
+                  size="small"
+                  href={listingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  component="a"
+                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  sx={{ p: 0.25, color: 'primary.main', '&:hover': { color: 'primary.dark' }, flexShrink: 0 }}
+                >
+                  <OpenInNewIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              )}
+            </Box>
+          </Tooltip>
+        );
+      }
     },
     { 
       field: 'variantInfo',

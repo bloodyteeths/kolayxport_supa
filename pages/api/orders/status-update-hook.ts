@@ -63,7 +63,7 @@ export default async function handler(
           const updatedOrder = await prisma.senkronOrderData.findUnique({
             where: { orderId: order.id }
           });
-          if (updatedOrder?.customStatus === 'Çıktı') {
+          if (updatedOrder?.customStatus === 'shipped') {
             updatedOrders++;
           }
         } catch (error: any) {
@@ -86,7 +86,7 @@ export default async function handler(
           const updatedOrder = await prisma.senkronOrderData.findUnique({
             where: { orderId }
           });
-          if (updatedOrder?.customStatus === 'Çıktı') {
+          if (updatedOrder?.customStatus === 'shipped') {
             updatedOrders++;
           }
         } catch (error: any) {

@@ -3,6 +3,7 @@ import { Button, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/materia
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import TableChartIcon from '@mui/icons-material/TableChart';
 import PrintIcon from '@mui/icons-material/Print';
+import { useTranslations } from 'next-intl';
 import { exportToCSV, exportToPDF } from './exportUtils';
 import { GRADIENTS, glassCard } from './ui';
 
@@ -15,7 +16,7 @@ interface ExportButtonProps {
   filename: string;
   /** DOM element id to capture for PDF print */
   elementId?: string;
-  /** Override button label (default: "Disa Aktar") */
+  /** Override button label (default: translated "Export") */
   label?: string;
   /** Compact size variant */
   size?: 'small' | 'medium';
@@ -26,9 +27,11 @@ export default function ExportButton({
   columns,
   filename,
   elementId,
-  label = 'Disa Aktar',
+  label,
   size = 'small',
 }: ExportButtonProps) {
+  const t = useTranslations('etsyResearch');
+  const resolvedLabel = label ?? t('exportButton');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
@@ -85,7 +88,7 @@ export default function ExportButton({
           },
         }}
       >
-        {label}
+        {resolvedLabel}
       </Button>
 
       <Menu
@@ -111,7 +114,7 @@ export default function ExportButton({
             <TableChartIcon sx={{ fontSize: 18, color: '#11998e' }} />
           </ListItemIcon>
           <ListItemText
-            primary="CSV Indir"
+            primary={t('csvDownload')}
             primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
           />
         </MenuItem>
@@ -122,7 +125,7 @@ export default function ExportButton({
               <PrintIcon sx={{ fontSize: 18, color: '#764ba2' }} />
             </ListItemIcon>
             <ListItemText
-              primary="PDF Yazdir"
+              primary={t('pdfPrint')}
               primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 500 }}
             />
           </MenuItem>

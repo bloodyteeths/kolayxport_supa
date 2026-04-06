@@ -3,8 +3,8 @@ import { logger } from '../logger';
 
 /**
  * Hook that automatically updates order custom status based on cargo status:
- * - "Kargolandı" (SHIPPED) → "Çıktı"
- * - "İptal Edildi" (CANCELLED) → "İptal"
+ * - SHIPPED → "shipped"
+ * - CANCELLED → "cancelled"
  */
 export async function executeStatusUpdateHook(orderId: string, userId: string): Promise<void> {
   try {
@@ -29,17 +29,17 @@ export async function executeStatusUpdateHook(orderId: string, userId: string): 
     
     // Determine target status based on cargo status
     if (orderStatus === 'SHIPPED') {
-      if (currentCustomStatus === 'Çıktı') {
-        logger.info(`Order ${orderId} custom status already set to "Çıktı"`);
+      if (currentCustomStatus === 'shipped') {
+        logger.info(`Order ${orderId} custom status already set to "shipped"`);
         return;
       }
-      targetStatus = 'Çıktı';
+      targetStatus = 'shipped';
     } else if (orderStatus === 'CANCELLED' || orderStatus === 'CANCELED') {
-      if (currentCustomStatus === 'İptal') {
-        logger.info(`Order ${orderId} custom status already set to "İptal"`);
+      if (currentCustomStatus === 'cancelled') {
+        logger.info(`Order ${orderId} custom status already set to "cancelled"`);
         return;
       }
-      targetStatus = 'İptal';
+      targetStatus = 'cancelled';
     } else {
       // No automatic update needed for other statuses
       return;

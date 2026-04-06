@@ -65,14 +65,14 @@ const DashboardLandingContent = ({ user }) => {
     {
       href: '/app/etsy-listings',
       icon: Store,
-      label: 'Etsy Listings',
+      label: t('features.etsyListingsLabel'),
       description: t('features.etsyListings'),
       color: { bg: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)', icon: '#ea580c' },
     },
     {
       href: '/app/ebay-listings',
       icon: ShoppingBag,
-      label: 'eBay Listings',
+      label: t('features.ebayListingsLabel'),
       description: t('features.ebayListings'),
       color: { bg: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', icon: '#2563eb' },
     },
@@ -86,7 +86,7 @@ const DashboardLandingContent = ({ user }) => {
     {
       href: '/app/analytics',
       icon: BarChart3,
-      label: 'Analitik',
+      label: t('features.analyticsLabel'),
       description: t('features.analyticsDesc'),
       color: { bg: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)', icon: '#7c3aed' },
     },

@@ -117,16 +117,18 @@ export function formatNicheDataForExport(
   }));
 }
 
-export const NICHE_CSV_COLUMNS = [
-  { key: 'title', label: 'Baslik' },
-  { key: 'price', label: 'Fiyat' },
-  { key: 'currency', label: 'Para Birimi' },
-  { key: 'favorites', label: 'Favoriler' },
-  { key: 'views', label: 'Goruntulenme' },
-  { key: 'quantity', label: 'Stok' },
-  { key: 'tags', label: 'Etiketler' },
-  { key: 'url', label: 'URL' },
-];
+export function getNicheCsvColumns(t: (key: string) => string) {
+  return [
+    { key: 'title', label: t('csvColumns.title') },
+    { key: 'price', label: t('csvColumns.price') },
+    { key: 'currency', label: t('csvColumns.currency') },
+    { key: 'favorites', label: t('csvColumns.favorites') },
+    { key: 'views', label: t('csvColumns.views') },
+    { key: 'quantity', label: t('csvColumns.stock') },
+    { key: 'tags', label: t('csvColumns.tags') },
+    { key: 'url', label: t('csvColumns.url') },
+  ];
+}
 
 export function formatTagDataForExport(
   tags: (TagData & { avgEngagement?: number; effectivenessScore?: number })[],
@@ -140,13 +142,15 @@ export function formatTagDataForExport(
   }));
 }
 
-export const TAG_CSV_COLUMNS = [
-  { key: 'tag', label: 'Etiket' },
-  { key: 'frequency', label: 'Siklik' },
-  { key: 'percentage', label: 'Yuzde (%)' },
-  { key: 'avgEngagement', label: 'Ort. Etkilesim' },
-  { key: 'effectivenessScore', label: 'Etkinlik Puani' },
-];
+export function getTagCsvColumns(t: (key: string) => string) {
+  return [
+    { key: 'tag', label: t('csvColumns.tag') },
+    { key: 'frequency', label: t('csvColumns.frequency') },
+    { key: 'percentage', label: t('csvColumns.percentage') },
+    { key: 'avgEngagement', label: t('csvColumns.avgEngagement') },
+    { key: 'effectivenessScore', label: t('csvColumns.effectivenessScore') },
+  ];
+}
 
 export function formatShopDataForExport(
   shops: (ShopData & { avgPrice?: number; listingCount?: number })[],
@@ -162,15 +166,17 @@ export function formatShopDataForExport(
   }));
 }
 
-export const SHOP_CSV_COLUMNS = [
-  { key: 'shopName', label: 'Magaza Adi' },
-  { key: 'totalSales', label: 'Toplam Satis' },
-  { key: 'rating', label: 'Puan' },
-  { key: 'reviewCount', label: 'Degerlendirme' },
-  { key: 'listingCount', label: 'Ilan Sayisi' },
-  { key: 'avgPrice', label: 'Ort. Fiyat' },
-  { key: 'url', label: 'URL' },
-];
+export function getShopCsvColumns(t: (key: string) => string) {
+  return [
+    { key: 'shopName', label: t('csvColumns.shopName') },
+    { key: 'totalSales', label: t('csvColumns.totalSales') },
+    { key: 'rating', label: t('csvColumns.rating') },
+    { key: 'reviewCount', label: t('csvColumns.reviewCount') },
+    { key: 'listingCount', label: t('csvColumns.listingCount') },
+    { key: 'avgPrice', label: t('csvColumns.avgPrice') },
+    { key: 'url', label: t('csvColumns.url') },
+  ];
+}
 
 export function formatKeywordDataForExport(
   keywords: (KeywordData | AutocompleteSuggestion)[],
@@ -185,11 +191,13 @@ export function formatKeywordDataForExport(
   }));
 }
 
-export const KEYWORD_CSV_COLUMNS = [
-  { key: 'keyword', label: 'Anahtar Kelime' },
-  { key: 'count', label: 'Siklik' },
-  { key: 'percentage', label: 'Yuzde (%)' },
-  { key: 'score', label: 'Puan' },
-  { key: 'competition', label: 'Rekabet' },
-  { key: 'sources', label: 'Kaynaklar' },
-];
+export function getKeywordCsvColumns(t: (key: string) => string) {
+  return [
+    { key: 'keyword', label: t('csvColumns.keyword') },
+    { key: 'count', label: t('csvColumns.frequency') },
+    { key: 'percentage', label: t('csvColumns.percentage') },
+    { key: 'score', label: t('csvColumns.score') },
+    { key: 'competition', label: t('csvColumns.competition') },
+    { key: 'sources', label: t('csvColumns.sources') },
+  ];
+}

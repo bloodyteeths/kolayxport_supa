@@ -1256,7 +1256,7 @@ export async function syncAllOrders(userId: string, options: {
         }
 
         // Execute status update hook for all orders in this batch
-        // This will check if any orders have "SHIPPED" status and update custom status to "Çıktı"
+        // This will check if any orders have "SHIPPED" status and update custom status to "shipped"
         const batchOrderIds = batch.map(order => {
           const existingOrder = existingOrdersMap.get(order.marketplaceKey);
           return existingOrder?.id || '';

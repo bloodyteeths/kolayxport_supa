@@ -39,8 +39,8 @@ import FormControl from '@mui/material/FormControl';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
 
-// Custom status values stored in DB — indices map to t('customStatuses.N') for display
-const DURUM_VALUES = ['Çıkmadı', 'Çıktı', 'İptal', 'Üretimde', 'Sipariş Verildi', 'Hazırlanıyor', 'Kargoya Verildi', 'Teslim Edildi'];
+// Custom status keys stored in DB — display via t('customStatuses.KEY')
+const DURUM_KEYS = ['notShipped', 'shipped', 'cancelled', 'inProduction', 'ordered', 'preparing', 'inTransit', 'delivered'];
 
 // Status keys mapped to t('orderStatuses.KEY')
 const ORDER_STATUS_VALUES = [
@@ -152,7 +152,7 @@ function SenkronPage() {
     }
   }, [orders]);
 
-  // Auto-update status for Kargolandı and İptal Edildi orders on page load
+  // Auto-update custom status for SHIPPED and CANCELLED orders on page load
   useEffect(() => {
     if (orders && orders.length > 0) {
       // Find all orders that need status updates
@@ -160,14 +160,14 @@ function SenkronPage() {
         const orderStatus = (order.status || order.externalStatus || '').toUpperCase();
         const customStatus = order.senkronData?.customStatus;
         
-        // Check for SHIPPED → Çıktı
-        if (orderStatus === 'SHIPPED' && customStatus !== 'Çıktı') {
-          return { order, targetStatus: 'Çıktı' };
+        // Check for SHIPPED → shipped
+        if (orderStatus === 'SHIPPED' && customStatus !== 'shipped') {
+          return { order, targetStatus: 'shipped' };
         }
-        
-        // Check for CANCELLED → İptal
-        if ((orderStatus === 'CANCELLED' || orderStatus === 'CANCELED') && customStatus !== 'İptal') {
-          return { order, targetStatus: 'İptal' };
+
+        // Check for CANCELLED → cancelled
+        if ((orderStatus === 'CANCELLED' || orderStatus === 'CANCELED') && customStatus !== 'cancelled') {
+          return { order, targetStatus: 'cancelled' };
         }
         
         return null;
@@ -495,7 +495,7 @@ function SenkronPage() {
                 value={filterDurum}
                 onChange={e => { setFilterDurum(e.target.value); setPage(1); }}
                 input={<OutlinedInput label={t('allStatuses')} />}
-                renderValue={(selected) => selected.length === 0 ? t('allStatuses') : selected.join(', ')}
+                renderValue={(selected) => selected.length === 0 ? t('allStatuses') : selected.map((key) => t(`customStatuses.${key}`)).join(', ')}
                 MenuProps={{
                   PaperProps: {
                     style: {
@@ -505,10 +505,10 @@ function SenkronPage() {
                   },
                 }}
               >
-                {DURUM_VALUES.map((val, idx) => (
-                  <MenuItem key={val} value={val}>
-                    <Checkbox checked={filterDurum.indexOf(val) > -1} />
-                    <ListItemText primary={t(`customStatuses.${idx}`)} />
+                {DURUM_KEYS.map((key) => (
+                  <MenuItem key={key} value={key}>
+                    <Checkbox checked={filterDurum.indexOf(key) > -1} />
+                    <ListItemText primary={t(`customStatuses.${key}`)} />
                   </MenuItem>
                 ))}
               </Select>
@@ -722,12 +722,12 @@ function SenkronPage() {
                             </TableCell>
                             <TableCell sx={{ p: 1, minWidth: 140, fontSize: 16, fontWeight: 600, textAlign: 'center' }}>
                               <Select
-                                value={optimisticStatus[order.id] ?? order.senkronData?.customStatus ?? 'Çıkmadı'}
+                                value={optimisticStatus[order.id] ?? order.senkronData?.customStatus ?? 'notShipped'}
                                 onChange={e => handleSaveStatus(order.id, e.target.value)}
                                 size="small"
                               >
-                                {DURUM_VALUES.map((val, idx) => (
-                                  <MenuItem key={val} value={val}>{t(`customStatuses.${idx}`)}</MenuItem>
+                                {DURUM_KEYS.map((key) => (
+                                  <MenuItem key={key} value={key}>{t(`customStatuses.${key}`)}</MenuItem>
                                 ))}
                               </Select>
                             </TableCell>
@@ -875,12 +875,12 @@ function SenkronPage() {
                             </TableCell>
                             <TableCell sx={{ p: 1, minWidth: 140, fontSize: 16, fontWeight: 600, textAlign: 'center' }}>
                               <Select
-                                value={optimisticStatus[order.id] ?? order.senkronData?.customStatus ?? 'Çıkmadı'}
+                                value={optimisticStatus[order.id] ?? order.senkronData?.customStatus ?? 'notShipped'}
                                 onChange={e => handleSaveStatus(order.id, e.target.value)}
                                 size="small"
                               >
-                                {DURUM_VALUES.map((val, idx) => (
-                                  <MenuItem key={val} value={val}>{t(`customStatuses.${idx}`)}</MenuItem>
+                                {DURUM_KEYS.map((key) => (
+                                  <MenuItem key={key} value={key}>{t(`customStatuses.${key}`)}</MenuItem>
                                 ))}
                               </Select>
                             </TableCell>

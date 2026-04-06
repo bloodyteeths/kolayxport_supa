@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -34,6 +35,7 @@ const renderCellContent = (content) => {
 
 export default function OrdersTable() {
   // All hooks must run unconditionally at the top level
+  const t = useTranslations('ordersTable');
   const { user, session: supabaseSession, isLoading: authLoading, refreshUser } = useAuth();
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -116,23 +118,23 @@ export default function OrdersTable() {
   // --- End of hooks section ---
 
   if (shouldShowLoading) {
-    return <p>Loading session...</p>;
+    return <p>{t('loadingSession')}</p>;
   }
   if (shouldShowSignIn) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Please Sign In</CardTitle>
-          <CardDescription>You need to sign in with Google to continue.</CardDescription>
+          <CardTitle>{t('pleaseSignIn')}</CardTitle>
+          <CardDescription>{t('signInDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button onClick={async () => {
-            const { error } = await supabase.auth.signInWithOAuth({ 
+            const { error } = await supabase.auth.signInWithOAuth({
               provider: 'google',
               options: { redirectTo: window.location.href }
             });
             if (error) console.error('Error signing in with Google:', error);
-          }}>Sign in with Google</Button>
+          }}>{t('signInWithGoogle')}</Button>
         </CardContent>
       </Card>
     );
@@ -141,7 +143,7 @@ export default function OrdersTable() {
   const handleSync = async (marketplace) => {
     if (!marketplace) {
       console.error("Marketplace not specified for sync.");
-      setSyncError("Marketplace not specified.");
+      setSyncError(t('marketplaceNotSpecified'));
       return;
     }
     setSyncLoading(true);
@@ -287,40 +289,40 @@ export default function OrdersTable() {
 
   // Column definitions
   const columns = [
-    { header: 'Sipariş Kimliği', key: 'COL_ORDER_ID', get: row => row.id || '' },
-    { header: 'Alıcı Adı', key: 'COL_RECIPIENT_FNAME', get: row => row.recipientFirstName || userSettingsFallback.COL_RECIPIENT_FNAME },
-    { header: 'Alıcı Soyadı', key: 'COL_RECIPIENT_LNAME', get: row => row.recipientLastName || userSettingsFallback.COL_RECIPIENT_LNAME },
-    { header: 'Alıcı Şirketi', key: 'COL_RECIPIENT_COMPANY', get: row => row.recipientCompany || userSettingsFallback.COL_RECIPIENT_COMPANY },
-    { header: 'Adres Satırı 1', key: 'COL_RECIPIENT_STREET1', get: row => row.recipientStreet1 || userSettingsFallback.COL_RECIPIENT_STREET1 },
-    { header: 'Adres Satırı 2', key: 'COL_RECIPIENT_STREET2', get: row => row.recipientStreet2 || userSettingsFallback.COL_RECIPIENT_STREET2 },
-    { header: 'Şehir', key: 'COL_RECIPIENT_CITY', get: row => row.recipientCity || userSettingsFallback.COL_RECIPIENT_CITY },
-    { header: 'Eyalet / İl', key: 'COL_RECIPIENT_STATE', get: row => row.recipientState || userSettingsFallback.COL_RECIPIENT_STATE },
-    { header: 'Posta Kodu', key: 'COL_RECIPIENT_POSTAL', get: row => row.recipientPostal || userSettingsFallback.COL_RECIPIENT_POSTAL },
-    { header: 'Ülke', key: 'COL_RECIPIENT_COUNTRY', get: row => row.recipientCountry || userSettingsFallback.COL_RECIPIENT_COUNTRY },
-    { header: 'Telefon', key: 'COL_RECIPIENT_PHONE', get: row => row.recipientPhone || userSettingsFallback.COL_RECIPIENT_PHONE },
-    { header: 'Ağırlık (kg)', key: 'COL_WEIGHT', get: row => row.weight || userSettingsFallback.COL_WEIGHT },
-    { header: 'Servis Türü', key: 'COL_SERVICE_TYPE', get: row => row.serviceType || userSettingsFallback.COL_SERVICE_TYPE },
-    { header: 'Paket Türü', key: 'COL_PACKAGING_TYPE', get: row => row.packagingType || userSettingsFallback.COL_PACKAGING_TYPE },
-    { header: 'Gümrük Değeri', key: 'COL_CUSTOMS_VALUE', get: row => row.customsValue || userSettingsFallback.COL_CUSTOMS_VALUE },
-    { header: 'Etiket Oluşturma Onay', key: 'COL_LABEL_TRIGGER', get: row => row.labelTrigger || userSettingsFallback.COL_LABEL_TRIGGER },
-    { header: 'Etiket URL', key: 'COL_LABEL_URL', get: row => row.labelUrl || userSettingsFallback.COL_LABEL_URL },
-    { header: 'Eşya Açıklaması', key: 'COL_COMMODITY_DESC', get: row => row.commodityDesc || userSettingsFallback.COL_COMMODITY_DESC },
-    { header: 'Üretim Ülkesi', key: 'COL_COUNTRY_OF_MFG', get: row => row.countryOfMfg || userSettingsFallback.COL_COUNTRY_OF_MFG },
-    { header: 'Harmonize Kodu', key: 'COL_HARMONIZED_CODE', get: row => row.harmonizedCode || userSettingsFallback.COL_HARMONIZED_CODE },
-    { header: 'Para Birimi', key: 'COL_CURRENCY', get: row => row.currency || userSettingsFallback.COL_CURRENCY },
+    { header: t('orderId'), key: 'COL_ORDER_ID', get: row => row.id || '' },
+    { header: t('recipientFirstName'), key: 'COL_RECIPIENT_FNAME', get: row => row.recipientFirstName || userSettingsFallback.COL_RECIPIENT_FNAME },
+    { header: t('recipientLastName'), key: 'COL_RECIPIENT_LNAME', get: row => row.recipientLastName || userSettingsFallback.COL_RECIPIENT_LNAME },
+    { header: t('recipientCompany'), key: 'COL_RECIPIENT_COMPANY', get: row => row.recipientCompany || userSettingsFallback.COL_RECIPIENT_COMPANY },
+    { header: t('addressLine1'), key: 'COL_RECIPIENT_STREET1', get: row => row.recipientStreet1 || userSettingsFallback.COL_RECIPIENT_STREET1 },
+    { header: t('addressLine2'), key: 'COL_RECIPIENT_STREET2', get: row => row.recipientStreet2 || userSettingsFallback.COL_RECIPIENT_STREET2 },
+    { header: t('city'), key: 'COL_RECIPIENT_CITY', get: row => row.recipientCity || userSettingsFallback.COL_RECIPIENT_CITY },
+    { header: t('state'), key: 'COL_RECIPIENT_STATE', get: row => row.recipientState || userSettingsFallback.COL_RECIPIENT_STATE },
+    { header: t('postalCode'), key: 'COL_RECIPIENT_POSTAL', get: row => row.recipientPostal || userSettingsFallback.COL_RECIPIENT_POSTAL },
+    { header: t('country'), key: 'COL_RECIPIENT_COUNTRY', get: row => row.recipientCountry || userSettingsFallback.COL_RECIPIENT_COUNTRY },
+    { header: t('phone'), key: 'COL_RECIPIENT_PHONE', get: row => row.recipientPhone || userSettingsFallback.COL_RECIPIENT_PHONE },
+    { header: t('weight'), key: 'COL_WEIGHT', get: row => row.weight || userSettingsFallback.COL_WEIGHT },
+    { header: t('serviceType'), key: 'COL_SERVICE_TYPE', get: row => row.serviceType || userSettingsFallback.COL_SERVICE_TYPE },
+    { header: t('packageType'), key: 'COL_PACKAGING_TYPE', get: row => row.packagingType || userSettingsFallback.COL_PACKAGING_TYPE },
+    { header: t('customsValue'), key: 'COL_CUSTOMS_VALUE', get: row => row.customsValue || userSettingsFallback.COL_CUSTOMS_VALUE },
+    { header: t('labelTrigger'), key: 'COL_LABEL_TRIGGER', get: row => row.labelTrigger || userSettingsFallback.COL_LABEL_TRIGGER },
+    { header: t('labelUrl'), key: 'COL_LABEL_URL', get: row => row.labelUrl || userSettingsFallback.COL_LABEL_URL },
+    { header: t('commodityDesc'), key: 'COL_COMMODITY_DESC', get: row => row.commodityDesc || userSettingsFallback.COL_COMMODITY_DESC },
+    { header: t('countryOfMfg'), key: 'COL_COUNTRY_OF_MFG', get: row => row.countryOfMfg || userSettingsFallback.COL_COUNTRY_OF_MFG },
+    { header: t('harmonizedCode'), key: 'COL_HARMONIZED_CODE', get: row => row.harmonizedCode || userSettingsFallback.COL_HARMONIZED_CODE },
+    { header: t('currency'), key: 'COL_CURRENCY', get: row => row.currency || userSettingsFallback.COL_CURRENCY },
   ];
 
   if (requireSetup) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Welcome to MyBabySync</CardTitle>
-          <CardDescription>Get started by creating your Google Sheet and Drive folder.</CardDescription>
+          <CardTitle>{t('welcomeTitle')}</CardTitle>
+          <CardDescription>{t('welcomeDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
-          {setupError && <p className="text-red-600 mb-2">Error: {setupError}</p>}
+          {setupError && <p className="text-red-600 mb-2">{t('error')} {setupError}</p>}
           <Button onClick={handleSetup} disabled={setupLoading}>
-            {setupLoading ? 'Creating...' : 'Get Started'}
+            {setupLoading ? t('creating') : t('getStarted')}
           </Button>
         </CardContent>
       </Card>
@@ -329,30 +331,30 @@ export default function OrdersTable() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Siparişler</CardTitle>
+        <CardTitle>{t('orders')}</CardTitle>
         <CardDescription>
-          Pazaryerlerinden gelen siparişlerinizi buradan yönetebilirsiniz.
+          {t('ordersDescription')}
         </CardDescription>
         <div className="flex items-center space-x-2 mt-4">
           <Button onClick={() => fetchOrders()} disabled={isLoading || setupLoading}> 
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Yenile
+            {t('refresh')}
           </Button>
           <Button onClick={() => handleSync('veeqo')} disabled={syncLoading || setupLoading}>
             <ShoppingCart className={`mr-2 h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
-            Veeqo Siparişlerini Senkronize Et
+            {t('syncVeeqo')}
           </Button>
           <Button onClick={() => handleSync('shippo')} disabled={syncLoading || setupLoading}>
             <ShoppingCart className={`mr-2 h-4 w-4 ${syncLoading ? 'animate-spin' : ''}`} />
-            Shippo Siparişlerini Senkronize Et
+            {t('syncShippo')}
           </Button>
         </div>
-        {syncLoading && <p className="text-sm text-blue-600 mt-2">Senkronize ediliyor...</p>}
+        {syncLoading && <p className="text-sm text-blue-600 mt-2">{t('syncing')}</p>}
         {syncMessage && <p className="text-sm text-green-600 mt-2">{syncMessage}</p>}
-        {syncError && <p className="text-sm text-red-600 mt-2">Sync Hatası: {syncError}</p>}
-        {isLoading && <p className="text-sm text-blue-600 mt-2">Siparişler yükleniyor...</p>}
-        {error && <p className="text-sm text-red-600 mt-2">Hata: {error}</p>}
-        {setupError && <p className="text-sm text-red-600 mt-2">Kurulum Hatası: {setupError}</p>}
+        {syncError && <p className="text-sm text-red-600 mt-2">{t('syncError')} {syncError}</p>}
+        {isLoading && <p className="text-sm text-blue-600 mt-2">{t('loadingOrders')}</p>}
+        {error && <p className="text-sm text-red-600 mt-2">{t('error')} {error}</p>}
+        {setupError && <p className="text-sm text-red-600 mt-2">{t('setupError')} {setupError}</p>}
       </CardHeader>
 
       <CardContent>
@@ -363,7 +365,7 @@ export default function OrdersTable() {
               {columns.map((col) => (
                 <TableHead key={col.header}>{col.header}</TableHead>
               ))}
-              <TableHead>Aksiyonlar</TableHead>
+              <TableHead>{t('actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -416,15 +418,15 @@ export default function OrdersTable() {
                         ) : (
                           <Ticket className="h-4 w-4" />
                         )}
-                        <span className="ml-2">Etiket Oluştur</span>
+                        <span className="ml-2">{t('generateLabel')}</span>
                       </Button>
                       {currentLabelState.error && <p className="text-xs text-red-500 mt-1">{currentLabelState.error}</p>}
                       {currentLabelState.url && (
                         <Link href={currentLabelState.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline mt-1 block">
-                          Etiketi Görüntüle
+                          {t('viewLabel')}
                         </Link>
                       )}
-                      {currentLabelState.tracking && <p className="text-xs mt-1">Takip No: {currentLabelState.tracking}</p>}
+                      {currentLabelState.tracking && <p className="text-xs mt-1">{t('trackingNumber')} {currentLabelState.tracking}</p>}
                     </TableCell>
                   </TableRow>
                 );
@@ -432,7 +434,7 @@ export default function OrdersTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length + 1} className="text-center">
-                  {isLoading || setupLoading ? 'Yükleniyor...' : (error || setupError || requireSetup) ? 'Siparişler yüklenemedi.' : 'Gösterilecek sipariş bulunmamaktadır.'}
+                  {isLoading || setupLoading ? t('loading') : (error || setupError || requireSetup) ? t('loadFailed') : t('noOrders')}
                 </TableCell>
               </TableRow>
             )}

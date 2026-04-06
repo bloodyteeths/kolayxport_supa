@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'next/router';
+import { useTranslations } from 'next-intl';
 
 export default function AuthForm() {
+  const t = useTranslations('auth');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState('login'); // 'login' or 'signup'
@@ -32,24 +34,24 @@ export default function AuthForm() {
       if (error) {
         setError(error.message);
       } else {
-        setSuccess('Login successful!');
+        setSuccess(t('loginSuccess'));
         router.push('/app');
       }
     } else {
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) setError(error.message);
-      else setSuccess('Signup successful! Please check your email to confirm your account.');
+      else setSuccess(t('signupSuccess'));
     }
     setLoading(false);
   };
 
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded shadow">
-      <h2 className="text-2xl font-bold mb-4 text-center">Giriş Yap / Kayıt Ol</h2>
+      <h2 className="text-2xl font-bold mb-4 text-center">{t('title')}</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
           type="email"
-          placeholder="E-posta"
+          placeholder={t('emailPlaceholder')}
           value={email}
           onChange={e => setEmail(e.target.value)}
           className="w-full px-3 py-2 border rounded"
@@ -57,7 +59,7 @@ export default function AuthForm() {
         />
         <input
           type="password"
-          placeholder="Şifre"
+          placeholder={t('passwordPlaceholder')}
           value={password}
           onChange={e => setPassword(e.target.value)}
           className="w-full px-3 py-2 border rounded"
@@ -68,25 +70,25 @@ export default function AuthForm() {
           className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
           disabled={loading}
         >
-          {mode === 'login' ? 'E-posta ile Giriş Yap' : 'E-posta ile Kayıt Ol'}
+          {mode === 'login' ? t('signInWithEmail') : t('signUpWithEmail')}
         </button>
       </form>
       <div className="text-center mt-4">
         {mode === 'login' ? (
           <span>
-            Hesabınız yok mu?{' '}
-            <button className="text-blue-600 hover:underline" onClick={() => setMode('signup')}>Kayıt Ol</button>
+            {t('noAccount')}{' '}
+            <button className="text-blue-600 hover:underline" onClick={() => setMode('signup')}>{t('signUp')}</button>
           </span>
         ) : (
           <span>
-            Zaten hesabınız var mı?{' '}
-            <button className="text-blue-600 hover:underline" onClick={() => setMode('login')}>Giriş Yap</button>
+            {t('hasAccount')}{' '}
+            <button className="text-blue-600 hover:underline" onClick={() => setMode('login')}>{t('signIn')}</button>
           </span>
         )}
       </div>
       <div className="flex items-center my-4">
         <div className="flex-1 h-px bg-gray-300" />
-        <span className="mx-2 text-gray-400 text-sm">veya</span>
+        <span className="mx-2 text-gray-400 text-sm">{t('or')}</span>
         <div className="flex-1 h-px bg-gray-300" />
       </div>
       <button
@@ -95,7 +97,7 @@ export default function AuthForm() {
         disabled={loading}
       >
         <img src="/google-icon.png" alt="Google" className="w-5 h-5 mr-2" />
-        Google ile {mode === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}
+        {mode === 'login' ? t('signInWithGoogle') : t('signUpWithGoogle')}
       </button>
       {error && <div className="mt-4 text-red-600 text-center">{error}</div>}
       {success && <div className="mt-4 text-green-600 text-center">{success}</div>}

@@ -16,6 +16,7 @@ import { useMarketplaceOptions } from '@/lib/hooks/useMarketplaceOptions';
 // Layout import removed - using AppLayout only
 import AppLayout from '@/components/AppLayout';
 import CircleIcon from '@mui/icons-material/Circle';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import UPSLabelDrawer from '@/components/UPSLabelDrawer';
 import ManualOrderButton from '@/components/ManualOrderButton';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
@@ -245,6 +246,34 @@ export interface LabelRow {
   variantInfo?: string;
 }
 
+
+/** Build a marketplace order URL from marketplace name + order number */
+function getMarketplaceOrderUrl(marketplace: string, orderNumber: string): string | null {
+  if (!marketplace || !orderNumber || orderNumber === '—') return null;
+  const mp = marketplace.toLowerCase();
+
+  // Etsy
+  if (mp.includes('etsy')) {
+    return `https://www.etsy.com/your/orders/sold/completed?order_id=${orderNumber}`;
+  }
+  // Trendyol
+  if (mp.includes('trendyol')) {
+    return `https://partner.trendyol.com/orders/detail/${orderNumber}`;
+  }
+  // eBay
+  if (mp.includes('ebay')) {
+    return `https://www.ebay.com/sh/ord/details?orderid=${encodeURIComponent(orderNumber)}`;
+  }
+  // Amazon
+  if (mp.includes('amazon')) {
+    return `https://sellercentral.amazon.com/orders-v3/order/${orderNumber}`;
+  }
+  // Hepsiburada
+  if (mp.includes('hepsiburada')) {
+    return `https://merchant.hepsiburada.com/siparis/detay/${orderNumber}`;
+  }
+  return null;
+}
 
 const statusColors: Record<string, {bg: string, text: string}> = {
   UNSHIPPED: { bg: '#87CEEB', text: '#000' }, // Baby Blue
@@ -1616,7 +1645,32 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       sortable: true,
       sortComparator: (v1, v2) => new Date(v1).getTime() - new Date(v2).getTime(), // newest to oldest
     },
-    { field: 'orderNumber', headerName: t('columnOrderNo'), width: 110 },
+    {
+      field: 'orderNumber',
+      headerName: t('columnOrderNo'),
+      width: 140,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => {
+        const url = getMarketplaceOrderUrl(params.row.marketplace, params.value as string);
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', gap: 0.5 }}>
+            <Typography variant="body2" noWrap>{params.value || '—'}</Typography>
+            {url && (
+              <IconButton
+                size="small"
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                component="a"
+                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                sx={{ p: 0.25, color: 'primary.main', '&:hover': { color: 'primary.dark' } }}
+              >
+                <OpenInNewIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            )}
+          </Box>
+        );
+      }
+    },
     {
       field: 'customerSevk',
       headerName: t('columnCustomerShip'),
@@ -2465,7 +2519,16 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         </Box>
                       </Box>
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.7rem' }}>
-                        #{row.orderNumber} · {row.marketplace || '-'} · {row.orderDate ? formatDate(new Date(row.orderDate)) : '-'}
+                        {(() => {
+                          const mpUrl = getMarketplaceOrderUrl(row.marketplace, row.orderNumber);
+                          return mpUrl ? (
+                            <a href={mpUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#1976d2', textDecoration: 'none' }}>
+                              #{row.orderNumber} <OpenInNewIcon sx={{ fontSize: 10, verticalAlign: 'middle' }} />
+                            </a>
+                          ) : (
+                            <>#{row.orderNumber}</>
+                          );
+                        })()} · {row.marketplace || '-'} · {row.orderDate ? formatDate(new Date(row.orderDate)) : '-'}
                         {row.orderTotalPrice > 0 && ` · ${currSymbol}${row.orderTotalPrice.toFixed(2)}`}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.65rem' }}>

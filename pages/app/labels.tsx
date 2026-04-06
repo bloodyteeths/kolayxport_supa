@@ -151,6 +151,7 @@ interface LocalUIOrder {
       image_url?: string;
       weight?: number;
       product?: {
+        id?: number;
         title?: string;
         main_image_src?: string;
         hs_tariff_number?: string;
@@ -244,36 +245,16 @@ export interface LabelRow {
   
   // Add variantInfo for Trendyol orders
   variantInfo?: string;
+
+  // Direct listing URL from marketplace
+  listingUrl?: string;
 }
 
 
-/** Build a marketplace order URL from marketplace name + order number */
-function getProductListingUrl(marketplace: string, title: string, channel?: string): string | null {
-  if (!title || title === '—' || title === 'N/A (Order Level)') return null;
-  const mp = (marketplace || '').toLowerCase();
-  const ch = (channel || '').toLowerCase();
-  const q = encodeURIComponent(title.slice(0, 120));
-
-  // Etsy
-  if (mp.includes('etsy') || ch.includes('etsy')) {
-    return `https://www.etsy.com/search?q=${q}`;
-  }
-  // eBay
-  if (mp.includes('ebay')) {
-    return `https://www.ebay.com/sch/i.html?_nkw=${q}`;
-  }
-  // Trendyol
-  if (mp.includes('trendyol')) {
-    return `https://www.trendyol.com/sr?q=${q}`;
-  }
-  // Amazon
-  if (mp.includes('amazon')) {
-    return `https://www.amazon.com/s?k=${q}`;
-  }
-  // Hepsiburada
-  if (mp.includes('hepsiburada')) {
-    return `https://www.hepsiburada.com/ara?q=${q}`;
-  }
+/** Get the product listing URL — prefer pre-resolved direct URL from LabelRow */
+function getProductListingUrl(row: LabelRow): string | null {
+  // Use pre-resolved direct listing URL from Veeqo Product API / EtsyListing DB
+  if (row.listingUrl) return row.listingUrl;
   return null;
 }
 
@@ -781,6 +762,48 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
     }
   }
 
+  // Pre-fetch listing URLs: collect Veeqo product IDs and Shippo titles
+  const veeqoProductIds: number[] = [];
+  const shippoTitles: string[] = [];
+  for (const order of orders) {
+    if (!order || typeof order !== 'object') continue;
+    let safeRaw = order.rawData;
+    if (typeof safeRaw === 'string') {
+      try { safeRaw = JSON.parse(safeRaw); } catch { safeRaw = {}; }
+    }
+    const items = order.line_items || safeRaw?.line_items || [];
+    for (const item of items) {
+      if (item.sellable?.product?.id) {
+        veeqoProductIds.push(Number(item.sellable.product.id));
+      } else if (item.title) {
+        shippoTitles.push(item.title);
+      }
+    }
+  }
+
+  // Batch fetch listing URLs
+  const listingUrlsByProductId: Record<string, string> = {};
+  const listingUrlsByTitle: Record<string, string> = {};
+  if (veeqoProductIds.length > 0 || shippoTitles.length > 0) {
+    try {
+      const resp = await fetch('/api/listing-urls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productIds: [...new Set(veeqoProductIds)],
+          titles: [...new Set(shippoTitles)],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        Object.assign(listingUrlsByProductId, data.byProductId || {});
+        Object.assign(listingUrlsByTitle, data.byTitle || {});
+      }
+    } catch (error) {
+      console.warn('Failed to batch fetch listing URLs:', error);
+    }
+  }
+
   const labelRows: LabelRow[] = [];
   for (const order of orders) {
     // Skip invalid orders
@@ -896,8 +919,12 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         shippingLabelUrl: hasOrderLabel ? (latestShipment?.pdfUrl || order.shippingLabelUrl) : undefined,
         labelStockType: order.labelStockType,
         variantInfo: lineItems?.[0]?.variantInfo || '—',
+        listingUrl: (() => {
+          const t = order.commodityDesc || safeRaw?.line_items?.[0]?.title || '';
+          return listingUrlsByTitle[t] || undefined;
+        })(),
       };
-      
+
       labelRows.push(orderLevelRow);
       continue;
     }
@@ -959,12 +986,19 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         shippingLabelUrl: latestLabelJob?.pdfUrl || (latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined),
         labelStockType: order.labelStockType,
         variantInfo: item.variantInfo || '—',
+        listingUrl: (() => {
+          if (isVeeqoItem && item.sellable?.product?.id) {
+            return listingUrlsByProductId[String(item.sellable.product.id)] || undefined;
+          }
+          const t = item.title || '';
+          return listingUrlsByTitle[t] || undefined;
+        })(),
       };
     });
-    
+
     labelRows.push(...itemRows);
   }
-  
+
   return labelRows;
 }
 
@@ -1726,7 +1760,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       minWidth: 180,
       flex: 2,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const listingUrl = getProductListingUrl(params.row.marketplace, params.value as string, params.row.channel);
+        const listingUrl = getProductListingUrl(params.row);
         return (
           <Tooltip title={params.value || ''} placement="bottom-start">
             <Box
@@ -2587,7 +2621,12 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         {row.orderTotalPrice > 0 && ` · ${currSymbol}${row.orderTotalPrice.toFixed(2)}`}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.65rem' }}>
-                        {row.title || row.sku || '-'}{row.variantInfo && row.variantInfo !== '—' ? ` · ${row.variantInfo}` : ''}
+                        {row.listingUrl ? (
+                          <a href={row.listingUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#1976d2', textDecoration: 'none' }}>
+                            {row.title || row.sku || '-'} <OpenInNewIcon sx={{ fontSize: 9, verticalAlign: 'middle' }} />
+                          </a>
+                        ) : (row.title || row.sku || '-')}
+                        {row.variantInfo && row.variantInfo !== '—' ? ` · ${row.variantInfo}` : ''}
                       </Typography>
                     </Box>
                   </Box>

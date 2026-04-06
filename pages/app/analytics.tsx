@@ -14,13 +14,11 @@ import {
   Users,
   Package,
   RefreshCw,
-  DollarSign as CurrencyIcon,
-  Truck,
-  Clock,
-  Activity,
   ChevronLeft,
   ChevronRight,
   Calendar,
+  ArrowUpRight,
+  ArrowDownRight,
 } from 'lucide-react';
 
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
@@ -29,13 +27,6 @@ const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 // Types
 // ---------------------------------------------------------------------------
 
-interface MonthlyStatItem {
-  month: string;
-  orders: number;
-  revenue: number;
-  customers: number;
-}
-
 interface MarketplaceBreakdownItem {
   marketplace: string;
   orders: number;
@@ -43,23 +34,7 @@ interface MarketplaceBreakdownItem {
   customers: number;
   avgOrderValue: number;
   percentage: number;
-}
-
-interface ShippingStats {
-  totalLabels: number;
-  pendingLabels: number;
-  byCarrier: { carrier: string; count: number }[];
-}
-
-interface RecentActivityItem {
-  orderNumber: string;
-  customerName: string;
-  totalPrice: number;
-  currency: string;
-  marketplace: string;
-  externalStatus: string;
-  uiOrderDate: string;
-  labelStatus: string;
+  byCurrency?: Record<string, number>;
 }
 
 interface AnalyticsData {
@@ -69,40 +44,31 @@ interface AnalyticsData {
   averageOrderValue: number;
   orderTrend: number;
   revenueTrend: number;
-  previousPeriod?: {
-    orders: number;
-    revenue: number;
-  };
-  exchangeRates?: {
-    USD: number;
-    EUR: number;
-    lastUpdated?: string;
-  };
+  previousPeriod?: { orders: number; revenue: number };
+  exchangeRates?: { USD: number; EUR: number; lastUpdated?: string };
   topMarketplaces: {
     name: string;
     orders: number;
     revenue: number;
     color: string;
+    byCurrency?: Record<string, number>;
   }[];
-  dailyStats: {
-    date: string;
-    orders: number;
-    revenue: number;
-  }[];
-  topProducts: {
-    name: string;
-    orders: number;
-    revenue: number;
-  }[];
-  orderStatusBreakdown: {
-    status: string;
-    count: number;
-    color: string;
-  }[];
-  monthlyStats?: MonthlyStatItem[];
+  dailyStats: { date: string; orders: number; revenue: number }[];
+  topProducts: { name: string; orders: number; revenue: number }[];
+  orderStatusBreakdown: { status: string; count: number; color: string }[];
+  monthlyStats?: { month: string; orders: number; revenue: number; customers: number }[];
   marketplaceBreakdown?: MarketplaceBreakdownItem[];
-  shippingStats?: ShippingStats;
-  recentActivity?: RecentActivityItem[];
+  shippingStats?: { totalLabels: number; pendingLabels: number; byCarrier: { carrier: string; count: number }[] };
+  recentActivity?: {
+    orderNumber: string;
+    customerName: string;
+    totalPrice: number;
+    currency: string;
+    marketplace: string;
+    externalStatus: string;
+    uiOrderDate: string;
+    labelStatus: string;
+  }[];
   hourlyBreakdown?: {
     hour: number;
     orders: number;
@@ -116,16 +82,12 @@ interface AnalyticsData {
 // Constants
 // ---------------------------------------------------------------------------
 
-const MARKETPLACE_PALETTE = [
-  '#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#F97316',
-  '#8B5CF6', '#EC4899', '#14B8A6', '#6366F1', '#84CC16',
-  '#06B6D4', '#D946EF', '#F43F5E', '#0EA5E9', '#A855F7',
-];
-const MARKETPLACE_COLORS_FIXED: Record<string, string> = {
+const MARKETPLACE_COLORS: Record<string, string> = {
   trendyol: '#F59E0B',
   amazon: '#3B82F6',
   'amazon fba': '#6366F1',
   etsy: '#F97316',
+  ebay: '#0064D2',
   veeqo: '#14B8A6',
   shippo: '#10B981',
   hepsiburada: '#EF4444',
@@ -135,173 +97,113 @@ const MARKETPLACE_COLORS_FIXED: Record<string, string> = {
   outletemporiumus: '#84CC16',
   manual: '#9CA3AF',
 };
-const getMarketplaceColor = (name: string | null | undefined, index: number): string => {
-  if (!name) return MARKETPLACE_PALETTE[index % MARKETPLACE_PALETTE.length];
-  return MARKETPLACE_COLORS_FIXED[name.toLowerCase()] || MARKETPLACE_PALETTE[index % MARKETPLACE_PALETTE.length];
-};
-const MARKETPLACE_COLORS: Record<string, string> = MARKETPLACE_COLORS_FIXED;
 
-const MARKETPLACE_BG: Record<string, string> = {
-  trendyol: 'bg-amber-100 text-amber-800',
-  amazon: 'bg-blue-100 text-blue-800',
-  'amazon fba': 'bg-indigo-100 text-indigo-800',
-  etsy: 'bg-orange-100 text-orange-800',
-  veeqo: 'bg-teal-100 text-teal-800',
-  shippo: 'bg-green-100 text-green-800',
-  hepsiburada: 'bg-red-100 text-red-800',
-  bellecouturegifts: 'bg-pink-100 text-pink-800',
-  decorsweetart: 'bg-purple-100 text-purple-800',
-  mybabybymerry: 'bg-cyan-100 text-cyan-800',
-  outletemporiumus: 'bg-lime-100 text-lime-800',
-  manual: 'bg-gray-100 text-gray-800',
+const PALETTE = [
+  '#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#F97316',
+  '#8B5CF6', '#EC4899', '#14B8A6', '#6366F1', '#84CC16',
+];
+
+const mpColor = (name: string | null | undefined, i: number) =>
+  MARKETPLACE_COLORS[(name || '').toLowerCase()] || PALETTE[i % PALETTE.length];
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', TRY: '₺', TL: '₺', CAD: 'C$', AUD: 'A$',
 };
 
-// formatCurrency and formatNumber are now provided by useLocale() inside the component
+const fmtNative = (byCurrency: Record<string, number> | undefined): string => {
+  if (!byCurrency) return '-';
+  return Object.entries(byCurrency)
+    .filter(([, v]) => v > 0)
+    .map(([cur, val]) => `${CURRENCY_SYMBOLS[cur] || cur}${val.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`)
+    .join(' + ');
+};
 
 // ---------------------------------------------------------------------------
-// Small reusable pieces
+// Small components
 // ---------------------------------------------------------------------------
 
-const SectionCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <div className={`card-premium p-3 sm:p-4 lg:p-6 overflow-hidden min-w-0 ${className}`}>{children}</div>
-);
-
-const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="text-base font-semibold text-slate-900 mb-4" style={{ letterSpacing: '-0.01em' }}>{children}</h3>
+const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm ${className}`}>{children}</div>
 );
 
 const EmptyState = ({ message }: { message?: string }) => (
-  <div className="flex items-center justify-center py-10 text-slate-400 text-sm">{message || '-'}</div>
+  <div className="flex items-center justify-center py-12 text-slate-400 text-sm">{message || '-'}</div>
 );
 
-const MarketplaceBadge = ({ name }: { name: string | null | undefined }) => {
-  const safeName = name || 'Unknown';
-  const key = safeName.toLowerCase();
-  const color = MARKETPLACE_COLORS_FIXED[key] || '#94a3b8';
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
-      style={{ backgroundColor: `${color}15`, color }}
-    >
-      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-      {safeName}
-    </span>
-  );
-};
-
-const StatusBadge = ({ status }: { status: string | null | undefined }) => {
-  const s = (status || '').toLowerCase();
-  let color = '#64748b';
-  let bg = '#f8fafc';
-  if (s.includes('deliver') || s.includes('teslim')) { color = '#16a34a'; bg = '#f0fdf4'; }
-  else if (s.includes('ship') || s.includes('kargo')) { color = '#2563eb'; bg = '#eff6ff'; }
-  else if (s.includes('pending') || s.includes('bekle')) { color = '#d97706'; bg = '#fffbeb'; }
-  else if (s.includes('cancel') || s.includes('iptal')) { color = '#dc2626'; bg = '#fef2f2'; }
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
-      style={{ backgroundColor: bg, color }}
-    >
-      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-      {status || '-'}
-    </span>
-  );
-};
+const MarketplaceDot = ({ name, size = 8 }: { name: string; size?: number }) => (
+  <span
+    className="inline-block rounded-full flex-shrink-0"
+    style={{ width: size, height: size, backgroundColor: MARKETPLACE_COLORS[name.toLowerCase()] || '#94a3b8' }}
+  />
+);
 
 // ---------------------------------------------------------------------------
-// StatCard
+// KPI Card
 // ---------------------------------------------------------------------------
 
-const StatCard = ({
+const KPICard = ({
   title,
   value,
   trend,
   trendLabel,
   icon: Icon,
-  color = 'blue',
-  fmtNumber,
+  iconColor,
+  iconBg,
 }: {
   title: string;
-  value: string | number;
+  value: string;
   trend?: number;
   trendLabel?: string;
   icon: React.ComponentType<any>;
-  color?: string;
-  fmtNumber?: (v: number) => string;
+  iconColor: string;
+  iconBg: string;
 }) => {
-  const trendPositive = trend !== undefined && trend >= 0;
-
-  const colorMap: Record<string, { bg: string; icon: string; trendBg: string; trendColor: string }> = {
-    blue: { bg: 'linear-gradient(135deg, #eff6ff, #dbeafe)', icon: '#2563eb', trendBg: trendPositive ? '#f0fdf4' : '#fef2f2', trendColor: trendPositive ? '#059669' : '#dc2626' },
-    green: { bg: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', icon: '#16a34a', trendBg: trendPositive ? '#f0fdf4' : '#fef2f2', trendColor: trendPositive ? '#059669' : '#dc2626' },
-    purple: { bg: 'linear-gradient(135deg, #f5f3ff, #ede9fe)', icon: '#7c3aed', trendBg: trendPositive ? '#f0fdf4' : '#fef2f2', trendColor: trendPositive ? '#059669' : '#dc2626' },
-    orange: { bg: 'linear-gradient(135deg, #fff7ed, #ffedd5)', icon: '#ea580c', trendBg: trendPositive ? '#f0fdf4' : '#fef2f2', trendColor: trendPositive ? '#059669' : '#dc2626' },
-  };
-
-  const c = colorMap[color] || colorMap.blue;
-
+  const positive = (trend ?? 0) >= 0;
   return (
-    <div className="card-premium p-3 sm:p-5 overflow-hidden min-w-0 group">
-      <div className="flex items-start justify-between">
-        <div
-          className="p-2 sm:p-2.5 rounded-xl transition-transform duration-200 group-hover:scale-105"
-          style={{ background: c.bg }}
-        >
-          <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: c.icon }} />
+    <Card className="p-4 sm:p-5">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="p-2 rounded-xl" style={{ backgroundColor: iconBg }}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: iconColor }} />
         </div>
-        {trend !== undefined && (
-          <span
-            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold"
-            style={{ backgroundColor: c.trendBg, color: c.trendColor }}
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className="hidden sm:block">
-              {trendPositive ? <path d="M5 2L8 6H2L5 2Z" /> : <path d="M5 8L2 4H8L5 8Z" />}
-            </svg>
+        <span className="text-xs sm:text-sm font-medium text-slate-500">{title}</span>
+      </div>
+      <div className="text-lg sm:text-2xl font-bold text-slate-900" style={{ letterSpacing: '-0.025em' }}>
+        {value}
+      </div>
+      {trend !== undefined && (
+        <div className="mt-2 flex items-center gap-1.5">
+          {positive ? (
+            <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" />
+          ) : (
+            <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
+          )}
+          <span className={`text-xs font-semibold ${positive ? 'text-emerald-600' : 'text-red-500'}`}>
             {Math.abs(trend).toFixed(1)}%
           </span>
-        )}
-      </div>
-      <div className="mt-2.5 sm:mt-4 min-w-0">
-        <h3 className="text-sm sm:text-xl font-bold text-slate-900 truncate" style={{ letterSpacing: '-0.025em' }}>
-          {typeof value === 'number' ? (fmtNumber ? fmtNumber(value) : String(value)) : value}
-        </h3>
-        <p className="text-[10px] sm:text-[13px] font-medium text-slate-500 truncate mt-0.5">{title}</p>
-        {trendLabel && <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 truncate">{trendLabel}</p>}
-      </div>
-    </div>
+          {trendLabel && <span className="text-xs text-slate-400 ml-1">{trendLabel}</span>}
+        </div>
+      )}
+    </Card>
   );
 };
 
 // ---------------------------------------------------------------------------
-// Skeleton loader
+// Skeleton
 // ---------------------------------------------------------------------------
 
-const SkeletonBlock = ({ className = '' }: { className?: string }) => (
-  <div className={`animate-shimmer rounded-xl ${className}`} />
-);
-
-const LoadingSkeleton = () => (
-  <div className="space-y-6">
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+const Skeleton = () => (
+  <div className="space-y-6 animate-pulse">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {[...Array(4)].map((_, i) => (
-        <SkeletonBlock key={i} className="h-32" />
+        <div key={i} className="bg-slate-100 rounded-2xl h-28" />
       ))}
     </div>
-    <SkeletonBlock className="h-12" />
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <SkeletonBlock className="h-80" />
-      <SkeletonBlock className="h-80" />
+    <div className="bg-slate-100 rounded-2xl h-10" />
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="lg:col-span-2 bg-slate-100 rounded-2xl h-72" />
+      <div className="bg-slate-100 rounded-2xl h-72" />
     </div>
-    <SkeletonBlock className="h-64" />
-    <SkeletonBlock className="h-80" />
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <SkeletonBlock className="h-64" />
-      <SkeletonBlock className="h-64" />
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <SkeletonBlock className="h-48" />
-      <SkeletonBlock className="h-64" />
-    </div>
+    <div className="bg-slate-100 rounded-2xl h-64" />
   </div>
 );
 
@@ -309,43 +211,37 @@ const LoadingSkeleton = () => (
 // Main page
 // ---------------------------------------------------------------------------
 
-export default function AnalyticsPage() {
+export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const t = useTranslations('analytics');
-  const tc = useTranslations('common');
   const { config, formatCurrency, formatDate, formatDateTime, formatNumber } = useLocale();
+
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState('day');
+  const [dateRange, setDateRange] = useState('30days');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedDay, setSelectedDay] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  // Initialize selectedMonth and selectedDay on client only to avoid hydration mismatch
+  // Init dates client-side
   useEffect(() => {
     const now = new Date();
-    if (!selectedMonth) {
-      setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-    }
-    if (!selectedDay) {
-      setSelectedDay(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
-    }
+    if (!selectedMonth) setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+    if (!selectedDay) setSelectedDay(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
   }, []);
 
-  // Navigate months
-  const navigateMonth = (direction: -1 | 1) => {
+  const navigateMonth = (dir: -1 | 1) => {
     if (!selectedMonth) return;
     const [y, m] = selectedMonth.split('-').map(Number);
-    const d = new Date(y, m - 1 + direction, 1);
+    const d = new Date(y, m - 1 + dir, 1);
     setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   };
 
-  // Navigate days
-  const navigateDay = (direction: -1 | 1) => {
+  const navigateDay = (dir: -1 | 1) => {
     if (!selectedDay) return;
     const d = new Date(selectedDay + 'T00:00:00');
-    d.setDate(d.getDate() + direction);
+    d.setDate(d.getDate() + dir);
     setSelectedDay(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
   };
 
@@ -362,55 +258,36 @@ export default function AnalyticsPage() {
     return `${d.getDate()} ${config.monthsFull[d.getMonth()]} ${d.getFullYear()}, ${dayNamesArr[d.getDay()]}`;
   }, [selectedDay, config.monthsFull, dayNamesArr]);
 
+  // Fetch
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace('/app');
     } else if (user) {
-      if (dateRange === 'day' && selectedDay) fetchAnalyticsData();
-      else if (dateRange === 'month' && selectedMonth) fetchAnalyticsData();
-      else if (dateRange !== 'day' && dateRange !== 'month') fetchAnalyticsData();
+      if (dateRange === 'day' && selectedDay) fetchData();
+      else if (dateRange === 'month' && selectedMonth) fetchData();
+      else if (dateRange !== 'day' && dateRange !== 'month') fetchData();
     }
   }, [authLoading, user, router, dateRange, selectedMonth, selectedDay]);
 
-  const fetchAnalyticsData = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw new Error('No active session');
-
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No session');
       const params = new URLSearchParams({ dateRange });
       if (dateRange === 'month') params.set('month', selectedMonth);
       if (dateRange === 'day') params.set('day', selectedDay);
-
-      const response = await fetch(`/api/analytics?${params.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
+      const res = await fetch(`/api/analytics?${params}`, {
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Failed to fetch analytics data: ${errorData.error || response.statusText}`);
-      }
-
-      const analyticsData = await response.json();
-      setData(analyticsData);
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
+      if (!res.ok) throw new Error('Fetch failed');
+      setData(await res.json());
+    } catch (e) {
+      console.error('Dashboard fetch error:', e);
       setData({
-        totalOrders: 0,
-        totalRevenue: 0,
-        totalCustomers: 0,
-        averageOrderValue: 0,
-        orderTrend: 0,
-        revenueTrend: 0,
-        topMarketplaces: [],
-        dailyStats: [],
-        topProducts: [],
-        orderStatusBreakdown: [],
+        totalOrders: 0, totalRevenue: 0, totalCustomers: 0, averageOrderValue: 0,
+        orderTrend: 0, revenueTrend: 0, topMarketplaces: [], dailyStats: [],
+        topProducts: [], orderStatusBreakdown: [],
       });
     } finally {
       setLoading(false);
@@ -419,37 +296,32 @@ export default function AnalyticsPage() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchAnalyticsData();
+    await fetchData();
     setRefreshing(false);
   };
 
-  // -----------------------------------------------------------------------
-  // Chart configs (built from data)
-  // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Chart configs
+  // ---------------------------------------------------------------------------
 
-  const dailyLabels =
-    data?.dailyStats.map((s) =>
-      formatDate(new Date(s.date), { month: 'short', day: 'numeric' })
-    ) || [];
+  const dailyLabels = data?.dailyStats.map((s) =>
+    formatDate(new Date(s.date), { month: 'short', day: 'numeric' })
+  ) || [];
 
-  const revenueChartOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'area', height: 280, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
-    colors: ['#2563eb', '#10b981'],
+  const revenueChartOpts: ApexCharts.ApexOptions = {
+    chart: { type: 'area', height: 300, toolbar: { show: false }, fontFamily: 'Inter, sans-serif', background: 'transparent' },
+    colors: ['#3b82f6', '#10b981'],
     dataLabels: { enabled: false },
-    stroke: { curve: 'smooth', width: [0, 3] },
-    xaxis: { categories: dailyLabels },
+    stroke: { curve: 'smooth', width: [0, 2.5] },
+    xaxis: { categories: dailyLabels, labels: { style: { fontSize: '11px', colors: '#94a3b8' } } },
     yaxis: [
-      { title: { text: t('orders') }, labels: { formatter: (v: number) => Math.round(v).toString() } },
-      { opposite: true, title: { text: t('revenueLabel') }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
+      { title: { text: t('orders'), style: { color: '#94a3b8', fontSize: '12px' } }, labels: { formatter: (v: number) => Math.round(v).toString(), style: { colors: '#94a3b8' } } },
+      { opposite: true, title: { text: t('revenueLabel'), style: { color: '#94a3b8', fontSize: '12px' } }, labels: { formatter: (v: number) => formatNumber(Math.round(v)), style: { colors: '#94a3b8' } } },
     ],
-    fill: { type: ['solid', 'gradient'], opacity: [0.35, 1], gradient: { shadeIntensity: 1, stops: [0, 100] } },
-    legend: { position: 'top' },
-    tooltip: {
-      y: {
-        formatter: (v: number, { seriesIndex }: { seriesIndex: number }) =>
-          seriesIndex === 1 ? formatCurrency(v) : `${v} ${t('orders').toLowerCase()}`,
-      },
-    },
+    fill: { type: ['solid', 'gradient'], opacity: [0.15, 1], gradient: { shadeIntensity: 1, stops: [0, 100] } },
+    legend: { position: 'top', labels: { colors: '#64748b' } },
+    grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+    tooltip: { y: { formatter: (v: number, { seriesIndex }: { seriesIndex: number }) => seriesIndex === 1 ? formatCurrency(v) : `${v}` } },
   };
 
   const revenueChartSeries = [
@@ -457,28 +329,47 @@ export default function AnalyticsPage() {
     { name: t('revenue'), type: 'line', data: data?.dailyStats.map((s) => Math.round(s.revenue)) || [] },
   ];
 
-  // Marketplace donut — prefer marketplaceBreakdown, fallback to topMarketplaces
+  // Marketplace donut
   const mpData = data?.marketplaceBreakdown ?? data?.topMarketplaces?.map((m) => ({
-    marketplace: m.name || 'Unknown',
-    orders: m.orders,
-    revenue: m.revenue,
-    customers: 0,
-    avgOrderValue: m.orders > 0 ? m.revenue / m.orders : 0,
-    percentage: 0,
+    marketplace: m.name || 'Unknown', orders: m.orders, revenue: m.revenue,
+    customers: 0, avgOrderValue: m.orders > 0 ? m.revenue / m.orders : 0, percentage: 0,
+    byCurrency: m.byCurrency,
   })) ?? [];
 
-  const donutColors = mpData.map((m, i) => getMarketplaceColor(m.marketplace || 'Unknown', i));
+  const donutColors = mpData.map((m, i) => mpColor(m.marketplace, i));
 
-  const donutOptions: ApexCharts.ApexOptions = {
+  const donutOpts: ApexCharts.ApexOptions = {
     chart: { type: 'donut' },
     colors: donutColors,
-    labels: mpData.map((m) => m.marketplace || 'Unknown'),
-    legend: { position: 'bottom' },
-    plotOptions: { pie: { donut: { size: '70%' } } },
+    labels: mpData.map((m) => m.marketplace),
+    legend: { position: 'bottom', labels: { colors: '#64748b' } },
+    plotOptions: { pie: { donut: { size: '72%', labels: { show: true, total: { show: true, label: t('totalRevenue'), formatter: () => formatCurrency(data?.totalRevenue ?? 0) } } } } },
     tooltip: { y: { formatter: (v: number) => formatCurrency(v) } },
+    dataLabels: { enabled: false },
   };
 
   const donutSeries = mpData.map((m) => Math.round(m.revenue));
+
+  // Hourly charts
+  const hourlyData = data?.hourlyBreakdown ?? [];
+  const hourlyLabels = hourlyData.map((h) => `${String(h.hour).padStart(2, '0')}:00`);
+
+  const hourlyOpts: ApexCharts.ApexOptions = {
+    chart: { type: 'bar', height: 260, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
+    colors: ['#3b82f6', '#e2e8f0'],
+    plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
+    dataLabels: { enabled: false },
+    xaxis: { categories: hourlyLabels, labels: { style: { fontSize: '10px', colors: '#94a3b8' } } },
+    yaxis: { labels: { formatter: (v: number) => Math.round(v).toString(), style: { colors: '#94a3b8' } } },
+    legend: { position: 'top', labels: { colors: '#64748b' } },
+    grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+    tooltip: { y: { formatter: (v: number) => `${v} ${t('orders').toLowerCase()}` } },
+  };
+
+  const hourlySeries = [
+    { name: t('selectedDay'), data: hourlyData.map((h) => h.orders) },
+    { name: t('previousDayChart'), data: hourlyData.map((h) => h.prevOrders) },
+  ];
 
   // Monthly chart
   const monthlyStats = data?.monthlyStats ?? [];
@@ -487,167 +378,69 @@ export default function AnalyticsPage() {
     return isNaN(d.getTime()) ? m.month : config.monthsShort[d.getMonth()];
   });
 
-  const monthlyChartOptions: ApexCharts.ApexOptions = {
+  const monthlyOpts: ApexCharts.ApexOptions = {
     chart: { type: 'bar', height: 280, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
-    colors: ['#2563eb', '#10b981'],
+    colors: ['#3b82f6', '#10b981'],
     plotOptions: { bar: { borderRadius: 6, columnWidth: '50%' } },
     dataLabels: { enabled: false },
-    stroke: { width: [0, 3], curve: 'smooth' },
-    xaxis: { categories: monthlyLabels },
+    stroke: { width: [0, 2.5], curve: 'smooth' },
+    xaxis: { categories: monthlyLabels, labels: { style: { colors: '#94a3b8' } } },
     yaxis: [
-      { title: { text: t('orders') }, labels: { formatter: (v: number) => Math.round(v).toString() } },
-      { opposite: true, title: { text: t('revenueLabel') }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
+      { title: { text: t('orders'), style: { color: '#94a3b8' } }, labels: { formatter: (v: number) => Math.round(v).toString(), style: { colors: '#94a3b8' } } },
+      { opposite: true, title: { text: t('revenueLabel'), style: { color: '#94a3b8' } }, labels: { formatter: (v: number) => formatNumber(Math.round(v)), style: { colors: '#94a3b8' } } },
     ],
-    legend: { position: 'top' },
-    tooltip: {
-      y: {
-        formatter: (v: number, { seriesIndex }: { seriesIndex: number }) =>
-          seriesIndex === 1 ? formatCurrency(v) : `${formatNumber(v)} ${t('orders').toLowerCase()}`,
-      },
-    },
+    legend: { position: 'top', labels: { colors: '#64748b' } },
+    grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
+    tooltip: { y: { formatter: (v: number, { seriesIndex }: { seriesIndex: number }) => seriesIndex === 1 ? formatCurrency(v) : `${v}` } },
   };
 
-  const monthlyChartSeries = [
+  const monthlySeries = [
     { name: t('orders'), type: 'column', data: monthlyStats.map((m) => m.orders) },
     { name: t('revenue'), type: 'line', data: monthlyStats.map((m) => Math.round(m.revenue)) },
   ];
 
-  // Hourly chart for day mode
-  const hourlyData = data?.hourlyBreakdown ?? [];
-  const hourlyLabels = hourlyData.map((h) => `${String(h.hour).padStart(2, '0')}:00`);
-
-  const hourlyChartOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'bar', height: 300, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
-    colors: ['#2563eb', '#cbd5e1'],
-    plotOptions: { bar: { borderRadius: 5, columnWidth: '60%' } },
-    dataLabels: { enabled: false },
-    xaxis: { categories: hourlyLabels, labels: { style: { fontSize: '10px' } } },
-    yaxis: { title: { text: t('orders') }, labels: { formatter: (v: number) => Math.round(v).toString() } },
-    legend: { position: 'top' },
-    tooltip: {
-      y: { formatter: (v: number) => `${v} ${t('orders').toLowerCase()}` },
-    },
-  };
-
-  const hourlyChartSeries = [
-    { name: t('selectedDay'), data: hourlyData.map((h) => h.orders) },
-    { name: t('previousDayChart'), data: hourlyData.map((h) => h.prevOrders) },
-  ];
-
-  const hourlyRevenueChartOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'area', height: 300, toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
-    colors: ['#10b981', '#cbd5e1'],
-    dataLabels: { enabled: false },
-    stroke: { curve: 'smooth', width: 2 },
-    fill: { type: 'gradient', opacity: [0.4, 0.1], gradient: { shadeIntensity: 1, stops: [0, 100] } },
-    xaxis: { categories: hourlyLabels, labels: { style: { fontSize: '10px' } } },
-    yaxis: { title: { text: t('revenueLabel') }, labels: { formatter: (v: number) => formatNumber(Math.round(v)) } },
-    legend: { position: 'top' },
-    tooltip: {
-      y: { formatter: (v: number) => formatCurrency(v) },
-    },
-  };
-
-  const hourlyRevenueChartSeries = [
-    { name: t('selectedDay'), data: hourlyData.map((h) => h.revenue) },
-    { name: t('previousDayChart'), data: hourlyData.map((h) => h.prevRevenue) },
-  ];
-
-  // Order status helpers
+  // Status
   const totalStatusCount = data?.orderStatusBreakdown.reduce((a, b) => a + b.count, 0) || 1;
 
-  // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Render
-  // -----------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   if (authLoading || loading) {
-    return (
-      <AppLayout title={t('pageTitle')}>
-        <LoadingSkeleton />
-      </AppLayout>
-    );
+    return <AppLayout title={t('pageTitle')}><Skeleton /></AppLayout>;
   }
 
   return (
     <AppLayout title={t('pageTitle')}>
-      <div className="space-y-6 overflow-x-hidden max-w-full">
-        {/* Header */}
+      <div className="space-y-5 max-w-full">
+
+        {/* ── Header ─────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-lg sm:text-2xl font-bold text-slate-900 truncate" style={{ letterSpacing: '-0.025em' }}>
+          <div>
+            <h1 className="text-lg sm:text-2xl font-bold text-slate-900" style={{ letterSpacing: '-0.025em' }}>
               {dateRange === 'day' ? t('dayAnalysis') : t('dashboardTitle')}
             </h1>
-            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500 truncate">
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               {dateRange === 'day' ? selectedDayLabel : t('trackPerformance')}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="btn-primary text-xs sm:text-sm !py-2 !px-3 sm:!px-4 disabled:opacity-50"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {t('refresh')}
-            </button>
-          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="btn-primary text-xs sm:text-sm !py-2 !px-4 disabled:opacity-50 self-start sm:self-auto"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            {t('refresh')}
+          </button>
         </div>
 
-        {/* ============================================================= */}
-        {/* ROW 1: KPI Cards                                              */}
-        {/* ============================================================= */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6 overflow-hidden">
-          <StatCard
-            title={dateRange === 'day' ? t('orders') : t('totalOrders')}
-            value={data?.totalOrders ?? 0}
-            trend={data?.orderTrend}
-            trendLabel={
-              dateRange === 'day' ? `${t('previousDay')}: ${formatNumber(data?.previousPeriod?.orders ?? 0)}`
-              : dateRange === 'month' ? `${t('previousMonth')}: ${formatNumber(data?.previousPeriod?.orders ?? 0)}`
-              : t('previousPeriod')
-            }
-            icon={ShoppingCart}
-            color="blue"
-            fmtNumber={formatNumber}
-          />
-          <StatCard
-            title={dateRange === 'day' ? t('revenue') : t('totalRevenue')}
-            value={formatCurrency(data?.totalRevenue ?? 0)}
-            trend={data?.revenueTrend}
-            trendLabel={
-              dateRange === 'day' ? `${t('previousDay')}: ${formatCurrency(data?.previousPeriod?.revenue ?? 0)}`
-              : dateRange === 'month' ? `${t('previousMonth')}: ${formatCurrency(data?.previousPeriod?.revenue ?? 0)}`
-              : t('previousPeriod')
-            }
-            icon={DollarSign}
-            color="green"
-            fmtNumber={formatNumber}
-          />
-          <StatCard
-            title={t('customerCount')}
-            value={data?.totalCustomers ?? 0}
-            icon={Users}
-            color="purple"
-            fmtNumber={formatNumber}
-          />
-          <StatCard
-            title={t('averageOrder')}
-            value={formatCurrency(data?.averageOrderValue ?? 0)}
-            icon={Package}
-            color="orange"
-            fmtNumber={formatNumber}
-          />
-        </div>
-
-        {/* ============================================================= */}
-        {/* ROW 2: Date Range + Exchange Rates                            */}
-        {/* ============================================================= */}
-        <div className="flex flex-col gap-3 sm:gap-4">
-          <div className="flex flex-wrap items-center gap-2">
+        {/* ── Date Range Bar ─────────────────────────────────────── */}
+        <Card className="p-3 sm:p-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="px-2 py-1.5 sm:px-3 sm:py-2 border border-slate-200 rounded-xl text-xs sm:text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+              className="px-3 py-2 border border-slate-200 rounded-xl text-xs sm:text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
             >
               <option value="day">{t('dateRanges.day')}</option>
               <option value="month">{t('dateRanges.month')}</option>
@@ -658,317 +451,259 @@ export default function AnalyticsPage() {
               <option value="12months">{t('dateRanges.12months')}</option>
               <option value="all">{t('dateRanges.all')}</option>
             </select>
+
             {dateRange === 'day' && (
               <div className="flex items-center bg-white border border-slate-200 rounded-xl">
-                <button
-                  onClick={() => navigateDay(-1)}
-                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-l-md transition-colors"
-                >
-                  <ChevronLeft className="h-4 w-4 text-gray-600" />
+                <button onClick={() => navigateDay(-1)} className="p-2 hover:bg-slate-50 rounded-l-xl transition-colors">
+                  <ChevronLeft className="h-4 w-4 text-slate-500" />
                 </button>
-                <div className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 justify-center">
-                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm font-medium text-gray-900 whitespace-nowrap">{selectedDayLabel}</span>
+                <div className="flex items-center gap-1.5 px-3 py-1.5">
+                  <Calendar className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium text-slate-800 whitespace-nowrap">{selectedDayLabel}</span>
                 </div>
-                <button
-                  onClick={() => navigateDay(1)}
-                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-r-md transition-colors"
-                >
-                  <ChevronRight className="h-4 w-4 text-gray-600" />
+                <button onClick={() => navigateDay(1)} className="p-2 hover:bg-slate-50 rounded-r-xl transition-colors">
+                  <ChevronRight className="h-4 w-4 text-slate-500" />
                 </button>
               </div>
             )}
+
             {dateRange === 'month' && (
               <div className="flex items-center bg-white border border-slate-200 rounded-xl">
-                <button
-                  onClick={() => navigateMonth(-1)}
-                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-l-md transition-colors"
-                >
-                  <ChevronLeft className="h-4 w-4 text-gray-600" />
+                <button onClick={() => navigateMonth(-1)} className="p-2 hover:bg-slate-50 rounded-l-xl transition-colors">
+                  <ChevronLeft className="h-4 w-4 text-slate-500" />
                 </button>
-                <div className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 justify-center">
-                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
-                  <span className="text-xs sm:text-sm font-medium text-gray-900 whitespace-nowrap">{selectedMonthLabel}</span>
+                <div className="flex items-center gap-1.5 px-3 py-1.5">
+                  <Calendar className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium text-slate-800 whitespace-nowrap">{selectedMonthLabel}</span>
                 </div>
-                <button
-                  onClick={() => navigateMonth(1)}
-                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-r-md transition-colors"
-                >
-                  <ChevronRight className="h-4 w-4 text-gray-600" />
+                <button onClick={() => navigateMonth(1)} className="p-2 hover:bg-slate-50 rounded-r-xl transition-colors">
+                  <ChevronRight className="h-4 w-4 text-slate-500" />
                 </button>
               </div>
             )}
-          </div>
 
-          {data?.exchangeRates && (
-            <div className="flex-1 p-3 rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.04), rgba(79,70,229,0.06))', border: '1px solid rgba(37,99,235,0.12)' }}>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6">
-                <div className="flex items-center gap-2">
-                  <CurrencyIcon className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium text-gray-700">{t('currentRates')}:</span>
-                </div>
-                <div className="flex items-center gap-4 sm:gap-6">
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-semibold text-gray-900">1 USD =</span>
-                    <span className="text-base font-bold text-blue-600">
-                      {formatCurrency(data.exchangeRates.USD)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-semibold text-gray-900">1 EUR =</span>
-                    <span className="text-base font-bold text-green-600">
-                      {formatCurrency(data.exchangeRates.EUR)}
-                    </span>
-                  </div>
-                </div>
-                {data.exchangeRates.lastUpdated && (
-                  <span className="text-xs text-gray-500">
-                    {formatDateTime(new Date(data.exchangeRates.lastUpdated), { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                )}
+            {/* Exchange rates inline */}
+            {data?.exchangeRates && (
+              <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
+                <span>1 USD = <strong className="text-blue-600">{formatCurrency(data.exchangeRates.USD)}</strong></span>
+                <span>1 EUR = <strong className="text-emerald-600">{formatCurrency(data.exchangeRates.EUR)}</strong></span>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </Card>
+
+        {/* ── KPI Cards ──��───────────────────────────────────────── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <KPICard
+            title={dateRange === 'day' ? t('orders') : t('totalOrders')}
+            value={formatNumber(data?.totalOrders ?? 0)}
+            trend={data?.orderTrend}
+            trendLabel={dateRange === 'day' ? t('previousDay') : dateRange === 'month' ? t('previousMonth') : undefined}
+            icon={ShoppingCart}
+            iconColor="#2563eb"
+            iconBg="#eff6ff"
+          />
+          <KPICard
+            title={dateRange === 'day' ? t('revenue') : t('totalRevenue')}
+            value={formatCurrency(data?.totalRevenue ?? 0)}
+            trend={data?.revenueTrend}
+            trendLabel={dateRange === 'day' ? t('previousDay') : dateRange === 'month' ? t('previousMonth') : undefined}
+            icon={DollarSign}
+            iconColor="#059669"
+            iconBg="#ecfdf5"
+          />
+          <KPICard
+            title={t('customerCount')}
+            value={formatNumber(data?.totalCustomers ?? 0)}
+            icon={Users}
+            iconColor="#7c3aed"
+            iconBg="#f5f3ff"
+          />
+          <KPICard
+            title={t('averageOrder')}
+            value={formatCurrency(data?.averageOrderValue ?? 0)}
+            icon={Package}
+            iconColor="#ea580c"
+            iconBg="#fff7ed"
+          />
         </div>
 
-        {/* ============================================================= */}
-        {/* DAY MODE: Hourly Breakdown Charts                             */}
-        {/* ============================================================= */}
-        {dateRange === 'day' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-            <SectionCard>
-              <SectionTitle>{t('hourlyOrderBreakdown')}</SectionTitle>
-              {hourlyData.some((h) => h.orders > 0 || h.prevOrders > 0) ? (
-                <Chart options={hourlyChartOptions} series={hourlyChartSeries} type="bar" height={300} />
-              ) : (
-                <EmptyState message={t('noOrderDataToday')} />
-              )}
-            </SectionCard>
-            <SectionCard>
-              <SectionTitle>{t('hourlyRevenueComparison')}</SectionTitle>
-              {hourlyData.some((h) => h.revenue > 0 || h.prevRevenue > 0) ? (
-                <Chart options={hourlyRevenueChartOptions} series={hourlyRevenueChartSeries} type="area" height={300} />
-              ) : (
-                <EmptyState message={t('noRevenueDataToday')} />
-              )}
-            </SectionCard>
-          </div>
+        {/* ── Currency notice ────────────────────────────────────── */}
+        {data?.exchangeRates && (
+          <p className="text-[11px] text-slate-400 -mt-2 px-1">{t('allCurrenciesConverted')}</p>
         )}
 
-        {/* ============================================================= */}
-        {/* ROW 3: Revenue/Orders Trend + Marketplace Donut               */}
-        {/* ============================================================= */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          <SectionCard>
-            <SectionTitle>{t('revenueAndOrderTrend')}</SectionTitle>
+        {/* ── Day mode: Hourly chart ─────────────────────────────── */}
+        {dateRange === 'day' && hourlyData.length > 0 && hourlyData.some((h) => h.orders > 0 || h.prevOrders > 0) && (
+          <Card className="p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-slate-800 mb-3">{t('hourlyOrderBreakdown')}</h3>
+            <Chart options={hourlyOpts} series={hourlySeries} type="bar" height={260} />
+          </Card>
+        )}
+
+        {/* ── Main chart + Donut ─────────────────���───────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Card className="lg:col-span-2 p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-slate-800 mb-3">{t('revenueAndOrderTrend')}</h3>
             {data?.dailyStats && data.dailyStats.length > 0 ? (
-              <Chart options={revenueChartOptions} series={revenueChartSeries} type="line" height={280} />
+              <Chart options={revenueChartOpts} series={revenueChartSeries} type="line" height={300} />
             ) : (
               <EmptyState message={t('noDataInRange')} />
             )}
-          </SectionCard>
+          </Card>
 
-          <SectionCard>
-            <SectionTitle>{t('marketplaceDistribution')}</SectionTitle>
+          <Card className="p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-slate-800 mb-3">{t('marketplaceDistribution')}</h3>
             {donutSeries.length > 0 && donutSeries.some((v) => v > 0) ? (
-              <Chart options={donutOptions} series={donutSeries} type="donut" height={280} />
+              <Chart options={donutOpts} series={donutSeries} type="donut" height={300} />
             ) : (
               <EmptyState message={t('noMarketplaceData')} />
             )}
-          </SectionCard>
+          </Card>
         </div>
 
-        {/* ============================================================= */}
-        {/* ROW 4: Marketplace Breakdown Table                            */}
-        {/* ============================================================= */}
-        <SectionCard>
-          <SectionTitle>{t('marketplacePerformance')}</SectionTitle>
-          {mpData.length > 0 ? (
-            <>
-              {/* Mobile cards */}
-              <div className="block md:hidden space-y-3">
-                {[...mpData]
-                  .sort((a, b) => b.orders - a.orders)
-                  .map((mp, idx) => {
-                    const totalOrders = mpData.reduce((s, m) => s + m.orders, 0) || 1;
-                    const pct = mp.percentage || (mp.orders / totalOrders) * 100;
-                    return (
-                      <div key={idx} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                        <div className="flex items-center justify-between mb-3">
-                          <MarketplaceBadge name={mp.marketplace} />
-                          <span className="text-xs text-gray-500">{pct.toFixed(1)}%</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <p className="text-xs text-gray-500">{t('orders')}</p>
-                            <p className="text-sm font-semibold text-gray-900">{formatNumber(mp.orders)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">{t('revenue')}</p>
-                            <p className="text-sm font-semibold text-gray-900">{formatCurrency(mp.revenue)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-              {/* Desktop table */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('marketplace')}
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('orders')}
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('revenueLabel')}
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('customers')}
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {t('avgOrder')}
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        % {t('percentage')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {[...mpData]
-                      .sort((a, b) => b.orders - a.orders)
-                      .map((mp, idx) => {
-                        const totalOrders = mpData.reduce((s, m) => s + m.orders, 0) || 1;
-                        const pct = mp.percentage || (mp.orders / totalOrders) * 100;
-                        const avg = mp.avgOrderValue || (mp.orders > 0 ? mp.revenue / mp.orders : 0);
-                        return (
-                          <tr key={idx} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              <MarketplaceBadge name={mp.marketplace} />
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                              {formatNumber(mp.orders)}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                              {formatCurrency(mp.revenue)}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                              {formatNumber(mp.customers)}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                              {formatCurrency(avg)}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
-                              {pct.toFixed(1)}%
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : (
-            <EmptyState />
-          )}
-        </SectionCard>
+        {/* ── Marketplace Breakdown Table ─────────────────────────── */}
+        {mpData.length > 0 && (
+          <Card className="overflow-hidden">
+            <div className="p-4 sm:p-5 pb-0">
+              <h3 className="text-sm font-semibold text-slate-800 mb-4">{t('marketplacePerformance')}</h3>
+            </div>
 
-        {/* ============================================================= */}
-        {/* ROW 5: Monthly Trends Chart                                   */}
-        {/* ============================================================= */}
-        {monthlyStats.length > 0 && (
-          <SectionCard>
-            <SectionTitle>{t('monthlyTrends')}</SectionTitle>
-            <Chart options={monthlyChartOptions} series={monthlyChartSeries} type="line" height={280} />
-          </SectionCard>
-        )}
-
-        {/* ============================================================= */}
-        {/* ROW 6: Top Products + Order Status                            */}
-        {/* ============================================================= */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          {/* Top Products */}
-          <SectionCard>
-            <SectionTitle>{t('topSellingProducts')}</SectionTitle>
-            {data?.topProducts && data.topProducts.length > 0 ? (
-              <>
-                {/* Mobile cards */}
-                <div className="block md:hidden space-y-3">
-                  {data.topProducts.slice(0, 5).map((product, index) => (
-                    <div key={index} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                      <div className="flex items-start justify-between mb-2">
-                        <span className="text-xs font-medium text-gray-400">#{index + 1}</span>
+            {/* Mobile cards */}
+            <div className="block md:hidden px-4 pb-4 space-y-3">
+              {[...mpData].sort((a, b) => b.revenue - a.revenue).map((mp, i) => {
+                const pct = mp.percentage || ((mp.orders / (data?.totalOrders || 1)) * 100);
+                return (
+                  <div key={i} className="rounded-xl border border-slate-100 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <MarketplaceDot name={mp.marketplace} />
+                        <span className="text-sm font-semibold text-slate-800">{mp.marketplace}</span>
                       </div>
-                      <p className="text-sm font-medium text-gray-900 mb-3 line-clamp-2">{product.name}</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-xs text-gray-500">{t('orders')}</p>
-                          <p className="text-sm font-semibold text-gray-900">{formatNumber(product.orders)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500">{t('revenue')}</p>
-                          <p className="text-sm font-semibold text-gray-900">{formatCurrency(product.revenue)}</p>
-                        </div>
+                      <span className="text-xs text-slate-400">{pct.toFixed(1)}%</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-slate-500">{t('orders')}</span>
+                        <p className="font-semibold text-slate-800">{formatNumber(mp.orders)}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">{t('nativeCurrency')}</span>
+                        <p className="font-semibold text-slate-800">{fmtNative(mp.byCurrency)}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">{t('convertedTRY')}</span>
+                        <p className="font-semibold text-emerald-700">{formatCurrency(mp.revenue)}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">{t('avgOrder')}</span>
+                        <p className="font-semibold text-slate-800">{formatCurrency(mp.avgOrderValue || (mp.orders > 0 ? mp.revenue / mp.orders : 0))}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-                {/* Desktop table */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{t('product')}</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{t('orders')}</th>
-                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">{t('revenueLabel')}</th>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-t border-b border-slate-100 bg-slate-50/60">
+                    <th className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{t('marketplace')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('orders')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('nativeCurrency')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('revenueTRY')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">{t('avgOrder')}</th>
+                    <th className="px-5 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...mpData].sort((a, b) => b.revenue - a.revenue).map((mp, i) => {
+                    const pct = mp.percentage || ((mp.orders / (data?.totalOrders || 1)) * 100);
+                    const avg = mp.avgOrderValue || (mp.orders > 0 ? mp.revenue / mp.orders : 0);
+                    return (
+                      <tr key={i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <MarketplaceDot name={mp.marketplace} size={10} />
+                            <span className="text-sm font-medium text-slate-800">{mp.marketplace}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5 text-sm text-slate-700 text-right font-medium">{formatNumber(mp.orders)}</td>
+                        <td className="px-5 py-3.5 text-sm text-slate-600 text-right font-mono">{fmtNative(mp.byCurrency)}</td>
+                        <td className="px-5 py-3.5 text-sm text-emerald-700 text-right font-semibold">{formatCurrency(mp.revenue)}</td>
+                        <td className="px-5 py-3.5 text-sm text-slate-700 text-right">{formatCurrency(avg)}</td>
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            <div className="w-16 bg-slate-100 rounded-full h-1.5">
+                              <div className="h-1.5 rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: mpColor(mp.marketplace, i) }} />
+                            </div>
+                            <span className="text-xs text-slate-500 w-10 text-right">{pct.toFixed(1)}%</span>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {data.topProducts.slice(0, 5).map((product, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 text-sm font-medium text-gray-500">{index + 1}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 max-w-[200px] truncate">{product.name}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right">{formatNumber(product.orders)}</td>
-                          <td className="px-3 py-2 text-sm text-gray-900 text-right">{formatCurrency(product.revenue)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
+        {/* ── Monthly Trends ─────────────────────────────���───────── */}
+        {monthlyStats.length > 0 && (
+          <Card className="p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-slate-800 mb-3">{t('monthlyTrends')}</h3>
+            <Chart options={monthlyOpts} series={monthlySeries} type="line" height={280} />
+          </Card>
+        )}
+
+        {/* ── Bottom row: Top Products + Order Status ────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+          {/* Top Products */}
+          <Card className="p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">{t('topSellingProducts')}</h3>
+            {data?.topProducts && data.topProducts.length > 0 ? (
+              <div className="space-y-3">
+                {data.topProducts.slice(0, 5).map((p, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-slate-300 w-5 text-center">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-800 truncate">{p.name}</p>
+                      <p className="text-xs text-slate-400">{formatNumber(p.orders)} {t('orders').toLowerCase()}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-700 flex-shrink-0">{formatCurrency(p.revenue)}</span>
+                  </div>
+                ))}
+              </div>
             ) : (
               <EmptyState message={t('noProductData')} />
             )}
-          </SectionCard>
+          </Card>
 
-          {/* Order Status Breakdown */}
-          <SectionCard>
-            <SectionTitle>{t('orderStatuses')}</SectionTitle>
+          {/* Order Status */}
+          <Card className="p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">{t('orderStatuses')}</h3>
             {data?.orderStatusBreakdown && data.orderStatusBreakdown.length > 0 ? (
               <div className="space-y-3">
-                {data.orderStatusBreakdown.map((status, index) => {
-                  const pct = (status.count / totalStatusCount) * 100;
+                {data.orderStatusBreakdown.map((s, i) => {
+                  const pct = (s.count / totalStatusCount) * 100;
                   return (
-                    <div key={index}>
-                      <div className="flex items-center justify-between mb-1">
+                    <div key={i}>
+                      <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: status.color }} />
-                          <span className="text-sm font-medium text-gray-900">{status.status}</span>
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                          <span className="text-sm text-slate-700">{s.status}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">{formatNumber(status.count)}</span>
-                          <span className="text-xs text-gray-400">({pct.toFixed(1)}%)</span>
+                          <span className="text-sm font-medium text-slate-800">{formatNumber(s.count)}</span>
+                          <span className="text-xs text-slate-400">({pct.toFixed(1)}%)</span>
                         </div>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2">
-                        <div
-                          className="h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${pct}%`, backgroundColor: status.color }}
-                        />
+                      <div className="w-full bg-slate-100 rounded-full h-1.5">
+                        <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: s.color }} />
                       </div>
                     </div>
                   );
@@ -977,96 +712,72 @@ export default function AnalyticsPage() {
             ) : (
               <EmptyState message={t('noStatusData')} />
             )}
-          </SectionCard>
+          </Card>
         </div>
 
-        {/* ============================================================= */}
-        {/* ROW 7: Shipping Stats + Recent Activity                       */}
-        {/* ============================================================= */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          {/* Shipping Stats */}
-          <SectionCard>
-            <SectionTitle>{t('shippingStatistics')}</SectionTitle>
-            {data?.shippingStats ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 rounded-lg p-4 text-center">
-                    <Truck className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-                    <p className="text-2xl font-bold text-gray-900">{formatNumber(data.shippingStats.totalLabels)}</p>
-                    <p className="text-xs text-gray-600">{t('totalLabels')}</p>
+        {/* ── Recent Activity ─────���──────────────────────────────── */}
+        {data?.recentActivity && data.recentActivity.length > 0 && (
+          <Card className="p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-slate-800 mb-4">{t('recentActivity')}</h3>
+            {/* Mobile */}
+            <div className="block md:hidden space-y-2">
+              {data.recentActivity.slice(0, 8).map((item, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <MarketplaceDot name={item.marketplace} />
+                      <span className="text-sm font-medium text-slate-800">#{item.orderNumber}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 truncate mt-0.5">{item.customerName}</p>
                   </div>
-                  <div className="bg-amber-50 rounded-lg p-4 text-center">
-                    <Clock className="h-6 w-6 text-amber-600 mx-auto mb-1" />
-                    <p className="text-2xl font-bold text-gray-900">{formatNumber(data.shippingStats.pendingLabels)}</p>
-                    <p className="text-xs text-gray-600">{t('pendingLabels')}</p>
+                  <div className="text-right flex-shrink-0 ml-2">
+                    <p className="text-sm font-semibold text-slate-800">
+                      {CURRENCY_SYMBOLS[(item.currency || 'TRY').toUpperCase()] || ''}{item.totalPrice?.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      {item.uiOrderDate ? formatDate(new Date(item.uiOrderDate), { day: 'numeric', month: 'short' }) : ''}
+                    </p>
                   </div>
                 </div>
-
-                {data.shippingStats.byCarrier && data.shippingStats.byCarrier.length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-2">{t('byCarrier')}</p>
-                    <div className="space-y-2">
-                      {data.shippingStats.byCarrier.map((c, i) => {
-                        const maxCount = Math.max(...data.shippingStats!.byCarrier.map((x) => x.count), 1);
-                        const barPct = (c.count / maxCount) * 100;
-                        return (
-                          <div key={i} className="flex items-center gap-3">
-                            <span className="text-sm text-gray-700 w-16 flex-shrink-0">{c.carrier}</span>
-                            <div className="flex-1 bg-gray-100 rounded-full h-2">
-                              <div
-                                className="h-2 rounded-full bg-blue-500 transition-all duration-300"
-                                style={{ width: `${barPct}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-medium text-gray-900 w-10 text-right">{formatNumber(c.count)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <EmptyState message={t('noShippingData')} />
-            )}
-          </SectionCard>
-
-          {/* Recent Activity */}
-          <SectionCard>
-            <div className="flex items-center gap-2 mb-4">
-              <Activity className="h-5 w-5 text-gray-600" />
-              <SectionTitle>{t('recentActivity')}</SectionTitle>
+              ))}
             </div>
-            {data?.recentActivity && data.recentActivity.length > 0 ? (
-              <div className="space-y-2 max-h-[380px] overflow-y-auto">
-                {data.recentActivity.slice(0, 10).map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex flex-wrap items-center gap-2 py-2 border-b border-gray-100 last:border-b-0"
-                  >
-                    <span className="text-sm font-medium text-gray-900 min-w-[80px]">#{item.orderNumber}</span>
-                    <span className="text-sm text-gray-600 truncate max-w-[120px]">{item.customerName}</span>
-                    <span className="text-sm font-semibold text-gray-900 ml-auto">
-                      {formatCurrency(item.totalPrice)}
-                    </span>
-                    <MarketplaceBadge name={item.marketplace} />
-                    <StatusBadge status={item.externalStatus} />
-                    <span className="text-xs text-gray-400">
-                      {item.uiOrderDate
-                        ? formatDate(new Date(item.uiOrderDate), {
-                            day: 'numeric',
-                            month: 'short',
-                          })
-                        : ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState message={t('noActivityYet')} />
-            )}
-          </SectionCard>
-        </div>
+            {/* Desktop */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="pb-2 text-left text-xs font-medium text-slate-400">#</th>
+                    <th className="pb-2 text-left text-xs font-medium text-slate-400">{t('marketplace')}</th>
+                    <th className="pb-2 text-left text-xs font-medium text-slate-400">{t('customers')}</th>
+                    <th className="pb-2 text-right text-xs font-medium text-slate-400">{t('revenue')}</th>
+                    <th className="pb-2 text-right text-xs font-medium text-slate-400">{t('orderStatuses')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.recentActivity.slice(0, 8).map((item, i) => (
+                    <tr key={i} className="border-b border-slate-50 last:border-0">
+                      <td className="py-2.5 text-sm text-slate-700">{item.orderNumber}</td>
+                      <td className="py-2.5">
+                        <div className="flex items-center gap-2">
+                          <MarketplaceDot name={item.marketplace} />
+                          <span className="text-sm text-slate-600">{item.marketplace}</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 text-sm text-slate-600 max-w-[150px] truncate">{item.customerName}</td>
+                      <td className="py-2.5 text-sm font-semibold text-slate-800 text-right">
+                        {CURRENCY_SYMBOLS[(item.currency || 'TRY').toUpperCase()] || ''}{item.totalPrice?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <span className="text-xs text-slate-500">{item.externalStatus || '-'}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+
       </div>
     </AppLayout>
   );

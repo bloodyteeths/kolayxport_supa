@@ -179,9 +179,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         
         return rates;
       } catch (error) {
-        console.error('Error fetching exchange rates:', error);
-        // Return empty rates object - this will cause convertToTRY to return original amounts
-        // This way we show data without incorrect conversions
+        console.error('[Analytics] Exchange rate API failed, using last cached rates:', error);
+        // If we have previously cached rates, reuse them even if expired
+        if (Object.keys(cachedRates).length > 0) {
+          return cachedRates;
+        }
+        // Absolute last resort — return empty so convertToTRY returns raw amounts
+        // This should never happen in practice since the cache persists in-memory
         return {};
       }
     };
@@ -465,23 +469,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
     };
 
-    // Calculate marketplace breakdown with currency conversion
+    // Calculate marketplace breakdown with currency conversion + native currency tracking
     const marketplaceBreakdown = marketplaceOrders.reduce((acc, order) => {
       const marketplace = normalizeMarketplace(order.marketplace);
-      const convertedRevenue = convertToTRY(order.totalPrice || 0, order.currency);
-      
+      const rawAmount = order.totalPrice || 0;
+      const currency = (order.currency || 'TRY').toUpperCase();
+      const convertedRevenue = convertToTRY(rawAmount, order.currency);
+
       if (!acc[marketplace]) {
-        acc[marketplace] = { orders: 0, revenue: 0 };
+        acc[marketplace] = { orders: 0, revenue: 0, byCurrency: {} as Record<string, number> };
       }
       acc[marketplace].orders += 1;
       acc[marketplace].revenue += convertedRevenue;
+      // Track native currency amounts
+      acc[marketplace].byCurrency[currency] = (acc[marketplace].byCurrency[currency] || 0) + rawAmount;
       return acc;
-    }, {} as Record<string, { orders: number; revenue: number }>);
+    }, {} as Record<string, { orders: number; revenue: number; byCurrency: Record<string, number> }>);
 
     const topMarketplaces = Object.entries(marketplaceBreakdown).map(([name, stats], index) => ({
       name,
       orders: stats.orders,
       revenue: stats.revenue,
+      byCurrency: stats.byCurrency,
       color: marketplaceColors[name?.toLowerCase()] || marketplaceColorPalette[index % marketplaceColorPalette.length]
     }));
 
@@ -560,11 +569,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       .map(([month, stats]) => ({ month, orders: stats.orders, revenue: Math.round(stats.revenue * 100) / 100, customers: stats.customers }))
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // Format marketplace breakdown — aggregate by marketplace converting currencies to TRY
-    const mpBreakdownMap = new Map<string, { orders: number; revenue: number; customers: number; avgOrderValueSum: number; avgOrderValueCount: number }>();
+    // Format marketplace breakdown — aggregate by marketplace converting currencies to TRY + track native
+    const mpBreakdownMap = new Map<string, { orders: number; revenue: number; customers: number; avgOrderValueSum: number; avgOrderValueCount: number; byCurrency: Record<string, number> }>();
     for (const row of marketplaceBreakdownRaw) {
       const mp = normalizeMarketplace(row.marketplace);
-      const convertedRevenue = convertToTRY(Number(row.revenue) || 0, row.currency);
+      const rawRevenue = Number(row.revenue) || 0;
+      const currency = (row.currency || 'TRY').toUpperCase();
+      const convertedRevenue = convertToTRY(rawRevenue, row.currency);
       const convertedAvg = convertToTRY(Number(row.avg_order_value) || 0, row.currency);
       const existing = mpBreakdownMap.get(mp);
       if (existing) {
@@ -573,13 +584,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         existing.customers += Number(row.customers);
         existing.avgOrderValueSum += convertedAvg * Number(row.orders);
         existing.avgOrderValueCount += Number(row.orders);
+        existing.byCurrency[currency] = (existing.byCurrency[currency] || 0) + rawRevenue;
       } else {
         mpBreakdownMap.set(mp, {
           orders: Number(row.orders),
           revenue: convertedRevenue,
           customers: Number(row.customers),
           avgOrderValueSum: convertedAvg * Number(row.orders),
-          avgOrderValueCount: Number(row.orders)
+          avgOrderValueCount: Number(row.orders),
+          byCurrency: { [currency]: rawRevenue }
         });
       }
     }
@@ -591,7 +604,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         revenue: Math.round(stats.revenue * 100) / 100,
         customers: stats.customers,
         avgOrderValue: stats.avgOrderValueCount > 0 ? Math.round((stats.avgOrderValueSum / stats.avgOrderValueCount) * 100) / 100 : 0,
-        percentage: totalOrdersForPercentage > 0 ? Math.round((stats.orders / totalOrdersForPercentage) * 10000) / 100 : 0
+        percentage: totalOrdersForPercentage > 0 ? Math.round((stats.orders / totalOrdersForPercentage) * 10000) / 100 : 0,
+        byCurrency: Object.fromEntries(
+          Object.entries(stats.byCurrency).map(([c, v]) => [c, Math.round(v * 100) / 100])
+        )
       }))
       .sort((a, b) => b.orders - a.orders);
 

@@ -129,8 +129,11 @@ export function useOrders(page: number = 1, pageSize: number = 15, filters: Reco
           ? lineItems[0].title || lineItems[0].productName || '---'
           : '---';
 
-        // Determine source and channel based on marketplace using robust Etsy detection
-        const isEtsy = isEtsyOrderSync(order.marketplace);
+        // Determine source and channel based on marketplace + rawData using robust Etsy detection
+        const raw = typeof order.rawData === 'string' ? (() => { try { return JSON.parse(order.rawData); } catch { return {}; } })() : (order.rawData || {});
+        const shopApp = (raw?.shop_app || '').toLowerCase();
+        const veeqoChannelType = (raw?.channel?.type_code || '').toLowerCase();
+        const isEtsy = isEtsyOrderSync(order.marketplace) || shopApp.includes('etsy') || veeqoChannelType.includes('etsy');
         const source = order.source || (isEtsy ? 'shippo' : 'veeqo');
         const channel = order.channel || (isEtsy ? 'etsy' : 'other');
 

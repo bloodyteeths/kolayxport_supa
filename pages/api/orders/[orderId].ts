@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 
 export default async function handler(
@@ -8,13 +8,8 @@ export default async function handler(
 ) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
 
-  // Get user from Supabase
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
   const { orderId } = req.query;
 

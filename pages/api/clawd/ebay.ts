@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '../../../lib/auth';
 import {
   refreshUserToken,
   getApplicationToken,
@@ -148,15 +148,10 @@ export default async function handler(
 
   // Fall back to session auth
   if (!authenticated) {
-    try {
-      const supabase = getSupabaseServerClient(req, res);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        authenticated = true;
-        sessionUserId = user.id;
-      }
-    } catch {
-      // Session auth failed, continue
+    const user = await getAuthUser(req, res);
+    if (user) {
+      authenticated = true;
+      sessionUserId = user.id;
     }
   }
 

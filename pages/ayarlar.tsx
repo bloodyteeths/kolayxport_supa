@@ -13,7 +13,7 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import SubscriptionDashboard from '../components/SubscriptionDashboard';
 import ImporterFormCollapsible from '../components/ImporterFormCollapsible';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabase';
+// supabase browser client removed — auth now handled by NextAuth cookies
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
 
@@ -183,11 +183,7 @@ const AyarlarPage = () => {
     setEtsyShopsLoading(true);
     setEtsyShopsError(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-      const response = await axios.get('/api/integrations/etsy/shops', {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      });
+      const response = await axios.get('/api/integrations/etsy/shops');
       setEtsyShops(response.data.shops || []);
     } catch (error: any) {
       setEtsyShopsError(error.response?.data?.error || 'Failed to fetch Etsy shops');
@@ -202,13 +198,9 @@ const AyarlarPage = () => {
     if (!window.confirm(t('disconnectEtsyConfirm'))) return;
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
       await axios.post('/api/integrations/etsy/shops', {
         shopId,
         action: 'delete'
-      }, {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
       });
       
       setSnackbar({
@@ -233,11 +225,7 @@ const AyarlarPage = () => {
   const fetchEbayStatus = async () => {
     setEbayLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-      const response = await axios.get('/api/integrations/ebay/status', {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      });
+      const response = await axios.get('/api/integrations/ebay/status');
       setEbayConnected(response.data.connected);
       setEbayTokenExpires(response.data.tokenExpiresAt);
     } catch {
@@ -250,11 +238,7 @@ const AyarlarPage = () => {
   const handleDisconnectEbay = async () => {
     if (!window.confirm(t('disconnectEbayConfirm'))) return;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-      await axios.delete('/api/integrations/ebay/status', {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      });
+      await axios.delete('/api/integrations/ebay/status');
       setEbayConnected(false);
       setEbayTokenExpires(null);
       setSnackbar({ open: true, message: t('ebayDisconnected'), severity: 'success' });
@@ -325,10 +309,7 @@ const AyarlarPage = () => {
       setIsLoading(true);
       setFetchError(null);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const accessToken = session?.access_token;
         const response = await axios.get<UserSettingsResponse>('/api/user/settings', {
-          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
           timeout: 10000
         });
         setFormData({

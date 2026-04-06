@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '../../../lib/logger';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '../../../lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export const config = { maxDuration: 30 };
@@ -507,16 +507,9 @@ export default async function handler(
 
   // Fall back to session auth
   if (!authenticated) {
-    try {
-      const supabase = getSupabaseServerClient(req, res);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        authenticated = true;
-      }
-    } catch {
-      // session auth failed
+    const user = await getAuthUser(req, res);
+    if (user) {
+      authenticated = true;
     }
   }
 

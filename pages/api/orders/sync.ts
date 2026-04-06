@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { syncAllOrders } from '@/lib/orderSync';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { isTrendyolEnabled } from '@/lib/config';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 // Import Trendyol sync function from auto-sync script
@@ -16,13 +16,10 @@ async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Get user via Supabase client
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    logger.warn('Unauthorized sync attempt', { authError });
-    return res.status(401).json({ error: 'Unauthorized', details: authError?.message });
+  const user = await getAuthUser(req, res);
+  if (!user) {
+    logger.warn('Unauthorized sync attempt');
+    return res.status(401).json({ error: 'Unauthorized' });
   }
   const userId = user.id;
 

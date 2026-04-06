@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 
 export default async function handler(
@@ -52,11 +52,9 @@ export default async function handler(
     diagnostics.checks.cookies = { error: error.message } as any;
   }
 
-  // Check Supabase auth
+  // Check auth
   try {
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user }, error } = await supabase.auth.getUser();
-    
+    const user = await getAuthUser(req, res);
     if (user) {
       diagnostics.checks.auth = {
         authenticated: true,
@@ -66,7 +64,7 @@ export default async function handler(
     } else {
       diagnostics.checks.auth = {
         authenticated: false,
-        error: error?.message || 'No user found',
+        error: 'No user found',
         userId: null,
       };
     }

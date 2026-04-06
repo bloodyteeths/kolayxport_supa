@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { fullSyncAllOrders } from '@/lib/orderSync';
 import { logger } from '@/lib/logger';
 
@@ -13,11 +13,10 @@ export default async function handler(
   }
 
   // Authenticate user
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    logger.warn('Unauthorized full sync attempt', { authError });
-    return res.status(401).json({ error: 'Unauthorized', details: authError?.message });
+  const user = await getAuthUser(req, res);
+  if (!user) {
+    logger.warn('Unauthorized full sync attempt');
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {

@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Disclosure, Transition } from '@headlessui/react';
 import { CheckCircle, ChevronDown, Zap, ShieldCheck, Star, MessageSquare, TrendingUp } from 'lucide-react';
 import { NextSeo } from 'next-seo';
-import { supabase } from '@/lib/supabase';
+import { signIn as nextAuthSignIn } from 'next-auth/react';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -165,26 +165,19 @@ export default function FiyatlandirmaPage() {
         throw new Error('Stripe publishable key is not configured. Please check NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable.');
       }
 
-      // Get current session from Supabase
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError || !session) {
-        // Redirect to sign in instead of showing error
-        await supabase.auth.signInWithOAuth({ 
-          provider: 'google',
-          options: { redirectTo: window.location.origin + '/fiyatlandirma' } 
-        });
-        return;
-      }
-
       const res = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ plan, interval }),
       });
+
+      if (res.status === 401) {
+        // Not authenticated, redirect to sign in
+        await nextAuthSignIn('google', { callbackUrl: '/fiyatlandirma' });
+        return;
+      }
 
       if (!res.ok) {
         const errorText = await res.text();

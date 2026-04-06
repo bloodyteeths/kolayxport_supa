@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 
 export default async function handler(
   req: NextApiRequest,
@@ -13,13 +13,8 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Get user via Supabase client
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
     const { orderNumbers } = req.query;

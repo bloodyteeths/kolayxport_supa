@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { withPrismaRetry } from '../../../lib/prismaWithRetry';
 
@@ -14,20 +14,9 @@ export default async function handler(
       cookieLength: req.headers.cookie?.length 
     });
     
-    const supabase = getSupabaseServerClient(req, res);
-    const bearer = req.headers.authorization?.startsWith('Bearer ')
-      ? req.headers.authorization.substring('Bearer '.length)
-      : undefined;
-    const { data: { user: authUser }, error: authError } = bearer
-      ? await supabase.auth.getUser(bearer)
-      : await supabase.auth.getUser();
-
-    if (authError || !authUser) {
-      console.error('[/api/user/settings] Auth failed', { 
-        error: authError?.message,
-        code: authError?.code,
-        hasCookies: !!req.headers.cookie 
-      });
+    const authUser = await getAuthUser(req, res);
+    if (!authUser) {
+      console.error('[/api/user/settings] Auth failed');
       return res.status(401).json({ error: 'Not authenticated' });
     }
     const userId = authUser.id;
@@ -87,13 +76,13 @@ export default async function handler(
         update: { 
           updatedAt: new Date(),
           email: authUser.email || undefined,
-          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || undefined,
+          name: authUser.name || authUser.email?.split('@')[0] || undefined,
           shippingSettings: shippingSettings || undefined
         },
         create: {
           id: userId,
           email: authUser.email || undefined,
-          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || undefined,
+          name: authUser.name || authUser.email?.split('@')[0] || undefined,
           createdAt: new Date(),
           updatedAt: new Date(),
           shippingSettings: shippingSettings || {}

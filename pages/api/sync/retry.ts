@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { logger } from '../../../lib/logger';
 import { retryFailedSync } from '../../../lib/sync-status';
 import { SyncType } from '../../../lib/types';
@@ -97,12 +97,8 @@ export default async function handler(
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(); // Renamed to authUser to avoid conflict
-
-  if (authError || !authUser) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+  const authUser = await getAuthUser(req, res);
+  if (!authUser) return res.status(401).json({ error: 'Not authenticated' });
 
   const { id: originalSyncId } = req.query;
 

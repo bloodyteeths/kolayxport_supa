@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '../../../lib/auth';
 
 // Etsy API base URL
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
@@ -1073,14 +1073,9 @@ export default async function handler(
 
     // Fall back to session auth
     if (!authenticated) {
-        try {
-            const supabase = getSupabaseServerClient(req, res);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                authenticated = true;
-            }
-        } catch {
-            // Session auth failed, continue
+        const user = await getAuthUser(req, res);
+        if (user) {
+            authenticated = true;
         }
     }
 

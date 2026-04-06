@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
-import { createClient } from '@supabase/supabase-js';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 
@@ -19,58 +18,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Use Supabase Auth instead of NextAuth
-    let supabaseUser, authError;
-    
-    console.log('[Analytics API] Starting authentication check...');
-    
-    const supabase = getSupabaseServerClient(req, res);
-    const result = await supabase.auth.getUser();
-    supabaseUser = result.data?.user;
-    authError = result.error;
-    
-    console.log('[Analytics API] Initial auth result:', { 
-      hasUser: !!supabaseUser, 
-      userEmail: supabaseUser?.email, 
-      authError: authError?.message 
-    });
-    
-    if (authError || !supabaseUser) {
-      console.log('[Analytics API] Trying Authorization header fallback...');
-      // Try Authorization header fallback
-      const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
-      let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
-      const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      
-      console.log('[Analytics API] Auth header token found:', !!token);
-      
-      if (token) {
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-          console.error('[API analytics] Missing Supabase environment variables for Authorization header fallback.');
-        } else {
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-          
-          const supabaseDirect = createClient(supabaseUrl, supabaseAnonKey);
-          const { data, error: userError } = await supabaseDirect.auth.getUser(token);
-          supabaseUser = data?.user;
-          authError = userError;
-          
-          console.log('[Analytics API] Fallback auth result:', { 
-            hasUser: !!supabaseUser, 
-            userEmail: supabaseUser?.email, 
-            authError: authError?.message 
-          });
-        }
-      }
-    }
-    
-    if (authError || !supabaseUser) {
-      console.log('[Analytics API] Authentication failed:', authError?.message);
-      return res.status(401).json({ error: 'Not authenticated', details: authError?.message });
-    }
-
-    console.log('[Analytics API] User authenticated:', supabaseUser.email);
+    const supabaseUser = await getAuthUser(req, res);
+    if (!supabaseUser) return res.status(401).json({ error: 'Not authenticated' });
 
     const dateRange = (req.query.dateRange as string) || '7days';
     const monthParam = req.query.month as string | undefined; // e.g. "2026-03"

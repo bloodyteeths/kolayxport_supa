@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
-import { createClient } from '@supabase/supabase-js';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 
@@ -15,36 +14,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    // Use Supabase Auth instead of NextAuth
-    let user, authError;
-    const supabase = getSupabaseServerClient(req, res);
-    const result = await supabase.auth.getUser();
-    user = result.data.user;
-    authError = result.error;
-    
-    if (authError || !user) {
-      // Try Authorization header fallback
-      const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
-      let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
-      const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (token) {
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-          console.error('[API marketplace analytics] Missing Supabase environment variables for Authorization header fallback.');
-        } else {
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-          
-          const supabaseDirect = createClient(supabaseUrl, supabaseAnonKey);
-          const { data, error: userError } = await supabaseDirect.auth.getUser(token);
-          user = data.user;
-          authError = userError;
-        }
-      }
-    }
-    
-    if (authError || !user) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
     const marketplace = req.query.marketplace as string | undefined;
     const dateRange = (req.query.dateRange as string) || '30days';

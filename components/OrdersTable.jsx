@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+import { signIn as nextAuthSignIn } from 'next-auth/react';
 import {
   Table,
   TableBody,
@@ -128,13 +128,7 @@ export default function OrdersTable() {
           <CardDescription>{t('signInDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={async () => {
-            const { error } = await supabase.auth.signInWithOAuth({
-              provider: 'google',
-              options: { redirectTo: window.location.href }
-            });
-            if (error) console.error('Error signing in with Google:', error);
-          }}>{t('signInWithGoogle')}</Button>
+          <Button onClick={() => nextAuthSignIn('google', { callbackUrl: window.location.href })}>{t('signInWithGoogle')}</Button>
         </CardContent>
       </Card>
     );

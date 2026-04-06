@@ -18,7 +18,7 @@ import {
   Truck,
   CheckCircle,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { signIn as nextAuthSignIn } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
 
@@ -198,12 +198,7 @@ function AppIndexPage() {
 
   if (status === 'unauthenticated') {
     if (typeof window !== 'undefined') {
-      supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin + '/app',
-        },
-      });
+      nextAuthSignIn('google', { callbackUrl: '/app' });
     }
     return (
       <AppLayout title={tAuth('redirecting')} simpleHeader>

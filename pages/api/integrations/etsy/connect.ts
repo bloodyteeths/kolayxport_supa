@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 
@@ -12,12 +12,8 @@ export default async function handler(
   }
 
   // Authenticate user
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
     // Generate PKCE code verifier and challenge

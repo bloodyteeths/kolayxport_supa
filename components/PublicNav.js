@@ -3,7 +3,7 @@ import Link from 'next/link';
 import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react'; // Using lucide-react for icons
-import { supabase } from '@/lib/supabase'; // ADDED
+import { signIn as nextAuthSignIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
 
@@ -39,11 +39,8 @@ const mobileMenuVariants = {
   exit: { opacity: 0, scale: 0.95, transition: { duration: 0.15, ease: 'easeIn' } },
 };
 
-const defaultCtaAction = async () => { // ADDED helper for default action
-  await supabase.auth.signInWithOAuth({ 
-    provider: 'google',
-    options: { redirectTo: window.location.origin + '/app' } 
-  });
+const defaultCtaAction = async () => {
+  await nextAuthSignIn('google', { callbackUrl: '/app' });
 };
 
 const PublicNav = ({ ctaLabel }) => {

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import * as React from 'react'
 import { Home, CreditCard, Bell, LogIn, LogOut, Settings } from 'lucide-react'
 import { useAuth } from "@/lib/auth-context"
-import { supabase } from '@/lib/supabase'
+import { signIn as nextAuthSignIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/router'
 import useSidebar from '../hooks/useSidebar';
@@ -17,7 +17,7 @@ import { useTranslations } from 'next-intl';
  */
 export default function Layout({ children }) {
   const { isOpen, toggleSidebar, closeSidebar } = useSidebar();
-  const { user, session, isLoading, signIn: supabaseSignIn, signOut: supabaseSignOut } = useAuth();
+  const { user, isLoading, signOut: authSignOut } = useAuth();
   const router = useRouter();
   const t = useTranslations('public');
 
@@ -90,20 +90,14 @@ export default function Layout({ children }) {
               </nav>
               <div className="p-4 mt-auto">
                 {!user && !isLoading && (
-                  <Button onClick={async () => {
-                    const { error } = await supabase.auth.signInWithOAuth({ 
-                      provider: 'google',
-                      options: { redirectTo: window.location.origin + '/app' } 
-                    });
-                    if (error) console.error('Error signing in with Google:', error);
-                  }} className="w-full flex items-center justify-center">
+                  <Button onClick={() => nextAuthSignIn('google', { callbackUrl: '/app' })} className="w-full flex items-center justify-center">
                     <LogIn className="w-4 h-4 mr-2" /> {t('signInWithGoogle')}
                   </Button>
                 )}
                 {user && (
                   <div className="flex flex-col items-center space-y-2">
                     <span className="text-sm text-gray-200 truncate" title={user.email}>{user.name || user.email}</span>
-                    <Button onClick={async () => await supabaseSignOut()} variant="outline" className="w-full flex items-center justify-center">
+                    <Button onClick={async () => await authSignOut()} variant="outline" className="w-full flex items-center justify-center">
                       <LogOut className="w-4 h-4 mr-2" /> {t('signOut')}
                     </Button>
                   </div>
@@ -142,7 +136,7 @@ export default function Layout({ children }) {
             {user && (
               <>
                 <span className="mx-2">|</span>
-                <a href="#" onClick={async (e) => { e.preventDefault(); await supabaseSignOut(); }} className="hover:underline">{t('logout')}</a>
+                <a href="#" onClick={async (e) => { e.preventDefault(); await authSignOut(); }} className="hover:underline">{t('logout')}</a>
               </>
             )}
             <div className="mt-2">

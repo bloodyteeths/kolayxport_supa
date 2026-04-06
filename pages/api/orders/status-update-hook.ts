@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { executeStatusUpdateHook } from '../../../lib/hooks/statusUpdateHook';
 import { logger } from '../../../lib/logger';
 
@@ -17,13 +17,9 @@ export default async function handler(
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser(req, res);
 
-  if (authError || !user) {
+  if (!user) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 

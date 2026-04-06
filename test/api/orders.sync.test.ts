@@ -4,13 +4,9 @@ import prisma from '../../lib/prisma';
 import { createServer } from 'http';
 import handler from '../../pages/api/orders/sync';
 
-// Mock Supabase auth
-vi.mock('../../lib/supabase', () => ({
-  getSupabaseServerClient: () => ({
-    auth: {
-      getUser: async () => ({ data: { user: { id: 'test-user' } }, error: null })
-    }
-  })
+// Mock NextAuth auth
+vi.mock('../../lib/auth', () => ({
+  getAuthUser: async () => ({ id: 'test-user', email: 'test@example.com', name: 'Test' })
 }));
 
 // Mock fetchVeeqoOrders to return a known order with line_items

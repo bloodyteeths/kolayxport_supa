@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '../../../lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Allow up to 60s for AI responses (Vercel default is 10s)
@@ -778,20 +778,10 @@ export default async function handler(
     return res.status(405).json({ error: 'Sadece POST metodu desteklenmektedir.' });
   }
 
-  // --- Auth: session-based via Supabase ---
-  let userId: string | null = null;
-
-  try {
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user }, error } = await supabase.auth.getUser();
-
-    if (error || !user) {
-      return res.status(401).json({ error: 'Oturum doğrulanamadı. Lütfen tekrar giriş yapın.' });
-    }
-    userId = user.id;
-  } catch {
-    return res.status(401).json({ error: 'Kimlik doğrulama başarısız.' });
-  }
+  // --- Auth ---
+  const authUser = await getAuthUser(req, res);
+  if (!authUser) return res.status(401).json({ error: 'Oturum doğrulanamadı. Lütfen tekrar giriş yapın.' });
+  const userId: string = authUser.id;
 
   // --- Rate limit ---
   if (!checkRateLimit(userId)) {

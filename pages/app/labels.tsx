@@ -21,7 +21,7 @@ import UPSLabelDrawer from '@/components/UPSLabelDrawer';
 import ManualOrderButton from '@/components/ManualOrderButton';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
 import withAuth from '@/components/withAuth';
-import { supabase } from '@/lib/supabase';
+// supabase browser client removed — auth now handled by NextAuth cookies
 import {
   FEDEX_SERVICE_TYPES,
   FEDEX_PACKAGING_TYPES,
@@ -2172,12 +2172,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     const toastId = toast.loading(t('etgbStarting', { count: etgbSelectedRows.length }));
     
     try {
-      // Get user settings for ETGB recipient email (send auth header and safe JSON parse)
-      const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token;
-      const settingsResponse = await fetch('/api/user/settings', {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      });
+      // Get user settings for ETGB recipient email (NextAuth cookie auth)
+      const settingsResponse = await fetch('/api/user/settings');
       let settings: any = {};
       try {
         settings = await settingsResponse.json();
@@ -2191,12 +2187,11 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         return;
       }
       
-      // Process ETGB
+      // Process ETGB (NextAuth cookie auth)
       const response = await fetch('/api/etgb/process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({
           orderIds: etgbSelectedRows,

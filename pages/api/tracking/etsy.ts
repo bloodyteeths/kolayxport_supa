@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '@/lib/integrations/etsyClient';
 import { logger } from '@/lib/logger';
@@ -12,13 +12,8 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Authenticate user
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
     const { shopId, receiptId, trackingNumber, carrier } = req.body as EtsyTrackingData;

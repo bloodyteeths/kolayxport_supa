@@ -2,8 +2,7 @@
 import prisma from '@/lib/prisma';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '@/lib/logger'; // Assuming you have a logger, changed to named import
-import { getSupabaseServerClient } from '../../../lib/supabase';
-import { createClient } from '@supabase/supabase-js';
+import { getAuthUser } from '@/lib/auth';
 
 // Define a more specific type for the updates if possible, based on LabelRow
 interface OrderUpdatePayload {
@@ -36,27 +35,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   // --- Authentication ---
-  let user, authError;
-  const supabase = getSupabaseServerClient(req, res);
-  const result = await supabase.auth.getUser();
-  user = result.data.user;
-  authError = result.error;
-  if (authError || !user) {
-    const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
-    let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
-    const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (token) {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        const supabaseDirect = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-        const { data, error: userError } = await supabaseDirect.auth.getUser(token);
-        user = data.user;
-        authError = userError;
-      }
-    }
-  }
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
   const {
     id: orderId,

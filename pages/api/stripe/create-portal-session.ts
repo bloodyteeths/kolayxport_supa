@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { stripe } from '../../../lib/stripe';
 import prisma from '../../../lib/prisma';
 
@@ -11,12 +11,8 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !authUser) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+  const authUser = await getAuthUser(req, res);
+  if (!authUser) return res.status(401).json({ error: 'Not authenticated' });
 
   try {
     // Get user's stripe customer ID

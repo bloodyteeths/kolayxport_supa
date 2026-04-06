@@ -8,6 +8,7 @@ import Layout from '@/components/Layout';
 import { Toaster } from 'react-hot-toast';
 import { DefaultSeo, LogoJsonLd } from 'next-seo';
 import SEO from '../next-seo.config';
+import { SessionProvider } from 'next-auth/react';
 import { AuthProvider } from '@/lib/auth-context';
 import { ReactElement, ReactNode } from 'react';
 import { NextPage } from 'next';
@@ -42,6 +43,7 @@ function MyApp({ Component, pageProps }: AppProps) {
   }, [router.query]);
 
   return (
+    <SessionProvider session={pageProps.session}>
     <AuthProvider>
       <NextIntlClientProvider locale={locale} messages={messages[locale]}>
       <ThemeProvider theme={theme}>
@@ -101,6 +103,7 @@ function MyApp({ Component, pageProps }: AppProps) {
       </ThemeProvider>
       </NextIntlClientProvider>
     </AuthProvider>
+    </SessionProvider>
   );
 }
 

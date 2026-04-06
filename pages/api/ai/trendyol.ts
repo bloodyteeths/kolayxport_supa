@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '../../../lib/auth';
 import { logger } from '../../../lib/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -10,11 +10,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const action = req.query.action as string;
 
   try {
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey) {

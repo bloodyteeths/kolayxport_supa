@@ -33,7 +33,6 @@ import {
   Wallet
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
 import useSidebar from '../hooks/useSidebar';
 import useScreenSize from '../hooks/useScreenSize';
 import { useTranslations } from 'next-intl';

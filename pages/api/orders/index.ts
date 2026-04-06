@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
-import { createClient } from '@supabase/supabase-js';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 
 export default async function handler(
@@ -27,35 +26,8 @@ export default async function handler(
       .json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  let user, authError;
-  const supabase = getSupabaseServerClient(req, res);
-  const result = await supabase.auth.getUser();
-  user = result.data.user;
-  authError = result.error;
-  if (authError || !user) {
-    // Try Authorization header fallback
-    const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
-    let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
-    const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (token) {
-      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        // Keep essential error logging
-        console.error('[API orders/index] Missing Supabase environment variables for Authorization header fallback.');
-      } else {
-        // Environment variables are now guaranteed to be strings here due to the check above.
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        
-        const supabaseDirect = createClient(supabaseUrl, supabaseAnonKey);
-        const { data, error: userError } = await supabaseDirect.auth.getUser(token);
-        user = data.user;
-        authError = userError; // Assign to the outer authError
-      }
-    }
-  }
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.limit as string) || 15;

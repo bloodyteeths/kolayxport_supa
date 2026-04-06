@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 
 // Google Trends API (npm package)
 let googleTrends: any;
@@ -11,11 +11,8 @@ try {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Auth check
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const action = req.query.action as string;
   if (!action) {

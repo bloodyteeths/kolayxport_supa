@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../../lib/prisma';
 import { syncAllOrders } from '../../../../lib/orderSync';
 import { VEEQO_API_KEY as GLOBAL_VEEQO_API_KEY } from '../../../../lib/config';
-import { getSupabaseServerClient } from '../../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { logger } from '../../../../lib/logger';
 
 export default async function handler(
@@ -18,13 +18,10 @@ export default async function handler(
     return res.status(400).json({ error: 'Invalid order ID' });
   }
 
-  // Get user via Supabase client
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    logger.warn('Unauthorized resync attempt', { authError });
-    return res.status(401).json({ error: 'Unauthorized', details: authError?.message });
+  const user = await getAuthUser(req, res);
+  if (!user) {
+    logger.warn('Unauthorized resync attempt');
+    return res.status(401).json({ error: 'Unauthorized' });
   }
   const userId = user.id;
 

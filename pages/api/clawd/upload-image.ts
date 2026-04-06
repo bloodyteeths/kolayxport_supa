@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../../lib/supabase';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '../../../lib/auth';
 import { logger } from '../../../lib/logger';
 import { IncomingForm } from 'formidable';
 import fs from 'fs';
@@ -34,15 +34,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (!authenticated) {
-    try {
-      const supabase = getSupabaseServerClient(req, res);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        authenticated = true;
-        userId = user.id;
-      }
-    } catch {
-      // session auth failed
+    const user = await getAuthUser(req, res);
+    if (user) {
+      authenticated = true;
+      userId = user.id;
     }
   }
 

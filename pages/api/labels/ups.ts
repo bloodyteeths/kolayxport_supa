@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { getUpsCredentialsForUser } from '@/lib/ups/ups.credentials';
 import { createUpsShipment, CreateShipmentInput, getUpsAccessToken } from '@/lib/ups/createUpsShipment';
 import { saveUpsLabelToCache } from '@/lib/ups/cache';
@@ -45,13 +45,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Authenticate user via Supabase session
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !authUser) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+  const authUser = await getAuthUser(req, res);
+  if (!authUser) return res.status(401).json({ error: 'Not authenticated' });
 
   const userId = authUser.id;
   const { orderId, recipient, package: pkg, serviceType, isEdi = true, internationalForms, dutyPaymentType = 'RECEIVER', description } = req.body || {};

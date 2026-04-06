@@ -1,4 +1,4 @@
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 const prisma = require('../../../lib/prisma').default;
 
 // This would be imported from actual adapter files
@@ -56,15 +56,9 @@ export default async function handler(req, res) {
   }
   
   try {
-    // Authenticate with Supabase
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user } , error: authError } = await supabase.auth.getUser();
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
-    if (authError) {
-      console.error('Supabase auth error in sync/index:', authError);
-      return res.status(401).json({ error: 'Authentication error', details: authError.message });
-    }
-    
     // Get all marketplace configs for the user
     const marketplaceConfigs = await prisma.marketplaceConfig.findMany({
       where: { userId: user.id }

@@ -1,25 +1,17 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { createBrowserClient, createServerClient } from '@supabase/ssr';
 
 // Support both NEXT_PUBLIC_ prefixed and unprefixed env vars
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY;
-
-// Client-side accessible keys check is disabled to allow build without env variables.
-if (!URL || !ANON) {
-  throw new Error('Missing Supabase URL or Anon Key for browser client. Check your .env file and NEXT_PUBLIC_ prefixes.');
-}
-
-// Client-side (browser) Supabase client
-export const supabase = createBrowserClient(URL, ANON);
 
 let adminInstance: SupabaseClient | null = null;
 
-// 1) service-role client for server-only logic (lazy initialization)
+/**
+ * Service-role Supabase client for server-only logic (e.g., Storage uploads).
+ * Auth is handled by NextAuth — this client is only for Supabase Storage or
+ * other non-auth Supabase features.
+ */
 export const supabaseAdmin = () => {
   if (typeof window !== 'undefined') {
-    // This function should not be called on the client.
-    // If it is, it's a programming error.
     throw new Error('supabaseAdmin should not be called on the client-side.');
   }
 
@@ -30,74 +22,12 @@ export const supabaseAdmin = () => {
     throw new Error(errorMessage);
   }
 
+  if (!URL) {
+    throw new Error('Missing SUPABASE_URL for admin client.');
+  }
+
   if (!adminInstance) {
-    // URL is confirmed to exist by the module-level check
     adminInstance = createClient(URL, SERVICE_KEY);
   }
   return adminInstance;
-};
-
-// 2) pages-router helper for req/res session routes using @supabase/ssr
-export function getSupabaseServerClient(req, res) {
-  if (typeof window !== 'undefined') {
-    // This function should not be called on the client.
-    // If it is, it's a programming error.
-    throw new Error('getSupabaseServerClient should not be called on the client-side.');
-  }
-  if (!URL || !ANON) {
-    throw new Error('Missing Supabase URL or Anon Key for server client. Check your .env file.');
-  }
-  // URL and ANON are confirmed to exist by the module-level check
-  return createServerClient(
-    URL,
-    ANON,
-    {
-      cookies: {
-        get(name) {
-          // Handle both req.cookies (if available) and manual parsing
-          if (req.cookies && req.cookies[name]) {
-            return req.cookies[name];
-          }
-          
-          // Fallback to manual cookie parsing
-          const cookieHeader = req.headers?.cookie || '';
-          if (!cookieHeader) return undefined;
-          
-          const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-            const [key, ...val] = cookie.trim().split('=');
-            if (key) {
-              acc[key] = decodeURIComponent(val.join('='));
-            }
-            return acc;
-          }, {} as Record<string, string>);
-          
-          return cookies[name];
-        },
-        set(name, value, options) {
-          if (res) res.setHeader('Set-Cookie', serializeCookie(name, value, options));
-        },
-        remove(name, options) {
-          if (res) res.setHeader('Set-Cookie', serializeCookie(name, '', { ...options, maxAge: -1 }));
-        },
-      },
-    }
-  );
-}
-
-// Helper to serialize cookies (since res.cookie is not directly available in API routes like in Express)
-// This is a simplified version. For robust cookie serialization, a library like 'cookie' is often used.
-// However, createServerClient from @supabase/ssr might handle some of this internally or expect a specific format.
-// Let's assume for now this basic serialization is what's needed or that createServerClient handles the options correctly.
-// We might need to install and use the 'cookie' package if this is not sufficient.
-// For now, this will be a placeholder to satisfy the structure.
-// The options object is passed through.
-const serializeCookie = (name, value, options) => {
-  const parts = [`${name}=${encodeURIComponent(value)}`];
-  if (options.maxAge) parts.push(`Max-Age=${options.maxAge}`);
-  if (options.path) parts.push(`Path=${options.path}`);
-  if (options.domain) parts.push(`Domain=${options.domain}`);
-  if (options.secure) parts.push('Secure');
-  if (options.httpOnly) parts.push('HttpOnly');
-  if (options.sameSite) parts.push(`SameSite=${options.sameSite}`);
-  return parts.join('; ');
 };

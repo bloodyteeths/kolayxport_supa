@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../lib/supabase';
-import { createClient } from '@supabase/supabase-js';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '../../lib/prisma';
 
 export default async function handler(
@@ -12,33 +11,8 @@ export default async function handler(
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  // --- Authentication (same pattern as orders/index.ts) ---
-  let user, authError;
-  const supabase = getSupabaseServerClient(req, res);
-  const result = await supabase.auth.getUser();
-  user = result.data.user;
-  authError = result.error;
-
-  if (authError || !user) {
-    const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
-    let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
-    const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (token) {
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        const supabaseDirect = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        );
-        const { data, error: userError } = await supabaseDirect.auth.getUser(token);
-        user = data.user;
-        authError = userError;
-      }
-    }
-  }
-
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
   // --- Parse date range ---
   const range = (req.query.range as string) || '7days';

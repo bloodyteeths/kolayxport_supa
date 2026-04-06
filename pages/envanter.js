@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/router';
 import Layout from '@/components/AppLayout';
 import { toast } from 'react-hot-toast';

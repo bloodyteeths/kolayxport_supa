@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 
 export const config = {
   runtime: 'nodejs',
@@ -11,12 +11,8 @@ export default async function handler(
   res: NextApiResponse
 ) {
   if (req.method === 'GET') {
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     const credential = await prisma.credential.findUnique({
       where: { userId: user.id },
@@ -36,12 +32,8 @@ export default async function handler(
   }
 
   if (req.method === 'DELETE') {
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     await prisma.credential.update({
       where: { userId: user.id },

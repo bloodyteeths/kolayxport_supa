@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
 import { UIOrder, OrderChannel, OrderSource } from '@/lib/types';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
@@ -14,13 +14,11 @@ async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Get user via Supabase client
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    logger.warn('Unauthorized Etsy sync attempt', { authError });
-    return res.status(401).json({ error: 'Unauthorized', details: authError?.message });
+  // Get user via NextAuth
+  const user = await getAuthUser(req, res);
+  if (!user) {
+    logger.warn('Unauthorized Etsy sync attempt', {});
+    return res.status(401).json({ error: 'Unauthorized' });
   }
   const userId = user.id;
 

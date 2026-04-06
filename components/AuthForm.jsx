@@ -1,106 +1,37 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useTranslations } from 'next-intl';
 
 export default function AuthForm() {
   const t = useTranslations('auth');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [mode, setMode] = useState('login'); // 'login' or 'signup'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const router = useRouter();
 
   const handleGoogle = async () => {
     setError('');
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin + '/app' },
-    });
-    if (error) setError(error.message);
-    setLoading(false);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setLoading(true);
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setError(error.message);
-      } else {
-        setSuccess(t('loginSuccess'));
-        router.push('/app');
-      }
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) setError(error.message);
-      else setSuccess(t('signupSuccess'));
+    try {
+      await signIn('google', { callbackUrl: '/app' });
+    } catch (err) {
+      setError(err.message || 'Sign in failed');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded shadow">
       <h2 className="text-2xl font-bold mb-4 text-center">{t('title')}</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="email"
-          placeholder={t('emailPlaceholder')}
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          className="w-full px-3 py-2 border rounded"
-          required
-        />
-        <input
-          type="password"
-          placeholder={t('passwordPlaceholder')}
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          className="w-full px-3 py-2 border rounded"
-          required
-        />
-        <button
-          type="submit"
-          className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
-          disabled={loading}
-        >
-          {mode === 'login' ? t('signInWithEmail') : t('signUpWithEmail')}
-        </button>
-      </form>
-      <div className="text-center mt-4">
-        {mode === 'login' ? (
-          <span>
-            {t('noAccount')}{' '}
-            <button className="text-blue-600 hover:underline" onClick={() => setMode('signup')}>{t('signUp')}</button>
-          </span>
-        ) : (
-          <span>
-            {t('hasAccount')}{' '}
-            <button className="text-blue-600 hover:underline" onClick={() => setMode('login')}>{t('signIn')}</button>
-          </span>
-        )}
-      </div>
-      <div className="flex items-center my-4">
-        <div className="flex-1 h-px bg-gray-300" />
-        <span className="mx-2 text-gray-400 text-sm">{t('or')}</span>
-        <div className="flex-1 h-px bg-gray-300" />
-      </div>
       <button
         onClick={handleGoogle}
         className="w-full py-2 mb-4 bg-white text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition flex items-center justify-center"
         disabled={loading}
       >
         <img src="/google-icon.png" alt="Google" className="w-5 h-5 mr-2" />
-        {mode === 'login' ? t('signInWithGoogle') : t('signUpWithGoogle')}
+        {t('signInWithGoogle')}
       </button>
       {error && <div className="mt-4 text-red-600 text-center">{error}</div>}
-      {success && <div className="mt-4 text-green-600 text-center">{success}</div>}
     </div>
   );
-} 
+}

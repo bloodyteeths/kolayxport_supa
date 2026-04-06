@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '../../../lib/auth';
 import { logger } from '../../../lib/logger';
 import {
   fetchTrendyolCategoryProducts,
@@ -13,11 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Auth check
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     // ================================================================
     // BROWSE CATEGORY (single category scrape)

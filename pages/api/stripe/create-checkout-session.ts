@@ -1,7 +1,7 @@
 import { STRIPE_PRICES } from '@/lib/stripePrices';
 import prisma from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
-import { supabase } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -9,23 +9,8 @@ export default async function handler(req, res) {
     return res.status(405).end('Method Not Allowed');
   }
 
-  // Get the authorization header
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Extract the access token
-  const accessToken = authHeader.replace('Bearer ', '');
-  
-  // Verify the token with Supabase
-  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-  console.log('API auth check:', { user: user?.email, error: error?.message });
-  
-  if (error || !user) {
-    console.log('API: Unauthorized user');
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const userId = user.id;
   console.log('API: Creating checkout for user:', user.email, 'plan:', req.body.plan);
@@ -118,7 +103,7 @@ export default async function handler(req, res) {
           data: {
             id: userId,
             email: user.email || '',
-            name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+            name: user.name || user.email?.split('@')[0] || 'User',
             // Initialize billing fields
             subscriptionPlan: 'trial',
             subscriptionStatus: 'trialing',

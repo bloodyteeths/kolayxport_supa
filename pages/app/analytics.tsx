@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { supabase } from '@/lib/supabase';
+// supabase browser client removed — auth now handled by NextAuth cookies
 import { useRouter } from 'next/router';
 import AppLayout from '../../components/AppLayout';
 import dynamic from 'next/dynamic';
@@ -272,13 +272,11 @@ export default function DashboardPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No session');
       const params = new URLSearchParams({ dateRange });
       if (dateRange === 'month') params.set('month', selectedMonth);
       if (dateRange === 'day') params.set('day', selectedDay);
       const res = await fetch(`/api/analytics?${params}`, {
-        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
       });
       if (!res.ok) throw new Error('Fetch failed');
       setData(await res.json());

@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../../lib/prisma';
-import { getSupabaseServerClient } from '../../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { logger } from '../../../../lib/logger';
 import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '../../../../lib/integrations/etsyClient';
 
@@ -34,15 +34,8 @@ export default async function handler(
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
 
   const { orderId } = req.query;
   const { trackingNumber: rawTrackingNumber, carrierId = 3, notifyCustomer = true, updateRemoteOrder = true } = req.body;

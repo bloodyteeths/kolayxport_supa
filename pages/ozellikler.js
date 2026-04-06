@@ -5,7 +5,7 @@ import Breadcrumb from '../components/Breadcrumb';
 import { motion } from 'framer-motion';
 import { NextSeo } from 'next-seo';
 import { Zap, Shuffle, Edit3, Package, Link2, Settings, ShieldCheck, Gift, ArrowLeftRight } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+// supabase browser client removed — auth now handled by NextAuth
 
 const featureSections = [
   {

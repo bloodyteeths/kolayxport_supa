@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 
 // Rate limiting per IP for anonymous users
 const anonLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -45,12 +45,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  // Auth check — optional (Bearer token OR Supabase cookie)
+  // Auth check — optional (Bearer token OR session cookie)
   let userId: string | null = null;
   let plan = 'free';
   try {
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getAuthUser(req, res);
     if (user) {
       userId = user.id;
       plan = 'starter';

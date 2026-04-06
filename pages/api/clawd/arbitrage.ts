@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '../../../lib/logger';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '../../../lib/auth';
 import { getApplicationToken } from '../../../lib/integrations/ebayClient';
 import { fetchTrendyolCategoryProducts, TRENDYOL_CATEGORIES } from '../../../lib/integrations/trendyolSearch';
 import { scanCategory, scanBatch, batchTranslateTitles, extractEnglishQuery, getCachedExchangeRate } from '../../../lib/arbitrage/scanner';
@@ -38,11 +38,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (!authenticated) {
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user?.id) {
+    const authUser = await getAuthUser(req, res);
+    if (authUser?.id) {
       authenticated = true;
-      userId = session.user.id;
+      userId = authUser.id;
     }
   }
 

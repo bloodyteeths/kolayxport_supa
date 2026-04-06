@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { getSupabaseServerClient } from '@/lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 
 async function handler(
@@ -34,45 +34,15 @@ async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Get user via Supabase client
-  let supabase = getSupabaseServerClient(req, res);
-  let { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  // If regular auth fails, try extension auth header
-  if ((authError || !user) && req.headers['x-extension-auth']) {
-    try {
-      const extensionToken = req.headers['x-extension-auth'] as string;
-      // Create a new Supabase client with the extension token
-      const { createClient } = require('@supabase/supabase-js');
-      const tempSupabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          global: {
-            headers: {
-              Authorization: `Bearer ${extensionToken}`
-            }
-          }
-        }
-      );
-      const { data: { user: extensionUser }, error: extensionError } = await tempSupabase.auth.getUser();
-      if (extensionUser && !extensionError) {
-        user = extensionUser;
-        authError = null;
-      }
-    } catch (extensionAuthError) {
-      logger.warn('Extension auth also failed', { error: extensionAuthError });
-    }
-  }
-
-  if (authError || !user) {
-    logger.warn('Unauthorized Etsy address sync attempt', { 
-      authError: authError?.message,
+  // Get user via NextAuth
+  const user = await getAuthUser(req, res);
+  if (!user) {
+    logger.warn('Unauthorized Etsy address sync attempt', {
       hasExtensionAuth: !!req.headers['x-extension-auth'],
       origin: req.headers.origin,
       userAgent: req.headers['user-agent']
     });
-    return res.status(401).json({ error: 'Unauthorized', details: authError?.message });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
   const userId = user.id;
 

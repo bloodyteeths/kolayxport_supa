@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../../lib/prisma';
 import { createFedexShipment } from '../../../../lib/fedex/fedex.service';
 import { OrderRow, ShipperProfileData, FedexShipmentResult, OrderRowItem } from '../../../../lib/fedex/fedex.types';
@@ -89,11 +89,9 @@ async function handler(
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !authUser) {
-    logger.warn('[API generate-label] Authentication failed.', { authError });
+  const authUser = await getAuthUser(req, res);
+  if (!authUser) {
+    logger.warn('[API generate-label] Authentication failed.');
     return res.status(401).json({ error: 'Not authenticated' });
   }
 

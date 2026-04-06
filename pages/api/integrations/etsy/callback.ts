@@ -1,5 +1,4 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '@/lib/supabase';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 

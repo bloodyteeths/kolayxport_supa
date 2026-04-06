@@ -5,7 +5,7 @@ import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { ChevronDown, Star, Truck, BarChart3, Box, Search, Sparkles, TrendingUp, ShoppingBag, Globe, Layers, Brain, Target, Zap, ArrowLeftRight, DollarSign } from 'lucide-react';
 import { Disclosure, Transition } from '@headlessui/react';
-import { supabase } from '@/lib/supabase';
+// supabase browser client removed — auth now handled by NextAuth
 import { FAQPageJsonLd } from 'next-seo';
 
 // Placeholder data - replace with your actual data or fetch from an API

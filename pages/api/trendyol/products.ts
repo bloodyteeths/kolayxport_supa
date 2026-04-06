@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '../../../lib/auth';
 import prisma from '../../../lib/prisma';
 import { createTrendyolClient } from '../../../lib/integrations/trendyolApiClient';
 import { logger } from '../../../lib/logger';
@@ -10,9 +10,8 @@ export const config = {
 };
 
 async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) {
+  const user = await getAuthUser(req, res);
+  if (!user) {
     return { error: 'Unauthorized', status: 401 };
   }
 

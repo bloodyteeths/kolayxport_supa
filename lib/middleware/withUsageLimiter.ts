@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../prisma';
-import { getSupabaseServerClient } from '../supabase';
+import { getAuthUser } from '../auth';
 import { logger } from '../logger';
 import { User } from '@prisma/client';
 
@@ -91,9 +91,7 @@ const checkUsage = async (userId: string, limitType: 'orderSync' | 'label') => {
 
 export const withUsageLimiter = (handler, limitType: 'orderSync' | 'label') => {
   return async (req: NextApiRequest, res: NextApiResponse) => {
-    const supabase = getSupabaseServerClient(req, res);
-    const { data: { user } } = await supabase.auth.getUser();
-
+    const user = await getAuthUser(req, res);
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }

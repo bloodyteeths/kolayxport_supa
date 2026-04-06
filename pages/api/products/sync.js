@@ -1,8 +1,7 @@
-import { getSupabaseServerClient } from '../../../lib/supabase';
+import { getAuthUser } from '@/lib/auth';
 const prisma = require('../../../lib/prisma').default;
 import { startSync, updateSyncProgress, completeSync } from '../../../lib/sync-status';
 import { logger } from '../../../lib/logger';
-import { createClient } from '@supabase/supabase-js';
 
 // This would be imported from actual adapter files
 const fetchVeeqoProducts = async (config) => {
@@ -54,27 +53,9 @@ export default async function handler(req, res) {
   }
   
   try {
-    let user, authError;
-    const supabase = getSupabaseServerClient(req, res);
-    const result = await supabase.auth.getUser();
-    user = result.data.user;
-    authError = result.error;
-    if (authError || !user) {
-      // Try Authorization header fallback
-      const authHeaderRaw = req.headers['authorization'] || req.headers['Authorization'];
-      let authHeader = Array.isArray(authHeaderRaw) ? authHeaderRaw[0] : authHeaderRaw;
-      const token = authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-      if (token) {
-        const supabaseDirect = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-        const { data, error } = await supabaseDirect.auth.getUser(token);
-        user = data.user;
-        authError = error;
-      }
-    }
-    if (authError || !user) {
-      return res.status(401).json({ error: 'Not authenticated' });
-    }
-    
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Not authenticated' });
+
     // Prevent overlapping syncs
     const inProgress = await prisma.syncOperation.findFirst({
       where: {

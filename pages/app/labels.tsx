@@ -248,12 +248,13 @@ export interface LabelRow {
 
 
 /** Build a marketplace order URL from marketplace name + order number */
-function getMarketplaceOrderUrl(marketplace: string, orderNumber: string): string | null {
-  if (!marketplace || !orderNumber || orderNumber === '—') return null;
-  const mp = marketplace.toLowerCase();
+function getMarketplaceOrderUrl(marketplace: string, orderNumber: string, channel?: string): string | null {
+  if (!orderNumber || orderNumber === '—') return null;
+  const mp = (marketplace || '').toLowerCase();
+  const ch = (channel || '').toLowerCase();
 
-  // Etsy
-  if (mp.includes('etsy')) {
+  // Etsy — direct marketplace match OR orders routed through Veeqo/Shippo with channel=etsy
+  if (mp.includes('etsy') || ch.includes('etsy')) {
     return `https://www.etsy.com/your/orders/sold/completed?order_id=${orderNumber}`;
   }
   // Trendyol
@@ -1650,7 +1651,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       headerName: t('columnOrderNo'),
       width: 140,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
-        const url = getMarketplaceOrderUrl(params.row.marketplace, params.value as string);
+        const url = getMarketplaceOrderUrl(params.row.marketplace, params.value as string, params.row.channel);
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', height: '100%', gap: 0.5 }}>
             <Typography variant="body2" noWrap>{params.value || '—'}</Typography>
@@ -2520,7 +2521,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                       </Box>
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.7rem' }}>
                         {(() => {
-                          const mpUrl = getMarketplaceOrderUrl(row.marketplace, row.orderNumber);
+                          const mpUrl = getMarketplaceOrderUrl(row.marketplace, row.orderNumber, row.channel);
                           return mpUrl ? (
                             <a href={mpUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#1976d2', textDecoration: 'none' }}>
                               #{row.orderNumber} <OpenInNewIcon sx={{ fontSize: 10, verticalAlign: 'middle' }} />

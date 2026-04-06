@@ -864,6 +864,17 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
     
     
     
+    // Build Trendyol contentId lookup from rawData.lines (for listing URLs)
+    const trendyolContentMap = new Map<string, number>();
+    const isTrendyol = (order.marketplace || '').toLowerCase().includes('trendyol');
+    if (isTrendyol && safeRaw?.lines) {
+      for (const line of safeRaw.lines) {
+        if (line.id && line.contentId) {
+          trendyolContentMap.set(String(line.id), line.contentId);
+        }
+      }
+    }
+
     // Check if line_items are in rawData (Shippo/Etsy case)
     let lineItems = order.line_items;
     if ((!lineItems || lineItems.length === 0) && safeRaw?.line_items) {
@@ -920,6 +931,10 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelStockType: order.labelStockType,
         variantInfo: lineItems?.[0]?.variantInfo || '—',
         listingUrl: (() => {
+          // Trendyol: construct from contentId
+          if (isTrendyol && safeRaw?.lines?.[0]?.contentId) {
+            return `https://www.trendyol.com/x/x-p-${safeRaw.lines[0].contentId}`;
+          }
           const t = order.commodityDesc || safeRaw?.line_items?.[0]?.title || '';
           return listingUrlsByTitle[t] || undefined;
         })(),
@@ -987,9 +1002,17 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelStockType: order.labelStockType,
         variantInfo: item.variantInfo || '—',
         listingUrl: (() => {
+          // Veeqo items: resolved via Product API
           if (isVeeqoItem && item.sellable?.product?.id) {
             return listingUrlsByProductId[String(item.sellable.product.id)] || undefined;
           }
+          // Trendyol: construct from contentId in rawData.lines
+          if (isTrendyol) {
+            const lineId = (item as any).remoteLineId || (item as any).marketplaceKey || item.id;
+            const contentId = trendyolContentMap.get(String(lineId)) || safeRaw?.lines?.[0]?.contentId;
+            if (contentId) return `https://www.trendyol.com/x/x-p-${contentId}`;
+          }
+          // Fallback: title matching from EtsyListing DB
           const t = item.title || '';
           return listingUrlsByTitle[t] || undefined;
         })(),

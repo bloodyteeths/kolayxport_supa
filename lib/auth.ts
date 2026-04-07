@@ -13,7 +13,6 @@ import prisma from '@/lib/prisma';
 const prismaAdapter = PrismaAdapter(prisma);
 
 export const authOptions = {
-  debug: true,
   adapter: prismaAdapter,
   providers: [
     GoogleProvider({
@@ -27,27 +26,16 @@ export const authOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        console.log('[auth] authorize called with email:', credentials?.email);
-        if (!credentials?.email || !credentials?.password) {
-          console.log('[auth] missing credentials');
-          return null;
-        }
+        if (!credentials?.email || !credentials?.password) return null;
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
-        if (!user || !user.password) {
-          console.log('[auth] user not found or no password for:', credentials.email);
-          return null;
-        }
+        if (!user || !user.password) return null;
 
         const valid = await bcrypt.compare(credentials.password, user.password);
-        if (!valid) {
-          console.log('[auth] invalid password for:', credentials.email);
-          return null;
-        }
+        if (!valid) return null;
 
-        console.log('[auth] login success for:', user.id, user.email);
         return { id: user.id, email: user.email, name: user.name };
       },
     }),

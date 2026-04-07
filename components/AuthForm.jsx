@@ -37,16 +37,13 @@ export default function AuthForm() {
         email,
         password,
         redirect: false,
+        callbackUrl: '/app',
       });
 
-      console.log('[auth-debug] signIn result:', JSON.stringify(result));
-
       if (result?.error) {
-        console.log('[auth-debug] error detected:', result.error, 'status:', result.status, 'ok:', result.ok, 'url:', result.url);
         setError(isSignUp ? 'Account created but login failed. Try logging in.' : t('invalidCredentials') || 'Invalid email or password');
         setLoading(false);
       } else {
-        console.log('[auth-debug] success, redirecting to /app');
         router.push('/app');
       }
     } catch (err) {

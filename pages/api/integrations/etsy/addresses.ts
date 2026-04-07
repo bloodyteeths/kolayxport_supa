@@ -48,8 +48,26 @@ async function handler(
     origin: req.headers.origin,
   });
 
-  // Get user via NextAuth
-  const user = await getAuthUser(req, res);
+  // Get user via NextAuth (cookie or Bearer token)
+  let user = await getAuthUser(req, res);
+
+  // Extension fallback: if extension sends request from chrome-extension:// origin
+  // and provides shop name in orders, look up user via EtsyShop
+  if (!user && origin && origin.startsWith('chrome-extension://')) {
+    const { orders } = req.body || {};
+    const shopName = orders?.[0]?.etsyStoreName || orders?.[0]?.shopName;
+    if (shopName) {
+      const shop = await prisma.etsyShop.findFirst({
+        where: { shopName: { equals: shopName, mode: 'insensitive' }, isActive: true },
+        select: { userId: true, user: { select: { id: true, email: true, name: true } } },
+      });
+      if (shop?.user) {
+        user = { id: shop.user.id, email: shop.user.email, name: shop.user.name };
+        logger.info('[ext-auth] Authenticated via shop name lookup', { shopName, userId: user.id });
+      }
+    }
+  }
+
   if (!user) {
     logger.warn('Unauthorized Etsy address sync attempt', {
       hasExtensionAuth: !!extAuth,

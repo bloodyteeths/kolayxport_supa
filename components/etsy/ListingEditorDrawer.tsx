@@ -1420,6 +1420,10 @@ export default function ListingEditorDrawer({
                   tags={fields.tags}
                   title={fields.title}
                   description={fields.description}
+                  materials={fields.materials}
+                  taxonomyId={listing?.taxonomy_id}
+                  weight={fields.item_weight}
+                  trackedKeywords={trackedKeywords}
                   compact={false}
                 />
 

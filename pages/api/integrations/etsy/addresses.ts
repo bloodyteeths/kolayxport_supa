@@ -34,11 +34,25 @@ async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Debug: log all auth-related headers from extension
+  const authHeader = req.headers.authorization;
+  const extAuth = req.headers['x-extension-auth'];
+  const cookies = req.headers.cookie;
+  logger.info('[ext-debug] Auth headers received', {
+    hasAuthorization: !!authHeader,
+    authorizationPrefix: authHeader ? authHeader.substring(0, 30) + '...' : null,
+    hasExtensionAuth: !!extAuth,
+    extAuthPrefix: extAuth ? String(extAuth).substring(0, 30) + '...' : null,
+    hasSessionCookie: cookies?.includes('next-auth.session-token') || cookies?.includes('__Secure-next-auth.session-token') || false,
+    cookieNames: cookies ? cookies.split(';').map(c => c.trim().split('=')[0]) : [],
+    origin: req.headers.origin,
+  });
+
   // Get user via NextAuth
   const user = await getAuthUser(req, res);
   if (!user) {
     logger.warn('Unauthorized Etsy address sync attempt', {
-      hasExtensionAuth: !!req.headers['x-extension-auth'],
+      hasExtensionAuth: !!extAuth,
       origin: req.headers.origin,
       userAgent: req.headers['user-agent']
     });

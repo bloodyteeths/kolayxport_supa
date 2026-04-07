@@ -36,6 +36,11 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         },
       },
       {
+        // Never cache auth routes — stale CSRF tokens break login
+        urlPattern: /\/api\/auth\/.*/i,
+        handler: 'NetworkOnly',
+      },
+      {
         urlPattern: /\/api\/.*/i,
         handler: 'NetworkFirst',
         options: {
@@ -82,6 +87,16 @@ const nextConfig = {
   // Security headers
   async headers() {
     return [
+      {
+        // Prevent caching of auth endpoints
+        source: '/api/auth/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache, must-revalidate',
+          },
+        ],
+      },
       {
         source: '/(.*)',
         headers: [

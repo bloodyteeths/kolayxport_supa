@@ -55,6 +55,11 @@
     "hasAccount": "Zaten hesabınız var mı?",
     "signUp": "Kayıt Ol",
     "signIn": "Giriş Yap",
+    "name": "Ad",
+    "email": "E-posta",
+    "password": "Şifre",
+    "invalidCredentials": "Geçersiz e-posta veya şifre",
+    "alreadyHaveAccount": "Zaten hesabınız var mı?",
     "or": "veya",
     "loginSuccess": "Giriş başarılı!",
     "signupSuccess": "Kayıt başarılı! Hesabınızı onaylamak için e-postanızı kontrol edin."

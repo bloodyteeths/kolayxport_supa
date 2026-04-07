@@ -87,13 +87,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     console.log('[Analytics API] Database user found:', dbUser.id);
 
-    // Build where clause
+    // Build where clause — use uiOrderDate when available, fall back to createdAt
     const whereClause: any = {
       userId: dbUser.id,
-      uiOrderDate: {
-        gte: startDate,
-        lte: endDate
-      }
+      OR: [
+        { uiOrderDate: { gte: startDate, lte: endDate } },
+        { uiOrderDate: null, createdAt: { gte: startDate, lte: endDate } },
+      ],
     };
 
     if (marketplace) {

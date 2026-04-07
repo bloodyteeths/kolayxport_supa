@@ -215,7 +215,9 @@ export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const t = useTranslations('analytics');
-  const { config, formatCurrency, formatDate, formatDateTime, formatNumber } = useLocale();
+  const { config, formatCurrency: _formatCurrency, formatDate, formatDateTime, formatNumber } = useLocale();
+  // All analytics values are converted to TRY — always show ₺
+  const formatCurrency = (value: number) => _formatCurrency(value, 'TRY');
 
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -483,8 +485,8 @@ export default function DashboardPage() {
             {/* Exchange rates inline */}
             {data?.exchangeRates && (
               <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
-                <span>1 USD = <strong className="text-blue-600">{formatCurrency(data.exchangeRates.USD)}</strong></span>
-                <span>1 EUR = <strong className="text-emerald-600">{formatCurrency(data.exchangeRates.EUR)}</strong></span>
+                <span>1 USD = <strong className="text-blue-600">₺{data.exchangeRates.USD.toFixed(2)}</strong></span>
+                <span>1 EUR = <strong className="text-emerald-600">₺{data.exchangeRates.EUR.toFixed(2)}</strong></span>
               </div>
             )}
           </div>

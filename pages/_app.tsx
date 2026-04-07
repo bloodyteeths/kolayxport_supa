@@ -33,6 +33,12 @@ const messages = { tr: trMessages, en: enMessages } as const;
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const locale = useLocaleStore((s) => s.locale);
+  const hydrate = useLocaleStore((s) => s.hydrate);
+
+  // Hydrate locale from localStorage after mount to avoid SSR mismatch
+  useEffect(() => {
+    hydrate();
+  }, []);
 
   useEffect(() => {
     const { session_id } = router.query;

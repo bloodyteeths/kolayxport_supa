@@ -4,20 +4,27 @@ export type AppLocale = 'tr' | 'en';
 
 interface LocaleState {
   locale: AppLocale;
+  hydrated: boolean;
   setLocale: (locale: AppLocale) => void;
+  hydrate: () => void;
 }
 
-const getStoredLocale = (): AppLocale => {
-  if (typeof window === 'undefined') return 'tr';
-  const stored = localStorage.getItem('kolayxport_locale');
-  return stored === 'en' ? 'en' : 'tr';
-};
-
+// Always start with 'tr' to match SSR — avoids hydration mismatch.
+// Call hydrate() in useEffect to read localStorage after mount.
 const useLocaleStore = create<LocaleState>((set) => ({
-  locale: getStoredLocale(),
+  locale: 'tr',
+  hydrated: false,
   setLocale: (locale) => {
-    localStorage.setItem('kolayxport_locale', locale);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('kolayxport_locale', locale);
+    }
     set({ locale });
+  },
+  hydrate: () => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem('kolayxport_locale');
+    const locale: AppLocale = stored === 'en' ? 'en' : 'tr';
+    set({ locale, hydrated: true });
   },
 }));
 

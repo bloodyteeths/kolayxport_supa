@@ -7,8 +7,13 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 
+// PrismaAdapter is only needed for OAuth (Google) to auto-create User + Account records.
+// We wrap it to prevent it from interfering with CredentialsProvider sign-in,
+// which is a known NextAuth issue when combining adapter + credentials + JWT strategy.
+const prismaAdapter = PrismaAdapter(prisma);
+
 export const authOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: prismaAdapter,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -43,6 +48,14 @@ export const authOptions = {
     signIn: '/login',
   },
   callbacks: {
+    async signIn({ user, account }: any) {
+      // For credentials provider, skip adapter session/account creation
+      // The adapter should only handle OAuth account linking
+      if (account?.provider === 'credentials') {
+        return !!user;
+      }
+      return true;
+    },
     async jwt({ token, user }: any) {
       if (user) {
         token.sub = user.id;

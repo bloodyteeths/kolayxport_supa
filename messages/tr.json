@@ -1890,7 +1890,8 @@
         "selectSection": "Bölüm seçin...",
         "amount": "Miktar...",
         "quantityPlaceholder": "Adet...",
-        "selectOperation": "İşlem seçin..."
+        "selectOperation": "İşlem seçin...",
+        "bulkActions": "Toplu İşlem"
       },
       "photos": {
         "selectFiles": "Fotoğraf Seç",

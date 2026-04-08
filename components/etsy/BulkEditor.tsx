@@ -519,6 +519,9 @@ export default function BulkEditor({
   // Search within selected listings
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Bulk action bar visibility
+  const [showBulkActions, setShowBulkActions] = useState(false);
+
   // Operation state
   const [operation, setOperation] = useState<OperationType>('');
   const [inputValue, setInputValue] = useState('');
@@ -2379,8 +2382,28 @@ export default function BulkEditor({
 
         {/* Main content */}
         <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 1, sm: 2 } }}>
-          {/* Action bar */}
-          {renderActionBar()}
+          {/* Bulk action bar toggle + collapsible */}
+          <Box sx={{ mb: 1 }}>
+            <Button
+              size="small"
+              variant={showBulkActions ? 'contained' : 'outlined'}
+              startIcon={<TuneIcon sx={{ fontSize: 16 }} />}
+              onClick={() => setShowBulkActions(prev => !prev)}
+              sx={{
+                mb: showBulkActions ? 1 : 0,
+                textTransform: 'none', fontWeight: 600, borderRadius: '8px', fontSize: '0.8rem',
+                ...(showBulkActions ? {
+                  background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
+                  '&:hover': { background: 'linear-gradient(135deg, #1d4ed8, #4338ca)' },
+                } : {}),
+              }}
+            >
+              {t('actionBar.bulkActions')}
+            </Button>
+            <Collapse in={showBulkActions}>
+              {renderActionBar()}
+            </Collapse>
+          </Box>
 
           {/* Search + select all row */}
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>

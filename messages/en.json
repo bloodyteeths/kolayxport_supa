@@ -1890,7 +1890,8 @@
         "selectSection": "Select section...",
         "amount": "Amount...",
         "quantityPlaceholder": "Quantity...",
-        "selectOperation": "Select operation..."
+        "selectOperation": "Select operation...",
+        "bulkActions": "Bulk Actions"
       },
       "photos": {
         "selectFiles": "Select Photos",

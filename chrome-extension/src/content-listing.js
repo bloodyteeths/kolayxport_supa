@@ -169,7 +169,6 @@
       const est = velocity?.estMonthlySales || 0;
       const revenue = velocity?.estMonthlyRevenue || 0;
       const estTotal = velocity?.estTotalSales || 0;
-      const estMethod = velocity?.estMethod || 'favorites';
       const demand = velocity?.demandScore || 'low';
       const favs = listing?.favorites || 0;
       const views = listing?.views || 0;
@@ -179,101 +178,61 @@
       const quantity = listing?.quantity || 0;
       const lowStock = velocity?.lowStock || false;
 
-      // Header line
-      let headerParts = `<span class="kx-stats-logo">KX</span>`;
-      headerParts += `
-        <span class="kx-seo-bar">
-          ${S.t('seo')}:
-          <span class="kx-seo-track"><span class="kx-seo-fill" style="width:${seoPct}%;background:${seoFillColor};"></span></span>
-          <span class="${seoColor}" style="font-weight:700;">${seo}/100</span>
-        </span>
-      `;
-
-      // Estimated sales badge
-      if (est > 0) {
-        headerParts += `<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:4px;font-weight:700;">~${est}${S.t('perMonth')} ${S.t('sales')}</span>`;
-      }
-
-      // Revenue badge
-      if (revenue > 0) {
-        headerParts += `<span style="background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:4px;font-weight:700;">$${S.formatNum(revenue)}${S.t('perMonth')}</span>`;
-      }
-
-      // Demand badge
       const dl = S.demandLabel(demand);
-      headerParts += `<span style="font-weight:600;">${S.t('demand')}: <span class="${dl.cssClass}">${dl.text}</span></span>`;
+      const demandText = demand === 'hot' ? 'Hot' : demand === 'good' ? 'Good' : demand === 'moderate' ? 'Moderate' : 'Low';
+      const demandColor = demand === 'hot' ? '#c62828' : demand === 'good' ? '#2e7d32' : demand === 'moderate' ? '#e65100' : '#888';
+
+      // Build clean metric boxes
+      const metrics = [];
+      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">SEO</span><span style="color:${seoFillColor};font-weight:700;">${seo}/100</span></span>`);
+      if (est > 0) metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Est. Sales</span><span style="color:#2e7d32;font-weight:700;">~${est}/mo</span></span>`);
+      if (revenue > 0) metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Est. Revenue</span><span style="color:#1565c0;font-weight:700;">$${S.formatNum(revenue)}/mo</span></span>`);
+      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Demand</span><span style="color:${demandColor};font-weight:700;">${demandText}</span></span>`);
+      if (reviews > 0) metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Reviews</span><span style="font-weight:700;">${S.formatNum(reviews)}</span></span>`);
+      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Favs</span><span style="font-weight:700;">${S.formatNum(favs)}</span></span>`);
+      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Views</span><span style="font-weight:700;">${S.formatNum(views)}</span></span>`);
+      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Age</span><span>${age} mo</span></span>`);
+
+      if (quantity > 0) {
+        const stockColor = quantity <= 3 ? '#c62828' : quantity <= 10 ? '#e65100' : '#444';
+        metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Stock</span><span style="color:${stockColor};font-weight:700;">${quantity}</span></span>`);
+      }
+
+      const tagColor = tagCount >= 13 ? '#2e7d32' : tagCount >= 10 ? '#e65100' : '#c62828';
+      metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Tags</span><span style="color:${tagColor};font-weight:700;">${tagCount}/13</span></span>`);
 
       if (bestSeller?.isBestSeller) {
-        headerParts += `<span class="kx-best">★ ${S.t('bestSeller')} · Top ${bestSeller.percentile}%</span>`;
+        metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Rank</span><span style="color:#b8860b;font-weight:700;">Top ${bestSeller.percentile}%</span></span>`);
       }
 
-      if (lowStock) {
-        headerParts += `<span class="kx-red" style="font-weight:700;">${S.t('lowStock')}</span>`;
-      }
-
-      headerParts += `<button class="kx-collapse-btn" data-kx-collapse>▲</button>`;
-
-      // Stats line
-      const statParts = [];
-      statParts.push(`<span style="font-weight:600;">~${estTotal} ${S.t('totalSales')} (${estMethod === 'reviews' ? S.t('fromReviews') : S.t('fromFavs')})</span>`);
-      statParts.push('<span class="kx-sep">·</span>');
-      if (reviews > 0) {
-        statParts.push(`<span>★ ${S.formatNum(reviews)} ${S.t('reviews')}</span>`);
-        statParts.push('<span class="kx-sep">·</span>');
-      }
-      statParts.push(`<span>♥ ${S.formatNum(favs)}</span>`);
-      statParts.push('<span class="kx-sep">·</span>');
-      statParts.push(`<span>👁 ${S.formatNum(views)}</span>`);
-      statParts.push('<span class="kx-sep">·</span>');
-      statParts.push(`<span>${age} ${S.t('months')}</span>`);
-
-      // Stock quantity
-      if (quantity > 0) {
-        const stockClass = quantity <= 3 ? 'kx-red' : quantity <= 10 ? 'kx-orange' : '';
-        statParts.push('<span class="kx-sep">·</span>');
-        statParts.push(`<span class="${stockClass}">📦 ${quantity}</span>`);
-      }
-
-      // Tag line
-      let tagLine = '';
-      if (tagCount > 0) {
-        const tagColor = tagCount >= 13 ? 'kx-green' : tagCount >= 10 ? 'kx-orange' : 'kx-red';
-        tagLine = `<span class="${tagColor}">${S.t('tags')}: ${tagCount}/13</span>`;
-        if (tagCount < 13) tagLine += ` <span class="kx-red">(${13 - tagCount} ${S.t('missing')})</span>`;
-      }
-
-      // Shop line
-      let shopLine = '';
       if (shop) {
-        shopLine = `<span>${S.t('shop')}: ${S.formatNum(shop.num_sales || 0)} ${S.t('sales')}</span>`;
-        if (shop.rating) shopLine += ` <span class="kx-sep">·</span> <span>${shop.rating.toFixed(1)}★</span>`;
-      }
-
-      let details = '';
-      if (tagLine || shopLine) {
-        details = `<div class="kx-stats-row" data-kx-details>${tagLine}${tagLine && shopLine ? ' <span class="kx-sep">·</span> ' : ''}${shopLine}</div>`;
+        metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Shop Sales</span><span style="font-weight:700;">${S.formatNum(shop.num_sales || 0)}</span></span>`);
+        if (shop.rating) metrics.push(`<span class="kx-metric"><span class="kx-metric-label">Rating</span><span style="font-weight:700;">${shop.rating.toFixed(1)}★</span></span>`);
       }
 
       let tagsHtml = '';
       if (listing?.tags && listing.tags.length > 0) {
-        tagsHtml = `<div data-kx-details style="margin-top:4px;">${listing.tags.map(t => `<span class="kx-tag-pill">${t}</span>`).join('')}</div>`;
+        tagsHtml = `<div data-kx-details style="margin-top:6px;">${listing.tags.map(t => `<span class="kx-tag-pill">${t}</span>`).join('')}</div>`;
       }
 
       el.innerHTML = `
-        <div class="kx-stats-header">${headerParts}</div>
-        <div class="kx-stats-row">${statParts.join('')}</div>
-        ${details}
+        <div class="kx-stats-header">
+          <span class="kx-stats-logo">KX</span>
+          ${lowStock ? `<span style="color:#c62828;font-weight:700;font-size:11px;">LOW STOCK</span>` : ''}
+          <button class="kx-collapse-btn" data-kx-collapse>▲</button>
+        </div>
+        <div class="kx-metrics-grid">${metrics.join('')}</div>
         ${tagsHtml}
       `;
 
       const collapseBtn = el.querySelector('[data-kx-collapse]');
       if (collapseBtn) {
         collapseBtn.addEventListener('click', () => {
+          const grid = el.querySelector('.kx-metrics-grid');
           const detailEls = el.querySelectorAll('[data-kx-details]');
-          const statsRow = el.querySelector('.kx-stats-row');
-          const isHidden = statsRow.style.display === 'none';
+          const isHidden = grid?.style.display === 'none';
 
-          statsRow.style.display = isHidden ? '' : 'none';
+          if (grid) grid.style.display = isHidden ? '' : 'none';
           detailEls.forEach(d => d.style.display = isHidden ? '' : 'none');
           collapseBtn.textContent = isHidden ? '▲' : '▼';
         });

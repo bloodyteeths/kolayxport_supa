@@ -66,6 +66,21 @@ const KX_INLINE_CSS = `
   background: none; border: none; cursor: pointer; font-size: 11px; color: #667eea;
   font-weight: 600; padding: 0; margin-left: auto;
 }
+.kx-stats-bar .kx-metrics-grid {
+  display: flex; flex-wrap: wrap; gap: 2px;
+}
+.kx-stats-bar .kx-metric {
+  display: inline-flex; flex-direction: column; align-items: center;
+  padding: 4px 10px; background: #fff; border-radius: 6px;
+  border: 1px solid #e8e8ee; min-width: 54px;
+}
+.kx-stats-bar .kx-metric-label {
+  font-size: 9px; color: #888; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.3px; line-height: 1;
+}
+.kx-stats-bar .kx-metric > span:last-child {
+  font-size: 13px; line-height: 1.3;
+}
 `;
 
 function injectInlineCSS() {

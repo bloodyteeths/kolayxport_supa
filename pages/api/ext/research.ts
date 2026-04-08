@@ -118,11 +118,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { query, listingIds } = params;
         if (!query) return res.status(400).json({ error: 'query required' });
 
-        // Public API — NO includes= (only works with OAuth)
-        const searchData = await etsyGet(
-          `/listings/active?keywords=${encodeURIComponent(query)}&limit=100&sort_on=score`
-        );
+        // Two parallel fetches:
+        // 1. Keyword search for market summary stats
+        // 2. Batch fetch of actual page listing IDs for per-card data
+        const pageIds = Array.isArray(listingIds) ? listingIds.filter((id: string) => /^\d+$/.test(id)) : [];
 
+        const [searchData, batchData] = await Promise.all([
+          etsyGet(`/listings/active?keywords=${encodeURIComponent(query)}&limit=100&sort_on=score`),
+          pageIds.length > 0
+            ? etsyGetSafe(`/listings/batch?listing_ids=${pageIds.slice(0, 100).join(',')}`)
+            : null,
+        ]);
+
+        // Summary from keyword search
         const items = (searchData.results || []);
         const prices = items.map((i: any) => (i.price?.amount || 0) / (i.price?.divisor || 100)).filter((p: number) => p > 0);
         const avgPrice = prices.length > 0 ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
@@ -135,18 +143,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const uniqueShops = new Set(items.map((i: any) => i.shop_id)).size;
         const competition = uniqueShops > 50 ? 'high' : uniqueShops > 20 ? 'medium' : 'low';
 
-        // Total estimated market revenue for this keyword
         let totalEstRevenue = 0;
 
-        // Per-listing badges with rich metrics
+        // Per-listing badges from BATCH fetch (actual page listings)
         const listingBadges: Record<string, any> = {};
-        for (const item of items) {
+        const batchItems = batchData?.results || [];
+        for (const item of batchItems) {
           const lid = String(item.listing_id);
           const metrics = computeListingMetrics(item);
-          totalEstRevenue += metrics.estMonthlyRevenue;
-
-          // Return ALL badges — content script matches against page listing IDs
           listingBadges[lid] = metrics;
+        }
+
+        // Also add any keyword search results (for best seller ranking)
+        for (const item of items) {
+          const lid = String(item.listing_id);
+          if (!listingBadges[lid]) {
+            const metrics = computeListingMetrics(item);
+            listingBadges[lid] = metrics;
+          }
+          totalEstRevenue += computeListingMetrics(item).estMonthlyRevenue;
         }
 
         return res.json({
@@ -234,8 +249,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!shopId) return res.status(400).json({ error: 'shopId required' });
 
         // Step 1: Resolve shop name → numeric shop_id
-        // /shops/{name} works but /shops/{name}/listings/active may not
-        const shop = await etsyGet(`/shops/${encodeURIComponent(shopId)}`);
+        // Etsy API v3 requires numeric shop_id in path — shop names are NOT accepted
+        // Use /shops?shop_name=X to look up by name
+        let shop: any;
+        if (/^\d+$/.test(shopId)) {
+          shop = await etsyGet(`/shops/${shopId}`);
+        } else {
+          const lookup = await etsyGet(`/shops?shop_name=${encodeURIComponent(shopId)}`);
+          const results = lookup.results || [];
+          // Find exact match (case-insensitive)
+          shop = results.find((s: any) => s.shop_name.toLowerCase() === shopId.toLowerCase());
+          if (!shop && results.length > 0) shop = results[0];
+          if (!shop) return res.status(404).json({ error: `Shop "${shopId}" not found` });
+        }
         const numericShopId = shop.shop_id;
 
         // Step 2: Fetch listings using numeric ID

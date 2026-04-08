@@ -18,14 +18,17 @@
     const S = window.__KX_EBAY_SHARED;
     const C = window.__KX_CACHE;
 
-    if (S.getPageType() !== 'search') return;
-
     S.isOverlayEnabled().then(enabled => {
       if (!enabled) return;
-      S.injectInlineCSS();
-      processSearchPage();
+      if (S.getPageType() === 'search') {
+        S.injectInlineCSS();
+        processSearchPage();
+      }
       S.onUrlChange(() => {
-        if (S.getPageType() === 'search') setTimeout(processSearchPage, 500);
+        if (S.getPageType() === 'search') {
+          S.injectInlineCSS();
+          setTimeout(processSearchPage, 500);
+        }
       });
     });
 

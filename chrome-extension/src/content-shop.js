@@ -18,11 +18,11 @@
     const S = window.__KX_SHARED;
     const C = window.__KX_CACHE;
 
-    if (S.getPageType() !== 'shop') return;
-
     S.isOverlayEnabled().then(enabled => {
       if (!enabled) return;
-      processShopPage();
+      if (S.getPageType() === 'shop') {
+        processShopPage();
+      }
       S.onUrlChange(() => {
         if (S.getPageType() === 'shop') setTimeout(processShopPage, 500);
       });

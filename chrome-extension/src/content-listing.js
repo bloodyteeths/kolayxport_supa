@@ -18,14 +18,19 @@
     const S = window.__KX_SHARED;
     const C = window.__KX_CACHE;
 
-    if (S.getPageType() !== 'listing') return;
-
     S.isOverlayEnabled().then(enabled => {
       if (!enabled) return;
-      S.injectInlineCSS();
-      processListingPage();
+      // Run on listing pages, and register URL change handler for SPA navigation
+      // (search → listing clicks don't reload the page)
+      if (S.getPageType() === 'listing') {
+        S.injectInlineCSS();
+        processListingPage();
+      }
       S.onUrlChange(() => {
-        if (S.getPageType() === 'listing') setTimeout(processListingPage, 500);
+        if (S.getPageType() === 'listing') {
+          S.injectInlineCSS();
+          setTimeout(processListingPage, 500);
+        }
       });
     });
 

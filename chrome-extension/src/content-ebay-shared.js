@@ -193,7 +193,10 @@ const EBAY_SELECTORS = {
 // ---------------------------------------------------------------------------
 // i18n — Turkish / English
 // ---------------------------------------------------------------------------
-const _ebayLang = (navigator.language || '').startsWith('tr') ? 'tr' : 'en';
+const _ebayLang = (() => {
+  try { return chrome.i18n.getUILanguage().startsWith('tr') ? 'tr' : 'en'; }
+  catch { return (navigator.language || '').startsWith('tr') ? 'tr' : 'en'; }
+})();
 
 const _ebayI18n = {
   tr: {
@@ -205,6 +208,12 @@ const _ebayI18n = {
     fullAnalysis: 'Tam Analiz', perMonth: '/ay', vsAvg: '% ort.',
     bestSeller: 'En Çok Satan', seo: 'SEO', price: 'Fiyat',
     positive: 'olumlu', products: 'ürün',
+    estRevenue: 'Tah. Gelir',
+    demand: 'Talep',
+    demandHot: '🔥 Çok Yüksek', demandGood: '📈 İyi',
+    demandModerate: '📊 Orta', demandLow: '📉 Düşük',
+    convRate: 'Dönüşüm', lowStock: '🔥 Az Stok',
+    estMktRevenue: 'Tah. Pazar Geliri',
   },
   en: {
     loading: 'KolayXport loading...',
@@ -215,6 +224,12 @@ const _ebayI18n = {
     fullAnalysis: 'Full Analysis', perMonth: '/mo', vsAvg: '% avg.',
     bestSeller: 'Best Seller', seo: 'SEO', price: 'Price',
     positive: 'positive', products: 'products',
+    estRevenue: 'Est. Revenue',
+    demand: 'Demand',
+    demandHot: '🔥 Hot', demandGood: '📈 Good',
+    demandModerate: '📊 Moderate', demandLow: '📉 Low',
+    convRate: 'Conv. Rate', lowStock: '🔥 Low Stock',
+    estMktRevenue: 'Est. Market Revenue',
   },
 };
 
@@ -315,6 +330,13 @@ function ebayPriceVsAvg(price, avgPrice) {
   };
 }
 
+function ebayDemandLabel(score) {
+  if (score === 'hot') return { text: ebayT('demandHot'), cssClass: 'kx-red' };
+  if (score === 'good') return { text: ebayT('demandGood'), cssClass: 'kx-green' };
+  if (score === 'moderate') return { text: ebayT('demandModerate'), cssClass: 'kx-orange' };
+  return { text: ebayT('demandLow'), cssClass: 'kx-red' };
+}
+
 async function ebayIsOverlayEnabled() {
   return new Promise(resolve => {
     chrome.storage.local.get('kx_overlays_enabled', (result) => {
@@ -341,6 +363,7 @@ window.__KX_EBAY_SHARED = {
   salesColor: ebaySalesColor,
   computeBestSellerRanks: ebayComputeBestSellerRanks,
   priceVsAvg: ebayPriceVsAvg,
+  demandLabel: ebayDemandLabel,
   isOverlayEnabled: ebayIsOverlayEnabled,
   getPageType: getEbayPageType,
   t: ebayT,

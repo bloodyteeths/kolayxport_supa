@@ -298,7 +298,10 @@ async function isOverlayEnabled() {
 // ---------------------------------------------------------------------------
 // i18n — Turkish / English
 // ---------------------------------------------------------------------------
-const _lang = (navigator.language || '').startsWith('tr') ? 'tr' : 'en';
+const _lang = (() => {
+  try { return chrome.i18n.getUILanguage().startsWith('tr') ? 'tr' : 'en'; }
+  catch { return (navigator.language || '').startsWith('tr') ? 'tr' : 'en'; }
+})();
 
 const _i18n = {
   tr: {
@@ -335,6 +338,24 @@ const _i18n = {
     bestSellers: 'Best Sellers',
     shopAnalysisLoading: 'KolayXport mağaza analizi yükleniyor...',
     shopIdNotFound: 'Mağaza ID bulunamadı',
+    estRevenue: 'Tah. Gelir',
+    estRevenueShort: 'Gelir',
+    demand: 'Talep',
+    demandHot: '🔥 Çok Yüksek',
+    demandGood: '📈 İyi',
+    demandModerate: '📊 Orta',
+    demandLow: '📉 Düşük',
+    convRate: 'Dönüşüm',
+    lowStock: '🔥 Az Stok',
+    estMktRevenue: 'Tah. Pazar Geliri',
+    shopAge: 'Mağaza Yaşı',
+    years: 'yıl',
+    estShopRevenue: 'Tah. Aylık Gelir',
+    estShopSales: 'Tah. Aylık Satış',
+    hotListings: 'Sıcak Ürünler',
+    lowStockItems: 'Az Stok',
+    avgConversion: 'Ort. Dönüşüm',
+    revenuePerListing: 'Ürün Başına Gelir',
   },
   en: {
     loading: 'KolayXport loading...',
@@ -370,10 +391,42 @@ const _i18n = {
     bestSellers: 'Best Sellers',
     shopAnalysisLoading: 'KolayXport shop analysis loading...',
     shopIdNotFound: 'Shop ID not found',
+    estRevenue: 'Est. Revenue',
+    estRevenueShort: 'Revenue',
+    demand: 'Demand',
+    demandHot: '🔥 Hot',
+    demandGood: '📈 Good',
+    demandModerate: '📊 Moderate',
+    demandLow: '📉 Low',
+    convRate: 'Conv. Rate',
+    lowStock: '🔥 Low Stock',
+    estMktRevenue: 'Est. Market Revenue',
+    shopAge: 'Shop Age',
+    years: 'yr',
+    estShopRevenue: 'Est. Monthly Revenue',
+    estShopSales: 'Est. Monthly Sales',
+    hotListings: 'Hot Listings',
+    lowStockItems: 'Low Stock',
+    avgConversion: 'Avg Conversion',
+    revenuePerListing: 'Rev/Listing',
   },
 };
 
 function t(key) { return _i18n[_lang]?.[key] || _i18n.en[key] || key; }
+
+function demandLabel(score) {
+  if (score === 'hot') return { text: t('demandHot'), cssClass: 'kx-red' };
+  if (score === 'good') return { text: t('demandGood'), cssClass: 'kx-green' };
+  if (score === 'moderate') return { text: t('demandModerate'), cssClass: 'kx-orange' };
+  return { text: t('demandLow'), cssClass: 'kx-red' };
+}
+
+function demandColor(score) {
+  if (score === 'hot') return '#c62828';
+  if (score === 'good') return '#2e7d32';
+  if (score === 'moderate') return '#e65100';
+  return '#999';
+}
 
 // ---------------------------------------------------------------------------
 // Page Type Detection
@@ -399,6 +452,7 @@ window.__KX_SHARED = {
   formatNum, formatPrice,
   competitionColor, scoreClass, salesColor,
   computeBestSellerRanks, priceVsAvg,
+  demandLabel, demandColor,
   isOverlayEnabled,
   getPageType,
   t,

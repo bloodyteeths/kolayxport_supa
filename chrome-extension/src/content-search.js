@@ -95,6 +95,13 @@
           <span class="kx-bar-value" style="font-size:12px">${S.formatPrice(summary.minPrice)} - ${S.formatPrice(summary.maxPrice)}</span>
         </div>
         <div class="kx-bar-divider"></div>
+        ${summary.estMarketRevenue ? `
+          <div class="kx-bar-item">
+            <span class="kx-bar-label">${S.t('estMktRevenue')}</span>
+            <span class="kx-bar-value" style="color:#4caf50;">$${S.formatNum(summary.estMarketRevenue)}</span>
+          </div>
+          <div class="kx-bar-divider"></div>
+        ` : ''}
         <div class="kx-bar-item">
           <span class="kx-bar-label">${S.t('avgFav')}</span>
           <span class="kx-bar-value">${S.formatNum(summary.avgFavorites)}</span>
@@ -136,6 +143,8 @@
         const rank = ranks[id];
         const priceDiff = S.priceVsAvg(badge.price, avgPrice);
         const est = badge.estMonthlySales || 0;
+        const revenue = badge.estMonthlyRevenue || 0;
+        const demand = badge.demandScore || 'low';
 
         const parts = [];
 
@@ -144,10 +153,38 @@
           parts.push('<span class="kx-sep">·</span>');
         }
 
+        // Estimated monthly sales
         parts.push(`<span class="${S.salesColor(est)}">~${est}${S.t('perMonth')}</span>`);
         parts.push('<span class="kx-sep">·</span>');
+
+        // Estimated revenue (the killer metric)
+        if (revenue > 0) {
+          parts.push(`<span class="kx-green" style="font-weight:700;">$${S.formatNum(Math.round(revenue))}${S.t('perMonth')}</span>`);
+          parts.push('<span class="kx-sep">·</span>');
+        }
+
+        // Favorites
         parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
 
+        // Demand indicator
+        const dl = S.demandLabel(demand);
+        parts.push('<span class="kx-sep">·</span>');
+        parts.push(`<span class="${dl.cssClass}">${dl.text}</span>`);
+
+        // Conversion rate
+        if (badge.conversionRate > 0) {
+          const crClass = badge.conversionRate >= 5 ? 'kx-green' : badge.conversionRate >= 2 ? 'kx-orange' : 'kx-red';
+          parts.push('<span class="kx-sep">·</span>');
+          parts.push(`<span class="${crClass}">${badge.conversionRate}% ${S.t('convRate')}</span>`);
+        }
+
+        // Low stock signal
+        if (badge.lowStock) {
+          parts.push('<span class="kx-sep">·</span>');
+          parts.push(`<span class="kx-red" style="font-weight:700;">${S.t('lowStock')}</span>`);
+        }
+
+        // Price vs avg
         if (priceDiff) {
           parts.push('<span class="kx-sep">·</span>');
           parts.push(`<span class="${priceDiff.cssClass}">${priceDiff.text}</span>`);

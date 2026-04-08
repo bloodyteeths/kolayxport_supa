@@ -106,10 +106,15 @@
       const seoFillColor = seo >= 70 ? '#4caf50' : seo >= 40 ? '#ff9800' : '#f44336';
 
       const est = velocity?.estMonthlySales || 0;
+      const revenue = velocity?.estMonthlyRevenue || 0;
+      const demand = velocity?.demandScore || 'low';
+      const convRate = velocity?.conversionRate || 0;
       const favs = listing?.favorites || 0;
       const views = listing?.views || 0;
       const age = velocity?.ageMonths || 0;
       const tagCount = listing?.tagCount || 0;
+      const quantity = listing?.quantity || 0;
+      const lowStock = velocity?.lowStock || false;
 
       // Header line
       let headerParts = `<span class="kx-stats-logo">KX</span>`;
@@ -121,8 +126,21 @@
         </span>
       `;
 
+      // Revenue badge (prominent)
+      if (revenue > 0) {
+        headerParts += `<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:4px;font-weight:700;">$${S.formatNum(Math.round(revenue))}${S.t('perMonth')}</span>`;
+      }
+
+      // Demand badge
+      const dl = S.demandLabel(demand);
+      headerParts += `<span style="font-weight:600;">${S.t('demand')}: <span class="${dl.cssClass}">${dl.text}</span></span>`;
+
       if (bestSeller?.isBestSeller) {
         headerParts += `<span class="kx-best">★ ${S.t('bestSeller')} · Top ${bestSeller.percentile}%</span>`;
+      }
+
+      if (lowStock) {
+        headerParts += `<span class="kx-red" style="font-weight:700;">${S.t('lowStock')}</span>`;
       }
 
       headerParts += `<button class="kx-collapse-btn" data-kx-collapse>▲</button>`;
@@ -136,6 +154,20 @@
       statParts.push(`<span>${S.formatNum(views)} ${S.t('views')}</span>`);
       statParts.push('<span class="kx-sep">·</span>');
       statParts.push(`<span>${age} ${S.t('months')}</span>`);
+
+      // Conversion rate
+      if (convRate > 0) {
+        const crClass = convRate >= 5 ? 'kx-green' : convRate >= 2 ? 'kx-orange' : 'kx-red';
+        statParts.push('<span class="kx-sep">·</span>');
+        statParts.push(`<span class="${crClass}">${convRate}% ${S.t('convRate')}</span>`);
+      }
+
+      // Stock quantity
+      if (quantity > 0) {
+        const stockClass = quantity <= 3 ? 'kx-red' : quantity <= 10 ? 'kx-orange' : '';
+        statParts.push('<span class="kx-sep">·</span>');
+        statParts.push(`<span class="${stockClass}">📦 ${quantity}</span>`);
+      }
 
       // Tag line
       let tagLine = '';

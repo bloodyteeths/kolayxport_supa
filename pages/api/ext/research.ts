@@ -18,7 +18,7 @@ function checkAnonLimit(ip: string): boolean {
   return true;
 }
 
-// Etsy public API helper — uses same auth as main etsy.ts
+// Etsy public API helper
 const ETSY_BASE = 'https://openapi.etsy.com/v3/application';
 
 async function etsyGet(path: string) {
@@ -34,8 +34,45 @@ async function etsyGet(path: string) {
   return res.json();
 }
 
-// Sleep for rate limiting
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+// Compute listing metrics from Etsy listing data
+function computeListingMetrics(item: any) {
+  const price = (item.price?.amount || 0) / (item.price?.divisor || 100);
+  const favs = item.num_favorers || 0;
+  const views = item.views || 0;
+  const createdTs = item.original_creation_timestamp || item.creation_timestamp || Math.floor(Date.now() / 1000);
+  const ageMs = Date.now() - createdTs * 1000;
+  const ageDays = Math.max(1, ageMs / (24 * 3600 * 1000));
+  const ageMonths = Math.max(1, ageDays / 30);
+
+  // Sales velocity: favorites correlate ~3% with sales
+  const estMonthlySales = (favs / ageMonths) * 0.03;
+  const estMonthlyRevenue = estMonthlySales * price;
+
+  // Demand score: favorites per day (normalized)
+  const favsPerDay = favs / ageDays;
+  const demandScore = favsPerDay >= 5 ? 'hot' : favsPerDay >= 1 ? 'good' : favsPerDay >= 0.3 ? 'moderate' : 'low';
+
+  // Conversion rate: favs / views
+  const conversionRate = views > 0 ? (favs / views) * 100 : 0;
+
+  // Stock signal
+  const quantity = item.quantity || 0;
+
+  return {
+    price,
+    favorites: favs,
+    views,
+    quantity,
+    ageDays: Math.round(ageDays),
+    ageMonths: Math.round(ageMonths),
+    estMonthlySales: Math.round(estMonthlySales * 10) / 10,
+    estMonthlyRevenue: Math.round(estMonthlyRevenue * 100) / 100,
+    favsPerDay: Math.round(favsPerDay * 100) / 100,
+    demandScore,
+    conversionRate: Math.round(conversionRate * 100) / 100,
+    lowStock: quantity > 0 && quantity <= 3,
+  };
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // CORS for extension
@@ -60,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!userId) {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
     if (!checkAnonLimit(ip)) {
-      return res.status(429).json({ error: 'Günlük ücretsiz limit aşıldı (3/gün). KolayXport hesabıyla giriş yapın.' });
+      return res.status(429).json({ error: 'Daily free limit reached (3/day). Sign in with KolayXport account.' });
     }
   }
 
@@ -69,11 +106,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     switch (action) {
       case 'search_enrich': {
-        // Enrich search results page
         const { query, listingIds } = params;
         if (!query) return res.status(400).json({ error: 'query required' });
 
-        // Fetch search stats
         const searchData = await etsyGet(
           `/listings/active?keywords=${encodeURIComponent(query)}&limit=100&includes=Images(url_170x135)&sort_on=score`
         );
@@ -90,25 +125,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const uniqueShops = new Set(items.map((i: any) => i.shop_id)).size;
         const competition = uniqueShops > 50 ? 'high' : uniqueShops > 20 ? 'medium' : 'low';
 
-        // Per-listing badges (for IDs on the page)
+        // Total estimated market revenue for this keyword
+        let totalEstRevenue = 0;
+
+        // Per-listing badges with rich metrics
         const listingBadges: Record<string, any> = {};
-        if (Array.isArray(listingIds) && listingIds.length > 0) {
-          // Match from search results
-          for (const item of items) {
-            const lid = String(item.listing_id);
-            if (listingIds.includes(lid)) {
-              const price = (item.price?.amount || 0) / (item.price?.divisor || 100);
-              const ageMs = Date.now() - (item.original_creation_timestamp || item.creation_timestamp || Date.now()) * 1000;
-              const ageMonths = Math.max(1, ageMs / (30 * 24 * 3600 * 1000));
-              const estMonthlySales = ((item.num_favorers || 0) / ageMonths) * 0.03;
-              listingBadges[lid] = {
-                price,
-                favorites: item.num_favorers || 0,
-                views: item.views || 0,
-                estMonthlySales: Math.round(estMonthlySales * 10) / 10,
-                competition: price > avgPrice * 1.5 ? 'premium' : price < avgPrice * 0.7 ? 'budget' : 'competitive',
-              };
-            }
+        for (const item of items) {
+          const lid = String(item.listing_id);
+          const metrics = computeListingMetrics(item);
+          totalEstRevenue += metrics.estMonthlyRevenue;
+
+          // Include all items if no specific IDs, or filter to requested IDs
+          if (!listingIds || !Array.isArray(listingIds) || listingIds.length === 0 || listingIds.includes(lid)) {
+            listingBadges[lid] = metrics;
           }
         }
 
@@ -122,6 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             avgViews: Math.round(avgViews),
             uniqueShops,
             competition,
+            estMarketRevenue: Math.round(totalEstRevenue),
           },
           listingBadges,
           plan,
@@ -133,10 +163,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!listingId) return res.status(400).json({ error: 'listingId required' });
 
         const listing = await etsyGet(`/listings/${listingId}?includes=Images,Shop`);
-        const price = (listing.price?.amount || 0) / (listing.price?.divisor || 100);
-        const ageMs = Date.now() - (listing.original_creation_timestamp || listing.creation_timestamp || Date.now()) * 1000;
-        const ageMonths = Math.max(1, ageMs / (30 * 24 * 3600 * 1000));
-        const estMonthlySales = ((listing.num_favorers || 0) / ageMonths) * 0.03;
+        const metrics = computeListingMetrics(listing);
 
         // SEO score
         const titleLen = (listing.title || '').length;
@@ -153,14 +180,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           listing: {
             listing_id: listing.listing_id,
             title: listing.title,
-            price,
-            favorites: listing.num_favorers || 0,
-            views: listing.views || 0,
+            price: metrics.price,
+            favorites: metrics.favorites,
+            views: metrics.views,
             tags: listing.tags || [],
             tagCount,
             imageCount: imgCount,
+            quantity: metrics.quantity,
           },
-          velocity: { estMonthlySales: Math.round(estMonthlySales * 10) / 10, ageMonths: Math.round(ageMonths) },
+          velocity: {
+            estMonthlySales: metrics.estMonthlySales,
+            estMonthlyRevenue: metrics.estMonthlyRevenue,
+            ageMonths: metrics.ageMonths,
+            ageDays: metrics.ageDays,
+            favsPerDay: metrics.favsPerDay,
+            demandScore: metrics.demandScore,
+            conversionRate: metrics.conversionRate,
+            lowStock: metrics.lowStock,
+          },
           seoScore: { total: seoScore, title: titleScore, tags: tagScore, description: descScore, images: imgScore },
           shop: listing.shop ? {
             shop_id: listing.shop.shop_id,
@@ -176,23 +213,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { shopId } = params;
         if (!shopId) return res.status(400).json({ error: 'shopId required' });
 
+        // Fetch shop info + up to 100 listings for deeper analysis
         const [shop, listingsData] = await Promise.all([
           etsyGet(`/shops/${shopId}`),
-          etsyGet(`/shops/${shopId}/listings/active?limit=25&sort_on=score`),
+          etsyGet(`/shops/${shopId}/listings/active?limit=100&sort_on=score`),
         ]);
 
         const listings = listingsData.results || [];
-        const bestSellers = [...listings]
-          .sort((a: any, b: any) => (b.num_favorers || 0) - (a.num_favorers || 0))
+
+        // Compute metrics for all listings
+        const listingMetrics = listings.map((l: any) => ({
+          ...computeListingMetrics(l),
+          title: l.title,
+          listing_id: l.listing_id,
+        }));
+
+        // Best sellers by estimated revenue
+        const bestSellers = [...listingMetrics]
+          .sort((a, b) => b.estMonthlyRevenue - a.estMonthlyRevenue)
           .slice(0, 5)
-          .map((l: any) => ({
+          .map((l) => ({
             title: l.title,
-            price: (l.price?.amount || 0) / (l.price?.divisor || 100),
-            favorites: l.num_favorers || 0,
+            listing_id: l.listing_id,
+            price: l.price,
+            favorites: l.favorites,
+            estMonthlySales: l.estMonthlySales,
+            estMonthlyRevenue: l.estMonthlyRevenue,
+            demandScore: l.demandScore,
           }));
 
-        const prices = listings.map((l: any) => (l.price?.amount || 0) / (l.price?.divisor || 100)).filter((p: number) => p > 0);
+        // Aggregate shop metrics
+        const prices = listingMetrics.map((l: any) => l.price).filter((p: number) => p > 0);
         const avgPrice = prices.length > 0 ? prices.reduce((a: number, b: number) => a + b, 0) / prices.length : 0;
+        const totalEstMonthlyRevenue = listingMetrics.reduce((s: number, l: any) => s + l.estMonthlyRevenue, 0);
+        const totalEstMonthlySales = listingMetrics.reduce((s: number, l: any) => s + l.estMonthlySales, 0);
+        const avgConversionRate = listingMetrics.length > 0
+          ? listingMetrics.reduce((s: number, l: any) => s + l.conversionRate, 0) / listingMetrics.length
+          : 0;
+        const hotListings = listingMetrics.filter((l: any) => l.demandScore === 'hot' || l.demandScore === 'good').length;
+        const lowStockCount = listingMetrics.filter((l: any) => l.lowStock).length;
+
+        // Shop age
+        const shopAgeMs = Date.now() - (shop.create_timestamp || Math.floor(Date.now() / 1000)) * 1000;
+        const shopAgeYears = Math.round((shopAgeMs / (365 * 24 * 3600 * 1000)) * 10) / 10;
 
         return res.json({
           shop: {
@@ -203,6 +266,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             review_count: shop.review_count || 0,
             listing_count: shop.listing_active_count || 0,
             created: shop.create_timestamp,
+            shopAgeYears,
+            currency: shop.currency_code || 'USD',
+          },
+          revenue: {
+            estMonthlyRevenue: Math.round(totalEstMonthlyRevenue),
+            estMonthlySales: Math.round(totalEstMonthlySales * 10) / 10,
+            avgConversionRate: Math.round(avgConversionRate * 100) / 100,
+            hotListings,
+            lowStockCount,
           },
           avgPrice: Math.round(avgPrice * 100) / 100,
           bestSellers,
@@ -214,7 +286,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
   } catch (err: any) {
-    console.error('[ext/research]', err);
+    console.error('[ext/research]', err?.message || err);
     return res.status(500).json({ error: 'Research API error' });
   }
 }

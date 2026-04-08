@@ -251,6 +251,7 @@ async function callEtsyAPI(endpoint: string, accessToken: string, options: Reque
 
     if (!response.ok) {
         const errorText = await response.text();
+        console.error(`[Etsy API Error] ${response.status} ${endpoint}: ${errorText}`);
         const error = new Error(`Etsy API error: ${response.status} - ${errorText}`);
         logger.error('Etsy API error', error);
         throw error;
@@ -1606,6 +1607,7 @@ export default async function handler(
                 });
             }
 
+            console.log(`[Etsy Update] listing=${listing_id} fields=${Object.keys(updatePayload).join(',')}`);
             logger.info('Updating Etsy listing', {
                 listing_id,
                 fields: Object.keys(updatePayload),
@@ -1620,6 +1622,7 @@ export default async function handler(
                 }
             );
 
+            console.log(`[Etsy Update] listing=${listing_id} SUCCESS updated=${Object.keys(updatePayload).join(',')}`);
             return res.status(200).json({
                 success: true,
                 listing_id,

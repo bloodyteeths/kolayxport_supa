@@ -145,9 +145,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const metrics = computeListingMetrics(item);
           totalEstRevenue += metrics.estMonthlyRevenue;
 
-          if (!listingIds || !Array.isArray(listingIds) || listingIds.length === 0 || listingIds.includes(lid)) {
-            listingBadges[lid] = metrics;
-          }
+          // Return ALL badges — content script matches against page listing IDs
+          listingBadges[lid] = metrics;
         }
 
         return res.json({
@@ -234,13 +233,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { shopId } = params;
         if (!shopId) return res.status(400).json({ error: 'shopId required' });
 
-        const encodedShopId = encodeURIComponent(shopId);
+        // Step 1: Resolve shop name → numeric shop_id
+        // /shops/{name} works but /shops/{name}/listings/active may not
+        const shop = await etsyGet(`/shops/${encodeURIComponent(shopId)}`);
+        const numericShopId = shop.shop_id;
 
-        // Fetch shop info + listings separately (no includes= on public API)
-        const [shop, listingsData] = await Promise.all([
-          etsyGet(`/shops/${encodedShopId}`),
-          etsyGet(`/shops/${encodedShopId}/listings/active?limit=100&sort_on=score`),
-        ]);
+        // Step 2: Fetch listings using numeric ID
+        const listingsData = await etsyGet(`/shops/${numericShopId}/listings/active?limit=100&sort_on=score`);
 
         const listings = listingsData.results || [];
 

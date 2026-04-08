@@ -44,9 +44,9 @@ async function etsyGetSafe(path: string): Promise<any | null> {
 }
 
 // Compute listing metrics from Etsy listing data
-// NOTE: Etsy API does NOT provide actual sales per listing.
-// We show real engagement data and a composite "momentum" score instead.
-function computeListingMetrics(item: any) {
+// Sales estimation: review-based (reviews × 8) when available,
+// price-adjusted favorites ratio as fallback (industry standard approach)
+function computeListingMetrics(item: any, reviewCount?: number) {
   const price = (item.price?.amount || 0) / (item.price?.divisor || 100);
   const favs = item.num_favorers || 0;
   const views = item.views || 0;
@@ -55,29 +55,36 @@ function computeListingMetrics(item: any) {
   const ageDays = Math.max(1, ageMs / (24 * 3600 * 1000));
   const ageMonths = Math.max(1, ageDays / 30);
 
-  // Real engagement velocity
+  // Engagement velocity
   const favsPerDay = favs / ageDays;
-  const viewsPerDay = views / ageDays;
 
-  // Engagement rate: what % of viewers favorite this listing (real signal)
+  // Engagement rate: what % of viewers favorite this listing
   const engagementRate = views > 0 ? (favs / views) * 100 : 0;
 
-  // Demand score: based on favorites velocity (real data)
+  // Demand score
   const demandScore = favsPerDay >= 5 ? 'hot' : favsPerDay >= 1 ? 'good' : favsPerDay >= 0.3 ? 'moderate' : 'low';
 
-  // Momentum score (0-100): composite of engagement signals
-  // Higher = more likely to be selling well
-  const favsScore = Math.min(40, favsPerDay * 8);           // max 40 pts (5+ favs/day = max)
-  const viewsScore = Math.min(25, viewsPerDay * 0.25);      // max 25 pts (100+ views/day = max)
-  const engScore = Math.min(20, engagementRate * 4);         // max 20 pts (5%+ engagement = max)
-  const ageScore = ageMonths >= 1 && ageMonths <= 6 ? 15 :   // newer listings with traction get bonus
-                   ageMonths > 6 && favsPerDay >= 1 ? 10 : 5; // older listings need sustained engagement
-  const momentum = Math.round(Math.min(100, favsScore + viewsScore + engScore + ageScore));
+  // --- Sales estimation (industry-standard approach) ---
+  // Method 1: Review-based (most accurate) — ~12% of buyers leave reviews → reviews × 8
+  // Method 2: Favorites ratio (fallback) — adjusted by price tier
+  let estTotalSales: number;
+  let estMethod: 'reviews' | 'favorites';
+
+  if (reviewCount !== undefined && reviewCount > 0) {
+    estTotalSales = reviewCount * 8;
+    estMethod = 'reviews';
+  } else {
+    // Price-adjusted favorites-to-sales ratio
+    const ratio = price > 50 ? 45 : price > 15 ? 30 : 20;
+    estTotalSales = Math.max(0, favs / ratio);
+    estMethod = 'favorites';
+  }
+
+  const estMonthlySales = ageMonths > 0 ? estTotalSales / ageMonths : 0;
+  const estMonthlyRevenue = estMonthlySales * price;
 
   // Stock signal
   const quantity = item.quantity || 0;
-
-  // Tag count
   const tagCount = item.tags?.length || 0;
 
   return {
@@ -86,18 +93,41 @@ function computeListingMetrics(item: any) {
     views,
     quantity,
     tagCount,
+    reviewCount: reviewCount ?? 0,
     ageDays: Math.round(ageDays),
     ageMonths: Math.round(ageMonths),
     favsPerDay: Math.round(favsPerDay * 100) / 100,
-    viewsPerDay: Math.round(viewsPerDay * 100) / 100,
     engagementRate: Math.round(engagementRate * 100) / 100,
-    momentum,
     demandScore,
     lowStock: quantity > 0 && quantity <= 3,
-    // Keep backward-compat fields for existing code (clearly labeled as estimates)
-    estMonthlySales: Math.round(favsPerDay * 30 * 0.03 * 10) / 10,
-    estMonthlyRevenue: Math.round(favsPerDay * 30 * 0.03 * price * 100) / 100,
+    estTotalSales: Math.round(estTotalSales),
+    estMonthlySales: Math.round(estMonthlySales * 10) / 10,
+    estMonthlyRevenue: Math.round(estMonthlyRevenue),
+    estMethod,
   };
+}
+
+// Fetch review count for a listing (public API, no OAuth needed)
+async function getReviewCount(listingId: string | number): Promise<number> {
+  const data = await etsyGetSafe(`/listings/${listingId}/reviews?limit=1`);
+  return data?.count ?? 0;
+}
+
+// Batch fetch review counts for multiple listings (parallel with rate limiting)
+async function batchGetReviewCounts(listingIds: string[]): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  // Process in batches of 10 to avoid rate limiting
+  for (let i = 0; i < listingIds.length; i += 10) {
+    const batch = listingIds.slice(i, i + 10);
+    const results = await Promise.all(
+      batch.map(async (id) => {
+        const count = await getReviewCount(id);
+        return { id, count };
+      })
+    );
+    for (const r of results) counts[r.id] = r.count;
+  }
+  return counts;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -162,12 +192,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         let totalEstRevenue = 0;
 
+        // Collect all listing IDs for review count fetching
+        const batchItems = batchData?.results || [];
+        const allListingIds = [
+          ...batchItems.map((i: any) => String(i.listing_id)),
+          ...items.map((i: any) => String(i.listing_id)),
+        ];
+        const uniqueIds = [...new Set(allListingIds)].slice(0, 48); // cap at 48 to avoid rate limits
+
+        // Fetch review counts in parallel
+        const reviewCounts = await batchGetReviewCounts(uniqueIds);
+
         // Per-listing badges from BATCH fetch (actual page listings)
         const listingBadges: Record<string, any> = {};
-        const batchItems = batchData?.results || [];
         for (const item of batchItems) {
           const lid = String(item.listing_id);
-          const metrics = computeListingMetrics(item);
+          const metrics = computeListingMetrics(item, reviewCounts[lid]);
           listingBadges[lid] = metrics;
         }
 
@@ -175,10 +215,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         for (const item of items) {
           const lid = String(item.listing_id);
           if (!listingBadges[lid]) {
-            const metrics = computeListingMetrics(item);
+            const metrics = computeListingMetrics(item, reviewCounts[lid]);
             listingBadges[lid] = metrics;
           }
-          totalEstRevenue += computeListingMetrics(item).estMonthlyRevenue;
+          totalEstRevenue += (listingBadges[lid]?.estMonthlyRevenue || 0);
         }
 
         return res.json({
@@ -203,13 +243,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!listingId) return res.status(400).json({ error: 'listingId required' });
 
         // Public API — NO includes= (includes=Images,Shop only works with OAuth)
-        // Fetch listing data and image count separately
-        const [listing, imagesData] = await Promise.all([
+        // Fetch listing data, images, and reviews in parallel
+        const [listing, imagesData, reviewCount] = await Promise.all([
           etsyGet(`/listings/${listingId}`),
           etsyGetSafe(`/listings/${listingId}/images`),
+          getReviewCount(listingId),
         ]);
 
-        const metrics = computeListingMetrics(listing);
+        const metrics = computeListingMetrics(listing, reviewCount);
 
         // Fetch shop data separately if we have shop_id
         let shopData: any = null;
@@ -239,17 +280,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             tagCount,
             imageCount: imgCount,
             quantity: metrics.quantity,
+            reviewCount: metrics.reviewCount,
           },
           velocity: {
+            estTotalSales: metrics.estTotalSales,
             estMonthlySales: metrics.estMonthlySales,
             estMonthlyRevenue: metrics.estMonthlyRevenue,
+            estMethod: metrics.estMethod,
             ageMonths: metrics.ageMonths,
             ageDays: metrics.ageDays,
             favsPerDay: metrics.favsPerDay,
-            viewsPerDay: metrics.viewsPerDay,
-            demandScore: metrics.demandScore,
             engagementRate: metrics.engagementRate,
-            momentum: metrics.momentum,
+            demandScore: metrics.demandScore,
             lowStock: metrics.lowStock,
           },
           seoScore: { total: seoScore, title: titleScore, tags: tagScore, description: descScore, images: imgScore },

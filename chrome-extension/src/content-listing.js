@@ -166,12 +166,14 @@
       const seoPct = Math.min(seo, 100);
       const seoFillColor = seo >= 70 ? '#4caf50' : seo >= 40 ? '#ff9800' : '#f44336';
 
-      const momentum = velocity?.momentum || 0;
+      const est = velocity?.estMonthlySales || 0;
+      const revenue = velocity?.estMonthlyRevenue || 0;
+      const estTotal = velocity?.estTotalSales || 0;
+      const estMethod = velocity?.estMethod || 'favorites';
       const demand = velocity?.demandScore || 'low';
-      const engRate = velocity?.engagementRate || 0;
-      const favsPerDay = velocity?.favsPerDay || 0;
       const favs = listing?.favorites || 0;
       const views = listing?.views || 0;
+      const reviews = listing?.reviewCount || 0;
       const age = velocity?.ageMonths || 0;
       const tagCount = listing?.tagCount || 0;
       const quantity = listing?.quantity || 0;
@@ -187,9 +189,15 @@
         </span>
       `;
 
-      // Momentum score
-      const momColor = momentum >= 70 ? '#4caf50' : momentum >= 40 ? '#ff9800' : '#f44336';
-      headerParts += `<span style="background:${momColor}20;color:${momColor};padding:2px 8px;border-radius:4px;font-weight:700;">⚡ ${momentum}/100</span>`;
+      // Estimated sales badge
+      if (est > 0) {
+        headerParts += `<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:4px;font-weight:700;">~${est}${S.t('perMonth')} ${S.t('sales')}</span>`;
+      }
+
+      // Revenue badge
+      if (revenue > 0) {
+        headerParts += `<span style="background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:4px;font-weight:700;">$${S.formatNum(revenue)}${S.t('perMonth')}</span>`;
+      }
 
       // Demand badge
       const dl = S.demandLabel(demand);
@@ -205,26 +213,19 @@
 
       headerParts += `<button class="kx-collapse-btn" data-kx-collapse>▲</button>`;
 
-      // Stats line — real data only
+      // Stats line
       const statParts = [];
+      statParts.push(`<span style="font-weight:600;">~${estTotal} ${S.t('totalSales')} (${estMethod === 'reviews' ? S.t('fromReviews') : S.t('fromFavs')})</span>`);
+      statParts.push('<span class="kx-sep">·</span>');
+      if (reviews > 0) {
+        statParts.push(`<span>★ ${S.formatNum(reviews)} ${S.t('reviews')}</span>`);
+        statParts.push('<span class="kx-sep">·</span>');
+      }
       statParts.push(`<span>♥ ${S.formatNum(favs)}</span>`);
       statParts.push('<span class="kx-sep">·</span>');
       statParts.push(`<span>👁 ${S.formatNum(views)}</span>`);
       statParts.push('<span class="kx-sep">·</span>');
       statParts.push(`<span>${age} ${S.t('months')}</span>`);
-
-      // Engagement rate (real: favs/views)
-      if (engRate > 0) {
-        const erClass = engRate >= 5 ? 'kx-green' : engRate >= 2 ? 'kx-orange' : 'kx-red';
-        statParts.push('<span class="kx-sep">·</span>');
-        statParts.push(`<span class="${erClass}">${engRate}% ${S.t('engRate')}</span>`);
-      }
-
-      // Favs velocity
-      if (favsPerDay >= 0.1) {
-        statParts.push('<span class="kx-sep">·</span>');
-        statParts.push(`<span>${favsPerDay}${S.t('favsDay')}</span>`);
-      }
 
       // Stock quantity
       if (quantity > 0) {

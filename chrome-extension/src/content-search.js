@@ -151,38 +151,35 @@
 
         const rank = ranks[id];
         const priceDiff = S.priceVsAvg(badge.price, avgPrice);
-        const momentum = badge.momentum || 0;
+        const est = badge.estMonthlySales || 0;
+        const revenue = badge.estMonthlyRevenue || 0;
         const demand = badge.demandScore || 'low';
 
         const parts = [];
 
-        // Momentum score (0-100) — composite engagement signal
-        const momColor = momentum >= 70 ? 'kx-green' : momentum >= 40 ? 'kx-orange' : 'kx-red';
-        parts.push(`<span class="${momColor}" style="font-weight:700;">⚡${momentum}</span>`);
+        // Estimated monthly sales
+        parts.push(`<span class="${S.salesColor(est)}" style="font-weight:700;">~${est}${S.t('perMonth')}</span>`);
         parts.push('<span class="kx-sep">·</span>');
+
+        // Estimated revenue
+        if (revenue > 0) {
+          parts.push(`<span class="kx-green" style="font-weight:700;">$${S.formatNum(revenue)}${S.t('perMonth')}</span>`);
+          parts.push('<span class="kx-sep">·</span>');
+        }
 
         // Demand indicator
         const dl = S.demandLabel(demand);
         parts.push(`<span class="${dl.cssClass}">${dl.text}</span>`);
         parts.push('<span class="kx-sep">·</span>');
 
-        // Real engagement: favorites + views
+        // Reviews + Favorites
+        if (badge.reviewCount > 0) {
+          parts.push(`<span>★ ${S.formatNum(badge.reviewCount)}</span>`);
+          parts.push('<span class="kx-sep">·</span>');
+        }
         parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
         parts.push('<span class="kx-sep">·</span>');
         parts.push(`<span>👁 ${S.formatNum(badge.views || 0)}</span>`);
-
-        // Engagement rate (real: favs/views %)
-        if (badge.engagementRate > 0) {
-          const erClass = badge.engagementRate >= 5 ? 'kx-green' : badge.engagementRate >= 2 ? 'kx-orange' : 'kx-red';
-          parts.push('<span class="kx-sep">·</span>');
-          parts.push(`<span class="${erClass}">${badge.engagementRate}% ${S.t('engRate')}</span>`);
-        }
-
-        // Favorites velocity (favs/day)
-        if (badge.favsPerDay >= 0.1) {
-          parts.push('<span class="kx-sep">·</span>');
-          parts.push(`<span>${badge.favsPerDay}${S.t('favsDay')}</span>`);
-        }
 
         // Low stock signal
         if (badge.lowStock) {

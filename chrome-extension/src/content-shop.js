@@ -126,15 +126,21 @@
           if (!card || card.querySelector('.kx-data-row')) return;
 
           const rank = ranks[id];
-          const momentum = badge.momentum || 0;
+          const est = badge.estMonthlySales || 0;
+          const revenue = badge.estMonthlyRevenue || 0;
           const demand = badge.demandScore || 'low';
           const priceDiff = S.priceVsAvg(badge.price, avgPrice);
 
           const parts = [];
 
-          // Momentum score
-          const momColor = momentum >= 70 ? 'kx-green' : momentum >= 40 ? 'kx-orange' : 'kx-red';
-          parts.push(`<span class="${momColor}" style="font-weight:700;">⚡${momentum}</span>`);
+          // Estimated sales
+          parts.push(`<span class="${S.salesColor(est)}" style="font-weight:700;">~${est}${S.t('perMonth')}</span>`);
+
+          if (revenue > 0) {
+            parts.push('<span class="kx-sep">·</span>');
+            parts.push(`<span class="kx-green" style="font-weight:700;">$${S.formatNum(revenue)}${S.t('perMonth')}</span>`);
+          }
+
           parts.push('<span class="kx-sep">·</span>');
 
           // Demand
@@ -142,17 +148,12 @@
           parts.push(`<span class="${dl.cssClass}">${dl.text}</span>`);
           parts.push('<span class="kx-sep">·</span>');
 
-          // Real engagement
-          parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
-          parts.push('<span class="kx-sep">·</span>');
-          parts.push(`<span>👁 ${S.formatNum(badge.views || 0)}</span>`);
-
-          // Engagement rate
-          if (badge.engagementRate > 0) {
-            const erClass = badge.engagementRate >= 5 ? 'kx-green' : badge.engagementRate >= 2 ? 'kx-orange' : 'kx-red';
+          // Reviews + Favorites
+          if (badge.reviewCount > 0) {
+            parts.push(`<span>★ ${S.formatNum(badge.reviewCount)}</span>`);
             parts.push('<span class="kx-sep">·</span>');
-            parts.push(`<span class="${erClass}">${badge.engagementRate}% ${S.t('engRate')}</span>`);
           }
+          parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
 
           if (badge.lowStock) {
             parts.push('<span class="kx-sep">·</span>');

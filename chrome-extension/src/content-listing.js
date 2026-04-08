@@ -34,14 +34,20 @@
       });
     });
 
-    async function processListingPage() {
+    async function processListingPage(retries = 0) {
       const listingId = S.SELECTORS.listingId();
       if (!listingId) return;
 
       if (document.getElementById('kx-listing-stats')) return;
 
       const anchor = findInsertionPoint();
-      if (!anchor) return;
+      if (!anchor) {
+        // Etsy lazy-loads the buy box — retry up to 5 times
+        if (retries < 5) {
+          setTimeout(() => processListingPage(retries + 1), 500);
+        }
+        return;
+      }
 
       const statsBar = document.createElement('div');
       statsBar.id = 'kx-listing-stats';
@@ -97,8 +103,13 @@
 
     function findInsertionPoint() {
       return document.querySelector('[data-buy-box-region="price"]') ||
+             document.querySelector('[data-appears-component-name="price"]') ||
+             document.querySelector('[data-buy-box-region="title"]') ||
              document.querySelector('.wt-mb-xs-2') ||
              document.querySelector('.listing-page-title-component') ||
+             document.querySelector('[data-listing-page-region="title"]') ||
+             document.querySelector('[data-component="listing-page-title"]') ||
+             document.querySelector('h1[data-buy-box-listing-title]')?.parentElement ||
              document.querySelector('h1')?.parentElement ||
              null;
     }

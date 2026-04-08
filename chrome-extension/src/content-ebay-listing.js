@@ -32,14 +32,19 @@
       });
     });
 
-    async function processListingPage() {
+    async function processListingPage(retries = 0) {
       const itemId = S.SELECTORS.itemId();
       if (!itemId) return;
 
       if (document.getElementById('kx-ebay-listing-stats')) return;
 
       const anchor = findInsertionPoint();
-      if (!anchor) return;
+      if (!anchor) {
+        if (retries < 5) {
+          setTimeout(() => processListingPage(retries + 1), 500);
+        }
+        return;
+      }
 
       const statsBar = document.createElement('div');
       statsBar.id = 'kx-ebay-listing-stats';

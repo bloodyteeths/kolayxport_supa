@@ -84,7 +84,7 @@ async function handleMessage(request, sender, sendResponse) {
 
       const stored = await chrome.storage.local.get(['kx_user', 'kx_api_key']);
       const userId = stored.kx_user?.id || '';
-      const apiKey = stored.kx_api_key || '6d8a3ea6c932f48f65f6a4c0f71ee47395fd9fc77d0fbf6b46956f48129199e1';
+      const apiKey = stored.kx_api_key || '';
 
       const headers = { 'Content-Type': 'application/json' };
       if (authToken) {

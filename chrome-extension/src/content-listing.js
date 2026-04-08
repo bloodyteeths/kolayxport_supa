@@ -18,16 +18,23 @@
     const S = window.__KX_SHARED;
     const C = window.__KX_CACHE;
 
+    let _currentListingId = null;
+
     S.isOverlayEnabled().then(enabled => {
       if (!enabled) return;
-      // Run on listing pages, and register URL change handler for SPA navigation
-      // (search → listing clicks don't reload the page)
       if (S.getPageType() === 'listing') {
         S.injectInlineCSS();
         processListingPage();
       }
       S.onUrlChange(() => {
         if (S.getPageType() === 'listing') {
+          // Remove stale stats bar from previous listing
+          const newId = S.SELECTORS.listingId();
+          if (newId !== _currentListingId) {
+            const old = document.getElementById('kx-listing-stats');
+            if (old) old.remove();
+            _currentListingId = null;
+          }
           S.injectInlineCSS();
           setTimeout(processListingPage, 500);
         }
@@ -42,13 +49,13 @@
 
       const anchor = findInsertionPoint();
       if (!anchor) {
-        // Etsy lazy-loads the buy box — retry up to 5 times
-        if (retries < 5) {
-          setTimeout(() => processListingPage(retries + 1), 500);
+        if (retries < 10) {
+          setTimeout(() => processListingPage(retries + 1), 800);
         }
         return;
       }
 
+      _currentListingId = listingId;
       const statsBar = document.createElement('div');
       statsBar.id = 'kx-listing-stats';
       statsBar.className = 'kx-stats-bar';
@@ -102,16 +109,27 @@
     }
 
     function findInsertionPoint() {
-      return document.querySelector('[data-buy-box-region="price"]') ||
-             document.querySelector('[data-appears-component-name="price"]') ||
-             document.querySelector('[data-buy-box-region="title"]') ||
-             document.querySelector('.wt-mb-xs-2') ||
-             document.querySelector('.listing-page-title-component') ||
-             document.querySelector('[data-listing-page-region="title"]') ||
-             document.querySelector('[data-component="listing-page-title"]') ||
-             document.querySelector('h1[data-buy-box-listing-title]')?.parentElement ||
-             document.querySelector('h1')?.parentElement ||
-             null;
+      // Buy box selectors (most specific first)
+      const selectors = [
+        '[data-buy-box-region="price"]',
+        '[data-appears-component-name="price"]',
+        '[data-buy-box-region="title"]',
+        '#listing-page-cart',
+        '[data-selector="listing-page-buy-box"]',
+        '.listing-page-title-component',
+        '.wt-mb-xs-2',
+        '[data-listing-page-region="title"]',
+        '[data-component="listing-page-title"]',
+      ];
+      for (const sel of selectors) {
+        const el = document.querySelector(sel);
+        if (el) return el;
+      }
+      // Fallback: parent of the first h1 on the page
+      const h1 = document.querySelector('h1[data-buy-box-listing-title]') ||
+                  document.querySelector('h1.wt-text-body-03') ||
+                  document.querySelector('h1');
+      return h1?.parentElement || null;
     }
 
     function renderStatsBar(el, data, bestSeller) {

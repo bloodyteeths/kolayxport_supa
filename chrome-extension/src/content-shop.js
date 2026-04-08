@@ -1,6 +1,7 @@
 /**
  * KolayXport Research — Shop Page Overlay
  * Sticky header bar: revenue estimate, best sellers, shop metrics
+ * + per-listing data rows on the shop's listing grid
  */
 
 (function () {
@@ -21,10 +22,14 @@
     S.isOverlayEnabled().then(enabled => {
       if (!enabled) return;
       if (S.getPageType() === 'shop') {
+        S.injectInlineCSS();
         processShopPage();
       }
       S.onUrlChange(() => {
-        if (S.getPageType() === 'shop') setTimeout(processShopPage, 500);
+        if (S.getPageType() === 'shop') {
+          S.injectInlineCSS();
+          setTimeout(processShopPage, 500);
+        }
       });
     });
 
@@ -57,6 +62,9 @@
 
         if (!data?.shop) { bar.innerHTML = ''; return; }
         renderShopBar(bar, data, S);
+
+        // Inject per-listing data rows
+        setTimeout(() => injectListingDataRows(S, C), 500);
       } catch (err) {
         bar.innerHTML = `<span style="opacity:0.7">⚠ ${err.message || S.t('loadFailed')}</span>`;
       }
@@ -64,6 +72,101 @@
 
     async function resolveShopId(shopName) {
       return shopName;
+    }
+
+    function extractListingIds() {
+      const ids = [];
+      document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
+        const match = link.href.match(/\/listing\/(\d+)/);
+        if (match && !ids.includes(match[1])) ids.push(match[1]);
+      });
+      return ids;
+    }
+
+    async function injectListingDataRows(S, C) {
+      const listingIds = extractListingIds();
+      if (listingIds.length === 0) return;
+
+      // Use search_enrich with the shop name as query to get batch data
+      const shopName = S.SELECTORS.shopName();
+      try {
+        const data = await C.getOrFetch(
+          `shop_listings:${shopName}`,
+          'search',
+          () => S.apiCall('search_enrich', { query: shopName, listingIds: listingIds.slice(0, 48) })
+        );
+
+        if (!data) return;
+
+        const badges = data.listingBadges || {};
+        const avgPrice = data.summary?.avgPrice || 0;
+        if (Object.keys(badges).length === 0) return;
+
+        const ranks = S.computeBestSellerRanks(badges);
+        const links = document.querySelectorAll('a[href*="/listing/"]');
+        const processed = new Set();
+
+        links.forEach(link => {
+          const match = link.href.match(/\/listing\/(\d+)/);
+          if (!match || processed.has(match[1])) return;
+          processed.add(match[1]);
+
+          const id = match[1];
+          const badge = badges[id];
+          if (!badge) return;
+
+          const card = link.closest('[data-listing-id]') || link.closest('.v2-listing-card') || link.closest('.listing-link') || link.parentElement;
+          if (!card || card.querySelector('.kx-data-row')) return;
+
+          const rank = ranks[id];
+          const est = badge.estMonthlySales || 0;
+          const revenue = badge.estMonthlyRevenue || 0;
+          const demand = badge.demandScore || 'low';
+          const priceDiff = S.priceVsAvg(badge.price, avgPrice);
+
+          const parts = [];
+
+          if (rank?.isBestSeller) {
+            parts.push(`<span class="kx-best">★ Top ${rank.percentile}%</span>`);
+            parts.push('<span class="kx-sep">·</span>');
+          }
+
+          parts.push(`<span class="${S.salesColor(est)}">~${est}${S.t('perMonth')}</span>`);
+
+          if (revenue > 0) {
+            parts.push('<span class="kx-sep">·</span>');
+            parts.push(`<span class="kx-green" style="font-weight:700;">$${S.formatNum(Math.round(revenue))}${S.t('perMonth')}</span>`);
+          }
+
+          parts.push('<span class="kx-sep">·</span>');
+          parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
+
+          const dl = S.demandLabel(demand);
+          parts.push('<span class="kx-sep">·</span>');
+          parts.push(`<span class="${dl.cssClass}">${dl.text}</span>`);
+
+          if (badge.conversionRate > 0) {
+            const crClass = badge.conversionRate >= 5 ? 'kx-green' : badge.conversionRate >= 2 ? 'kx-orange' : 'kx-red';
+            parts.push('<span class="kx-sep">·</span>');
+            parts.push(`<span class="${crClass}">${badge.conversionRate}% ${S.t('convRate')}</span>`);
+          }
+
+          if (badge.lowStock) {
+            parts.push('<span class="kx-sep">·</span>');
+            parts.push(`<span class="kx-red" style="font-weight:700;">${S.t('lowStock')}</span>`);
+          }
+
+          if (priceDiff) {
+            parts.push('<span class="kx-sep">·</span>');
+            parts.push(`<span class="${priceDiff.cssClass}">${priceDiff.text}</span>`);
+          }
+
+          const row = document.createElement('div');
+          row.className = 'kx-data-row';
+          row.innerHTML = parts.join('');
+          card.appendChild(row);
+        });
+      } catch (_) {}
     }
 
     function renderShopBar(bar, data, S) {

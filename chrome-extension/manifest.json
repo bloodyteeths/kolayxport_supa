@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "KolayXport — Etsy & eBay Araştırma & Sipariş Senkron",
-  "version": "7.1.0",
-  "description": "Etsy ve eBay araştırma verileri (fiyat, rekabet, satış tahmini) doğrudan marketplace üzerinde + otomatik sipariş senkronizasyonu",
+  "name": "KolayXport — Etsy & eBay Research Tool",
+  "version": "8.0.0",
+  "description": "Inline sales estimates, SEO scores, competition analysis & revenue data directly on Etsy and eBay pages. Like Helium10 for Etsy & eBay.",
   "author": "Kolayxport",
   "icons": {
     "16": "icons/icon-16.png",

@@ -435,7 +435,7 @@ function getPageType() {
   const path = location.pathname;
   if (path.includes('/search') || location.search.includes('search_query') || location.search.includes('q=')) return 'search';
   if (path.match(/\/listing\/\d+/)) return 'listing';
-  if (path.match(/\/shop\/[^/]+\/?$/)) return 'shop';
+  if (path.match(/\/shop\/[^/]+/)) return 'shop';
   return 'other';
 }
 

@@ -58,45 +58,17 @@ const log = {
 
 log.info('🚀 Kolayxport Etsy Content Script v3.0 Loading', { url: window.location.href });
 
-// Get authentication token - try multiple sources
+// Get authentication token from background service worker
 async function getAuthToken() {
-  // Try localStorage first (common for SPAs)
-  let token = localStorage.getItem("kxJwt") || localStorage.getItem("authToken");
-  
-  if (!token) {
-    // Try getting from background script
-    try {
-      const response = await chrome.runtime.sendMessage({ action: 'getAuthStatus' });
-      token = response.token;
-    } catch (e) {
-      log.warn('Could not get auth token from background', e.message);
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getAuthStatus' });
+    if (response?.authenticated && response.token) {
+      return response.token;
     }
+  } catch (e) {
+    log.warn('Could not get auth token from background', e.message);
   }
-  
-  if (!token) {
-    // Try cookies via background script
-    try {
-      const cookies = await chrome.runtime.sendMessage({ 
-        action: 'getCookies',
-        domain: 'app.kolayxport.com'
-      });
-      
-      // Look for auth cookies
-      for (const [name, value] of Object.entries(cookies || {})) {
-        if (name.includes('sb-') && name.includes('access-token')) {
-          token = value;
-          break;
-        } else if (name === 'next-auth.session-token' || name === '__Secure-next-auth.session-token') {
-          token = value;
-          break;
-        }
-      }
-    } catch (e) {
-      log.warn('Could not get cookies', e.message);
-    }
-  }
-  
-  return token;
+  return null;
 }
 
 // Utility – push in batches and dedupe with chrome.storage.local
@@ -117,15 +89,9 @@ const pushBatch = async batch => {
     
     const headers = {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
       'X-Extension-Version': chrome.runtime.getManifest().version
     };
-    
-    // Add appropriate auth header based on token type
-    if (token.includes('sb-')) {
-      headers['Authorization'] = `Bearer ${token}`;
-    } else {
-      headers['Cookie'] = `next-auth.session-token=${token}`;
-    }
     
     log.info('Sending request to server', { 
       url: API, 

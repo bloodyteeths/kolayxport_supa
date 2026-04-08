@@ -124,67 +124,18 @@ function getEtsyStoreInfo() {
   return { shopId, storeName };
 }
 
-// Get authentication token - use API endpoint approach
+// Get authentication token from background service worker
 async function getAuthToken() {
   try {
-    // Try getting from background script first (it handles the API call)
     const response = await chrome.runtime.sendMessage({ action: 'getAuthStatus' });
-    if (response && response.token) {
+    if (response?.authenticated && response.token) {
       log.info('Got auth token from background script');
       return response.token;
     }
   } catch (e) {
     log.warn('Could not get auth token from background', e.message);
   }
-
-  // Fallback: Try direct API call (though this might fail due to CORS)
-  try {
-    log.info('Trying direct auth API call...');
-    const response = await fetch(API.replace('/addresses', '/auth/extension'), {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-
-    if (response.ok) {
-      const authData = await response.json();
-      if (authData.authenticated && authData.token) {
-        log.success('Got auth token from direct API call');
-        return authData.token;
-      }
-    }
-  } catch (e) {
-    log.warn('Direct auth API call failed', e.message);
-  }
-
-  // Final fallback: Try localStorage/cookies (legacy approach)
-  let token = localStorage.getItem("kxJwt") || localStorage.getItem("authToken");
-  
-  if (!token) {
-    try {
-      const cookies = await chrome.runtime.sendMessage({ 
-        action: 'getCookies',
-        domain: 'kolayxport.com'
-      });
-      
-      // Look for auth cookies
-      for (const [name, value] of Object.entries(cookies || {})) {
-        if (name.includes('sb-') && name.includes('access-token')) {
-          token = value;
-          break;
-        } else if (name === 'next-auth.session-token' || name === '__Secure-next-auth.session-token') {
-          token = value;
-          break;
-        }
-      }
-    } catch (e) {
-      log.warn('Could not get cookies', e.message);
-    }
-  }
-  
-  return token;
+  return null;
 }
 
 // Utility – push in batches and dedupe with chrome.storage.local

@@ -20,10 +20,13 @@
 
     if (S.getPageType() !== 'shop') return;
 
-    processShopPage();
+    S.isOverlayEnabled().then(enabled => {
+      if (!enabled) return;
+      processShopPage();
     S.onUrlChange(() => {
       if (S.getPageType() === 'shop') setTimeout(processShopPage, 500);
     });
+    }); // end isOverlayEnabled
 
     async function processShopPage() {
       const shopName = S.SELECTORS.shopName();
@@ -37,13 +40,13 @@
         bar.className = 'kx-shop-bar';
         shadow.appendChild(bar);
       }
-      bar.innerHTML = '<span style="opacity:0.8">KolayXport mağaza analizi yükleniyor...</span>';
+      bar.innerHTML = `<span style="opacity:0.8">${S.t('shopAnalysisLoading')}</span>`;
 
       try {
         // We need shop ID — try to find it from the page or use shop name
         const shopId = await resolveShopId(shopName);
         if (!shopId) {
-          bar.innerHTML = '<span style="opacity:0.7">Mağaza ID bulunamadı</span>';
+          bar.innerHTML = `<span style="opacity:0.7">${S.t('shopIdNotFound')}</span>`;
           return;
         }
 
@@ -68,7 +71,6 @@
 
     function renderShopBar(bar, data, S) {
       const { shop, avgPrice, bestSellers } = data;
-      const estRevenue = shop.num_sales * avgPrice * 0.15; // rough monthly estimate
 
       bar.innerHTML = `
         <div style="display:flex;align-items:center;gap:4px;font-weight:700;">
@@ -77,34 +79,34 @@
         </div>
         <div class="kx-bar-divider"></div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Toplam Satış</span>
+          <span class="kx-bar-label">${S.t('topSales')}</span>
           <span class="kx-bar-value">${S.formatNum(shop.num_sales)}</span>
         </div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Puan</span>
+          <span class="kx-bar-label">${S.t('rating')}</span>
           <span class="kx-bar-value">${shop.rating ? shop.rating.toFixed(1) + ' ★' : 'N/A'}</span>
         </div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Yorum</span>
+          <span class="kx-bar-label">${S.t('reviews')}</span>
           <span class="kx-bar-value">${S.formatNum(shop.review_count)}</span>
         </div>
         <div class="kx-bar-divider"></div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Aktif Ürün</span>
+          <span class="kx-bar-label">${S.t('activeListings')}</span>
           <span class="kx-bar-value">${shop.listing_count}</span>
         </div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Ort. Fiyat</span>
+          <span class="kx-bar-label">${S.t('avgPrice')}</span>
           <span class="kx-bar-value">${S.formatPrice(avgPrice)}</span>
         </div>
         <div class="kx-bar-divider"></div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Best Sellers</span>
+          <span class="kx-bar-label">${S.t('bestSellers')}</span>
           <span class="kx-bar-value" style="font-size:11px;">${bestSellers.slice(0, 3).map(b => S.formatPrice(b.price)).join(', ')}</span>
         </div>
         <div style="margin-left:auto;">
           <a href="${S.API_BASE}/app/etsy-research" target="_blank" class="kx-btn kx-btn-sm" style="background:rgba(255,255,255,0.2);text-decoration:none;color:#fff;">
-            Tam Analiz →
+            ${S.t('fullAnalysis')}
           </a>
         </div>
       `;

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KolayXport — Etsy & eBay Araştırma & Sipariş Senkron",
-  "version": "7.0.0",
+  "version": "7.1.0",
   "description": "Etsy ve eBay araştırma verileri (fiyat, rekabet, satış tahmini) doğrudan marketplace üzerinde + otomatik sipariş senkronizasyonu",
   "author": "Kolayxport",
   "icons": {

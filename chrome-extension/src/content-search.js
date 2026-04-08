@@ -1,15 +1,14 @@
 /**
- * KolayXport Research — Search Results Overlay
- * Injects: summary bar (sticky) + per-listing badges + X-Ray button
+ * KolayXport Research — Etsy Search Results
+ * Injects: summary bar (sticky) + inline data row below each listing card
  */
 
 (function () {
   'use strict';
 
-  // Wait for shared module
   function waitForShared(cb, attempts = 0) {
     if (window.__KX_SHARED && window.__KX_CACHE) { cb(); return; }
-    if (attempts > 50) { console.warn('[KX Search] Shared module not loaded'); return; }
+    if (attempts > 50) return;
     setTimeout(() => waitForShared(cb, attempts + 1), 100);
   }
 
@@ -21,11 +20,13 @@
 
     if (S.getPageType() !== 'search') return;
 
-    processSearchPage();
-    S.onUrlChange((url) => {
-      if (S.getPageType() === 'search') {
-        setTimeout(processSearchPage, 500);
-      }
+    S.isOverlayEnabled().then(enabled => {
+      if (!enabled) return;
+      S.injectInlineCSS();
+      processSearchPage();
+      S.onUrlChange(() => {
+        if (S.getPageType() === 'search') setTimeout(processSearchPage, 500);
+      });
     });
 
     async function processSearchPage() {
@@ -34,16 +35,14 @@
 
       const shadow = S.createOverlayContainer('kx-search-overlay', 'top');
 
-      // Show loading
       let bar = shadow.querySelector('.kx-bar');
       if (!bar) {
         bar = document.createElement('div');
         bar.className = 'kx-bar';
         shadow.appendChild(bar);
       }
-      bar.innerHTML = '<span style="opacity:0.8">KolayXport Araştırma yükleniyor...</span>';
+      bar.innerHTML = `<span style="opacity:0.8">${S.t('loading')}</span>`;
 
-      // Extract listing IDs from the page
       const listingIds = extractListingIds();
 
       try {
@@ -56,18 +55,16 @@
         if (!data?.summary) return;
         renderSummaryBar(shadow, bar, data.summary, query);
         if (data.listingBadges) {
-          injectListingBadges(data.listingBadges);
+          injectDataRows(data.listingBadges, data.summary.avgPrice);
         }
       } catch (err) {
-        bar.innerHTML = `<span style="opacity:0.7">⚠ ${err.message || 'Veri yüklenemedi'}</span>`;
-        console.error('[KX Search]', err);
+        bar.innerHTML = `<span style="opacity:0.7">${err.message || S.t('loadFailed')}</span>`;
       }
     }
 
     function extractListingIds() {
       const ids = [];
-      const links = document.querySelectorAll('a[href*="/listing/"]');
-      links.forEach(link => {
+      document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
         const match = link.href.match(/\/listing\/(\d+)/);
         if (match && !ids.includes(match[1])) ids.push(match[1]);
       });
@@ -75,7 +72,9 @@
     }
 
     function renderSummaryBar(shadow, bar, summary, query) {
-      const compColor = summary.competition === 'low' ? '#4caf50' : summary.competition === 'medium' ? '#ff9800' : '#f44336';
+      const compColor = S.competitionColor(summary.competition);
+      const compLabel = summary.competition === 'low' ? S.t('compLow') : summary.competition === 'medium' ? S.t('compMed') : S.t('compHigh');
+
       bar.innerHTML = `
         <div style="display:flex;align-items:center;gap:4px;font-weight:700;">
           <span style="font-size:10px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;">KX</span>
@@ -83,48 +82,42 @@
         </div>
         <div class="kx-bar-divider"></div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Sonuç</span>
+          <span class="kx-bar-label">${S.t('result')}</span>
           <span class="kx-bar-value">${S.formatNum(summary.totalResults)}</span>
         </div>
         <div class="kx-bar-divider"></div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Ort. Fiyat</span>
+          <span class="kx-bar-label">${S.t('avgPrice')}</span>
           <span class="kx-bar-value">${S.formatPrice(summary.avgPrice)}</span>
         </div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Aralık</span>
+          <span class="kx-bar-label">${S.t('range')}</span>
           <span class="kx-bar-value" style="font-size:12px">${S.formatPrice(summary.minPrice)} - ${S.formatPrice(summary.maxPrice)}</span>
         </div>
         <div class="kx-bar-divider"></div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Ort. Fav</span>
+          <span class="kx-bar-label">${S.t('avgFav')}</span>
           <span class="kx-bar-value">${S.formatNum(summary.avgFavorites)}</span>
         </div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Mağaza</span>
+          <span class="kx-bar-label">${S.t('shops')}</span>
           <span class="kx-bar-value">${summary.uniqueShops}</span>
         </div>
         <div class="kx-bar-divider"></div>
         <div class="kx-bar-item">
-          <span class="kx-bar-label">Rekabet</span>
-          <span class="kx-bar-value" style="color:${compColor}">${summary.competition === 'low' ? 'Düşük' : summary.competition === 'medium' ? 'Orta' : 'Yüksek'}</span>
+          <span class="kx-bar-label">${S.t('competition')}</span>
+          <span class="kx-bar-value" style="color:${compColor}">${compLabel}</span>
         </div>
-        <div style="margin-left:auto;display:flex;gap:6px;">
-          <button class="kx-btn kx-btn-sm" id="kx-xray-btn" style="background:rgba(255,255,255,0.2);">X-Ray</button>
+        <div style="margin-left:auto;">
           <a href="${S.API_BASE}/app/etsy-research" target="_blank" class="kx-btn kx-btn-sm" style="background:rgba(255,255,255,0.2);text-decoration:none;color:#fff;">
-            Tam Analiz →
+            ${S.t('fullAnalysis')}
           </a>
         </div>
       `;
-
-      // X-Ray button
-      const xrayBtn = shadow.getElementById('kx-xray-btn');
-      if (xrayBtn) {
-        xrayBtn.addEventListener('click', () => showXRay(shadow, summary, query));
-      }
     }
 
-    function injectListingBadges(badges) {
+    function injectDataRows(badges, avgPrice) {
+      const ranks = S.computeBestSellerRanks(badges);
       const links = document.querySelectorAll('a[href*="/listing/"]');
       const processed = new Set();
 
@@ -133,68 +126,38 @@
         if (!match || processed.has(match[1])) return;
         processed.add(match[1]);
 
-        const badge = badges[match[1]];
+        const id = match[1];
+        const badge = badges[id];
         if (!badge) return;
 
-        // Find the card container
         const card = link.closest('[data-listing-id]') || link.closest('.v2-listing-card') || link.parentElement;
-        if (!card || card.querySelector('.kx-listing-badge')) return;
+        if (!card || card.querySelector('.kx-data-row')) return;
 
-        card.style.position = 'relative';
-        const badgeEl = document.createElement('div');
-        badgeEl.className = 'kx-listing-badge';
-        badgeEl.style.cssText = `
-          position: absolute; top: 4px; left: 4px; z-index: 100;
-          background: rgba(0,0,0,0.82); color: #fff; padding: 3px 7px;
-          border-radius: 4px; font-size: 10px; font-weight: 600;
-          display: flex; align-items: center; gap: 4px;
-          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-          backdrop-filter: blur(4px); pointer-events: none;
-        `;
+        const rank = ranks[id];
+        const priceDiff = S.priceVsAvg(badge.price, avgPrice);
+        const est = badge.estMonthlySales || 0;
 
-        const salesColor = badge.estMonthlySales >= 5 ? '#4caf50' : badge.estMonthlySales >= 1 ? '#ff9800' : '#f44336';
-        badgeEl.innerHTML = `
-          <span style="color:${salesColor}">~${badge.estMonthlySales}/ay</span>
-          <span style="opacity:0.5">|</span>
-          <span>♥ ${S.formatNum(badge.favorites)}</span>
-        `;
-        card.appendChild(badgeEl);
+        const parts = [];
+
+        if (rank?.isBestSeller) {
+          parts.push(`<span class="kx-best">★ Top ${rank.percentile}%</span>`);
+          parts.push('<span class="kx-sep">·</span>');
+        }
+
+        parts.push(`<span class="${S.salesColor(est)}">~${est}${S.t('perMonth')}</span>`);
+        parts.push('<span class="kx-sep">·</span>');
+        parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
+
+        if (priceDiff) {
+          parts.push('<span class="kx-sep">·</span>');
+          parts.push(`<span class="${priceDiff.cssClass}">${priceDiff.text}</span>`);
+        }
+
+        const row = document.createElement('div');
+        row.className = 'kx-data-row';
+        row.innerHTML = parts.join('');
+        card.appendChild(row);
       });
-    }
-
-    function showXRay(shadow, summary, query) {
-      let xray = shadow.getElementById('kx-xray-panel');
-      if (xray) { xray.remove(); return; }
-
-      xray = document.createElement('div');
-      xray.id = 'kx-xray-panel';
-      xray.className = 'kx-panel';
-      xray.innerHTML = `
-        <div class="kx-panel-header">
-          <span style="font-weight:700;">X-Ray: "${query}"</span>
-          <button class="kx-btn kx-btn-sm" id="kx-xray-close" style="background:rgba(255,255,255,0.2);">✕</button>
-        </div>
-        <div class="kx-panel-body">
-          <div class="kx-panel-section">
-            <div class="kx-panel-section-title">Pazar Özeti</div>
-            <div class="kx-metric"><span class="kx-metric-label">Toplam Sonuç</span><span class="kx-metric-value">${S.formatNum(summary.totalResults)}</span></div>
-            <div class="kx-metric"><span class="kx-metric-label">Ortalama Fiyat</span><span class="kx-metric-value">${S.formatPrice(summary.avgPrice)}</span></div>
-            <div class="kx-metric"><span class="kx-metric-label">Fiyat Aralığı</span><span class="kx-metric-value">${S.formatPrice(summary.minPrice)} - ${S.formatPrice(summary.maxPrice)}</span></div>
-            <div class="kx-metric"><span class="kx-metric-label">Ort. Favori</span><span class="kx-metric-value">${S.formatNum(summary.avgFavorites)}</span></div>
-            <div class="kx-metric"><span class="kx-metric-label">Ort. Görüntülenme</span><span class="kx-metric-value">${S.formatNum(summary.avgViews)}</span></div>
-            <div class="kx-metric"><span class="kx-metric-label">Benzersiz Mağaza</span><span class="kx-metric-value">${summary.uniqueShops}</span></div>
-            <div class="kx-metric"><span class="kx-metric-label">Rekabet</span><span class="kx-metric-value">${summary.competition === 'low' ? '🟢 Düşük' : summary.competition === 'medium' ? '🟡 Orta' : '🔴 Yüksek'}</span></div>
-          </div>
-          <div class="kx-panel-section">
-            <a href="${S.API_BASE}/app/etsy-research" target="_blank" class="kx-btn" style="width:100%;justify-content:center;text-decoration:none;">
-              KolayXport'ta Tam Analiz →
-            </a>
-          </div>
-        </div>
-      `;
-      shadow.appendChild(xray);
-
-      shadow.getElementById('kx-xray-close').addEventListener('click', () => xray.remove());
     }
   }
 })();

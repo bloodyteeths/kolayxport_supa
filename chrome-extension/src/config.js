@@ -30,12 +30,6 @@ export const CONFIG = {
   
   // Authentication token patterns
   AUTH_PATTERNS: {
-    SUPABASE: [
-      'sb-access-token',
-      'sb-refresh-token',
-      'supabase-auth-token',
-      'supabase.auth.token'
-    ],
     NEXTAUTH: [
       'next-auth.session-token',
       '__Secure-next-auth.session-token'
@@ -69,9 +63,6 @@ export function getDomain() {
 
 // Check if token matches auth patterns
 export function identifyTokenType(tokenName) {
-  if (CONFIG.AUTH_PATTERNS.SUPABASE.some(pattern => tokenName.includes(pattern))) {
-    return 'supabase';
-  }
   if (CONFIG.AUTH_PATTERNS.NEXTAUTH.some(pattern => tokenName.includes(pattern))) {
     return 'nextauth';
   }

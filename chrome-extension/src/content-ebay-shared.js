@@ -1,6 +1,6 @@
 /**
  * KolayXport Research — eBay Shared Content Script Utilities
- * Shadow DOM overlay injection, URL change observer, DOM selectors for eBay
+ * Shadow DOM overlay, URL change observer, DOM selectors for eBay
  */
 
 // ---------------------------------------------------------------------------
@@ -10,7 +10,69 @@ const KX_EBAY_PREFIX = 'kx-ebay-research';
 const EBAY_API_BASE = 'https://kolayxport.com';
 
 // ---------------------------------------------------------------------------
-// Shadow DOM Container (same styling as Etsy)
+// Inline CSS (reuse from Etsy shared if already injected)
+// ---------------------------------------------------------------------------
+const KX_EBAY_INLINE_CSS = `
+.kx-data-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 4px 8px; font-size: 11px; font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f5f5fa; border-top: 1px solid #e8e8ee; color: #555;
+  line-height: 1.4;
+}
+.kx-data-row .kx-sep { color: #ccc; font-weight: 400; }
+.kx-data-row .kx-best { color: #b8860b; }
+.kx-data-row .kx-green { color: #2e7d32; }
+.kx-data-row .kx-orange { color: #e65100; }
+.kx-data-row .kx-red { color: #c62828; }
+.kx-stats-bar {
+  background: #f5f5fa; border: 1px solid #e0e0e8; border-radius: 8px;
+  padding: 10px 14px; margin: 10px 0; font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #444; line-height: 1.6;
+}
+.kx-stats-bar .kx-stats-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  font-weight: 700; font-size: 13px; color: #333;
+}
+.kx-stats-bar .kx-stats-logo {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 800;
+}
+.kx-stats-bar .kx-stats-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.kx-stats-bar .kx-sep { color: #ccc; }
+.kx-stats-bar .kx-best { color: #b8860b; font-weight: 700; }
+.kx-stats-bar .kx-green { color: #2e7d32; }
+.kx-stats-bar .kx-orange { color: #e65100; }
+.kx-stats-bar .kx-red { color: #c62828; }
+.kx-stats-bar .kx-seo-bar {
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.kx-stats-bar .kx-seo-track {
+  width: 60px; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;
+  display: inline-block; vertical-align: middle;
+}
+.kx-stats-bar .kx-seo-fill {
+  height: 100%; border-radius: 3px;
+}
+.kx-stats-bar .kx-collapse-btn {
+  background: none; border: none; cursor: pointer; font-size: 11px; color: #667eea;
+  font-weight: 600; padding: 0; margin-left: auto;
+}
+`;
+
+function injectEbayInlineCSS() {
+  if (document.getElementById('kx-ebay-inline-css')) return;
+  const style = document.createElement('style');
+  style.id = 'kx-ebay-inline-css';
+  style.textContent = KX_EBAY_INLINE_CSS;
+  document.head.appendChild(style);
+}
+
+// ---------------------------------------------------------------------------
+// Shadow DOM Container (for summary bar)
 // ---------------------------------------------------------------------------
 function createEbayOverlayContainer(id, position = 'top') {
   const existing = document.getElementById(id);
@@ -35,20 +97,18 @@ function createEbayOverlayContainer(id, position = 'top') {
     .kx-bar-label { opacity: 0.8; font-size: 11px; }
     .kx-bar-value { font-weight: 700; font-size: 14px; }
     .kx-bar-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.3); }
-    .kx-badge {
-      position: absolute; top: 4px; left: 4px; z-index: 100;
-      background: rgba(0,0,0,0.85); color: #fff; padding: 3px 6px;
-      border-radius: 4px; font-size: 10px; font-weight: 600;
-      display: flex; align-items: center; gap: 3px;
-      backdrop-filter: blur(4px); pointer-events: none;
+    .kx-btn {
+      display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px;
+      border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff;
+      transition: opacity 0.2s;
     }
-    .kx-badge-green { background: rgba(76,175,80,0.9); }
-    .kx-badge-yellow { background: rgba(255,152,0,0.9); }
-    .kx-badge-red { background: rgba(244,67,54,0.9); }
+    .kx-btn:hover { opacity: 0.9; }
+    .kx-btn-sm { padding: 3px 8px; font-size: 11px; }
     .kx-panel {
       position: fixed; top: 80px; right: 0; width: 320px; max-height: calc(100vh - 100px);
       background: #fff; border-left: 1px solid #e0e0e0; box-shadow: -4px 0 20px rgba(0,0,0,0.1);
-      overflow-y: auto; z-index: 10000; font-size: 13px; transition: transform 0.3s;
+      overflow-y: auto; z-index: 10000; font-size: 13px;
     }
     .kx-panel-header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -58,45 +118,10 @@ function createEbayOverlayContainer(id, position = 'top') {
     .kx-panel-body { padding: 12px 16px; }
     .kx-panel-section { margin-bottom: 12px; }
     .kx-panel-section-title { font-weight: 700; font-size: 12px; color: #667eea; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .kx-score-ring {
-      width: 60px; height: 60px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 900; font-size: 18px; color: #fff;
-    }
-    .kx-score-high { background: linear-gradient(135deg, #11998e, #38ef7d); }
-    .kx-score-mid { background: linear-gradient(135deg, #F2994A, #F2C94C); }
-    .kx-score-low { background: linear-gradient(135deg, #eb3349, #f45c43); }
-    .kx-tag { display: inline-block; padding: 2px 8px; margin: 2px; border-radius: 12px; font-size: 11px; background: #f0f0f0; color: #333; }
-    .kx-tag-good { background: #e8f5e9; color: #2e7d32; }
-    .kx-tag-weak { background: #ffebee; color: #c62828; }
-    .kx-btn {
-      display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px;
-      border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff;
-      transition: opacity 0.2s;
-    }
-    .kx-btn:hover { opacity: 0.9; }
-    .kx-btn-sm { padding: 3px 8px; font-size: 11px; }
-    .kx-btn-outline { background: transparent; border: 1px solid #667eea; color: #667eea; }
     .kx-metric { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
     .kx-metric-label { color: #666; font-size: 12px; }
     .kx-metric-value { font-weight: 700; font-size: 13px; }
-    .kx-progress { height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
-    .kx-progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
-    .kx-hidden { display: none !important; }
     .kx-loading { text-align: center; padding: 20px; color: #999; }
-    .kx-toggle {
-      position: fixed; top: 50%; right: 0; transform: translateY(-50%);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff; border: none; cursor: pointer; padding: 8px 4px;
-      border-radius: 6px 0 0 6px; font-size: 11px; writing-mode: vertical-rl;
-      z-index: 9999; box-shadow: -2px 0 8px rgba(102,126,234,0.3);
-    }
-    .kx-shop-bar {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 16px;
-      font-size: 13px; flex-wrap: wrap; margin: 0; border-radius: 0;
-    }
   `;
   shadow.appendChild(style);
 
@@ -110,7 +135,7 @@ function createEbayOverlayContainer(id, position = 'top') {
 }
 
 // ---------------------------------------------------------------------------
-// URL Change Observer (eBay SPA navigation)
+// URL Change Observer
 // ---------------------------------------------------------------------------
 let _ebayLastUrl = location.href;
 const _ebayUrlCallbacks = [];
@@ -137,34 +162,25 @@ window.addEventListener('popstate', () => {
 });
 
 // ---------------------------------------------------------------------------
-// DOM Selectors (eBay-specific)
+// DOM Selectors (eBay)
 // ---------------------------------------------------------------------------
 const EBAY_SELECTORS = {
-  // Search results
   searchResultCard: '.s-item',
   searchResultLink: 'a[href*="/itm/"]',
-
   searchQuery: () => {
     const params = new URLSearchParams(location.search);
     return params.get('_nkw') || '';
   },
-
-  // Listing page — item ID is the last numeric segment of /itm/ URL
   itemId: () => {
     const match = location.pathname.match(/\/itm\/(?:[^/]*\/)?(\d+)/);
     if (match) return match[1];
-    // Also try just trailing number
     const trailingMatch = location.pathname.match(/\/itm\/.*?(\d{8,})(?:\?|$)/);
     return trailingMatch ? trailingMatch[1] : null;
   },
-
-  // Seller page
   sellerName: () => {
     const match = location.pathname.match(/\/usr\/([^/?#]+)/);
     return match ? match[1] : null;
   },
-
-  // Item title on listing page
   itemTitle: () => {
     const h1 = document.querySelector('h1.x-item-title__mainTitle') ||
                document.querySelector('#itemTitle') ||
@@ -175,12 +191,41 @@ const EBAY_SELECTORS = {
 };
 
 // ---------------------------------------------------------------------------
-// Page Type Detection (eBay)
+// i18n — Turkish / English
+// ---------------------------------------------------------------------------
+const _ebayLang = (navigator.language || '').startsWith('tr') ? 'tr' : 'en';
+
+const _ebayI18n = {
+  tr: {
+    loading: 'KolayXport yükleniyor...',
+    loadFailed: 'Veri yüklenemedi',
+    result: 'Sonuç', avgPrice: 'Ort. Fiyat', range: 'Aralık',
+    sellers: 'Satıcı', competition: 'Rekabet',
+    compLow: 'Düşük', compMed: 'Orta', compHigh: 'Yüksek',
+    fullAnalysis: 'Tam Analiz', perMonth: '/ay', vsAvg: '% ort.',
+    bestSeller: 'En Çok Satan', seo: 'SEO', price: 'Fiyat',
+    positive: 'olumlu', products: 'ürün',
+  },
+  en: {
+    loading: 'KolayXport loading...',
+    loadFailed: 'Failed to load data',
+    result: 'Results', avgPrice: 'Avg Price', range: 'Range',
+    sellers: 'Sellers', competition: 'Competition',
+    compLow: 'Low', compMed: 'Medium', compHigh: 'High',
+    fullAnalysis: 'Full Analysis', perMonth: '/mo', vsAvg: '% avg.',
+    bestSeller: 'Best Seller', seo: 'SEO', price: 'Price',
+    positive: 'positive', products: 'products',
+  },
+};
+
+function ebayT(key) { return _ebayI18n[_ebayLang]?.[key] || _ebayI18n.en[key] || key; }
+
+// ---------------------------------------------------------------------------
+// Page Type Detection
 // ---------------------------------------------------------------------------
 function getEbayPageType() {
   const path = location.pathname;
   const search = location.search;
-
   if (path.includes('/sch/') || search.includes('_nkw=')) return 'search';
   if (path.includes('/itm/')) return 'listing';
   if (path.includes('/usr/')) return 'seller';
@@ -188,7 +233,7 @@ function getEbayPageType() {
 }
 
 // ---------------------------------------------------------------------------
-// API Communication (via background script — uses kx_ebay_research type)
+// API Communication
 // ---------------------------------------------------------------------------
 async function ebayApiCall(action, params = {}) {
   return new Promise((resolve, reject) => {
@@ -210,7 +255,7 @@ async function ebayApiCall(action, params = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers (same as Etsy shared)
+// Helpers
 // ---------------------------------------------------------------------------
 function ebayFormatNum(n) {
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
@@ -223,15 +268,59 @@ function ebayFormatPrice(n) {
 }
 
 function ebayCompetitionColor(level) {
-  if (level === 'low') return 'kx-badge-green';
-  if (level === 'medium') return 'kx-badge-yellow';
-  return 'kx-badge-red';
+  if (level === 'low') return '#4caf50';
+  if (level === 'medium') return '#ff9800';
+  return '#f44336';
 }
 
 function ebayScoreClass(score) {
-  if (score >= 70) return 'kx-score-high';
-  if (score >= 40) return 'kx-score-mid';
-  return 'kx-score-low';
+  if (score >= 70) return 'kx-green';
+  if (score >= 40) return 'kx-orange';
+  return 'kx-red';
+}
+
+function ebaySalesColor(est) {
+  if (est >= 5) return 'kx-green';
+  if (est >= 1) return 'kx-orange';
+  return 'kx-red';
+}
+
+function ebayComputeBestSellerRanks(badges) {
+  const entries = Object.entries(badges || {});
+  if (entries.length === 0) return {};
+
+  const sorted = entries.sort((a, b) => {
+    const salesDiff = (b[1].estMonthlySales || b[1].soldQuantity || 0) - (a[1].estMonthlySales || a[1].soldQuantity || 0);
+    if (salesDiff !== 0) return salesDiff;
+    return (b[1].price || 0) - (a[1].price || 0);
+  });
+
+  const total = sorted.length;
+  const ranks = {};
+  sorted.forEach(([id], index) => {
+    const rank = index + 1;
+    const percentile = Math.round((rank / total) * 100);
+    ranks[id] = { rank, total, percentile, isBestSeller: percentile <= 10 };
+  });
+  return ranks;
+}
+
+function ebayPriceVsAvg(price, avgPrice) {
+  if (!price || !avgPrice) return null;
+  const diff = ((price - avgPrice) / avgPrice * 100).toFixed(0);
+  const isLower = price <= avgPrice;
+  return {
+    text: (isLower ? '' : '+') + diff + ebayT('vsAvg'),
+    cssClass: isLower ? 'kx-green' : 'kx-red',
+  };
+}
+
+async function ebayIsOverlayEnabled() {
+  return new Promise(resolve => {
+    chrome.storage.local.get('kx_overlays_enabled', (result) => {
+      resolve(result.kx_overlays_enabled !== false);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +330,7 @@ window.__KX_EBAY_SHARED = {
   KX_EBAY_PREFIX,
   API_BASE: EBAY_API_BASE,
   createOverlayContainer: createEbayOverlayContainer,
+  injectInlineCSS: injectEbayInlineCSS,
   onUrlChange: onEbayUrlChange,
   SELECTORS: EBAY_SELECTORS,
   apiCall: ebayApiCall,
@@ -248,5 +338,10 @@ window.__KX_EBAY_SHARED = {
   formatPrice: ebayFormatPrice,
   competitionColor: ebayCompetitionColor,
   scoreClass: ebayScoreClass,
+  salesColor: ebaySalesColor,
+  computeBestSellerRanks: ebayComputeBestSellerRanks,
+  priceVsAvg: ebayPriceVsAvg,
+  isOverlayEnabled: ebayIsOverlayEnabled,
   getPageType: getEbayPageType,
+  t: ebayT,
 };

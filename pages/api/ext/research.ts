@@ -338,3 +338,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: `Research API error: ${err?.message || 'unknown'}` });
   }
 }
+// force redeploy 1775615131

@@ -140,45 +140,48 @@
         const badge = badges[id];
         if (!badge) return;
 
-        const card = link.closest('[data-listing-id]') || link.closest('.v2-listing-card') || link.parentElement;
+        const card = link.closest('[data-listing-id]') ||
+                     link.closest('[data-listing-card-v2]') ||
+                     link.closest('.v2-listing-card') ||
+                     link.closest('.listing-link') ||
+                     link.closest('.wt-grid__item-xs-6') ||
+                     link.closest('[class*="listing-card"]') ||
+                     link.parentElement?.parentElement || link.parentElement;
         if (!card || card.querySelector('.kx-data-row')) return;
 
         const rank = ranks[id];
         const priceDiff = S.priceVsAvg(badge.price, avgPrice);
-        const est = badge.estMonthlySales || 0;
-        const revenue = badge.estMonthlyRevenue || 0;
+        const momentum = badge.momentum || 0;
         const demand = badge.demandScore || 'low';
 
         const parts = [];
 
-        if (rank?.isBestSeller) {
-          parts.push(`<span class="kx-best">★ Top ${rank.percentile}%</span>`);
-          parts.push('<span class="kx-sep">·</span>');
-        }
-
-        // Estimated monthly sales
-        parts.push(`<span class="${S.salesColor(est)}">~${est}${S.t('perMonth')}</span>`);
+        // Momentum score (0-100) — composite engagement signal
+        const momColor = momentum >= 70 ? 'kx-green' : momentum >= 40 ? 'kx-orange' : 'kx-red';
+        parts.push(`<span class="${momColor}" style="font-weight:700;">⚡${momentum}</span>`);
         parts.push('<span class="kx-sep">·</span>');
-
-        // Estimated revenue (the killer metric)
-        if (revenue > 0) {
-          parts.push(`<span class="kx-green" style="font-weight:700;">$${S.formatNum(Math.round(revenue))}${S.t('perMonth')}</span>`);
-          parts.push('<span class="kx-sep">·</span>');
-        }
-
-        // Favorites
-        parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
 
         // Demand indicator
         const dl = S.demandLabel(demand);
-        parts.push('<span class="kx-sep">·</span>');
         parts.push(`<span class="${dl.cssClass}">${dl.text}</span>`);
+        parts.push('<span class="kx-sep">·</span>');
 
-        // Conversion rate
-        if (badge.conversionRate > 0) {
-          const crClass = badge.conversionRate >= 5 ? 'kx-green' : badge.conversionRate >= 2 ? 'kx-orange' : 'kx-red';
+        // Real engagement: favorites + views
+        parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
+        parts.push('<span class="kx-sep">·</span>');
+        parts.push(`<span>👁 ${S.formatNum(badge.views || 0)}</span>`);
+
+        // Engagement rate (real: favs/views %)
+        if (badge.engagementRate > 0) {
+          const erClass = badge.engagementRate >= 5 ? 'kx-green' : badge.engagementRate >= 2 ? 'kx-orange' : 'kx-red';
           parts.push('<span class="kx-sep">·</span>');
-          parts.push(`<span class="${crClass}">${badge.conversionRate}% ${S.t('convRate')}</span>`);
+          parts.push(`<span class="${erClass}">${badge.engagementRate}% ${S.t('engRate')}</span>`);
+        }
+
+        // Favorites velocity (favs/day)
+        if (badge.favsPerDay >= 0.1) {
+          parts.push('<span class="kx-sep">·</span>');
+          parts.push(`<span>${badge.favsPerDay}${S.t('favsDay')}</span>`);
         }
 
         // Low stock signal

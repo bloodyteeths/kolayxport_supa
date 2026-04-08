@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+console.log('[KX-shared] loading content-shared.js');
 const KX_PREFIX = 'kx-research';
 const API_BASE = 'https://kolayxport.com';
 
@@ -346,6 +347,8 @@ const _i18n = {
     demandModerate: '📊 Orta',
     demandLow: '📉 Düşük',
     convRate: 'Dönüşüm',
+    engRate: 'Etkileşim',
+    favsDay: ' fav/gün',
     lowStock: '🔥 Az Stok',
     estMktRevenue: 'Tah. Pazar Geliri',
     shopAge: 'Mağaza Yaşı',
@@ -399,6 +402,8 @@ const _i18n = {
     demandModerate: '📊 Moderate',
     demandLow: '📉 Low',
     convRate: 'Conv. Rate',
+    engRate: 'Engage',
+    favsDay: ' fav/day',
     lowStock: '🔥 Low Stock',
     estMktRevenue: 'Est. Market Revenue',
     shopAge: 'Shop Age',
@@ -433,15 +438,18 @@ function demandColor(score) {
 // ---------------------------------------------------------------------------
 function getPageType() {
   const path = location.pathname;
-  if (path.includes('/search') || location.search.includes('search_query') || location.search.includes('q=')) return 'search';
+  // Check listing and shop BEFORE search — search query params (ga_search_query)
+  // can appear in listing/shop URLs when navigating from search results
   if (path.match(/\/listing\/\d+/)) return 'listing';
   if (path.match(/\/shop\/[^/]+/)) return 'shop';
+  if (path.includes('/search') || location.search.includes('search_query=') || location.search.includes('q=')) return 'search';
   return 'other';
 }
 
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
+console.log('[KX-shared] exporting __KX_SHARED, pageType:', getPageType());
 window.__KX_SHARED = {
   KX_PREFIX, API_BASE,
   createOverlayContainer,

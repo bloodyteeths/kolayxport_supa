@@ -44,6 +44,8 @@ async function etsyGetSafe(path: string): Promise<any | null> {
 }
 
 // Compute listing metrics from Etsy listing data
+// NOTE: Etsy API does NOT provide actual sales per listing.
+// We show real engagement data and a composite "momentum" score instead.
 function computeListingMetrics(item: any) {
   const price = (item.price?.amount || 0) / (item.price?.divisor || 100);
   const favs = item.num_favorers || 0;
@@ -53,33 +55,48 @@ function computeListingMetrics(item: any) {
   const ageDays = Math.max(1, ageMs / (24 * 3600 * 1000));
   const ageMonths = Math.max(1, ageDays / 30);
 
-  // Sales velocity: favorites correlate ~3% with sales
-  const estMonthlySales = (favs / ageMonths) * 0.03;
-  const estMonthlyRevenue = estMonthlySales * price;
-
-  // Demand score: favorites per day (normalized)
+  // Real engagement velocity
   const favsPerDay = favs / ageDays;
+  const viewsPerDay = views / ageDays;
+
+  // Engagement rate: what % of viewers favorite this listing (real signal)
+  const engagementRate = views > 0 ? (favs / views) * 100 : 0;
+
+  // Demand score: based on favorites velocity (real data)
   const demandScore = favsPerDay >= 5 ? 'hot' : favsPerDay >= 1 ? 'good' : favsPerDay >= 0.3 ? 'moderate' : 'low';
 
-  // Conversion rate: favs / views
-  const conversionRate = views > 0 ? (favs / views) * 100 : 0;
+  // Momentum score (0-100): composite of engagement signals
+  // Higher = more likely to be selling well
+  const favsScore = Math.min(40, favsPerDay * 8);           // max 40 pts (5+ favs/day = max)
+  const viewsScore = Math.min(25, viewsPerDay * 0.25);      // max 25 pts (100+ views/day = max)
+  const engScore = Math.min(20, engagementRate * 4);         // max 20 pts (5%+ engagement = max)
+  const ageScore = ageMonths >= 1 && ageMonths <= 6 ? 15 :   // newer listings with traction get bonus
+                   ageMonths > 6 && favsPerDay >= 1 ? 10 : 5; // older listings need sustained engagement
+  const momentum = Math.round(Math.min(100, favsScore + viewsScore + engScore + ageScore));
 
   // Stock signal
   const quantity = item.quantity || 0;
+
+  // Tag count
+  const tagCount = item.tags?.length || 0;
 
   return {
     price,
     favorites: favs,
     views,
     quantity,
+    tagCount,
     ageDays: Math.round(ageDays),
     ageMonths: Math.round(ageMonths),
-    estMonthlySales: Math.round(estMonthlySales * 10) / 10,
-    estMonthlyRevenue: Math.round(estMonthlyRevenue * 100) / 100,
     favsPerDay: Math.round(favsPerDay * 100) / 100,
+    viewsPerDay: Math.round(viewsPerDay * 100) / 100,
+    engagementRate: Math.round(engagementRate * 100) / 100,
+    momentum,
     demandScore,
-    conversionRate: Math.round(conversionRate * 100) / 100,
     lowStock: quantity > 0 && quantity <= 3,
+    // Keep backward-compat fields for existing code (clearly labeled as estimates)
+    estMonthlySales: Math.round(favsPerDay * 30 * 0.03 * 10) / 10,
+    estMonthlyRevenue: Math.round(favsPerDay * 30 * 0.03 * price * 100) / 100,
   };
 }
 
@@ -229,8 +246,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ageMonths: metrics.ageMonths,
             ageDays: metrics.ageDays,
             favsPerDay: metrics.favsPerDay,
+            viewsPerDay: metrics.viewsPerDay,
             demandScore: metrics.demandScore,
-            conversionRate: metrics.conversionRate,
+            engagementRate: metrics.engagementRate,
+            momentum: metrics.momentum,
             lowStock: metrics.lowStock,
           },
           seoScore: { total: seoScore, title: titleScore, tags: tagScore, description: descScore, images: imgScore },

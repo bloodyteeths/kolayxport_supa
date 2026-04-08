@@ -85,6 +85,7 @@
 
     async function injectListingDataRows(S, C) {
       const listingIds = extractListingIds();
+      console.log('[KX-shop] found', listingIds.length, 'listing IDs on page');
       if (listingIds.length === 0) return;
 
       // Use search_enrich with the shop name as query to get batch data
@@ -115,40 +116,42 @@
           const badge = badges[id];
           if (!badge) return;
 
-          const card = link.closest('[data-listing-id]') || link.closest('.v2-listing-card') || link.closest('.listing-link') || link.parentElement;
+          const card = link.closest('[data-listing-id]') ||
+                       link.closest('[data-listing-card-v2]') ||
+                       link.closest('.v2-listing-card') ||
+                       link.closest('.listing-link') ||
+                       link.closest('.wt-grid__item-xs-6') ||
+                       link.closest('[class*="listing-card"]') ||
+                       link.parentElement?.parentElement || link.parentElement;
           if (!card || card.querySelector('.kx-data-row')) return;
 
           const rank = ranks[id];
-          const est = badge.estMonthlySales || 0;
-          const revenue = badge.estMonthlyRevenue || 0;
+          const momentum = badge.momentum || 0;
           const demand = badge.demandScore || 'low';
           const priceDiff = S.priceVsAvg(badge.price, avgPrice);
 
           const parts = [];
 
-          if (rank?.isBestSeller) {
-            parts.push(`<span class="kx-best">★ Top ${rank.percentile}%</span>`);
-            parts.push('<span class="kx-sep">·</span>');
-          }
-
-          parts.push(`<span class="${S.salesColor(est)}">~${est}${S.t('perMonth')}</span>`);
-
-          if (revenue > 0) {
-            parts.push('<span class="kx-sep">·</span>');
-            parts.push(`<span class="kx-green" style="font-weight:700;">$${S.formatNum(Math.round(revenue))}${S.t('perMonth')}</span>`);
-          }
-
+          // Momentum score
+          const momColor = momentum >= 70 ? 'kx-green' : momentum >= 40 ? 'kx-orange' : 'kx-red';
+          parts.push(`<span class="${momColor}" style="font-weight:700;">⚡${momentum}</span>`);
           parts.push('<span class="kx-sep">·</span>');
-          parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
 
+          // Demand
           const dl = S.demandLabel(demand);
-          parts.push('<span class="kx-sep">·</span>');
           parts.push(`<span class="${dl.cssClass}">${dl.text}</span>`);
+          parts.push('<span class="kx-sep">·</span>');
 
-          if (badge.conversionRate > 0) {
-            const crClass = badge.conversionRate >= 5 ? 'kx-green' : badge.conversionRate >= 2 ? 'kx-orange' : 'kx-red';
+          // Real engagement
+          parts.push(`<span>♥ ${S.formatNum(badge.favorites || 0)}</span>`);
+          parts.push('<span class="kx-sep">·</span>');
+          parts.push(`<span>👁 ${S.formatNum(badge.views || 0)}</span>`);
+
+          // Engagement rate
+          if (badge.engagementRate > 0) {
+            const erClass = badge.engagementRate >= 5 ? 'kx-green' : badge.engagementRate >= 2 ? 'kx-orange' : 'kx-red';
             parts.push('<span class="kx-sep">·</span>');
-            parts.push(`<span class="${crClass}">${badge.conversionRate}% ${S.t('convRate')}</span>`);
+            parts.push(`<span class="${erClass}">${badge.engagementRate}% ${S.t('engRate')}</span>`);
           }
 
           if (badge.lowStock) {

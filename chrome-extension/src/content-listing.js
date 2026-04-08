@@ -6,9 +6,11 @@
 (function () {
   'use strict';
 
+  console.log('[KX-listing] script loaded, shared:', !!window.__KX_SHARED, 'cache:', !!window.__KX_CACHE);
+
   function waitForShared(cb, attempts = 0) {
     if (window.__KX_SHARED && window.__KX_CACHE) { cb(); return; }
-    if (attempts > 50) return;
+    if (attempts > 50) { console.log('[KX-listing] gave up waiting for shared after 50 attempts'); return; }
     setTimeout(() => waitForShared(cb, attempts + 1), 100);
   }
 
@@ -43,6 +45,7 @@
 
     async function processListingPage(retries = 0) {
       const listingId = S.SELECTORS.listingId();
+      if (retries === 0) console.log('[KX-listing] start, id:', listingId, 'path:', location.pathname);
       if (!listingId) return;
 
       if (document.getElementById('kx-listing-stats')) return;
@@ -50,10 +53,14 @@
       const anchor = findInsertionPoint();
       if (!anchor) {
         if (retries < 10) {
+          if (retries % 3 === 0) console.log('[KX-listing] waiting for DOM, retry', retries);
           setTimeout(() => processListingPage(retries + 1), 800);
+        } else {
+          console.log('[KX-listing] gave up finding insertion point');
         }
         return;
       }
+      console.log('[KX-listing] found anchor:', anchor.tagName, anchor.className?.substring(0, 40));
 
       _currentListingId = listingId;
       const statsBar = document.createElement('div');
@@ -109,7 +116,7 @@
     }
 
     function findInsertionPoint() {
-      // Buy box selectors (most specific first)
+      // Try specific buy box selectors first
       const selectors = [
         '[data-buy-box-region="price"]',
         '[data-appears-component-name="price"]',
@@ -117,7 +124,6 @@
         '#listing-page-cart',
         '[data-selector="listing-page-buy-box"]',
         '.listing-page-title-component',
-        '.wt-mb-xs-2',
         '[data-listing-page-region="title"]',
         '[data-component="listing-page-title"]',
       ];
@@ -125,11 +131,32 @@
         const el = document.querySelector(sel);
         if (el) return el;
       }
-      // Fallback: parent of the first h1 on the page
-      const h1 = document.querySelector('h1[data-buy-box-listing-title]') ||
-                  document.querySelector('h1.wt-text-body-03') ||
-                  document.querySelector('h1');
-      return h1?.parentElement || null;
+
+      // Fallback: find the listing title text on the right side (buy box area)
+      // Etsy puts the title in the buy box, not as a standalone h1
+      const allH1s = document.querySelectorAll('h1');
+      for (const h1 of allH1s) {
+        // Skip h1s in the header/nav area
+        if (h1.closest('header') || h1.closest('nav')) continue;
+        return h1.parentElement;
+      }
+
+      // Last resort: find "Add to cart" button and go up to its container
+      const addToCart = document.querySelector('button[data-selector="add-to-cart"]') ||
+                        document.querySelector('[data-selector="add-to-cart-button"]') ||
+                        Array.from(document.querySelectorAll('button')).find(b =>
+                          b.textContent.trim().match(/^Add to cart$|^Sepete ekle$/i)
+                        );
+      if (addToCart) {
+        // Walk up to find a good container
+        let container = addToCart.parentElement;
+        for (let i = 0; i < 5 && container; i++) {
+          if (container.offsetWidth > 300) return container;
+          container = container.parentElement;
+        }
+      }
+
+      return null;
     }
 
     function renderStatsBar(el, data, bestSeller) {
@@ -139,10 +166,10 @@
       const seoPct = Math.min(seo, 100);
       const seoFillColor = seo >= 70 ? '#4caf50' : seo >= 40 ? '#ff9800' : '#f44336';
 
-      const est = velocity?.estMonthlySales || 0;
-      const revenue = velocity?.estMonthlyRevenue || 0;
+      const momentum = velocity?.momentum || 0;
       const demand = velocity?.demandScore || 'low';
-      const convRate = velocity?.conversionRate || 0;
+      const engRate = velocity?.engagementRate || 0;
+      const favsPerDay = velocity?.favsPerDay || 0;
       const favs = listing?.favorites || 0;
       const views = listing?.views || 0;
       const age = velocity?.ageMonths || 0;
@@ -160,10 +187,9 @@
         </span>
       `;
 
-      // Revenue badge (prominent)
-      if (revenue > 0) {
-        headerParts += `<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:4px;font-weight:700;">$${S.formatNum(Math.round(revenue))}${S.t('perMonth')}</span>`;
-      }
+      // Momentum score
+      const momColor = momentum >= 70 ? '#4caf50' : momentum >= 40 ? '#ff9800' : '#f44336';
+      headerParts += `<span style="background:${momColor}20;color:${momColor};padding:2px 8px;border-radius:4px;font-weight:700;">⚡ ${momentum}/100</span>`;
 
       // Demand badge
       const dl = S.demandLabel(demand);
@@ -179,21 +205,25 @@
 
       headerParts += `<button class="kx-collapse-btn" data-kx-collapse>▲</button>`;
 
-      // Stats line
+      // Stats line — real data only
       const statParts = [];
-      statParts.push(`<span class="${S.salesColor(est)}">~${est}${S.t('perMonth')} ${S.t('sales')}</span>`);
-      statParts.push('<span class="kx-sep">·</span>');
       statParts.push(`<span>♥ ${S.formatNum(favs)}</span>`);
       statParts.push('<span class="kx-sep">·</span>');
-      statParts.push(`<span>${S.formatNum(views)} ${S.t('views')}</span>`);
+      statParts.push(`<span>👁 ${S.formatNum(views)}</span>`);
       statParts.push('<span class="kx-sep">·</span>');
       statParts.push(`<span>${age} ${S.t('months')}</span>`);
 
-      // Conversion rate
-      if (convRate > 0) {
-        const crClass = convRate >= 5 ? 'kx-green' : convRate >= 2 ? 'kx-orange' : 'kx-red';
+      // Engagement rate (real: favs/views)
+      if (engRate > 0) {
+        const erClass = engRate >= 5 ? 'kx-green' : engRate >= 2 ? 'kx-orange' : 'kx-red';
         statParts.push('<span class="kx-sep">·</span>');
-        statParts.push(`<span class="${crClass}">${convRate}% ${S.t('convRate')}</span>`);
+        statParts.push(`<span class="${erClass}">${engRate}% ${S.t('engRate')}</span>`);
+      }
+
+      // Favs velocity
+      if (favsPerDay >= 0.1) {
+        statParts.push('<span class="kx-sep">·</span>');
+        statParts.push(`<span>${favsPerDay}${S.t('favsDay')}</span>`);
       }
 
       // Stock quantity

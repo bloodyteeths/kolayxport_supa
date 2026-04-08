@@ -34,6 +34,15 @@ async function etsyGet(path: string) {
   return res.json();
 }
 
+// Safe fetch — returns null on error instead of throwing
+async function etsyGetSafe(path: string): Promise<any | null> {
+  try {
+    return await etsyGet(path);
+  } catch {
+    return null;
+  }
+}
+
 // Compute listing metrics from Etsy listing data
 function computeListingMetrics(item: any) {
   const price = (item.price?.amount || 0) / (item.price?.divisor || 100);
@@ -109,8 +118,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { query, listingIds } = params;
         if (!query) return res.status(400).json({ error: 'query required' });
 
+        // Public API — NO includes= (only works with OAuth)
         const searchData = await etsyGet(
-          `/listings/active?keywords=${encodeURIComponent(query)}&limit=100&includes=Images(url_170x135)&sort_on=score`
+          `/listings/active?keywords=${encodeURIComponent(query)}&limit=100&sort_on=score`
         );
 
         const items = (searchData.results || []);
@@ -135,7 +145,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const metrics = computeListingMetrics(item);
           totalEstRevenue += metrics.estMonthlyRevenue;
 
-          // Include all items if no specific IDs, or filter to requested IDs
           if (!listingIds || !Array.isArray(listingIds) || listingIds.length === 0 || listingIds.includes(lid)) {
             listingBadges[lid] = metrics;
           }
@@ -162,14 +171,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { listingId } = params;
         if (!listingId) return res.status(400).json({ error: 'listingId required' });
 
-        const listing = await etsyGet(`/listings/${listingId}?includes=Images,Shop`);
+        // Public API — NO includes= (includes=Images,Shop only works with OAuth)
+        // Fetch listing data and image count separately
+        const [listing, imagesData] = await Promise.all([
+          etsyGet(`/listings/${listingId}`),
+          etsyGetSafe(`/listings/${listingId}/images`),
+        ]);
+
         const metrics = computeListingMetrics(listing);
+
+        // Fetch shop data separately if we have shop_id
+        let shopData: any = null;
+        if (listing.shop_id) {
+          shopData = await etsyGetSafe(`/shops/${listing.shop_id}`);
+        }
 
         // SEO score
         const titleLen = (listing.title || '').length;
         const tagCount = (listing.tags || []).length;
         const descLen = (listing.description || '').length;
-        const imgCount = (listing.images || []).length;
+        const imgCount = imagesData?.results?.length || (listing.images || []).length || 0;
         const titleScore = titleLen >= 100 ? 25 : titleLen >= 60 ? 18 : titleLen >= 30 ? 12 : 5;
         const tagScore = tagCount >= 13 ? 25 : tagCount >= 10 ? 20 : tagCount >= 5 ? 12 : 5;
         const descScore = descLen >= 300 ? 25 : descLen >= 100 ? 18 : descLen > 0 ? 10 : 0;
@@ -199,11 +220,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             lowStock: metrics.lowStock,
           },
           seoScore: { total: seoScore, title: titleScore, tags: tagScore, description: descScore, images: imgScore },
-          shop: listing.shop ? {
-            shop_id: listing.shop.shop_id,
-            shop_name: listing.shop.shop_name,
-            num_sales: listing.shop.transaction_sold_count,
-            rating: listing.shop.review_average,
+          shop: shopData ? {
+            shop_id: shopData.shop_id,
+            shop_name: shopData.shop_name,
+            num_sales: shopData.transaction_sold_count,
+            rating: shopData.review_average,
           } : null,
           plan,
         });
@@ -213,10 +234,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { shopId } = params;
         if (!shopId) return res.status(400).json({ error: 'shopId required' });
 
-        // Fetch shop info + up to 100 listings for deeper analysis
+        const encodedShopId = encodeURIComponent(shopId);
+
+        // Fetch shop info + listings separately (no includes= on public API)
         const [shop, listingsData] = await Promise.all([
-          etsyGet(`/shops/${shopId}`),
-          etsyGet(`/shops/${shopId}/listings/active?limit=100&sort_on=score`),
+          etsyGet(`/shops/${encodedShopId}`),
+          etsyGet(`/shops/${encodedShopId}/listings/active?limit=100&sort_on=score`),
         ]);
 
         const listings = listingsData.results || [];
@@ -286,7 +309,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
   } catch (err: any) {
-    console.error('[ext/research]', err?.message || err);
-    return res.status(500).json({ error: 'Research API error' });
+    console.error('[ext/research]', action, err?.message || err);
+    return res.status(500).json({ error: `Research API error: ${err?.message || 'unknown'}` });
   }
 }

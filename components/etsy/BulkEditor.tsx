@@ -2459,6 +2459,55 @@ export default function BulkEditor({
           )}
         </Box>
       </Box>
+
+      {/* Sticky bottom save bar */}
+      {pendingCount > 0 && (
+        <Paper
+          elevation={8}
+          sx={{
+            position: 'sticky', bottom: 0, left: 0, right: 0,
+            px: { xs: 2, sm: 3 }, py: 1.5,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 2, zIndex: 10,
+            borderTop: '2px solid', borderColor: 'primary.main',
+            bgcolor: 'rgba(255,255,255,0.97)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Chip
+              label={t('header.changes', { count: pendingCount })}
+              color="primary"
+              size="small"
+              sx={{ fontWeight: 700 }}
+            />
+            <Button
+              variant="text"
+              size="small"
+              color="error"
+              onClick={handleDiscard}
+              sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.8rem' }}
+            >
+              {t('header.discard')}
+            </Button>
+          </Box>
+          <Button
+            variant="contained"
+            onClick={handleSave}
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <SyncIcon />}
+            sx={{
+              minHeight: 44, px: 4, fontWeight: 700, textTransform: 'none', borderRadius: '10px',
+              fontSize: '0.95rem',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
+              '&.Mui-disabled': { bgcolor: '#e0e0e0' },
+            }}
+          >
+            {saving ? `${saveProgress}%` : t('footer.publishToEtsy')}
+          </Button>
+        </Paper>
+      )}
     </Dialog>
   );
 }

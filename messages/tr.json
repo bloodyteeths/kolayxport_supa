@@ -2008,6 +2008,9 @@
         "sectionCreated": "\"{name}\" bölümü oluşturuldu",
         "sectionCreateFailed": "Bölüm oluşturulamadı"
       },
+      "footer": {
+        "publishToEtsy": "Etsy'ye Gönder"
+      },
       "confirm": {
         "unsavedChanges": "{count} kaydedilmemiş değişiklik var. Çıkmak istediğinizden emin misiniz?",
         "deleteAllPhotos": "{count} listeden TÜM fotoğraflar silinecek. Bu işlem geri alınamaz.",

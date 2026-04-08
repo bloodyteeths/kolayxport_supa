@@ -2008,6 +2008,9 @@
         "sectionCreated": "Section \"{name}\" created",
         "sectionCreateFailed": "Failed to create section"
       },
+      "footer": {
+        "publishToEtsy": "Publish to Etsy"
+      },
       "confirm": {
         "unsavedChanges": "{count} unsaved changes. Are you sure you want to exit?",
         "deleteAllPhotos": "Delete ALL photos from {count} listings? This cannot be undone.",

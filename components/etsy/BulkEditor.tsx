@@ -129,7 +129,7 @@ type FieldCategory =
   | 'state';
 
 type OperationType =
-  | 'ai_rewrite' | 'ai_optimize' | 'add_before' | 'add_after' | 'find_replace' | 'delete' | 'change_to'
+  | '' | 'ai_rewrite' | 'ai_optimize' | 'add_before' | 'add_after' | 'find_replace' | 'delete' | 'change_to'
   | 'add' | 'remove' | 'remove_all'
   | 'increase_pct' | 'decrease_pct' | 'increase_fixed' | 'decrease_fixed' | 'set_price'
   | 'set_value' | 'set_section' | 'set_quantity'
@@ -520,7 +520,7 @@ export default function BulkEditor({
   const [searchTerm, setSearchTerm] = useState('');
 
   // Operation state
-  const [operation, setOperation] = useState<OperationType>('ai_rewrite');
+  const [operation, setOperation] = useState<OperationType>('');
   const [inputValue, setInputValue] = useState('');
   const [findValue, setFindValue] = useState('');
   const [replaceValue, setReplaceValue] = useState('');
@@ -615,7 +615,7 @@ export default function BulkEditor({
   const handleFieldChange = useCallback((field: FieldCategory) => {
     setActiveField(field);
     const def = FIELD_DEFS.find(f => f.key === field)!;
-    setOperation(def.operations[0].value);
+    setOperation('');
     setInputValue('');
     setFindValue('');
     setReplaceValue('');
@@ -661,6 +661,10 @@ export default function BulkEditor({
 
   // Apply bulk operation to all checked listings
   const handleApply = useCallback(() => {
+    if (!operation) {
+      toast.error(t('toast.noOperationSelected'));
+      return;
+    }
     const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
     if (checked.length === 0) {
       toast.error(t('toast.noListingsSelected'));
@@ -677,7 +681,7 @@ export default function BulkEditor({
           switch (operation) {
             case 'add_before': newVal = inputValue + newVal; break;
             case 'add_after': newVal = newVal + inputValue; break;
-            case 'find_replace': newVal = newVal.split(findValue).join(replaceValue); break;
+            case 'find_replace': newVal = newVal.replace(new RegExp(findValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replaceValue); break;
             case 'delete': newVal = ''; break;
             case 'change_to': newVal = inputValue; break;
             case 'ai_rewrite': return; // handled separately
@@ -1366,6 +1370,7 @@ export default function BulkEditor({
         <FormControl size="small" sx={{ minWidth: 160 }}>
           <Select
             value={operation}
+            displayEmpty
             onChange={(e) => setOperation(e.target.value as OperationType)}
             sx={{
               fontSize: '0.85rem', fontWeight: 600,
@@ -1375,6 +1380,9 @@ export default function BulkEditor({
               },
             }}
           >
+            <MenuItem value="" disabled>
+              <span style={{ color: '#9e9e9e' }}>{t('actionBar.selectOperation')}</span>
+            </MenuItem>
             {ops.map(op => (
               <MenuItem key={op.value} value={op.value}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
@@ -1495,7 +1503,7 @@ export default function BulkEditor({
           variant="contained"
           size="small"
           onClick={isAI ? handleAIAction : handleApply}
-          disabled={saving || aiProcessing}
+          disabled={saving || aiProcessing || !operation}
           sx={{
             minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px',
             background: isAI

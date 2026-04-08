@@ -1889,7 +1889,8 @@
         "commaSeparated": "{field} (virgül ile ayırın)...",
         "selectSection": "Bölüm seçin...",
         "amount": "Miktar...",
-        "quantityPlaceholder": "Adet..."
+        "quantityPlaceholder": "Adet...",
+        "selectOperation": "İşlem seçin..."
       },
       "photos": {
         "selectFiles": "Fotoğraf Seç",
@@ -1985,6 +1986,7 @@
       },
       "toast": {
         "noListingsSelected": "Hiçbir liste seçilmedi",
+        "noOperationSelected": "Lütfen önce bir işlem seçin",
         "appliedToListings": "{count} listeye uygulandı (henüz kaydedilmedi)",
         "aiOptimized": "AI {count} listeyi optimize etti",
         "aiOptimizeFailed": "AI optimizasyonu başarısız",

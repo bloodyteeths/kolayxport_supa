@@ -1612,7 +1612,7 @@ export default async function handler(
             });
 
             const result = await callEtsyAPI(
-                `/shops/${shopId}/listings/${listing_id}`,
+                `/shops/${shopId}/listings/${listing_id}?legacy=false`,
                 accessToken,
                 {
                     method: 'PATCH',

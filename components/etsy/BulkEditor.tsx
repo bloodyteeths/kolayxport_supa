@@ -1142,6 +1142,7 @@ export default function BulkEditor({
     const entries = Array.from(pendingChanges.entries());
     let success = 0;
     let failed = 0;
+    const failedIds: number[] = [];
 
     for (let i = 0; i < entries.length; i++) {
       const [listingId, changes] = entries[i];
@@ -1175,9 +1176,17 @@ export default function BulkEditor({
         if (changes.taxonomy_id !== undefined) body.taxonomy_id = changes.taxonomy_id;
 
         const res = await callUpdateListing(shopId, listingId, body);
-        if (res.ok) success++;
-        else failed++;
-      } catch {
+        if (res.ok) {
+          success++;
+        } else {
+          const errBody = await res.json().catch(() => ({ error: res.statusText }));
+          console.error(`[BulkEditor] Failed to update listing ${listingId}:`, errBody);
+          failedIds.push(listingId);
+          failed++;
+        }
+      } catch (err) {
+        console.error(`[BulkEditor] Exception updating listing ${listingId}:`, err);
+        failedIds.push(listingId);
         failed++;
       }
       setSaveProgress(Math.round(((i + 1) / entries.length) * 100));
@@ -1191,6 +1200,13 @@ export default function BulkEditor({
       setPendingChanges(new Map());
       onCompleted();
     } else {
+      // Keep only failed listings in pendingChanges so user can retry
+      const remainingChanges = new Map<number, any>();
+      for (const id of failedIds) {
+        const c = pendingChanges.get(id);
+        if (c) remainingChanges.set(id, c);
+      }
+      setPendingChanges(remainingChanges);
       toast.error(t('toast.savePartial', { success, failed }));
     }
   }, [pendingChanges, shopId, onCompleted]);

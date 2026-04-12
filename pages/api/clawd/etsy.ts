@@ -2682,6 +2682,58 @@ export default async function handler(
             });
         }
 
+        // GET /api/clawd/etsy?action=get_variation_images&listing_id=XXXXX
+        if (req.method === 'GET' && action === 'get_variation_images' && listing_id) {
+            logger.info('Fetching variation images for listing', { listing_id });
+            const data = await callEtsyAPI(
+                `/listings/${listing_id}/variation-images`,
+                accessToken
+            );
+            return res.status(200).json({
+                listing_id: parseInt(listing_id),
+                results: data.results || [],
+            });
+        }
+
+        // POST /api/clawd/etsy?action=set_variation_images&listing_id=XXXXX
+        if (req.method === 'POST' && action === 'set_variation_images' && listing_id) {
+            const { variation_images } = req.body;
+            if (!variation_images || !Array.isArray(variation_images)) {
+                return res.status(400).json({ error: 'variation_images array is required' });
+            }
+            logger.info('Setting variation images for listing', { listing_id, count: variation_images.length });
+            const result = await callEtsyAPI(
+                `/listings/${listing_id}/variation-images`,
+                accessToken,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({ variation_images }),
+                }
+            );
+            return res.status(200).json({
+                success: true,
+                listing_id: parseInt(listing_id),
+                results: result.results || [],
+            });
+        }
+
+        // GET /api/clawd/etsy?action=get_taxonomy_properties&taxonomy_id=XXXXX
+        if (req.method === 'GET' && action === 'get_taxonomy_properties') {
+            const taxonomy_id = req.query.taxonomy_id as string;
+            if (!taxonomy_id) {
+                return res.status(400).json({ error: 'taxonomy_id is required' });
+            }
+            logger.info('Fetching taxonomy properties', { taxonomy_id });
+            const data = await callEtsyAPI(
+                `/seller-taxonomy/nodes/${taxonomy_id}/properties`,
+                accessToken
+            );
+            return res.status(200).json({
+                taxonomy_id: parseInt(taxonomy_id),
+                results: data.results || [],
+            });
+        }
+
         // DELETE /api/clawd/etsy?action=delete_listing&listing_id=XXXXX
         if (req.method === 'DELETE' && action === 'delete_listing' && listing_id) {
             logger.info('Deleting Etsy listing', { listing_id, shopId });

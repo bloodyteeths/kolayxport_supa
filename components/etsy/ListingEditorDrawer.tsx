@@ -2061,6 +2061,7 @@ export default function ListingEditorDrawer({
                 <VariationEditor
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
+                  taxonomyId={listing?.taxonomy_id}
                   onSaved={fetchListing}
                 />
               </Box>

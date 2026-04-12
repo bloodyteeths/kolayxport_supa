@@ -55,6 +55,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import VariationEditor from './VariationEditor';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,6 +91,7 @@ interface SelectedListing {
   return_policy_id?: number;
   processing_min?: number;
   processing_max?: number;
+  taxonomy_id?: number | null;
 }
 
 interface ShopSection {
@@ -124,7 +126,7 @@ interface BulkEditorProps {
 type FieldCategory =
   | 'photos' | 'videos'
   | 'title' | 'description' | 'tags' | 'materials' | 'about' | 'category' | 'section' | 'personalization'
-  | 'price' | 'quantity' | 'sku'
+  | 'variations' | 'price' | 'quantity' | 'sku'
   | 'processing_time' | 'shipping_profile' | 'item_weight' | 'item_size' | 'return_policy'
   | 'state';
 
@@ -262,6 +264,11 @@ const FIELD_DEFS: FieldDef[] = [
     operations: [{ value: 'set_value', label: 'operations.configure' }],
   },
   // Inventory
+  {
+    key: 'variations', label: 'fields.variations', group: 'groups.inventory',
+    icon: <TuneIcon fontSize="small" />,
+    operations: [{ value: 'set_value', label: 'operations.editInline' }],
+  },
   {
     key: 'price', label: 'fields.price', group: 'groups.inventory',
     icon: <PriceIcon fontSize="small" />,
@@ -642,6 +649,7 @@ export default function BulkEditor({
       case 'quantity': return pending?.quantity ?? (listing.quantity || 0);
       case 'section': return pending?.shop_section_id ?? listing.shop_section_id;
       case 'state': return pending?.state ?? listing.state;
+      case 'variations': return null; // Variations are managed independently via VariationEditor
       case 'item_weight': return pending?.item_weight ?? listing.item_weight;
       case 'item_size': return {
         length: pending?.item_length ?? listing.item_length,
@@ -2245,6 +2253,17 @@ export default function BulkEditor({
               <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
                 {listing.processing_min ? t('processingTime.daysRange', { min: listing.processing_min, max: listing.processing_max ?? 0 }) : t('inlineEditor.notSet')}
               </Typography>
+            )}
+
+            {activeField === 'variations' && (
+              <Box sx={{ mt: 0.5, border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' }}>
+                <VariationEditor
+                  listingId={String(listing.listing_id)}
+                  shopId={shopId}
+                  taxonomyId={listing.taxonomy_id ?? undefined}
+                  onSaved={() => {}}
+                />
+              </Box>
             )}
 
             {activeField === 'shipping_profile' && (

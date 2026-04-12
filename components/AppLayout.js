@@ -49,6 +49,7 @@ function getNavGroups(t) {
       label: null,
       items: [
         { href: '/app', icon: LayoutDashboard, label: t('overview') },
+        { href: '/app/labels', icon: FileText, label: t('labelsNav') },
         { href: '/app/analytics', icon: TrendingUp, label: t('analytics') },
         { href: '/app/financials', icon: Wallet, label: t('financials') },
       ],
@@ -67,7 +68,6 @@ function getNavGroups(t) {
     {
       label: t('operations'),
       items: [
-        { href: '/app/labels', icon: FileText, label: t('labelsNav') },
         { href: '/app/senkron', icon: ShoppingCart, label: t('sync') },
       ],
     },

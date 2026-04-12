@@ -1661,13 +1661,13 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     {
       field: 'itemImageUrl',
       headerName: t('columnProductImage'),
-      width: 140,
+      width: 56,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
         <Box
-          sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'center',
             height: '100%',
             cursor: 'pointer'
@@ -1679,31 +1679,24 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           }}
         >
           <img
-            src={params.value as string || '/placeholder.png'} 
+            src={params.value as string || '/placeholder.png'}
             alt={t('columnProductImage')}
-            style={{ 
-              width: 65, 
-              height: 65, 
-              objectFit: 'cover', 
-              borderRadius: 8,
-              transition: 'transform 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              (e.target as HTMLImageElement).style.transform = 'scale(1.1)';
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLImageElement).style.transform = 'scale(1)';
+            style={{
+              width: 40,
+              height: 40,
+              objectFit: 'cover',
+              borderRadius: 6,
             }}
             onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
           />
         </Box>
       )
     },
-    { field: 'marketplace', headerName: t('columnStore'), width: 110 },
+    { field: 'marketplace', headerName: t('columnStore'), width: 90 },
     {
       field: 'status',
       headerName: tc('status'),
-      width: 120,
+      width: 100,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         const status = params.value?.toUpperCase() || 'UNKNOWN';
         const config = statusColors[status] || { bg: '#ccc', text: '#000' };
@@ -1725,9 +1718,9 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       }
     },
     {
-      field: 'orderDate', 
-      headerName: t('columnOrderDate'), 
-      width: 130,
+      field: 'orderDate',
+      headerName: t('columnOrderDate'),
+      width: 105,
       valueFormatter: (value: string | undefined) => fmtDateTr(value), // Turkish style
       sortable: true,
       sortComparator: (v1, v2) => new Date(v1).getTime() - new Date(v2).getTime(), // newest to oldest
@@ -1735,7 +1728,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     {
       field: 'orderNumber',
       headerName: t('columnOrderNo'),
-      width: 140,
+      width: 120,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         const url = getMarketplaceOrderUrl(params.row.marketplace, params.value as string, params.row.channel);
         return (
@@ -1761,13 +1754,13 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     {
       field: 'customerSevk',
       headerName: t('columnCustomerShip'),
-      width: 150,
+      width: 130,
       valueGetter: (_value, row) => `${row.recipientFirstName || ''} ${row.recipientLastName || ''}`.trim() || row.originalOrder?.customerName || '—'
     },
     { 
-      field: 'orderTotalPrice', 
-      headerName: t('columnTotal'), 
-      width: 120, 
+      field: 'orderTotalPrice',
+      headerName: t('columnTotal'),
+      width: 95,
       type: 'number',
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
@@ -1929,8 +1922,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     },
     {
       field: 'lastCarrier',
-      headerName: t('carrier'), 
-      width: 140, 
+      headerName: t('carrier'),
+      width: 100, 
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         // Try to get the latest label job's carrier
         const labelJobs = params.row.originalOrder?.line_items?.find(i => i.id === params.row.itemId)?.labelJobs || [];
@@ -1979,7 +1972,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     {
       field: 'actions',
       headerName: t('details'),
-      width: 140,
+      width: 120,
       minWidth: 120,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
@@ -2493,82 +2486,75 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   };
 
   return (
-    <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px - 48px)' }, display: 'flex', flexDirection: 'column', p: { xs: 0.5, sm: 2 }, overflow: 'auto', maxWidth: '100%' }}>
+    <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px - 48px)' }, display: 'flex', flexDirection: 'column', p: { xs: 0.5, sm: 1, md: 1.5 }, overflow: 'auto', maxWidth: '100%' }}>
       <Toaster position="top-right" reverseOrder={false} />
-      <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: { xs: 0.5, sm: 1 }, fontSize: { xs: '1rem', sm: '1.3rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <Typography variant="h6" component="h1" sx={{ fontWeight: 'bold', mb: { xs: 0.5, sm: 0.5 }, fontSize: { xs: '1rem', sm: '1.15rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {t('labelManagement')}
       </Typography>
-      <Box sx={{ display:'flex', flexDirection:'column', gap: 1, mb: 1, maxWidth: '100%', flexShrink: 0 }}>
-        {/* Row 1: Actions + Search (always visible) */}
-        <Paper elevation={1} sx={{ p: { xs: 0.75, sm: 1.5 }, display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%' }}>
-          <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.8rem' }, px: { xs: 1, sm: 2 }, minWidth: 0, whiteSpace: 'nowrap' }}>
-            {syncingOrders ? t('syncing') : t('syncButton')}
+      <Paper elevation={1} sx={{ p: { xs: 0.75, sm: 1 }, mb: 0.75, display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%', flexShrink: 0 }}>
+        <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.8rem' }, px: { xs: 1, sm: 1.5 }, minWidth: 0, whiteSpace: 'nowrap' }}>
+          {syncingOrders ? t('syncing') : t('syncButton')}
+        </Button>
+        <ManualOrderButton onOrderCreated={() => { mutate(); toast.success(t('orderListRefreshed')); }} />
+        {etgbEnabled && (
+          <Button variant="contained" color="secondary" onClick={handleProcessEtgb} disabled={processingEtgb || etgbSelectedRows.length === 0} size="small" sx={{ textTransform: 'none' }}>
+            {processingEtgb ? t('processing') : `ETGB (${etgbSelectedRows.length})`}
           </Button>
-          <ManualOrderButton onOrderCreated={() => { mutate(); toast.success(t('orderListRefreshed')); }} />
-          {etgbEnabled && (
-            <Button variant="contained" color="secondary" onClick={handleProcessEtgb} disabled={processingEtgb || etgbSelectedRows.length === 0} size="small" sx={{ textTransform: 'none' }}>
-              {processingEtgb ? t('processing') : `ETGB (${etgbSelectedRows.length})`}
-            </Button>
-          )}
-          <Box sx={{ display: 'flex', gap: 0.5, flex: 1, minWidth: { xs: '100%', sm: 200 } }}>
-            <FormControl size="small" variant="outlined" sx={{ minWidth: 80 }}>
-              <Select value={searchType} onChange={e => setSearchType(e.target.value)} displayEmpty sx={{ fontSize: '0.8rem', height: 36 }}>
-                {searchTypeOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-              </Select>
-            </FormControl>
-            <TextField size="small" placeholder="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /> }} sx={{ flex: 1, '& .MuiInputBase-root': { height: 36, fontSize: '0.8rem' } }} />
-          </Box>
-          <Tooltip title={t('refresh')}>
-            <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" size="small"><RefreshIcon fontSize="small" /></IconButton></span>
-          </Tooltip>
-        </Paper>
-
-        {/* Row 2: Filters (hidden on mobile) */}
-        <Paper elevation={0} sx={{ p: { xs: 0.5, sm: 1 }, display: { xs: 'none', sm: 'flex' }, gap: 1, alignItems: 'center', flexWrap: 'wrap', bgcolor: 'grey.50' }}>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 120 }}>
-            <InputLabel shrink>{t('orderStatus')}</InputLabel>
-            <Select value={statusFilter} label={t('orderStatus')} onChange={e => setStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.8rem', height: 34 }}>
-              {orderStatusFilterOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+        )}
+        <Box sx={{ display: 'flex', gap: 0.5, flex: 1, minWidth: { xs: '100%', sm: 180 }, maxWidth: { sm: 280 } }}>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 72 }}>
+            <Select value={searchType} onChange={e => setSearchType(e.target.value)} displayEmpty sx={{ fontSize: '0.8rem', height: 32 }}>
+              {searchTypeOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
             </Select>
           </FormControl>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 120 }}>
-            <InputLabel shrink>{t('labelStatus')}</InputLabel>
-            <Select value={labelStatusFilter} label={t('labelStatus')} onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.8rem', height: 34 }}>
-              {labelStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
-            </Select>
-          </FormControl>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 120, display: { xs: 'none', md: 'inline-flex' } }}>
-            <InputLabel shrink>{t('store')}</InputLabel>
-            <Select
-              multiple
-              value={marketplaceFilter}
-              label={t('store')}
-              onChange={(e) => setMarketplaceFilter(typeof e.target.value === 'string' ? [e.target.value] : e.target.value)}
-              displayEmpty
-              renderValue={(selected) => selected.length === 0 ? <em>{t('all')}</em> : selected.length === 1 ? selected[0] : t('storesCount', { count: selected.length })}
-              disabled={isLoadingMarketplaces}
-              sx={{ fontSize: '0.8rem', height: 34 }}
-              MenuProps={{ PaperProps: { style: { maxHeight: 7 * 48 + 8, width: 250 } } }}
-            >
-              <MenuItem value=""><em>{t('all')}</em></MenuItem>
-              {dbMarketplaceOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label} ({opt.count})</MenuItem>)}
-            </Select>
-          </FormControl>
-          <TextField label={t('startDate')} type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 140, '& .MuiInputBase-root': { height: 34, fontSize: '0.8rem' } }} />
-          <TextField label={t('endDate')} type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 140, '& .MuiInputBase-root': { height: 34, fontSize: '0.8rem' } }} />
-          <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="text" size="small" sx={{ fontSize: '0.75rem', textTransform: 'none' }}>{t('reset')}</Button>
-        </Paper>
-
-        {/* Row 3: Label toggle tabs */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <ToggleButtonGroup exclusive size="small" value={labelFilter} onChange={handleLabelFilter} aria-label={t('labelFilter')} sx={{ '& .MuiToggleButton-root': { fontSize: '0.75rem', px: { xs: 1, sm: 2 }, py: 0.3 } }}>
+          <TextField size="small" placeholder="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /> }} sx={{ flex: 1, '& .MuiInputBase-root': { height: 32, fontSize: '0.8rem' } }} />
+        </Box>
+        {/* Inline filters — hidden on mobile */}
+        <FormControl size="small" variant="outlined" sx={{ minWidth: 100, display: { xs: 'none', md: 'inline-flex' } }}>
+          <InputLabel shrink>{t('orderStatus')}</InputLabel>
+          <Select value={statusFilter} label={t('orderStatus')} onChange={e => setStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.78rem', height: 32 }}>
+            {orderStatusFilterOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" variant="outlined" sx={{ minWidth: 100, display: { xs: 'none', md: 'inline-flex' } }}>
+          <InputLabel shrink>{t('labelStatus')}</InputLabel>
+          <Select value={labelStatusFilter} label={t('labelStatus')} onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.78rem', height: 32 }}>
+            {labelStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <FormControl size="small" variant="outlined" sx={{ minWidth: 100, display: { xs: 'none', lg: 'inline-flex' } }}>
+          <InputLabel shrink>{t('store')}</InputLabel>
+          <Select
+            multiple
+            value={marketplaceFilter}
+            label={t('store')}
+            onChange={(e) => setMarketplaceFilter(typeof e.target.value === 'string' ? [e.target.value] : e.target.value)}
+            displayEmpty
+            renderValue={(selected) => selected.length === 0 ? <em>{t('all')}</em> : selected.length === 1 ? selected[0] : t('storesCount', { count: selected.length })}
+            disabled={isLoadingMarketplaces}
+            sx={{ fontSize: '0.78rem', height: 32 }}
+            MenuProps={{ PaperProps: { style: { maxHeight: 7 * 48 + 8, width: 250 } } }}
+          >
+            <MenuItem value=""><em>{t('all')}</em></MenuItem>
+            {dbMarketplaceOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label} ({opt.count})</MenuItem>)}
+          </Select>
+        </FormControl>
+        <TextField label={t('startDate')} type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 130, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 32, fontSize: '0.78rem' } }} />
+        <TextField label={t('endDate')} type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 130, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 32, fontSize: '0.78rem' } }} />
+        <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="text" size="small" sx={{ fontSize: '0.7rem', textTransform: 'none', display: { xs: 'none', md: 'inline-flex' }, minWidth: 0, px: 0.5 }}>{t('reset')}</Button>
+        {/* Label toggle + count — pushed to the right */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
+          <ToggleButtonGroup exclusive size="small" value={labelFilter} onChange={handleLabelFilter} aria-label={t('labelFilter')} sx={{ '& .MuiToggleButton-root': { fontSize: '0.7rem', px: { xs: 0.75, sm: 1.5 }, py: 0.2 } }}>
             <ToggleButton value="all">{t('all')}</ToggleButton>
             <ToggleButton value="unlabeled">{t('unlabeled')}</ToggleButton>
             <ToggleButton value="labeled">{t('received')}</ToggleButton>
           </ToggleButtonGroup>
-          <Typography variant="caption" color="text.secondary">{t('ordersCount', { count: total })}</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{t('ordersCount', { count: total })}</Typography>
+          <Tooltip title={t('refresh')}>
+            <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" size="small"><RefreshIcon fontSize="small" /></IconButton></span>
+          </Tooltip>
         </Box>
-      </Box>
+      </Paper>
 
       {/* Mobile Card Layout */}
       <Box sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', flexGrow: 1, overflow: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
@@ -2779,9 +2765,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
               if (target.closest('button') || target.closest('a') || target.closest('.MuiCheckbox-root')) return;
               openDrawer(params.row as LabelRow);
             }}
-            rowHeight={60}
+            rowHeight={48}
             disableColumnResize={false}
-            disableColumnMenu
             keepNonExistentRowsSelected={etgbEnabled}
             checkboxSelection={etgbEnabled}
             onRowSelectionModelChange={etgbEnabled ? ((newSelection) => {
@@ -2808,6 +2793,14 @@ function LabelsPage(props: { source?: string; channel?: string }) {
             initialState={{
               sorting: {
                 sortModel: [{ field: 'orderDate', sort: 'desc' }],
+              },
+              columns: {
+                columnVisibilityModel: {
+                  shipByDate: false,
+                  customerNote: false,
+                  variantInfo: false,
+                  delete: false,
+                },
               },
             }}
             density="compact"

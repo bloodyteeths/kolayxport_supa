@@ -1665,7 +1665,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     {
       field: 'itemImageUrl',
       headerName: t('columnProductImage'),
-      width: 56,
+      width: 72,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
         <Box
@@ -1686,8 +1686,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
             src={params.value as string || '/placeholder.png'}
             alt={t('columnProductImage')}
             style={{
-              width: 40,
-              height: 40,
+              width: 52,
+              height: 52,
               objectFit: 'cover',
               borderRadius: 6,
             }}
@@ -2795,7 +2795,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
               if (target.closest('button') || target.closest('a') || target.closest('.MuiCheckbox-root')) return;
               openDrawer(params.row as LabelRow);
             }}
-            rowHeight={48}
+            rowHeight={58}
             disableColumnResize={false}
             keepNonExistentRowsSelected={etgbEnabled}
             checkboxSelection={etgbEnabled}

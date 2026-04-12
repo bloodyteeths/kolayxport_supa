@@ -1420,7 +1420,7 @@ export default function BulkEditor({
 
     // Fields that don't need the standard action bar
     if (['photos', 'videos', 'about', 'category', 'personalization', 'processing_time',
-         'shipping_profile', 'item_weight', 'item_size', 'return_policy', 'state'].includes(activeField)) {
+         'shipping_profile', 'item_weight', 'item_size', 'return_policy', 'state', 'variations'].includes(activeField)) {
       return renderSpecialActionBar();
     }
 
@@ -1951,6 +1951,15 @@ export default function BulkEditor({
                 </Button>
               </Box>
             </Box>
+          </Paper>
+        );
+
+      case 'variations':
+        return (
+          <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem' }}>
+              {t('operations.editInline')}
+            </Typography>
           </Paper>
         );
 

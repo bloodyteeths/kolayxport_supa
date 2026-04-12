@@ -77,14 +77,14 @@ function formatDate(iso?: string): string {
   }
 }
 
-// Turkish date formatter: dd/MM/yy
+// Turkish date+time formatter: dd/MM/yy HH:mm
 function fmtDateTr(iso?: string): string {
   if (!iso) return '—';
   try {
     const d = new Date(iso);
     if (isNaN(d.getTime())) return '—';
     const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)}`;
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   } catch (e) {
     console.error('Error formatting date:', e);
     return '—';
@@ -1278,6 +1278,10 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   const [hasFedexCredentials, setHasFedexCredentials] = useState(false);
   const [checkingFedexCredentials, setCheckingFedexCredentials] = useState(true);
   const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
+  const COMPACT_COLS: Record<string, boolean> = { shipByDate: false, customerNote: false, variantInfo: false, delete: false, lastCarrier: false };
+  const DETAILED_COLS: Record<string, boolean> = { shipByDate: false, customerNote: false, delete: false };
+  const ALL_COLS: Record<string, boolean> = {};
+  const [columnVisibilityModel, setColumnVisibilityModel] = useState<Record<string, boolean>>(COMPACT_COLS);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
@@ -1720,7 +1724,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     {
       field: 'orderDate',
       headerName: t('columnOrderDate'),
-      width: 105,
+      width: 125,
       valueFormatter: (value: string | undefined) => fmtDateTr(value), // Turkish style
       sortable: true,
       sortComparator: (v1, v2) => new Date(v1).getTime() - new Date(v2).getTime(), // newest to oldest
@@ -2728,7 +2732,33 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       </Box>
 
       {/* Desktop DataGrid */}
-      <Box sx={{ flexGrow: 1, width: '100%', overflow: 'hidden', minHeight: 0, display: { xs: 'none', md: 'block' } }}>
+      <Box sx={{ flexGrow: 1, width: '100%', overflow: 'hidden', minHeight: 0, display: { xs: 'none', md: 'flex' }, flexDirection: 'column' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1, py: 0.25, gap: 0.5 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>{t('viewPreset')}</Typography>
+          {([
+            { label: t('viewCompact'), model: COMPACT_COLS },
+            { label: t('viewDetailed'), model: DETAILED_COLS },
+            { label: t('viewAll'), model: ALL_COLS },
+          ] as { label: string; model: Record<string, boolean> }[]).map((preset) => {
+            const isActive = JSON.stringify(columnVisibilityModel) === JSON.stringify(preset.model);
+            return (
+              <Chip
+                key={preset.label}
+                label={preset.label}
+                size="small"
+                onClick={() => setColumnVisibilityModel(preset.model)}
+                sx={{
+                  height: 22, fontSize: '0.75rem', fontWeight: isActive ? 700 : 400,
+                  bgcolor: isActive ? 'primary.main' : 'transparent',
+                  color: isActive ? 'white' : 'text.secondary',
+                  border: '1px solid', borderColor: isActive ? 'primary.main' : 'divider',
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: isActive ? 'primary.dark' : 'action.hover' },
+                }}
+              />
+            );
+          })}
+        </Box>
         <div
           style={{ height: '100%' }}
           onSubmit={(e) => e.preventDefault()}
@@ -2790,17 +2820,11 @@ function LabelsPage(props: { source?: string; channel?: string }) {
               const uniqueOrderIds = Array.from(new Set(orderIds));
               setEtgbSelectedRows(uniqueOrderIds);
             }) : undefined}
+            columnVisibilityModel={columnVisibilityModel}
+            onColumnVisibilityModelChange={(model) => setColumnVisibilityModel(model)}
             initialState={{
               sorting: {
                 sortModel: [{ field: 'orderDate', sort: 'desc' }],
-              },
-              columns: {
-                columnVisibilityModel: {
-                  shipByDate: false,
-                  customerNote: false,
-                  variantInfo: false,
-                  delete: false,
-                },
               },
             }}
             density="compact"

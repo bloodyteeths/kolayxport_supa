@@ -589,6 +589,7 @@ export default function BulkEditor({
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiProgress, setAiProgress] = useState(0);
   const [aiInstructions, setAiInstructions] = useState('');
+  const [aiLoadingId, setAiLoadingId] = useState<number | null>(null);
 
   // Groups collapsed state
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -908,6 +909,61 @@ export default function BulkEditor({
       setAiInstructions('');
     }
   }, [filteredListings, checkedIds, activeField, aiInstructions, getFieldValue, updatePending]);
+
+  // Single-listing AI magic wand
+  const handleSingleListingAI = useCallback(async (listing: SelectedListing, field: 'title' | 'description' | 'tags') => {
+    if (aiLoadingId) return; // already processing
+    setAiLoadingId(listing.listing_id);
+
+    try {
+      const title = getFieldValue(listing, 'title') as string;
+      const tags = getFieldValue(listing, 'tags') as string[];
+      const description = getFieldValue(listing, 'description') as string;
+      const materials = listing.materials || [];
+
+      if (field === 'title') {
+        const res = await fetch('/api/ai/etsy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'optimize_title', title, description, tags }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'AI failed');
+        const data = await res.json();
+        if (data.optimized_title) {
+          updatePending(listing.listing_id, { title: data.optimized_title });
+          toast.success(t('toast.aiSingleDone'));
+        }
+      } else if (field === 'description') {
+        const res = await fetch('/api/ai/etsy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'generate_description', title, tags, materials, existing_description: description }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'AI failed');
+        const data = await res.json();
+        if (data.description) {
+          updatePending(listing.listing_id, { description: data.description });
+          toast.success(t('toast.aiSingleDone'));
+        }
+      } else if (field === 'tags') {
+        const res = await fetch('/api/ai/etsy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'suggest_tags', title, description, tags_current: tags }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'AI failed');
+        const data = await res.json();
+        if (data.suggestions && Array.isArray(data.suggestions)) {
+          updatePending(listing.listing_id, { tags: data.suggestions });
+          toast.success(t('toast.aiSingleDone'));
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || t('toast.aiOptimizeFailed'));
+    } finally {
+      setAiLoadingId(null);
+    }
+  }, [aiLoadingId, getFieldValue, updatePending]);
 
   // Bulk AI alt text for photos
   const handleBulkAltText = useCallback(async () => {
@@ -1964,14 +2020,32 @@ export default function BulkEditor({
             {/* Field-specific inline editor */}
             {activeField === 'title' && (
               <Box>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={value as string}
-                  onChange={(e) => updatePending(listing.listing_id, { title: e.target.value })}
-                  multiline={false}
-                  sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem' } }}
-                />
+                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start' }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={value as string}
+                    onChange={(e) => updatePending(listing.listing_id, { title: e.target.value })}
+                    multiline={false}
+                    sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem' } }}
+                  />
+                  <Tooltip title={t('inlineEditor.aiMagic')}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleSingleListingAI(listing, 'title')}
+                      disabled={aiLoadingId === listing.listing_id}
+                      sx={{
+                        background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                        color: '#fff',
+                        '&:hover': { background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' },
+                        '&.Mui-disabled': { background: '#e0e0e0', color: '#999' },
+                        minWidth: 32, width: 32, height: 32, flexShrink: 0,
+                      }}
+                    >
+                      {aiLoadingId === listing.listing_id ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <span style={{ fontSize: 16 }}>✨</span>}
+                    </IconButton>
+                  </Tooltip>
+                </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.25 }}>
                   <Typography
                     variant="caption"
@@ -1994,16 +2068,34 @@ export default function BulkEditor({
 
             {activeField === 'description' && (
               <Box>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={value as string}
-                  onChange={(e) => updatePending(listing.listing_id, { description: e.target.value })}
-                  multiline
-                  minRows={2}
-                  maxRows={6}
-                  sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem' } }}
-                />
+                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start' }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={value as string}
+                    onChange={(e) => updatePending(listing.listing_id, { description: e.target.value })}
+                    multiline
+                    minRows={3}
+                    maxRows={12}
+                    sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem', overflowY: 'auto !important' } }}
+                  />
+                  <Tooltip title={t('inlineEditor.aiMagic')}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleSingleListingAI(listing, 'description')}
+                      disabled={aiLoadingId === listing.listing_id}
+                      sx={{
+                        background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                        color: '#fff',
+                        '&:hover': { background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' },
+                        '&.Mui-disabled': { background: '#e0e0e0', color: '#999' },
+                        minWidth: 32, width: 32, height: 32, flexShrink: 0, mt: 0.5,
+                      }}
+                    >
+                      {aiLoadingId === listing.listing_id ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <span style={{ fontSize: 16 }}>✨</span>}
+                    </IconButton>
+                  </Tooltip>
+                </Box>
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25 }}>
                   {t('inlineEditor.characters', { count: (value as string).length })}
                 </Typography>
@@ -2011,10 +2103,32 @@ export default function BulkEditor({
             )}
 
             {activeField === 'tags' && (
-              <InlineTagEditor
-                tags={value as string[]}
-                onChange={(newTags) => updatePending(listing.listing_id, { tags: newTags })}
-              />
+              <Box>
+                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start' }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <InlineTagEditor
+                      tags={value as string[]}
+                      onChange={(newTags) => updatePending(listing.listing_id, { tags: newTags })}
+                    />
+                  </Box>
+                  <Tooltip title={t('inlineEditor.aiMagic')}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleSingleListingAI(listing, 'tags')}
+                      disabled={aiLoadingId === listing.listing_id}
+                      sx={{
+                        background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                        color: '#fff',
+                        '&:hover': { background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' },
+                        '&.Mui-disabled': { background: '#e0e0e0', color: '#999' },
+                        minWidth: 32, width: 32, height: 32, flexShrink: 0,
+                      }}
+                    >
+                      {aiLoadingId === listing.listing_id ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <span style={{ fontSize: 16 }}>✨</span>}
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
             )}
 
             {activeField === 'materials' && (

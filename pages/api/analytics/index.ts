@@ -37,11 +37,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       const d = new Date(dayParam + 'T00:00:00');
       startDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
       endDate = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+    } else if (dateRange === 'day') {
+      // Today
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    } else if (dateRange === 'yesterday') {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      startDate = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 0, 0, 0, 0);
+      endDate = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59, 999);
     } else if (dateRange === 'month' && monthParam) {
       // Specific month: "2026-03" → start=2026-03-01, end=2026-03-31 23:59:59
       const [year, month] = monthParam.split('-').map(Number);
       startDate = new Date(year, month - 1, 1);
       endDate = new Date(year, month, 0, 23, 59, 59, 999); // last day of month
+    } else if (dateRange === 'month') {
+      // This month
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     } else {
       switch (dateRange) {
         case '7days':
@@ -53,8 +65,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         case '90days':
           startDate.setDate(now.getDate() - 90);
           break;
+        case '3months':
+          startDate.setMonth(now.getMonth() - 3);
+          break;
         case '6months':
           startDate.setMonth(now.getMonth() - 6);
+          break;
+        case '9months':
+          startDate.setMonth(now.getMonth() - 9);
+          break;
+        case 'thisYear':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        case 'lastYear':
+          startDate = new Date(now.getFullYear() - 1, 0, 1);
+          endDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
           break;
         case '12months':
           startDate.setFullYear(now.getFullYear() - 1);

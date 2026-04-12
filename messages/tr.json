@@ -371,14 +371,19 @@
       "Cumartesi"
     ],
     "dateRanges": {
-      "day": "Gunun Analizi",
-      "month": "Aya Gore",
-      "7days": "Son 7 Gun",
-      "30days": "Son 30 Gun",
-      "90days": "Son 90 Gun",
+      "day": "Bugün",
+      "yesterday": "Dün",
+      "7days": "Son 7 Gün",
+      "30days": "Son 30 Gün",
+      "month": "Bu Ay",
+      "3months": "Son 3 Ay",
       "6months": "Son 6 Ay",
+      "9months": "Son 9 Ay",
+      "thisYear": "Bu Yıl",
+      "lastYear": "Geçen Yıl",
       "12months": "Son 12 Ay",
-      "all": "Tum Zamanlar"
+      "all": "Tüm Zamanlar",
+      "custom": "Özel"
     },
     "percentage": "Oran",
     "noProductData": "Ürün verisi yok",
@@ -1977,7 +1982,8 @@
         "charsTooltip": "{count}/140 karakter",
         "noSection": "Bölüm yok",
         "notSet": "Ayarlanmamış",
-        "was": "(önceki: {value})"
+        "was": "(önceki: {value})",
+        "aiMagic": "AI ile optimize et"
       },
       "search": {
         "placeholder": "Listelerde ara...",
@@ -1990,6 +1996,7 @@
         "noOperationSelected": "Lütfen önce bir işlem seçin",
         "appliedToListings": "{count} listeye uygulandı (henüz kaydedilmedi)",
         "aiOptimized": "AI {count} listeyi optimize etti",
+        "aiSingleDone": "AI optimizasyonu uygulandı",
         "aiOptimizeFailed": "AI optimizasyonu başarısız",
         "altTextSuccess": "Alt metin: {count} liste güncellendi",
         "altTextPartial": "Alt metin: {success} başarılı, {failed} başarısız",

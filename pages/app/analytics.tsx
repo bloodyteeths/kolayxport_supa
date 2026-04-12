@@ -443,11 +443,15 @@ export default function DashboardPage() {
               className="px-3 py-2 border border-slate-200 rounded-xl text-xs sm:text-sm bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none cursor-pointer"
             >
               <option value="day">{t('dateRanges.day')}</option>
-              <option value="month">{t('dateRanges.month')}</option>
+              <option value="yesterday">{t('dateRanges.yesterday')}</option>
               <option value="7days">{t('dateRanges.7days')}</option>
               <option value="30days">{t('dateRanges.30days')}</option>
-              <option value="90days">{t('dateRanges.90days')}</option>
+              <option value="month">{t('dateRanges.month')}</option>
+              <option value="3months">{t('dateRanges.3months')}</option>
               <option value="6months">{t('dateRanges.6months')}</option>
+              <option value="9months">{t('dateRanges.9months')}</option>
+              <option value="thisYear">{t('dateRanges.thisYear')}</option>
+              <option value="lastYear">{t('dateRanges.lastYear')}</option>
               <option value="12months">{t('dateRanges.12months')}</option>
               <option value="all">{t('dateRanges.all')}</option>
             </select>

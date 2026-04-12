@@ -634,8 +634,10 @@ function SenkronPage() {
 
                         const customerNote = extractCustomerNote(order);
 
+                        const isCancelled = (order.status || order.externalStatus || '').toUpperCase() === 'CANCELLED' || (order.senkronData?.customStatus) === 'cancelled';
+
                         return (
-                          <TableRow key={row.rowKey} sx={{ height: 80 }}>
+                          <TableRow key={row.rowKey} sx={{ height: 80, ...(isCancelled && { opacity: 0.5, textDecoration: 'line-through', backgroundColor: '#fff0f0' }) }}>
                             <TableCell sx={{ p: { xs: 0.5, sm: 1 }, minWidth: { xs: 56, sm: 120 }, width: { xs: 56, sm: 120 }, verticalAlign: 'middle' }}>—</TableCell>
                             <TableCell sx={{ p: 1, fontSize: 14, maxWidth: 150, display: { xs: 'none', sm: 'table-cell' } }}>
                       <div style={{
@@ -771,9 +773,10 @@ function SenkronPage() {
                       // Check item.shipBy first (for Trendyol), then fall back to order.shipByDate
                       const shipByDateTR = (item.shipBy || order.shipByDate) ? formatDateTime(item.shipBy || order.shipByDate, { timeZone: 'Europe/Istanbul', hour12: false }) : '—';
                       const customerNote = extractCustomerNote(order);
-                      
+                      const isCancelled = (order.status || order.externalStatus || '').toUpperCase() === 'CANCELLED' || (order.senkronData?.customStatus) === 'cancelled';
+
                       return (
-                        <TableRow key={row.rowKey} sx={{ height: { xs: 80, sm: 120 } }}>
+                        <TableRow key={row.rowKey} sx={{ height: { xs: 80, sm: 120 }, ...(isCancelled && { opacity: 0.5, textDecoration: 'line-through', backgroundColor: '#fff0f0' }) }}>
                             <TableCell sx={{ p: { xs: 0.5, sm: 1 }, minWidth: { xs: 56, sm: 120 }, width: { xs: 56, sm: 120 }, verticalAlign: 'middle' }}>
                               {item.image
                                 ? <img

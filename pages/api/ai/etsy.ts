@@ -299,7 +299,7 @@ WRITING STYLE:
 - Short paragraphs (2-3 sentences max). Use \\n\\n between paragraphs for mobile readability.
 - Include relevant keywords from the title and tags naturally — not forced.
 - Be specific and honest — don't oversell or make claims you can't support from the product info given.
-- Total length: 600-1200 characters. Concise but complete.
+- Total length: 1500-2500 characters. Comprehensive and detailed — buyers expect thorough descriptions on Etsy.
 
 WHAT NOT TO DO:
 - NO ALL CAPS, excessive exclamation marks, or spammy formatting.
@@ -450,6 +450,8 @@ TAGS:
 DESCRIPTIONS:
 - First 160 chars = meta preview (Google + Etsy). Make it compelling and keyword-rich.
 - Natural buyer-friendly language. Short paragraphs for mobile.
+- Total length: 1500-2500 characters. Write comprehensive, detailed descriptions — NOT short summaries.
+- Include: Hook paragraph, product details, why buy this, perfect for (occasions/recipients), and ordering info.
 
 For each listing, title words and tag words should have ZERO overlap.
 

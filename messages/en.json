@@ -411,14 +411,19 @@
       "Saturday"
     ],
     "dateRanges": {
-      "day": "Today's Analysis",
-      "month": "By Month",
+      "day": "Today",
+      "yesterday": "Yesterday",
       "7days": "Last 7 Days",
       "30days": "Last 30 Days",
-      "90days": "Last 90 Days",
+      "month": "This Month",
+      "3months": "Last 3 Months",
       "6months": "Last 6 Months",
+      "9months": "Last 9 Months",
+      "thisYear": "This Year",
+      "lastYear": "Last Year",
       "12months": "Last 12 Months",
-      "all": "All Time"
+      "all": "All Time",
+      "custom": "Custom"
     },
     "percentage": "Share",
     "noProductData": "No product data",
@@ -1977,7 +1982,8 @@
         "charsTooltip": "{count}/140 chars",
         "noSection": "No section",
         "notSet": "Not set",
-        "was": "(was: {value})"
+        "was": "(was: {value})",
+        "aiMagic": "AI optimize this listing"
       },
       "search": {
         "placeholder": "Search listings...",
@@ -1990,6 +1996,7 @@
         "noOperationSelected": "Please select an operation first",
         "appliedToListings": "Applied to {count} listings (not saved yet)",
         "aiOptimized": "AI optimized {count} listings",
+        "aiSingleDone": "AI optimization applied",
         "aiOptimizeFailed": "AI optimization failed",
         "altTextSuccess": "Alt text: {count} listings updated",
         "altTextPartial": "Alt text: {success} ok, {failed} failed",

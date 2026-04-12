@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
-  Box, CircularProgress, Typography, Paper, List, ListItemButton,
-  ListItemIcon, ListItemText, Drawer, IconButton, useMediaQuery, useTheme,
-  TextField, InputAdornment, Button,
+  Box, CircularProgress, Typography, useMediaQuery, useTheme,
+  TextField, InputAdornment, Button, Tabs, Tab,
 } from '@mui/material';
-import {
-  BarChart2, Hash, Store, Compass, Activity,
-  TrendingUp, Target, Menu, ChevronLeft, LayoutDashboard, Search,
-} from 'lucide-react';
+import { Search, BarChart2, Link, Store } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
 import withAuth from '@/components/withAuth';
@@ -15,25 +11,37 @@ import { useAuth } from '@/lib/auth-context';
 import { useEtsyResearchStore } from '@/lib/stores/useEtsyResearchStore';
 import { useTranslations } from 'next-intl';
 
-// Lazy load sub-components for performance
-const ResearchDashboard = lazy(() => import('@/components/etsy/research/ResearchDashboard'));
-const NicheAnalyzer = lazy(() => import('@/components/etsy/research/NicheAnalyzer'));
-const KeywordIntelligence = lazy(() => import('@/components/etsy/research/KeywordIntelligence'));
+// Lazy load sub-components
+const UnifiedResearch = lazy(() => import('@/components/etsy/research/UnifiedResearch'));
+const ListingGrader = lazy(() => import('@/components/etsy/research/ListingGrader'));
 const CompetitorIntelligence = lazy(() => import('@/components/etsy/research/CompetitorIntelligence'));
-const KeywordDiscovery = lazy(() => import('@/components/etsy/research/KeywordDiscovery'));
-const TrendAnalyzer = lazy(() => import('@/components/etsy/research/TrendAnalyzer'));
-const ListingSEO = lazy(() => import('@/components/etsy/research/ListingSEO'));
+const AiOptimizePanel = lazy(() => import('@/components/etsy/research/AiOptimizePanel'));
 
 const GRADIENTS = {
   primary: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+};
+
+const pillTabsSx = {
+  mb: 2,
+  '& .MuiTabs-indicator': { display: 'none' },
+  '& .MuiTabs-flexContainer': { gap: '6px', justifyContent: 'center' },
+  '& .MuiTab-root': {
+    minHeight: 40, borderRadius: '20px', textTransform: 'none' as const,
+    fontSize: '0.9rem', fontWeight: 500, px: 2.5, py: 0.5,
+    border: '1px solid #e0e0e0', color: '#666',
+    transition: 'all 0.2s',
+    '&.Mui-selected': {
+      background: GRADIENTS.primary, color: '#fff',
+      border: '1px solid transparent', fontWeight: 700,
+      boxShadow: '0 2px 12px rgba(102,126,234,0.3)',
+    },
+  },
 };
 
 interface ShopInfo {
   shopId: string;
   shopName: string;
 }
-
-const SIDEBAR_WIDTH = 220;
 
 function EtsyResearchPage() {
   const { user } = useAuth();
@@ -42,27 +50,22 @@ function EtsyResearchPage() {
   const [selectedShopId, setSelectedShopId] = useState<string>('');
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeNav, setActiveNav] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const { setQuery, searchMarket, fetchDiscoveryData } = useEtsyResearchStore();
+  const activeView = useEtsyResearchStore(s => s.activeView);
+  const setActiveView = useEtsyResearchStore(s => s.setActiveView);
+  const { setQuery, parallelSearch, fetchDiscoveryData } = useEtsyResearchStore();
 
-  // Auto-fetch discovery data on mount (trending niches, hot keywords)
+  // Map activeView to tab index
+  const tabIndex = activeView === 'research' ? 0 : activeView === 'grader' ? 1 : 2;
+  const handleTabChange = (_: any, newValue: number) => {
+    setActiveView(newValue === 0 ? 'research' : newValue === 1 ? 'grader' : 'shopIntel');
+  };
+
+  // Auto-fetch discovery data on mount
   useEffect(() => { fetchDiscoveryData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Section definitions matching the original structure
-  const NAV_ITEMS = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: -1, tab: -1 },
-    { id: 'niche', label: t('navNiche'), icon: BarChart2, section: 1, tab: 100, desc: t('navNicheDesc') },
-    { id: 'keywords', label: t('navKeywords'), icon: Hash, section: 1, tab: 101, desc: t('navKeywordsDesc') },
-    { id: 'competitors', label: t('navCompetitors'), icon: Store, section: 1, tab: 102, desc: t('navCompetitorsDesc') },
-    { id: 'discovery', label: t('navDiscovery'), icon: Compass, section: 2, tab: 0, desc: t('navDiscoveryDesc') },
-    { id: 'trends', label: t('navTrends'), icon: Activity, section: 2, tab: 1, desc: t('navTrendsDesc') },
-    { id: 'seo', label: t('navMyShop'), icon: Target, section: 0, tab: 9, desc: t('navMyShopDesc') },
-  ];
 
   // Fetch shops
   useEffect(() => {
@@ -77,9 +80,7 @@ function EtsyResearchPage() {
           shopName: s.shopName || s.shopId,
         }));
         setShops(shopList);
-        if (shopList.length > 0) {
-          setSelectedShopId(shopList[0].shopId);
-        }
+        if (shopList.length > 0) setSelectedShopId(shopList[0].shopId);
       } catch (err) {
         console.error('Failed to fetch Etsy shops:', err);
       } finally {
@@ -88,7 +89,7 @@ function EtsyResearchPage() {
     })();
   }, [(user as any)?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch listings for My Shop section
+  // Fetch listings for grader/SEO
   useEffect(() => {
     if (!selectedShopId) return;
     (async () => {
@@ -104,22 +105,6 @@ function EtsyResearchPage() {
       }
     })();
   }, [selectedShopId]);
-
-  const handleNavigate = useCallback((navId: string) => {
-    setActiveNav(navId);
-    if (isMobile) setSidebarOpen(false);
-  }, [isMobile]);
-
-  const handleNavigateFromDashboard = useCallback((section: number, tab?: number) => {
-    const item = NAV_ITEMS.find(n => n.section === section && (tab === undefined || n.tab === tab));
-    if (item) setActiveNav(item.id);
-  }, []);
-
-  const handleKeywordToSearch = useCallback((keyword: string) => {
-    setQuery(keyword);
-    setActiveNav('niche');
-    setTimeout(() => searchMarket(), 100);
-  }, [setQuery, searchMarket]);
 
   if (loading) {
     return (
@@ -143,125 +128,40 @@ function EtsyResearchPage() {
     );
   }
 
-  const sidebarContent = (
-    <Box sx={{ width: SIDEBAR_WIDTH, pt: 1 }}>
-      {isMobile && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', px: 1, mb: 1 }}>
-          <IconButton onClick={() => setSidebarOpen(false)} size="small">
-            <ChevronLeft size={20} />
-          </IconButton>
-        </Box>
-      )}
-      <List dense disablePadding>
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeNav === item.id;
-          return (
-            <ListItemButton
-              key={item.id}
-              selected={isActive}
-              onClick={() => handleNavigate(item.id)}
-              sx={{
-                mx: 1, mb: 0.5, borderRadius: '10px',
-                minHeight: 44,
-                ...(isActive ? {
-                  background: GRADIENTS.primary,
-                  color: '#fff',
-                  '& .MuiListItemIcon-root': { color: '#fff' },
-                  '& .MuiListItemText-secondary': { color: 'rgba(255,255,255,0.7)' },
-                  boxShadow: '0 2px 8px rgba(102,126,234,0.3)',
-                } : {
-                  '&:hover': { bgcolor: 'rgba(102,126,234,0.06)' },
-                }),
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 36 }}>
-                <Icon size={18} />
-              </ListItemIcon>
-              <ListItemText
-                primary={item.label}
-                secondary={!isMobile && item.desc ? item.desc : undefined}
-                primaryTypographyProps={{ fontSize: '0.82rem', fontWeight: isActive ? 700 : 500 }}
-                secondaryTypographyProps={{ fontSize: '0.65rem' }}
-              />
-            </ListItemButton>
-          );
-        })}
-      </List>
-    </Box>
-  );
-
-  const renderContent = () => {
-    switch (activeNav) {
-      case 'dashboard':
-        return <ResearchDashboard onNavigateToSection={handleNavigateFromDashboard} />;
-      case 'niche':
-        return <NicheAnalyzer />;
-      case 'keywords':
-        return <KeywordIntelligence userListings={listings} />;
-      case 'competitors':
-        return <CompetitorIntelligence />;
-      case 'discovery':
-        return <KeywordDiscovery onNavigateToSearch={handleKeywordToSearch} />;
-      case 'trends':
-        return <TrendAnalyzer />;
-      case 'seo':
-        return <ListingSEO shopId={selectedShopId} userListings={listings} />;
-      default:
-        return <ResearchDashboard onNavigateToSection={handleNavigateFromDashboard} />;
-    }
-  };
-
   return (
     <AppLayout title={t('pageTitle')}>
       <Toaster position="top-right" />
-      <Box sx={{ display: 'flex', minHeight: 'calc(100vh - 64px)' }}>
-        {/* Desktop sidebar */}
-        {!isMobile && (
-          <Paper sx={{
-            width: SIDEBAR_WIDTH, flexShrink: 0, borderRadius: 0,
-            borderRight: '1px solid #eee', bgcolor: '#fafbfe',
-            position: 'sticky', top: 64, height: 'calc(100vh - 64px)',
-            overflowY: 'auto',
-          }}>
-            {sidebarContent}
-          </Paper>
-        )}
+      <Box sx={{ maxWidth: 1400, mx: 'auto', width: '100%', p: { xs: 0.5, sm: 1, md: 1.5 } }}>
+        {/* Horizontal pill tabs */}
+        <Tabs value={tabIndex} onChange={handleTabChange} sx={pillTabsSx} variant="scrollable" scrollButtons="auto">
+          <Tab icon={<BarChart2 size={16} />} iconPosition="start" label={t('tab_research')} />
+          <Tab icon={<Link size={16} />} iconPosition="start" label={t('tab_grader')} />
+          <Tab icon={<Store size={16} />} iconPosition="start" label={t('tab_shopIntel')} />
+        </Tabs>
 
-        {/* Mobile drawer */}
-        {isMobile && (
-          <Drawer
-            open={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-            PaperProps={{ sx: { width: SIDEBAR_WIDTH, bgcolor: '#fafbfe' } }}
-          >
-            {sidebarContent}
-          </Drawer>
-        )}
+        {/* Search bar — shown for Research tab */}
+        {activeView === 'research' && <SearchBar />}
 
-        {/* Main content */}
-        <Box sx={{ flex: 1, p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1600, mx: 'auto', width: '100%' }}>
-          {/* Mobile header with menu button */}
-          {isMobile && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <IconButton onClick={() => setSidebarOpen(true)} sx={{ p: 0.5 }}>
-                <Menu size={22} />
-              </IconButton>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                {NAV_ITEMS.find(n => n.id === activeNav)?.label || 'Dashboard'}
-              </Typography>
-            </Box>
+        {/* Content */}
+        <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>}>
+          {activeView === 'research' && (
+            <UnifiedResearch
+              userListings={listings}
+              onNavigateToShopIntel={() => setActiveView('shopIntel')}
+            />
           )}
-
-          {/* Search bar — shown for analysis sections */}
-          {['niche', 'keywords', 'competitors', 'discovery', 'trends'].includes(activeNav) && (
-            <SearchBar />
+          {activeView === 'grader' && (
+            <ListingGrader shopId={selectedShopId} userListings={listings} />
           )}
+          {activeView === 'shopIntel' && (
+            <CompetitorIntelligence />
+          )}
+        </Suspense>
 
-          <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>}>
-            {renderContent()}
-          </Suspense>
-        </Box>
+        {/* Floating AI Panel */}
+        <Suspense fallback={null}>
+          <AiOptimizePanel />
+        </Suspense>
       </Box>
     </AppLayout>
   );
@@ -269,9 +169,11 @@ function EtsyResearchPage() {
 
 function SearchBar() {
   const t = useTranslations('etsyResearch');
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const {
     query, minPrice, maxPrice, sortOn, loading,
-    setQuery, setMinPrice, setMaxPrice, setSortOn, searchMarket,
+    setQuery, setMinPrice, setMaxPrice, setSortOn, parallelSearch,
   } = useEtsyResearchStore();
 
   return (
@@ -280,45 +182,50 @@ function SearchBar() {
       position: 'relative', overflow: 'hidden',
     }}>
       <Box sx={{ position: 'absolute', top: -30, right: -30, width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.1)' }} />
-      <Paper sx={{ p: { xs: 1.5, md: 2 }, borderRadius: '12px', position: 'relative', zIndex: 1 }}>
+      <Box sx={{ p: { xs: 1.5, md: 2 }, borderRadius: '12px', bgcolor: '#fff', position: 'relative', zIndex: 1 }}>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <TextField
             label={t('whatAreYouSelling')}
             value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
-            size="small" sx={{ flex: 2, minWidth: 200 }}
+            size="small" sx={{ flex: 2, minWidth: isMobile ? '100%' : 200 }}
             placeholder={t('searchExamplePlaceholder')}
-            onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && searchMarket()}
+            onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && parallelSearch()}
             InputProps={{
               startAdornment: <InputAdornment position="start"><Search size={16} color="#667eea" /></InputAdornment>,
             }}
           />
-          <TextField label={t('minPriceLabel')} value={minPrice} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMinPrice(e.target.value)}
-            size="small" type="number" sx={{ width: 80 }}
-            InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-          />
-          <TextField label={t('maxPriceLabel')} value={maxPrice} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMaxPrice(e.target.value)}
-            size="small" type="number" sx={{ width: 80 }}
-            InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-          />
-          <TextField label={t('sorting')} value={sortOn} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSortOn(e.target.value)}
-            size="small" select sx={{ width: 130 }} SelectProps={{ native: true }}>
-            <option value="score">{t('bestMatch')}</option>
-            <option value="price">{t('price')}</option>
-            <option value="created">{t('newlyAdded')}</option>
-            <option value="updated">{t('lastUpdated')}</option>
-          </TextField>
-          <Button variant="contained" onClick={searchMarket}
+          {!isMobile && (
+            <>
+              <TextField label={t('minPriceLabel')} value={minPrice} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMinPrice(e.target.value)}
+                size="small" type="number" sx={{ width: 80 }}
+                InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              />
+              <TextField label={t('maxPriceLabel')} value={maxPrice} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMaxPrice(e.target.value)}
+                size="small" type="number" sx={{ width: 80 }}
+                InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+              />
+              <TextField label={t('sorting')} value={sortOn} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSortOn(e.target.value)}
+                size="small" select sx={{ width: 130 }} SelectProps={{ native: true }}>
+                <option value="score">{t('bestMatch')}</option>
+                <option value="price">{t('price')}</option>
+                <option value="created">{t('newlyAdded')}</option>
+                <option value="updated">{t('lastUpdated')}</option>
+              </TextField>
+            </>
+          )}
+          <Button variant="contained" onClick={parallelSearch}
             disabled={loading || !query.trim()}
             startIcon={loading ? <CircularProgress size={16} /> : <Search size={16} />}
             sx={{
               background: GRADIENTS.primary, borderRadius: '10px', px: 3,
               boxShadow: '0 4px 12px rgba(102,126,234,0.4)',
+              ...(isMobile && { width: '100%' }),
             }}
           >
             {t('research')}
           </Button>
         </Box>
-      </Paper>
+      </Box>
     </Box>
   );
 }

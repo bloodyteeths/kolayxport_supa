@@ -106,6 +106,17 @@ interface EtsyResearchState {
   discoveryData: any | null;
   discoveryLoading: boolean;
 
+  // --- Active view ---
+  activeView: 'research' | 'grader' | 'shopIntel';
+
+  // --- AI Optimize Panel ---
+  aiOptimizeOpen: boolean;
+  aiOptimizeTab: number;
+  optimizedTitle: string | null;
+  optimizedTags: string[] | null;
+  optimizedDescription: string | null;
+  optimizeLoading: boolean;
+
   // --- Actions ---
   setQuery: (q: string) => void;
   setMyTitle: (t: string) => void;
@@ -146,6 +157,12 @@ interface EtsyResearchState {
   removeTrackedKeyword: (keywordId: string, shopId: string) => Promise<void>;
   fetchRankHistory: (keywordId: string, shopId: string) => Promise<void>;
   fetchDiscoveryData: () => Promise<void>;
+  parallelSearch: () => Promise<void>;
+  setActiveView: (v: 'research' | 'grader' | 'shopIntel') => void;
+  setAiOptimizeOpen: (open: boolean) => void;
+  setAiOptimizeTab: (tab: number) => void;
+  optimizeField: (field: 'title' | 'tags' | 'description', input: { title: string; tags?: string[]; description?: string; materials?: string[] }) => Promise<void>;
+  clearOptimized: () => void;
   exportCSV: () => void;
   saveSearch: () => void;
   loadSearch: (s: SavedSearch) => void;
@@ -214,6 +231,13 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
   comparisonVisible: false,
   discoveryData: null,
   discoveryLoading: false,
+  activeView: 'research',
+  aiOptimizeOpen: false,
+  aiOptimizeTab: 0,
+  optimizedTitle: null,
+  optimizedTags: null,
+  optimizedDescription: null,
+  optimizeLoading: false,
 
   // --- Setters ---
   setQuery: (q) => set({ query: q }),
@@ -674,6 +698,65 @@ export const useEtsyResearchStore = create<EtsyResearchState>((set, get) => ({
 
   initSavedSearches: () => {
     set({ savedSearches: loadSavedSearches() });
+  },
+
+  setActiveView: (v) => set({ activeView: v }),
+  setAiOptimizeOpen: (open) => set({ aiOptimizeOpen: open }),
+  setAiOptimizeTab: (tab) => set({ aiOptimizeTab: tab }),
+  clearOptimized: () => set({ optimizedTitle: null, optimizedTags: null, optimizedDescription: null }),
+
+  parallelSearch: async () => {
+    const { query } = get();
+    if (!query.trim()) return;
+    // Fire searchMarket first (it also triggers discoverShops)
+    await get().searchMarket();
+    // Then fire niche analysis, keyword discovery, and trends in parallel
+    const promises = [
+      get().fetchNicheAnalysis(),
+      get().searchKeywords(),
+      get().fetchTrends(),
+    ];
+    await Promise.allSettled(promises);
+  },
+
+  optimizeField: async (field, input) => {
+    set({ optimizeLoading: true });
+    const { serverTagFreq, serverKeywords, query } = get();
+    const marketContext = serverTagFreq.length > 0 ? {
+      topTags: serverTagFreq.slice(0, 20),
+      topKeywords: serverKeywords.slice(0, 15),
+      query,
+    } : undefined;
+
+    try {
+      if (field === 'title') {
+        const res = await fetch('/api/ai/etsy', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'optimize_title', title: input.title, tags: input.tags, description: input.description, market_context: marketContext }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed');
+        const data = await res.json();
+        set({ optimizedTitle: data.optimized_title || null });
+      } else if (field === 'tags') {
+        const res = await fetch('/api/ai/etsy', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'suggest_tags', title: input.title, tags_current: input.tags, description: input.description, market_context: marketContext }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed');
+        const data = await res.json();
+        set({ optimizedTags: data.suggestions || null });
+      } else if (field === 'description') {
+        const res = await fetch('/api/ai/etsy', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'generate_description', title: input.title, tags: input.tags, materials: input.materials, existing_description: input.description, market_context: marketContext }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed');
+        const data = await res.json();
+        set({ optimizedDescription: data.description || null });
+      }
+      toast.success('AI optimization complete');
+    } catch (err: any) { toast.error(err.message); }
+    finally { set({ optimizeLoading: false }); }
   },
 
   fetchDiscoveryData: async () => {

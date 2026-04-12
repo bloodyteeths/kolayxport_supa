@@ -222,6 +222,139 @@ export function TrendChart({ data, height = 200, color = '#667eea' }: {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Keyword Card — compact card for keyword scorecard grid
+// ---------------------------------------------------------------------------
+export function KeywordCard({ keyword, score, frequency, maxFreq, trendData, inMyTags, onClick }: {
+  keyword: string; score: number; frequency: number; maxFreq: number;
+  trendData?: number[]; inMyTags?: boolean; onClick?: () => void;
+}) {
+  const scoreColor = score >= 70 ? '#11998e' : score >= 40 ? '#F2994A' : '#eb3349';
+  return (
+    <Paper
+      onClick={onClick}
+      sx={{
+        p: 1.5, display: 'flex', alignItems: 'center', gap: 1.5,
+        borderRadius: '12px', cursor: onClick ? 'pointer' : 'default',
+        border: inMyTags ? '2px solid #11998e' : '1px solid #f0f0f0',
+        bgcolor: inMyTags ? 'rgba(17,153,142,0.04)' : '#fff',
+        transition: 'all 0.15s',
+        '&:hover': onClick ? { boxShadow: '0 4px 16px rgba(0,0,0,0.08)', transform: 'translateY(-1px)' } : {},
+      }}
+    >
+      <ScoreRing score={score} size={40} label="" color={scoreColor} />
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {keyword}
+          {inMyTags && <Box component="span" sx={{ ml: 0.5, fontSize: '0.7rem', color: '#11998e' }}>✓</Box>}
+        </Typography>
+        <GradientBar value={frequency} max={maxFreq} height={6} />
+      </Box>
+      {trendData && trendData.length > 1 && (
+        <Sparkline data={trendData} width={50} height={20} />
+      )}
+    </Paper>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Demand vs Competition dual gauge
+// ---------------------------------------------------------------------------
+export function DemandCompetitionGauge({ demand, competition, size = 80 }: {
+  demand: number; competition: number; size?: number;
+}) {
+  const demandColor = demand >= 70 ? '#11998e' : demand >= 40 ? '#F2994A' : '#eb3349';
+  const compColor = competition >= 70 ? '#eb3349' : competition >= 40 ? '#F2994A' : '#11998e';
+  const r = (size - 8) / 2;
+  const c = Math.PI * r; // half circle
+
+  return (
+    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+      {/* Demand */}
+      <Box sx={{ textAlign: 'center' }}>
+        <Box sx={{ position: 'relative', width: size, height: size / 2 + 10 }}>
+          <svg width={size} height={size / 2 + 10}>
+            <path d={`M 4 ${size / 2 + 4} A ${r} ${r} 0 0 1 ${size - 4} ${size / 2 + 4}`}
+              fill="none" stroke="#f0f0f0" strokeWidth="6" strokeLinecap="round" />
+            <path d={`M 4 ${size / 2 + 4} A ${r} ${r} 0 0 1 ${size - 4} ${size / 2 + 4}`}
+              fill="none" stroke={demandColor} strokeWidth="6" strokeLinecap="round"
+              strokeDasharray={c} strokeDashoffset={c - (demand / 100) * c}
+              style={{ transition: 'stroke-dashoffset 0.8s ease-out' }} />
+          </svg>
+          <Typography sx={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', fontSize: size * 0.22, fontWeight: 800, color: demandColor }}>
+            {demand}
+          </Typography>
+        </Box>
+        <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.7rem' }}>Demand</Typography>
+      </Box>
+      {/* Competition */}
+      <Box sx={{ textAlign: 'center' }}>
+        <Box sx={{ position: 'relative', width: size, height: size / 2 + 10 }}>
+          <svg width={size} height={size / 2 + 10}>
+            <path d={`M 4 ${size / 2 + 4} A ${r} ${r} 0 0 1 ${size - 4} ${size / 2 + 4}`}
+              fill="none" stroke="#f0f0f0" strokeWidth="6" strokeLinecap="round" />
+            <path d={`M 4 ${size / 2 + 4} A ${r} ${r} 0 0 1 ${size - 4} ${size / 2 + 4}`}
+              fill="none" stroke={compColor} strokeWidth="6" strokeLinecap="round"
+              strokeDasharray={c} strokeDashoffset={c - (competition / 100) * c}
+              style={{ transition: 'stroke-dashoffset 0.8s ease-out' }} />
+          </svg>
+          <Typography sx={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', fontSize: size * 0.22, fontWeight: 800, color: compColor }}>
+            {competition}
+          </Typography>
+        </Box>
+        <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.7rem' }}>Competition</Typography>
+      </Box>
+    </Box>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sticky score bar — compact horizontal bar with key metrics
+// ---------------------------------------------------------------------------
+export function StickyScoreBar({ metrics }: {
+  metrics: { label: string; value: string; color: string }[];
+}) {
+  return (
+    <Paper sx={{
+      position: 'sticky', top: 0, zIndex: 10,
+      display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 }, flexWrap: 'wrap',
+      px: 2, py: 1, borderRadius: '12px',
+      background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.06)',
+    }}>
+      {metrics.map((m) => (
+        <Box key={m.label} sx={{ textAlign: 'center', minWidth: 60 }}>
+          <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 500, lineHeight: 1 }}>{m.label}</Typography>
+          <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: m.color, lineHeight: 1.3 }}>{m.value}</Typography>
+        </Box>
+      ))}
+    </Paper>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Before/After diff view for AI optimization
+// ---------------------------------------------------------------------------
+export function BeforeAfter({ before, after, label }: {
+  before: string; after: string; label: string;
+}) {
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: 'text.secondary' }}>{label}</Typography>
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+        <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: '#fef2f2', border: '1px solid #fecaca' }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: '#b91c1c', display: 'block', mb: 0.5 }}>Before</Typography>
+          <Typography sx={{ fontSize: '0.82rem', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{before}</Typography>
+        </Paper>
+        <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: '#15803d', display: 'block', mb: 0.5 }}>After</Typography>
+          <Typography sx={{ fontSize: '0.82rem', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{after}</Typography>
+        </Paper>
+      </Box>
+    </Box>
+  );
+}
+
 export function PremiumEmptyState({ icon, title, desc, steps }: {
   icon: React.ReactNode; title: string; desc: string; steps?: string[];
 }) {

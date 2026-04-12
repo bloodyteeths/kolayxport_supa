@@ -2495,7 +2495,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   return (
     <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px - 48px)' }, display: 'flex', flexDirection: 'column', p: { xs: 0.5, sm: 2 }, overflow: 'auto', maxWidth: '100%' }}>
       <Toaster position="top-right" reverseOrder={false} />
-      <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: { xs: 1, sm: 2 }, fontSize: { xs: '1.1rem', sm: '1.5rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 'bold', mb: { xs: 0.5, sm: 1 }, fontSize: { xs: '1rem', sm: '1.3rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {t('labelManagement')}
       </Typography>
       <Box sx={{ display:'flex', flexDirection:'column', gap: 1, mb: 1, maxWidth: '100%', flexShrink: 0 }}>

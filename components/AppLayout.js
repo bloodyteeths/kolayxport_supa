@@ -489,7 +489,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
 
           {/* ─── Page Content ─────────────────────────────── */}
           <main className={`flex-1 overflow-y-auto ${
-            isMobile ? 'p-2' : 'p-3 sm:p-4 lg:p-5'
+            isMobile ? 'p-1.5' : 'p-2 sm:p-3 lg:p-4'
           }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', backgroundColor: '#f8fafc' }}>
             {children}
           </main>

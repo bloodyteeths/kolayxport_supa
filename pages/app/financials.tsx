@@ -81,7 +81,7 @@ function FinancialsPage() {
   return (
     <AppLayout title={t('pageTitle')}>
       <Toaster position="top-right" />
-      <Box sx={{ p: { xs: 1.5, sm: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+      <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1400, mx: 'auto' }}>
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
           <Box sx={{

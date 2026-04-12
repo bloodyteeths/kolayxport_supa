@@ -160,7 +160,7 @@ const KPICard = ({
 }) => {
   const positive = (trend ?? 0) >= 0;
   return (
-    <Card className="p-4 sm:p-5">
+    <Card className="p-3 sm:p-4">
       <div className="flex items-center gap-3 mb-3">
         <div className="p-2 rounded-xl" style={{ backgroundColor: iconBg }}>
           <Icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: iconColor }} />
@@ -412,7 +412,7 @@ export default function DashboardPage() {
 
   return (
     <AppLayout title={t('pageTitle')}>
-      <div className="space-y-5 max-w-full">
+      <div className="space-y-3 max-w-full">
 
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -539,7 +539,7 @@ export default function DashboardPage() {
 
         {/* ── Day mode: Hourly chart ─────────────────────────────── */}
         {dateRange === 'day' && hourlyData.length > 0 && hourlyData.some((h) => h.orders > 0 || h.prevOrders > 0) && (
-          <Card className="p-4 sm:p-5">
+          <Card className="p-3 sm:p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-3">{t('hourlyOrderBreakdown')}</h3>
             <Chart options={hourlyOpts} series={hourlySeries} type="bar" height={260} />
           </Card>
@@ -547,7 +547,7 @@ export default function DashboardPage() {
 
         {/* ── Main chart + Donut ─────────────────���───────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="lg:col-span-2 p-4 sm:p-5">
+          <Card className="lg:col-span-2 p-3 sm:p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-3">{t('revenueAndOrderTrend')}</h3>
             {data?.dailyStats && data.dailyStats.length > 0 ? (
               <Chart options={revenueChartOpts} series={revenueChartSeries} type="line" height={300} />
@@ -556,7 +556,7 @@ export default function DashboardPage() {
             )}
           </Card>
 
-          <Card className="p-4 sm:p-5">
+          <Card className="p-3 sm:p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-3">{t('marketplaceDistribution')}</h3>
             {donutSeries.length > 0 && donutSeries.some((v) => v > 0) ? (
               <Chart options={donutOpts} series={donutSeries} type="donut" height={300} />
@@ -657,7 +657,7 @@ export default function DashboardPage() {
 
         {/* ── Monthly Trends ─────────────────────────────���───────── */}
         {monthlyStats.length > 0 && (
-          <Card className="p-4 sm:p-5">
+          <Card className="p-3 sm:p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-3">{t('monthlyTrends')}</h3>
             <Chart options={monthlyOpts} series={monthlySeries} type="line" height={280} />
           </Card>
@@ -667,7 +667,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Top Products */}
-          <Card className="p-4 sm:p-5">
+          <Card className="p-3 sm:p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-4">{t('topSellingProducts')}</h3>
             {data?.topProducts && data.topProducts.length > 0 ? (
               <div className="space-y-3">
@@ -688,7 +688,7 @@ export default function DashboardPage() {
           </Card>
 
           {/* Order Status */}
-          <Card className="p-4 sm:p-5">
+          <Card className="p-3 sm:p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-4">{t('orderStatuses')}</h3>
             {data?.orderStatusBreakdown && data.orderStatusBreakdown.length > 0 ? (
               <div className="space-y-3">
@@ -721,7 +721,7 @@ export default function DashboardPage() {
 
         {/* ── Recent Activity ─────���──────────────────────────────── */}
         {data?.recentActivity && data.recentActivity.length > 0 && (
-          <Card className="p-4 sm:p-5">
+          <Card className="p-3 sm:p-4">
             <h3 className="text-sm font-semibold text-slate-800 mb-4">{t('recentActivity')}</h3>
             {/* Mobile */}
             <div className="block md:hidden space-y-2">

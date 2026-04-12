@@ -9,14 +9,14 @@ import { useTranslations } from 'next-intl';
 const GuideSection = ({ title, icon: Icon, children, id }) => (
   <motion.section
     id={id}
-    className="bg-white p-6 md:p-8 rounded-lg shadow-md mb-8"
+    className="bg-white p-3 sm:p-4 md:p-5 rounded-lg shadow-md mb-4"
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5 }}
   >
-    <div className="flex items-center mb-6">
-      {Icon && <Icon size={32} className="mr-3 text-blue-600" />}
-      <h2 className="text-2xl font-bold text-slate-800">{title}</h2>
+    <div className="flex items-center mb-3">
+      {Icon && <Icon size={28} className="mr-2 text-blue-600" />}
+      <h2 className="text-xl font-bold text-slate-800">{title}</h2>
     </div>
     <div className="prose prose-slate max-w-none text-slate-700 leading-relaxed">
       {children}

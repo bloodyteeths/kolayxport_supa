@@ -1891,7 +1891,7 @@ function EtsyListingsPage() {
 
           {/* Compact Stats Row */}
           {listings.length > 0 && (
-            <Paper sx={{ px: 1.5, py: 0.75, mb: 1, display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2 }, flexWrap: 'wrap', minHeight: 36 }}>
+            <Paper sx={{ px: 1.5, py: 0.5, mb: 0.5, display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2 }, flexWrap: 'wrap', minHeight: 32 }}>
               <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
                 {t('listingCount', { count: totalCount })}
               </Typography>
@@ -1927,7 +1927,7 @@ function EtsyListingsPage() {
           )}
 
           {/* Top Toolbar */}
-          <Paper sx={{ px: 1.5, py: 1, mb: 1.5, overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
+          <Paper sx={{ px: 1.5, py: 0.75, mb: 0.5, overflow: 'hidden', width: '100%', boxSizing: 'border-box' }}>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
 
               {/* Mobile: shop selector */}
@@ -2239,7 +2239,7 @@ function EtsyListingsPage() {
 
           {/* Column Preset Toggle + DataGrid (desktop only) */}
           <Paper sx={{ width: '100%', display: { xs: 'none', md: 'block' } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1.5, pt: 1, gap: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1.5, pt: 0.5, gap: 0.5 }}>
               <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>{t('viewPreset')}</Typography>
               {([
                 { label: t('compact'), model: { expires: false, section: false } as Record<string, boolean> },
@@ -2254,7 +2254,7 @@ function EtsyListingsPage() {
                     size="small"
                     onClick={() => setColumnVisibilityModel(preset.model)}
                     sx={{
-                      height: 26, fontSize: '0.85rem', fontWeight: isActive ? 700 : 400,
+                      height: 24, fontSize: '0.8rem', fontWeight: isActive ? 700 : 400,
                       bgcolor: isActive ? 'primary.main' : 'transparent',
                       color: isActive ? 'white' : 'text.secondary',
                       border: '1px solid', borderColor: isActive ? 'primary.main' : 'divider',
@@ -2265,8 +2265,6 @@ function EtsyListingsPage() {
                 );
               })}
             </Box>
-          </Paper>
-          <Paper sx={{ width: '100%', display: { xs: 'none', md: 'block' } }}>
             <DataGrid
               rows={filteredListings}
               columns={columns}
@@ -2275,7 +2273,7 @@ function EtsyListingsPage() {
               disableRowSelectionOnClick
               processRowUpdate={handleProcessRowUpdate}
               onProcessRowUpdateError={(error) => toast.error(t('updateError', { error: error.message }))}
-              rowHeight={64}
+              rowHeight={52}
               rowSelectionModel={selectedIds}
               onRowSelectionModelChange={(newSelection) => setSelectedIds(newSelection)}
               paginationModel={paginationModel}

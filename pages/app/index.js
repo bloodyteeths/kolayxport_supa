@@ -107,7 +107,7 @@ const DashboardLandingContent = ({ user }) => {
   ];
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-4 max-w-5xl">
       {/* Greeting */}
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900" style={{ letterSpacing: '-0.025em' }}>
@@ -120,7 +120,7 @@ const DashboardLandingContent = ({ user }) => {
 
       {/* Announcement banner */}
       <div
-        className="relative overflow-hidden rounded-xl p-4 sm:p-6"
+        className="relative overflow-hidden rounded-xl p-3 sm:p-4"
         style={{
           background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.04) 0%, rgba(79, 70, 229, 0.06) 100%)',
           border: '1px solid rgba(37, 99, 235, 0.12)',
@@ -159,7 +159,7 @@ const DashboardLandingContent = ({ user }) => {
       </div>
 
       {/* Updates timeline */}
-      <div className="card-premium p-5 sm:p-6">
+      <div className="card-premium p-3 sm:p-4">
         <h2 className="text-base font-semibold text-slate-900 mb-3" style={{ letterSpacing: '-0.01em' }}>
           {t('recentUpdates')}
         </h2>

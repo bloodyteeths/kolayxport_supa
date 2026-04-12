@@ -9,12 +9,12 @@ import { useTranslations } from 'next-intl';
 const Section = ({ title, icon: Icon, children, id }) => (
   <motion.div
     id={id}
-    className="bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-md mb-8 overflow-hidden max-w-full"
+    className="bg-white p-3 sm:p-4 md:p-5 rounded-lg shadow-md mb-4 overflow-hidden max-w-full"
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5 }}
   >
-    <div className="flex items-center mb-4 sm:mb-6 min-w-0">
+    <div className="flex items-center mb-3 min-w-0">
       {Icon && <Icon size={28} className="mr-2 sm:mr-3 text-blue-600 flex-shrink-0" />}
       <h2 className="text-lg sm:text-2xl font-bold text-slate-800 break-words min-w-0">{title}</h2>
     </div>

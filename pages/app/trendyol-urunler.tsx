@@ -674,7 +674,7 @@ function TrendyolListingsPage() {
   return (
     <AppLayout title={t('title')}>
       <Toaster position="top-right" />
-      <Box sx={{ p: { xs: 1.5, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+      <Box sx={{ p: { xs: 0.5, sm: 1, md: 1.5 }, maxWidth: 1400, mx: 'auto' }}>
         {/* Toolbar */}
         <Paper sx={{ p: { xs: 1.5, md: 2 }, mb: 2, borderRadius: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
           <TextField size="small" placeholder={t('searchProducts')} value={searchTerm}

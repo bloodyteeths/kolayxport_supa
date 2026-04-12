@@ -2684,15 +2684,19 @@ export default async function handler(
 
         // GET /api/clawd/etsy?action=get_variation_images&listing_id=XXXXX
         if (req.method === 'GET' && action === 'get_variation_images' && listing_id) {
-            logger.info('Fetching variation images for listing', { listing_id });
-            const data = await callEtsyAPI(
-                `/listings/${listing_id}/variation-images`,
-                accessToken
-            );
-            return res.status(200).json({
-                listing_id: parseInt(listing_id),
-                results: data.results || [],
-            });
+            try {
+                const data = await callEtsyAPI(
+                    `/listings/${listing_id}/variation-images`,
+                    accessToken
+                );
+                return res.status(200).json({
+                    listing_id: parseInt(listing_id),
+                    results: data.results || [],
+                });
+            } catch {
+                // Listing may have no variations or no variation images — return empty
+                return res.status(200).json({ listing_id: parseInt(listing_id), results: [] });
+            }
         }
 
         // POST /api/clawd/etsy?action=set_variation_images&listing_id=XXXXX
@@ -2701,20 +2705,23 @@ export default async function handler(
             if (!variation_images || !Array.isArray(variation_images)) {
                 return res.status(400).json({ error: 'variation_images array is required' });
             }
-            logger.info('Setting variation images for listing', { listing_id, count: variation_images.length });
-            const result = await callEtsyAPI(
-                `/listings/${listing_id}/variation-images`,
-                accessToken,
-                {
-                    method: 'POST',
-                    body: JSON.stringify({ variation_images }),
-                }
-            );
-            return res.status(200).json({
-                success: true,
-                listing_id: parseInt(listing_id),
-                results: result.results || [],
-            });
+            try {
+                const result = await callEtsyAPI(
+                    `/listings/${listing_id}/variation-images`,
+                    accessToken,
+                    {
+                        method: 'POST',
+                        body: JSON.stringify({ variation_images }),
+                    }
+                );
+                return res.status(200).json({
+                    success: true,
+                    listing_id: parseInt(listing_id),
+                    results: result.results || [],
+                });
+            } catch (err: any) {
+                return res.status(400).json({ error: err.message || 'Failed to set variation images' });
+            }
         }
 
         // GET /api/clawd/etsy?action=get_taxonomy_properties&taxonomy_id=XXXXX
@@ -2723,15 +2730,19 @@ export default async function handler(
             if (!taxonomy_id) {
                 return res.status(400).json({ error: 'taxonomy_id is required' });
             }
-            logger.info('Fetching taxonomy properties', { taxonomy_id });
-            const data = await callEtsyAPI(
-                `/seller-taxonomy/nodes/${taxonomy_id}/properties`,
-                accessToken
-            );
-            return res.status(200).json({
-                taxonomy_id: parseInt(taxonomy_id),
-                results: data.results || [],
-            });
+            try {
+                const data = await callEtsyAPI(
+                    `/seller-taxonomy/nodes/${taxonomy_id}/properties`,
+                    accessToken
+                );
+                return res.status(200).json({
+                    taxonomy_id: parseInt(taxonomy_id),
+                    results: data.results || [],
+                });
+            } catch {
+                // Taxonomy node may not have properties — return empty
+                return res.status(200).json({ taxonomy_id: parseInt(taxonomy_id), results: [] });
+            }
         }
 
         // DELETE /api/clawd/etsy?action=delete_listing&listing_id=XXXXX

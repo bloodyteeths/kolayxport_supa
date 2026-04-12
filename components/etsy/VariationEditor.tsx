@@ -9,27 +9,11 @@ import {
   Delete as DeleteIcon,
   Add as AddIcon,
   ContentCopy as DuplicateIcon,
-  DragIndicator as DragIcon,
+  KeyboardArrowUp as UpIcon,
+  KeyboardArrowDown as DownIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 // --- Types ---
 
@@ -159,28 +143,6 @@ const sectionHeaderSx = {
   borderBottom: '1px solid rgba(0,0,0,0.08)',
 };
 
-// --- Sortable row wrapper ---
-function SortableRow({ id, children }: { id: string; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    position: 'relative' as const,
-    zIndex: isDragging ? 10 : undefined,
-  };
-  return (
-    <Box ref={setNodeRef} style={style}>
-      <Box sx={[rowSx, isDragging && { cursor: 'grabbing' }]}>
-        <Box {...attributes} {...listeners} sx={{ cursor: 'grab', color: 'text.disabled', display: 'flex', alignItems: 'center', mr: 0.5 }}>
-          <DragIcon sx={{ fontSize: 18 }} />
-        </Box>
-        {children}
-      </Box>
-    </Box>
-  );
-}
-
 // --- Inline editable text ---
 function EditableText({ value, onChange, fontWeight = 600 }: { value: string; onChange: (v: string) => void; fontWeight?: number }) {
   const [editing, setEditing] = useState(false);
@@ -272,12 +234,6 @@ export default function VariationEditor({ listingId, shopId, taxonomyId, onSaved
   const [listingImages, setListingImages] = useState<ListingImage[]>([]);
   const [variationImages, setVariationImages] = useState<VariationImage[]>([]);
   const [savingPhotos, setSavingPhotos] = useState(false);
-
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
 
   // Detect currency
   const currencyCode = useMemo(() => {
@@ -426,11 +382,6 @@ export default function VariationEditor({ listingId, shopId, taxonomyId, onSaved
 
   const getPrice = (o: Offering) => (o.price.amount / o.price.divisor).toFixed(2);
 
-  const sortableIds = useMemo(
-    () => products.map((p, i) => `${p.product_id || 'new'}-${i}`),
-    [products]
-  );
-
   // --- Mutations ---
 
   const updateField = (idx: number, field: string, value: any) => {
@@ -488,15 +439,14 @@ export default function VariationEditor({ listingId, shopId, taxonomyId, onSaved
     });
   };
 
-  // DnD reorder
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = sortableIds.indexOf(active.id as string);
-    const newIndex = sortableIds.indexOf(over.id as string);
-    if (oldIndex !== -1 && newIndex !== -1) {
-      setProducts(prev => arrayMove(prev, oldIndex, newIndex));
-    }
+  const moveProduct = (idx: number, dir: 'up' | 'down') => {
+    setProducts(prev => {
+      const arr = [...prev];
+      const t = dir === 'up' ? idx - 1 : idx + 1;
+      if (t < 0 || t >= arr.length) return prev;
+      [arr[idx], arr[t]] = [arr[t], arr[idx]];
+      return arr;
+    });
   };
 
   // Bulk price/quantity apply
@@ -803,71 +753,80 @@ export default function VariationEditor({ listingId, shopId, taxonomyId, onSaved
             </Paper>
           ) : (
             <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-                  {grouped.map(group => (
-                    <Box key={group.propName}>
-                      {group.propName && (
-                        <Box sx={sectionHeaderSx}>
-                          <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                            {group.propName}
-                          </Typography>
-                        </Box>
-                      )}
-                      {group.items.map(({ product, globalIdx }) => {
-                        const o = product.offerings[0];
-                        if (!o) return null;
-                        return (
-                          <SortableRow key={sortableIds[globalIdx]} id={sortableIds[globalIdx]}>
-                            {/* Label — editable */}
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                                {product.property_values.map((pv, pvIdx) => (
-                                  <EditableText
-                                    key={pvIdx}
-                                    value={pv.values[0] || ''}
-                                    onChange={(v) => updatePropertyValue(globalIdx, pvIdx, v)}
-                                  />
-                                ))}
-                              </Box>
-                              {product.sku && (
-                                <Typography variant="caption" color="text.secondary">SKU: {product.sku}</Typography>
-                              )}
-                            </Box>
-
-                            {/* Quick info */}
-                            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 55, textAlign: 'right' }}>
-                              {sym}{getPrice(o)}
-                            </Typography>
-                            <Chip
-                              label={o.quantity === 0 ? t('outOfStock') : `${o.quantity} ${t('pieces')}`}
-                              size="small"
-                              color={o.quantity === 0 ? 'error' : 'default'}
-                              variant="outlined"
-                              sx={{ fontSize: '0.7rem', height: 22, minWidth: { xs: 'auto', sm: 60 } }}
-                            />
-
-                            {/* Enabled indicator */}
-                            {!o.is_enabled && (
-                              <Chip label="OFF" size="small" color="default" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.6 }} />
-                            )}
-
-                            {/* Actions */}
-                            <Box sx={{ display: 'flex', gap: 0 }}>
-                              <Tooltip title={t('copy')}>
-                                <IconButton size="small" onClick={() => duplicateProduct(globalIdx)}><DuplicateIcon sx={{ fontSize: 16 }} /></IconButton>
-                              </Tooltip>
-                              <Tooltip title={t('deleteTooltip')}>
-                                <IconButton size="small" color="error" onClick={() => setDeleteIndex(globalIdx)}><DeleteIcon sx={{ fontSize: 16 }} /></IconButton>
-                              </Tooltip>
-                            </Box>
-                          </SortableRow>
-                        );
-                      })}
+              {grouped.map(group => (
+                <Box key={group.propName}>
+                  {group.propName && (
+                    <Box sx={sectionHeaderSx}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {group.propName}
+                      </Typography>
                     </Box>
-                  ))}
-                </SortableContext>
-              </DndContext>
+                  )}
+                  {group.items.map(({ product, globalIdx }) => {
+                    const o = product.offerings?.[0];
+                    if (!o) return null;
+                    return (
+                      <Box key={product.product_id || `new-${globalIdx}`} sx={{
+                        ...rowSx,
+                        opacity: o.is_enabled ? 1 : 0.45,
+                      }}>
+                        {/* Reorder arrows */}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', mr: 0.5 }}>
+                          <IconButton size="small" disabled={globalIdx === 0} onClick={() => moveProduct(globalIdx, 'up')} sx={{ p: 0.15 }}>
+                            <UpIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                          <IconButton size="small" disabled={globalIdx === products.length - 1} onClick={() => moveProduct(globalIdx, 'down')} sx={{ p: 0.15 }}>
+                            <DownIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Box>
+
+                        {/* Label — editable */}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                            {product.property_values?.map((pv, pvIdx) => (
+                              <EditableText
+                                key={pvIdx}
+                                value={pv.values?.[0] || ''}
+                                onChange={(v) => updatePropertyValue(globalIdx, pvIdx, v)}
+                              />
+                            ))}
+                          </Box>
+                          {product.sku && (
+                            <Typography variant="caption" color="text.secondary">SKU: {product.sku}</Typography>
+                          )}
+                        </Box>
+
+                        {/* Quick info */}
+                        <Typography variant="body2" color="text.secondary" sx={{ minWidth: 55, textAlign: 'right' }}>
+                          {sym}{getPrice(o)}
+                        </Typography>
+                        <Chip
+                          label={o.quantity === 0 ? t('outOfStock') : `${o.quantity} ${t('pieces')}`}
+                          size="small"
+                          color={o.quantity === 0 ? 'error' : 'default'}
+                          variant="outlined"
+                          sx={{ fontSize: '0.7rem', height: 22, minWidth: { xs: 'auto', sm: 60 } }}
+                        />
+
+                        {/* Enabled indicator */}
+                        {!o.is_enabled && (
+                          <Chip label="OFF" size="small" color="default" sx={{ fontSize: '0.65rem', height: 18, opacity: 0.6 }} />
+                        )}
+
+                        {/* Actions */}
+                        <Box sx={{ display: 'flex', gap: 0 }}>
+                          <Tooltip title={t('copy')}>
+                            <IconButton size="small" onClick={() => duplicateProduct(globalIdx)}><DuplicateIcon sx={{ fontSize: 16 }} /></IconButton>
+                          </Tooltip>
+                          <Tooltip title={t('deleteTooltip')}>
+                            <IconButton size="small" color="error" onClick={() => setDeleteIndex(globalIdx)}><DeleteIcon sx={{ fontSize: 16 }} /></IconButton>
+                          </Tooltip>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              ))}
 
               {/* Inline add option */}
               <Box sx={{ display: 'flex', gap: 1, px: 1.5, py: 1.2, alignItems: 'center', borderTop: '1px solid rgba(0,0,0,0.08)', bgcolor: 'rgba(0,0,0,0.01)' }}>

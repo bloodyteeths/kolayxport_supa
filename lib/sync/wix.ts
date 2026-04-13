@@ -76,22 +76,20 @@ export async function syncWixRecentOrdersForUser(userId: string): Promise<SyncMe
 
     const client = createWixClient(credential, onTokenRefresh);
 
-    // Fetch orders from last 7 days
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Fetch orders from last 30 days using cursor pagination
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     let allOrders: any[] = [];
-    let offset = 0;
-    const limit = 50;
+    let cursor: string | undefined;
 
-    // Paginate through all recent orders
     while (true) {
-      const { orders, totalResults } = await client.queryOrders({
-        limit,
-        offset,
-        dateCreatedFrom: sevenDaysAgo,
+      const result = await client.searchOrders({
+        limit: 100,
+        cursor,
+        dateCreatedFrom: thirtyDaysAgo,
       });
-      allOrders = allOrders.concat(orders);
-      offset += limit;
-      if (offset >= totalResults || orders.length === 0) break;
+      allOrders = allOrders.concat(result.orders);
+      if (!result.hasNext || result.orders.length === 0) break;
+      cursor = result.cursor;
     }
 
     logger.info(`[WIX SYNC] Fetched ${allOrders.length} orders for user ${userId}`);

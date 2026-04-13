@@ -1724,10 +1724,26 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     {
       field: 'orderDate',
       headerName: t('columnOrderDate'),
-      width: 125,
-      valueFormatter: (value: string | undefined) => fmtDateTr(value), // Turkish style
+      width: 110,
       sortable: true,
-      sortComparator: (v1, v2) => new Date(v1).getTime() - new Date(v2).getTime(), // newest to oldest
+      sortComparator: (v1, v2) => new Date(v1).getTime() - new Date(v2).getTime(),
+      renderCell: (params: GridRenderCellParams<LabelRow>) => {
+        const iso = params.value as string | undefined;
+        if (!iso) return '—';
+        try {
+          const d = new Date(iso);
+          if (isNaN(d.getTime())) return '—';
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          const date = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear().toString().slice(-2)}`;
+          const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          return (
+            <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%', lineHeight: 1.3 }}>
+              <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>{date}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>{time}</Typography>
+            </Box>
+          );
+        } catch { return '—'; }
+      },
     },
     {
       field: 'orderNumber',
@@ -2795,7 +2811,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
               if (target.closest('button') || target.closest('a') || target.closest('.MuiCheckbox-root')) return;
               openDrawer(params.row as LabelRow);
             }}
-            rowHeight={58}
+            rowHeight={68}
             disableColumnResize={false}
             keepNonExistentRowsSelected={etgbEnabled}
             checkboxSelection={etgbEnabled}

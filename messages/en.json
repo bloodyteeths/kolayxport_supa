@@ -885,6 +885,8 @@
     "noWixConnected": "No Wix site connected yet.",
     "connectYourWix": "Connect Your Wix Site",
     "wixConnectedSuccess": "Wix site connected successfully!",
+    "wixInstallOpened": "Wix install page opened. Complete the installation and we'll connect automatically.",
+    "wixConnectFailed": "Failed to start Wix connection.",
     "wixDisconnected": "Wix site disconnected.",
     "wixDisconnectFailed": "Failed to disconnect Wix.",
     "wixConnectionFailed": "Wix connection failed.",

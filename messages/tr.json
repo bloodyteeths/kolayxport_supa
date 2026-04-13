@@ -845,6 +845,8 @@
     "noWixConnected": "Henüz Wix siteniz bağlı değil.",
     "connectYourWix": "Wix Sitenizi Bağlayın",
     "wixConnectedSuccess": "Wix sitesi başarıyla bağlandı!",
+    "wixInstallOpened": "Wix yükleme sayfası açıldı. Kurulumu tamamlayın, otomatik bağlanacak.",
+    "wixConnectFailed": "Wix bağlantısı başlatılamadı.",
     "wixDisconnected": "Wix site bağlantısı kesildi.",
     "wixDisconnectFailed": "Wix bağlantısı kesilemedi.",
     "wixConnectionFailed": "Wix bağlantısı başarısız oldu.",

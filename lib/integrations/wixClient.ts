@@ -155,7 +155,7 @@ export class WixApiClient {
     // Use ecom/v1/orders API (stores/v2 is deprecated)
     const body: any = {
       query: {
-        filter: Object.keys(filter).length > 0 ? JSON.stringify(filter) : undefined,
+        filter: Object.keys(filter).length > 0 ? filter : undefined,
         sort: [{ fieldName: 'dateCreated', order: 'DESC' }],
         paging: {
           limit: params.limit || 50,

@@ -41,7 +41,7 @@ async function handler(
     const hasVeeqo = !!finalVeeqoApiKey;
     const hasShippo = !!finalShippoToken;
     const hasTrendyol = !!(finalTrendyolApiKey && finalTrendyolApiSecret && finalTrendyolSupplierId) && isTrendyolEnabled(userId);
-    const hasWix = !!(userSettings?.wixAccessToken && userSettings?.wixSiteId) && isWixEnabled(userId);
+    const hasWix = !!(userSettings?.wixInstanceId && userSettings?.wixSiteId) && isWixEnabled(userId);
 
     if (!hasVeeqo && !hasShippo && !hasTrendyol && !hasWix) {
       logger.error('No integration credentials found', undefined, { userId, operation: 'order-sync' });

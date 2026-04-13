@@ -29,11 +29,12 @@ export async function syncWixRecentOrdersForUser(userId: string): Promise<SyncMe
     where: { userId, isActive: true },
   });
 
+  const cred = await prisma.credential.findUnique({ where: { userId } });
   const credential = wixSite
-    ? { wixAccessToken: wixSite.accessToken, wixRefreshToken: wixSite.refreshToken, wixSiteId: wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
-    : await prisma.credential.findUnique({ where: { userId } });
+    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+    : cred;
 
-  if (!credential?.wixAccessToken || !credential?.wixSiteId) {
+  if (!credential?.wixInstanceId || !credential?.wixSiteId) {
     logger.info(`[WIX SYNC] Skipping user ${userId}: missing credentials`);
     return null;
   }
@@ -57,7 +58,6 @@ export async function syncWixRecentOrdersForUser(userId: string): Promise<SyncMe
             where: { id: wixSite.id },
             data: {
               accessToken: creds.accessToken,
-              refreshToken: creds.refreshToken || undefined,
               tokenExpiresAt: creds.tokenExpiresAt,
             },
           });
@@ -66,7 +66,6 @@ export async function syncWixRecentOrdersForUser(userId: string): Promise<SyncMe
           where: { userId },
           data: {
             wixAccessToken: creds.accessToken,
-            wixRefreshToken: creds.refreshToken || undefined,
             wixTokenExpiresAt: creds.tokenExpiresAt,
           },
         });

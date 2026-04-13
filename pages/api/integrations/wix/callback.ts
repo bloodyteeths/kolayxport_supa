@@ -5,72 +5,64 @@ import { logger } from '@/lib/logger';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { code, state, instanceId, error } = req.query;
+  const { instanceId, state, error } = req.query;
 
   if (error) {
-    logger.error('Wix OAuth error', undefined, { error: error as string });
+    logger.error('Wix install error', undefined, { error: error as string });
     return res.redirect('/ayarlar?error=wix_auth_failed');
   }
 
-  if (!code || !state) {
-    return res.status(400).json({ error: 'Missing code or state parameter' });
+  if (!instanceId || !state) {
+    return res.status(400).json({ error: 'Missing instanceId or state parameter' });
   }
 
   let userId = '';
 
   try {
-    // Decode state
     const stateData = JSON.parse(Buffer.from(state as string, 'base64url').toString());
     userId = stateData.userId;
 
-    logger.info('Processing Wix OAuth callback', { userId, hasInstanceId: !!instanceId });
+    logger.info('Processing Wix install callback', { userId, instanceId: instanceId as string });
 
     const appId = process.env.WIX_APP_ID;
     const appSecret = process.env.WIX_APP_SECRET;
     if (!appId || !appSecret) throw new Error('WIX_APP_ID or WIX_APP_SECRET not configured');
 
-    // Exchange code for tokens
-    const tokenRes = await fetch('https://www.wixapis.com/oauth/access', {
+    // Get access token using client_credentials grant
+    const tokenRes = await fetch('https://www.wixapis.com/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        grant_type: 'authorization_code',
+        grant_type: 'client_credentials',
         client_id: appId,
         client_secret: appSecret,
-        code: code as string,
+        instance_id: instanceId as string,
       }),
     });
 
     if (!tokenRes.ok) {
       const errorBody = await tokenRes.text();
-      logger.error('Wix token exchange failed', undefined, { status: tokenRes.status, body: errorBody, userId });
+      logger.error('Wix token request failed', undefined, { status: tokenRes.status, body: errorBody, userId });
       return res.redirect('/ayarlar?error=wix_token_failed');
     }
 
-    const tokens = await tokenRes.json() as {
-      access_token: string;
-      refresh_token?: string;
-      expires_in?: number;
-    };
+    const tokenData = await tokenRes.json() as { access_token: string; expires_in?: number };
+    const tokenExpiresAt = new Date(Date.now() + ((tokenData.expires_in || 14400) * 1000));
 
-    const tokenExpiresAt = new Date(Date.now() + ((tokens.expires_in || 600) * 1000));
-    const siteId = (instanceId as string) || '';
-
-    // Try to fetch site info
-    let siteName = `Wix Site ${siteId}`;
+    // Get site info using the token
+    let siteName = `Wix Site`;
+    let siteId = instanceId as string;
     try {
-      const siteRes = await fetch('https://www.wixapis.com/site-properties/v4/properties', {
-        headers: {
-          'Authorization': tokens.access_token,
-          'wix-site-id': siteId,
-        },
+      const instanceRes = await fetch('https://www.wixapis.com/apps/v1/instance', {
+        headers: { 'Authorization': tokenData.access_token },
       });
-      if (siteRes.ok) {
-        const siteData = await siteRes.json() as any;
-        siteName = siteData.properties?.siteDisplayName || siteData.properties?.siteName || siteName;
+      if (instanceRes.ok) {
+        const instanceData = await instanceRes.json() as any;
+        siteName = instanceData.instance?.siteName || instanceData.site?.siteDisplayName || siteName;
+        siteId = instanceData.site?.siteId || instanceData.instance?.siteId || siteId;
       }
     } catch (e) {
-      logger.warn('Could not fetch Wix site name', { userId, siteId });
+      logger.warn('Could not fetch Wix site info', { userId, instanceId: instanceId as string });
     }
 
     // Upsert WixSite
@@ -78,8 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { userId_siteId: { userId, siteId } },
       update: {
         siteName,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token || null,
+        accessToken: tokenData.access_token,
         tokenExpiresAt,
         isActive: true,
         updatedAt: new Date(),
@@ -88,40 +79,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         userId,
         siteId,
         siteName,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token || null,
+        accessToken: tokenData.access_token,
         tokenExpiresAt,
         isActive: true,
       },
     });
 
-    // Also upsert Credential for backward compatibility
+    // Also update Credential for sync pipeline compatibility
     await prisma.credential.upsert({
       where: { userId },
       update: {
-        wixAccessToken: tokens.access_token,
-        wixRefreshToken: tokens.refresh_token || null,
+        wixAccessToken: tokenData.access_token,
         wixSiteId: siteId,
-        wixInstanceId: siteId,
+        wixInstanceId: instanceId as string,
         wixTokenExpiresAt: tokenExpiresAt,
         updatedAt: new Date(),
       },
       create: {
         userId,
-        wixAccessToken: tokens.access_token,
-        wixRefreshToken: tokens.refresh_token || null,
+        wixAccessToken: tokenData.access_token,
         wixSiteId: siteId,
-        wixInstanceId: siteId,
+        wixInstanceId: instanceId as string,
         wixTokenExpiresAt: tokenExpiresAt,
       },
     });
 
-    logger.info('Wix OAuth completed successfully', { userId, siteId, siteName });
+    logger.info('Wix connection completed', { userId, siteId, siteName, instanceId: instanceId as string });
     res.redirect('/ayarlar?success=wix_connected');
   } catch (err) {
-    logger.error('Wix OAuth callback failed', err instanceof Error ? err : new Error(String(err)), { userId });
+    logger.error('Wix callback failed', err instanceof Error ? err : new Error(String(err)), { userId });
     const errorMsg = err instanceof Error ? err.message : String(err);
-    const encoded = encodeURIComponent(errorMsg.substring(0, 100));
-    return res.redirect(`/ayarlar?error=wix_callback_failed&details=${encoded}`);
+    return res.redirect(`/ayarlar?error=wix_callback_failed&details=${encodeURIComponent(errorMsg.substring(0, 100))}`);
   }
 }

@@ -10,11 +10,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const wixSite = await prisma.wixSite.findFirst({ where: { userId: user.id, isActive: true } });
+  const cred = await prisma.credential.findUnique({ where: { userId: user.id } });
   const credential = wixSite
-    ? { wixAccessToken: wixSite.accessToken, wixRefreshToken: wixSite.refreshToken, wixSiteId: wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
-    : await prisma.credential.findUnique({ where: { userId: user.id } });
+    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+    : cred;
 
-  if (!credential?.wixAccessToken || !credential?.wixSiteId) {
+  if (!credential?.wixInstanceId || !credential?.wixSiteId) {
     return res.status(400).json({ error: 'Wix credentials not configured' });
   }
 

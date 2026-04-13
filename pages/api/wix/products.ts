@@ -18,11 +18,12 @@ async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
     where: { userId: user.id, isActive: true },
   });
 
+  const cred = await prisma.credential.findUnique({ where: { userId: user.id } });
   const credential = wixSite
-    ? { wixAccessToken: wixSite.accessToken, wixRefreshToken: wixSite.refreshToken, wixSiteId: wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
-    : await prisma.credential.findUnique({ where: { userId: user.id } });
+    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+    : cred;
 
-  if (!credential?.wixAccessToken || !credential?.wixSiteId) {
+  if (!credential?.wixInstanceId || !credential?.wixSiteId) {
     return { error: 'Wix credentials not configured', status: 400 };
   }
 
@@ -32,9 +33,9 @@ async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
   const onTokenRefresh = async (creds: any) => {
     try {
       if (wixSite) {
-        await prisma.wixSite.update({ where: { id: wixSite.id }, data: { accessToken: creds.accessToken, refreshToken: creds.refreshToken, tokenExpiresAt: creds.tokenExpiresAt } });
+        await prisma.wixSite.update({ where: { id: wixSite.id }, data: { accessToken: creds.accessToken, tokenExpiresAt: creds.tokenExpiresAt } });
       }
-      await prisma.credential.update({ where: { userId: user.id }, data: { wixAccessToken: creds.accessToken, wixRefreshToken: creds.refreshToken, wixTokenExpiresAt: creds.tokenExpiresAt } });
+      await prisma.credential.update({ where: { userId: user.id }, data: { wixAccessToken: creds.accessToken, wixTokenExpiresAt: creds.tokenExpiresAt } });
     } catch (e) {
       logger.warn('[WIX PRODUCTS] Failed to persist refreshed tokens');
     }

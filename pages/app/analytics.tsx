@@ -321,7 +321,7 @@ export default function DashboardPage() {
     fill: { type: ['solid', 'gradient'], opacity: [0.15, 1], gradient: { shadeIntensity: 1, stops: [0, 100] } },
     legend: { position: 'top', labels: { colors: '#64748b' } },
     grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
-    tooltip: { y: { formatter: (v: number, { seriesIndex }: { seriesIndex: number }) => seriesIndex === 1 ? formatCurrency(v) : `${v}` } },
+    tooltip: { y: { formatter: (v: number, opts?: any) => opts?.seriesIndex === 1 ? formatCurrency(v) : `${v}` } },
   };
 
   const revenueChartSeries = [
@@ -391,7 +391,7 @@ export default function DashboardPage() {
     ],
     legend: { position: 'top', labels: { colors: '#64748b' } },
     grid: { borderColor: '#f1f5f9', strokeDashArray: 4 },
-    tooltip: { y: { formatter: (v: number, { seriesIndex }: { seriesIndex: number }) => seriesIndex === 1 ? formatCurrency(v) : `${v}` } },
+    tooltip: { y: { formatter: (v: number, opts?: any) => opts?.seriesIndex === 1 ? formatCurrency(v) : `${v}` } },
   };
 
   const monthlySeries = [

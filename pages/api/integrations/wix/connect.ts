@@ -10,19 +10,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const appId = process.env.WIX_APP_ID;
-    const redirectUri = process.env.WIX_REDIRECT_URI;
-    if (!appId || !redirectUri) {
-      return res.status(500).json({ error: 'Wix app not configured' });
-    }
+    if (!appId) return res.status(500).json({ error: 'Wix app not configured' });
 
     const state = Buffer.from(JSON.stringify({ userId: user.id })).toString('base64url');
+    const redirectUrl = `${process.env.NEXTAUTH_URL || 'https://kolayxport.com'}/api/integrations/wix/callback`;
 
-    const authUrl = `https://www.wix.com/installer/install?appId=${appId}&redirectUrl=${encodeURIComponent(redirectUri)}&token=${state}`;
+    const authUrl = `https://www.wix.com/installer/install?appId=${appId}&redirectUrl=${encodeURIComponent(redirectUrl)}&state=${state}`;
 
-    logger.info('Initiating Wix OAuth flow', { userId: user.id });
+    logger.info('Initiating Wix app install flow', { userId: user.id });
     res.redirect(authUrl);
   } catch (error) {
-    logger.error('Failed to initiate Wix OAuth', error instanceof Error ? error : new Error(String(error)), { userId: user.id });
+    logger.error('Failed to initiate Wix connection', error instanceof Error ? error : new Error(String(error)), { userId: user.id });
     return res.status(500).json({ error: 'Failed to initiate Wix connection' });
   }
 }

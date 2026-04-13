@@ -1,24 +1,25 @@
 /**
  * Wix API client for orders and product management.
- * Uses OAuth tokens stored per-user. Supports token refresh with deduplication lock.
+ * Uses Client Credentials OAuth (appId + appSecret + instanceId → access token).
+ * Tokens are valid for ~4 hours and re-requested when expired.
  */
 
 export interface WixCredentials {
   siteId: string;
-  accessToken: string;
-  refreshToken?: string;
+  instanceId: string;
+  accessToken?: string;
   tokenExpiresAt?: Date;
 }
 
-export type TokenRefreshCallback = (creds: WixCredentials) => Promise<void>;
+export type TokenRefreshCallback = (creds: { accessToken: string; tokenExpiresAt: Date; instanceId: string; siteId: string }) => Promise<void>;
 
 const BASE_URL = 'https://www.wixapis.com';
-const MIN_GAP_MS = 200; // Conservative rate limiting
+const MIN_GAP_MS = 200;
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // Refresh 5 min before expiry
 
 export class WixApiClient {
   private accessToken: string;
-  private refreshToken?: string;
+  private instanceId: string;
   private siteId: string;
   private tokenExpiresAt?: Date;
   private onTokenRefresh?: TokenRefreshCallback;
@@ -26,58 +27,55 @@ export class WixApiClient {
   private lastRequestTime = 0;
 
   constructor(credentials: WixCredentials, onTokenRefresh?: TokenRefreshCallback) {
-    this.accessToken = credentials.accessToken;
-    this.refreshToken = credentials.refreshToken;
+    this.accessToken = credentials.accessToken || '';
+    this.instanceId = credentials.instanceId;
     this.siteId = credentials.siteId;
     this.tokenExpiresAt = credentials.tokenExpiresAt;
     this.onTokenRefresh = onTokenRefresh;
   }
 
   private needsTokenRefresh(): boolean {
-    if (!this.tokenExpiresAt) return false;
+    if (!this.accessToken || !this.tokenExpiresAt) return true;
     return Date.now() >= this.tokenExpiresAt.getTime() - TOKEN_REFRESH_BUFFER_MS;
   }
 
   /**
-   * Refresh access token. Uses lock to prevent concurrent refresh attempts.
+   * Get a new access token using client_credentials grant.
+   * Wix tokens are valid for ~4 hours. No refresh tokens needed.
    */
   private async refreshAccessToken(): Promise<void> {
     if (this.refreshPromise) return this.refreshPromise;
 
     this.refreshPromise = (async () => {
       try {
-        if (!this.refreshToken) throw new Error('No Wix refresh token available');
-
         const appId = process.env.WIX_APP_ID;
         const appSecret = process.env.WIX_APP_SECRET;
         if (!appId || !appSecret) throw new Error('WIX_APP_ID or WIX_APP_SECRET not configured');
 
-        const res = await fetch(`${BASE_URL}/oauth/access`, {
+        const res = await fetch(`${BASE_URL}/oauth2/token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            grant_type: 'refresh_token',
+            grant_type: 'client_credentials',
             client_id: appId,
             client_secret: appSecret,
-            refresh_token: this.refreshToken,
+            instance_id: this.instanceId,
           }),
         });
 
         if (!res.ok) {
           const text = await res.text();
-          throw new Error(`Wix token refresh failed (${res.status}): ${text}`);
+          throw new Error(`Wix token request failed (${res.status}): ${text}`);
         }
 
         const data = await res.json();
         this.accessToken = data.access_token;
-        if (data.refresh_token) this.refreshToken = data.refresh_token;
-        // Wix tokens typically expire in 10 minutes
-        this.tokenExpiresAt = new Date(Date.now() + (data.expires_in || 600) * 1000);
+        this.tokenExpiresAt = new Date(Date.now() + (data.expires_in || 14400) * 1000);
 
         if (this.onTokenRefresh) {
           await this.onTokenRefresh({
             accessToken: this.accessToken,
-            refreshToken: this.refreshToken || '',
+            instanceId: this.instanceId,
             siteId: this.siteId,
             tokenExpiresAt: this.tokenExpiresAt,
           });
@@ -110,14 +108,13 @@ export class WixApiClient {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Authorization': this.accessToken,
-      'wix-site-id': this.siteId,
       ...(options.headers as Record<string, string> || {}),
     };
 
     const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
     // Retry on 401
-    if (res.status === 401 && this.refreshToken) {
+    if (res.status === 401) {
       await this.refreshAccessToken();
       headers['Authorization'] = this.accessToken;
       const retryRes = await fetch(`${BASE_URL}${path}`, { ...options, headers });
@@ -141,7 +138,7 @@ export class WixApiClient {
   async queryOrders(params: {
     limit?: number;
     offset?: number;
-    dateCreatedFrom?: string; // ISO date
+    dateCreatedFrom?: string;
     dateCreatedTo?: string;
   } = {}): Promise<{ orders: any[]; totalResults: number }> {
     const filter: any = {};
@@ -293,29 +290,33 @@ export class WixApiClient {
   async getSiteProperties(): Promise<any> {
     return this.request<any>('/site-properties/v4/properties');
   }
+
+  async getAppInstance(): Promise<any> {
+    return this.request<any>('/apps/v1/instance');
+  }
 }
 
 /**
- * Factory function to create a WixApiClient from database credentials.
+ * Factory: create WixApiClient from DB credentials.
  */
 export function createWixClient(
   credential: {
     wixAccessToken?: string | null;
-    wixRefreshToken?: string | null;
     wixSiteId?: string | null;
+    wixInstanceId?: string | null;
     wixTokenExpiresAt?: Date | null;
   },
   onTokenRefresh?: TokenRefreshCallback
 ): WixApiClient {
-  if (!credential.wixAccessToken || !credential.wixSiteId) {
-    throw new Error('Missing Wix credentials (accessToken or siteId)');
+  if (!credential.wixInstanceId || !credential.wixSiteId) {
+    throw new Error('Missing Wix credentials (instanceId or siteId)');
   }
 
   return new WixApiClient(
     {
       siteId: credential.wixSiteId,
-      accessToken: credential.wixAccessToken,
-      refreshToken: credential.wixRefreshToken || undefined,
+      instanceId: credential.wixInstanceId,
+      accessToken: credential.wixAccessToken || undefined,
       tokenExpiresAt: credential.wixTokenExpiresAt || undefined,
     },
     onTokenRefresh

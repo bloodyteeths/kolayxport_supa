@@ -4,13 +4,22 @@ import { getAuthUser } from '../../../../lib/auth';
 import { logger } from '../../../../lib/logger';
 import crypto from 'crypto';
 
-const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY!;
-const SHOPIFY_REDIRECT_URI = process.env.SHOPIFY_REDIRECT_URI!;
 const SCOPES = 'read_orders,read_products,write_products,read_inventory,write_inventory';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
+  const SHOPIFY_REDIRECT_URI = process.env.SHOPIFY_REDIRECT_URI;
+
+  if (!SHOPIFY_API_KEY || !SHOPIFY_REDIRECT_URI) {
+    logger.error('Shopify env vars missing', undefined, {
+      hasKey: !!SHOPIFY_API_KEY,
+      hasRedirect: !!SHOPIFY_REDIRECT_URI,
+    });
+    return res.status(500).json({ error: 'Shopify integration not configured' });
   }
 
   const user = await getAuthUser(req, res);

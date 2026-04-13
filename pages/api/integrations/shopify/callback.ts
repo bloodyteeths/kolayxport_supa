@@ -4,12 +4,16 @@ import prisma from '../../../../lib/prisma';
 import { logger } from '../../../../lib/logger';
 import crypto from 'crypto';
 
-const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY!;
-const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET!;
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
+  const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
+
+  if (!SHOPIFY_API_KEY || !SHOPIFY_API_SECRET) {
+    return res.redirect('/ayarlar?error=shopify_connection_failed');
   }
 
   const { code, shop, state, hmac } = req.query as Record<string, string>;

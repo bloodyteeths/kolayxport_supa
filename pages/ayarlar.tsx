@@ -173,6 +173,11 @@ const AyarlarPage = () => {
   const [ebayTokenExpires, setEbayTokenExpires] = useState<string | null>(null);
   const [ebayLoading, setEbayLoading] = useState(false);
 
+  // --- Wix Connection State ---
+  const [wixConnected, setWixConnected] = useState(false);
+  const [wixSites, setWixSites] = useState<any[]>([]);
+  const [wixLoading, setWixLoading] = useState(false);
+
   // --- Etsy Shops State ---
   const [etsyShops, setEtsyShops] = useState<any[]>([]);
   const [etsyShopsLoading, setEtsyShopsLoading] = useState(false);
@@ -247,6 +252,32 @@ const AyarlarPage = () => {
     }
   };
 
+  // --- Wix Functions ---
+  const fetchWixStatus = async () => {
+    setWixLoading(true);
+    try {
+      const response = await axios.get('/api/integrations/wix/status');
+      setWixConnected(response.data.connected);
+      setWixSites(response.data.sites || []);
+    } catch {
+      setWixConnected(false);
+    } finally {
+      setWixLoading(false);
+    }
+  };
+
+  const handleDisconnectWix = async () => {
+    if (!window.confirm(t('disconnectWixConfirm'))) return;
+    try {
+      await axios.delete('/api/integrations/wix/status');
+      setWixConnected(false);
+      setWixSites([]);
+      setSnackbar({ open: true, message: t('wixDisconnected'), severity: 'success' });
+    } catch {
+      setSnackbar({ open: true, message: t('wixDisconnectFailed'), severity: 'error' });
+    }
+  };
+
   const [syncHistoryLoading, setSyncHistoryLoading] = useState(false);
   const [syncHistoryError, setSyncHistoryError] = useState<string | null>(null);
   const [syncHistoryCursor, setSyncHistoryCursor] = useState<string | null>(null);
@@ -283,6 +314,7 @@ const AyarlarPage = () => {
     fetchSyncHistory();
     fetchEtsyShops();
     fetchEbayStatus();
+    fetchWixStatus();
 
     // Show Etsy OAuth callback result from query params
     const { success, error, details } = router.query;
@@ -291,6 +323,14 @@ const AyarlarPage = () => {
       router.replace('/ayarlar', undefined, { shallow: true });
     } else if (success === 'ebay_connected') {
       setSnackbar({ open: true, message: t('ebayConnectedSuccess'), severity: 'success' });
+      router.replace('/ayarlar', undefined, { shallow: true });
+    } else if (success === 'wix_connected') {
+      setSnackbar({ open: true, message: t('wixConnectedSuccess'), severity: 'success' });
+      fetchWixStatus();
+      router.replace('/ayarlar', undefined, { shallow: true });
+    } else if (error === 'wix_auth_failed' || error === 'wix_token_failed' || error === 'wix_callback_failed') {
+      const detailMsg = details ? ` ${decodeURIComponent(details as string)}` : '';
+      setSnackbar({ open: true, message: `${t('wixConnectionFailed')}${detailMsg}`, severity: 'error' });
       router.replace('/ayarlar', undefined, { shallow: true });
     } else if (error === 'ebay_auth_failed' || error === 'ebay_token_failed' || error === 'ebay_callback_failed') {
       const detailMsg = details ? ` ${decodeURIComponent(details as string)}` : '';
@@ -665,6 +705,64 @@ const AyarlarPage = () => {
                       href="/api/integrations/ebay/connect"
                     >
                       {t('connectYourEbay')}
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Wix Connection */}
+              <Box sx={{ mb: 3, mt: 4, pt: 3, borderTop: '1px solid #e0e0e0' }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 2, gap: 1 }}>
+                  <Typography variant="h6" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {t('wixAccountConnection')}
+                  </Typography>
+                  {!wixConnected && (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      href="/api/integrations/wix/connect"
+                      sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >
+                      {t('connectWix')}
+                    </Button>
+                  )}
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {t('wixDesc')}
+                </Typography>
+
+                {wixLoading ? (
+                  <Typography>{t('checkingWixStatus')}</Typography>
+                ) : wixConnected ? (
+                  <Paper elevation={1} sx={{ p: 2, border: '1px solid #e0e0e0', overflow: 'hidden' }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5 }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="subtitle1" fontWeight="bold" color="success.main" sx={{ mb: 0.5 }}>
+                          {t('wixConnected')}
+                        </Typography>
+                        {wixSites.length > 0 && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {wixSites.map((s: any) => s.siteName || s.siteId).join(', ')}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                        <Button size="small" variant="outlined" href="/api/integrations/wix/connect">
+                          {t('reconnect')}
+                        </Button>
+                        <Button size="small" variant="outlined" color="error" onClick={handleDisconnectWix}>
+                          {t('disconnect')}
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Paper>
+                ) : (
+                  <Box sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {t('noWixConnected')}
+                    </Typography>
+                    <Button variant="outlined" color="primary" href="/api/integrations/wix/connect">
+                      {t('connectYourWix')}
                     </Button>
                   </Box>
                 )}

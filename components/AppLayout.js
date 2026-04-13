@@ -63,6 +63,7 @@ function getNavGroups(t) {
         { href: '/app/ebay-research', icon: Target, label: 'eBay Research' },
         { href: '/app/trendyol-urunler', icon: Package, label: 'Trendyol Ürünler' },
         { href: '/app/trendyol-arastirma', icon: Target, label: 'Trendyol Araştırma' },
+        { href: '/app/wix-urunler', icon: Package, label: t('wixProducts') },
       ],
     },
     {

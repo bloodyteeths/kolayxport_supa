@@ -58,6 +58,16 @@ export function isTrendyolEnabled(userId?: string): boolean {
   return userId ? ALLOW_TRENDYOL_USERS.includes(userId) : false;
 }
 
+// Wix Marketplace Integration
+export const MARKETPLACE_WIX = process.env.MARKETPLACE_WIX === 'true';
+export const ALLOW_WIX_USERS = process.env.ALLOW_WIX_USERS?.split(',').map(id => id.trim()) || [];
+
+export function isWixEnabled(userId?: string): boolean {
+  if (!MARKETPLACE_WIX) return false;
+  if (ALLOW_WIX_USERS.length === 0) return true;
+  return userId ? ALLOW_WIX_USERS.includes(userId) : false;
+}
+
 // FedEx & Global Shipper Details
 export const FEDEX_API_KEY = process.env.FEDEX_API_KEY;
 export const FEDEX_API_SECRET = process.env.FEDEX_API_SECRET;

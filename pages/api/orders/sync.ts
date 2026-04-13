@@ -3,8 +3,9 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { syncAllOrders } from '@/lib/orderSync';
 import { getAuthUser } from '@/lib/auth';
-import { isTrendyolEnabled } from '@/lib/config';
+import { isTrendyolEnabled, isWixEnabled } from '@/lib/config';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
+import { syncWixRecentOrdersForUser } from '@/lib/sync/wix';
 // Import Trendyol sync function from auto-sync script
 const { syncTrendyolRecentOrders } = require('../../../scripts/auto-sync-all-users.js');
 
@@ -40,8 +41,9 @@ async function handler(
     const hasVeeqo = !!finalVeeqoApiKey;
     const hasShippo = !!finalShippoToken;
     const hasTrendyol = !!(finalTrendyolApiKey && finalTrendyolApiSecret && finalTrendyolSupplierId) && isTrendyolEnabled(userId);
+    const hasWix = !!(userSettings?.wixAccessToken && userSettings?.wixSiteId) && isWixEnabled(userId);
 
-    if (!hasVeeqo && !hasShippo && !hasTrendyol) {
+    if (!hasVeeqo && !hasShippo && !hasTrendyol && !hasWix) {
       logger.error('No integration credentials found', undefined, { userId, operation: 'order-sync' });
       return res.status(400).json({ error: 'No integration credentials found. Please check your settings.' });
     }
@@ -124,6 +126,22 @@ async function handler(
                   failedOrders: 1,
                   errors: [{ orderId: 'trendyol_sync', error: error.message }]
                 };
+              }
+            })()
+          );
+        }
+
+        // Add Wix sync if enabled and credentials exist
+        if (hasWix) {
+          syncPromises.push(
+            (async () => {
+              try {
+                logger.info(`[Fast Sync] Starting Wix sync for user ${userId}`);
+                await syncWixRecentOrdersForUser(userId);
+                return { newOrders: 0, updatedOrders: 0, skippedOrders: 0, failedOrders: 0, errors: [] };
+              } catch (error: any) {
+                logger.error(`[Fast Sync] Wix sync failed for user ${userId}:`, error);
+                return { newOrders: 0, updatedOrders: 0, skippedOrders: 0, failedOrders: 1, errors: [{ orderId: 'wix_sync', error: error.message }] };
               }
             })()
           );

@@ -182,7 +182,8 @@ function determineChannel(order: any): OrderChannel {
   if (marketplace.includes('shopify')) return 'shopify';
   if (marketplace.includes('amazon')) return 'amazon';
   if (marketplace.includes('ebay')) return 'ebay';
-  
+  if (marketplace.includes('wix')) return 'wix';
+
   return 'other';
 }
 

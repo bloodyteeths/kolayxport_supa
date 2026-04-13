@@ -58,6 +58,8 @@ model User {
   financialTransactions FinancialTransaction[]
   financialSyncCursors  FinancialSyncCursor[]
   trendyolProducts      TrendyolProduct[]
+  wixSites              WixSite[]               @relation("UserWixSites")
+  wixProducts           WixProduct[]
 }
 
 model Account {
@@ -273,6 +275,11 @@ model Credential {
   ebayAccessToken       String?
   ebayRefreshToken      String?
   ebayTokenExpiresAt    DateTime?
+  wixAccessToken        String?
+  wixRefreshToken       String?
+  wixSiteId             String?
+  wixInstanceId         String?
+  wixTokenExpiresAt     DateTime?
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -926,4 +933,70 @@ model TrendyolProduct {
   @@index([userId, supplierId])
   @@index([userId, onSale])
   @@index([userId, categoryId])
+}
+
+model WixSite {
+  id              String    @id @default(cuid())
+  userId          String
+  siteId          String    @unique
+  siteName        String?
+  accessToken     String
+  refreshToken    String?
+  tokenExpiresAt  DateTime?
+  isActive        Boolean   @default(true)
+  lastOrderSyncAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user     User         @relation("UserWixSites", fields: [userId], references: [id], onDelete: Cascade)
+  products WixProduct[] @relation("WixSiteProducts")
+
+  @@unique([userId, siteId])
+  @@index([userId])
+}
+
+model WixProduct {
+  id           String  @id @default(cuid())
+  userId       String
+  wixSiteId    String
+  wixProductId String
+  slug         String?
+
+  title       String
+  description String? @db.Text
+  productType String?
+  brand       String?
+  collectionIds Json?
+
+  price         Decimal? @db.Decimal(10, 2)
+  discountPrice Decimal? @db.Decimal(10, 2)
+  currency      String   @default("USD")
+
+  trackInventory Boolean @default(true)
+  inStock        Boolean @default(true)
+  quantity       Int     @default(0)
+
+  images       Json?
+  thumbnailUrl String?
+  imageCount   Int     @default(0)
+
+  variants Json?
+  options  Json?
+
+  visible Boolean @default(true)
+  ribbon  String?
+  weight  Float?
+  sku     String?
+
+  wixCreatedDate DateTime?
+  wixUpdatedDate DateTime?
+  syncedAt       DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  site WixSite @relation("WixSiteProducts", fields: [wixSiteId], references: [id], onDelete: Cascade)
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wixSiteId, wixProductId])
+  @@index([userId, wixSiteId])
 }

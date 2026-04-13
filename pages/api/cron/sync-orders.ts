@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { syncAllOrders } from '@/lib/orderSync';
 import { syncTrendyolRecentOrdersForUser } from '@/lib/sync/trendyol';
-import { isTrendyolEnabled } from '@/lib/config';
+import { syncWixRecentOrdersForUser } from '@/lib/sync/wix';
+import { isTrendyolEnabled, isWixEnabled } from '@/lib/config';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Temporary disable cron via env flag to avoid Hobby plan limits
@@ -42,6 +43,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await syncTrendyolRecentOrdersForUser(user.id);
         } catch (e: any) {
           results.push({ userId: user.id, source: 'trendyol', error: e?.message || String(e) });
+        }
+      }
+
+      // Wix is optional per user
+      if (isWixEnabled(user.id)) {
+        try {
+          await syncWixRecentOrdersForUser(user.id);
+        } catch (e: any) {
+          results.push({ userId: user.id, source: 'wix', error: e?.message || String(e) });
         }
       }
     }

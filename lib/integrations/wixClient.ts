@@ -142,18 +142,20 @@ export class WixApiClient {
     dateCreatedTo?: string;
   } = {}): Promise<{ orders: any[]; totalResults: number }> {
     const filter: any = {};
-    if (params.dateCreatedFrom) {
-      filter['dateCreated'] = filter['dateCreated'] || {};
-      filter['dateCreated']['$gte'] = params.dateCreatedFrom;
-    }
-    if (params.dateCreatedTo) {
-      filter['dateCreated'] = filter['dateCreated'] || {};
-      filter['dateCreated']['$lte'] = params.dateCreatedTo;
+    if (params.dateCreatedFrom || params.dateCreatedTo) {
+      filter['dateCreated'] = {};
+      if (params.dateCreatedFrom) {
+        filter['dateCreated']['$gte'] = params.dateCreatedFrom;
+      }
+      if (params.dateCreatedTo) {
+        filter['dateCreated']['$lte'] = params.dateCreatedTo;
+      }
     }
 
+    // Use ecom/v1/orders API (stores/v2 is deprecated)
     const body: any = {
       query: {
-        filter: Object.keys(filter).length > 0 ? filter : undefined,
+        filter: Object.keys(filter).length > 0 ? JSON.stringify(filter) : undefined,
         sort: [{ fieldName: 'dateCreated', order: 'DESC' }],
         paging: {
           limit: params.limit || 50,
@@ -162,19 +164,19 @@ export class WixApiClient {
       },
     };
 
-    const data = await this.request<any>('/stores/v2/orders/query', {
+    const data = await this.request<any>('/ecom/v1/orders/query', {
       method: 'POST',
       body: JSON.stringify(body),
     });
 
     return {
       orders: data.orders || [],
-      totalResults: data.totalResults || 0,
+      totalResults: data.totalResults || data.metadata?.count || 0,
     };
   }
 
   async getOrder(orderId: string): Promise<any> {
-    const data = await this.request<any>(`/stores/v2/orders/${orderId}`);
+    const data = await this.request<any>(`/ecom/v1/orders/${orderId}`);
     return data.order || data;
   }
 

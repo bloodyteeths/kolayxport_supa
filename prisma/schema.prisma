@@ -60,6 +60,8 @@ model User {
   trendyolProducts      TrendyolProduct[]
   wixSites              WixSite[]               @relation("UserWixSites")
   wixProducts           WixProduct[]
+  shopifyShops          ShopifyShop[]            @relation("UserShopifyShops")
+  shopifyProducts       ShopifyProduct[]
 }
 
 model Account {
@@ -280,6 +282,8 @@ model Credential {
   wixSiteId             String?
   wixInstanceId         String?
   wixTokenExpiresAt     DateTime?
+  shopifyAccessToken    String?
+  shopifyShopDomain     String?
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -999,4 +1003,77 @@ model WixProduct {
 
   @@unique([userId, wixSiteId, wixProductId])
   @@index([userId, wixSiteId])
+}
+
+model ShopifyShop {
+  id                String    @id @default(cuid())
+  userId            String
+  shopDomain        String    @unique // e.g. "mystore.myshopify.com"
+  shopName          String?
+  accessToken       String
+  scopes            String?
+  isActive          Boolean   @default(true)
+  lastOrderSyncAt   DateTime?
+  lastProductSyncAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user     User              @relation("UserShopifyShops", fields: [userId], references: [id], onDelete: Cascade)
+  products ShopifyProduct[]  @relation("ShopifyShopProducts")
+
+  @@unique([userId, shopDomain])
+  @@index([userId])
+}
+
+model ShopifyProduct {
+  id               String  @id @default(cuid())
+  userId           String
+  shopifyShopId    String
+  shopifyProductId String  // Shopify's product numeric ID as string
+
+  // Content
+  title       String
+  description String?  @db.Text
+  vendor      String?
+  productType String?
+  status      String?  // active, draft, archived
+  tags        String[]
+  handle      String?
+
+  // Pricing (from default variant)
+  price          Decimal? @db.Decimal(10, 2)
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+  currency       String   @default("USD")
+
+  // Inventory
+  trackInventory Boolean @default(true)
+  totalInventory Int     @default(0)
+
+  // Images (JSON array of {id, src, alt, position})
+  images       Json?
+  thumbnailUrl String?
+  imageCount   Int     @default(0)
+
+  // Variants (JSON array of variant objects)
+  variants     Json?
+  options      Json?
+  variantCount Int     @default(0)
+
+  // SEO
+  seoTitle       String?
+  seoDescription String?
+
+  // Shopify timestamps
+  shopifyCreatedAt DateTime?
+  shopifyUpdatedAt DateTime?
+  syncedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  shop ShopifyShop @relation("ShopifyShopProducts", fields: [shopifyShopId], references: [id], onDelete: Cascade)
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, shopifyShopId, shopifyProductId])
+  @@index([userId, shopifyShopId])
+  @@index([shopifyShopId, status])
 }

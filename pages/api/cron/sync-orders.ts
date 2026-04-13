@@ -3,7 +3,8 @@ import prisma from '@/lib/prisma';
 import { syncAllOrders } from '@/lib/orderSync';
 import { syncTrendyolRecentOrdersForUser } from '@/lib/sync/trendyol';
 import { syncWixRecentOrdersForUser } from '@/lib/sync/wix';
-import { isTrendyolEnabled, isWixEnabled } from '@/lib/config';
+import { syncShopifyRecentOrdersForUser } from '@/lib/sync/shopify';
+import { isTrendyolEnabled, isWixEnabled, isShopifyEnabled } from '@/lib/config';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Temporary disable cron via env flag to avoid Hobby plan limits
@@ -52,6 +53,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await syncWixRecentOrdersForUser(user.id);
         } catch (e: any) {
           results.push({ userId: user.id, source: 'wix', error: e?.message || String(e) });
+        }
+      }
+
+      // Shopify is optional per user
+      if (isShopifyEnabled(user.id)) {
+        try {
+          await syncShopifyRecentOrdersForUser(user.id);
+        } catch (e: any) {
+          results.push({ userId: user.id, source: 'shopify', error: e?.message || String(e) });
         }
       }
     }

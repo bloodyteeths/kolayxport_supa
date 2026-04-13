@@ -68,6 +68,16 @@ export function isWixEnabled(userId?: string): boolean {
   return userId ? ALLOW_WIX_USERS.includes(userId) : false;
 }
 
+// Shopify Marketplace Integration
+export const MARKETPLACE_SHOPIFY = process.env.MARKETPLACE_SHOPIFY === 'true';
+export const ALLOW_SHOPIFY_USERS = process.env.ALLOW_SHOPIFY_USERS?.split(',').map(id => id.trim()) || [];
+
+export function isShopifyEnabled(userId?: string): boolean {
+  if (!MARKETPLACE_SHOPIFY) return false;
+  if (ALLOW_SHOPIFY_USERS.length === 0) return true;
+  return userId ? ALLOW_SHOPIFY_USERS.includes(userId) : false;
+}
+
 // FedEx & Global Shipper Details
 export const FEDEX_API_KEY = process.env.FEDEX_API_KEY;
 export const FEDEX_API_SECRET = process.env.FEDEX_API_SECRET;

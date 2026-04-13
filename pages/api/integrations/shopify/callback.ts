@@ -1,0 +1,117 @@
+// pages/api/integrations/shopify/callback.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import prisma from '../../../../lib/prisma';
+import { logger } from '../../../../lib/logger';
+import crypto from 'crypto';
+
+const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY!;
+const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET!;
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { code, shop, state, hmac } = req.query as Record<string, string>;
+
+  if (!code || !shop || !state || !hmac) {
+    logger.error('Shopify callback missing params', undefined, { query: req.query });
+    return res.redirect('/ayarlar?error=shopify_missing_params');
+  }
+
+  // Verify HMAC
+  const queryWithoutHmac = Object.entries(req.query)
+    .filter(([key]) => key !== 'hmac')
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&');
+
+  const generatedHmac = crypto
+    .createHmac('sha256', SHOPIFY_API_SECRET)
+    .update(queryWithoutHmac)
+    .digest('hex');
+
+  if (generatedHmac !== hmac) {
+    logger.error('Shopify HMAC verification failed');
+    return res.redirect('/ayarlar?error=shopify_hmac_failed');
+  }
+
+  // Decode state to get userId
+  let userId: string;
+  try {
+    const decoded = JSON.parse(Buffer.from(state, 'base64url').toString());
+    userId = decoded.userId;
+    if (!userId) throw new Error('No userId in state');
+  } catch (e) {
+    logger.error('Shopify callback invalid state', undefined, { state });
+    return res.redirect('/ayarlar?error=shopify_invalid_state');
+  }
+
+  try {
+    // Exchange code for permanent access token
+    const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: SHOPIFY_API_KEY,
+        client_secret: SHOPIFY_API_SECRET,
+        code,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const err = await tokenResponse.text();
+      logger.error('Shopify token exchange failed', undefined, { status: tokenResponse.status, body: err });
+      return res.redirect('/ayarlar?error=shopify_token_failed');
+    }
+
+    const tokenData = await tokenResponse.json();
+    const { access_token, scope } = tokenData;
+
+    // Fetch shop info
+    const shopInfoResponse = await fetch(`https://${shop}/admin/api/2024-10/shop.json`, {
+      headers: { 'X-Shopify-Access-Token': access_token },
+    });
+    const shopInfo = shopInfoResponse.ok ? (await shopInfoResponse.json()).shop : null;
+
+    // Upsert ShopifyShop record
+    await prisma.shopifyShop.upsert({
+      where: { shopDomain: shop },
+      create: {
+        userId,
+        shopDomain: shop,
+        shopName: shopInfo?.name || shop.split('.')[0],
+        accessToken: access_token,
+        scopes: scope,
+        isActive: true,
+      },
+      update: {
+        userId,
+        accessToken: access_token,
+        scopes: scope,
+        shopName: shopInfo?.name || undefined,
+        isActive: true,
+      },
+    });
+
+    // Also update Credential for backward compat
+    await prisma.credential.upsert({
+      where: { userId },
+      create: {
+        userId,
+        shopifyAccessToken: access_token,
+        shopifyShopDomain: shop,
+      },
+      update: {
+        shopifyAccessToken: access_token,
+        shopifyShopDomain: shop,
+      },
+    });
+
+    logger.info('Shopify store connected successfully', { userId, shop, scopes: scope });
+    return res.redirect('/ayarlar?success=shopify_connected');
+  } catch (error: any) {
+    logger.error('Shopify callback error', error, { userId, shop });
+    return res.redirect('/ayarlar?error=shopify_connection_failed');
+  }
+}

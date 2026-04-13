@@ -173,6 +173,170 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true });
     }
 
+    // ── CACHED PRODUCTS (DB-only with status/collection counts) ────
+    if (action === 'cached_products' && req.method === 'GET') {
+      const page = parseInt(req.query.page as string) || 0;
+      const size = parseInt(req.query.size as string) || 100;
+      const visibleParam = req.query.visible as string;
+      const collectionIdParam = req.query.collectionId as string | undefined;
+
+      const baseWhere: any = { userId, wixSiteId: wixSiteDbId };
+      if (visibleParam === 'true') baseWhere.visible = true;
+      else if (visibleParam === 'false') baseWhere.visible = false;
+      // 'all' or undefined = no filter
+
+      // If collectionId filter, we need to fetch all matching first, then filter in JS
+      let products: any[];
+      let count: number;
+
+      if (collectionIdParam) {
+        const allMatching = await prisma.wixProduct.findMany({
+          where: baseWhere,
+          orderBy: { syncedAt: 'desc' },
+        });
+        const filtered = allMatching.filter((p: any) => {
+          const ids = Array.isArray(p.collectionIds) ? p.collectionIds : [];
+          return ids.includes(collectionIdParam);
+        });
+        count = filtered.length;
+        products = filtered.slice(page * size, page * size + size);
+      } else {
+        [products, count] = await Promise.all([
+          prisma.wixProduct.findMany({
+            where: baseWhere,
+            skip: page * size,
+            take: size,
+            orderBy: { syncedAt: 'desc' },
+          }),
+          prisma.wixProduct.count({ where: baseWhere }),
+        ]);
+      }
+
+      // Status counts
+      const [visibleCount, hiddenCount, allCount] = await Promise.all([
+        prisma.wixProduct.count({ where: { userId, wixSiteId: wixSiteDbId, visible: true } }),
+        prisma.wixProduct.count({ where: { userId, wixSiteId: wixSiteDbId, visible: false } }),
+        prisma.wixProduct.count({ where: { userId, wixSiteId: wixSiteDbId } }),
+      ]);
+
+      // Collection counts
+      const allProducts = await prisma.wixProduct.findMany({
+        where: { userId, wixSiteId: wixSiteDbId },
+        select: { collectionIds: true },
+      });
+      const collectionCounts: Record<string, number> = {};
+      for (const p of allProducts) {
+        const ids = Array.isArray(p.collectionIds) ? p.collectionIds : [];
+        for (const cid of ids) {
+          if (typeof cid === 'string') {
+            collectionCounts[cid] = (collectionCounts[cid] || 0) + 1;
+          }
+        }
+      }
+
+      return res.status(200).json({
+        products,
+        count,
+        statusCounts: { visible: visibleCount, hidden: hiddenCount, all: allCount },
+        collectionCounts,
+      });
+    }
+
+    // ── BULK UPDATE ──────────────────────────────────────
+    if (action === 'bulk_update' && req.method === 'PUT') {
+      const { productIds, updates } = req.body;
+      if (!Array.isArray(productIds) || productIds.length === 0) {
+        return res.status(400).json({ error: 'Missing productIds array' });
+      }
+
+      let succeeded = 0;
+      let failed = 0;
+
+      for (const productId of productIds) {
+        try {
+          // Build Wix API update payload
+          const mappedUpdates: Record<string, any> = {};
+          if (updates.price != null) mappedUpdates.priceData = { price: updates.price };
+          if (updates.visible != null) mappedUpdates.visible = updates.visible;
+
+          if (Object.keys(mappedUpdates).length > 0) {
+            await client.updateProduct(productId, mappedUpdates);
+          }
+
+          // Handle inventory/quantity separately
+          if (updates.quantity != null) {
+            const inventory = await client.getInventoryItem(productId);
+            if (inventory?.id) {
+              const defaultVariant = inventory.variants?.[0];
+              if (defaultVariant) {
+                const currentQty = defaultVariant.quantity || 0;
+                const diff = updates.quantity - currentQty;
+                if (diff !== 0) {
+                  await client.updateInventoryVariants(inventory.id, [
+                    { variantId: defaultVariant.variantId, quantity: diff },
+                  ]);
+                }
+              }
+            }
+          }
+
+          // Update DB cache
+          const dbData: any = {};
+          if (updates.price != null) dbData.price = updates.price;
+          if (updates.visible != null) dbData.visible = updates.visible;
+          if (updates.quantity != null) {
+            dbData.quantity = updates.quantity;
+            dbData.inStock = updates.quantity > 0;
+          }
+          if (Object.keys(dbData).length > 0) {
+            await prisma.wixProduct.updateMany({
+              where: { wixProductId: productId, userId },
+              data: dbData,
+            });
+          }
+
+          succeeded++;
+        } catch (err: any) {
+          logger.warn(`[WIX PRODUCTS] bulk_update failed for ${productId}: ${err.message}`);
+          failed++;
+        }
+
+        // Rate limit delay
+        await new Promise((r) => setTimeout(r, 100));
+      }
+
+      return res.status(200).json({ succeeded, failed });
+    }
+
+    // ── BULK DELETE ──────────────────────────────────────
+    if (action === 'bulk_delete' && req.method === 'DELETE') {
+      const { productIds } = req.body;
+      if (!Array.isArray(productIds) || productIds.length === 0) {
+        return res.status(400).json({ error: 'Missing productIds array' });
+      }
+
+      let succeeded = 0;
+      let failed = 0;
+
+      for (const productId of productIds) {
+        try {
+          await client.deleteProduct(productId);
+          await prisma.wixProduct.deleteMany({
+            where: { wixProductId: productId, userId },
+          });
+          succeeded++;
+        } catch (err: any) {
+          logger.warn(`[WIX PRODUCTS] bulk_delete failed for ${productId}: ${err.message}`);
+          failed++;
+        }
+
+        // Rate limit delay
+        await new Promise((r) => setTimeout(r, 100));
+      }
+
+      return res.status(200).json({ succeeded, failed });
+    }
+
     return res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (err: any) {
     logger.error('[WIX PRODUCTS] Handler error', err);

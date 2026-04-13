@@ -184,9 +184,75 @@ function EditableText({ value, onChange, fontWeight = 600 }: { value: string; on
   );
 }
 
+// --- Error Boundary ---
+
+class VariationErrorBoundary extends React.Component<
+  { children: React.ReactNode; listingId: string },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[VariationEditor] Crash:', error.message, '\nStack:', info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <Box sx={{ p: 2, border: '1px solid #f44336', borderRadius: 2, bgcolor: '#fff5f5' }}>
+          <Typography variant="body2" color="error" fontWeight={700}>
+            Variation editor error
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+            {this.state.error.message}
+          </Typography>
+          <Button size="small" sx={{ mt: 1, textTransform: 'none' }}
+            onClick={() => this.setState({ error: null })}>
+            Retry
+          </Button>
+        </Box>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// --- Sanitize API data to prevent object-as-React-child crashes ---
+
+function sanitizeProducts(raw: any[]): Product[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(p => ({
+    product_id: Number(p.product_id) || 0,
+    sku: String(p.sku ?? ''),
+    offerings: Array.isArray(p.offerings) ? p.offerings.map((o: any) => ({
+      offering_id: Number(o.offering_id) || 0,
+      price: {
+        amount: Number(o.price?.amount) || 0,
+        divisor: Number(o.price?.divisor) || 100,
+        currency_code: String(o.price?.currency_code ?? 'USD'),
+      },
+      quantity: Number(o.quantity) || 0,
+      is_enabled: Boolean(o.is_enabled),
+    })) : [],
+    property_values: Array.isArray(p.property_values) ? p.property_values.map((pv: any) => ({
+      property_id: Number(pv.property_id) || 0,
+      property_name: String(pv.property_name ?? ''),
+      values: Array.isArray(pv.values) ? pv.values.map((v: any) => String(v)) : [],
+      scale_id: pv.scale_id != null ? Number(pv.scale_id) : null,
+    })) : [],
+  }));
+}
+
 // --- Component ---
 
-export default function VariationEditor({ listingId, shopId, taxonomyId, onSaved }: VariationEditorProps) {
+export default function VariationEditor(props: VariationEditorProps) {
+  return (
+    <VariationErrorBoundary listingId={props.listingId}>
+      <VariationEditorInner {...props} />
+    </VariationErrorBoundary>
+  );
+}
+
+function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: VariationEditorProps) {
   const t = useTranslations('etsy.variation');
   const [products, setProducts] = useState<Product[]>([]);
   const [originalProducts, setOriginalProducts] = useState<Product[]>([]);
@@ -338,7 +404,7 @@ export default function VariationEditor({ listingId, shopId, taxonomyId, onSaved
       );
       if (!res.ok) throw new Error(t('inventoryFetchFailed'));
       const data = await res.json();
-      const fetched = data.products || [];
+      const fetched = sanitizeProducts(data.products || []);
       setProducts(fetched);
       setOriginalProducts(JSON.parse(JSON.stringify(fetched)));
     } catch (err: any) {
@@ -355,7 +421,21 @@ export default function VariationEditor({ listingId, shopId, taxonomyId, onSaved
     if (!taxonomyId) return;
     fetch(`/api/clawd/etsy?action=get_taxonomy_properties&taxonomy_id=${taxonomyId}&shop_id=${shopId}`)
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.results) setTaxonomyProperties(data.results); })
+      .then(data => {
+        if (data?.results && Array.isArray(data.results)) {
+          setTaxonomyProperties(data.results.map((tp: any) => ({
+            property_id: Number(tp.property_id) || 0,
+            name: String(tp.name ?? ''),
+            display_name: String(tp.display_name ?? ''),
+            scales: Array.isArray(tp.scales) ? tp.scales.map((s: any) => ({
+              scale_id: Number(s.scale_id) || 0,
+              display_name: String(s.display_name ?? ''),
+              description: String(s.description ?? ''),
+            })) : [],
+            possible_values: Array.isArray(tp.possible_values) ? tp.possible_values : [],
+          })));
+        }
+      })
       .catch(() => {});
   }, [taxonomyId, shopId]);
 

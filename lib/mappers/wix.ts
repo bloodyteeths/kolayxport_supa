@@ -27,9 +27,9 @@ export function toOrderItem(item: any): NormalizedLineItem {
 /** Map a single Wix order to UIOrder format */
 export function toOrder(order: any): UIOrder {
   const billing = order.billingInfo?.contactDetails || {};
-  const shipping = order.shippingInfo?.logistics?.shippingDestination || {};
-  const addr = shipping.address || {};
-  const contact = shipping.contactDetails || billing;
+  const shippingDest = order.shippingInfo?.logistics?.shippingDestination || {};
+  const addr = shippingDest.address || {};
+  const contact = shippingDest.contactDetails || billing;
 
   const customerName = `${contact.firstName || billing.firstName || ''} ${contact.lastName || billing.lastName || ''}`.trim()
     || order.buyerInfo?.contactName || '';
@@ -37,6 +37,7 @@ export function toOrder(order: any): UIOrder {
   const lineItems = (order.lineItems || []).map((item: any) => toOrderItem(item));
 
   const orderDate = order.createdDate || order.dateCreated;
+  const street1 = addr.addressLine || addr.addressLine1 || '';
 
   return {
     id: order.id || String(Math.random()),
@@ -51,16 +52,16 @@ export function toOrder(order: any): UIOrder {
     source: 'wix' as const,
     channel: 'wix' as const,
     marketplace: 'Wix',
-    shippingAddress: addr.addressLine1
-      ? `${contact.firstName || ''} ${contact.lastName || ''}, ${addr.addressLine1}, ${addr.city || ''}, ${addr.country || ''}`.trim()
+    shippingAddress: street1
+      ? `${contact.firstName || ''} ${contact.lastName || ''}, ${street1}, ${addr.city || ''}, ${addr.subdivisionFullname || addr.subdivision || ''}, ${addr.postalCode || ''}, ${addr.countryFullname || addr.country || ''}`.trim()
       : null,
     to_address: {
       name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || customerName,
       phone: contact.phone || billing.phone || '',
-      street1: addr.addressLine1 || addr.addressLine || '',
+      street1,
       street2: addr.addressLine2 || '',
       city: addr.city || '',
-      state: addr.subdivision || addr.state || '',
+      state: addr.subdivisionFullname || addr.subdivision || '',
       postal: addr.postalCode || '',
       country: addr.country || '',
       isResidential: true,

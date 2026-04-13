@@ -2686,7 +2686,7 @@ export default async function handler(
         if (req.method === 'GET' && action === 'get_variation_images' && listing_id) {
             try {
                 const data = await callEtsyAPI(
-                    `/listings/${listing_id}/variation-images`,
+                    `/shops/${shopId}/listings/${listing_id}/variation-images`,
                     accessToken
                 );
                 return res.status(200).json({
@@ -2707,7 +2707,7 @@ export default async function handler(
             }
             try {
                 const result = await callEtsyAPI(
-                    `/listings/${listing_id}/variation-images`,
+                    `/shops/${shopId}/listings/${listing_id}/variation-images`,
                     accessToken,
                     {
                         method: 'POST',

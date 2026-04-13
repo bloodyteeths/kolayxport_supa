@@ -1309,7 +1309,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
               ))}
             </Select>
             <Typography variant="caption" color="text.secondary">
-              {t('processingTime')} — Etsy listing level
+              {t('processingTime')} — {t('appliedToAll')}
             </Typography>
           </Paper>
         </Box>
@@ -1324,7 +1324,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
       {/* Save / Cancel */}
       <Box display="flex" justifyContent="flex-end" mt={2} gap={1} alignItems="center"
-        sx={{ position: 'sticky', bottom: 0, bgcolor: 'white', py: 1.5, zIndex: 5, borderTop: '1px solid #eee' }}>
+        sx={{ py: 1.5, borderTop: '1px solid #eee' }}>
         {hasChanges && (
           <>
             <Typography variant="caption" color="text.secondary" sx={{ mr: 'auto' }}>

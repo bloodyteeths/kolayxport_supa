@@ -36,8 +36,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (parts.length === 3) {
           const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
           logger.info('Wix webhook JWT decoded', { payload });
-          instanceId = payload.instanceId;
-          // eventType might be something like "AppInstalled"
+
+          // Wix nests the actual event data inside a "data" string field
+          if (payload.data && typeof payload.data === 'string') {
+            try {
+              const eventData = JSON.parse(payload.data);
+              logger.info('Wix webhook event data', { eventData });
+              instanceId = eventData.instanceId;
+            } catch {
+              // data wasn't JSON, try payload directly
+              instanceId = payload.instanceId;
+            }
+          } else {
+            instanceId = payload.instanceId;
+          }
         }
       } catch (jwtErr) {
         logger.warn('Failed to decode Wix JWT', { error: String(jwtErr) });

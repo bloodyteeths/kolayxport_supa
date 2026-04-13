@@ -704,6 +704,25 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     return Array.from(seen.values());
   }, [products]);
 
+  // DEBUG: Find #310 object-as-child crash
+  // eslint-disable-next-line no-console
+  console.log('[VariationEditor DEBUG]', {
+    totalStock, typeof_totalStock: typeof totalStock,
+    productsLen: products.length,
+    existingProperties: existingProperties.map(p => ({ id: p.id, name: p.name, typeof_name: typeof p.name })),
+    grouped: grouped.map(g => ({ propName: g.propName, typeof_propName: typeof g.propName, itemCount: g.items.length })),
+    scalesForProperty: scalesForProperty.map(s => ({ scale_id: s.scale_id, display_name: s.display_name, typeof_dn: typeof s.display_name })),
+    sample_product: products[0] ? {
+      sku: products[0].sku, typeof_sku: typeof products[0].sku,
+      prop_values: products[0].property_values.map(pv => ({
+        name: pv.property_name, typeof_name: typeof pv.property_name,
+        values: pv.values, typeof_v0: typeof pv.values[0],
+      })),
+      price: products[0].offerings[0]?.price,
+    } : null,
+    t_test: { tabVariations: t('tabVariations'), typeof_tv: typeof t('tabVariations') },
+  });
+
   return (
     <Box>
       {/* Tabs — 7 tabs */}

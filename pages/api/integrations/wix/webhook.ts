@@ -3,17 +3,56 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
 /**
- * Receives instanceId + siteId from the Wix Dashboard Page extension
- * after the user installs the app on their site.
- * Also handles Wix webhook events (App Instance Installed).
+ * Receives Wix webhook events (App Instance Installed).
+ * Wix sends a JWT in the body — we decode it to extract instanceId.
+ * Also accepts plain JSON { instanceId } for direct calls.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { instanceId, siteId, userId } = req.body;
+    let instanceId: string | undefined;
+    let siteId: string | undefined;
+    let userId: string | undefined;
+
+    // Try to extract from JWT (Wix webhook format)
+    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    logger.info('Wix webhook received', {
+      contentType: req.headers['content-type'],
+      bodyType: typeof req.body,
+      bodyPreview: rawBody?.substring(0, 200),
+      hasDigest: !!req.headers['digest'],
+    });
+
+    // Wix sends JWT — could be in body directly or in body.data
+    const jwtToken = typeof req.body === 'string'
+      ? req.body
+      : req.body?.data || req.body?.token;
+
+    if (jwtToken && typeof jwtToken === 'string' && jwtToken.includes('.')) {
+      // Decode JWT payload (middle part)
+      try {
+        const parts = jwtToken.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+          logger.info('Wix webhook JWT decoded', { payload });
+          instanceId = payload.instanceId;
+          // eventType might be something like "AppInstalled"
+        }
+      } catch (jwtErr) {
+        logger.warn('Failed to decode Wix JWT', { error: String(jwtErr) });
+      }
+    }
+
+    // Fallback: plain JSON body
+    if (!instanceId && req.body?.instanceId) {
+      instanceId = req.body.instanceId;
+      siteId = req.body.siteId;
+      userId = req.body.userId;
+    }
 
     if (!instanceId) {
+      logger.warn('Wix webhook: no instanceId found', { body: rawBody?.substring(0, 500) });
       return res.status(400).json({ error: 'Missing instanceId' });
     }
 

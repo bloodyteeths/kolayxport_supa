@@ -6,7 +6,6 @@ import { logger } from '../logger';
 import { MNG_ENDPOINTS } from './mng.config';
 import type {
   MngCredentials,
-  MngAuthRequest,
   MngAuthResponse,
   MngOrderRequest,
   MngOrderResponse,
@@ -25,38 +24,30 @@ interface TokenCacheEntry {
 const tokenCache = new Map<string, TokenCacheEntry>();
 const TOKEN_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
-function getBaseUrl(env: MngCredentials['environment']): string {
-  return MNG_ENDPOINTS[env].base;
-}
-
-function getTokenUrl(env: MngCredentials['environment']): string {
-  return MNG_ENDPOINTS[env].token;
-}
-
 // ─── Authentication ──────────────────────────────────────────────────────────
 
 /**
  * Get a JWT token from MNG Identity API.
- * Tokens are cached per customerNumber and refreshed before expiry.
+ * Uses appId + appSecret (DHL eCommerce portal credentials).
+ * Tokens are cached per appId and refreshed before expiry.
  */
 export async function getMngToken(credentials: MngCredentials): Promise<string> {
-  const cacheKey = `${credentials.customerNumber}_${credentials.environment}`;
+  const cacheKey = credentials.appId;
   const cached = tokenCache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {
     return cached.token;
   }
 
-  const body: MngAuthRequest = {
-    customerNumber: credentials.customerNumber,
-    password: credentials.password,
+  const body = {
+    appId: credentials.appId,
+    appSecret: credentials.appSecret,
     identityType: 1,
   };
 
-  const tokenUrl = getTokenUrl(credentials.environment);
-  logger.info(`[MNG] Requesting JWT token from ${tokenUrl}`);
+  logger.info(`[MNG] Requesting JWT token from ${MNG_ENDPOINTS.token}`);
 
-  const res = await fetch(tokenUrl, {
+  const res = await fetch(MNG_ENDPOINTS.token, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -93,7 +84,7 @@ async function mngRequest<T = any>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = await getMngToken(credentials);
-  const baseUrl = getBaseUrl(credentials.environment);
+  const baseUrl = MNG_ENDPOINTS.base;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

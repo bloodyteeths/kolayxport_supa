@@ -10,14 +10,8 @@ export interface MngOption {
 // ─── API Endpoints ──────────────────────────────────────────────────────────
 
 export const MNG_ENDPOINTS = {
-  test: {
-    base: 'https://testapi.mngkargo.com.tr/mngapi/api',
-    token: 'https://testapi.mngkargo.com.tr/mngapi/api/token',
-  },
-  production: {
-    base: 'https://api.mngkargo.com.tr/mngapi/api',
-    token: 'https://api.mngkargo.com.tr/mngapi/api/token',
-  },
+  base: 'https://api.mngkargo.com.tr/mngapi/api',
+  token: 'https://api.mngkargo.com.tr/mngapi/api/token',
 } as const;
 
 // ─── Shipment Service Types ─────────────────────────────────────────────────

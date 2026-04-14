@@ -3,19 +3,8 @@
 // ---------------------------------------------------------------------------
 
 export interface MngCredentials {
-  customerNumber: string;
-  password: string;
-  appId?: string;
-  appSecret?: string;
-  environment: 'test' | 'production';
-}
-
-// ─── Auth ────────────────────────────────────────────────────────────────────
-
-export interface MngAuthRequest {
-  customerNumber: string;
-  password: string;
-  identityType: number; // always 1
+  appId: string;
+  appSecret: string;
 }
 
 export interface MngAuthResponse {

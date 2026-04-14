@@ -143,9 +143,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 3. Title-based fallback for Etsy listings (Shippo/chrome extension orders)
     if (Array.isArray(titles) && titles.length > 0) {
       const listings = await prisma.etsyListing.findMany({
-        where: { state: 'active' }, // Only match active listings — expired ones have dead URLs
         select: { etsyListingId: true, title: true, url: true, state: true, thumbnailUrl170x135: true, thumbnailUrl570xN: true },
-        orderBy: { syncedAt: 'desc' },
+        orderBy: [{ state: 'asc' }, { etsyListingId: 'desc' }], // 'active' sorts before other states, highest ID first
       });
 
       // Build normalized lookup, prioritizing active listings with highest listing ID (newest)
@@ -198,7 +197,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         if (match) {
-          result.byTitle[title] = match.url || `https://www.etsy.com/listing/${match.etsyListingId}`;
+          // Only set URL for active listings (expired URLs show "item not available")
+          if (match.isActive) {
+            result.byTitle[title] = match.url || `https://www.etsy.com/listing/${match.etsyListingId}`;
+          }
+          // Images stay valid even for expired listings
           const imageUrl = match.thumbnailUrl570xN || match.thumbnailUrl170x135 || '';
           if (imageUrl) {
             result.images[title] = imageUrl;

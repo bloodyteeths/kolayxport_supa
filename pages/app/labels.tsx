@@ -781,10 +781,30 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
     }
   }
 
-  // Batch fetch listing URLs
+  // Batch fetch listing URLs and images
   const listingUrlsByProductId: Record<string, string> = {};
   const listingUrlsByTitle: Record<string, string> = {};
-  if (veeqoProductIds.length > 0 || shippoTitles.length > 0) {
+  const listingImagesByTitle: Record<string, string> = {};
+
+  // Also collect Etsy listing IDs from rawData for direct lookup
+  const etsyListingIds: string[] = [];
+  for (const order of orders) {
+    if (!order || typeof order !== 'object') continue;
+    const mp = (order.marketplace || '').toLowerCase();
+    if (!mp.includes('etsy')) continue;
+    let safeRaw = order.rawData;
+    if (typeof safeRaw === 'string') {
+      try { safeRaw = JSON.parse(safeRaw); } catch { safeRaw = {}; }
+    }
+    // Chrome extension may store listing IDs in items
+    const items = safeRaw?.items || safeRaw?.line_items || [];
+    for (const item of items) {
+      const lid = item.listingId || item.listing_id || item.listingID;
+      if (lid) etsyListingIds.push(String(lid));
+    }
+  }
+
+  if (veeqoProductIds.length > 0 || shippoTitles.length > 0 || etsyListingIds.length > 0) {
     try {
       const resp = await fetch('/api/listing-urls', {
         method: 'POST',
@@ -792,12 +812,14 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         body: JSON.stringify({
           productIds: [...new Set(veeqoProductIds)],
           titles: [...new Set(shippoTitles)],
+          listingIds: [...new Set(etsyListingIds)],
         }),
       });
       if (resp.ok) {
         const data = await resp.json();
         Object.assign(listingUrlsByProductId, data.byProductId || {});
         Object.assign(listingUrlsByTitle, data.byTitle || {});
+        Object.assign(listingImagesByTitle, data.images || {});
       }
     } catch (error) {
       console.warn('Failed to batch fetch listing URLs:', error);
@@ -905,7 +927,10 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         unitPrice: order.orderTotalPrice ?? order.totalPrice ?? safeRaw?.total_price ?? 0,
         weight: order.weightKg ?? 0.5,
         hsCode: order.harmonizedCode ?? '—',
-        itemImageUrl: order.imageUrl || '/placeholder.png',
+        itemImageUrl: (() => {
+          const t = order.commodityDesc || safeRaw?.line_items?.[0]?.title || '';
+          return order.imageUrl || listingImagesByTitle[t] || '/placeholder.png';
+        })(),
 
         recipientFirstName: addr.recipientFirstName || '—',
         recipientLastName: addr.recipientLastName || '—',
@@ -976,7 +1001,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         unitPrice: (isVeeqoItem ? item.sellable?.price : item.unitPrice ?? item.value ?? item.total_price) ?? 0,
         weight: (isVeeqoItem ? item.sellable?.weight : item.weight) ?? 0.5,
         hsCode: (isVeeqoItem ? item.sellable?.product?.hs_tariff_number : item.hs_code) ?? order.harmonizedCode ?? '—',
-        itemImageUrl: (isVeeqoItem ? item.sellable?.image_url || item.sellable?.product?.main_image_src : item.image) || order.imageUrl || '/placeholder.png',
+        itemImageUrl: (isVeeqoItem ? item.sellable?.image_url || item.sellable?.product?.main_image_src : (item.image || listingImagesByTitle[item.title || ''])) || order.imageUrl || '/placeholder.png',
         
         recipientFirstName: addr.recipientFirstName || '—',
         recipientLastName: addr.recipientLastName || '—',

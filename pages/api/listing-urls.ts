@@ -5,22 +5,24 @@ import prisma from '@/lib/prisma';
 const productUrlCache = new Map<number, { url: string; channel: string }>();
 
 /**
- * Batch lookup listing URLs for order items.
+ * Batch lookup listing URLs and thumbnails for order items.
  * POST /api/listing-urls
- * Body: { productIds: number[], titles?: string[] }
+ * Body: { productIds: number[], titles?: string[], listingIds?: string[] }
  *   - productIds: Veeqo product IDs → calls Veeqo Product API for channel URLs
  *   - titles: fallback title matching against EtsyListing table
- * Returns: { byProductId: { [id]: url }, byTitle: { [title]: url } }
+ *   - listingIds: direct Etsy listing ID lookup
+ * Returns: { byProductId: { [id]: url }, byTitle: { [title]: url }, images: { [title]: imageUrl } }
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { productIds, titles } = req.body;
-  const result: { byProductId: Record<string, string>; byTitle: Record<string, string> } = {
+  const { productIds, titles, listingIds } = req.body;
+  const result: { byProductId: Record<string, string>; byTitle: Record<string, string>; images: Record<string, string> } = {
     byProductId: {},
     byTitle: {},
+    images: {},
   };
 
   try {
@@ -113,23 +115,77 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    // 2. Title-based fallback for Etsy listings (Shippo orders without Veeqo product IDs)
+    // 2. Direct listing ID lookup for Etsy listings
+    if (Array.isArray(listingIds) && listingIds.length > 0) {
+      const bigintIds = listingIds.map((id: string) => {
+        try { return BigInt(id); } catch { return null; }
+      }).filter(Boolean) as bigint[];
+
+      if (bigintIds.length > 0) {
+        const directMatches = await prisma.etsyListing.findMany({
+          where: { etsyListingId: { in: bigintIds } },
+          select: { etsyListingId: true, title: true, url: true, thumbnailUrl170x135: true, thumbnailUrl570xN: true },
+        });
+        for (const match of directMatches) {
+          const idStr = match.etsyListingId.toString();
+          const url = match.url || `https://www.etsy.com/listing/${idStr}`;
+          // Store by listing ID for direct resolution
+          result.byProductId[`etsy-${idStr}`] = url;
+          // Also store image
+          const imageUrl = match.thumbnailUrl570xN || match.thumbnailUrl170x135 || '';
+          if (imageUrl && match.title) {
+            result.images[match.title] = imageUrl;
+          }
+        }
+      }
+    }
+
+    // 3. Title-based fallback for Etsy listings (Shippo/chrome extension orders)
     if (Array.isArray(titles) && titles.length > 0) {
       const listings = await prisma.etsyListing.findMany({
-        select: { etsyListingId: true, title: true, url: true },
+        select: { etsyListingId: true, title: true, url: true, thumbnailUrl170x135: true, thumbnailUrl570xN: true },
       });
+
+      // Build normalized lookup for better matching
+      const normalizedListings = listings.map(l => ({
+        ...l,
+        normalizedTitle: l.title.toLowerCase().replace(/\s+/g, ' ').trim(),
+      }));
 
       for (const title of titles) {
         if (!title || title === '—' || title === 'N/A (Order Level)') continue;
-        const lower = title.toLowerCase().trim();
-        const prefix = lower.slice(0, 30);
-        const match = listings.find(
-          (l) =>
-            l.title.toLowerCase().startsWith(prefix) ||
-            lower.startsWith(l.title.toLowerCase().slice(0, 30))
-        );
+        if (result.byTitle[title]) continue; // Already resolved by listing ID
+
+        const normalizedInput = title.toLowerCase().replace(/\s+/g, ' ').trim();
+
+        // Try exact match first
+        let match = normalizedListings.find(l => l.normalizedTitle === normalizedInput);
+
+        // Then try prefix match (first 30 chars) in both directions
+        if (!match) {
+          const prefix = normalizedInput.slice(0, 30);
+          match = normalizedListings.find(
+            (l) =>
+              l.normalizedTitle.startsWith(prefix) ||
+              normalizedInput.startsWith(l.normalizedTitle.slice(0, 30))
+          );
+        }
+
+        // Then try substring/contains match for partial titles
+        if (!match) {
+          match = normalizedListings.find(
+            (l) =>
+              l.normalizedTitle.includes(normalizedInput) ||
+              normalizedInput.includes(l.normalizedTitle)
+          );
+        }
+
         if (match) {
           result.byTitle[title] = match.url || `https://www.etsy.com/listing/${match.etsyListingId}`;
+          const imageUrl = match.thumbnailUrl570xN || match.thumbnailUrl170x135 || '';
+          if (imageUrl) {
+            result.images[title] = imageUrl;
+          }
         }
       }
     }
@@ -137,6 +193,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json(result);
   } catch (error) {
     console.error('[listing-urls] Error:', error);
-    res.status(500).json({ byProductId: {}, byTitle: {} });
+    res.status(500).json({ byProductId: {}, byTitle: {}, images: {} });
   }
 }

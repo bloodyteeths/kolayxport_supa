@@ -179,7 +179,24 @@ async function handler(
         const orderIdMap = new Map(currentOrders.map(o => [o.marketplaceKey, o.id]));
 
         const orderItemsToCreate: Prisma.OrderItemCreateManyInput[] = [];
-        
+
+        // Fetch EtsyListing thumbnails for image matching
+        const allItemTitles = batch.flatMap(o => (o.line_items || []).map((i: any) => i.title).filter(Boolean));
+        let etsyListingImageMap = new Map<string, string>();
+        if (allItemTitles.length > 0) {
+          try {
+            const etsyListings = await prisma.etsyListing.findMany({
+              select: { title: true, thumbnailUrl570xN: true, thumbnailUrl170x135: true },
+            });
+            for (const listing of etsyListings) {
+              const imageUrl = listing.thumbnailUrl570xN || listing.thumbnailUrl170x135 || '';
+              if (imageUrl) {
+                etsyListingImageMap.set(listing.title.toLowerCase().replace(/\s+/g, ' ').trim(), imageUrl);
+              }
+            }
+          } catch { /* non-critical */ }
+        }
+
         for (const order of batch) {
           const orderId = orderIdMap.get(order.marketplaceKey);
           if (!orderId) continue;
@@ -187,6 +204,22 @@ async function handler(
           const lineItems = order.line_items || [];
           for (let i = 0; i < lineItems.length; i++) {
             const item = lineItems[i];
+            // Look up image from EtsyListing by title match
+            let itemImage = item.image || '';
+            if (!itemImage && item.title) {
+              const normalizedTitle = item.title.toLowerCase().replace(/\s+/g, ' ').trim();
+              itemImage = etsyListingImageMap.get(normalizedTitle) || '';
+              // Try prefix match if exact match fails
+              if (!itemImage) {
+                const prefix = normalizedTitle.slice(0, 30);
+                for (const [key, url] of etsyListingImageMap) {
+                  if (key.startsWith(prefix) || normalizedTitle.startsWith(key.slice(0, 30))) {
+                    itemImage = url;
+                    break;
+                  }
+                }
+              }
+            }
             orderItemsToCreate.push({
               orderId,
               productName: item.title || 'Unknown Product',
@@ -195,7 +228,7 @@ async function handler(
               totalPrice: new Prisma.Decimal((item.value || 0) * (item.quantity || 1)),
               weightKg: item.weight || 0.5,
               sku: item.sku || '',
-              image: item.image || '',
+              image: itemImage,
               variantInfo: item.variantInfo || '',
               marketplaceKey: String(item.id),
               orderNumber: order.orderNumber,

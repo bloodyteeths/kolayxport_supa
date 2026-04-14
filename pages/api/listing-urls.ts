@@ -143,8 +143,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 3. Title-based fallback for Etsy listings (Shippo/chrome extension orders)
     if (Array.isArray(titles) && titles.length > 0) {
       const listings = await prisma.etsyListing.findMany({
+        where: { state: 'active' }, // Only match active listings — expired ones have dead URLs
         select: { etsyListingId: true, title: true, url: true, state: true, thumbnailUrl170x135: true, thumbnailUrl570xN: true },
-        orderBy: { syncedAt: 'desc' }, // Most recently synced first
+        orderBy: { syncedAt: 'desc' },
       });
 
       // Build normalized lookup, prioritizing active listings with highest listing ID (newest)

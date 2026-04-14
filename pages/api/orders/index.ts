@@ -459,32 +459,32 @@ export default async function handler(
       }
       trackingSubmissionsByOrderId.get(submission.orderId).push(submission);
     });
-    // --- Lazy-enrich Etsy OrderItems with current EtsyListing images ---
-    // Collect Etsy order items that are missing images
+    // --- Lazy-enrich ALL Etsy OrderItems with current active EtsyListing data ---
     const etsyOrderIds = (result as any[])
       .filter((o: any) => (o.marketplace || '').toLowerCase().includes('etsy'))
       .map((o: any) => o.id);
 
     if (etsyOrderIds.length > 0) {
       const etsyItems = (itemsResult as any[]).filter(
-        (item: any) => etsyOrderIds.includes(item.orderId) && (!item.image || item.image === '')
+        (item: any) => etsyOrderIds.includes(item.orderId)
       );
 
       if (etsyItems.length > 0) {
         try {
-          // Fetch all EtsyListings with images (prefer active, highest ID)
+          // ONLY fetch ACTIVE EtsyListings — expired/removed listings are excluded
           const etsyListings = await prisma.$queryRawUnsafe(`
-            SELECT "etsyListingId", title, url, state, "thumbnailUrl570xN", "thumbnailUrl170x135"
+            SELECT "etsyListingId", title, url, "thumbnailUrl570xN", "thumbnailUrl170x135"
             FROM "EtsyListing"
-            WHERE ("thumbnailUrl570xN" IS NOT NULL OR "thumbnailUrl170x135" IS NOT NULL)
-            ORDER BY (CASE WHEN state = 'active' THEN 0 ELSE 1 END), "etsyListingId" DESC
+            WHERE state = 'active'
+            ORDER BY "etsyListingId" DESC
           `) as any[];
 
           const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 
-          // Build lookup: normalized title -> { imageUrl, url, etsyListingId }
-          // First entry wins (active + highest ID due to ORDER BY)
-          const listingByTitle = new Map<string, { imageUrl: string; url: string; etsyListingId: string }>();
+          type ListingMatch = { imageUrl: string; url: string; etsyListingId: string };
+
+          // Build lookup: normalized title -> listing data (highest ID first due to ORDER BY)
+          const listingByTitle = new Map<string, ListingMatch>();
           for (const l of etsyListings) {
             const norm = normalize(l.title);
             if (!listingByTitle.has(norm)) {
@@ -496,59 +496,66 @@ export default async function handler(
             }
           }
 
-          // Match and update items
-          const itemUpdates: { id: string; image: string }[] = [];
+          const findMatch = (itemTitle: string): ListingMatch | undefined => {
+            // 1. Exact match
+            let matched = listingByTitle.get(itemTitle);
+            if (matched) return matched;
+
+            // 2. Prefix match (first 30 chars)
+            const prefix = itemTitle.slice(0, 30);
+            for (const [key, val] of listingByTitle) {
+              if (key.startsWith(prefix) || itemTitle.startsWith(key.slice(0, 30))) {
+                return val;
+              }
+            }
+
+            // 3. Word overlap (≥60%)
+            const itemWords = new Set(itemTitle.split(/\s+/).filter(w => w.length > 2));
+            let bestOverlap = 0;
+            let bestMatch: ListingMatch | undefined;
+            for (const [key, val] of listingByTitle) {
+              const listingWords = new Set(key.split(/\s+/).filter(w => w.length > 2));
+              const overlap = [...itemWords].filter(w => listingWords.has(w)).length;
+              const ratio = overlap / Math.max(itemWords.size, 1);
+              if (ratio >= 0.6 && overlap > bestOverlap) {
+                bestOverlap = overlap;
+                bestMatch = val;
+              }
+            }
+            return bestMatch;
+          };
+
+          // Match items and enrich
+          const imageUpdates: { id: string; image: string }[] = [];
           for (const item of etsyItems) {
             const itemTitle = normalize(item.productName || '');
             if (!itemTitle) continue;
 
-            // Try exact → prefix → word overlap → substring
-            let matched: { imageUrl: string; url: string; etsyListingId: string } | undefined = listingByTitle.get(itemTitle);
-
-            if (!matched) {
-              const prefix = itemTitle.slice(0, 30);
-              for (const [key, val] of listingByTitle) {
-                if (key.startsWith(prefix) || itemTitle.startsWith(key.slice(0, 30))) {
-                  matched = val;
-                  break;
+            const matched = findMatch(itemTitle);
+            if (matched) {
+              // Always set the listing URL for display
+              item.etsyListingUrl = matched.url;
+              // Update image if missing
+              if (!item.image || item.image === '') {
+                item.image = matched.imageUrl;
+                if (matched.imageUrl) {
+                  imageUpdates.push({ id: item.id, image: matched.imageUrl });
                 }
               }
-            }
-
-            if (!matched) {
-              // Word overlap: match if ≥60% of words overlap
-              const itemWords = new Set(itemTitle.split(/\s+/).filter(w => w.length > 2));
-              let bestOverlap = 0;
-              let bestMatch: { imageUrl: string; url: string; etsyListingId: string } | undefined = undefined;
-              for (const [key, val] of listingByTitle) {
-                const listingWords = new Set(key.split(/\s+/).filter(w => w.length > 2));
-                const overlap = [...itemWords].filter(w => listingWords.has(w)).length;
-                const ratio = overlap / Math.max(itemWords.size, 1);
-                if (ratio >= 0.6 && overlap > bestOverlap) {
-                  bestOverlap = overlap;
-                  bestMatch = val;
-                }
-              }
-              matched = bestMatch;
-            }
-
-            if (matched?.imageUrl) {
-              item.image = matched.imageUrl;
-              itemUpdates.push({ id: item.id, image: matched.imageUrl });
             }
           }
 
-          // Persist image updates back to DB (fire-and-forget, non-blocking)
-          if (itemUpdates.length > 0) {
-            const ids = itemUpdates.map(u => u.id);
-            const cases = itemUpdates.map(u => `WHEN '${u.id}' THEN '${u.image.replace(/'/g, "''")}'`).join(' ');
+          // Persist image updates back to DB (fire-and-forget)
+          if (imageUpdates.length > 0) {
+            const ids = imageUpdates.map(u => u.id);
+            const cases = imageUpdates.map(u => `WHEN '${u.id}' THEN '${u.image.replace(/'/g, "''")}'`).join(' ');
             prisma.$executeRawUnsafe(`
               UPDATE "OrderItem" SET image = CASE id ${cases} END
               WHERE id = ANY($1)
-            `, ids).catch(() => {}); // Non-blocking, ignore errors
+            `, ids).catch(() => {});
           }
         } catch (err) {
-          console.warn('[orders] Etsy image enrichment failed:', err);
+          console.warn('[orders] Etsy enrichment failed:', err);
         }
       }
     }
@@ -618,6 +625,7 @@ export default async function handler(
         country_of_origin: item.countryOfMfg || '',
         sku: item.sku || '',
         image: item.image || '',
+        etsyListingUrl: item.etsyListingUrl || '',
         variantInfo: item.variantInfo || '',
         labelJobStatus: item.labelJobStatus || '',
         trackingNumber: item.trackingNumber || '',

@@ -168,6 +168,7 @@ interface LocalUIOrder {
     quantity?: number;
     variantInfo?: string;
     image?: string;
+    etsyListingUrl?: string;
     weight?: number;
     hs_code?: string;
     country_of_origin?: string;
@@ -960,6 +961,10 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
           if (isTrendyol && safeRaw?.lines?.[0]?.contentId) {
             return `https://www.trendyol.com/x/x-p-${safeRaw.lines[0].contentId}`;
           }
+          // Use server-resolved active listing URL first (from orders API enrichment)
+          const firstItem = lineItems?.[0];
+          if (firstItem?.etsyListingUrl) return firstItem.etsyListingUrl;
+          // Fallback to title-based lookup
           const t = order.commodityDesc || safeRaw?.line_items?.[0]?.title || '';
           return listingUrlsByTitle[t] || undefined;
         })(),
@@ -1037,6 +1042,8 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
             const contentId = trendyolContentMap.get(String(lineId)) || safeRaw?.lines?.[0]?.contentId;
             if (contentId) return `https://www.trendyol.com/x/x-p-${contentId}`;
           }
+          // Use server-resolved active listing URL first
+          if (item.etsyListingUrl) return item.etsyListingUrl;
           // Fallback: title matching from EtsyListing DB
           const t = item.title || '';
           return listingUrlsByTitle[t] || undefined;

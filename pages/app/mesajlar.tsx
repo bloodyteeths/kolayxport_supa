@@ -200,7 +200,7 @@ export default function MessagesPage() {
     );
   };
 
-  const ThreadView = () => (
+  const threadView = (
     <div className="flex flex-col h-full">
       {/* Thread header */}
       {selectedConv && (
@@ -423,7 +423,7 @@ export default function MessagesPage() {
               }}
             >
               <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2 mb-1" />
-              <ThreadView />
+              {threadView}
             </SwipeableDrawer>
           </>
         ) : (
@@ -443,7 +443,7 @@ export default function MessagesPage() {
             {/* Right: Thread */}
             <div className="flex-1 bg-white rounded-xl overflow-hidden" style={{ border: '1px solid #e2e8f0' }}>
               {selectedConv ? (
-                <ThreadView />
+                threadView
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400">
                   <Mail size={40} className="mb-3 text-slate-300" />

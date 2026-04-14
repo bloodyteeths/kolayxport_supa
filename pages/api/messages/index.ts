@@ -56,7 +56,7 @@ function normalizeWixConversation(conv: any): UnifiedConversation {
   const isUnanswered = lastDirection === 'PARTICIPANT_TO_BUSINESS' || lastDirection === 'CUSTOMER_TO_BUSINESS' || lastDirection === 'VISITOR';
 
   // _contactName is injected by our listConversations workaround
-  const customerName = conv._contactName || conv.displayName || 'Customer';
+  const customerName = conv._contactName || conv.participantDisplayData?.name || conv.displayName || 'Customer';
 
   return {
     id: conv.id,
@@ -266,8 +266,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!client) return res.status(400).json({ error: 'Wix credentials not configured' });
 
         const msgData = await client.getConversationMessages(conversationId, { limit: 100 });
+        logger.info('[MESSAGES] Wix thread raw', { conversationId, msgCount: msgData?.messages?.length, keys: Object.keys(msgData || {}) });
         const messages = (msgData.messages || []).map(normalizeWixMessage);
-
 
         return res.status(200).json({
           id: conversationId,

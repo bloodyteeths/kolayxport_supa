@@ -289,24 +289,8 @@ export class WixApiClient {
 
   // ─── Inbox / Conversations ────────────────────────────────
   // Wix Inbox REST API has NO "list conversations" endpoint.
-  // Workflow: query CRM contacts → get-or-create conversation per contact → list messages.
-  // Endpoints: POST /inbox/v2/conversations (get-or-create), GET /inbox/v2/conversations/{id},
-  //            GET /inbox/v2/messages, POST /inbox/v2/messages (send)
-
-  /**
-   * Query CRM contacts to find people who may have conversations.
-   */
-  async queryContacts(params: { limit?: number; cursor?: string } = {}): Promise<any> {
-    return this.request<any>('/contacts/v4/contacts/query', {
-      method: 'POST',
-      body: JSON.stringify({
-        query: {
-          paging: { limit: params.limit || 50, ...(params.cursor ? { cursor: params.cursor } : {}) },
-          sort: [{ fieldName: 'lastActivity.activityDate', order: 'DESC' }],
-        },
-      }),
-    });
-  }
+  // Workaround: extract contactIds from recent orders → get-or-create conversation per contact.
+  // The Contacts API requires separate permissions we may not have, so we use Orders instead.
 
   /**
    * Get or create a conversation for a contact/member/visitor.
@@ -353,15 +337,28 @@ export class WixApiClient {
   }
 
   /**
-   * List conversations by querying contacts and resolving their conversations.
-   * This is a workaround since Wix has no "list conversations" endpoint.
+   * List conversations by extracting contactIds from recent orders,
+   * then get-or-creating a conversation for each unique contact.
+   * This avoids needing the Contacts API permission.
    */
   async listConversations(params: { limit?: number } = {}): Promise<{ conversations: any[] }> {
     const limit = params.limit || 20;
-    // Step 1: Get recent contacts
-    const contactsData = await this.queryContacts({ limit });
-    const contacts = contactsData.contacts || [];
 
+    // Step 1: Get recent orders to extract customer contactIds
+    const ordersData = await this.searchOrders({ limit: 100 });
+    const orders = ordersData.orders || [];
+
+    // Extract unique contactIds with customer names
+    const contactMap = new Map<string, { contactId: string; name: string; email?: string }>();
+    for (const order of orders) {
+      const contactId = order.buyerInfo?.contactId;
+      if (!contactId || contactMap.has(contactId)) continue;
+      const name = [order.billingInfo?.contactDetails?.firstName, order.billingInfo?.contactDetails?.lastName]
+        .filter(Boolean).join(' ') || order.buyerInfo?.email || 'Customer';
+      contactMap.set(contactId, { contactId, name, email: order.buyerInfo?.email });
+    }
+
+    const contacts = Array.from(contactMap.values()).slice(0, limit);
     if (contacts.length === 0) return { conversations: [] };
 
     // Step 2: Get-or-create conversations for each contact (parallel, batched)
@@ -370,14 +367,13 @@ export class WixApiClient {
     for (let i = 0; i < contacts.length; i += batchSize) {
       const batch = contacts.slice(i, i + batchSize);
       const results = await Promise.allSettled(
-        batch.map(async (contact: any) => {
+        batch.map(async (contact) => {
           try {
-            const convData = await this.getOrCreateConversation({ contactId: contact.id });
+            const convData = await this.getOrCreateConversation({ contactId: contact.contactId });
             const conv = convData.conversation;
             if (conv) {
-              conv._contactName = contact.info?.name?.first
-                ? `${contact.info.name.first} ${contact.info.name.last || ''}`.trim()
-                : contact.primaryInfo?.email || 'Customer';
+              conv._contactName = contact.name;
+              conv._contactEmail = contact.email;
               return conv;
             }
           } catch {

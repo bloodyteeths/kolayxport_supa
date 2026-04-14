@@ -146,6 +146,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               }).length;
             } catch (e: any) {
               logger.warn(`[MESSAGES] Wix count failed: ${e?.message || e}`);
+              // Silently skip — counts badge shouldn't show errors
             }
           })()
         );
@@ -200,7 +201,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             } catch (e: any) {
               const msg = e?.message || String(e);
               logger.warn(`[MESSAGES] Wix list failed: ${msg}`);
-              errors.push(`Wix: ${msg}`);
+              const is403 = msg.includes('403');
+              errors.push(is403
+                ? 'Wix: Inbox permission missing — update app version in Wix Dev Center and reinstall'
+                : `Wix: ${msg}`);
             }
           })()
         );

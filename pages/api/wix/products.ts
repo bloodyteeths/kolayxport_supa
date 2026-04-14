@@ -258,6 +258,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const mappedUpdates: Record<string, any> = {};
           if (updates.price != null) mappedUpdates.priceData = { price: updates.price };
           if (updates.visible != null) mappedUpdates.visible = updates.visible;
+          if (updates.customTextFields !== undefined) mappedUpdates.customTextFields = updates.customTextFields;
 
           if (Object.keys(mappedUpdates).length > 0) {
             await client.updateProduct(productId, mappedUpdates);
@@ -288,6 +289,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             dbData.quantity = updates.quantity;
             dbData.inStock = updates.quantity > 0;
           }
+          if (updates.customTextFields !== undefined) dbData.customTextFields = updates.customTextFields;
           if (Object.keys(dbData).length > 0) {
             await prisma.wixProduct.updateMany({
               where: { wixProductId: productId, userId },
@@ -368,6 +370,7 @@ async function upsertWixProduct(userId: string, wixSiteId: string, p: any) {
       imageCount: images.length,
       variants: p.variants || undefined,
       options: p.productOptions || undefined,
+      customTextFields: p.customTextFields || null,
       visible: p.visible ?? true,
       ribbon: p.ribbon || null,
       weight: p.weight || null,
@@ -396,6 +399,7 @@ async function upsertWixProduct(userId: string, wixSiteId: string, p: any) {
       imageCount: images.length,
       variants: p.variants || undefined,
       options: p.productOptions || undefined,
+      customTextFields: p.customTextFields || null,
       visible: p.visible ?? true,
       ribbon: p.ribbon || null,
       weight: p.weight || null,

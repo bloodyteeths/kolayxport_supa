@@ -15,7 +15,7 @@ import {
   Add as AddIcon, Sync as SyncIcon, FilterList as FilterListIcon,
   Close as CloseIcon, FileDownload as FileDownloadIcon,
   MoreVert as MoreVertIcon, Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon,
+  VisibilityOff as VisibilityOffIcon, TextFields as TextFieldsIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -49,6 +49,7 @@ interface WixProductRow {
   ribbon: string | null;
   brand: string | null;
   productType: string | null;
+  customTextFields: Array<{ title: string; mandatory: boolean; maxLength: number }> | null;
   wixUpdatedDate: string | null;
   syncedAt: string;
 }
@@ -176,6 +177,14 @@ function MobileWixProductCard({
             ))}
             <Chip label={t('imagesCount', { count: product.imageCount })} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
             {product.sku && <Chip label={`SKU: ${product.sku}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
+            {Array.isArray(product.customTextFields) && product.customTextFields.length > 0 && (
+              <Chip
+                icon={<TextFieldsIcon sx={{ fontSize: 12 }} />}
+                label={t('personalizationActive', { count: product.customTextFields.length })}
+                size="small" color="primary" variant="outlined"
+                sx={{ height: 20, fontSize: '0.65rem' }}
+              />
+            )}
           </Box>
           {/* Health breakdown */}
           <Box sx={{ display: 'flex', gap: 0.5, mb: 1, flexWrap: 'wrap' }}>
@@ -630,6 +639,11 @@ function WixProductsPage() {
             >
               {params.value}
             </Typography>
+            {Array.isArray(params.row.customTextFields) && params.row.customTextFields.length > 0 && (
+              <Tooltip title={t('personalizationActive', { count: params.row.customTextFields.length })}>
+                <TextFieldsIcon sx={{ fontSize: 14, color: 'primary.main', flexShrink: 0 }} />
+              </Tooltip>
+            )}
             <Box className="row-actions" sx={{ opacity: 0, transition: '0.15s', display: 'flex', gap: 0.25 }}>
               <Tooltip title={t('edit')}>
                 <IconButton size="small" onClick={() => { setDrawerProduct(params.row); setDrawerOpen(true); }}>

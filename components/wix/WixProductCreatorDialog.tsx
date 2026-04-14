@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button,
   Switch, FormControlLabel, Autocomplete, Chip, Box, CircularProgress,
+  Typography, IconButton, Collapse, Divider,
 } from '@mui/material';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 
@@ -31,6 +36,8 @@ export default function WixProductCreatorDialog({
   const [weight, setWeight] = useState('');
   const [visible, setVisible] = useState(true);
   const [selectedCollections, setSelectedCollections] = useState<WixCollection[]>([]);
+  const [customTextFields, setCustomTextFields] = useState<Array<{ title: string; mandatory: boolean; maxLength: number }>>([]);
+  const [personalizationExpanded, setPersonalizationExpanded] = useState(false);
   const [creating, setCreating] = useState(false);
 
   const resetForm = () => {
@@ -42,6 +49,8 @@ export default function WixProductCreatorDialog({
     setWeight('');
     setVisible(true);
     setSelectedCollections([]);
+    setCustomTextFields([]);
+    setPersonalizationExpanded(false);
   };
 
   const handleCreate = async () => {
@@ -56,6 +65,7 @@ export default function WixProductCreatorDialog({
       if (price) body.priceData = { price: parseFloat(price) };
       if (sku) body.sku = sku;
       if (weight) body.weight = parseFloat(weight);
+      if (customTextFields.length > 0) body.customTextFields = customTextFields;
 
       const res = await fetch('/api/wix/products?action=create', {
         method: 'POST',
@@ -155,6 +165,93 @@ export default function WixProductCreatorDialog({
             size="small"
           />
         )}
+
+        {/* Personalization */}
+        <Divider />
+        <Box>
+          <Box
+            sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer' }}
+            onClick={() => setPersonalizationExpanded(!personalizationExpanded)}
+          >
+            <TextFieldsIcon fontSize="small" color="action" />
+            <Typography variant="subtitle2" fontWeight={600}>{t('personalizationSection')}</Typography>
+            {customTextFields.length > 0 && (
+              <Chip label={customTextFields.length} size="small" color="primary" variant="outlined" />
+            )}
+            <ExpandMoreIcon sx={{ transform: personalizationExpanded ? 'rotate(180deg)' : 'none', transition: '0.2s', ml: 'auto' }} />
+          </Box>
+          <Collapse in={personalizationExpanded}>
+            <Box sx={{ mt: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                {t('personalizationHelperText')}
+              </Typography>
+              {customTextFields.map((field, idx) => (
+                <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1.5 }}>
+                  <TextField
+                    label={t('personalizationFieldTitle')}
+                    value={field.title}
+                    onChange={(e) => {
+                      const updated = [...customTextFields];
+                      updated[idx] = { ...updated[idx], title: e.target.value };
+                      setCustomTextFields(updated);
+                    }}
+                    size="small"
+                    sx={{ flex: 2 }}
+                  />
+                  <TextField
+                    label={t('personalizationMaxLength')}
+                    value={field.maxLength}
+                    onChange={(e) => {
+                      const updated = [...customTextFields];
+                      updated[idx] = { ...updated[idx], maxLength: Math.max(1, parseInt(e.target.value) || 1) };
+                      setCustomTextFields(updated);
+                    }}
+                    type="number"
+                    size="small"
+                    sx={{ width: 90 }}
+                    inputProps={{ min: 1, max: 500 }}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={field.mandatory}
+                        onChange={(e) => {
+                          const updated = [...customTextFields];
+                          updated[idx] = { ...updated[idx], mandatory: e.target.checked };
+                          setCustomTextFields(updated);
+                        }}
+                        size="small"
+                      />
+                    }
+                    label={<Typography variant="caption">{t('personalizationMandatory')}</Typography>}
+                    sx={{ mx: 0 }}
+                  />
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => setCustomTextFields(customTextFields.filter((_, i) => i !== idx))}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              ))}
+              {customTextFields.length < 2 ? (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={() => setCustomTextFields([...customTextFields, { title: '', mandatory: false, maxLength: 200 }])}
+                >
+                  {t('personalizationAddField')}
+                </Button>
+              ) : (
+                <Typography variant="caption" color="text.secondary">
+                  {t('personalizationMaxFields', { max: 2 })}
+                </Typography>
+              )}
+            </Box>
+          </Collapse>
+        </Box>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>{t('cancel')}</Button>

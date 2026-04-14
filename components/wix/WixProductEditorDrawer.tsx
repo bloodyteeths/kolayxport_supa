@@ -10,6 +10,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import InventoryIcon from '@mui/icons-material/Inventory';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
+import AddIcon from '@mui/icons-material/Add';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-hot-toast';
@@ -79,6 +81,7 @@ export default function WixProductEditorDrawer({
   const [ribbon, setRibbon] = useState('');
   const [selectedCollections, setSelectedCollections] = useState<WixCollection[]>([]);
   const [stockQuantity, setStockQuantity] = useState('');
+  const [customTextFields, setCustomTextFields] = useState<Array<{ title: string; mandatory: boolean; maxLength: number }>>([]);
 
   // UI state
   const [saving, setSaving] = useState(false);
@@ -105,6 +108,7 @@ export default function WixProductEditorDrawer({
     const colIds: string[] = Array.isArray(product.collectionIds) ? product.collectionIds : [];
     const matched = collections.filter(c => colIds.includes(c.id));
     setSelectedCollections(matched);
+    setCustomTextFields(Array.isArray(product.customTextFields) ? product.customTextFields : []);
     setHasChanges(false);
   }, [product, collections]);
 
@@ -125,6 +129,7 @@ export default function WixProductEditorDrawer({
       if (price) updates.priceData = { price: parseFloat(price) };
       if (sku) updates.sku = sku;
       if (weight) updates.weight = parseFloat(weight);
+      updates.customTextFields = customTextFields;
 
       const res = await fetch('/api/wix/products?action=update', {
         method: 'PUT',
@@ -324,6 +329,96 @@ export default function WixProductEditorDrawer({
           }
           size="small"
         />
+
+        <Divider />
+
+        {/* Personalization / Custom Text Fields */}
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <TextFieldsIcon fontSize="small" color="action" />
+            <Typography variant="subtitle2" fontWeight={600}>{t('personalizationSection')}</Typography>
+            {customTextFields.length > 0 && (
+              <Chip label={customTextFields.length} size="small" color="primary" variant="outlined" />
+            )}
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+            {t('personalizationHelperText')}
+          </Typography>
+          {customTextFields.map((field, idx) => (
+            <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1.5 }}>
+              <TextField
+                label={t('personalizationFieldTitle')}
+                value={field.title}
+                onChange={(e) => {
+                  const updated = [...customTextFields];
+                  updated[idx] = { ...updated[idx], title: e.target.value };
+                  setCustomTextFields(updated);
+                  markChanged();
+                }}
+                size="small"
+                sx={{ flex: 2 }}
+              />
+              <TextField
+                label={t('personalizationMaxLength')}
+                value={field.maxLength}
+                onChange={(e) => {
+                  const updated = [...customTextFields];
+                  updated[idx] = { ...updated[idx], maxLength: Math.max(1, parseInt(e.target.value) || 1) };
+                  setCustomTextFields(updated);
+                  markChanged();
+                }}
+                type="number"
+                size="small"
+                sx={{ width: 90 }}
+                inputProps={{ min: 1, max: 500 }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={field.mandatory}
+                    onChange={(e) => {
+                      const updated = [...customTextFields];
+                      updated[idx] = { ...updated[idx], mandatory: e.target.checked };
+                      setCustomTextFields(updated);
+                      markChanged();
+                    }}
+                    size="small"
+                  />
+                }
+                label={<Typography variant="caption">{t('personalizationMandatory')}</Typography>}
+                sx={{ mx: 0 }}
+              />
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => {
+                  setCustomTextFields(customTextFields.filter((_, i) => i !== idx));
+                  markChanged();
+                }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+          {customTextFields.length < 2 && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setCustomTextFields([...customTextFields, { title: '', mandatory: false, maxLength: 200 }]);
+                markChanged();
+              }}
+            >
+              {t('personalizationAddField')}
+            </Button>
+          )}
+          {customTextFields.length >= 2 && (
+            <Typography variant="caption" color="text.secondary">
+              {t('personalizationMaxFields', { max: 2 })}
+            </Typography>
+          )}
+        </Box>
 
         <Divider />
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Box, Button, Typography, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, ToggleButton, ToggleButtonGroup, CircularProgress,
+  Switch, FormControlLabel, IconButton, Divider,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
@@ -9,6 +10,8 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import DownloadIcon from '@mui/icons-material/Download';
+import TextFieldsIcon from '@mui/icons-material/TextFields';
+import AddIcon from '@mui/icons-material/Add';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 
@@ -29,6 +32,8 @@ export default function WixBulkOperationsBar({
   const [priceMode, setPriceMode] = useState<'set' | 'percent'>('set');
   const [priceValue, setPriceValue] = useState('');
   const [stockValue, setStockValue] = useState('');
+  const [personalizationDialogOpen, setPersonalizationDialogOpen] = useState(false);
+  const [bulkCustomTextFields, setBulkCustomTextFields] = useState<Array<{ title: string; mandatory: boolean; maxLength: number }>>([]);
   const [processing, setProcessing] = useState(false);
 
   const productIds = selectedProducts.map(p => p.wixProductId || p.id);
@@ -153,6 +158,10 @@ export default function WixBulkOperationsBar({
           {t('bulkMakeHidden')}
         </Button>
         <Button size="small" variant="outlined" sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)' }}
+          startIcon={<TextFieldsIcon />} onClick={() => { setBulkCustomTextFields([]); setPersonalizationDialogOpen(true); }}>
+          {t('bulkPersonalization')}
+        </Button>
+        <Button size="small" variant="outlined" sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.5)' }}
           startIcon={<DownloadIcon />} onClick={handleCsvExport}>
           {t('csvDownload')}
         </Button>
@@ -225,6 +234,102 @@ export default function WixBulkOperationsBar({
           <Button onClick={() => setDeleteDialogOpen(false)}>{t('cancel')}</Button>
           <Button variant="contained" color="error" onClick={handleBulkDelete} disabled={processing}>
             {processing ? <CircularProgress size={16} /> : t('delete')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Personalization Dialog */}
+      <Dialog open={personalizationDialogOpen} onClose={() => setPersonalizationDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t('bulkPersonalization')}</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '16px !important' }}>
+          <Typography variant="body2" color="text.secondary">
+            {t('personalizationHelperText')}
+          </Typography>
+          {bulkCustomTextFields.map((field, idx) => (
+            <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <TextField
+                label={t('personalizationFieldTitle')}
+                value={field.title}
+                onChange={(e) => {
+                  const updated = [...bulkCustomTextFields];
+                  updated[idx] = { ...updated[idx], title: e.target.value };
+                  setBulkCustomTextFields(updated);
+                }}
+                size="small"
+                sx={{ flex: 2 }}
+              />
+              <TextField
+                label={t('personalizationMaxLength')}
+                value={field.maxLength}
+                onChange={(e) => {
+                  const updated = [...bulkCustomTextFields];
+                  updated[idx] = { ...updated[idx], maxLength: Math.max(1, parseInt(e.target.value) || 1) };
+                  setBulkCustomTextFields(updated);
+                }}
+                type="number"
+                size="small"
+                sx={{ width: 90 }}
+                inputProps={{ min: 1, max: 500 }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={field.mandatory}
+                    onChange={(e) => {
+                      const updated = [...bulkCustomTextFields];
+                      updated[idx] = { ...updated[idx], mandatory: e.target.checked };
+                      setBulkCustomTextFields(updated);
+                    }}
+                    size="small"
+                  />
+                }
+                label={<Typography variant="caption">{t('personalizationMandatory')}</Typography>}
+                sx={{ mx: 0 }}
+              />
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => setBulkCustomTextFields(bulkCustomTextFields.filter((_, i) => i !== idx))}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+          {bulkCustomTextFields.length < 2 && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => setBulkCustomTextFields([...bulkCustomTextFields, { title: '', mandatory: false, maxLength: 200 }])}
+            >
+              {t('personalizationAddField')}
+            </Button>
+          )}
+          <Divider />
+          <Button
+            size="small"
+            color="warning"
+            variant="outlined"
+            onClick={() => {
+              handleBulkUpdate({ customTextFields: [] });
+              setPersonalizationDialogOpen(false);
+            }}
+            disabled={processing}
+          >
+            {t('personalizationRemoveAll')}
+          </Button>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPersonalizationDialogOpen(false)}>{t('cancel')}</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              handleBulkUpdate({ customTextFields: bulkCustomTextFields });
+              setPersonalizationDialogOpen(false);
+            }}
+            disabled={bulkCustomTextFields.length === 0 || bulkCustomTextFields.some(f => !f.title.trim()) || processing}
+          >
+            {processing ? <CircularProgress size={16} /> : t('bulkSetPersonalization')}
           </Button>
         </DialogActions>
       </Dialog>

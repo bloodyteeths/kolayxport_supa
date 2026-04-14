@@ -984,8 +984,9 @@ model WixProduct {
   thumbnailUrl String?
   imageCount   Int     @default(0)
 
-  variants Json?
-  options  Json?
+  variants         Json?
+  options          Json?
+  customTextFields Json?
 
   visible Boolean @default(true)
   ribbon  String?

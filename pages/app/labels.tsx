@@ -384,9 +384,9 @@ async function fetchEtsyAddressEnrichment(orderNumber: string): Promise<any | nu
   return null;
 }
 
-// --- Build MNG order from label row (extracts address from shippingAddress JSON) ---
+// --- Build MNG order from label row (extracts address from shippingAddress JSON + rawData) ---
 function buildMngOrder(row: any, originalOrder?: LocalUIOrder) {
-  // Parse shippingAddress JSON to get structured to_address data
+  // Parse shippingAddress — could be JSON (to_address) or plain text string
   let addr: any = {};
   const rawShipping = originalOrder?.shippingAddress;
   if (typeof rawShipping === 'string') {
@@ -395,35 +395,33 @@ function buildMngOrder(row: any, originalOrder?: LocalUIOrder) {
     addr = rawShipping;
   }
 
+  // Also check rawData for marketplace-specific address fields (Trendyol shipmentAddress, etc.)
+  let rawData = originalOrder?.rawData;
+  if (typeof rawData === 'string') {
+    try { rawData = JSON.parse(rawData); } catch { rawData = {}; }
+  }
+  const shipAddr = rawData?.shipmentAddress || {};
+
   const clean = (v: any) => (!v || v === '—') ? '' : String(v).trim();
 
-  // Try to extract district from address text (Turkish format: "City/District" or "mahalle, sokak, City/District")
-  let city = clean(addr.city || row.recipientCity);
-  let district = clean(addr.state || row.recipientState);
-  const fullAddress = clean(addr.street1 || row.recipientStreet1);
-
-  // Parse "City/District" pattern common in Turkish addresses
-  if (city && !district) {
-    const slashMatch = fullAddress.match(/([^,]+)\/([^,]+)\s*$/);
-    if (slashMatch) {
-      const possibleCity = slashMatch[1].trim();
-      const possibleDistrict = slashMatch[2].trim();
-      if (possibleCity.toLowerCase() === city.toLowerCase()) {
-        district = possibleDistrict;
-      }
-    }
-  }
+  // Build fields from all sources: addr (to_address JSON), shipAddr (rawData.shipmentAddress), row (DataGrid)
+  const city = clean(addr.city || shipAddr.city || row.recipientCity);
+  const district = clean(shipAddr.district || addr.state || row.recipientState);
+  const neighbourhood = clean(shipAddr.neighborhood || '');
+  const fullAddress = clean(addr.street1 || shipAddr.address1 || shipAddr.fullAddress || row.recipientStreet1);
+  const street2 = clean(addr.street2 || shipAddr.address2 || row.recipientStreet2);
 
   return {
     orderId: row.orderId,
     orderNumber: row.orderNumber,
-    recipientName: clean(addr.name) || `${clean(row.recipientFirstName)} ${clean(row.recipientLastName)}`.trim(),
-    recipientPhone: clean(addr.phone || row.recipientPhone),
+    recipientName: clean(addr.name || shipAddr.fullName) || `${clean(row.recipientFirstName)} ${clean(row.recipientLastName)}`.trim(),
+    recipientPhone: clean(addr.phone || shipAddr.phone || row.recipientPhone),
     recipientEmail: clean(addr.email || row.recipientEmail),
     recipientCity: city,
     recipientDistrict: district,
-    recipientAddress: `${clean(addr.street1 || row.recipientStreet1)} ${clean(addr.street2 || row.recipientStreet2)}`.trim(),
-    recipientPostalCode: clean(addr.postal || addr.postalCode || row.recipientPostal),
+    recipientNeighbourhood: neighbourhood,
+    recipientAddress: `${fullAddress} ${street2}`.trim(),
+    recipientPostalCode: clean(addr.postal || addr.postalCode || shipAddr.postalCode || row.recipientPostal),
     weight: row.weight,
     title: row.title,
     shipments: originalOrder?.shipments || [],

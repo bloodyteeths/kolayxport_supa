@@ -6,6 +6,9 @@ import { logger } from '@/lib/logger';
  * Receives Wix webhook events (App Instance Installed).
  * Wix sends a JWT in the body — we decode it to extract instanceId.
  * Also accepts plain JSON { instanceId } for direct calls.
+ *
+ * IMPORTANT: Must always return 200 to Wix, even if we can't process the event.
+ * Returning non-200 causes the app install to hang in a spinner.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -15,13 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let siteId: string | undefined;
     let userId: string | undefined;
 
-    // Try to extract from JWT (Wix webhook format)
     const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     logger.info('Wix webhook received', {
       contentType: req.headers['content-type'],
       bodyType: typeof req.body,
       bodyPreview: rawBody?.substring(0, 200),
-      hasDigest: !!req.headers['digest'],
     });
 
     // Wix sends JWT — could be in body directly or in body.data
@@ -30,21 +31,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : req.body?.data || req.body?.token;
 
     if (jwtToken && typeof jwtToken === 'string' && jwtToken.includes('.')) {
-      // Decode JWT payload (middle part)
       try {
         const parts = jwtToken.split('.');
         if (parts.length === 3) {
           const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
           logger.info('Wix webhook JWT decoded', { payload });
 
-          // Wix nests the actual event data inside a "data" string field
           if (payload.data && typeof payload.data === 'string') {
             try {
               const eventData = JSON.parse(payload.data);
               logger.info('Wix webhook event data', { eventData });
+
+              // Check if this event is for our app or a CLI-registered component
+              const ourAppId = process.env.WIX_APP_ID;
+              if (eventData.appId && ourAppId && eventData.appId !== ourAppId) {
+                // This event is for a different component (e.g., CLI dashboard page).
+                // Acknowledge it so Wix doesn't hang, but don't process.
+                logger.info('Wix webhook: event is for different component, acknowledging', {
+                  eventAppId: eventData.appId, ourAppId,
+                });
+                return res.status(200).json({ success: true, skipped: true, reason: 'different_component' });
+              }
+
               instanceId = eventData.instanceId;
             } catch {
-              // data wasn't JSON, try payload directly
               instanceId = payload.instanceId;
             }
           } else {
@@ -65,12 +75,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!instanceId) {
       logger.warn('Wix webhook: no instanceId found', { body: rawBody?.substring(0, 500) });
-      return res.status(400).json({ error: 'Missing instanceId' });
+      // Return 200 anyway so Wix doesn't retry endlessly
+      return res.status(200).json({ success: false, reason: 'no_instance_id' });
     }
 
     const appId = process.env.WIX_APP_ID;
     const appSecret = process.env.WIX_APP_SECRET;
-    if (!appId || !appSecret) return res.status(500).json({ error: 'Wix not configured' });
+    if (!appId || !appSecret) {
+      return res.status(200).json({ success: false, reason: 'not_configured' });
+    }
 
     // Get access token using client_credentials
     const tokenRes = await fetch('https://www.wixapis.com/oauth2/token', {
@@ -86,8 +99,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!tokenRes.ok) {
       const body = await tokenRes.text();
-      logger.error('Wix webhook token request failed', undefined, { status: tokenRes.status, body });
-      return res.status(500).json({ error: 'Token request failed' });
+      logger.error('Wix webhook token request failed', undefined, { status: tokenRes.status, body, instanceId });
+      // Return 200 so Wix completes the install flow
+      return res.status(200).json({ success: false, reason: 'token_failed', instanceId });
     }
 
     const tokenData = await tokenRes.json() as { access_token: string; expires_in?: number };
@@ -109,14 +123,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       logger.warn('Could not fetch Wix site info from webhook');
     }
 
-    // Store as a pending connection (no userId yet — will be claimed when user polls)
-    // If userId was provided (from authenticated call), use it directly
     if (userId) {
       await saveWixConnection(userId, instanceId, resolvedSiteId, siteName, tokenData.access_token, tokenExpiresAt);
       return res.status(200).json({ success: true, siteId: resolvedSiteId, siteName });
     }
 
-    // Store pending connection keyed by instanceId
+    // Store pending connection keyed by siteId
     await prisma.wixSite.upsert({
       where: { siteId: resolvedSiteId },
       update: {
@@ -127,7 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         updatedAt: new Date(),
       },
       create: {
-        userId: 'pending', // Will be claimed by the user
+        userId: 'pending',
         siteId: resolvedSiteId,
         siteName,
         accessToken: tokenData.access_token,
@@ -140,7 +152,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ success: true, siteId: resolvedSiteId, siteName });
   } catch (err) {
     logger.error('Wix webhook failed', err instanceof Error ? err : new Error(String(err)));
-    return res.status(500).json({ error: 'Webhook processing failed' });
+    // Always return 200 to prevent install from hanging
+    return res.status(200).json({ success: false, reason: 'internal_error' });
   }
 }
 

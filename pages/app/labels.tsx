@@ -763,21 +763,42 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
     }
   }
 
-  // Pre-fetch listing URLs: collect Veeqo product IDs and Shippo titles
+  // Pre-fetch listing URLs: collect Veeqo product IDs and titles
   const veeqoProductIds: number[] = [];
   const shippoTitles: string[] = [];
+  // Map orderId → Veeqo product IDs (for DB items that lack sellable.product.id)
+  const orderVeeqoProductIds = new Map<string, number[]>();
+
   for (const order of orders) {
     if (!order || typeof order !== 'object') continue;
     let safeRaw = order.rawData;
     if (typeof safeRaw === 'string') {
       try { safeRaw = JSON.parse(safeRaw); } catch { safeRaw = {}; }
     }
+
+    // Collect from API-returned items (DB items or rawData fallback)
     const items = order.line_items || safeRaw?.line_items || [];
     for (const item of items) {
       if (item.sellable?.product?.id) {
         veeqoProductIds.push(Number(item.sellable.product.id));
       } else if (item.title) {
         shippoTitles.push(item.title);
+      }
+    }
+
+    // ALSO extract Veeqo product IDs from rawData.line_items for DB items
+    // DB items lose the sellable.product.id — rawData still has it
+    if (safeRaw?.line_items) {
+      const rawProductIds: number[] = [];
+      for (const rawItem of safeRaw.line_items) {
+        if (rawItem.sellable?.product?.id) {
+          const pid = Number(rawItem.sellable.product.id);
+          veeqoProductIds.push(pid);
+          rawProductIds.push(pid);
+        }
+      }
+      if (rawProductIds.length > 0) {
+        orderVeeqoProductIds.set(order.id, rawProductIds);
       }
     }
   }
@@ -787,25 +808,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
   const listingUrlsByTitle: Record<string, string> = {};
   const listingImagesByTitle: Record<string, string> = {};
 
-  // Also collect Etsy listing IDs from rawData for direct lookup
-  const etsyListingIds: string[] = [];
-  for (const order of orders) {
-    if (!order || typeof order !== 'object') continue;
-    const mp = (order.marketplace || '').toLowerCase();
-    if (!mp.includes('etsy')) continue;
-    let safeRaw = order.rawData;
-    if (typeof safeRaw === 'string') {
-      try { safeRaw = JSON.parse(safeRaw); } catch { safeRaw = {}; }
-    }
-    // Chrome extension may store listing IDs in items
-    const items = safeRaw?.items || safeRaw?.line_items || [];
-    for (const item of items) {
-      const lid = item.listingId || item.listing_id || item.listingID;
-      if (lid) etsyListingIds.push(String(lid));
-    }
-  }
-
-  if (veeqoProductIds.length > 0 || shippoTitles.length > 0 || etsyListingIds.length > 0) {
+  if (veeqoProductIds.length > 0 || shippoTitles.length > 0) {
     try {
       const resp = await fetch('/api/listing-urls', {
         method: 'POST',
@@ -813,7 +816,6 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         body: JSON.stringify({
           productIds: [...new Set(veeqoProductIds)],
           titles: [...new Set(shippoTitles)],
-          listingIds: [...new Set(etsyListingIds)],
         }),
       });
       if (resp.ok) {
@@ -961,9 +963,15 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
           if (isTrendyol && safeRaw?.lines?.[0]?.contentId) {
             return `https://www.trendyol.com/x/x-p-${safeRaw.lines[0].contentId}`;
           }
-          // Use server-resolved active listing URL first (from orders API enrichment)
+          // Use server-resolved active listing URL first
           const firstItem = lineItems?.[0];
           if (firstItem?.etsyListingUrl) return firstItem.etsyListingUrl;
+          // Veeqo product IDs from rawData
+          const rawPids = orderVeeqoProductIds.get(order.id) || [];
+          if (rawPids.length > 0) {
+            const resolvedUrl = listingUrlsByProductId[String(rawPids[0])];
+            if (resolvedUrl) return resolvedUrl;
+          }
           // Fallback to title-based lookup
           const t = order.commodityDesc || safeRaw?.line_items?.[0]?.title || '';
           return listingUrlsByTitle[t] || undefined;
@@ -1006,7 +1014,18 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         unitPrice: (isVeeqoItem ? item.sellable?.price : item.unitPrice ?? item.value ?? item.total_price) ?? 0,
         weight: (isVeeqoItem ? item.sellable?.weight : item.weight) ?? 0.5,
         hsCode: (isVeeqoItem ? item.sellable?.product?.hs_tariff_number : item.hs_code) ?? order.harmonizedCode ?? '—',
-        itemImageUrl: (isVeeqoItem ? item.sellable?.image_url || item.sellable?.product?.main_image_src : (item.image || listingImagesByTitle[item.title || ''])) || order.imageUrl || '/placeholder.png',
+        itemImageUrl: (() => {
+          // Try Veeqo-resolved fresh image from EtsyListing DB first
+          const rawPids = orderVeeqoProductIds.get(order.id) || [];
+          const pidForItem = rawPids[lineItems.indexOf(item)] || rawPids[0];
+          if (pidForItem && listingImagesByTitle[`veeqo-${pidForItem}`]) {
+            return listingImagesByTitle[`veeqo-${pidForItem}`];
+          }
+          // Then title-matched EtsyListing image
+          if (listingImagesByTitle[item.title || '']) return listingImagesByTitle[item.title || ''];
+          // Then existing item image (may be stale Veeqo thumbnail)
+          return (isVeeqoItem ? item.sellable?.image_url || item.sellable?.product?.main_image_src : item.image) || order.imageUrl || '/placeholder.png';
+        })(),
         
         recipientFirstName: addr.recipientFirstName || '—',
         recipientLastName: addr.recipientLastName || '—',
@@ -1038,9 +1057,18 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
             const contentId = trendyolContentMap.get(String(lineId)) || safeRaw?.lines?.[0]?.contentId;
             if (contentId) return `https://www.trendyol.com/x/x-p-${contentId}`;
           }
-          // Server-resolved active EtsyListing URL (most reliable, checked against DB)
+          // Server-resolved active EtsyListing URL
           if (item.etsyListingUrl) return item.etsyListingUrl;
-          // Veeqo Product API fallback (may have stale listing IDs)
+          // Veeqo product IDs from rawData (DB items lose sellable.product.id)
+          const rawPids = orderVeeqoProductIds.get(order.id) || [];
+          const itemIdx = lineItems.indexOf(item);
+          if (rawPids.length > 0) {
+            // Try matching by index first (items are in same order)
+            const pidForItem = rawPids[itemIdx] || rawPids[0];
+            const resolvedUrl = listingUrlsByProductId[String(pidForItem)];
+            if (resolvedUrl) return resolvedUrl;
+          }
+          // Direct sellable fallback
           if (isVeeqoItem && item.sellable?.product?.id) {
             return listingUrlsByProductId[String(item.sellable.product.id)] || undefined;
           }

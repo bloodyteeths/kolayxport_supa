@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 
-// In-memory cache: veeqoProductId -> { url, channel }
-const productUrlCache = new Map<number, { url: string; channel: string }>();
+// In-memory cache: veeqoProductId -> { url, channel, remoteId }
+const productUrlCache = new Map<number, { url: string; channel: string; remoteId?: string }>();
 
 /**
  * Batch lookup listing URLs and thumbnails for order items.
@@ -96,8 +96,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 }
               }
 
+              // Extract Etsy remote_id for cross-checking
+              let etsyRemoteId = '';
+              if (product.channel_products) {
+                for (const cp of product.channel_products) {
+                  if ((cp.channel?.type_code || cp.type_code || '').toLowerCase() === 'etsy' && cp.remote_id) {
+                    etsyRemoteId = String(cp.remote_id);
+                    break;
+                  }
+                }
+              }
+
               if (bestUrl) {
-                productUrlCache.set(productId, { url: bestUrl, channel: bestChannel });
+                productUrlCache.set(productId, { url: bestUrl, channel: bestChannel, remoteId: etsyRemoteId });
               }
             } catch (err) {
               // Skip failed product lookups
@@ -105,11 +116,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }));
         }
 
-        // Build response from cache
+        // Build response from cache, cross-checking Etsy listing IDs against DB
+        const etsyRemoteIds = uniqueIds
+          .map(id => productUrlCache.get(id)?.remoteId)
+          .filter(Boolean) as string[];
+
+        // Fetch active EtsyListings for these remote IDs to verify + get images
+        let activeListingMap = new Map<string, { url: string; imageUrl: string }>();
+        if (etsyRemoteIds.length > 0) {
+          try {
+            const bigintIds = etsyRemoteIds.map(id => { try { return BigInt(id); } catch { return null; } }).filter(Boolean) as bigint[];
+            if (bigintIds.length > 0) {
+              const activeListings = await prisma.etsyListing.findMany({
+                where: { etsyListingId: { in: bigintIds } },
+                select: { etsyListingId: true, url: true, state: true, thumbnailUrl570xN: true, thumbnailUrl170x135: true },
+              });
+              for (const l of activeListings) {
+                if (l.state === 'active') {
+                  activeListingMap.set(l.etsyListingId.toString(), {
+                    url: l.url || `https://www.etsy.com/listing/${l.etsyListingId}`,
+                    imageUrl: l.thumbnailUrl570xN || l.thumbnailUrl170x135 || '',
+                  });
+                }
+              }
+            }
+          } catch { /* non-critical */ }
+        }
+
         for (const id of uniqueIds) {
           const cached = productUrlCache.get(id);
           if (cached) {
-            result.byProductId[String(id)] = cached.url;
+            // If it's an Etsy listing, prefer the verified active URL from DB
+            if (cached.remoteId && activeListingMap.has(cached.remoteId)) {
+              const active = activeListingMap.get(cached.remoteId)!;
+              result.byProductId[String(id)] = active.url;
+              if (active.imageUrl) {
+                result.images[`veeqo-${id}`] = active.imageUrl;
+              }
+            } else {
+              result.byProductId[String(id)] = cached.url;
+            }
           }
         }
       }

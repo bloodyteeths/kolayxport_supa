@@ -259,11 +259,11 @@ export class TrendyolApiClient {
       size: params.size ?? 50,
       ...params,
     });
-    return this.request('GET', `/sellers/${this.supplierId}/questions/filter${qs}`);
+    return this.request('GET', `/qna/sellers/${this.supplierId}/questions/filter${qs}`);
   }
 
   async answerQuestion(questionId: string, text: string): Promise<any> {
-    return this.request('POST', `/sellers/${this.supplierId}/questions/${questionId}/answers`, { text });
+    return this.request('POST', `/qna/sellers/${this.supplierId}/questions/${questionId}/answers`, { text });
   }
 
   // ================================================================

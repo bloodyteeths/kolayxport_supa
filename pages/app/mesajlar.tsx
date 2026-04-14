@@ -27,6 +27,8 @@ export default function MessagesPage() {
   const [conversations, setConversations] = useState<UnifiedConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [apiErrors, setApiErrors] = useState<string[]>([]);
+  const [enabledPlatforms, setEnabledPlatforms] = useState<string[]>([]);
 
   // Thread
   const [selectedConv, setSelectedConv] = useState<UnifiedConversation | null>(null);
@@ -46,12 +48,17 @@ export default function MessagesPage() {
     else setLoading(true);
     try {
       const res = await fetch(`/api/messages?action=list&platform=${platform}&status=${status}&size=50`);
+      const data = await res.json();
       if (res.ok) {
-        const data: MessagesListResponse = await res.json();
-        setConversations(data.conversations);
+        setConversations(data.conversations || []);
+        setApiErrors(data.errors || []);
+        setEnabledPlatforms(data.enabledPlatforms || []);
+      } else {
+        toast.error(data.error || `Error: ${res.status}`);
+        setConversations([]);
       }
     } catch {
-      toast.error(t('replyFailed'));
+      toast.error('Failed to fetch messages');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -376,7 +383,18 @@ export default function MessagesPage() {
               <MessageSquare size={28} className="text-slate-400" />
             </div>
             <p className="text-sm font-medium text-slate-500">{t('noMessages')}</p>
-            <p className="text-xs text-slate-400 mt-1">{t('noCredentials')}</p>
+            {enabledPlatforms.length === 0 ? (
+              <p className="text-xs text-slate-400 mt-1">{t('noCredentials')}</p>
+            ) : (
+              <p className="text-xs text-slate-400 mt-1">
+                {enabledPlatforms.join(', ')} connected
+              </p>
+            )}
+            {apiErrors.length > 0 && (
+              <div className="mt-3 text-xs text-red-500 text-center space-y-1">
+                {apiErrors.map((err, i) => <p key={i}>{err}</p>)}
+              </div>
+            )}
           </div>
         ) : isMobile ? (
           /* ── Mobile: Full-width list + Drawer ─────── */

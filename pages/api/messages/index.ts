@@ -94,21 +94,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const hasWix = isWixEnabled(user.id) && (wixSite || credential?.wixInstanceId);
     const hasTrendyol = isTrendyolEnabled(user.id) && credential?.trendyolSupplierId;
 
+    const userId = user.id;
+
+    // Helper to build Wix client safely
+    function buildWixClient() {
+      const wixCred = wixSite
+        ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: credential?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+        : credential;
+      if (!wixCred?.wixInstanceId || !wixCred?.wixSiteId) return null;
+      return createWixClient(wixCred, async (creds) => {
+        try {
+          if (wixSite) await prisma.wixSite.update({ where: { id: wixSite.id }, data: { accessToken: creds.accessToken, tokenExpiresAt: creds.tokenExpiresAt } });
+          if (credential) await prisma.credential.update({ where: { userId }, data: { wixAccessToken: creds.accessToken, wixTokenExpiresAt: creds.tokenExpiresAt } });
+        } catch {}
+      });
+    }
+
     // ── COUNTS (lightweight, for badge) ─────────────────
     if (action === 'counts') {
       const counts: MessageCountsResponse = { wix: 0, trendyol: 0, total: 0 };
 
       const promises: Promise<void>[] = [];
 
-      if (hasTrendyol) {
+      if (hasTrendyol && credential) {
         promises.push(
           (async () => {
             try {
-              const client = createTrendyolClient(credential!);
+              const client = createTrendyolClient(credential);
               const data = await client.getQuestions({ status: 'WAITING_FOR_ANSWER', size: 1 });
               counts.trendyol = data.totalElements || 0;
-            } catch (e) {
-              logger.warn('[MESSAGES] Trendyol count failed');
+            } catch (e: any) {
+              logger.warn(`[MESSAGES] Trendyol count failed: ${e?.message || e}`);
             }
           })()
         );
@@ -118,23 +134,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         promises.push(
           (async () => {
             try {
-              const wixCred = wixSite
-                ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: credential?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
-                : credential;
-              const client = createWixClient(wixCred!, async (creds) => {
-                try {
-                  if (wixSite) await prisma.wixSite.update({ where: { id: wixSite.id }, data: { accessToken: creds.accessToken, tokenExpiresAt: creds.tokenExpiresAt } });
-                  await prisma.credential.update({ where: { userId: user.id }, data: { wixAccessToken: creds.accessToken, wixTokenExpiresAt: creds.tokenExpiresAt } });
-                } catch {}
-              });
+              const client = buildWixClient();
+              if (!client) return;
               const data = await client.listConversations({ limit: 50 });
               const conversations = data.conversations || [];
               counts.wix = conversations.filter((c: any) => {
                 const dir = c.latestMessage?.direction || c.latestMessage?.sender?.role;
                 return dir === 'CUSTOMER_TO_BUSINESS' || dir === 'VISITOR';
               }).length;
-            } catch (e) {
-              logger.warn('[MESSAGES] Wix count failed');
+            } catch (e: any) {
+              logger.warn(`[MESSAGES] Wix count failed: ${e?.message || e}`);
             }
           })()
         );
@@ -153,42 +162,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const size = parseInt(req.query.size as string) || 20;
 
       let allConversations: UnifiedConversation[] = [];
+      const errors: string[] = [];
+      const enabledPlatforms: string[] = [];
       const promises: Promise<void>[] = [];
 
-      if (hasTrendyol && (platform === 'all' || platform === 'trendyol')) {
+      if (hasTrendyol && credential && (platform === 'all' || platform === 'trendyol')) {
+        enabledPlatforms.push('trendyol');
         promises.push(
           (async () => {
             try {
-              const client = createTrendyolClient(credential!);
+              const client = createTrendyolClient(credential);
               const trendyolStatus = status === 'unanswered' ? 'WAITING_FOR_ANSWER' : status === 'answered' ? 'ANSWERED' : undefined;
               const data = await client.getQuestions({ status: trendyolStatus, page, size });
               const normalized = (data.content || []).map(normalizeTrendyolQuestion);
               allConversations.push(...normalized);
-            } catch (e) {
-              logger.warn('[MESSAGES] Trendyol list failed');
+            } catch (e: any) {
+              const msg = e?.message || String(e);
+              logger.warn(`[MESSAGES] Trendyol list failed: ${msg}`);
+              errors.push(`Trendyol: ${msg}`);
             }
           })()
         );
       }
 
       if (hasWix && (platform === 'all' || platform === 'wix')) {
+        enabledPlatforms.push('wix');
         promises.push(
           (async () => {
             try {
-              const wixCred = wixSite
-                ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: credential?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
-                : credential;
-              const client = createWixClient(wixCred!, async (creds) => {
-                try {
-                  if (wixSite) await prisma.wixSite.update({ where: { id: wixSite.id }, data: { accessToken: creds.accessToken, tokenExpiresAt: creds.tokenExpiresAt } });
-                  await prisma.credential.update({ where: { userId: user.id }, data: { wixAccessToken: creds.accessToken, wixTokenExpiresAt: creds.tokenExpiresAt } });
-                } catch {}
-              });
+              const client = buildWixClient();
+              if (!client) { errors.push('Wix: credentials incomplete'); return; }
               const data = await client.listConversations({ limit: size });
               const normalized = (data.conversations || []).map(normalizeWixConversation);
               allConversations.push(...normalized);
-            } catch (e) {
-              logger.warn('[MESSAGES] Wix list failed');
+            } catch (e: any) {
+              const msg = e?.message || String(e);
+              logger.warn(`[MESSAGES] Wix list failed: ${msg}`);
+              errors.push(`Wix: ${msg}`);
             }
           })()
         );
@@ -206,13 +216,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const unansweredCount = allConversations.filter(c => c.status === 'unanswered').length;
 
-      const response: MessagesListResponse = {
+      const response: MessagesListResponse & { errors?: string[]; enabledPlatforms?: string[] } = {
         conversations: allConversations,
         totalCount: allConversations.length,
         unansweredCount,
         page,
         pageSize: size,
       };
+
+      // Include diagnostic info so frontend can show why it's empty
+      if (allConversations.length === 0) {
+        response.enabledPlatforms = enabledPlatforms;
+        if (errors.length > 0) response.errors = errors;
+      }
 
       return res.status(200).json(response);
     }
@@ -226,8 +242,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       if (platform === 'trendyol') {
-        // Trendyol questions are already fully loaded in list, return as-is
-        const client = createTrendyolClient(credential!);
+        if (!credential?.trendyolSupplierId) return res.status(400).json({ error: 'Trendyol credentials not configured' });
+        const client = createTrendyolClient(credential);
         const data = await client.getQuestions({ size: 50 });
         const question = (data.content || []).find((q: any) => String(q.id) === conversationId);
         if (!question) return res.status(404).json({ error: 'Question not found' });
@@ -235,26 +251,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       if (platform === 'wix') {
-        const wixCred = wixSite
-          ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: credential?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
-          : credential;
-        const client = createWixClient(wixCred!, async (creds) => {
-          try {
-            if (wixSite) await prisma.wixSite.update({ where: { id: wixSite.id }, data: { accessToken: creds.accessToken, tokenExpiresAt: creds.tokenExpiresAt } });
-            await prisma.credential.update({ where: { userId: user.id }, data: { wixAccessToken: creds.accessToken, wixTokenExpiresAt: creds.tokenExpiresAt } });
-          } catch {}
-        });
+        const client = buildWixClient();
+        if (!client) return res.status(400).json({ error: 'Wix credentials not configured' });
 
         const msgData = await client.getConversationMessages(conversationId, { limit: 100 });
         const messages = (msgData.messages || []).map(normalizeWixMessage);
 
-        // Also mark as read
         try { await client.markAsRead(conversationId); } catch {}
 
         return res.status(200).json({
           id: conversationId,
           platform: 'wix',
-          messages: messages.reverse(), // oldest first
+          messages: messages.reverse(),
         });
       }
 
@@ -270,22 +278,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (platform === 'trendyol') {
         if (!questionId) return res.status(400).json({ error: 'questionId is required for Trendyol' });
-        const client = createTrendyolClient(credential!);
+        if (!credential?.trendyolSupplierId) return res.status(400).json({ error: 'Trendyol credentials not configured' });
+        const client = createTrendyolClient(credential);
         const data = await client.answerQuestion(questionId, text);
         return res.status(200).json(data);
       }
 
       if (platform === 'wix') {
         if (!conversationId) return res.status(400).json({ error: 'conversationId is required for Wix' });
-        const wixCred = wixSite
-          ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: credential?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
-          : credential;
-        const client = createWixClient(wixCred!, async (creds) => {
-          try {
-            if (wixSite) await prisma.wixSite.update({ where: { id: wixSite.id }, data: { accessToken: creds.accessToken, tokenExpiresAt: creds.tokenExpiresAt } });
-            await prisma.credential.update({ where: { userId: user.id }, data: { wixAccessToken: creds.accessToken, wixTokenExpiresAt: creds.tokenExpiresAt } });
-          } catch {}
-        });
+        const client = buildWixClient();
+        if (!client) return res.status(400).json({ error: 'Wix credentials not configured' });
         const data = await client.sendMessage(conversationId, { text });
         return res.status(200).json(data);
       }

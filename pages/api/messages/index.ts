@@ -177,9 +177,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const normalized = (data.content || []).map(normalizeTrendyolQuestion);
               allConversations.push(...normalized);
             } catch (e: any) {
-              const msg = e?.message || String(e);
+              const msg = e?.message || (e?.body ? JSON.stringify(e.body) : String(e));
               logger.warn(`[MESSAGES] Trendyol list failed: ${msg}`);
-              errors.push(`Trendyol: ${msg}`);
+              errors.push(`Trendyol: ${e?.status || ''} ${e?.body?.errors?.[0]?.message || e?.body?.rawError || msg}`.trim());
             }
           })()
         );

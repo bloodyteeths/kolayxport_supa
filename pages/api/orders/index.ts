@@ -459,17 +459,12 @@ export default async function handler(
       }
       trackingSubmissionsByOrderId.get(submission.orderId).push(submission);
     });
-    // --- Lazy-enrich Etsy OrderItems with EtsyListing data ---
-    const etsyOrderIds = (result as any[])
-      .filter((o: any) => (o.marketplace || '').toLowerCase().includes('etsy'))
-      .map((o: any) => o.id);
+    // --- Lazy-enrich OrderItems with EtsyListing data ---
+    // Run for ALL orders — marketplace from Veeqo is the shop name, not "etsy"
+    // Title matching against EtsyListing naturally only matches Etsy products
+    const allItems = itemsResult as any[];
 
-    if (etsyOrderIds.length > 0) {
-      const etsyItems = (itemsResult as any[]).filter(
-        (item: any) => etsyOrderIds.includes(item.orderId)
-      );
-
-      if (etsyItems.length > 0) {
+    if (allItems.length > 0) {
         try {
           // Fetch ALL EtsyListings — active first, then by highest ID (newest)
           const etsyListings = await prisma.$queryRawUnsafe(`
@@ -536,7 +531,7 @@ export default async function handler(
 
           // Match items and enrich
           const imageUpdates: { id: string; image: string }[] = [];
-          for (const item of etsyItems) {
+          for (const item of allItems) {
             const itemTitle = normalize(item.productName || '');
             if (!itemTitle) continue;
 
@@ -568,7 +563,6 @@ export default async function handler(
         } catch (err) {
           console.warn('[orders] Etsy enrichment failed:', err);
         }
-      }
     }
 
     // OPTIMIZED: Simplified order processing with reduced complexity

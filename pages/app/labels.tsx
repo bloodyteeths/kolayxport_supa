@@ -1032,18 +1032,18 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelStockType: order.labelStockType,
         variantInfo: item.variantInfo || '—',
         listingUrl: (() => {
-          // Veeqo items: resolved via Product API
-          if (isVeeqoItem && item.sellable?.product?.id) {
-            return listingUrlsByProductId[String(item.sellable.product.id)] || undefined;
-          }
           // Trendyol: construct from contentId in rawData.lines
           if (isTrendyol) {
             const lineId = (item as any).remoteLineId || (item as any).marketplaceKey || item.id;
             const contentId = trendyolContentMap.get(String(lineId)) || safeRaw?.lines?.[0]?.contentId;
             if (contentId) return `https://www.trendyol.com/x/x-p-${contentId}`;
           }
-          // Use server-resolved active listing URL first
+          // Server-resolved active EtsyListing URL (most reliable, checked against DB)
           if (item.etsyListingUrl) return item.etsyListingUrl;
+          // Veeqo Product API fallback (may have stale listing IDs)
+          if (isVeeqoItem && item.sellable?.product?.id) {
+            return listingUrlsByProductId[String(item.sellable.product.id)] || undefined;
+          }
           // Fallback: title matching from EtsyListing DB
           const t = item.title || '';
           return listingUrlsByTitle[t] || undefined;

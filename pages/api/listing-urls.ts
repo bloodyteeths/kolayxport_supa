@@ -143,14 +143,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 3. Title-based fallback for Etsy listings (Shippo/chrome extension orders)
     if (Array.isArray(titles) && titles.length > 0) {
       const listings = await prisma.etsyListing.findMany({
-        select: { etsyListingId: true, title: true, url: true, thumbnailUrl170x135: true, thumbnailUrl570xN: true },
+        select: { etsyListingId: true, title: true, url: true, state: true, thumbnailUrl170x135: true, thumbnailUrl570xN: true },
+        orderBy: { syncedAt: 'desc' }, // Most recently synced first
       });
 
-      // Build normalized lookup for better matching
+      // Build normalized lookup, prioritizing active listings with highest listing ID (newest)
       const normalizedListings = listings.map(l => ({
         ...l,
         normalizedTitle: l.title.toLowerCase().replace(/\s+/g, ' ').trim(),
+        isActive: l.state === 'active',
       }));
+
+      // Helper: among multiple matches, pick the best one (active > inactive, then highest ID = newest)
+      const pickBest = (candidates: typeof normalizedListings) => {
+        if (candidates.length === 0) return undefined;
+        if (candidates.length === 1) return candidates[0];
+        // Prefer active listings
+        const active = candidates.filter(c => c.isActive);
+        const pool = active.length > 0 ? active : candidates;
+        // Among those, pick highest etsyListingId (newest listing)
+        return pool.reduce((best, c) => c.etsyListingId > best.etsyListingId ? c : best);
+      };
 
       for (const title of titles) {
         if (!title || title === '—' || title === 'N/A (Order Level)') continue;
@@ -159,25 +172,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const normalizedInput = title.toLowerCase().replace(/\s+/g, ' ').trim();
 
         // Try exact match first
-        let match = normalizedListings.find(l => l.normalizedTitle === normalizedInput);
+        let candidates = normalizedListings.filter(l => l.normalizedTitle === normalizedInput);
+        let match = pickBest(candidates);
 
         // Then try prefix match (first 30 chars) in both directions
         if (!match) {
           const prefix = normalizedInput.slice(0, 30);
-          match = normalizedListings.find(
+          candidates = normalizedListings.filter(
             (l) =>
               l.normalizedTitle.startsWith(prefix) ||
               normalizedInput.startsWith(l.normalizedTitle.slice(0, 30))
           );
+          match = pickBest(candidates);
         }
 
         // Then try substring/contains match for partial titles
         if (!match) {
-          match = normalizedListings.find(
+          candidates = normalizedListings.filter(
             (l) =>
               l.normalizedTitle.includes(normalizedInput) ||
               normalizedInput.includes(l.normalizedTitle)
           );
+          match = pickBest(candidates);
         }
 
         if (match) {

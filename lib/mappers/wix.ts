@@ -39,6 +39,19 @@ export function toOrder(order: any): UIOrder {
   const orderDate = order.createdDate || order.dateCreated;
   const street1 = addr.addressLine || addr.addressLine1 || '';
 
+  const toAddress = {
+    name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || customerName,
+    phone: contact.phone || billing.phone || '',
+    street1,
+    street2: addr.addressLine2 || '',
+    city: addr.city || '',
+    state: addr.subdivisionFullname || addr.subdivision || '',
+    postal: addr.postalCode || '',
+    country: addr.country || '',
+    isResidential: true,
+    email: order.buyerInfo?.email || billing.email || '',
+  };
+
   return {
     id: order.id || String(Math.random()),
     marketplaceKey: order.id || '',
@@ -55,20 +68,9 @@ export function toOrder(order: any): UIOrder {
     shippingAddress: street1
       ? `${contact.firstName || ''} ${contact.lastName || ''}, ${street1}, ${addr.city || ''}, ${addr.subdivisionFullname || addr.subdivision || ''}, ${addr.postalCode || ''}, ${addr.countryFullname || addr.country || ''}`.trim()
       : null,
-    to_address: {
-      name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || customerName,
-      phone: contact.phone || billing.phone || '',
-      street1,
-      street2: addr.addressLine2 || '',
-      city: addr.city || '',
-      state: addr.subdivisionFullname || addr.subdivision || '',
-      postal: addr.postalCode || '',
-      country: addr.country || '',
-      isResidential: true,
-      email: order.buyerInfo?.email || billing.email || '',
-    },
+    to_address: toAddress,
     marketplaceOrderDate: orderDate ? new Date(orderDate).toISOString() : undefined,
-    rawData: order,
+    rawData: { ...order, to_address: toAddress },
     commodityDesc: lineItems.length > 0 ? lineItems[0].title : '',
     externalStatus: order.status || order.fulfillmentStatus || '',
     recipientEmail: order.buyerInfo?.email || billing.email || '',

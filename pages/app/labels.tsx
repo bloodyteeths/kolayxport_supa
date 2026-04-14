@@ -395,12 +395,30 @@ function buildMngOrder(row: any, originalOrder?: LocalUIOrder) {
     addr = rawShipping;
   }
 
-  // Also check rawData for marketplace-specific address fields (Trendyol shipmentAddress, etc.)
+  // Also check rawData for marketplace-specific address fields
   let rawData = originalOrder?.rawData;
   if (typeof rawData === 'string') {
     try { rawData = JSON.parse(rawData); } catch { rawData = {}; }
   }
   const shipAddr = rawData?.shipmentAddress || {};
+
+  // Wix orders: extract structured address from nested Wix API path in rawData
+  const wixDest = rawData?.shippingInfo?.logistics?.shippingDestination;
+  if (wixDest?.address && !addr.city) {
+    const wAddr = wixDest.address;
+    const wContact = wixDest.contactDetails || rawData?.billingInfo?.contactDetails || {};
+    addr = {
+      name: `${wContact.firstName || ''} ${wContact.lastName || ''}`.trim(),
+      phone: wContact.phone || '',
+      street1: wAddr.addressLine || wAddr.addressLine1 || '',
+      street2: wAddr.addressLine2 || '',
+      city: wAddr.city || '',
+      state: wAddr.subdivisionFullname || wAddr.subdivision || '',
+      postal: wAddr.postalCode || '',
+      country: wAddr.country || '',
+      email: rawData?.buyerInfo?.email || '',
+    };
+  }
 
   const clean = (v: any) => (!v || v === '—') ? '' : String(v).trim();
 
@@ -559,6 +577,24 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
       }
     }
     
+    // Wix orders - extract from nested Wix API structure in rawData
+    const wixShippingDest = raw?.shippingInfo?.logistics?.shippingDestination;
+    if (wixShippingDest?.address) {
+      const wAddr = wixShippingDest.address;
+      const wContact = wixShippingDest.contactDetails || raw?.billingInfo?.contactDetails || {};
+      extractedAddress.recipientStreet1 = extractedAddress.recipientStreet1 || wAddr.addressLine || wAddr.addressLine1 || '';
+      extractedAddress.recipientStreet2 = extractedAddress.recipientStreet2 || wAddr.addressLine2 || '';
+      extractedAddress.recipientCity = extractedAddress.recipientCity || wAddr.city || '';
+      extractedAddress.recipientState = extractedAddress.recipientState || wAddr.subdivisionFullname || wAddr.subdivision || '';
+      extractedAddress.recipientPostal = extractedAddress.recipientPostal || wAddr.postalCode || '';
+      extractedAddress.recipientCountry = extractedAddress.recipientCountry || wAddr.country || '';
+      extractedAddress.recipientPhone = extractedAddress.recipientPhone || wContact.phone || '';
+      if (!extractedAddress.recipientFirstName || !extractedAddress.recipientLastName) {
+        extractedAddress.recipientFirstName = extractedAddress.recipientFirstName || (wContact.firstName || '').trim();
+        extractedAddress.recipientLastName = extractedAddress.recipientLastName || (wContact.lastName || '').trim();
+      }
+    }
+
     // Check for shipmentAddress field (alternative format used by some marketplaces)
     if (raw.shipmentAddress && typeof raw.shipmentAddress === 'object') {
       const shipAddr = raw.shipmentAddress;

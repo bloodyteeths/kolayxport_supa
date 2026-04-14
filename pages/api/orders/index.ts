@@ -586,6 +586,29 @@ export default async function handler(
             phone: addr.phone || ''
           };
         }
+        // Wix orders - extract structured address from rawData
+        if (rawOrder.source === 'wix' || rawOrder.marketplace === 'Wix') {
+          if (rawOrder.rawData?.to_address) {
+            return rawOrder.rawData.to_address;
+          }
+          // Fallback: extract from nested Wix API structure in rawData
+          const shippingDest = rawOrder.rawData?.shippingInfo?.logistics?.shippingDestination;
+          if (shippingDest?.address) {
+            const wAddr = shippingDest.address;
+            const wContact = shippingDest.contactDetails || rawOrder.rawData?.billingInfo?.contactDetails || {};
+            return {
+              name: `${wContact.firstName || ''} ${wContact.lastName || ''}`.trim(),
+              phone: wContact.phone || '',
+              street1: wAddr.addressLine || wAddr.addressLine1 || '',
+              street2: wAddr.addressLine2 || '',
+              city: wAddr.city || '',
+              state: wAddr.subdivisionFullname || wAddr.subdivision || '',
+              postal: wAddr.postalCode || '',
+              country: wAddr.country || '',
+              email: rawOrder.rawData?.buyerInfo?.email || '',
+            };
+          }
+        }
         // Standard shipping address handling
         if (typeof rawOrder.shippingAddress === 'string') {
           const trimmed = rawOrder.shippingAddress.trim();

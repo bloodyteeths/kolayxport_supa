@@ -169,7 +169,7 @@ function mapUIToPrisma(uiOrder: any, userId: string) {
     currency: uiOrder.currency,
     totalPrice: uiOrder.totalPrice,
     orderNumber: uiOrder.orderNumber,
-    shippingAddress: uiOrder.shippingAddress,
+    shippingAddress: uiOrder.to_address || uiOrder.shippingAddress,
     rawData: uiOrder.rawData,
     commodityDesc: uiOrder.commodityDesc,
     externalStatus: uiOrder.externalStatus,

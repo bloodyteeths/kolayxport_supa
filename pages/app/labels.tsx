@@ -18,6 +18,7 @@ import AppLayout from '@/components/AppLayout';
 import CircleIcon from '@mui/icons-material/Circle';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import UPSLabelDrawer from '@/components/UPSLabelDrawer';
+import MngLabelDrawer from '@/components/MngLabelDrawer';
 import ManualOrderButton from '@/components/ManualOrderButton';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
 import withAuth from '@/components/withAuth';
@@ -1310,6 +1311,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   // --- UPS Drawer State ---
   const [upsDrawerOpen, setUpsDrawerOpen] = useState(false);
   const [selectedOrderForUPS, setSelectedOrderForUPS] = useState<UIOrder | null>(null);
+  const [mngDrawerOpen, setMngDrawerOpen] = useState(false);
+  const [selectedOrderForMNG, setSelectedOrderForMNG] = useState<any>(null);
   
   // --- Image Modal State ---
   const [imageModalOpen, setImageModalOpen] = useState(false);
@@ -2052,15 +2055,15 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     {
       field: 'actions',
       headerName: t('details'),
-      width: 120,
-      minWidth: 120,
+      width: 180,
+      minWidth: 180,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => (
         <>
           <IconButton onClick={() => openDrawer(params.row as LabelRow)} size="small">
             <EditIcon fontSize="small"/>
           </IconButton>
-          <Button size="small" variant="outlined" sx={{ml:1}} onClick={() => { 
+          <Button size="small" variant="outlined" sx={{ml:1}} onClick={() => {
             // Convert LabelRow to UIOrder format for UPS drawer
             const originalOrder = params.row.originalOrder as LocalUIOrder | undefined;
             const uiOrder: UIOrder = {
@@ -2084,10 +2087,30 @@ function LabelsPage(props: { source?: string; channel?: string }) {
               countryOfOrigin: params.row.countryOfOrigin,
               shipments: originalOrder?.shipments || [],
             };
-            setSelectedOrderForUPS(uiOrder); 
-            setUpsDrawerOpen(true); 
+            setSelectedOrderForUPS(uiOrder);
+            setUpsDrawerOpen(true);
           }}>
             UPS
+          </Button>
+          <Button size="small" variant="outlined" color="secondary" sx={{ml:0.5}} onClick={() => {
+            const originalOrder = params.row.originalOrder as LocalUIOrder | undefined;
+            setSelectedOrderForMNG({
+              orderId: params.row.orderId,
+              orderNumber: params.row.orderNumber,
+              recipientName: `${params.row.recipientFirstName || ''} ${params.row.recipientLastName || ''}`.trim(),
+              recipientPhone: params.row.recipientPhone,
+              recipientEmail: params.row.recipientEmail,
+              recipientCity: params.row.recipientCity,
+              recipientDistrict: params.row.recipientState,
+              recipientAddress: `${params.row.recipientStreet1 || ''} ${params.row.recipientStreet2 || ''}`.trim(),
+              recipientPostalCode: params.row.recipientPostal,
+              weight: params.row.weight,
+              title: params.row.title,
+              shipments: originalOrder?.shipments || [],
+            });
+            setMngDrawerOpen(true);
+          }}>
+            MNG
           </Button>
         </>
       )
@@ -2791,6 +2814,32 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         >
                           {t('upsLabel')}
                         </Button>
+                        <Button
+                          variant="outlined"
+                          color="secondary"
+                          size="small"
+                          onClick={() => {
+                            const originalOrder = row.originalOrder as LocalUIOrder | undefined;
+                            setSelectedOrderForMNG({
+                              orderId: row.orderId,
+                              orderNumber: row.orderNumber,
+                              recipientName: `${row.recipientFirstName || ''} ${row.recipientLastName || ''}`.trim(),
+                              recipientPhone: row.recipientPhone,
+                              recipientEmail: row.recipientEmail,
+                              recipientCity: row.recipientCity,
+                              recipientDistrict: row.recipientState,
+                              recipientAddress: `${row.recipientStreet1 || ''} ${row.recipientStreet2 || ''}`.trim(),
+                              recipientPostalCode: row.recipientPostal,
+                              weight: row.weight,
+                              title: row.title,
+                              shipments: originalOrder?.shipments || [],
+                            });
+                            setMngDrawerOpen(true);
+                          }}
+                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
+                        >
+                          MNG
+                        </Button>
                       </Box>
                     </Box>
                   )}
@@ -3059,9 +3108,20 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           onClose={() => setUpsDrawerOpen(false)}
           order={selectedOrderForUPS}
           onSaved={async () => {
-            // Force a revalidation of the data
             await mutate();
-            // Force a re-render of the table
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }}
+        />
+      )}
+
+      {/* MNG Kargo Drawer mount */}
+      {selectedOrderForMNG && (
+        <MngLabelDrawer
+          open={mngDrawerOpen}
+          onClose={() => setMngDrawerOpen(false)}
+          order={selectedOrderForMNG}
+          onSaved={async () => {
+            await mutate();
             await new Promise(resolve => setTimeout(resolve, 500));
           }}
         />

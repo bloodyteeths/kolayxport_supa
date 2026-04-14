@@ -44,6 +44,11 @@ interface UserSettingsResponse {
     upsApiKey?: string | null;
     upsApiSecret?: string | null;
     upsAccountNumber?: string | null;
+    mngCustomerNumber?: string | null;
+    mngPassword?: string | null;
+    mngAppId?: string | null;
+    mngAppSecret?: string | null;
+    mngApiEnvironment?: string | null;
     etsyAccessToken?: string | null;
     etsyShopId?: string | null;
     etsyTokenExpiresAt?: string | null;
@@ -92,6 +97,11 @@ const initialFormData: UserSettingsResponse = {
     upsApiKey: '',
     upsApiSecret: '',
     upsAccountNumber: '',
+    mngCustomerNumber: '',
+    mngPassword: '',
+    mngAppId: '',
+    mngAppSecret: '',
+    mngApiEnvironment: 'test',
     parasutClientId: '',
     parasutClientSecret: '',
     parasutUsername: '',
@@ -591,6 +601,37 @@ const AyarlarPage = () => {
                 </Grid>
                 <Grid item xs={12} sm={6} md={4}>
                   <TextField fullWidth label="UPS Account Number" name="upsAccountNumber" value={formData.integrationSettings?.upsAccountNumber || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+
+                {/* MNG Kargo / DHL eCommerce */}
+                <Grid item xs={12}>
+                  <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>{t('mngIntegration')}</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField fullWidth label={t('mngCustomerNumber')} name="mngCustomerNumber" value={formData.integrationSettings?.mngCustomerNumber || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField fullWidth label={t('mngPassword')} name="mngPassword" type="password" value={formData.integrationSettings?.mngPassword || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField fullWidth label={t('mngAppId')} name="mngAppId" value={formData.integrationSettings?.mngAppId || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <TextField fullWidth label={t('mngAppSecret')} name="mngAppSecret" type="password" value={formData.integrationSettings?.mngAppSecret || ''} onChange={(e) => handleInputChange('integrationSettings', e.target.name, e.target.value)} />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <FormControl fullWidth>
+                    <InputLabel>{t('mngEnvironment')}</InputLabel>
+                    <Select
+                      name="mngApiEnvironment"
+                      value={formData.integrationSettings?.mngApiEnvironment || 'test'}
+                      label={t('mngEnvironment')}
+                      onChange={(e: SelectChangeEvent) => handleInputChange('integrationSettings', 'mngApiEnvironment', e.target.value)}
+                    >
+                      <MenuItem value="test">Test (Sandbox)</MenuItem>
+                      <MenuItem value="production">Production</MenuItem>
+                    </Select>
+                  </FormControl>
                 </Grid>
 
                 {/* Paraşüt Integration */}

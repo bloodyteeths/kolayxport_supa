@@ -284,6 +284,11 @@ model Credential {
   wixTokenExpiresAt     DateTime?
   shopifyAccessToken    String?
   shopifyShopDomain     String?
+  mngCustomerNumber     String?
+  mngPassword           String?
+  mngAppId              String?
+  mngAppSecret          String?
+  mngApiEnvironment     String?   @default("test")
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

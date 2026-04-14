@@ -53,7 +53,7 @@ function normalizeWixConversation(conv: any): UnifiedConversation {
 
   // A conversation is unanswered if the last message was from the customer
   const lastDirection = lastMessage.direction || lastMessage.sender?.role;
-  const isUnanswered = lastDirection === 'CUSTOMER_TO_BUSINESS' || lastDirection === 'VISITOR';
+  const isUnanswered = lastDirection === 'PARTICIPANT_TO_BUSINESS' || lastDirection === 'CUSTOMER_TO_BUSINESS' || lastDirection === 'VISITOR';
 
   // _contactName is injected by our listConversations workaround
   const customerName = conv._contactName || conv.displayName || 'Customer';
@@ -64,20 +64,25 @@ function normalizeWixConversation(conv: any): UnifiedConversation {
     status: isUnanswered ? 'unanswered' : 'answered',
     customerName,
     subject: customerName,
-    lastMessageText: lastMessage.text || lastMessage.preview || lastMessage.content?.text || '',
-    lastMessageDate: lastMessage.date || conv.lastActivityDate || conv.createdDate || new Date().toISOString(),
+    lastMessageText: lastMessage.content?.previewText || lastMessage.content?.basic?.items?.[0]?.text || lastMessage.text || lastMessage.preview || lastMessage.content?.text || '',
+    lastMessageDate: lastMessage.createdDate || lastMessage.date || conv.lastActivityDate || conv.createdDate || new Date().toISOString(),
     unreadCount: conv.unreadCount || 0,
     messages: [],
   };
 }
 
 function normalizeWixMessage(msg: any): UnifiedMessage {
-  const isSeller = msg.direction === 'BUSINESS_TO_CUSTOMER' || msg.sender?.role === 'BUSINESS';
+  const isSeller = msg.direction === 'BUSINESS_TO_PARTICIPANT' || msg.direction === 'BUSINESS_TO_CUSTOMER' || msg.sender?.role === 'BUSINESS';
+  const text = msg.content?.previewText
+    || msg.content?.basic?.items?.[0]?.text
+    || msg.content?.text
+    || msg.text
+    || '';
   return {
     id: msg.id || msg.sequence?.toString() || '',
     sender: isSeller ? 'seller' : 'customer',
-    text: msg.text || msg.content?.text || '',
-    date: msg.date || msg.createdDate || new Date().toISOString(),
+    text,
+    date: msg.createdDate || msg.date || new Date().toISOString(),
   };
 }
 
@@ -142,7 +147,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const conversations = data.conversations || [];
               counts.wix = conversations.filter((c: any) => {
                 const dir = c.latestMessage?.direction || c.latestMessage?.sender?.role;
-                return dir === 'CUSTOMER_TO_BUSINESS' || dir === 'VISITOR';
+                return dir === 'PARTICIPANT_TO_BUSINESS' || dir === 'CUSTOMER_TO_BUSINESS' || dir === 'VISITOR';
               }).length;
             } catch (e: any) {
               logger.warn(`[MESSAGES] Wix count failed: ${e?.message || e}`);

@@ -289,8 +289,22 @@ export class WixApiClient {
 
   // ─── Inbox / Conversations ────────────────────────────────
   // Wix Inbox REST API has NO "list conversations" endpoint.
-  // Workaround: extract contactIds from recent orders → get-or-create conversation per contact.
-  // The Contacts API requires separate permissions we may not have, so we use Orders instead.
+  // Workaround: query CRM contacts → get-or-create conversation per contact → list messages.
+
+  /**
+   * Query CRM contacts to find people who may have conversations.
+   */
+  async queryContacts(params: { limit?: number; cursor?: string } = {}): Promise<any> {
+    return this.request<any>('/contacts/v4/contacts/query', {
+      method: 'POST',
+      body: JSON.stringify({
+        query: {
+          paging: { limit: params.limit || 50, ...(params.cursor ? { cursor: params.cursor } : {}) },
+          sort: [{ fieldName: 'lastActivity.activityDate', order: 'DESC' }],
+        },
+      }),
+    });
+  }
 
   /**
    * Get or create a conversation for a contact/member/visitor.
@@ -316,6 +330,7 @@ export class WixApiClient {
   async getConversationMessages(conversationId: string, params: { limit?: number; cursor?: string } = {}): Promise<any> {
     const qs = new URLSearchParams();
     qs.set('conversationId', conversationId);
+    qs.set('visibility', 'BUSINESS_AND_PARTICIPANT');
     if (params.cursor) qs.set('paging.cursor', params.cursor);
     return this.request<any>(`/inbox/v2/messages?${qs.toString()}`);
   }

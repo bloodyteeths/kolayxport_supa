@@ -42,13 +42,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const eventData = JSON.parse(payload.data);
               logger.info('Wix webhook event data', { eventData });
 
-              // Check if this event is for our app or a CLI-registered component
+              // Check if this event is for our app or a CLI-registered component.
+              // The appId can be directly on eventData OR nested in eventData.data (another JSON string).
               const ourAppId = process.env.WIX_APP_ID;
-              if (eventData.appId && ourAppId && eventData.appId !== ourAppId) {
-                // This event is for a different component (e.g., CLI dashboard page).
-                // Acknowledge it so Wix doesn't hang, but don't process.
+              let eventAppId = eventData.appId;
+              if (!eventAppId && eventData.data && typeof eventData.data === 'string') {
+                try { eventAppId = JSON.parse(eventData.data).appId; } catch {}
+              }
+              if (eventAppId && ourAppId && eventAppId !== ourAppId) {
                 logger.info('Wix webhook: event is for different component, acknowledging', {
-                  eventAppId: eventData.appId, ourAppId,
+                  eventAppId, ourAppId,
                 });
                 return res.status(200).json({ success: true, skipped: true, reason: 'different_component' });
               }

@@ -288,35 +288,110 @@ export class WixApiClient {
   }
 
   // ─── Inbox / Conversations ────────────────────────────────
+  // Wix Inbox REST API has NO "list conversations" endpoint.
+  // Workflow: query CRM contacts → get-or-create conversation per contact → list messages.
+  // Endpoints: POST /inbox/v2/conversations (get-or-create), GET /inbox/v2/conversations/{id},
+  //            GET /inbox/v2/messages, POST /inbox/v2/messages (send)
 
-  async listConversations(params: { limit?: number; cursor?: string } = {}): Promise<any> {
-    const qs = new URLSearchParams();
-    if (params.limit) qs.set('paging.limit', String(params.limit));
-    if (params.cursor) qs.set('paging.cursor', params.cursor);
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return this.request<any>(`/inbox/v2/conversations${query}`);
+  /**
+   * Query CRM contacts to find people who may have conversations.
+   */
+  async queryContacts(params: { limit?: number; cursor?: string } = {}): Promise<any> {
+    return this.request<any>('/contacts/v4/contacts/query', {
+      method: 'POST',
+      body: JSON.stringify({
+        query: {
+          paging: { limit: params.limit || 50, ...(params.cursor ? { cursor: params.cursor } : {}) },
+          sort: [{ fieldName: 'lastActivity.activityDate', order: 'DESC' }],
+        },
+      }),
+    });
   }
 
+  /**
+   * Get or create a conversation for a contact/member/visitor.
+   * Returns { conversation: { id, ... } }
+   */
+  async getOrCreateConversation(participantId: { contactId?: string; memberId?: string; visitorId?: string }): Promise<any> {
+    return this.request<any>('/inbox/v2/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ participantId }),
+    });
+  }
+
+  /**
+   * Get a single conversation by ID.
+   */
+  async getConversation(conversationId: string): Promise<any> {
+    return this.request<any>(`/inbox/v2/conversations/${conversationId}`);
+  }
+
+  /**
+   * List messages in a conversation (up to 30 per page).
+   */
   async getConversationMessages(conversationId: string, params: { limit?: number; cursor?: string } = {}): Promise<any> {
     const qs = new URLSearchParams();
-    if (params.limit) qs.set('paging.limit', String(params.limit));
+    qs.set('conversationId', conversationId);
     if (params.cursor) qs.set('paging.cursor', params.cursor);
-    const query = qs.toString() ? `?${qs.toString()}` : '';
-    return this.request<any>(`/inbox/v2/conversations/${conversationId}/messages${query}`);
+    return this.request<any>(`/inbox/v2/messages?${qs.toString()}`);
   }
 
+  /**
+   * Send a message in a conversation.
+   */
   async sendMessage(conversationId: string, message: { text: string }): Promise<any> {
-    return this.request<any>(`/inbox/v2/conversations/${conversationId}/messages`, {
+    return this.request<any>('/inbox/v2/messages', {
       method: 'POST',
-      body: JSON.stringify({ message: { text: message.text, direction: 'BUSINESS_TO_CUSTOMER' } }),
+      body: JSON.stringify({
+        message: {
+          conversationId,
+          content: { text: message.text },
+          direction: 'BUSINESS_TO_CUSTOMER',
+        },
+      }),
     });
   }
 
-  async markAsRead(conversationId: string): Promise<any> {
-    return this.request<any>(`/inbox/v2/conversations/${conversationId}/mark-as-read`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
+  /**
+   * List conversations by querying contacts and resolving their conversations.
+   * This is a workaround since Wix has no "list conversations" endpoint.
+   */
+  async listConversations(params: { limit?: number } = {}): Promise<{ conversations: any[] }> {
+    const limit = params.limit || 20;
+    // Step 1: Get recent contacts
+    const contactsData = await this.queryContacts({ limit });
+    const contacts = contactsData.contacts || [];
+
+    if (contacts.length === 0) return { conversations: [] };
+
+    // Step 2: Get-or-create conversations for each contact (parallel, batched)
+    const conversations: any[] = [];
+    const batchSize = 5;
+    for (let i = 0; i < contacts.length; i += batchSize) {
+      const batch = contacts.slice(i, i + batchSize);
+      const results = await Promise.allSettled(
+        batch.map(async (contact: any) => {
+          try {
+            const convData = await this.getOrCreateConversation({ contactId: contact.id });
+            const conv = convData.conversation;
+            if (conv) {
+              conv._contactName = contact.info?.name?.first
+                ? `${contact.info.name.first} ${contact.info.name.last || ''}`.trim()
+                : contact.primaryInfo?.email || 'Customer';
+              return conv;
+            }
+          } catch {
+            // Contact may not have a conversation — skip
+          }
+          return null;
+        })
+      );
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value) conversations.push(r.value);
+      }
+    }
+
+    return { conversations };
   }
 
   // ─── Site Info ────────────────────────────────────────────

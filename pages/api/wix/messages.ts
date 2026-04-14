@@ -46,9 +46,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // ── LIST CONVERSATIONS ──────────────────────────────
     if (action === 'list' && req.method === 'GET') {
-      const limit = parseInt(req.query.limit as string) || 50;
-      const cursor = req.query.cursor as string | undefined;
-      const data = await client.listConversations({ limit, cursor });
+      const limit = parseInt(req.query.limit as string) || 20;
+      const data = await client.listConversations({ limit });
       return res.status(200).json(data);
     }
 
@@ -69,13 +68,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(data);
     }
 
-    // ── MARK AS READ ────────────────────────────────────
-    if (action === 'mark_read' && req.method === 'POST') {
-      const { conversationId } = req.body;
-      if (!conversationId) return res.status(400).json({ error: 'conversationId is required' });
-      const data = await client.markAsRead(conversationId);
-      return res.status(200).json(data);
-    }
 
     return res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (error: any) {

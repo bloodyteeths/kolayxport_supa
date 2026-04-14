@@ -49,23 +49,25 @@ function normalizeTrendyolQuestion(q: any): UnifiedConversation {
 }
 
 function normalizeWixConversation(conv: any): UnifiedConversation {
-  const lastMessage = conv.latestMessage || {};
-  const participant = conv.participants?.find((p: any) => p.type === 'CONTACT') || {};
+  const lastMessage = conv.latestMessage || conv.lastMessage || {};
 
   // A conversation is unanswered if the last message was from the customer
   const lastDirection = lastMessage.direction || lastMessage.sender?.role;
   const isUnanswered = lastDirection === 'CUSTOMER_TO_BUSINESS' || lastDirection === 'VISITOR';
 
+  // _contactName is injected by our listConversations workaround
+  const customerName = conv._contactName || conv.displayName || 'Customer';
+
   return {
     id: conv.id,
     platform: 'wix',
     status: isUnanswered ? 'unanswered' : 'answered',
-    customerName: participant.name || conv.displayName || 'Customer',
-    subject: conv.displayName || '',
-    lastMessageText: lastMessage.text || lastMessage.preview || '',
-    lastMessageDate: lastMessage.date || conv.lastActivityDate || new Date().toISOString(),
+    customerName,
+    subject: customerName,
+    lastMessageText: lastMessage.text || lastMessage.preview || lastMessage.content?.text || '',
+    lastMessageDate: lastMessage.date || conv.lastActivityDate || conv.createdDate || new Date().toISOString(),
     unreadCount: conv.unreadCount || 0,
-    messages: [], // populated only when viewing thread
+    messages: [],
   };
 }
 
@@ -257,7 +259,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const msgData = await client.getConversationMessages(conversationId, { limit: 100 });
         const messages = (msgData.messages || []).map(normalizeWixMessage);
 
-        try { await client.markAsRead(conversationId); } catch {}
 
         return res.status(200).json({
           id: conversationId,

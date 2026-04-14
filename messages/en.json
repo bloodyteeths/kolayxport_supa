@@ -88,7 +88,8 @@
     "release": "Release",
     "pullToRefresh": "Pull to refresh",
     "noNotifications": "No new notifications.",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "messages": "Messages"
   },
   "manualOrder": {
     "addButton": "Add Manual Order",
@@ -6787,7 +6788,20 @@
     "allProducts": "All Products",
     "viewPreset": "View",
     "compact": "Compact",
-    "detailed": "Detailed"
+    "detailed": "Detailed",
+    "personalizationSection": "Personalization",
+    "personalizationFieldTitle": "Field Title",
+    "personalizationMandatory": "Required",
+    "personalizationMaxLength": "Max Characters",
+    "personalizationAddField": "Add Field",
+    "personalizationMaxFields": "Maximum {max} fields allowed",
+    "personalizationActive": "{count} personalization field(s)",
+    "personalizationRemoveField": "Remove Field",
+    "personalizationRemoveAll": "Remove All Fields",
+    "bulkPersonalization": "Personalization",
+    "bulkSetPersonalization": "Set Fields",
+    "bulkRemovePersonalization": "Remove Fields",
+    "personalizationHelperText": "Text fields buyers fill in (e.g. name, message)"
   },
   "shopifyListings": {
     "title": "Shopify Products",
@@ -6824,5 +6838,29 @@
     "updateSuccess": "Product updated successfully",
     "deleteConfirm": "Are you sure you want to delete this product?",
     "deleteSuccess": "Product deleted successfully"
+  },
+  "messages": {
+    "title": "Messages",
+    "allPlatforms": "All Platforms",
+    "unanswered": "Unanswered",
+    "answered": "Answered",
+    "all": "All",
+    "noMessages": "No messages found",
+    "noCredentials": "Configure Wix or Trendyol credentials to see messages",
+    "reply": "Reply",
+    "replyPlaceholder": "Type your reply...",
+    "sendReply": "Send",
+    "replySent": "Reply sent successfully",
+    "replyFailed": "Failed to send reply",
+    "from": "From",
+    "product": "Product",
+    "loadingMessages": "Loading messages...",
+    "markAsRead": "Mark as read",
+    "selectConversation": "Select a conversation to view",
+    "trendyolAnswered": "Already answered (Trendyol allows one reply)",
+    "customer": "Customer",
+    "you": "You",
+    "newMessages": "new messages",
+    "viewAll": "View All Messages"
   }
 }

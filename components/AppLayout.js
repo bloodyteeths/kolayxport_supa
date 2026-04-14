@@ -30,13 +30,15 @@ import {
   ShoppingBag,
   Target,
   Package,
-  Wallet
+  Wallet,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import useSidebar from '../hooks/useSidebar';
 import useScreenSize from '../hooks/useScreenSize';
 import { useTranslations } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
+import useMessageCountStore from '@/lib/stores/useMessageCountStore';
 
 /**
  * AppLayout: For authenticated application routes (e.g., /app/*)
@@ -92,6 +94,15 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   const locale = useLocaleStore((s) => s.locale);
   const setLocale = useLocaleStore((s) => s.setLocale);
   const navGroups = getNavGroups(t);
+  const messageCount = useMessageCountStore((s) => s.counts.total);
+  const fetchMessageCounts = useMessageCountStore((s) => s.fetch);
+
+  // Poll message counts every 3 minutes
+  useEffect(() => {
+    fetchMessageCounts();
+    const interval = setInterval(fetchMessageCounts, 180_000);
+    return () => clearInterval(interval);
+  }, [fetchMessageCounts]);
   const navItems = navGroups.flatMap(g => g.items);
 
   const isActive = (href) => router.pathname === href;
@@ -465,6 +476,20 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
                 className="px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
               >
                 {locale === 'tr' ? 'EN' : 'TR'}
+              </button>
+
+              <button
+                onClick={() => router.push('/app/mesajlar')}
+                className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                title={t('messages')}
+              >
+                <Mail size={19} />
+                {messageCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full ring-2 ring-white px-1">
+                    {messageCount > 99 ? '99+' : messageCount}
+                  </span>
+                )}
+                <span className="sr-only">{t('messages')}</span>
               </button>
 
               <button

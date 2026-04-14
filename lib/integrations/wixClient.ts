@@ -223,6 +223,7 @@ export class WixApiClient {
     ribbon?: string;
     brand?: string;
     manageVariants?: boolean;
+    customTextFields?: Array<{ title: string; mandatory: boolean; maxLength: number }>;
   }): Promise<any> {
     const data = await this.request<any>('/stores/v1/products', {
       method: 'POST',
@@ -284,6 +285,38 @@ export class WixApiClient {
       collections: data.collections || [],
       totalResults: data.totalResults || 0,
     };
+  }
+
+  // ─── Inbox / Conversations ────────────────────────────────
+
+  async listConversations(params: { limit?: number; cursor?: string } = {}): Promise<any> {
+    const qs = new URLSearchParams();
+    if (params.limit) qs.set('paging.limit', String(params.limit));
+    if (params.cursor) qs.set('paging.cursor', params.cursor);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request<any>(`/inbox/v2/conversations${query}`);
+  }
+
+  async getConversationMessages(conversationId: string, params: { limit?: number; cursor?: string } = {}): Promise<any> {
+    const qs = new URLSearchParams();
+    if (params.limit) qs.set('paging.limit', String(params.limit));
+    if (params.cursor) qs.set('paging.cursor', params.cursor);
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request<any>(`/inbox/v2/conversations/${conversationId}/messages${query}`);
+  }
+
+  async sendMessage(conversationId: string, message: { text: string }): Promise<any> {
+    return this.request<any>(`/inbox/v2/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ message: { text: message.text, direction: 'BUSINESS_TO_CUSTOMER' } }),
+    });
+  }
+
+  async markAsRead(conversationId: string): Promise<any> {
+    return this.request<any>(`/inbox/v2/conversations/${conversationId}/mark-as-read`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
   }
 
   // ─── Site Info ────────────────────────────────────────────

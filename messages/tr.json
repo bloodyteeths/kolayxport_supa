@@ -88,7 +88,8 @@
     "release": "Bırak",
     "pullToRefresh": "Yenilemek için çek",
     "noNotifications": "Yeni bildiriminiz yok.",
-    "notifications": "Bildirimler"
+    "notifications": "Bildirimler",
+    "messages": "Mesajlar"
   },
   "manualOrder": {
     "addButton": "Manuel Sipariş Ekle",
@@ -6787,7 +6788,20 @@
     "allProducts": "Tüm Ürünler",
     "viewPreset": "Görünüm",
     "compact": "Kompakt",
-    "detailed": "Detaylı"
+    "detailed": "Detaylı",
+    "personalizationSection": "Kişiselleştirme",
+    "personalizationFieldTitle": "Alan Başlığı",
+    "personalizationMandatory": "Zorunlu",
+    "personalizationMaxLength": "Maks. Karakter",
+    "personalizationAddField": "Alan Ekle",
+    "personalizationMaxFields": "En fazla {max} alan eklenebilir",
+    "personalizationActive": "{count} kişiselleştirme alanı",
+    "personalizationRemoveField": "Alanı Sil",
+    "personalizationRemoveAll": "Tüm Alanları Kaldır",
+    "bulkPersonalization": "Kişiselleştirme",
+    "bulkSetPersonalization": "Alanları Ayarla",
+    "bulkRemovePersonalization": "Alanları Kaldır",
+    "personalizationHelperText": "Alıcıların dolduracağı metin alanları (ör. isim, mesaj)"
   },
   "shopifyListings": {
     "title": "Shopify Ürünler",
@@ -6824,5 +6838,29 @@
     "updateSuccess": "Ürün başarıyla güncellendi",
     "deleteConfirm": "Bu ürünü silmek istediğinizden emin misiniz?",
     "deleteSuccess": "Ürün başarıyla silindi"
+  },
+  "messages": {
+    "title": "Mesajlar",
+    "allPlatforms": "Tüm Platformlar",
+    "unanswered": "Cevaplanmamış",
+    "answered": "Cevaplanmış",
+    "all": "Tümü",
+    "noMessages": "Mesaj bulunamadı",
+    "noCredentials": "Mesajları görmek için Wix veya Trendyol bilgilerinizi yapılandırın",
+    "reply": "Yanıtla",
+    "replyPlaceholder": "Yanıtınızı yazın...",
+    "sendReply": "Gönder",
+    "replySent": "Yanıt başarıyla gönderildi",
+    "replyFailed": "Yanıt gönderilemedi",
+    "from": "Kimden",
+    "product": "Ürün",
+    "loadingMessages": "Mesajlar yükleniyor...",
+    "markAsRead": "Okundu olarak işaretle",
+    "selectConversation": "Görüntülemek için bir konuşma seçin",
+    "trendyolAnswered": "Zaten yanıtlandı (Trendyol tek yanıt izin verir)",
+    "customer": "Müşteri",
+    "you": "Siz",
+    "newMessages": "yeni mesaj",
+    "viewAll": "Tüm Mesajları Gör"
   }
 }

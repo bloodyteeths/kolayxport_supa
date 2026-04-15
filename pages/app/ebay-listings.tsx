@@ -682,8 +682,11 @@ function EbayListingsPage() {
   const handleDeleteListing = useCallback(
     async (row: EbayListingRow) => {
       try {
+        const params = new URLSearchParams({ action: 'delete_listing', user_id: userId! });
+        params.set('sku', row.sku);
+        if (row.offerId) params.set('offerId', row.offerId);
         const res = await fetch(
-          `/api/clawd/ebay?action=delete_listing&user_id=${userId}&sku=${encodeURIComponent(row.sku)}`,
+          `/api/clawd/ebay?${params}`,
           { method: 'DELETE' }
         );
         if (!res.ok) {

@@ -873,7 +873,7 @@ export default async function handler(
       });
     }
 
-    // DELETE ?action=delete_listing&sku=XXX — Delete inventory item
+    // DELETE ?action=delete_listing&sku=XXX&offerId=YYY — Delete offer + inventory item
     if (req.method === 'DELETE' && action === 'delete_listing') {
       const sku = req.query.sku as string;
       if (!sku) {
@@ -881,20 +881,56 @@ export default async function handler(
       }
 
       const encodedSku = encodeURIComponent(sku);
+      let offerId = req.query.offerId as string | undefined;
 
-      logger.info('Deleting eBay inventory item', { sku, userId });
+      logger.info('Deleting eBay listing', { sku, offerId, userId });
 
-      await callEbayAPI(
-        `/sell/inventory/v1/inventory_item/${encodedSku}`,
-        accessToken,
-        { method: 'DELETE' },
-        marketplaceId
-      );
+      // Step 1: Find the offer if not provided
+      if (!offerId) {
+        try {
+          const offersData = await callEbayAPI(
+            `/sell/inventory/v1/offer?sku=${encodedSku}&limit=10`,
+            accessToken, {}, marketplaceId
+          );
+          offerId = offersData.offers?.[0]?.offerId;
+        } catch { /* no offer exists */ }
+      }
+
+      // Step 2: Withdraw the offer if it's published, then delete it
+      if (offerId) {
+        try {
+          await callEbayAPI(
+            `/sell/inventory/v1/offer/${offerId}/withdraw`,
+            accessToken,
+            { method: 'POST' },
+            marketplaceId
+          );
+        } catch { /* not published or already withdrawn */ }
+
+        try {
+          await callEbayAPI(
+            `/sell/inventory/v1/offer/${offerId}`,
+            accessToken,
+            { method: 'DELETE' },
+            marketplaceId
+          );
+        } catch { /* offer already deleted */ }
+      }
+
+      // Step 3: Delete the inventory item
+      try {
+        await callEbayAPI(
+          `/sell/inventory/v1/inventory_item/${encodedSku}`,
+          accessToken,
+          { method: 'DELETE' },
+          marketplaceId
+        );
+      } catch { /* inventory item may not exist */ }
 
       return res.status(200).json({
         success: true,
         sku,
-        message: 'Inventory item deleted.',
+        message: 'Listing deleted.',
       });
     }
 

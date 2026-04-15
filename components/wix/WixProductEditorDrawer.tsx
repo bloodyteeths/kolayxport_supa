@@ -139,7 +139,10 @@ export default function WixProductEditorDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
-      if (!res.ok) throw new Error('Update failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Update failed');
+      }
       toast.success(t('updateSuccess'));
       setHasChanges(false);
       onSaved();

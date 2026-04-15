@@ -134,6 +134,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (action === 'update' && req.method === 'PUT') {
       const { productId, ...updateData } = req.body;
       if (!productId) return res.status(400).json({ error: 'Missing productId' });
+      logger.info('[WIX PRODUCTS] Update request', { productId, fields: Object.keys(updateData) });
       const product = await client.updateProduct(productId, updateData);
       if (product?.id) {
         try { await upsertWixProduct(userId, wixSiteDbId, product); } catch (e) { /* cache fail ok */ }

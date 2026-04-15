@@ -357,10 +357,12 @@ function SenkronPage() {
     {
       field: 'items',
       headerName: t('visual'),
-      renderCell: ({ row }) =>
-        row.items[0]?.image
-          ? <img src={row.items[0].image} width={240} height={240} style={{ objectFit:'cover', borderRadius: 12 }} />
-          : '—',
+      renderCell: ({ row }) => {
+        const img = row.lineItem?.image || row.items?.[0]?.image;
+        return img
+          ? <img src={img} width={240} height={240} style={{ objectFit:'cover', borderRadius: 12 }} />
+          : '—';
+      },
     },
     {
       field: 'customerName',
@@ -370,14 +372,14 @@ function SenkronPage() {
     {
       field: 'variantInfo',
       headerName: t('variant'),
-      valueGetter: ({ row }) => row.items[0]?.variantInfo || '—',
+      valueGetter: ({ row }) => row.lineItem?.variantInfo || row.items?.[0]?.variantInfo || '—',
     },
     {
       field: 'notes',
       headerName: t('note'),
       renderCell: ({ row }) => (
         <TextField
-          defaultValue={row.items[0]?.notes || ''}
+          defaultValue={row.lineItem?.notes || row.items?.[0]?.notes || ''}
           variant="outlined"
           size="small"
         />

@@ -20,7 +20,7 @@ async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
 
   const cred = await prisma.credential.findUnique({ where: { userId: user.id } });
   const credential = wixSite
-    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: wixSite.instanceId || cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
     : cred;
 
   if (!credential?.wixInstanceId || !credential?.wixSiteId) {
@@ -348,8 +348,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 /** Upsert a Wix product into the local cache */
 async function upsertWixProduct(userId: string, wixSiteId: string, p: any) {
-  const images = p.media?.items || p.media?.mainMedia ? [p.media.mainMedia, ...(p.media.items || [])].filter(Boolean) : [];
-  const thumbnailUrl = images[0]?.image?.url || images[0]?.url || '';
+  const images = (p.media?.items?.length || p.media?.mainMedia) ? [p.media.mainMedia, ...(p.media.items || [])].filter(Boolean) : [];
+  let thumbnailUrl = images[0]?.image?.url || images[0]?.url || images[0]?.thumbnail?.url || '';
+  // Convert wix:image:// URIs to actual URLs
+  if (thumbnailUrl.includes('wix:image')) {
+    thumbnailUrl = `https://static.wixstatic.com/media/${thumbnailUrl.replace('wix:image://v1/', '').split('/')[0]}`;
+  }
 
   await prisma.wixProduct.upsert({
     where: { userId_wixSiteId_wixProductId: { userId, wixSiteId, wixProductId: p.id } },

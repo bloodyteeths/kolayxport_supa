@@ -222,7 +222,7 @@ async function submitWixFulfillment(
   });
 
   const credential = wixSite
-    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: userSettings?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: (wixSite as any).instanceId || userSettings?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
     : userSettings;
 
   if (!credential?.wixInstanceId || !credential?.wixSiteId) {
@@ -256,12 +256,13 @@ async function submitWixFulfillment(
   const trackingLink = buildTrackingLink(carrierId, trackingNumber);
 
   // Get line items from the Wix order to fulfill all items
-  let lineItems: { id: string; quantity: number }[] | undefined;
+  // Wix Stores v2 fulfillment uses 1-based index, not lineItemId
+  let lineItems: { index: number; quantity: number }[] | undefined;
   try {
     const wixOrder = await wixClient.getOrder(wixOrderId);
     if (wixOrder?.lineItems?.length) {
-      lineItems = wixOrder.lineItems.map((item: any) => ({
-        id: item.id || item._id,
+      lineItems = wixOrder.lineItems.map((item: any, i: number) => ({
+        index: i + 1,
         quantity: item.quantity || 1,
       }));
     }

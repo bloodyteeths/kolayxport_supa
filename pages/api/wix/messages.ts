@@ -14,7 +14,7 @@ async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
 
   const cred = await prisma.credential.findUnique({ where: { userId: user.id } });
   const credential = wixSite
-    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: wixSite.instanceId || cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
     : cred;
 
   if (!credential?.wixInstanceId || !credential?.wixSiteId) {

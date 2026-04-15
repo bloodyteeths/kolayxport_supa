@@ -948,6 +948,7 @@ model WixSite {
   id              String    @id @default(cuid())
   userId          String
   siteId          String    @unique
+  instanceId      String?
   siteName        String?
   accessToken     String
   refreshToken    String?

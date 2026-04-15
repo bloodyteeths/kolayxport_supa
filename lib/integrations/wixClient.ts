@@ -191,14 +191,14 @@ export class WixApiClient {
    * For custom providers (MNG Kargo, etc.), provide trackingLink manually.
    */
   async createFulfillment(orderId: string, fulfillment: {
-    lineItems?: { id: string; quantity: number }[];
+    lineItems?: { index: number; quantity: number }[];
     trackingInfo: {
       shippingProvider: string;
       trackingNumber: string;
       trackingLink?: string;
     };
   }): Promise<any> {
-    return this.request<any>(`/ecom/v1/fulfillments/orders/${orderId}/create-fulfillment`, {
+    return this.request<any>(`/stores/v2/orders/${orderId}/fulfillments`, {
       method: 'POST',
       body: JSON.stringify({ fulfillment }),
     });

@@ -135,6 +135,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await prisma.wixSite.upsert({
       where: { siteId: resolvedSiteId },
       update: {
+        instanceId,
         siteName,
         accessToken: tokenData.access_token,
         tokenExpiresAt,
@@ -144,6 +145,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       create: {
         userId: 'pending',
         siteId: resolvedSiteId,
+        instanceId,
         siteName,
         accessToken: tokenData.access_token,
         tokenExpiresAt,
@@ -166,8 +168,8 @@ async function saveWixConnection(
 ) {
   await prisma.wixSite.upsert({
     where: { userId_siteId: { userId, siteId } },
-    update: { siteName, accessToken, tokenExpiresAt, isActive: true, updatedAt: new Date() },
-    create: { userId, siteId, siteName, accessToken, tokenExpiresAt, isActive: true },
+    update: { instanceId, siteName, accessToken, tokenExpiresAt, isActive: true, updatedAt: new Date() },
+    create: { userId, siteId, instanceId, siteName, accessToken, tokenExpiresAt, isActive: true },
   });
 
   await prisma.credential.upsert({

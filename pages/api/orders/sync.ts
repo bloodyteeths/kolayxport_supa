@@ -41,7 +41,9 @@ async function handler(
     const hasVeeqo = !!finalVeeqoApiKey;
     const hasShippo = !!finalShippoToken;
     const hasTrendyol = !!(finalTrendyolApiKey && finalTrendyolApiSecret && finalTrendyolSupplierId) && isTrendyolEnabled(userId);
-    const hasWix = !!(userSettings?.wixInstanceId && userSettings?.wixSiteId) && isWixEnabled(userId);
+    // Check both WixSite table and Credential table for Wix credentials
+    const wixSite = await prisma.wixSite.findFirst({ where: { userId, isActive: true } });
+    const hasWix = !!(wixSite || (userSettings?.wixInstanceId && userSettings?.wixSiteId)) && isWixEnabled(userId);
 
     if (!hasVeeqo && !hasShippo && !hasTrendyol && !hasWix) {
       logger.error('No integration credentials found', undefined, { userId, operation: 'order-sync' });

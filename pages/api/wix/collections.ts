@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const wixSite = await prisma.wixSite.findFirst({ where: { userId: user.id, isActive: true } });
   const cred = await prisma.credential.findUnique({ where: { userId: user.id } });
   const credential = wixSite
-    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: wixSite.instanceId || cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
     : cred;
 
   if (!credential?.wixInstanceId || !credential?.wixSiteId) {

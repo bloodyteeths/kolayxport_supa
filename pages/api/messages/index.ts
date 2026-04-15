@@ -109,7 +109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Helper to build Wix client safely
     function buildWixClient() {
       const wixCred = wixSite
-        ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: credential?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+        ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: (wixSite as any).instanceId || credential?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
         : credential;
       if (!wixCred?.wixInstanceId || !wixCred?.wixSiteId) return null;
       return createWixClient(wixCred, async (creds) => {

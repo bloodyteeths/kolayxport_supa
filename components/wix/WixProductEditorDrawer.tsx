@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Drawer, SwipeableDrawer, Box, Typography, IconButton, TextField, Button,
   CircularProgress, Switch, FormControlLabel, Chip, Autocomplete, Divider,
@@ -82,6 +82,7 @@ export default function WixProductEditorDrawer({
   const [selectedCollections, setSelectedCollections] = useState<WixCollection[]>([]);
   const [stockQuantity, setStockQuantity] = useState('');
   const [customTextFields, setCustomTextFields] = useState<Array<{ title: string; mandatory: boolean; maxLength: number }>>([]);
+  const [customTextFieldsChanged, setCustomTextFieldsChanged] = useState(false);
 
   // UI state
   const [saving, setSaving] = useState(false);
@@ -109,10 +110,12 @@ export default function WixProductEditorDrawer({
     const matched = collections.filter(c => colIds.includes(c.id));
     setSelectedCollections(matched);
     setCustomTextFields(Array.isArray(product.customTextFields) ? product.customTextFields : []);
+    setCustomTextFieldsChanged(false);
     setHasChanges(false);
   }, [product, collections]);
 
   const markChanged = useCallback(() => setHasChanges(true), []);
+  const markCustomTextFieldsChanged = useCallback(() => { setCustomTextFieldsChanged(true); setHasChanges(true); }, []);
 
   // Save product
   const handleSave = async () => {
@@ -129,7 +132,7 @@ export default function WixProductEditorDrawer({
       if (price) updates.priceData = { price: parseFloat(price) };
       if (sku) updates.sku = sku;
       if (weight) updates.weight = parseFloat(weight);
-      updates.customTextFields = customTextFields;
+      if (customTextFieldsChanged) updates.customTextFields = customTextFields;
 
       const res = await fetch('/api/wix/products?action=update', {
         method: 'PUT',
@@ -353,7 +356,7 @@ export default function WixProductEditorDrawer({
                   const updated = [...customTextFields];
                   updated[idx] = { ...updated[idx], title: e.target.value };
                   setCustomTextFields(updated);
-                  markChanged();
+                  markCustomTextFieldsChanged();
                 }}
                 size="small"
                 sx={{ flex: 2 }}
@@ -365,7 +368,7 @@ export default function WixProductEditorDrawer({
                   const updated = [...customTextFields];
                   updated[idx] = { ...updated[idx], maxLength: Math.max(1, parseInt(e.target.value) || 1) };
                   setCustomTextFields(updated);
-                  markChanged();
+                  markCustomTextFieldsChanged();
                 }}
                 type="number"
                 size="small"
@@ -380,7 +383,7 @@ export default function WixProductEditorDrawer({
                       const updated = [...customTextFields];
                       updated[idx] = { ...updated[idx], mandatory: e.target.checked };
                       setCustomTextFields(updated);
-                      markChanged();
+                      markCustomTextFieldsChanged();
                     }}
                     size="small"
                   />
@@ -393,7 +396,7 @@ export default function WixProductEditorDrawer({
                 color="error"
                 onClick={() => {
                   setCustomTextFields(customTextFields.filter((_, i) => i !== idx));
-                  markChanged();
+                  markCustomTextFieldsChanged();
                 }}
               >
                 <DeleteIcon fontSize="small" />
@@ -407,7 +410,7 @@ export default function WixProductEditorDrawer({
               startIcon={<AddIcon />}
               onClick={() => {
                 setCustomTextFields([...customTextFields, { title: '', mandatory: false, maxLength: 200 }]);
-                markChanged();
+                markCustomTextFieldsChanged();
               }}
             >
               {t('personalizationAddField')}

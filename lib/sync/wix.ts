@@ -31,7 +31,7 @@ export async function syncWixRecentOrdersForUser(userId: string): Promise<SyncMe
 
   const cred = await prisma.credential.findUnique({ where: { userId } });
   const credential = wixSite
-    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: wixSite.instanceId || cred?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
     : cred;
 
   if (!credential?.wixInstanceId || !credential?.wixSiteId) {

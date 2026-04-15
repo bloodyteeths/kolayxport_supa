@@ -1,4 +1,3 @@
-// @ts-nocheck — Amazon Prisma models pending migration
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';

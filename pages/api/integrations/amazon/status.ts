@@ -1,4 +1,3 @@
-// @ts-nocheck — Amazon credential fields pending migration
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';

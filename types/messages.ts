@@ -10,9 +10,27 @@ export interface UnifiedConversation {
     id: string;
     title: string;
     imageUrl?: string;
+    webUrl?: string;
   };
+  contactId?: string; // Wix contact ID for order lookup
   unreadCount: number;
   messages: UnifiedMessage[];
+}
+
+export interface OrderContextItem {
+  name: string;
+  imageUrl?: string;
+  price: string;
+  quantity: number;
+}
+
+export interface OrderContext {
+  orderNumber: string;
+  status: string;
+  createdDate: string;
+  items: OrderContextItem[];
+  total: string;
+  currency: string;
 }
 
 export interface UnifiedMessage {

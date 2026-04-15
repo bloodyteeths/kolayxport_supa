@@ -6905,6 +6905,16 @@
     "customer": "Customer",
     "you": "You",
     "newMessages": "new messages",
-    "viewAll": "View All Messages"
+    "viewAll": "View All Messages",
+    "productContext": "Product",
+    "viewProduct": "View product",
+    "recentOrders": "Recent Orders",
+    "noOrders": "No orders found",
+    "orderNumber": "Order #",
+    "orderDate": "Date",
+    "items": "items",
+    "loadingOrders": "Loading orders...",
+    "showContext": "Show details",
+    "hideContext": "Hide details"
   }
 }

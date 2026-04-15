@@ -6905,6 +6905,16 @@
     "customer": "Müşteri",
     "you": "Siz",
     "newMessages": "yeni mesaj",
-    "viewAll": "Tüm Mesajları Gör"
+    "viewAll": "Tüm Mesajları Gör",
+    "productContext": "Ürün",
+    "viewProduct": "Ürünü görüntüle",
+    "recentOrders": "Son Siparişler",
+    "noOrders": "Sipariş bulunamadı",
+    "orderNumber": "Sipariş #",
+    "orderDate": "Tarih",
+    "items": "ürün",
+    "loadingOrders": "Siparişler yükleniyor...",
+    "showContext": "Detayları göster",
+    "hideContext": "Detayları gizle"
   }
 }

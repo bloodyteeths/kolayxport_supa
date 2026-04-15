@@ -140,8 +140,12 @@ export class WixApiClient {
     cursor?: string;
     dateCreatedFrom?: string;
     dateCreatedTo?: string;
+    contactId?: string;
   } = {}): Promise<{ orders: any[]; cursor?: string; hasNext: boolean }> {
     const filter: any = {};
+    if (params.contactId) {
+      filter['buyerInfo.contactId'] = { '$eq': params.contactId };
+    }
     if (params.dateCreatedFrom || params.dateCreatedTo) {
       filter['createdDate'] = {};
       if (params.dateCreatedFrom) {
@@ -404,6 +408,7 @@ export class WixApiClient {
             if (conv) {
               const name = [contact.info?.name?.first, contact.info?.name?.last]
                 .filter(Boolean).join(' ') || contact.primaryInfo?.email || 'Customer';
+              conv._contactId = contactId;
               conv._contactName = name;
               conv._contactEmail = contact.primaryInfo?.email;
               conv.lastActivityDate = contact.lastActivity?.activityDate;

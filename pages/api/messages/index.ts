@@ -43,6 +43,7 @@ function normalizeTrendyolQuestion(q: any): UnifiedConversation {
       id: q.productMainId,
       title: q.productName || '',
       imageUrl: q.imageUrl,
+      webUrl: q.webUrl,
     } : undefined,
     unreadCount: isAnswered ? 0 : 1,
     messages,
@@ -64,6 +65,7 @@ function normalizeWixConversation(conv: any): UnifiedConversation {
     platform: 'wix',
     status: isUnanswered ? 'unanswered' : 'answered',
     customerName,
+    contactId: conv._contactId,
     subject: customerName,
     lastMessageText: lastMessage.content?.previewText || lastMessage.content?.basic?.items?.[0]?.text || lastMessage.text || lastMessage.preview || lastMessage.content?.text || '',
     lastMessageDate: lastMessage.createdDate || lastMessage.date || conv.lastActivityDate || conv.createdDate || new Date().toISOString(),
@@ -304,6 +306,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       return res.status(400).json({ error: 'Invalid platform' });
+    }
+
+    // ── ORDER CONTEXT (Wix: customer's recent orders) ──
+    if (action === 'orderContext' && req.method === 'GET') {
+      const contactId = req.query.contactId as string;
+      if (!contactId) return res.status(400).json({ error: 'contactId is required' });
+
+      const client = buildWixClient();
+      if (!client) return res.status(400).json({ error: 'Wix credentials not configured' });
+
+      try {
+        const data = await client.searchOrders({ contactId, limit: 5 });
+        const orders = (data.orders || []).map((order: any) => ({
+          orderNumber: order.number || order._id,
+          status: order.status || order.fulfillmentStatus || 'UNKNOWN',
+          createdDate: order._createdDate || order.createdDate || '',
+          items: (order.lineItems || []).map((item: any) => ({
+            name: item.name || item.productName?.original || '',
+            imageUrl: item.image?.url || item.mediaItem?.url,
+            price: item.price?.formattedAmount || item.priceData?.price?.toString() || '0',
+            quantity: item.quantity || 1,
+          })),
+          total: order.priceSummary?.total?.formattedAmount || order.totals?.total?.toString() || '0',
+          currency: order.currency || order.priceSummary?.total?.currency || 'USD',
+        }));
+        return res.status(200).json({ orders });
+      } catch (e: any) {
+        logger.warn(`[MESSAGES] Order context failed: ${e?.message || e}`);
+        return res.status(200).json({ orders: [] });
+      }
     }
 
     return res.status(400).json({ error: `Unknown action: ${action}` });

@@ -568,24 +568,20 @@ export default async function handler(
     // --- Wix listing URL enrichment: build slug map from WixProduct + WixSite ---
     let wixSlugMap: Record<string, string> = {}; // wixProductId → full URL
     const hasWixOrders = (result as any[]).some(o => o.marketplace === 'Wix');
-    console.log('[wix-listing-debug] hasWixOrders:', hasWixOrders);
     if (hasWixOrders) {
       try {
         const wixSite = await prisma.wixSite.findFirst({ where: { userId: user.id, isActive: true } });
-        console.log('[wix-listing-debug] wixSite siteUrl:', wixSite?.siteUrl, 'siteId:', wixSite?.siteId);
         if (wixSite?.siteUrl) {
           const baseUrl = wixSite.siteUrl.replace(/\/$/, '');
           const slugs = await prisma.wixProduct.findMany({
-            where: { userId: user.id, wixSiteId: wixSite.siteId },
+            where: { userId: user.id, wixSiteId: wixSite.id },
             select: { wixProductId: true, slug: true },
           });
-          console.log('[wix-listing-debug] slugs count:', slugs.length, 'sample:', slugs.slice(0, 2));
           for (const p of slugs) {
             if (p.slug) wixSlugMap[p.wixProductId] = `${baseUrl}/product-page/${p.slug}`;
           }
-          console.log('[wix-listing-debug] wixSlugMap keys:', Object.keys(wixSlugMap).length);
         }
-      } catch (err) { console.error('[wix-listing-debug] error:', err); }
+      } catch { /* non-critical */ }
     }
 
     // OPTIMIZED: Simplified order processing with reduced complexity
@@ -676,7 +672,6 @@ export default async function handler(
         if (isWixOrder) {
           const catId = wixRawLineItems[idx]?.catalogReference?.catalogItemId;
           wixListingUrl = catId ? (wixSlugMap[catId] || '') : '';
-          console.log('[wix-listing-debug] order:', rawOrder.orderNumber, 'idx:', idx, 'catId:', catId, 'url:', wixListingUrl, 'rawLineItems:', wixRawLineItems.length, 'rawDataType:', typeof rawOrder.rawData);
         }
         return {
         id: item.id,

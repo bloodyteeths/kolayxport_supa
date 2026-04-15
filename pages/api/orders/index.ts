@@ -664,7 +664,8 @@ export default async function handler(
       const itemsFromDb = itemsByOrderId.get(rawOrder.id) || [];
       // Build Wix catalogItemId → URL for this order's line items
       const isWixOrder = rawOrder.marketplace === 'Wix';
-      const wixRawLineItems = isWixOrder ? (rawOrder.rawData?.lineItems || []) : [];
+      const parsedRawData = typeof rawOrder.rawData === 'string' ? (() => { try { return JSON.parse(rawOrder.rawData); } catch { return {}; } })() : (rawOrder.rawData || {});
+      const wixRawLineItems = isWixOrder ? (parsedRawData.lineItems || []) : [];
       const line_items_for_ui = itemsFromDb.map((item, idx) => {
         // Match Wix product URL from catalogReference
         let wixListingUrl = '';

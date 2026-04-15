@@ -83,7 +83,7 @@ export interface SoldProduct {
   productName: string;
 }
 
-type Marketplace = 'trendyol' | 'etsy' | 'ebay';
+type Marketplace = 'trendyol' | 'etsy' | 'ebay' | 'amazon';
 
 interface FinanceState {
   // UI state

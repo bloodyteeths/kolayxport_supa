@@ -86,6 +86,13 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   if (t.includes('credit')) return 'revenue'; // eBay credits = revenue adjustment
   if (t.includes('storefee')) return 'other'; // eBay store subscription — don't mix with commissions
   if (t.includes('sellerrevenue') || t.includes('manualrefund')) return 'other';
+  // Amazon-specific types
+  if (t.includes('productcharges') || t.includes('productcharge')) return 'revenue';
+  if (t.includes('referralfee') || t.includes('amazoncommission')) return 'commission';
+  if (t.includes('fbafee') || t.includes('fulfillmentfee') || t.includes('fbainbound') || t.includes('fbastorage')) return 'shipping';
+  if (t.includes('refundcommission') || t.includes('amazonrefund')) return 'return';
+  if (t.includes('sponsoredproduct') || t.includes('sponsoredbrand') || t.includes('sponsoreddisplay') || t.includes('amazonadspend')) return 'adspend';
+  if (t.includes('amazoncoupon') || t.includes('amazondiscount')) return 'discount';
   return 'other';
 }
 

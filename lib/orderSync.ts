@@ -1013,6 +1013,52 @@ export async function syncAllOrders(userId: string, options: {
       }
     }
 
+    // Amazon SP-API order sync (uses Reports API for bulk, Orders API for incremental)
+    if (typeof source === 'undefined' || source === 'amazon') {
+      try {
+        const cred = await prisma.credential.findUnique({ where: { userId } }) as any;
+        if (cred?.amazonAccessToken && cred?.amazonRefreshToken) {
+          const { getValidToken } = await import('./integrations/amazonClient');
+          const { fetchOrderReport } = await import('./integrations/amazonReports');
+          const { toNormalizedOrderFromReport, parseOrderReport } = await import('./mappers/amazon');
+
+          const token = await getValidToken(cred, async (newToken: string, expiresAt: Date) => {
+            await prisma.credential.update({
+              where: { userId },
+              data: { amazonAccessToken: newToken, amazonTokenExpiresAt: expiresAt } as any,
+            });
+          });
+
+          if (token) {
+            const region = (cred.amazonRegion || 'eu') as 'na' | 'eu' | 'fe';
+            const marketplaceIds = [cred.amazonMarketplaceId || 'ATVPDKIKX0DER'];
+
+            // Use 30-day window for orders
+            const syncStart = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const syncEnd = endDate || new Date();
+
+            fetchPromises.push(
+              (async () => {
+                try {
+                  logger.info('[AmazonSync] Requesting order report', { userId, region });
+                  const tsv = await fetchOrderReport(token, region, marketplaceIds, syncStart, syncEnd);
+                  const rows = parseOrderReport(tsv);
+                  const orders = rows.map(toNormalizedOrderFromReport);
+                  logger.info(`[AmazonSync] Parsed ${orders.length} orders from report`, { userId });
+                  return orders;
+                } catch (err: any) {
+                  logger.error('[AmazonSync] Order sync failed', err, { userId });
+                  return [];
+                }
+              })()
+            );
+          }
+        }
+      } catch (err: any) {
+        logger.error('[AmazonSync] Failed to initialize', err, { userId });
+      }
+    }
+
     // Wait for all fetch promises to resolve
     const allOrders = await Promise.all(fetchPromises);
     logger.info(`[FullSync] All sources fetched. Arrays: ${allOrders.map(arr => arr.length).join(', ')}`);

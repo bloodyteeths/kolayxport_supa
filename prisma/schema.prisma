@@ -60,8 +60,11 @@ model User {
   trendyolProducts      TrendyolProduct[]
   wixSites              WixSite[]               @relation("UserWixSites")
   wixProducts           WixProduct[]
-  shopifyShops          ShopifyShop[]            @relation("UserShopifyShops")
-  shopifyProducts       ShopifyProduct[]
+  shopifyShops              ShopifyShop[]            @relation("UserShopifyShops")
+  shopifyProducts           ShopifyProduct[]
+  amazonTrackedProducts     AmazonTrackedProduct[]
+  amazonPriceSnapshots      AmazonPriceSnapshot[]
+  amazonNicheResearch       AmazonNicheResearch[]
 }
 
 model Account {
@@ -289,6 +292,12 @@ model Credential {
   mngAppId              String?
   mngAppSecret          String?
   mngApiEnvironment     String?   @default("test")
+  amazonAccessToken     String?
+  amazonRefreshToken    String?
+  amazonTokenExpiresAt  DateTime?
+  amazonSellerId        String?
+  amazonMarketplaceId   String?
+  amazonRegion          String?   @default("eu")
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -1084,4 +1093,77 @@ model ShopifyProduct {
   @@unique([userId, shopifyShopId, shopifyProductId])
   @@index([userId, shopifyShopId])
   @@index([shopifyShopId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Amazon Research & Tracking Models
+// ---------------------------------------------------------------------------
+
+model AmazonTrackedProduct {
+  id              String   @id @default(cuid())
+  userId          String
+  asin            String
+  title           String?
+  imageUrl        String?
+  categoryId      String?
+  categoryName    String?
+  seller          String?
+  currentPrice    Float?
+  currency        String   @default("USD")
+  currentRank     Int?
+  reviewCount     Int?
+  rating          Float?
+  notes           String?
+  tags            String[]
+  isActive        Boolean  @default(true)
+  lastCheckedAt   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  snapshots AmazonPriceSnapshot[]
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, asin])
+  @@index([userId, isActive])
+}
+
+model AmazonPriceSnapshot {
+  id               String   @id @default(cuid())
+  trackedProductId String
+  userId           String
+  price            Float?
+  currency         String   @default("USD")
+  salesRank        Int?
+  reviewCount      Int?
+  rating           Float?
+  timestamp        DateTime @default(now())
+
+  trackedProduct AmazonTrackedProduct @relation(fields: [trackedProductId], references: [id], onDelete: Cascade)
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([trackedProductId])
+  @@index([trackedProductId, timestamp])
+  @@index([userId])
+}
+
+model AmazonNicheResearch {
+  id               String   @id @default(cuid())
+  userId           String
+  query            String
+  categoryId       String?
+  categoryName     String?
+  marketplace      String   @default("amazon.com")
+  totalResults     Int?
+  avgPrice         Float?
+  medianPrice      Float?
+  avgReviews       Int?
+  avgRating        Float?
+  demandScore      Float?
+  competitionScore Float?
+  notes            String?
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

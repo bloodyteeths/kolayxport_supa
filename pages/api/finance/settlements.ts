@@ -1317,6 +1317,325 @@ async function handleEbaySync(userId: string, body: any, res: NextApiResponse) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Amazon settlement sync
+// ---------------------------------------------------------------------------
+
+async function getAmazonCredentials(userId: string) {
+  const cred = await prisma.credential.findUnique({ where: { userId } }) as any;
+  if (!cred?.amazonAccessToken || !cred?.amazonRefreshToken) {
+    throw { status: 400, message: 'Amazon credentials not configured. Please connect your Amazon account in settings.' };
+  }
+  return cred;
+}
+
+async function handleAmazonSync(userId: string, body: any, res: NextApiResponse) {
+  const { startDate, endDate } = body;
+  if (!startDate || !endDate) {
+    return res.status(400).json({ error: 'startDate and endDate are required (epoch ms)' });
+  }
+
+  const startMs = Number(startDate);
+  const endMs = Number(endDate);
+  if (isNaN(startMs) || isNaN(endMs) || startMs >= endMs) {
+    return res.status(400).json({ error: 'Invalid date range.' });
+  }
+
+  const cred = await getAmazonCredentials(userId);
+  const region = (cred.amazonRegion || 'eu') as any;
+
+  // Dynamic import to avoid loading Amazon modules when not needed
+  const { getValidToken, callSpApiWithRetry } = await import('../../../lib/integrations/amazonClient');
+
+  const token = await getValidToken(cred);
+  if (!token) {
+    return res.status(400).json({ error: 'Amazon token expired. Please reconnect your Amazon account.' });
+  }
+
+  const startISO = new Date(startMs).toISOString();
+  const endISO = new Date(endMs).toISOString();
+
+  // ---- PHASE 1: Fetch transactions via Finances API v2024-06-19 ----
+  const allTransactions: any[] = [];
+  let nextToken: string | null = null;
+
+  do {
+    const params = new URLSearchParams({
+      postedAfter: startISO,
+      postedBefore: endISO,
+      ...(nextToken ? { nextToken } : {}),
+    });
+
+    const data = await callSpApiWithRetry(
+      `/finances/2024-06-19/transactions?${params.toString()}`,
+      token,
+      region,
+    );
+
+    const txs = Array.isArray(data.transactions) ? data.transactions : [];
+    allTransactions.push(...txs);
+    nextToken = data.nextToken || null;
+  } while (nextToken);
+
+  logger.info('Amazon finance: fetched transactions', { total: allTransactions.length });
+
+  // ---- PHASE 2: Process transactions ----
+  const upsertBatch: Array<{
+    externalId: string;
+    transactionType: string;
+    orderNumber: string | null;
+    barcode: string | null;
+    productName: string | null;
+    quantity: number;
+    amount: number;
+    currency: string;
+    commission: number | null;
+    shippingAmount: number | null;
+    transactionDate: Date;
+    rawData: any;
+  }> = [];
+
+  let adSpendTotal = 0;
+  let adSpendCount = 0;
+
+  for (const tx of allTransactions) {
+    const txType = tx.transactionType || '';
+    const txId = tx.transactionId || tx.sellerOrderId || `amz_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const txDate = tx.postedDate ? new Date(tx.postedDate) : new Date();
+    const currency = tx.marketplaceDetails?.marketplaceId ? 'USD' : 'USD'; // Will be overridden per item
+    const orderId = tx.relatedIdentifiers?.find((r: any) => r.relatedIdentifierName === 'ORDER_ID')?.relatedIdentifierValue || tx.sellerOrderId || null;
+
+    // Extract amounts from items array
+    const items = Array.isArray(tx.items) ? tx.items : [];
+
+    for (const item of items) {
+      const description = item.description || '';
+      const itemAmount = parseFloat(item.totalAmount?.amount || '0');
+      const itemCurrency = item.totalAmount?.currencyCode || currency;
+      const asin = item.relatedIdentifiers?.find((r: any) => r.relatedIdentifierName === 'FNSKU' || r.relatedIdentifierName === 'ASIN')?.relatedIdentifierValue || null;
+
+      // Classify by transaction type
+      switch (txType) {
+        case 'Shipment': {
+          // Product charges (revenue)
+          upsertBatch.push({
+            externalId: `${txId}_${asin || upsertBatch.length}`,
+            transactionType: 'ProductCharges',
+            orderNumber: orderId,
+            barcode: asin,
+            productName: description || null,
+            quantity: 1,
+            amount: itemAmount,
+            currency: itemCurrency,
+            commission: null,
+            shippingAmount: null,
+            transactionDate: txDate,
+            rawData: item,
+          });
+          break;
+        }
+
+        case 'Refund': {
+          upsertBatch.push({
+            externalId: `${txId}_refund_${asin || upsertBatch.length}`,
+            transactionType: 'AmazonRefund',
+            orderNumber: orderId,
+            barcode: asin,
+            productName: description || 'Refund',
+            quantity: 1,
+            amount: -Math.abs(itemAmount),
+            currency: itemCurrency,
+            commission: null,
+            shippingAmount: null,
+            transactionDate: txDate,
+            rawData: item,
+          });
+          break;
+        }
+
+        case 'ServiceFee':
+        case 'OtherTransaction': {
+          const descLower = description.toLowerCase();
+
+          if (descLower.includes('fba') || descLower.includes('fulfillment')) {
+            upsertBatch.push({
+              externalId: `${txId}_fba_${upsertBatch.length}`,
+              transactionType: 'FBAFee',
+              orderNumber: orderId,
+              barcode: asin,
+              productName: description || 'FBA Fee',
+              quantity: 1,
+              amount: -Math.abs(itemAmount),
+              currency: itemCurrency,
+              commission: null,
+              shippingAmount: Math.abs(itemAmount),
+              transactionDate: txDate,
+              rawData: item,
+            });
+          } else if (descLower.includes('commission') || descLower.includes('referral')) {
+            upsertBatch.push({
+              externalId: `${txId}_comm_${upsertBatch.length}`,
+              transactionType: 'AmazonCommission',
+              orderNumber: orderId,
+              barcode: asin,
+              productName: description || 'Commission',
+              quantity: 1,
+              amount: -Math.abs(itemAmount),
+              currency: itemCurrency,
+              commission: Math.abs(itemAmount),
+              shippingAmount: null,
+              transactionDate: txDate,
+              rawData: item,
+            });
+          } else if (descLower.includes('storage')) {
+            upsertBatch.push({
+              externalId: `${txId}_storage_${upsertBatch.length}`,
+              transactionType: 'FBAStorage',
+              orderNumber: orderId,
+              barcode: asin,
+              productName: description || 'FBA Storage',
+              quantity: 1,
+              amount: -Math.abs(itemAmount),
+              currency: itemCurrency,
+              commission: null,
+              shippingAmount: null,
+              transactionDate: txDate,
+              rawData: item,
+            });
+          } else if (descLower.includes('sponsored') || descLower.includes('advertising')) {
+            adSpendTotal += Math.abs(itemAmount);
+            adSpendCount++;
+          } else {
+            upsertBatch.push({
+              externalId: `${txId}_other_${upsertBatch.length}`,
+              transactionType: 'AmazonOther',
+              orderNumber: orderId,
+              barcode: asin,
+              productName: description || 'Amazon Fee',
+              quantity: 1,
+              amount: itemAmount,
+              currency: itemCurrency,
+              commission: null,
+              shippingAmount: null,
+              transactionDate: txDate,
+              rawData: item,
+            });
+          }
+          break;
+        }
+
+        default:
+          break;
+      }
+    }
+
+    // Handle transactions without items array (top-level amount)
+    if (items.length === 0 && tx.totalAmount) {
+      const totalAmt = parseFloat(tx.totalAmount.amount || '0');
+      const totalCurrency = tx.totalAmount.currencyCode || 'USD';
+      const descLower = (tx.description || txType || '').toLowerCase();
+
+      if (descLower.includes('sponsored') || descLower.includes('advertising')) {
+        adSpendTotal += Math.abs(totalAmt);
+        adSpendCount++;
+      } else {
+        upsertBatch.push({
+          externalId: txId,
+          transactionType: txType === 'Refund' ? 'AmazonRefund' : 'AmazonOther',
+          orderNumber: orderId,
+          barcode: null,
+          productName: tx.description || txType || 'Amazon Transaction',
+          quantity: 1,
+          amount: totalAmt,
+          currency: totalCurrency,
+          commission: null,
+          shippingAmount: null,
+          transactionDate: txDate,
+          rawData: tx,
+        });
+      }
+    }
+  }
+
+  // ---- PHASE 3: Batch upsert to DB ----
+  let totalUpserted = 0;
+  const UPSERT_BATCH = 20;
+
+  for (let i = 0; i < upsertBatch.length; i += UPSERT_BATCH) {
+    const batch = upsertBatch.slice(i, i + UPSERT_BATCH);
+    await Promise.all(batch.map(txData =>
+      prisma.financialTransaction.upsert({
+        where: {
+          userId_marketplace_externalId: {
+            userId,
+            marketplace: 'amazon',
+            externalId: txData.externalId,
+          },
+        },
+        update: { ...txData, syncedAt: new Date() },
+        create: { userId, marketplace: 'amazon', ...txData },
+      })
+    ));
+    totalUpserted += batch.length;
+  }
+
+  // ---- PHASE 4: Upsert ad spend summary ----
+  if (adSpendTotal > 0) {
+    const startSec = Math.floor(startMs / 1000);
+    const endSec = Math.floor(endMs / 1000);
+    const adSpendId = `amz_adspend_${startSec}_${endSec}`;
+    await prisma.financialTransaction.upsert({
+      where: {
+        userId_marketplace_externalId: { userId, marketplace: 'amazon', externalId: adSpendId },
+      },
+      update: {
+        amount: -adSpendTotal,
+        quantity: adSpendCount,
+        syncedAt: new Date(),
+      },
+      create: {
+        userId,
+        marketplace: 'amazon',
+        externalId: adSpendId,
+        transactionType: 'AmazonAdSpend',
+        orderNumber: null,
+        barcode: null,
+        productName: 'Amazon Sponsored Ads',
+        quantity: adSpendCount,
+        amount: -adSpendTotal,
+        currency: 'USD',
+        commission: null,
+        shippingAmount: null,
+        transactionDate: new Date(endMs),
+      },
+    });
+    totalUpserted++;
+  }
+
+  // Update sync cursor
+  await prisma.financialSyncCursor.upsert({
+    where: { userId_marketplace: { userId, marketplace: 'amazon' } },
+    update: { lastSyncedTo: new Date(endMs), totalSynced: { increment: totalUpserted } },
+    create: { userId, marketplace: 'amazon', lastSyncedTo: new Date(endMs), totalSynced: totalUpserted },
+  });
+
+  logger.info('Amazon settlement sync complete', {
+    userId,
+    totalFetched: allTransactions.length,
+    totalUpserted,
+    adSpend: Math.round(adSpendTotal * 100) / 100,
+    adSpendCount,
+  });
+
+  return res.status(200).json({
+    success: true,
+    totalFetched: allTransactions.length,
+    totalUpserted,
+    adSpend: Math.round(adSpendTotal * 100) / 100,
+    syncedTo: new Date(endMs).toISOString(),
+  });
+}
+
 // Debug: inspect real eBay Finances API response
 async function handleDebugEbayFinances(userId: string, body: any, res: NextApiResponse) {
   const accessToken = await getEbayAccessToken(userId);
@@ -1367,6 +1686,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         if (marketplace === 'ebay') {
           return await handleEbaySync(userId, req.body, res);
+        }
+        if (marketplace === 'amazon') {
+          return await handleAmazonSync(userId, req.body, res);
         }
         return await handleSync(userId, req.body, res);
       }

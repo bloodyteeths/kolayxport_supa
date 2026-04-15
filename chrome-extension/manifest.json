@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "KolayXport — Etsy & eBay Research Tool",
-  "version": "8.0.0",
-  "description": "Inline sales estimates, SEO scores, competition analysis & revenue data directly on Etsy and eBay pages. Like Helium10 for Etsy & eBay.",
+  "name": "KolayXport — Etsy, eBay & Amazon Research Tool",
+  "version": "9.0.0",
+  "description": "Inline sales estimates, SEO scores, competition analysis & revenue data on Etsy, eBay and Amazon pages. AI-powered alternative to Helium 10.",
   "author": "Kolayxport",
   "icons": {
     "16": "icons/icon-16.png",
@@ -29,7 +29,11 @@
     "https://www.ebay.fr/*",
     "https://www.ebay.it/*",
     "https://www.ebay.es/*",
-    "https://www.ebay.com.au/*"
+    "https://www.ebay.com.au/*",
+    "https://www.amazon.com/*",
+    "https://www.amazon.com.tr/*",
+    "https://www.amazon.de/*",
+    "https://www.amazon.co.uk/*"
   ],
   "content_scripts": [
     {
@@ -74,6 +78,17 @@
         "https://www.ebay.com.au/*"
       ],
       "js": ["src/cache.js", "src/content-ebay-shared.js", "src/content-ebay-search.js", "src/content-ebay-listing.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "https://www.amazon.com/*",
+        "https://www.amazon.com.tr/*",
+        "https://www.amazon.de/*",
+        "https://www.amazon.co.uk/*"
+      ],
+      "js": ["src/cache.js", "src/content-amazon-shared.js", "src/content-amazon-search.js", "src/content-amazon-listing.js"],
       "run_at": "document_idle",
       "all_frames": false
     }

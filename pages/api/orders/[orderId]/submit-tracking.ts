@@ -215,21 +215,34 @@ async function submitWixFulfillment(
   carrierId: number,
   userId: string,
 ): Promise<void> {
-  if (!userSettings?.wixInstanceId || !userSettings?.wixSiteId) {
+  // Try WixSite first, fall back to Credential
+  const wixSite = await prisma.wixSite.findFirst({
+    where: { userId, isActive: true },
+  });
+
+  const credential = wixSite
+    ? { wixAccessToken: wixSite.accessToken, wixSiteId: wixSite.siteId, wixInstanceId: userSettings?.wixInstanceId || wixSite.siteId, wixTokenExpiresAt: wixSite.tokenExpiresAt }
+    : userSettings;
+
+  if (!credential?.wixInstanceId || !credential?.wixSiteId) {
     throw new Error('Wix credentials not found. Please configure your Wix integration settings.');
   }
 
   const onTokenRefresh = async (creds: { accessToken: string; tokenExpiresAt: Date; instanceId: string; siteId: string }) => {
-    await prisma.credential.update({
-      where: { userId },
-      data: {
-        wixAccessToken: creds.accessToken,
-        wixTokenExpiresAt: creds.tokenExpiresAt,
-      },
-    });
+    if (wixSite) {
+      await prisma.wixSite.update({
+        where: { id: wixSite.id },
+        data: { accessToken: creds.accessToken, tokenExpiresAt: creds.tokenExpiresAt },
+      });
+    } else {
+      await prisma.credential.update({
+        where: { userId },
+        data: { wixAccessToken: creds.accessToken, wixTokenExpiresAt: creds.tokenExpiresAt },
+      });
+    }
   };
 
-  const wixClient = createWixClient(userSettings, onTokenRefresh);
+  const wixClient = createWixClient(credential, onTokenRefresh);
 
   // Get Wix order ID from marketplaceKey
   const wixOrderId = order.marketplaceKey;

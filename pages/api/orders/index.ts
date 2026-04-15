@@ -565,6 +565,25 @@ export default async function handler(
         }
     }
 
+    // --- Wix listing URL enrichment: build slug map from WixProduct + WixSite ---
+    let wixSlugMap: Record<string, string> = {}; // wixProductId → full URL
+    const hasWixOrders = (result as any[]).some(o => o.marketplace === 'Wix');
+    if (hasWixOrders) {
+      try {
+        const wixSite = await prisma.wixSite.findFirst({ where: { userId: user.id, isActive: true } });
+        if (wixSite?.siteUrl) {
+          const baseUrl = wixSite.siteUrl.replace(/\/$/, '');
+          const slugs = await prisma.wixProduct.findMany({
+            where: { userId: user.id, wixSiteId: wixSite.siteId },
+            select: { wixProductId: true, slug: true },
+          });
+          for (const p of slugs) {
+            if (p.slug) wixSlugMap[p.wixProductId] = `${baseUrl}/product-page/${p.slug}`;
+          }
+        }
+      } catch { /* non-critical */ }
+    }
+
     // OPTIMIZED: Simplified order processing with reduced complexity
     const processedOrders = (result as any[]).map((rawOrder: any) => {
       // --- Simplified Address Extraction ---
@@ -643,7 +662,16 @@ export default async function handler(
 
       // --- Simplified Line Items Mapping ---
       const itemsFromDb = itemsByOrderId.get(rawOrder.id) || [];
-      const line_items_for_ui = itemsFromDb.map(item => ({
+      // Build Wix catalogItemId → URL for this order's line items
+      const isWixOrder = rawOrder.marketplace === 'Wix';
+      const wixRawLineItems = isWixOrder ? (rawOrder.rawData?.lineItems || []) : [];
+      const line_items_for_ui = itemsFromDb.map((item, idx) => {
+        // Match Wix product URL from catalogReference
+        let wixListingUrl = '';
+        if (isWixOrder && wixRawLineItems[idx]?.catalogReference?.catalogItemId) {
+          wixListingUrl = wixSlugMap[wixRawLineItems[idx].catalogReference.catalogItemId] || '';
+        }
+        return {
         id: item.id,
         title: item.productName || item.title || 'Unknown Product',
         value: parseFloat(String(item.unitPrice)) || 0,
@@ -653,7 +681,7 @@ export default async function handler(
         country_of_origin: item.countryOfMfg || '',
         sku: item.sku || '',
         image: item.image || '',
-        etsyListingUrl: item.etsyListingUrl || '',
+        etsyListingUrl: item.etsyListingUrl || wixListingUrl,
         variantInfo: item.variantInfo || '',
         labelJobStatus: item.labelJobStatus || '',
         trackingNumber: item.trackingNumber || '',
@@ -664,7 +692,8 @@ export default async function handler(
           carrier: item.labelJobCarrier,
           pdfUrl: item.labelJobPdfUrl,
         }] : [],
-      }));
+      };
+      });
 
       // --- Enhanced Date Processing ---
       let marketplaceOrderDate = rawOrder.uiOrderDate;

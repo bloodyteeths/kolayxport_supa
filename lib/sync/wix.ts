@@ -76,6 +76,20 @@ export async function syncWixRecentOrdersForUser(userId: string): Promise<SyncMe
 
     const client = createWixClient(credential, onTokenRefresh);
 
+    // Populate siteUrl if missing (needed for product listing links)
+    if (wixSite && !wixSite.siteUrl) {
+      try {
+        const instanceData = await client.getAppInstance();
+        const siteUrl = instanceData?.site?.url;
+        if (siteUrl) {
+          await prisma.wixSite.update({
+            where: { id: wixSite.id },
+            data: { siteUrl },
+          });
+        }
+      } catch { /* non-critical */ }
+    }
+
     // Fetch orders from last 30 days using cursor pagination
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     let allOrders: any[] = [];

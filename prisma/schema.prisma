@@ -950,6 +950,7 @@ model WixSite {
   siteId          String    @unique
   instanceId      String?
   siteName        String?
+  siteUrl         String?
   accessToken     String
   refreshToken    String?
   tokenExpiresAt  DateTime?

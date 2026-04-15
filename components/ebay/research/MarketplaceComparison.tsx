@@ -399,7 +399,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell>{data.totalResults.toLocaleString()}</TableCell>
+                      <TableCell>{(data.totalResults ?? 0).toLocaleString()}</TableCell>
                       <TableCell>${data.avgPrice.toFixed(2)}</TableCell>
                       <TableCell>${data.medianPrice.toFixed(2)}</TableCell>
                       <TableCell><ScoreBadge score={data.demandScore} label={data.demandLabel} /></TableCell>
@@ -448,7 +448,7 @@ export default function MarketplaceComparison({ userId, onNavigate }: Marketplac
 
                 <Collapse in={expanded}>
                   <Box sx={{ px: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                    <MetricRow label={t('mc_totalProducts')} value={data.totalResults.toLocaleString()} />
+                    <MetricRow label={t('mc_totalProducts')} value={(data.totalResults ?? 0).toLocaleString()} />
                     <MetricRow label={t('mc_avgPriceLabel')} value={`$${data.avgPrice.toFixed(2)}`} />
                     <MetricRow label={t('mc_medianPriceLabel')} value={`$${data.medianPrice.toFixed(2)}`} />
                     <MetricRow label={t('mc_demandLabel')} value={`${data.demandScore} (${data.demandLabel})`} />

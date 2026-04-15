@@ -5763,7 +5763,15 @@
     "listingsLoading": "eBay listeleriniz yukleniyor...",
     "listingsLoadedStatus": "{count} aktif listelemeniz yuklendi — araclar otomatik olarak verilerinizi kullanacak.",
     "listingsAuthError": "eBay hesabiniz bagli degil. Ayarlardan eBay hesabinizi baglayiniz.",
-    "listingsLoadError": "eBay listeleriniz yuklenemedi. Tum araclar manual arama ile calisir."
+    "listingsLoadError": "eBay listeleriniz yuklenemedi. Tum araclar manual arama ile calisir.",
+    "conditionUsed": "Kullanılmış",
+    "conditionOpenBox": "Açık Kutu",
+    "conditionRefurbished": "Yenilenmiş",
+    "sortBestMatch": "En İyi Eşleşme",
+    "sortPriceLow": "Fiyat: Düşükten Yükseğe",
+    "sortPriceHigh": "Fiyat: Yüksekten Düşüğe",
+    "sortNewest": "En Yeni",
+    "topRated": "En Çok Satan"
   },
   "ebayScheduled": {
     "dialogTitle": "Güncellemeyi Zamanla",

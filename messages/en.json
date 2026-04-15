@@ -5763,7 +5763,15 @@
     "listingsLoading": "Loading your eBay listings...",
     "listingsLoadedStatus": "{count} active listings loaded — tools will automatically use your data.",
     "listingsAuthError": "Your eBay account is not connected. Connect your eBay account from Settings.",
-    "listingsLoadError": "Your eBay listings could not be loaded. All tools work with manual search."
+    "listingsLoadError": "Your eBay listings could not be loaded. All tools work with manual search.",
+    "conditionUsed": "Used",
+    "conditionOpenBox": "Open Box",
+    "conditionRefurbished": "Refurbished",
+    "sortBestMatch": "Best Match",
+    "sortPriceLow": "Price: Low→High",
+    "sortPriceHigh": "Price: High→Low",
+    "sortNewest": "Newest Listed",
+    "topRated": "Top Rated"
   },
   "ebayScheduled": {
     "dialogTitle": "Schedule Update",

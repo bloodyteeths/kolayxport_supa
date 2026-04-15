@@ -417,7 +417,7 @@ function PriceStatsBar({ stats }: { stats: PriceStats | null }) {
       <Chip icon={<BarChart2 size={14} />} label={`${t('avg')}: $${stats.avg.toFixed(2)}`} size="small" color="primary" variant="outlined" />
       <Chip icon={<Target size={14} />} label={`${t('median')}: $${stats.median.toFixed(2)}`} size="small" variant="outlined" />
       <Chip icon={<DollarSign size={14} />} label={`Max: $${stats.max.toFixed(2)}`} size="small" variant="outlined" />
-      <Chip icon={<Package size={14} />} label={`${stats.totalResults.toLocaleString()} ${t('results')}`} size="small" color="secondary" />
+      <Chip icon={<Package size={14} />} label={`${(stats.totalResults ?? 0).toLocaleString()} ${t('results')}`} size="small" color="secondary" />
     </Paper>
   );
 }

@@ -1466,7 +1466,7 @@ export default function MarketResearch({ userId, initialQuery, initialTitle }: M
               {/* Breakdown */}
               <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
                 {[
-                  { label: t('totalResults'), value: demandScore.totalResults.toLocaleString(), desc: t('supplyAmount') },
+                  { label: t('totalResults'), value: (demandScore.totalResults ?? 0).toLocaleString(), desc: t('supplyAmount') },
                   { label: t('uniqueSellers'), value: demandScore.uniqueSellers.toString(), desc: t('competition') },
                   { label: t('productsPerSellerLabel'), value: demandScore.itemsPerSeller.toString(), desc: t('concentration') },
                   { label: t('priceSpread'), value: `${demandScore.priceSpread}x`, desc: t('diversity') },

@@ -179,6 +179,27 @@ export class WixApiClient {
     return data.order || data;
   }
 
+  // ─── Fulfillments ─────────────────────────────────────────
+
+  /**
+   * Create a fulfillment for an order (marks as shipped, sends buyer notification).
+   * Wix predefined providers: "fedex", "ups", "usps", "dhl", "canada-post"
+   * For custom providers (MNG Kargo, etc.), provide trackingLink manually.
+   */
+  async createFulfillment(orderId: string, fulfillment: {
+    lineItems?: { lineItemId: string; quantity: number }[];
+    trackingInfo: {
+      shippingProvider: string;
+      trackingNumber: string;
+      trackingLink?: string;
+    };
+  }): Promise<any> {
+    return this.request<any>(`/ecom/v1/fulfillments/orders/${orderId}/create-fulfillment`, {
+      method: 'POST',
+      body: JSON.stringify({ fulfillment }),
+    });
+  }
+
   // ─── Products ─────────────────────────────────────────────
 
   async queryProducts(params: {
@@ -394,6 +415,14 @@ export class WixApiClient {
             if (conv) {
               conv._contactName = contact.name;
               conv._contactEmail = contact.email;
+              // Fetch latest message for date and preview
+              try {
+                const msgData = await this.getConversationMessages(conv.id, { limit: 1 });
+                const msgs = msgData.messages || [];
+                if (msgs.length > 0) {
+                  conv.latestMessage = msgs[0];
+                }
+              } catch { /* skip if messages fail */ }
               return conv;
             }
           } catch {

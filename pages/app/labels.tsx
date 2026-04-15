@@ -63,6 +63,11 @@ const VEEQO_CARRIERS_BASE = [
   { value: 5, label: 'UPS' },
   { value: 7, label: 'USPS' },
   { value: 9, label: 'DHL' },
+  { value: 10, label: 'MNG Kargo (DHL eCommerce)' },
+  { value: 12, label: 'Yurtiçi Kargo' },
+  { value: 13, label: 'Aras Kargo' },
+  { value: 14, label: 'Sürat Kargo' },
+  { value: 15, label: 'Trendyol Express' },
 ] as const;
 
 function formatDate(iso?: string): string {

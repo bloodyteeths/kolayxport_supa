@@ -3,6 +3,7 @@ import prisma from '../../../../lib/prisma';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '../../../../lib/logger';
 import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '../../../../lib/integrations/etsyClient';
+import { createWixClient } from '../../../../lib/integrations/wixClient';
 
 interface VeeqoAllocation {
   id: number;
@@ -71,6 +72,7 @@ export default async function handler(
     const source = (() => {
       if (marketplace.includes('etsy')) return 'etsy';
       if (marketplace.includes('trendyol')) return 'trendyol';
+      if (marketplace.includes('wix')) return 'wix';
       return 'veeqo';
     })();
 
@@ -83,11 +85,14 @@ export default async function handler(
     if (source === 'etsy') {
       // Etsy tracking API temporarily disabled pending commercial access approval
       throw new Error('Etsy tracking submission is temporarily unavailable while we await API approval from Etsy. Please submit tracking numbers manually through your Etsy seller dashboard.');
+    } else if (source === 'wix') {
+      // Submit fulfillment directly to Wix
+      await submitWixFulfillment(userSettings, order, trackingNumber, carrierId, user.id);
     } else {
       // Submit through Veeqo for other marketplaces
       if (!userSettings?.veeqoApiKey) {
-        return res.status(400).json({ 
-          error: 'Veeqo API key not found. Please configure your integration settings.' 
+        return res.status(400).json({
+          error: 'Veeqo API key not found. Please configure your integration settings.'
         });
       }
 
@@ -150,15 +155,126 @@ export default async function handler(
 
 function getCarrierName(carrierId: number): string {
   const carrierMap: { [key: number]: string } = {
-    3: 'DHL',
-    4: 'FedEx',
+    1: 'Royal Mail',
+    2: 'FedEx',
+    3: 'Other',
+    4: 'DPD',
     5: 'UPS',
-    6: 'USPS',
-    1: 'TNT',
-    2: 'DPD',
-    // Add more carrier mappings as needed
+    7: 'USPS',
+    9: 'DHL',
+    10: 'MNG Kargo (DHL eCommerce)',
+    12: 'Yurtiçi Kargo',
+    13: 'Aras Kargo',
+    14: 'Sürat Kargo',
+    15: 'Trendyol Express',
   };
   return carrierMap[carrierId] || `Carrier ${carrierId}`;
+}
+
+// Map carrier ID to Wix shipping provider name
+// Wix predefined: "fedex", "ups", "usps", "dhl", "canada-post" (auto-generates tracking links)
+// All others are custom providers (need manual trackingLink)
+function getWixShippingProvider(carrierId: number): { provider: string; trackingLink?: string; trackingNumber?: string } {
+  const predefined: { [key: number]: string } = {
+    2: 'fedex',
+    5: 'ups',
+    7: 'usps',
+    9: 'dhl',
+  };
+  if (predefined[carrierId]) {
+    return { provider: predefined[carrierId] };
+  }
+  // Custom carriers — return display name
+  const customNames: { [key: number]: string } = {
+    1: 'Royal Mail',
+    3: 'Other',
+    4: 'DPD',
+    10: 'MNG Kargo',
+    12: 'Yurtiçi Kargo',
+    13: 'Aras Kargo',
+    14: 'Sürat Kargo',
+    15: 'Trendyol Express',
+  };
+  return { provider: customNames[carrierId] || 'Other' };
+}
+
+function buildTrackingLink(carrierId: number, trackingNumber: string): string | undefined {
+  const linkTemplates: { [key: number]: string } = {
+    10: `https://www.mngkargo.com.tr/gonderi-takip?gonderino=${trackingNumber}`,
+    12: `https://www.yurticikargo.com/tr/online-servisler/gonderi-sorgula?code=${trackingNumber}`,
+    13: `https://www.araskargo.com.tr/tanimlar/gonderi_takip.aspx?code=${trackingNumber}`,
+    14: `https://www.suratkargo.com.tr/gonderi-takip?code=${trackingNumber}`,
+  };
+  return linkTemplates[carrierId];
+}
+
+async function submitWixFulfillment(
+  userSettings: any,
+  order: any,
+  trackingNumber: string,
+  carrierId: number,
+  userId: string,
+): Promise<void> {
+  if (!userSettings?.wixInstanceId || !userSettings?.wixSiteId) {
+    throw new Error('Wix credentials not found. Please configure your Wix integration settings.');
+  }
+
+  const onTokenRefresh = async (creds: { accessToken: string; tokenExpiresAt: Date; instanceId: string; siteId: string }) => {
+    await prisma.credential.update({
+      where: { userId },
+      data: {
+        wixAccessToken: creds.accessToken,
+        wixTokenExpiresAt: creds.tokenExpiresAt,
+      },
+    });
+  };
+
+  const wixClient = createWixClient(userSettings, onTokenRefresh);
+
+  // Get Wix order ID from marketplaceKey
+  const wixOrderId = order.marketplaceKey;
+  if (!wixOrderId) {
+    throw new Error('Cannot determine Wix order ID');
+  }
+
+  // Build tracking info
+  const { provider } = getWixShippingProvider(carrierId);
+  const trackingLink = buildTrackingLink(carrierId, trackingNumber);
+
+  // Get line items from the Wix order to fulfill all items
+  let lineItems: { lineItemId: string; quantity: number }[] | undefined;
+  try {
+    const wixOrder = await wixClient.getOrder(wixOrderId);
+    if (wixOrder?.lineItems?.length) {
+      lineItems = wixOrder.lineItems.map((item: any) => ({
+        lineItemId: item.id || item._id,
+        quantity: item.quantity || 1,
+      }));
+    }
+  } catch (err) {
+    logger.warn('Could not fetch Wix order line items, creating fulfillment without line items', { wixOrderId, error: (err as Error).message });
+  }
+
+  const fulfillment: any = {
+    trackingInfo: {
+      shippingProvider: provider,
+      trackingNumber,
+      ...(trackingLink ? { trackingLink } : {}),
+    },
+  };
+  if (lineItems?.length) {
+    fulfillment.lineItems = lineItems;
+  }
+
+  await wixClient.createFulfillment(wixOrderId, fulfillment);
+
+  logger.info('Wix fulfillment created successfully', {
+    wixOrderId,
+    trackingNumber,
+    provider,
+    carrierId,
+    userId,
+  });
 }
 
 async function submitVeeqoTracking(

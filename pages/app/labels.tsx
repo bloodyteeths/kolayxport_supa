@@ -385,7 +385,7 @@ async function fetchEtsyAddressEnrichment(orderNumber: string): Promise<any | nu
 }
 
 // --- Build MNG order from label row (extracts address from shippingAddress JSON + rawData) ---
-function buildMngOrder(row: any, originalOrder?: LocalUIOrder) {
+function buildMngOrder(row: any, originalOrder?: LocalUIOrder, fallbackPhone?: string) {
   // Parse shippingAddress — could be JSON (to_address) or plain text string
   let addr: any = {};
   const rawShipping = originalOrder?.shippingAddress;
@@ -433,7 +433,7 @@ function buildMngOrder(row: any, originalOrder?: LocalUIOrder) {
     orderId: row.orderId,
     orderNumber: row.orderNumber,
     recipientName: clean(addr.name || shipAddr.fullName) || `${clean(row.recipientFirstName)} ${clean(row.recipientLastName)}`.trim(),
-    recipientPhone: clean(addr.phone || shipAddr.phone || row.recipientPhone),
+    recipientPhone: clean(addr.phone || shipAddr.phone || row.recipientPhone) || fallbackPhone || '',
     recipientEmail: clean(addr.email || row.recipientEmail),
     recipientCity: city,
     recipientDistrict: district,
@@ -1418,6 +1418,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   const [syncingOrders, setSyncingOrders] = useState(false);
   const [rawOrderDataModalOpen, setRawOrderDataModalOpen] = useState(false);
   const [currentRawData, setCurrentRawData] = useState<Record<string, any> | null>(null);
+  const [shipperPhoneNumber, setShipperPhoneNumber] = useState('');
   const [hasFedexCredentials, setHasFedexCredentials] = useState(false);
   const [checkingFedexCredentials, setCheckingFedexCredentials] = useState(true);
   const [labelFilter, setLabelFilter] = useState<'all' | 'unlabeled' | 'labeled'>('all');
@@ -1542,6 +1543,11 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           // toast.error('Lütfen entegrasyon ayarlarınızı tamamlayın.'); // Consider if this toast is too aggressive on load
         }
         
+        // Store shipper phone for fallback (e.g. Trendyol orders with no customer phone)
+        if (data.shipperProfile?.shipperPhoneNumber) {
+          setShipperPhoneNumber(data.shipperProfile.shipperPhoneNumber);
+        }
+
         // Check ETGB settings
         if (data.shippingSettings) {
           setEtgbEnabled(!!data.shippingSettings.etgbEnabled);
@@ -2174,7 +2180,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           </Button>
           <Button size="small" variant="outlined" color="secondary" sx={{ml:0.5}} onClick={() => {
             const originalOrder = params.row.originalOrder as LocalUIOrder | undefined;
-            const mngOrder = buildMngOrder(params.row, originalOrder);
+            const mngOrder = buildMngOrder(params.row, originalOrder, shipperPhoneNumber);
             setSelectedOrderForMNG(mngOrder);
             setMngDrawerOpen(true);
           }}>
@@ -2888,7 +2894,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                           size="small"
                           onClick={() => {
                             const originalOrder = row.originalOrder as LocalUIOrder | undefined;
-                            const mngOrder = buildMngOrder(row, originalOrder);
+                            const mngOrder = buildMngOrder(row, originalOrder, shipperPhoneNumber);
                             setSelectedOrderForMNG(mngOrder);
                             setMngDrawerOpen(true);
                           }}

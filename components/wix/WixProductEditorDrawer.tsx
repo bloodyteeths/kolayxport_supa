@@ -166,7 +166,10 @@ export default function WixProductEditorDrawer({
           quantity: parseInt(stockQuantity) || 0,
         }),
       });
-      if (!res.ok) throw new Error('Inventory update failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Inventory update failed');
+      }
       toast.success(t('updateSuccess'));
       onSaved();
     } catch (err: any) {
@@ -476,7 +479,7 @@ export default function WixProductEditorDrawer({
             ) : (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {images.map((img: any, i: number) => {
-                  const url = typeof img === 'string' ? img : img?.url || img?.src || img?.mediaUrl || '';
+                  const url = typeof img === 'string' ? img : img?.image?.url || img?.url || img?.src || img?.mediaUrl || img?.thumbnail?.url || '';
                   const thumbUrl = url.includes('wix:image')
                     ? `https://static.wixstatic.com/media/${url.replace('wix:image://v1/', '').split('/')[0]}`
                     : url;

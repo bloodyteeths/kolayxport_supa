@@ -1101,16 +1101,23 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         weight: (isVeeqoItem ? item.sellable?.weight : item.weight) ?? 0.5,
         hsCode: (isVeeqoItem ? item.sellable?.product?.hs_tariff_number : item.hs_code) ?? order.harmonizedCode ?? '—',
         itemImageUrl: (() => {
-          // Try Veeqo-resolved fresh image from EtsyListing DB first
+          // 1. DB item image (most reliable — stored during sync per line item)
+          const dbImage = isVeeqoItem ? undefined : item.image;
+          if (dbImage && dbImage !== '') return dbImage;
+          // 2. Veeqo sellable image
+          if (isVeeqoItem) {
+            const sellableImg = item.sellable?.image_url || item.sellable?.product?.main_image_src;
+            if (sellableImg) return sellableImg;
+          }
+          // 3. Veeqo product ID → EtsyListing image
           const rawPids = orderVeeqoProductIds.get(order.id) || [];
-          const pidForItem = rawPids[lineItems.indexOf(item)] || rawPids[0];
+          const pidForItem = rawPids[lineItems.indexOf(item)];
           if (pidForItem && listingImagesByTitle[`veeqo-${pidForItem}`]) {
             return listingImagesByTitle[`veeqo-${pidForItem}`];
           }
-          // Then title-matched EtsyListing image
+          // 4. Title-matched EtsyListing image (last resort)
           if (listingImagesByTitle[item.title || '']) return listingImagesByTitle[item.title || ''];
-          // Then existing item image (may be stale Veeqo thumbnail)
-          return (isVeeqoItem ? item.sellable?.image_url || item.sellable?.product?.main_image_src : item.image) || order.imageUrl || '/placeholder.png';
+          return order.imageUrl || '/placeholder.png';
         })(),
         
         recipientFirstName: addr.recipientFirstName || '—',

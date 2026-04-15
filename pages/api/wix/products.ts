@@ -155,16 +155,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (action === 'inventory' && req.method === 'PUT') {
       const { productId, quantity } = req.body;
       if (!productId) return res.status(400).json({ error: 'Missing productId' });
+      logger.info('[WIX PRODUCTS] Inventory update', { productId, quantity });
       const inventory = await client.getInventoryItem(productId);
-      if (inventory?.id) {
-        const defaultVariant = inventory.variants?.[0];
-        if (defaultVariant) {
-          const currentQty = defaultVariant.quantity || 0;
-          const diff = quantity - currentQty;
-          if (diff !== 0) {
-            await client.updateInventoryVariants(inventory.id, [{ variantId: defaultVariant.variantId, quantity: diff }]);
-          }
-        }
+      if (!inventory?.id) {
+        return res.status(400).json({ error: 'Inventory item not found for this product' });
+      }
+      const defaultVariant = inventory.variants?.[0];
+      if (!defaultVariant?.variantId) {
+        return res.status(400).json({ error: 'No variant found for this product' });
+      }
+      const currentQty = defaultVariant.quantity || 0;
+      const diff = quantity - currentQty;
+      if (diff !== 0) {
+        await client.updateInventoryVariants(inventory.id, [{ variantId: defaultVariant.variantId, quantity: diff }]);
       }
       // Update cache
       await prisma.wixProduct.updateMany({

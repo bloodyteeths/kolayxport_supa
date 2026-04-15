@@ -20,8 +20,9 @@ function normalizeTrendyolQuestion(q: any): UnifiedConversation {
     },
   ];
 
-  if (isAnswered && q.answers?.length > 0) {
-    const answer = q.answers[0];
+  // Trendyol Q&A API returns answer as singular object (q.answer), not array
+  const answer = q.answer || q.answers?.[0];
+  if (isAnswered && answer) {
     messages.push({
       id: `${q.id}-a`,
       sender: 'seller',
@@ -34,14 +35,14 @@ function normalizeTrendyolQuestion(q: any): UnifiedConversation {
     id: String(q.id),
     platform: 'trendyol',
     status: isAnswered ? 'answered' : 'unanswered',
-    customerName: q.customerFirstName || 'Müşteri',
+    customerName: q.customerFirstName || q.userName || 'Müşteri',
     subject: q.productName || '',
     lastMessageText: q.text || '',
     lastMessageDate: q.creationDate ? new Date(q.creationDate).toISOString() : new Date().toISOString(),
     productInfo: q.productMainId ? {
       id: q.productMainId,
       title: q.productName || '',
-      imageUrl: q.productImageUrl,
+      imageUrl: q.imageUrl,
     } : undefined,
     unreadCount: isAnswered ? 0 : 1,
     messages,

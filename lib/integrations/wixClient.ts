@@ -342,10 +342,15 @@ export class WixApiClient {
     return this.request<any>('/inbox/v2/messages', {
       method: 'POST',
       body: JSON.stringify({
+        conversationId,
         message: {
-          conversationId,
-          content: { text: message.text },
-          direction: 'BUSINESS_TO_CUSTOMER',
+          direction: 'BUSINESS_TO_PARTICIPANT',
+          visibility: 'BUSINESS_AND_PARTICIPANT',
+          content: {
+            basic: {
+              items: [{ text: message.text }],
+            },
+          },
         },
       }),
     });

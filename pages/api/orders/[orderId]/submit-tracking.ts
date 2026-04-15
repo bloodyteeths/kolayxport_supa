@@ -142,12 +142,13 @@ export default async function handler(
     });
 
   } catch (error: any) {
+    console.error('[submit-tracking] ERROR:', error?.message || error, { orderId });
     logger.error('Failed to submit tracking number', error, {
       orderId,
       userId: user.id
     });
-    return res.status(500).json({ 
-      error: 'Failed to submit tracking number', 
+    return res.status(500).json({
+      error: 'Failed to submit tracking number',
       details: error.message 
     });
   }
@@ -255,12 +256,12 @@ async function submitWixFulfillment(
   const trackingLink = buildTrackingLink(carrierId, trackingNumber);
 
   // Get line items from the Wix order to fulfill all items
-  let lineItems: { lineItemId: string; quantity: number }[] | undefined;
+  let lineItems: { id: string; quantity: number }[] | undefined;
   try {
     const wixOrder = await wixClient.getOrder(wixOrderId);
     if (wixOrder?.lineItems?.length) {
       lineItems = wixOrder.lineItems.map((item: any) => ({
-        lineItemId: item.id || item._id,
+        id: item.id || item._id,
         quantity: item.quantity || 1,
       }));
     }

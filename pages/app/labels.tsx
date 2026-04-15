@@ -2304,7 +2304,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || t('trackingFailed'));
+        throw new Error(data.details || data.error || t('trackingFailed'));
       }
 
       toast.success(t('trackingSuccess'), { id: toastId });

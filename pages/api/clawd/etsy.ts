@@ -3,6 +3,16 @@ import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
 
+// Raise body size limit for image uploads (base64 encoding inflates by ~33%,
+// so a 10MB Etsy image arrives as ~14MB JSON body)
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '20mb',
+    },
+  },
+};
+
 // Etsy API base URL
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
 

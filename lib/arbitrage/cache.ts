@@ -3,7 +3,7 @@ import prisma from '../prisma';
 // TTL constants in milliseconds
 export const TTL = {
   EXCHANGE_RATE: 60 * 60 * 1000,           // 1 hour
-  EBAY_SEARCH: 6 * 60 * 60 * 1000,         // 6 hours
+  EBAY_SEARCH: 24 * 60 * 60 * 1000,        // 24 hours — cross-tenant (key is query-only); maximises cache hits within eBay's 5k/day Browse quota
   TRENDYOL_PRODUCTS: 4 * 60 * 60 * 1000,   // 4 hours
   GEMINI_TRANSLATE: 24 * 60 * 60 * 1000,   // 24 hours
   CATEGORY_SUGGESTIONS: 7 * 24 * 60 * 60 * 1000, // 7 days

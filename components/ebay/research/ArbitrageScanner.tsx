@@ -47,6 +47,43 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveLabel, setSaveLabel] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+  const [quotaError, setQuotaError] = useState<{
+    message: string;
+    resetAt: string;
+    remaining: number;
+    limit: number;
+    tokenKind?: 'user' | 'app';
+  } | null>(null);
+
+  // Tick so the "resets in X" countdown updates in real-time without stale closures.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!quotaError) return;
+    const id = setInterval(() => setTick(t => t + 1), 30000);
+    return () => clearInterval(id);
+  }, [quotaError]);
+
+  /** Parse a 429 quota response body; returns structured quota info or null. */
+  const parseQuotaError = (data: any): {
+    message: string;
+    resetAt: string;
+    remaining: number;
+    limit: number;
+    tokenKind?: 'user' | 'app';
+  } | null => {
+    if (data?.error === 'QUOTA_EXHAUSTED' && data?.resetAt) {
+      return {
+        message: data.message || ta('quotaExhausted'),
+        resetAt: data.resetAt,
+        remaining: data.remaining ?? 0,
+        limit: data.limit ?? 0,
+        tokenKind: data.tokenKind,
+      };
+    }
+    return null;
+  };
+
+  const isQuotaExpired = quotaError ? new Date(quotaError.resetAt).getTime() <= Date.now() : true;
 
   // Fetch exchange rate on mount
   useEffect(() => {
@@ -104,10 +141,18 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
 
       const data: ArbitrageScanResponse = await res.json();
 
-      if (!res.ok) throw new Error((data as any).error || ta('scanFailed'));
+      if (!res.ok) {
+        const quota = parseQuotaError(data);
+        if (quota) {
+          setQuotaError(quota);
+          return; // Persistent banner renders instead of a toast
+        }
+        throw new Error((data as any).error || ta('scanFailed'));
+      }
 
       setScanResponse(data);
       setScanProgress(null);
+      setQuotaError(null);
 
       const profitCount = data.profitable;
       if (profitCount > 0) {
@@ -121,7 +166,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
       setLoading(false);
       setScanProgress(null);
     }
-  }, [buildParams, setLoading, setScanProgress, setScanResponse]);
+  }, [buildParams, setLoading, setScanProgress, setScanResponse, ta]);
 
   const startBackgroundScan = useCallback(async (categories: string[]) => {
     if (categories.length === 0) {
@@ -152,8 +197,18 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || ta('scanStartFailed'));
+      if (!res.ok) {
+        const quota = parseQuotaError(data);
+        if (quota) {
+          setQuotaError(quota);
+          setLoading(false);
+          setScanProgress(null);
+          return; // Persistent banner renders instead of a toast
+        }
+        throw new Error(data.error || ta('scanStartFailed'));
+      }
 
+      setQuotaError(null);
       setJobId(data.jobId);
 
       // Poll status (pure read — no server-side work triggered). 6s interval is plenty.
@@ -321,6 +376,44 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
           </Box>
         </Paper>
       </Collapse>
+
+      {/* Quota-exhausted banner — persistent until reset time is reached */}
+      {quotaError && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2 }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              disabled={!isQuotaExpired}
+              onClick={() => setQuotaError(null)}
+            >
+              {ta('retry')}
+            </Button>
+          }
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {ta('quotaExhausted')}
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            {ta('quotaResetsAt', {
+              time: new Date(quotaError.resetAt).toLocaleString(undefined, {
+                hour: '2-digit',
+                minute: '2-digit',
+                day: '2-digit',
+                month: 'short',
+              }),
+            })}
+            {` — ${quotaError.remaining}/${quotaError.limit}`}
+          </Typography>
+          {quotaError.tokenKind === 'app' && (
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+              {ta('connectEbayForUnlimited')}
+            </Typography>
+          )}
+        </Alert>
+      )}
 
       {/* Quick presets + Category browser button */}
       <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>

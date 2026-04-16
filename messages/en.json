@@ -3370,7 +3370,11 @@
         "automatic": "Automatic",
         "title": "Arbitrage Scanner",
         "save": "Save",
-        "scanAll": "Scan All"
+        "scanAll": "Scan All",
+        "retry": "Retry",
+        "quotaExhausted": "eBay daily quota exhausted",
+        "quotaResetsAt": "Resets at {time}",
+        "connectEbayForUnlimited": "Connect your own eBay account in settings to get your own daily quota."
       },
       "category": {
         "title": "Category Explorer",

@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
-import { getApplicationToken } from '../../../lib/integrations/ebayClient';
+import { getEbayTokenFor } from '../../../lib/integrations/ebayClient';
 import { callEbayRateLimited } from '../../../lib/integrations/ebayRateLimiter';
 
 export const config = { runtime: 'nodejs' };
@@ -245,7 +245,7 @@ export default async function handler(
           params.set('limit', String(limit));
           params.set('offset', String(offset));
 
-          const appToken = await getApplicationToken();
+          const { token: appToken } = await getEbayTokenFor(userId);
           const searchResult = await callEbayAPI(
             `/buy/browse/v1/item_summary/search?${params.toString()}`,
             appToken,
@@ -344,7 +344,7 @@ export default async function handler(
               .json({ error: 'Either q or category_id is required' });
           }
 
-          const appToken = await getApplicationToken();
+          const { token: appToken } = await getEbayTokenFor(userId);
 
           const params = new URLSearchParams();
           if (q) params.set('q', q);
@@ -612,7 +612,7 @@ export default async function handler(
           }
 
           // Fetch full details from eBay
-          const appToken = await getApplicationToken();
+          const { token: appToken } = await getEbayTokenFor(userId);
           const details = await getItemDetails(legacyItemId, appToken, marketplaceId);
 
           // Create or reactivate tracked product + initial snapshot in a transaction
@@ -701,7 +701,7 @@ export default async function handler(
             return res.status(200).json({ message: 'No tracked products to refresh', updated: 0 });
           }
 
-          const appToken = await getApplicationToken();
+          const { token: appToken } = await getEbayTokenFor(userId);
           const results: Array<{
             id: string;
             legacyItemId: string;

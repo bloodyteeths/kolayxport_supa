@@ -4,7 +4,7 @@ import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { EtsyClient } from '../../../lib/integrations/etsyClient';
 import type { EtsyCredentials } from '../../../lib/integrations/etsyClient';
-import { refreshUserToken } from '../../../lib/integrations/ebayClient';
+import { getUserAccessToken, EbayNotConnectedError } from '../../../lib/integrations/ebayClient';
 
 const TRENDYOL_API_BASE = 'https://apigw.trendyol.com/integration';
 const EBAY_FINANCES_BASE = 'https://apiz.ebay.com';
@@ -957,31 +957,15 @@ async function handleDebugLedger(userId: string, body: any, res: NextApiResponse
 // ---------------------------------------------------------------------------
 
 async function getEbayAccessToken(userId: string): Promise<string> {
-  const credential = await prisma.credential.findUnique({
-    where: { userId },
-    select: { ebayAccessToken: true, ebayRefreshToken: true, ebayTokenExpiresAt: true },
-  });
-  if (!credential?.ebayAccessToken) {
-    throw { status: 400, message: 'eBay not connected. Please connect your eBay account in settings.' };
-  }
-  const now = new Date();
-  const expiresAt = credential.ebayTokenExpiresAt;
-  if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-    if (!credential.ebayRefreshToken) {
-      throw { status: 400, message: 'eBay refresh token not available. Please reconnect.' };
+  try {
+    return await getUserAccessToken(userId);
+  } catch (err) {
+    if (err instanceof EbayNotConnectedError) {
+      // Preserve the { status, message } error shape that existing callers rely on.
+      throw { status: 400, message: err.message };
     }
-    const data = await refreshUserToken(credential.ebayRefreshToken);
-    await prisma.credential.update({
-      where: { userId },
-      data: {
-        ebayAccessToken: data.access_token,
-        ebayRefreshToken: data.refresh_token || credential.ebayRefreshToken,
-        ebayTokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
-      },
-    });
-    return data.access_token;
+    throw err;
   }
-  return credential.ebayAccessToken;
 }
 
 async function callEbayFinancesAPI(endpoint: string, accessToken: string): Promise<any> {

@@ -3,8 +3,9 @@ import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
 import {
-  refreshUserToken,
   getApplicationToken,
+  getEbayTokenFor,
+  getUserAccessToken,
 } from '../../../lib/integrations/ebayClient';
 import { callEbayRateLimited } from '../../../lib/integrations/ebayRateLimiter';
 
@@ -15,49 +16,10 @@ const EBAY_API_BASE = 'https://api.ebay.com';
 // Token management
 // ---------------------------------------------------------------------------
 
-async function refreshEbayToken(userId: string, refreshToken: string): Promise<string> {
-  const data = await refreshUserToken(refreshToken);
-
-  // Update the token in database
-  await prisma.credential.update({
-    where: { userId },
-    data: {
-      ebayAccessToken: data.access_token,
-      ebayRefreshToken: data.refresh_token || refreshToken,
-      ebayTokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
-    },
-  });
-
-  return data.access_token;
-}
-
-async function getEbayAccessToken(userId: string): Promise<string> {
-  const credential = await prisma.credential.findUnique({
-    where: { userId },
-    select: {
-      ebayAccessToken: true,
-      ebayRefreshToken: true,
-      ebayTokenExpiresAt: true,
-    },
-  });
-
-  if (!credential || !credential.ebayAccessToken) {
-    throw new Error('eBay not connected. Please connect your eBay account in settings.');
-  }
-
-  // Check if token is expired or about to expire (within 5 minutes)
-  const now = new Date();
-  const expiresAt = credential.ebayTokenExpiresAt;
-
-  if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-    if (!credential.ebayRefreshToken) {
-      throw new Error('eBay refresh token not available. Please reconnect your eBay account.');
-    }
-    return await refreshEbayToken(userId, credential.ebayRefreshToken);
-  }
-
-  return credential.ebayAccessToken;
-}
+// Thin wrapper around the shared `getUserAccessToken` helper so we keep a single
+// local name at every call site in this large file. The helper reads from
+// `Credential`, auto-refreshes via `refreshUserToken`, and persists the new token.
+const getEbayAccessToken = getUserAccessToken;
 
 // ---------------------------------------------------------------------------
 // API caller
@@ -453,7 +415,7 @@ export default async function handler(
         logger.info('Inventory item not found, falling back to Browse API', { sku });
 
         try {
-          const appToken = await getApplicationToken();
+          const { token: appToken } = await getEbayTokenFor(userId);
           const browseItem = await callEbayAPI(
             `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${sku}`,
             appToken
@@ -1354,7 +1316,7 @@ export default async function handler(
         return res.status(400).json({ error: 'q (search query) is required' });
       }
 
-      const appToken = await getApplicationToken();
+      const { token: appToken } = await getEbayTokenFor(userId);
       const limit = parseInt(req.query.limit as string) || 50;
       const offset = parseInt(req.query.offset as string) || 0;
       const sort = (req.query.sort as string) || 'BEST_MATCH';
@@ -1461,7 +1423,7 @@ export default async function handler(
         return res.status(400).json({ error: 'q (search query) is required' });
       }
 
-      const appToken = await getApplicationToken();
+      const { token: appToken } = await getEbayTokenFor(userId);
       const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
       const categoryId = req.query.category_id as string || '';
 
@@ -1571,7 +1533,7 @@ export default async function handler(
 
     // GET ?action=my_legacy_listings — Get user's own legacy listings via Analytics + Browse API
     if (req.method === 'GET' && action === 'my_legacy_listings') {
-      const appToken = await getApplicationToken();
+      const { token: appToken } = await getEbayTokenFor(userId);
       const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
 
       // Step 1: Get listing IDs from Analytics API (last 90 days)
@@ -1727,7 +1689,7 @@ export default async function handler(
         return res.status(400).json({ error: 'legacy_item_id is required' });
       }
 
-      const appToken = await getApplicationToken();
+      const { token: appToken } = await getEbayTokenFor(userId);
       const item = await callEbayAPI(
         `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyItemId}`,
         appToken
@@ -1743,7 +1705,7 @@ export default async function handler(
         return res.status(400).json({ error: 'seller username is required' });
       }
 
-      const appToken = await getApplicationToken();
+      const { token: appToken } = await getEbayTokenFor(userId);
       const q = (req.query.q as string) || '';
       const limit = parseInt(req.query.limit as string) || 50;
       const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
@@ -1806,7 +1768,7 @@ export default async function handler(
         return res.status(400).json({ error: 'category_id is required' });
       }
 
-      const appToken = await getApplicationToken();
+      const { token: appToken } = await getEbayTokenFor(userId);
       const limit = parseInt(req.query.limit as string) || 50;
       const marketplace = (req.query.marketplace_id as string) || 'EBAY_US';
       const condition = req.query.condition as string || '';

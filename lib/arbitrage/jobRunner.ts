@@ -1,6 +1,6 @@
 import prisma from '../prisma';
 import { logger } from '../logger';
-import { getApplicationToken } from '../integrations/ebayClient';
+import { getEbayTokenFor, getBrowseApiRateLimits } from '../integrations/ebayClient';
 import { scanCategory, getCachedExchangeRate } from './scanner';
 import type { ArbitrageResult, ArbitrageScanJobStatus } from './types';
 
@@ -15,15 +15,50 @@ interface JobParams {
   maxProductsPerCategory?: number;
 }
 
+export type StartScanJobResult =
+  | { ok: true; jobId: string }
+  | {
+      ok: false;
+      errorCode: 'QUOTA_EXHAUSTED';
+      message: string;
+      remaining: number;
+      limit: number;
+      resetAt: string;
+      tokenKind: 'user' | 'app';
+    };
+
 /**
  * Create a new background scan job and kick off background processing.
  * Returns immediately with the job ID — actual work runs detached.
+ *
+ * Pre-flight: checks the Browse API daily quota for the resolved token (user OAuth
+ * when connected, shared app token otherwise). If the estimated cost exceeds 60% of
+ * the remaining quota, the job is NOT created and `QUOTA_EXHAUSTED` is returned.
  */
 export async function startScanJob(
   userId: string,
   categorySlugs: string[],
   params: JobParams
-): Promise<string> {
+): Promise<StartScanJobResult> {
+  // Estimate ~1 Browse call per product (enrichment was removed).
+  const maxPerCategory = params.maxProductsPerCategory || 30;
+  const estimatedCost = categorySlugs.length * maxPerCategory;
+
+  // Resolve the tenant-aware token so the quota check reflects the token we'll actually use.
+  const { token: appToken, kind: tokenKind } = await getEbayTokenFor(userId);
+  const quota = await getBrowseApiRateLimits(appToken, tokenKind);
+  if (quota && quota.remaining < estimatedCost * 0.6) {
+    return {
+      ok: false,
+      errorCode: 'QUOTA_EXHAUSTED',
+      message: `eBay daily quota too low for this scan (need ~${estimatedCost}, have ${quota.remaining}/${quota.limit}). Resets at ${quota.resetAt}.`,
+      remaining: quota.remaining,
+      limit: quota.limit,
+      resetAt: quota.resetAt,
+      tokenKind,
+    };
+  }
+
   const job = await prisma.arbitrageScanJob.create({
     data: {
       userId,
@@ -40,7 +75,7 @@ export async function startScanJob(
   // Fire-and-forget: run in background, don't block the HTTP response
   void runJobInBackground(job.id);
 
-  return job.id;
+  return { ok: true, jobId: job.id };
 }
 
 // In-memory guard to prevent duplicate background runners for same job
@@ -208,7 +243,7 @@ export async function processNextChunk(jobId: string): Promise<ArbitrageScanJobS
   const chunk = remainingSlugs.slice(0, chunkSize);
 
   try {
-    const appToken = await getApplicationToken();
+    const { token: appToken } = await getEbayTokenFor(job.userId);
     const exchangeRate = params.exchangeRate || await getCachedExchangeRate();
 
     const processOne = async (slug: string): Promise<{ productsScanned: number; resultsCount: number }> => {

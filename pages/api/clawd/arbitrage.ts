@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
-import { getApplicationToken } from '../../../lib/integrations/ebayClient';
+import { getEbayTokenFor, getBrowseApiRateLimits } from '../../../lib/integrations/ebayClient';
 import { fetchTrendyolCategoryProducts, TRENDYOL_CATEGORIES } from '../../../lib/integrations/trendyolSearch';
 import { scanCategory, scanBatch, batchTranslateTitles, extractEnglishQuery, getCachedExchangeRate } from '../../../lib/arbitrage/scanner';
 import { discoverTrendyolCategories, getCategoryMappings, syncCategoryMappings, mapToEbayCategory } from '../../../lib/arbitrage/categoryMapper';
@@ -77,7 +77,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const exchangeRate = req.body.exchangeRate || await getCachedExchangeRate();
-        const appToken = await getApplicationToken();
+        const { token: appToken, kind: tokenKind } = await getEbayTokenFor(userId);
+
+        // Pre-flight quota check — estimate ~1 Browse call per product (enrichment removed).
+        // Fail-open if the analytics endpoint doesn't return a usable bucket.
+        const estimatedCost = categories.length * maxTrendyolResults;
+        const quota = await getBrowseApiRateLimits(appToken, tokenKind);
+        if (quota && quota.remaining < estimatedCost * 0.6) {
+          return res.status(429).json({
+            error: 'QUOTA_EXHAUSTED',
+            message: `eBay daily quota too low for this scan (need ~${estimatedCost}, have ${quota.remaining}/${quota.limit}). Resets at ${quota.resetAt}.`,
+            remaining: quota.remaining,
+            limit: quota.limit,
+            resetAt: quota.resetAt,
+            tokenKind,
+          });
+        }
 
         const allResults: ArbitrageResult[] = [];
         let totalScanned = 0;
@@ -123,7 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: 'At least one category is required' });
         }
 
-        const jobId = await startScanJob(userId, categories, {
+        const result = await startScanJob(userId, categories, {
           shippingCostUsd: scanParams.shippingCostUsd || 15,
           feeOverridePercent: scanParams.feeOverridePercent,
           includeInternationalFee: scanParams.includeInternationalFee ?? true,
@@ -131,9 +146,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           exchangeRate: scanParams.exchangeRate,
           minProfitUsd: scanParams.minProfitUsd || 5,
           minRoiPercent: scanParams.minRoiPercent || 20,
+          maxProductsPerCategory: scanParams.maxTrendyolResults
+            ? Math.ceil(scanParams.maxTrendyolResults / categories.length)
+            : 30,
         });
 
-        return res.json({ jobId, status: 'pending' });
+        if (!result.ok) {
+          return res.status(429).json({
+            error: result.errorCode,
+            message: result.message,
+            remaining: result.remaining,
+            limit: result.limit,
+            resetAt: result.resetAt,
+            tokenKind: result.tokenKind,
+          });
+        }
+
+        return res.json({ jobId: result.jobId, status: 'pending' });
       }
 
       case 'job_status': {
@@ -170,7 +199,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!trendyolCategoryName) {
           return res.status(400).json({ error: 'trendyolCategoryName is required' });
         }
-        const appToken = await getApplicationToken();
+        const { token: appToken } = await getEbayTokenFor(userId);
         const mapping = await mapToEbayCategory(
           sampleTitle || trendyolCategoryName,
           appToken

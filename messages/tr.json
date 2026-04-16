@@ -3370,7 +3370,11 @@
         "automatic": "Otomatik",
         "title": "Arbitraj Tarayıcı",
         "save": "Kaydet",
-        "scanAll": "Tümünü Tara"
+        "scanAll": "Tümünü Tara",
+        "retry": "Tekrar Dene",
+        "quotaExhausted": "eBay günlük kotası doldu",
+        "quotaResetsAt": "Sıfırlanma: {time}",
+        "connectEbayForUnlimited": "Kendi eBay hesabınızı bağlayarak kendi günlük kotanıza sahip olabilirsiniz."
       },
       "category": {
         "title": "Kategori Keşfedici",

@@ -114,6 +114,13 @@ export interface ArbitrageScanJobStatus {
   results?: ArbitrageResult[];
   exchangeRate?: number;
   error?: string;
+  errorCode?: 'QUOTA_EXHAUSTED' | 'NO_EBAY_CONNECTION';
+  rateLimitInfo?: {
+    remaining: number;
+    limit: number;
+    resetAt: string;
+    tokenKind?: 'user' | 'app';
+  };
   scanDurationMs?: number;
 }
 

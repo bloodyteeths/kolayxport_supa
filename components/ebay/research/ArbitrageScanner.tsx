@@ -203,8 +203,9 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
 
   const handleScan = useCallback((categories: string[]) => {
     setSelectedCategories(categories);
-    // Use background scan for 6+ categories, quick scan for fewer
-    if (categories.length > 5) {
+    // Use background scan for 2+ categories so progress updates work (quick scan has no per-category progress).
+    // Single-category quick scan is fine since it completes fast.
+    if (categories.length > 1) {
       startBackgroundScan(categories);
     } else {
       runQuickScan(categories);

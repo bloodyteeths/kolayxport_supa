@@ -9,6 +9,25 @@ import type { ArbitrageResult, EbayComparable, TrendyolProduct } from './types';
 
 const EBAY_API_BASE = 'https://api.ebay.com';
 
+// Global rate limiter — eBay Browse API allows ~5 QPS on application tokens.
+// We stay under 4 QPS with retries so bursts don't trip 429.
+const EBAY_MIN_INTERVAL_MS = 260; // ~3.8 QPS
+let ebayQueueTail: Promise<unknown> = Promise.resolve();
+let lastEbayCallAt = 0;
+
+function rateLimitedEbay<T>(fn: () => Promise<T>): Promise<T> {
+  const run = async (): Promise<T> => {
+    const now = Date.now();
+    const wait = Math.max(0, lastEbayCallAt + EBAY_MIN_INTERVAL_MS - now);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    lastEbayCallAt = Date.now();
+    return fn();
+  };
+  const next = ebayQueueTail.then(run, run);
+  ebayQueueTail = next.catch(() => {});
+  return next;
+}
+
 interface ScanParams {
   shippingCostUsd: number;
   feeOverridePercent?: number;
@@ -19,21 +38,39 @@ interface ScanParams {
   minRoiPercent?: number;
 }
 
-async function callEbayAPI(endpoint: string, token: string, marketplaceId = 'EBAY_US') {
+async function callEbayAPI(endpoint: string, token: string, marketplaceId = 'EBAY_US'): Promise<any> {
   const url = endpoint.startsWith('http') ? endpoint : `${EBAY_API_BASE}${endpoint}`;
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-EBAY-C-MARKETPLACE-ID': marketplaceId,
-    },
+
+  return rateLimitedEbay(async () => {
+    // Retry loop for 429 / transient 5xx
+    let lastErr: Error | null = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-EBAY-C-MARKETPLACE-ID': marketplaceId,
+        },
+      });
+      if (response.ok) return response.json();
+
+      const text = await response.text();
+      const err = new Error(`eBay API ${response.status}: ${text.substring(0, 200)}`);
+
+      // Retry 429 (rate limit) and 5xx with exponential backoff
+      if (response.status === 429 || response.status >= 500) {
+        lastErr = err;
+        const backoffMs = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s, 8s
+        logger.warn(`[arbitrage] eBay ${response.status} — retrying in ${backoffMs}ms (attempt ${attempt + 1}/4)`);
+        await new Promise(r => setTimeout(r, backoffMs));
+        continue;
+      }
+      // Non-retryable
+      throw err;
+    }
+    throw lastErr || new Error('eBay API: exhausted retries');
   });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`eBay API ${response.status}: ${text.substring(0, 200)}`);
-  }
-  return response.json();
 }
 
 async function getItemDetails(legacyItemId: string, appToken: string): Promise<EbayComparable> {
@@ -156,7 +193,7 @@ async function searchAndEnrichEbay(
   query: string,
   appToken: string,
   limit = 15,
-  enrichCount = 8
+  enrichCount = 3
 ): Promise<EbayComparable[]> {
   // Check cache
   const cached = await getCached<EbayComparable[]>(cacheKey.ebaySearch(query));
@@ -269,7 +306,7 @@ export async function scanBatch(
       if (tp.barcode && tp.barcode.length >= 8) {
         const gtinItems = await searchEbayByGtin(tp.barcode, appToken);
         if (gtinItems.length > 0) {
-          ebayItems = await searchAndEnrichEbay(tp.barcode, appToken, 10, 6);
+          ebayItems = await searchAndEnrichEbay(tp.barcode, appToken, 10, 3);
           matchTier = 'gtin';
         }
       }

@@ -200,8 +200,10 @@ export async function processNextChunk(jobId: string): Promise<ArbitrageScanJobS
     };
   }
 
-  // Process next chunk (up to 3 categories per poll)
-  const chunkSize = Math.min(3, remainingSlugs.length);
+  // Process next chunk — 4 categories in parallel. The eBay rate limiter in scanner.ts
+  // serializes actual API calls across all categories so we don't trip 429, but Trendyol
+  // fetches, Gemini translation and DB writes run concurrently, which is the biggest time win.
+  const chunkSize = Math.min(4, remainingSlugs.length);
   const chunk = remainingSlugs.slice(0, chunkSize);
 
   try {
@@ -211,83 +213,85 @@ export async function processNextChunk(jobId: string): Promise<ArbitrageScanJobS
     let chunkProductsScanned = 0;
     let chunkResultsCount = 0;
 
-    for (const slug of chunk) {
-      try {
-        const { results, productsScanned } = await scanCategory(slug, {
-          ...params,
-          exchangeRate,
-        }, appToken);
+    const categoryResults = await Promise.all(
+      chunk.map(slug =>
+        scanCategory(slug, { ...params, exchangeRate }, appToken)
+          .then(r => ({ slug, ...r }))
+          .catch(err => {
+            logger.warn(`[arbitrage] scanCategory failed for ${slug}: ${String(err)}`);
+            return { slug, results: [], productsScanned: 0 };
+          })
+      )
+    );
 
-        chunkProductsScanned += productsScanned;
+    for (const { slug, results, productsScanned } of categoryResults) {
+      chunkProductsScanned += productsScanned;
 
-        // Persist results to DB
-        for (const r of results) {
-          try {
-            await prisma.arbitrageResultRecord.upsert({
-              where: {
-                userId_trendyolProductId: {
-                  userId: job.userId,
-                  trendyolProductId: r.trendyol.id,
-                },
-              },
-              create: {
-                scanJobId: jobId,
+      // Persist results to DB
+      for (const r of results) {
+        try {
+          await prisma.arbitrageResultRecord.upsert({
+            where: {
+              userId_trendyolProductId: {
                 userId: job.userId,
                 trendyolProductId: r.trendyol.id,
-                trendyolName: r.trendyol.name,
-                trendyolBrand: r.trendyol.brand,
-                trendyolPriceTry: r.trendyol.priceTry,
-                trendyolImageUrl: r.trendyol.imageUrl,
-                trendyolUrl: r.trendyol.url,
-                trendyolCategory: r.trendyol.categoryName,
-                ebayMedianPrice: r.ebay.medianPrice,
-                ebayAvgPrice: r.ebay.avgPrice,
-                ebayListingCount: r.ebay.totalListings,
-                ebayAvgSold: r.ebay.avgSold,
-                ebayCategoryId: r.ebay.categoryId,
-                ebayCategoryName: r.ebay.categoryName,
-                ebayTopItems: r.ebay.topItems as any,
-                translatedQuery: r.translatedQuery,
-                matchTier: r.matchTier,
-                profitUsd: r.financials.profitUsd,
-                roiPercent: r.financials.roiPercent,
-                marginPercent: r.financials.marginPercent,
-                totalCostUsd: r.financials.totalCostUsd,
-                score: r.score,
-                verdict: r.verdict,
-                financials: r.financials as any,
-                exchangeRate,
               },
-              update: {
-                scanJobId: jobId,
-                trendyolPriceTry: r.trendyol.priceTry,
-                ebayMedianPrice: r.ebay.medianPrice,
-                ebayAvgPrice: r.ebay.avgPrice,
-                ebayListingCount: r.ebay.totalListings,
-                ebayAvgSold: r.ebay.avgSold,
-                ebayCategoryId: r.ebay.categoryId,
-                ebayCategoryName: r.ebay.categoryName,
-                ebayTopItems: r.ebay.topItems as any,
-                translatedQuery: r.translatedQuery,
-                matchTier: r.matchTier,
-                profitUsd: r.financials.profitUsd,
-                roiPercent: r.financials.roiPercent,
-                marginPercent: r.financials.marginPercent,
-                totalCostUsd: r.financials.totalCostUsd,
-                score: r.score,
-                verdict: r.verdict,
-                financials: r.financials as any,
-                exchangeRate,
-                updatedAt: new Date(),
-              },
-            });
-            chunkResultsCount++;
-          } catch (err) {
-            logger.warn(`Failed to persist result for product ${r.trendyol.id}`, { error: String(err) });
-          }
+            },
+            create: {
+              scanJobId: jobId,
+              userId: job.userId,
+              trendyolProductId: r.trendyol.id,
+              trendyolName: r.trendyol.name,
+              trendyolBrand: r.trendyol.brand,
+              trendyolPriceTry: r.trendyol.priceTry,
+              trendyolImageUrl: r.trendyol.imageUrl,
+              trendyolUrl: r.trendyol.url,
+              trendyolCategory: r.trendyol.categoryName,
+              ebayMedianPrice: r.ebay.medianPrice,
+              ebayAvgPrice: r.ebay.avgPrice,
+              ebayListingCount: r.ebay.totalListings,
+              ebayAvgSold: r.ebay.avgSold,
+              ebayCategoryId: r.ebay.categoryId,
+              ebayCategoryName: r.ebay.categoryName,
+              ebayTopItems: r.ebay.topItems as any,
+              translatedQuery: r.translatedQuery,
+              matchTier: r.matchTier,
+              profitUsd: r.financials.profitUsd,
+              roiPercent: r.financials.roiPercent,
+              marginPercent: r.financials.marginPercent,
+              totalCostUsd: r.financials.totalCostUsd,
+              score: r.score,
+              verdict: r.verdict,
+              financials: r.financials as any,
+              exchangeRate,
+            },
+            update: {
+              scanJobId: jobId,
+              trendyolPriceTry: r.trendyol.priceTry,
+              ebayMedianPrice: r.ebay.medianPrice,
+              ebayAvgPrice: r.ebay.avgPrice,
+              ebayListingCount: r.ebay.totalListings,
+              ebayAvgSold: r.ebay.avgSold,
+              ebayCategoryId: r.ebay.categoryId,
+              ebayCategoryName: r.ebay.categoryName,
+              ebayTopItems: r.ebay.topItems as any,
+              translatedQuery: r.translatedQuery,
+              matchTier: r.matchTier,
+              profitUsd: r.financials.profitUsd,
+              roiPercent: r.financials.roiPercent,
+              marginPercent: r.financials.marginPercent,
+              totalCostUsd: r.financials.totalCostUsd,
+              score: r.score,
+              verdict: r.verdict,
+              financials: r.financials as any,
+              exchangeRate,
+              updatedAt: new Date(),
+            },
+          });
+          chunkResultsCount++;
+        } catch (err) {
+          logger.warn(`Failed to persist result for product ${r.trendyol.id} (category ${slug})`, { error: String(err) });
         }
-      } catch (err) {
-        logger.warn(`Scan failed for category ${slug}`, { error: String(err) });
       }
     }
 

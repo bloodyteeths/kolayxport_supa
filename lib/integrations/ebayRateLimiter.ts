@@ -15,7 +15,7 @@ import { logger } from '../logger';
  *   });
  */
 
-const EBAY_MIN_INTERVAL_MS = 260; // ~3.8 QPS
+const EBAY_MIN_INTERVAL_MS = 140; // ~7 QPS — eBay Browse app token ceiling; retries cover any 429 bursts
 let queueTail: Promise<unknown> = Promise.resolve();
 let lastCallAt = 0;
 

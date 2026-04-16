@@ -140,12 +140,14 @@ export function extractEnglishQuery(product: TrendyolProduct): string {
   return englishWords;
 }
 
-/** Search eBay with query and return enriched items (with caching) */
+/** Search eBay with query and return items built from search-result metadata only.
+ * We skip per-item enrichment (get_item_by_legacy_id) — title/price/condition from
+ * item_summary/search is enough for arbitrage comparison, and enrichment adds 3-4x
+ * more API calls per product that would starve the global eBay rate limiter. */
 async function searchAndEnrichEbay(
   query: string,
   appToken: string,
-  limit = 15,
-  enrichCount = 3
+  limit = 10
 ): Promise<EbayComparable[]> {
   // Check cache
   const cached = await getCached<EbayComparable[]>(cacheKey.ebaySearch(query));
@@ -164,13 +166,8 @@ async function searchAndEnrichEbay(
   const ebayItems = searchResult.itemSummaries || [];
   if (ebayItems.length === 0) return [];
 
-  const enriched: EbayComparable[] = [];
-  const enrichLimit = Math.min(ebayItems.length, enrichCount);
-
-  for (let i = 0; i < enrichLimit; i++) {
-    const item = ebayItems[i];
-    const legacyId = item.legacyItemId;
-    const fallback: EbayComparable = {
+  const results: EbayComparable[] = ebayItems
+    .map((item: any) => ({
       title: item.title || '',
       price: parseFloat(item.price?.value || '0'),
       currency: item.price?.currency || 'USD',
@@ -180,20 +177,8 @@ async function searchAndEnrichEbay(
       imageUrl: item.image?.imageUrl || item.thumbnailImages?.[0]?.imageUrl || '',
       categoryId: item.categories?.[0]?.categoryId || '',
       categoryName: item.categories?.[0]?.categoryName || '',
-    };
-
-    if (!legacyId) {
-      enriched.push(fallback);
-      continue;
-    }
-    try {
-      enriched.push(await getItemDetails(legacyId, appToken));
-    } catch {
-      enriched.push(fallback);
-    }
-  }
-
-  const results = enriched.filter(i => i.price > 0);
+    }))
+    .filter((i: EbayComparable) => i.price > 0);
 
   // Cache results
   if (results.length > 0) {
@@ -258,7 +243,7 @@ export async function scanBatch(
       if (tp.barcode && tp.barcode.length >= 8) {
         const gtinItems = await searchEbayByGtin(tp.barcode, appToken);
         if (gtinItems.length > 0) {
-          ebayItems = await searchAndEnrichEbay(tp.barcode, appToken, 10, 3);
+          ebayItems = await searchAndEnrichEbay(tp.barcode, appToken, 10);
           matchTier = 'gtin';
         }
       }

@@ -200,9 +200,10 @@ export async function processNextChunk(jobId: string): Promise<ArbitrageScanJobS
     };
   }
 
-  // Process next chunk — 4 categories in parallel. The eBay rate limiter in scanner.ts
-  // serializes actual API calls across all categories so we don't trip 429, but Trendyol
-  // fetches, Gemini translation and DB writes run concurrently, which is the biggest time win.
+  // Process next chunk — 4 categories in parallel. Trendyol fetch + Gemini translate
+  // run concurrently; eBay API calls are globally serialised by the rate limiter.
+  // Each category commits its own results + append to processedSlugs atomically via
+  // Postgres array_append so the progress bar moves per-category, not per-chunk.
   const chunkSize = Math.min(4, remainingSlugs.length);
   const chunk = remainingSlugs.slice(0, chunkSize);
 
@@ -210,114 +211,124 @@ export async function processNextChunk(jobId: string): Promise<ArbitrageScanJobS
     const appToken = await getApplicationToken();
     const exchangeRate = params.exchangeRate || await getCachedExchangeRate();
 
-    let chunkProductsScanned = 0;
-    let chunkResultsCount = 0;
+    const processOne = async (slug: string): Promise<{ productsScanned: number; resultsCount: number }> => {
+      try {
+        const { results, productsScanned } = await scanCategory(slug, { ...params, exchangeRate }, appToken);
+        let resultsCount = 0;
 
-    const categoryResults = await Promise.all(
-      chunk.map(slug =>
-        scanCategory(slug, { ...params, exchangeRate }, appToken)
-          .then(r => ({ slug, ...r }))
-          .catch(err => {
-            logger.warn(`[arbitrage] scanCategory failed for ${slug}: ${String(err)}`);
-            return { slug, results: [], productsScanned: 0 };
-          })
-      )
-    );
-
-    for (const { slug, results, productsScanned } of categoryResults) {
-      chunkProductsScanned += productsScanned;
-
-      // Persist results to DB
-      for (const r of results) {
-        try {
-          await prisma.arbitrageResultRecord.upsert({
-            where: {
-              userId_trendyolProductId: {
+        for (const r of results) {
+          try {
+            await prisma.arbitrageResultRecord.upsert({
+              where: {
+                userId_trendyolProductId: {
+                  userId: job.userId,
+                  trendyolProductId: r.trendyol.id,
+                },
+              },
+              create: {
+                scanJobId: jobId,
                 userId: job.userId,
                 trendyolProductId: r.trendyol.id,
+                trendyolName: r.trendyol.name,
+                trendyolBrand: r.trendyol.brand,
+                trendyolPriceTry: r.trendyol.priceTry,
+                trendyolImageUrl: r.trendyol.imageUrl,
+                trendyolUrl: r.trendyol.url,
+                trendyolCategory: r.trendyol.categoryName,
+                ebayMedianPrice: r.ebay.medianPrice,
+                ebayAvgPrice: r.ebay.avgPrice,
+                ebayListingCount: r.ebay.totalListings,
+                ebayAvgSold: r.ebay.avgSold,
+                ebayCategoryId: r.ebay.categoryId,
+                ebayCategoryName: r.ebay.categoryName,
+                ebayTopItems: r.ebay.topItems as any,
+                translatedQuery: r.translatedQuery,
+                matchTier: r.matchTier,
+                profitUsd: r.financials.profitUsd,
+                roiPercent: r.financials.roiPercent,
+                marginPercent: r.financials.marginPercent,
+                totalCostUsd: r.financials.totalCostUsd,
+                score: r.score,
+                verdict: r.verdict,
+                financials: r.financials as any,
+                exchangeRate,
               },
-            },
-            create: {
-              scanJobId: jobId,
-              userId: job.userId,
-              trendyolProductId: r.trendyol.id,
-              trendyolName: r.trendyol.name,
-              trendyolBrand: r.trendyol.brand,
-              trendyolPriceTry: r.trendyol.priceTry,
-              trendyolImageUrl: r.trendyol.imageUrl,
-              trendyolUrl: r.trendyol.url,
-              trendyolCategory: r.trendyol.categoryName,
-              ebayMedianPrice: r.ebay.medianPrice,
-              ebayAvgPrice: r.ebay.avgPrice,
-              ebayListingCount: r.ebay.totalListings,
-              ebayAvgSold: r.ebay.avgSold,
-              ebayCategoryId: r.ebay.categoryId,
-              ebayCategoryName: r.ebay.categoryName,
-              ebayTopItems: r.ebay.topItems as any,
-              translatedQuery: r.translatedQuery,
-              matchTier: r.matchTier,
-              profitUsd: r.financials.profitUsd,
-              roiPercent: r.financials.roiPercent,
-              marginPercent: r.financials.marginPercent,
-              totalCostUsd: r.financials.totalCostUsd,
-              score: r.score,
-              verdict: r.verdict,
-              financials: r.financials as any,
-              exchangeRate,
-            },
-            update: {
-              scanJobId: jobId,
-              trendyolPriceTry: r.trendyol.priceTry,
-              ebayMedianPrice: r.ebay.medianPrice,
-              ebayAvgPrice: r.ebay.avgPrice,
-              ebayListingCount: r.ebay.totalListings,
-              ebayAvgSold: r.ebay.avgSold,
-              ebayCategoryId: r.ebay.categoryId,
-              ebayCategoryName: r.ebay.categoryName,
-              ebayTopItems: r.ebay.topItems as any,
-              translatedQuery: r.translatedQuery,
-              matchTier: r.matchTier,
-              profitUsd: r.financials.profitUsd,
-              roiPercent: r.financials.roiPercent,
-              marginPercent: r.financials.marginPercent,
-              totalCostUsd: r.financials.totalCostUsd,
-              score: r.score,
-              verdict: r.verdict,
-              financials: r.financials as any,
-              exchangeRate,
-              updatedAt: new Date(),
-            },
-          });
-          chunkResultsCount++;
-        } catch (err) {
-          logger.warn(`Failed to persist result for product ${r.trendyol.id} (category ${slug})`, { error: String(err) });
+              update: {
+                scanJobId: jobId,
+                trendyolPriceTry: r.trendyol.priceTry,
+                ebayMedianPrice: r.ebay.medianPrice,
+                ebayAvgPrice: r.ebay.avgPrice,
+                ebayListingCount: r.ebay.totalListings,
+                ebayAvgSold: r.ebay.avgSold,
+                ebayCategoryId: r.ebay.categoryId,
+                ebayCategoryName: r.ebay.categoryName,
+                ebayTopItems: r.ebay.topItems as any,
+                translatedQuery: r.translatedQuery,
+                matchTier: r.matchTier,
+                profitUsd: r.financials.profitUsd,
+                roiPercent: r.financials.roiPercent,
+                marginPercent: r.financials.marginPercent,
+                totalCostUsd: r.financials.totalCostUsd,
+                score: r.score,
+                verdict: r.verdict,
+                financials: r.financials as any,
+                exchangeRate,
+                updatedAt: new Date(),
+              },
+            });
+            resultsCount++;
+          } catch (err) {
+            logger.warn(`Failed to persist result for product ${r.trendyol.id} (category ${slug})`, { error: String(err) });
+          }
         }
+
+        // Atomically append this slug to processedSlugs and bump counters so the
+        // UI progress bar moves for every finished category (not just every chunk).
+        await prisma.$executeRaw`
+          UPDATE "ArbitrageScanJob"
+          SET "processedSlugs" = "processedSlugs" || ${slug}::text,
+              "progress" = "progress" + ${productsScanned}::int,
+              "totalProducts" = "totalProducts" + ${productsScanned}::int,
+              "resultsCount" = "resultsCount" + ${resultsCount}::int,
+              "exchangeRate" = ${exchangeRate}::double precision,
+              "updatedAt" = NOW()
+          WHERE id = ${jobId}
+        `;
+
+        return { productsScanned, resultsCount };
+      } catch (err) {
+        logger.warn(`[arbitrage] scanCategory failed for ${slug}: ${String(err)}`);
+        // Still mark as processed so we don't re-scan a broken category forever
+        await prisma.$executeRaw`
+          UPDATE "ArbitrageScanJob"
+          SET "processedSlugs" = "processedSlugs" || ${slug}::text,
+              "updatedAt" = NOW()
+          WHERE id = ${jobId}
+        `;
+        return { productsScanned: 0, resultsCount: 0 };
       }
+    };
+
+    await Promise.all(chunk.map(processOne));
+
+    // Re-read job to check completion against the freshly-appended processedSlugs
+    const refreshed = await prisma.arbitrageScanJob.findUnique({ where: { id: jobId } });
+    const newProcessedCount = refreshed?.processedSlugs?.length || 0;
+    const isComplete = newProcessedCount >= job.categorySlugs.length;
+
+    if (isComplete) {
+      await prisma.arbitrageScanJob.update({
+        where: { id: jobId },
+        data: { status: 'completed', completedAt: new Date() },
+      });
     }
 
-    // Update job progress
-    const newProcessed = [...processedSlugs, ...chunk];
-    const isComplete = newProcessed.length >= job.categorySlugs.length;
-
-    await prisma.arbitrageScanJob.update({
-      where: { id: jobId },
-      data: {
-        processedSlugs: newProcessed,
-        progress: job.progress + chunkProductsScanned,
-        totalProducts: job.totalProducts + chunkProductsScanned,
-        resultsCount: job.resultsCount + chunkResultsCount,
-        exchangeRate,
-        ...(isComplete ? { status: 'completed', completedAt: new Date() } : {}),
-      },
-    });
-
-    // Get current results
     const allResults = await getJobResults(jobId);
 
     return {
       jobId,
       status: isComplete ? 'completed' : 'processing',
-      progress: newProcessed.length,
+      progress: newProcessedCount,
       totalProducts: job.categorySlugs.length,
       resultsCount: allResults.length,
       results: allResults,

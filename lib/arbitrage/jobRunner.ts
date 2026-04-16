@@ -16,8 +16,8 @@ interface JobParams {
 }
 
 /**
- * Create a new background scan job.
- * Returns immediately with the job ID.
+ * Create a new background scan job and kick off background processing.
+ * Returns immediately with the job ID — actual work runs detached.
  */
 export async function startScanJob(
   userId: string,
@@ -37,7 +37,103 @@ export async function startScanJob(
     },
   });
 
+  // Fire-and-forget: run in background, don't block the HTTP response
+  void runJobInBackground(job.id);
+
   return job.id;
+}
+
+// In-memory guard to prevent duplicate background runners for same job
+const runningJobs = new Set<string>();
+
+/**
+ * Run a scan job to completion in the background.
+ * Processes chunks sequentially until all categories are done.
+ * Designed for fire-and-forget invocation.
+ */
+export async function runJobInBackground(jobId: string): Promise<void> {
+  if (runningJobs.has(jobId)) {
+    logger.info(`[arbitrage] Job ${jobId} already running, skipping duplicate start`);
+    return;
+  }
+  runningJobs.add(jobId);
+
+  try {
+    // Loop until job reaches a terminal state
+    while (true) {
+      const status = await processNextChunk(jobId);
+      if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+        logger.info(`[arbitrage] Job ${jobId} finished with status=${status.status}`);
+        break;
+      }
+      // Small breath between chunks to avoid hammering downstreams
+      await new Promise(r => setTimeout(r, 500));
+    }
+  } catch (err) {
+    logger.error(`[arbitrage] Background runner crashed for job ${jobId}: ${String(err)}`);
+    try {
+      await prisma.arbitrageScanJob.update({
+        where: { id: jobId },
+        data: { status: 'failed', error: String(err) },
+      });
+    } catch { /* swallow */ }
+  } finally {
+    runningJobs.delete(jobId);
+  }
+}
+
+/**
+ * Resume any jobs left in 'pending' or 'processing' state.
+ * Called lazily once per process after a restart, so orphaned runners don't leave jobs hanging.
+ */
+let staleJobsResumed = false;
+export async function resumeStaleJobsOnce(): Promise<void> {
+  if (staleJobsResumed) return;
+  staleJobsResumed = true;
+  try {
+    const stale = await prisma.arbitrageScanJob.findMany({
+      where: { status: { in: ['pending', 'processing'] } },
+      select: { id: true },
+      take: 20,
+    });
+    for (const { id } of stale) {
+      logger.info(`[arbitrage] Resuming stale job ${id} after restart`);
+      void runJobInBackground(id);
+    }
+  } catch (err) {
+    logger.warn('[arbitrage] Failed to resume stale jobs', { error: String(err) });
+  }
+}
+
+/**
+ * Read the current status of a scan job without doing any work.
+ * Safe to call frequently for UI polling.
+ */
+export async function getJobStatus(jobId: string): Promise<ArbitrageScanJobStatus> {
+  const job = await prisma.arbitrageScanJob.findUnique({ where: { id: jobId } });
+  if (!job) {
+    return { jobId, status: 'failed', progress: 0, totalProducts: 0, resultsCount: 0, error: 'Job not found' };
+  }
+
+  // Only load full result set when job is terminal or has results to show
+  const includeResults = job.status === 'completed' || job.resultsCount > 0;
+  const results = includeResults ? await getJobResults(jobId) : undefined;
+
+  return {
+    jobId,
+    status: job.status as any,
+    progress: job.processedSlugs?.length || 0,
+    totalProducts: job.categorySlugs.length,
+    resultsCount: job.resultsCount,
+    results,
+    exchangeRate: job.exchangeRate || undefined,
+    error: job.error || undefined,
+    scanDurationMs: job.completedAt && job.startedAt
+      ? job.completedAt.getTime() - job.startedAt.getTime()
+      : job.startedAt
+        ? Date.now() - job.startedAt.getTime()
+        : undefined,
+  };
 }
 
 /**

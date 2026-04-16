@@ -129,12 +129,18 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
       return;
     }
 
+    // Clear any stale polling from a previous scan
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+
     setLoading(true);
     setScanProgress({ current: 0, total: categories.length, phase: ta('startingScan') });
     setScanResponse(null);
 
     try {
-      // Start the background job
+      // Start the background job (returns immediately — work runs server-side)
       const res = await fetch('/api/clawd/arbitrage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,8 +156,11 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
 
       setJobId(data.jobId);
 
-      // Poll for status
+      // Poll status (pure read — no server-side work triggered). 6s interval is plenty.
+      let inFlight = false;
       pollRef.current = setInterval(async () => {
+        if (inFlight) return; // don't stack polls if one is slow
+        inFlight = true;
         try {
           const statusRes = await fetch('/api/clawd/arbitrage', {
             method: 'POST',
@@ -179,7 +188,7 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
           }
 
           if (status.status === 'completed' || status.status === 'failed') {
-            if (pollRef.current) clearInterval(pollRef.current);
+            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
             setLoading(false);
             setScanProgress(null);
             setJobId(null);
@@ -192,8 +201,10 @@ export default function ArbitrageScanner({ userId }: ArbitrageScannerProps) {
           }
         } catch {
           // Polling error — will retry next interval
+        } finally {
+          inFlight = false;
         }
-      }, 4000);
+      }, 6000);
     } catch (err: any) {
       toast.error(err.message || ta('scanError'));
       setLoading(false);

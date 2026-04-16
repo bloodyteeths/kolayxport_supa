@@ -5,7 +5,7 @@ import { getApplicationToken } from '../../../lib/integrations/ebayClient';
 import { fetchTrendyolCategoryProducts, TRENDYOL_CATEGORIES } from '../../../lib/integrations/trendyolSearch';
 import { scanCategory, scanBatch, batchTranslateTitles, extractEnglishQuery, getCachedExchangeRate } from '../../../lib/arbitrage/scanner';
 import { discoverTrendyolCategories, getCategoryMappings, syncCategoryMappings, mapToEbayCategory } from '../../../lib/arbitrage/categoryMapper';
-import { startScanJob, processNextChunk, getUserResults, getScanHistory, setTracked, recordPricePoint, getPriceHistory } from '../../../lib/arbitrage/jobRunner';
+import { startScanJob, getJobStatus, resumeStaleJobsOnce, getUserResults, getScanHistory, setTracked, recordPricePoint, getPriceHistory } from '../../../lib/arbitrage/jobRunner';
 import type { ArbitrageResult, ArbitrageScanResponse } from '../../../lib/arbitrage/types';
 
 export const config = { runtime: 'nodejs' };
@@ -21,6 +21,9 @@ function getUserId(req: NextApiRequest, res: NextApiResponse): { userId: string;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Resume any orphaned jobs from before the last restart (idempotent, fires once per process)
+  void resumeStaleJobsOnce();
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -137,7 +140,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { jobId } = req.body;
         if (!jobId) return res.status(400).json({ error: 'jobId is required' });
 
-        const status = await processNextChunk(jobId);
+        // Pure read — background runner does the work separately
+        const status = await getJobStatus(jobId);
         return res.json(status);
       }
 

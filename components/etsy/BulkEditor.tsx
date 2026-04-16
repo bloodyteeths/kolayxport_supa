@@ -616,11 +616,18 @@ export default function BulkEditor({
 
   const pendingCount = pendingChanges.size;
 
-  // Reset when listings change
+  // Reset only when the SET of listing IDs actually changes (not on every parent re-render).
+  // Using listings reference directly would clear pendingChanges whenever parent re-renders
+  // with a new memoized array (common with filters, health maps, status counts).
+  const listingIdsKey = useMemo(
+    () => listings.map(l => l.listing_id).sort((a, b) => a - b).join(','),
+    [listings]
+  );
   useEffect(() => {
     setCheckedIds(new Set(listings.map(l => l.listing_id)));
     setPendingChanges(new Map());
-  }, [listings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingIdsKey]);
 
   // Reset operation when field changes
   const handleFieldChange = useCallback((field: FieldCategory) => {

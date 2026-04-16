@@ -3,13 +3,15 @@ import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
 import { getApplicationToken } from '../../../lib/integrations/ebayClient';
+import { callEbayRateLimited } from '../../../lib/integrations/ebayRateLimiter';
 
 export const config = { runtime: 'nodejs' };
 
 const EBAY_API_BASE = 'https://api.ebay.com';
 
 // ---------------------------------------------------------------------------
-// API caller (same pattern as ebay.ts)
+// API caller — delegates to shared rate-limited caller so all eBay traffic
+// (research, arbitrage, tracker, etc.) shares a single global queue + retry.
 // ---------------------------------------------------------------------------
 
 async function callEbayAPI(
@@ -19,38 +21,12 @@ async function callEbayAPI(
   marketplaceId?: string
 ) {
   const url = endpoint.startsWith('http') ? endpoint : `${EBAY_API_BASE}${endpoint}`;
-
-  const headers: Record<string, string> = {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'Accept-Language': 'en-US',
-    'Content-Language': 'en-US',
-  };
-  if (marketplaceId) {
-    headers['X-EBAY-C-MARKETPLACE-ID'] = marketplaceId;
+  try {
+    return await callEbayRateLimited(url, { token, marketplaceId, options });
+  } catch (err) {
+    logger.error('eBay API error', err as Error, { endpoint });
+    throw err;
   }
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...headers,
-      ...((options.headers as Record<string, string>) || {}),
-    },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    const error = new Error(`eBay API error: ${response.status} - ${errorText}`);
-    logger.error('eBay API error', error, { endpoint, status: response.status });
-    throw error;
-  }
-
-  if (response.status === 204 || response.headers.get('content-length') === '0') {
-    return { success: true };
-  }
-
-  return response.json();
 }
 
 // ---------------------------------------------------------------------------

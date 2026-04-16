@@ -6,6 +6,7 @@ import {
   refreshUserToken,
   getApplicationToken,
 } from '../../../lib/integrations/ebayClient';
+import { callEbayRateLimited } from '../../../lib/integrations/ebayRateLimiter';
 
 // eBay REST API base URL
 const EBAY_API_BASE = 'https://api.ebay.com';
@@ -64,41 +65,12 @@ async function getEbayAccessToken(userId: string): Promise<string> {
 
 async function callEbayAPI(endpoint: string, accessToken: string, options: RequestInit = {}, marketplaceId?: string) {
   const url = endpoint.startsWith('http') ? endpoint : `${EBAY_API_BASE}${endpoint}`;
-
-  const headers: Record<string, string> = {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'Accept-Language': 'en-US',
-    'Content-Language': 'en-US',
-  };
-  if (marketplaceId) {
-    headers['X-EBAY-C-MARKETPLACE-ID'] = marketplaceId;
+  try {
+    return await callEbayRateLimited(url, { token: accessToken, marketplaceId, options });
+  } catch (err) {
+    logger.error('eBay API error', err as Error, { endpoint });
+    throw err;
   }
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...headers,
-      ...((options.headers as Record<string, string>) || {}),
-    },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    const error = new Error(`eBay API error: ${response.status} - ${errorText}`);
-    logger.error('eBay API error', error, {
-      endpoint,
-      status: response.status,
-    });
-    throw error;
-  }
-
-  if (response.status === 204 || response.headers.get('content-length') === '0') {
-    return { success: true };
-  }
-
-  return response.json();
 }
 
 // ---------------------------------------------------------------------------

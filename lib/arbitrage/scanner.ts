@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../logger';
 import { getApplicationToken } from '../integrations/ebayClient';
+import { callEbayRateLimited } from '../integrations/ebayRateLimiter';
 import { fetchTrendyolCategoryProducts, getExchangeRate } from '../integrations/trendyolSearch';
 import { calculateArbitrage } from './calculator';
 import { getCached, setCache, cacheKey, TTL, maybeClearExpired } from './cache';
@@ -8,25 +9,6 @@ import { mapToEbayCategory } from './categoryMapper';
 import type { ArbitrageResult, EbayComparable, TrendyolProduct } from './types';
 
 const EBAY_API_BASE = 'https://api.ebay.com';
-
-// Global rate limiter — eBay Browse API allows ~5 QPS on application tokens.
-// We stay under 4 QPS with retries so bursts don't trip 429.
-const EBAY_MIN_INTERVAL_MS = 260; // ~3.8 QPS
-let ebayQueueTail: Promise<unknown> = Promise.resolve();
-let lastEbayCallAt = 0;
-
-function rateLimitedEbay<T>(fn: () => Promise<T>): Promise<T> {
-  const run = async (): Promise<T> => {
-    const now = Date.now();
-    const wait = Math.max(0, lastEbayCallAt + EBAY_MIN_INTERVAL_MS - now);
-    if (wait > 0) await new Promise(r => setTimeout(r, wait));
-    lastEbayCallAt = Date.now();
-    return fn();
-  };
-  const next = ebayQueueTail.then(run, run);
-  ebayQueueTail = next.catch(() => {});
-  return next;
-}
 
 interface ScanParams {
   shippingCostUsd: number;
@@ -40,37 +22,7 @@ interface ScanParams {
 
 async function callEbayAPI(endpoint: string, token: string, marketplaceId = 'EBAY_US'): Promise<any> {
   const url = endpoint.startsWith('http') ? endpoint : `${EBAY_API_BASE}${endpoint}`;
-
-  return rateLimitedEbay(async () => {
-    // Retry loop for 429 / transient 5xx
-    let lastErr: Error | null = null;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-EBAY-C-MARKETPLACE-ID': marketplaceId,
-        },
-      });
-      if (response.ok) return response.json();
-
-      const text = await response.text();
-      const err = new Error(`eBay API ${response.status}: ${text.substring(0, 200)}`);
-
-      // Retry 429 (rate limit) and 5xx with exponential backoff
-      if (response.status === 429 || response.status >= 500) {
-        lastErr = err;
-        const backoffMs = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s, 8s
-        logger.warn(`[arbitrage] eBay ${response.status} — retrying in ${backoffMs}ms (attempt ${attempt + 1}/4)`);
-        await new Promise(r => setTimeout(r, backoffMs));
-        continue;
-      }
-      // Non-retryable
-      throw err;
-    }
-    throw lastErr || new Error('eBay API: exhausted retries');
-  });
+  return callEbayRateLimited(url, { token, marketplaceId });
 }
 
 async function getItemDetails(legacyItemId: string, appToken: string): Promise<EbayComparable> {

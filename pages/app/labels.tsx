@@ -2675,43 +2675,41 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   };
 
   return (
-    <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px)' }, display: 'flex', flexDirection: 'column', p: 0, overflow: 'auto', maxWidth: '100%' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 0, overflow: 'hidden', maxWidth: '100%' }}>
       <Toaster position="top-right" reverseOrder={false} />
-      <Typography variant="h6" component="h1" sx={{ fontWeight: 'bold', mb: 0.25, fontSize: { xs: '0.95rem', sm: '1.1rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
-        {t('labelManagement')}
-      </Typography>
-      <Paper elevation={1} sx={{ p: { xs: 0.5, sm: 0.75 }, mb: 0.5, display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%', flexShrink: 0 }}>
-        <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.8rem' }, px: { xs: 1, sm: 1.5 }, minWidth: 0, whiteSpace: 'nowrap' }}>
+      <Paper elevation={0} sx={{ p: { xs: 0.5, sm: 0.75 }, display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%', flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', borderRadius: 0, bgcolor: 'background.paper' }}>
+        {/* Row 1: Actions + Search + Filters */}
+        <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.78rem' }, px: { xs: 1, sm: 1.5 }, minWidth: 0, whiteSpace: 'nowrap', height: 30 }}>
           {syncingOrders ? t('syncing') : t('syncButton')}
         </Button>
         <ManualOrderButton onOrderCreated={() => { mutate(); toast.success(t('orderListRefreshed')); }} />
         {etgbEnabled && (
-          <Button variant="contained" color="secondary" onClick={handleProcessEtgb} disabled={processingEtgb || etgbSelectedRows.length === 0} size="small" sx={{ textTransform: 'none' }}>
+          <Button variant="contained" color="secondary" onClick={handleProcessEtgb} disabled={processingEtgb || etgbSelectedRows.length === 0} size="small" sx={{ textTransform: 'none', height: 30 }}>
             {processingEtgb ? t('processing') : `ETGB (${etgbSelectedRows.length})`}
           </Button>
         )}
-        <Box sx={{ display: 'flex', gap: 0.5, flex: 1, minWidth: { xs: '100%', sm: 180 }, maxWidth: { sm: 280 } }}>
-          <FormControl size="small" variant="outlined" sx={{ minWidth: 72 }}>
-            <Select value={searchType} onChange={e => setSearchType(e.target.value)} displayEmpty sx={{ fontSize: '0.8rem', height: 32 }}>
+        <Box sx={{ display: 'flex', gap: 0.5, flex: 1, minWidth: { xs: '100%', sm: 160 }, maxWidth: { sm: 260 } }}>
+          <FormControl size="small" variant="outlined" sx={{ minWidth: 68 }}>
+            <Select value={searchType} onChange={e => setSearchType(e.target.value)} displayEmpty sx={{ fontSize: '0.78rem', height: 30 }}>
               {searchTypeOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
             </Select>
           </FormControl>
-          <TextField size="small" placeholder="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /> }} sx={{ flex: 1, '& .MuiInputBase-root': { height: 32, fontSize: '0.8rem' } }} />
+          <TextField size="small" placeholder="Ara..." variant="outlined" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} InputProps={{ endAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.disabled' }} /> }} sx={{ flex: 1, '& .MuiInputBase-root': { height: 30, fontSize: '0.78rem' } }} />
         </Box>
         {/* Inline filters — hidden on mobile */}
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 100, display: { xs: 'none', md: 'inline-flex' } }}>
+        <FormControl size="small" variant="outlined" sx={{ minWidth: 95, display: { xs: 'none', md: 'inline-flex' } }}>
           <InputLabel shrink>{t('orderStatus')}</InputLabel>
-          <Select value={statusFilter} label={t('orderStatus')} onChange={e => setStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.78rem', height: 32 }}>
+          <Select value={statusFilter} label={t('orderStatus')} onChange={e => setStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.75rem', height: 30 }}>
             {orderStatusFilterOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 100, display: { xs: 'none', md: 'inline-flex' } }}>
+        <FormControl size="small" variant="outlined" sx={{ minWidth: 95, display: { xs: 'none', md: 'inline-flex' } }}>
           <InputLabel shrink>{t('labelStatus')}</InputLabel>
-          <Select value={labelStatusFilter} label={t('labelStatus')} onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.78rem', height: 32 }}>
+          <Select value={labelStatusFilter} label={t('labelStatus')} onChange={e => setLabelStatusFilter(e.target.value)} displayEmpty sx={{ fontSize: '0.75rem', height: 30 }}>
             {labelStatusOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" variant="outlined" sx={{ minWidth: 100, display: { xs: 'none', lg: 'inline-flex' } }}>
+        <FormControl size="small" variant="outlined" sx={{ minWidth: 95, display: { xs: 'none', lg: 'inline-flex' } }}>
           <InputLabel shrink>{t('store')}</InputLabel>
           <Select
             multiple
@@ -2721,26 +2719,52 @@ function LabelsPage(props: { source?: string; channel?: string }) {
             displayEmpty
             renderValue={(selected) => selected.length === 0 ? <em>{t('all')}</em> : selected.length === 1 ? selected[0] : t('storesCount', { count: selected.length })}
             disabled={isLoadingMarketplaces}
-            sx={{ fontSize: '0.78rem', height: 32 }}
+            sx={{ fontSize: '0.75rem', height: 30 }}
             MenuProps={{ PaperProps: { style: { maxHeight: 7 * 48 + 8, width: 250 } } }}
           >
             <MenuItem value=""><em>{t('all')}</em></MenuItem>
             {dbMarketplaceOptions.map(opt => <MenuItem key={opt.value} value={opt.value}>{opt.label} ({opt.count})</MenuItem>)}
           </Select>
         </FormControl>
-        <TextField label={t('startDate')} type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 130, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 32, fontSize: '0.78rem' } }} />
-        <TextField label={t('endDate')} type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 130, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 32, fontSize: '0.78rem' } }} />
+        <TextField label={t('startDate')} type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 125, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 30, fontSize: '0.75rem' } }} />
+        <TextField label={t('endDate')} type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} size="small" InputLabelProps={{ shrink: true }} sx={{ width: 125, display: { xs: 'none', lg: 'inline-flex' }, '& .MuiInputBase-root': { height: 30, fontSize: '0.75rem' } }} />
         <Button onClick={() => { setSearchTerm(''); setSearchType('all'); setStatusFilter(''); setLabelStatusFilter(''); setMarketplaceFilter([]); setLabelFilter('all'); const now = new Date(); const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10)); setFilterEndDate(now.toISOString().slice(0, 10)); }} variant="text" size="small" sx={{ fontSize: '0.7rem', textTransform: 'none', display: { xs: 'none', md: 'inline-flex' }, minWidth: 0, px: 0.5 }}>{t('reset')}</Button>
-        {/* Label toggle + count — pushed to the right */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
-          <ToggleButtonGroup exclusive size="small" value={labelFilter} onChange={handleLabelFilter} aria-label={t('labelFilter')} sx={{ '& .MuiToggleButton-root': { fontSize: '0.7rem', px: { xs: 0.75, sm: 1.5 }, py: 0.2 } }}>
+        {/* Label toggle + view presets + count — pushed right */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, ml: 'auto' }}>
+          <ToggleButtonGroup exclusive size="small" value={labelFilter} onChange={handleLabelFilter} aria-label={t('labelFilter')} sx={{ '& .MuiToggleButton-root': { fontSize: '0.68rem', px: { xs: 0.75, sm: 1.25 }, py: 0.15, height: 26 } }}>
             <ToggleButton value="all">{t('all')}</ToggleButton>
             <ToggleButton value="unlabeled">{t('unlabeled')}</ToggleButton>
             <ToggleButton value="labeled">{t('received')}</ToggleButton>
           </ToggleButtonGroup>
-          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>{t('ordersCount', { count: total })}</Typography>
+          {/* View presets — desktop only */}
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.25, borderLeft: '1px solid', borderColor: 'divider', pl: 0.75 }}>
+            {([
+              { label: t('viewCompact'), model: COMPACT_COLS },
+              { label: t('viewDetailed'), model: DETAILED_COLS },
+              { label: t('viewAll'), model: ALL_COLS },
+            ] as { label: string; model: Record<string, boolean> }[]).map((preset) => {
+              const isActive = JSON.stringify(columnVisibilityModel) === JSON.stringify(preset.model);
+              return (
+                <Chip
+                  key={preset.label}
+                  label={preset.label}
+                  size="small"
+                  onClick={() => setColumnVisibilityModel(preset.model)}
+                  sx={{
+                    height: 20, fontSize: '0.68rem', fontWeight: isActive ? 700 : 400,
+                    bgcolor: isActive ? 'primary.main' : 'transparent',
+                    color: isActive ? 'white' : 'text.secondary',
+                    border: '1px solid', borderColor: isActive ? 'primary.main' : 'divider',
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: isActive ? 'primary.dark' : 'action.hover' },
+                  }}
+                />
+              );
+            })}
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', fontSize: '0.72rem' }}>{t('ordersCount', { count: total })}</Typography>
           <Tooltip title={t('refresh')}>
-            <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" size="small"><RefreshIcon fontSize="small" /></IconButton></span>
+            <span><IconButton onClick={handleRefresh} disabled={isLoading || syncingOrders} color="primary" size="small" sx={{ p: 0.25 }}><RefreshIcon sx={{ fontSize: 18 }} /></IconButton></span>
           </Tooltip>
         </Box>
       </Paper>
@@ -2932,34 +2956,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
 
       {/* Desktop DataGrid */}
       <Box sx={{ flexGrow: 1, width: '100%', overflow: 'hidden', minHeight: 0, display: { xs: 'none', md: 'flex' }, flexDirection: 'column' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 1, py: 0.25, gap: 0.5 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>{t('viewPreset')}</Typography>
-          {([
-            { label: t('viewCompact'), model: COMPACT_COLS },
-            { label: t('viewDetailed'), model: DETAILED_COLS },
-            { label: t('viewAll'), model: ALL_COLS },
-          ] as { label: string; model: Record<string, boolean> }[]).map((preset) => {
-            const isActive = JSON.stringify(columnVisibilityModel) === JSON.stringify(preset.model);
-            return (
-              <Chip
-                key={preset.label}
-                label={preset.label}
-                size="small"
-                onClick={() => setColumnVisibilityModel(preset.model)}
-                sx={{
-                  height: 22, fontSize: '0.75rem', fontWeight: isActive ? 700 : 400,
-                  bgcolor: isActive ? 'primary.main' : 'transparent',
-                  color: isActive ? 'white' : 'text.secondary',
-                  border: '1px solid', borderColor: isActive ? 'primary.main' : 'divider',
-                  cursor: 'pointer',
-                  '&:hover': { bgcolor: isActive ? 'primary.dark' : 'action.hover' },
-                }}
-              />
-            );
-          })}
-        </Box>
         <div
-          style={{ height: '100%' }}
+          style={{ flex: 1, minHeight: 0 }}
           onSubmit={(e) => e.preventDefault()}
           onClick={(e) => {
             // Only stop propagation for specific pagination elements

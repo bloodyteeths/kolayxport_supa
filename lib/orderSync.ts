@@ -1091,10 +1091,11 @@ export async function syncAllOrders(userId: string, options: {
     if (typeof source === 'undefined' || source === 'ebay-api') {
       try {
         const cred = await prisma.credential.findUnique({ where: { userId } });
+        console.log(`[OrderSync] eBay credentials found: ${!!(cred as any)?.ebayAccessToken}`);
         if ((cred as any)?.ebayAccessToken) {
           fetchPromises.push(
             fetchEbayOrders(userId, { lastSync: lastSyncTime }).catch(err => {
-              logger.error('[EbayOrderSync] Failed', err instanceof Error ? err : new Error(String(err)));
+              console.error('[EbayOrderSync] Failed:', err);
               return [] as UIOrder[];
             })
           );

@@ -2888,7 +2888,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                           ) : (
                             <>#{row.orderNumber}</>
                           );
-                        })()} · {row.marketplace || '-'} · {row.orderDate ? formatDate(new Date(row.orderDate)) : '-'}
+                        })()} · {row.marketplace || '-'} · {row.orderDate ? formatDateTime(new Date(row.orderDate)) : '-'}
                         {group.orderTotalPrice > 0 && ` · ${currSymbol}${group.orderTotalPrice.toFixed(2)}`}
                       </Typography>
                       {/* Show first item title in collapsed view */}

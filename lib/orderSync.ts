@@ -752,6 +752,14 @@ function getUiOrderDate(order: any): string {
   if (typeof safeRaw === 'string') {
     try { safeRaw = JSON.parse(safeRaw); } catch { safeRaw = {}; }
   }
+  // Etsy receipts use created_timestamp (unix seconds)
+  if (safeRaw?.created_timestamp && typeof safeRaw.created_timestamp === 'number') {
+    return new Date(safeRaw.created_timestamp * 1000).toISOString();
+  }
+  // eBay orders use creationDate (ISO string)
+  if (safeRaw?.creationDate) {
+    return safeRaw.creationDate;
+  }
   return (
     safeRaw?.created_at ||
     safeRaw?.to_address?.object_created ||
@@ -1302,7 +1310,7 @@ export async function syncAllOrders(userId: string, options: {
             totalPrice: order.totalPrice,
             shippingAddress: order.to_address ? JSON.stringify(order.to_address) : (order.shippingAddress ? order.shippingAddress : Prisma.JsonNull),
             rawData: order.rawData ? (typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData) : Prisma.JsonNull,
-            uiOrderDate: order.uiOrderDate,
+            uiOrderDate: order.uiOrderDate || getUiOrderDate(order),
             commodityDesc: order.commodityDesc,
             // shipByDate, channel, and source are UI-only fields, not stored in database
           };

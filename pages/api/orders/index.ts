@@ -836,7 +836,7 @@ export default async function handler(
     };
 
     const makeKey = (o: UIOrder) =>
-      `${o.marketplace}-${o.marketplaceOrderId ?? o.orderNumber}`;
+      `${(o.marketplace || '').toLowerCase()}-${o.marketplaceOrderId ?? o.orderNumber}`;
 
     const dedupeAndFilter = async (raw: UIOrder[]): Promise<UIOrder[]> => {
       const map = new Map<string, UIOrder>();
@@ -848,16 +848,19 @@ export default async function handler(
           map.set(key, order);
           continue;
         }
-        // Preference rules
+        // Preference rules: prefer order with real item prices and address
         const existingHasAddr = hasAddress(existing);
         const candidateHasAddr = hasAddress(order);
-        if (!existingHasAddr && candidateHasAddr) {
-          map.set(key, order); // replace blank with filled
-        } else if (existingHasAddr === candidateHasAddr) {
-          // both have / both lack address → prefer Shippo
-          if (existing.source !== 'shippo' && order.source === 'shippo') {
-            map.set(key, order);
-          }
+        const existingHasItemPrices = existing.line_items?.some((i: any) => i.value > 0 || i.unitPrice > 0);
+        const candidateHasItemPrices = order.line_items?.some((i: any) => i.value > 0 || i.unitPrice > 0);
+
+        // Prefer the one with real item prices
+        if (!existingHasItemPrices && candidateHasItemPrices) {
+          map.set(key, order);
+        } else if (existingHasItemPrices && !candidateHasItemPrices) {
+          // keep existing — it has prices
+        } else if (!existingHasAddr && candidateHasAddr) {
+          map.set(key, order);
         }
       }
       return Array.from(map.values());

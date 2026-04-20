@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Box, Typography, Button, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import AddLinkIcon from '@mui/icons-material/AddLink';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 
@@ -23,10 +24,84 @@ interface VideoUploaderProps {
 export default function VideoUploader({ listingId, shopId, videos, onVideoChanged }: VideoUploaderProps) {
   const t = useTranslations('etsy.video');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<VideoInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    if (videos.length > 0) {
+      toast.error(t('deleteExistingFirst'));
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error(t('unsupportedFormat'));
+      return;
+    }
+
+    // Validate file size (100MB)
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error(t('fileTooLarge'));
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const formData = new FormData();
+      formData.append('video', file);
+      formData.append('listing_id', listingId);
+      formData.append('shop_id', shopId);
+
+      // Use XMLHttpRequest for upload progress
+      const result = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/clawd/etsy-video-upload');
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+
+        xhr.onload = () => {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(data);
+            } else {
+              reject(new Error(data.error || t('uploadFailed')));
+            }
+          } catch {
+            reject(new Error(t('uploadFailed')));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error(t('uploadError')));
+        xhr.send(formData);
+      });
+
+      toast.success(t('uploadSuccess'));
+      onVideoChanged();
+    } catch (err: any) {
+      toast.error(err.message || t('uploadError'));
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
 
   const handleUploadByUrl = async () => {
     if (!videoUrl.trim()) {
@@ -34,7 +109,6 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
       return;
     }
 
-    // Check if already has a video
     if (videos.length > 0) {
       toast.error(t('deleteExistingFirst'));
       return;
@@ -100,6 +174,15 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
         {t('videoCount', { current: videos.length, max: 1 })}
       </Typography>
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+        style={{ display: 'none' }}
+        onChange={handleFileUpload}
+      />
+
       {videos.length > 0 ? (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, border: '1px solid #e5e7eb', borderRadius: 1 }}>
           <VideoLibraryIcon sx={{ fontSize: 40, color: '#6366f1' }} />
@@ -119,26 +202,57 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
             <DeleteIcon />
           </IconButton>
         </Box>
-      ) : (
-        <Box
-          onClick={() => !uploading && setUrlDialogOpen(true)}
-          sx={{
-            p: 3,
-            border: '2px dashed #cbd5e1',
-            borderRadius: 1,
-            textAlign: 'center',
-            cursor: uploading ? 'wait' : 'pointer',
-            '&:hover': { borderColor: '#6366f1', backgroundColor: '#f5f3ff' },
-            transition: 'all 0.2s',
-          }}
-        >
-          <AddLinkIcon sx={{ fontSize: 36, color: '#94a3b8' }} />
+      ) : uploading ? (
+        <Box sx={{ p: 3, border: '2px dashed #6366f1', borderRadius: 1, textAlign: 'center', backgroundColor: '#f5f3ff' }}>
+          <CircularProgress size={36} variant={uploadProgress > 0 ? 'determinate' : 'indeterminate'} value={uploadProgress} />
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {t('addByUrl')}
+            {uploadProgress > 0 ? `${t('uploading')} ${uploadProgress}%` : t('uploading')}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {t('formatHint')}
-          </Typography>
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          {/* Direct file upload */}
+          <Box
+            onClick={() => fileInputRef.current?.click()}
+            sx={{
+              flex: 1,
+              p: 3,
+              border: '2px dashed #cbd5e1',
+              borderRadius: 1,
+              textAlign: 'center',
+              cursor: 'pointer',
+              '&:hover': { borderColor: '#6366f1', backgroundColor: '#f5f3ff' },
+              transition: 'all 0.2s',
+            }}
+          >
+            <CloudUploadIcon sx={{ fontSize: 36, color: '#6366f1' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {t('uploadFile')}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t('formatHint')}
+            </Typography>
+          </Box>
+
+          {/* URL upload */}
+          <Box
+            onClick={() => setUrlDialogOpen(true)}
+            sx={{
+              flex: 1,
+              p: 3,
+              border: '2px dashed #cbd5e1',
+              borderRadius: 1,
+              textAlign: 'center',
+              cursor: 'pointer',
+              '&:hover': { borderColor: '#94a3b8', backgroundColor: '#f8fafc' },
+              transition: 'all 0.2s',
+            }}
+          >
+            <AddLinkIcon sx={{ fontSize: 36, color: '#94a3b8' }} />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {t('addByUrl')}
+            </Typography>
+          </Box>
         </Box>
       )}
 

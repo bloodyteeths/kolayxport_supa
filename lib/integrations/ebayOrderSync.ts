@@ -27,9 +27,9 @@ export async function fetchEbayOrders(
   while (hasMore) {
     let url = `${EBAY_API_BASE}/sell/fulfillment/v1/order?limit=${PAGE_LIMIT}&offset=${offset}`;
 
-    // Always use 30-day window like Etsy
+    // Always use 30-day window — eBay needs date without milliseconds
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const filterDate = thirtyDaysAgo.toISOString();
+    const filterDate = thirtyDaysAgo.toISOString().replace(/\.\d{3}Z$/, 'Z');
     url += `&filter=creationdate:[${filterDate}..NOW]`;
 
     console.log(`[EbayOrderSync] Fetching orders: offset=${offset}`);

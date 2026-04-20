@@ -15,8 +15,11 @@ export async function fetchEtsyOrders(
 
   const allOrders: UIOrder[] = [];
 
+  console.log(`[EtsyOrderSync] Found ${shops.length} active Etsy shops for user ${userId}`);
+
   for (const shop of shops) {
     if (!shop.accessToken || !shop.shopId) continue;
+    console.log(`[EtsyOrderSync] Processing shop ${shop.shopName || shop.shopId}`);
 
     const onTokenRefresh = async (newCreds: EtsyCredentials) => {
       await prisma.etsyShop.update({
@@ -74,7 +77,9 @@ async function fetchReceiptsForShop(
   let hasMore = true;
   while (hasMore) {
     params.offset = offset;
+    console.log(`[EtsyOrderSync] Fetching receipts with params:`, JSON.stringify(params));
     const result = await client.getReceipts(params);
+    console.log(`[EtsyOrderSync] Got ${result.count || 0} total, ${(result.results || []).length} in this page`);
     const receipts = result.results || [];
     allReceipts.push(...receipts);
 

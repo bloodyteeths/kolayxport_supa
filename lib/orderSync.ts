@@ -1065,6 +1065,7 @@ export async function syncAllOrders(userId: string, options: {
     if (typeof source === 'undefined' || source === 'etsy-api') {
       try {
         const etsyShops = await prisma.etsyShop.findMany({ where: { userId, isActive: true } });
+        console.log(`[OrderSync] Etsy shops found: ${etsyShops.length}`);
         if (etsyShops.length > 0) {
           fetchPromises.push(
             fetchEtsyOrders(userId, { lastSync: lastSyncTime }).catch(err => {

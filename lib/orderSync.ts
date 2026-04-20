@@ -8,6 +8,8 @@ import { UIOrder, OrderSource, OrderChannel, NormalizedAddress, NormalizedLineIt
 import { getIntegrationCreds } from './config';
 import { fetchVeeqoOrders, processOrdersInBatches } from './integrations/veeqo';
 import { fetchShippoOrders } from './integrations/shippo';
+import { fetchEtsyOrders } from './integrations/etsyOrderSync';
+import { fetchEbayOrders } from './integrations/ebayOrderSync';
 import type { VeeqoOrder } from './types';
 import { batchExecuteStatusUpdateHook } from './hooks/statusUpdateHook';
 
@@ -1059,6 +1061,40 @@ export async function syncAllOrders(userId: string, options: {
       }
     }
 
+    // Direct Etsy API sync (has real per-item prices, unlike Shippo)
+    if (typeof source === 'undefined' || source === 'etsy-api') {
+      try {
+        const etsyShops = await prisma.etsyShop.findMany({ where: { userId, isActive: true } });
+        if (etsyShops.length > 0) {
+          fetchPromises.push(
+            fetchEtsyOrders(userId, { lastSync: lastSyncTime }).catch(err => {
+              logger.error('[EtsyOrderSync] Failed', err instanceof Error ? err : new Error(String(err)));
+              return [] as UIOrder[];
+            })
+          );
+        }
+      } catch (err) {
+        logger.error('[EtsyOrderSync] Init failed', err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+
+    // Direct eBay API sync (has real per-item prices)
+    if (typeof source === 'undefined' || source === 'ebay-api') {
+      try {
+        const cred = await prisma.credential.findUnique({ where: { userId } });
+        if ((cred as any)?.ebayAccessToken) {
+          fetchPromises.push(
+            fetchEbayOrders(userId, { lastSync: lastSyncTime }).catch(err => {
+              logger.error('[EbayOrderSync] Failed', err instanceof Error ? err : new Error(String(err)));
+              return [] as UIOrder[];
+            })
+          );
+        }
+      } catch (err) {
+        logger.error('[EbayOrderSync] Init failed', err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+
     // Wait for all fetch promises to resolve
     const allOrders = await Promise.all(fetchPromises);
     logger.info(`[FullSync] All sources fetched. Arrays: ${allOrders.map(arr => arr.length).join(', ')}`);
@@ -1073,21 +1109,34 @@ export async function syncAllOrders(userId: string, options: {
       if (!existing) {
         ordersByNumber.set(order.orderNumber, order);
       } else {
-        // Core merging logic
+        // Core merging logic — direct API sources (etsy-api, ebay-api) have real per-item prices
+        const directApiSources = ['etsy-api', 'ebay-api'];
+        const existingIsDirect = directApiSources.includes(existing.source);
+        const orderIsDirect = directApiSources.includes(order.source);
+
         const merged: UIOrder = {
           ...existing,
           ...order,
-          // Prioritize Shippo for address, as it's more reliable
-          to_address: order.source === 'shippo' && order.to_address ? order.to_address : existing.to_address,
-          // Prioritize Veeqo for richer line item data (like images)
-          line_items: existing.source === 'veeqo' && existing.line_items.length > 0 ? existing.line_items : order.line_items,
-          // Prioritize Veeqo for shipByDate as it has the real due_date data
-          shipByDate: existing.source === 'veeqo' && existing.shipByDate ? existing.shipByDate : order.shipByDate,
+          // Prioritize direct API for address (most complete), then Shippo, then existing
+          to_address: orderIsDirect && order.to_address?.street1 ? order.to_address
+            : existingIsDirect && existing.to_address?.street1 ? existing.to_address
+            : order.source === 'shippo' && order.to_address ? order.to_address
+            : existing.to_address,
+          // Direct API sources have real per-item prices — always prefer them
+          line_items: orderIsDirect && order.line_items.length > 0 ? order.line_items
+            : existingIsDirect && existing.line_items.length > 0 ? existing.line_items
+            : existing.source === 'veeqo' && existing.line_items.length > 0 ? existing.line_items
+            : order.line_items,
+          // Prioritize direct API or Veeqo for shipByDate
+          shipByDate: orderIsDirect && order.shipByDate ? order.shipByDate
+            : existingIsDirect && existing.shipByDate ? existing.shipByDate
+            : existing.source === 'veeqo' && existing.shipByDate ? existing.shipByDate
+            : order.shipByDate,
           // Combine rawData from both sources
           rawData: { ...(existing.rawData || {}), ...(order.rawData || {}) },
           // Mark as merged and use the most definitive source
           source: 'merged' as OrderSource,
-          id: existing.id || order.id, // Ensure we keep a consistent ID
+          id: existing.id || order.id,
         };
         ordersByNumber.set(order.orderNumber, merged);
       }

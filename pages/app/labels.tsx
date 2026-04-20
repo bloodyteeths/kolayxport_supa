@@ -2863,6 +2863,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                           {group.customerName || '—'}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                          <Chip label={statusLabel} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: statusConfig.bg, color: statusConfig.text }} />
                           {group.items.length > 1 && (
                             <Chip label={t('itemCount', { count: group.items.length })} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: '#e3f2fd', color: '#1565c0' }} />
                           )}
@@ -2932,7 +2933,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
                                     {item.variantInfo && item.variantInfo !== '—' ? `${item.variantInfo} · ` : ''}
                                     {item.sku !== '—' ? `SKU: ${item.sku} · ` : ''}
-                                    x{item.quantity} · {currSymbol}{item.unitPrice?.toFixed(2) || '0.00'}
+                                    x{item.quantity} · {currSymbol}{(item.unitPrice || 0).toFixed(2)}
                                   </Typography>
                                 </Box>
                                 <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>

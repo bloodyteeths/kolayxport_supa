@@ -1,0 +1,167 @@
+import { EtsyClient, EtsyCredentials } from './etsyClient';
+import { UIOrder } from '../types';
+import { logger } from '../logger';
+import prisma from '../prisma';
+
+export async function fetchEtsyOrders(
+  userId: string,
+  options?: { lastSync?: Date }
+): Promise<UIOrder[]> {
+  const shops = await prisma.etsyShop.findMany({
+    where: { userId, isActive: true },
+  });
+
+  if (shops.length === 0) return [];
+
+  const allOrders: UIOrder[] = [];
+
+  for (const shop of shops) {
+    if (!shop.accessToken || !shop.shopId) continue;
+
+    const onTokenRefresh = async (newCreds: EtsyCredentials) => {
+      await prisma.etsyShop.update({
+        where: { id: shop.id },
+        data: {
+          accessToken: newCreds.accessToken,
+          refreshToken: newCreds.refreshToken || undefined,
+          tokenExpiresAt: newCreds.tokenExpiresAt || undefined,
+        },
+      });
+    };
+
+    const client = new EtsyClient(
+      {
+        accessToken: shop.accessToken,
+        refreshToken: shop.refreshToken || undefined,
+        shopId: shop.shopId,
+        tokenExpiresAt: shop.tokenExpiresAt || undefined,
+      },
+      onTokenRefresh
+    );
+
+    try {
+      const orders = await fetchReceiptsForShop(client, shop.shopId, shop.shopName || 'Etsy', options);
+      allOrders.push(...orders);
+      logger.info(`[EtsyOrderSync] Fetched ${orders.length} orders from shop ${shop.shopName || shop.shopId}`);
+    } catch (err) {
+      logger.error(`[EtsyOrderSync] Failed to fetch orders from shop ${shop.shopId}`, err instanceof Error ? err : new Error(String(err)));
+    }
+  }
+
+  return allOrders;
+}
+
+async function fetchReceiptsForShop(
+  client: EtsyClient,
+  shopId: string,
+  shopName: string,
+  options?: { lastSync?: Date }
+): Promise<UIOrder[]> {
+  const PAGE_LIMIT = 100;
+  let offset = 0;
+  const allReceipts: any[] = [];
+
+  const params: Record<string, any> = {
+    limit: PAGE_LIMIT,
+    offset: 0,
+    includes: ['Transactions'],
+  };
+
+  if (options?.lastSync) {
+    params.min_created = Math.floor(options.lastSync.getTime() / 1000);
+  }
+
+  let hasMore = true;
+  while (hasMore) {
+    params.offset = offset;
+    const result = await client.getReceipts(params);
+    const receipts = result.results || [];
+    allReceipts.push(...receipts);
+
+    if (receipts.length < PAGE_LIMIT) {
+      hasMore = false;
+    } else {
+      offset += PAGE_LIMIT;
+    }
+
+    if (allReceipts.length > 500) break;
+  }
+
+  return allReceipts.map((receipt) => mapReceiptToUIOrder(receipt, shopId, shopName));
+}
+
+function parseEtsyPrice(price: any): number {
+  if (!price) return 0;
+  if (typeof price === 'number') return price;
+  if (price.amount != null && price.divisor != null) {
+    return price.amount / price.divisor;
+  }
+  if (price.amount != null) return price.amount / 100;
+  return 0;
+}
+
+function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string): UIOrder {
+  const transactions = receipt.transactions || [];
+
+  const lineItems = transactions.map((tx: any, idx: number) => {
+    const variations = (tx.variations || [])
+      .map((v: any) => `${v.formatted_name}: ${v.formatted_value}`)
+      .join(', ');
+
+    return {
+      id: String(tx.transaction_id || `${receipt.receipt_id}-${idx}`),
+      title: tx.title || 'Unknown Product',
+      value: parseEtsyPrice(tx.price),
+      quantity: tx.quantity || 1,
+      weight: 0.5,
+      sku: tx.product_data?.sku || tx.sku || '',
+      image: tx.image_url || '',
+      variantInfo: variations || '',
+    };
+  });
+
+  const customerName = receipt.name || '';
+  const nameParts = customerName.trim().split(/\s+/);
+
+  return {
+    id: `etsy-${receipt.receipt_id}`,
+    source: 'etsy-api',
+    channel: 'etsy',
+    marketplace: shopName || 'Etsy',
+    marketplaceKey: String(receipt.receipt_id),
+    orderNumber: String(receipt.receipt_id),
+    customerName,
+    status: mapEtsyStatus(receipt),
+    externalStatus: receipt.status || '',
+    currency: receipt.currency_code || 'USD',
+    totalPrice: parseEtsyPrice(receipt.grandtotal),
+    to_address: {
+      name: customerName,
+      phone: '',
+      street1: receipt.first_line || '',
+      street2: receipt.second_line || '',
+      city: receipt.city || '',
+      state: receipt.state || '',
+      postal: receipt.zip || '',
+      country: receipt.country_iso || 'US',
+      isResidential: true,
+      email: receipt.buyer_email || '',
+    },
+    line_items: lineItems,
+    marketplaceOrderDate: receipt.created_timestamp
+      ? new Date(receipt.created_timestamp * 1000).toISOString()
+      : undefined,
+    shipByDate: receipt.expected_ship_date
+      ? new Date(receipt.expected_ship_date * 1000).toISOString()
+      : undefined,
+    rawData: receipt,
+    commodityDesc: lineItems[0]?.title || '',
+  };
+}
+
+function mapEtsyStatus(receipt: any): string {
+  if (receipt.was_shipped) return 'SHIPPED';
+  if (receipt.was_paid) return 'PAID';
+  if (receipt.is_dead) return 'CANCELLED';
+  return 'AWAITING_FULFILLMENT';
+}

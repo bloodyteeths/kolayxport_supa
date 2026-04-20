@@ -1,4 +1,4 @@
-export type OrderSource = 'veeqo' | 'shippo' | 'trendyol' | 'wix' | 'shopify' | 'amazon';
+export type OrderSource = 'veeqo' | 'shippo' | 'trendyol' | 'wix' | 'shopify' | 'amazon' | 'etsy-api' | 'ebay-api' | 'merged';
 export type OrderChannel = 'etsy' | 'shopify' | 'amazon' | 'ebay' | 'trendyol' | 'wix' | 'other';
 
 export interface NormalizedAddress {

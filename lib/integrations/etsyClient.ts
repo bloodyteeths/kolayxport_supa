@@ -294,12 +294,14 @@ export class EtsyClient {
     max_created?: number;
     limit?: number;
     offset?: number;
+    includes?: string[];
   } = {}): Promise<any> {
     const query = new URLSearchParams();
     if (params.min_created != null) query.set('min_created', String(params.min_created));
     if (params.max_created != null) query.set('max_created', String(params.max_created));
     if (params.limit != null) query.set('limit', String(Math.min(params.limit, 100)));
     if (params.offset != null) query.set('offset', String(params.offset));
+    if (params.includes?.length) query.set('includes', params.includes.join(','));
 
     const url = `${this.baseUrl}/application/shops/${this.shopId}/receipts?${query.toString()}`;
 

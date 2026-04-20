@@ -33,7 +33,6 @@ export async function fetchEbayOrders(
     url += `&filter=creationdate:[${filterDate}..NOW]`;
 
     console.log(`[EbayOrderSync] Fetching orders: offset=${offset}`);
-    }
 
     try {
       const data = await callEbayRateLimited<any>(url, {

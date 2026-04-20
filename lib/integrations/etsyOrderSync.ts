@@ -70,8 +70,13 @@ async function fetchReceiptsForShop(
     includes: ['Transactions'],
   };
 
+  // For first sync or to catch all recent orders, use a 30-day window
   if (options?.lastSync) {
-    params.min_created = Math.floor(options.lastSync.getTime() / 1000);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const effectiveStart = options.lastSync < thirtyDaysAgo ? thirtyDaysAgo : options.lastSync;
+    params.min_created = Math.floor(effectiveStart.getTime() / 1000);
+  } else {
+    params.min_created = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000);
   }
 
   let hasMore = true;

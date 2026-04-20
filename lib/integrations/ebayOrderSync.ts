@@ -1,9 +1,19 @@
-import { getUserAccessToken } from './ebayClient';
+import { getUserAccessToken, getApplicationToken } from './ebayClient';
 import { callEbayRateLimited } from './ebayRateLimiter';
 import { UIOrder } from '../types';
 import { logger } from '../logger';
 
 const EBAY_API_BASE = 'https://api.ebay.com';
+
+async function fetchItemImage(legacyItemId: string, token: string): Promise<string> {
+  try {
+    const url = `${EBAY_API_BASE}/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyItemId}`;
+    const data = await callEbayRateLimited<any>(url, { token, marketplaceId: 'EBAY_US' });
+    return data?.image?.imageUrl || '';
+  } catch {
+    return '';
+  }
+}
 
 export async function fetchEbayOrders(
   userId: string,
@@ -52,9 +62,30 @@ export async function fetchEbayOrders(
 
       console.log(`[EbayOrderSync] API response: total=${data.total}, orders=${(data.orders || []).length}`);
       const orders = data.orders || [];
+
+      // Collect legacyItemIds and fetch images in parallel
+      const legacyIds = new Set<string>();
+      for (const order of orders) {
+        for (const li of order.lineItems || []) {
+          if (li.legacyItemId) legacyIds.add(String(li.legacyItemId));
+        }
+      }
+
+      const imageMap = new Map<string, string>();
+      if (legacyIds.size > 0) {
+        let appToken: string;
+        try { appToken = await getApplicationToken(); } catch { appToken = accessToken; }
+        const imagePromises = Array.from(legacyIds).map(async (id) => {
+          const img = await fetchItemImage(id, appToken);
+          if (img) imageMap.set(id, img);
+        });
+        await Promise.all(imagePromises);
+        console.log(`[EbayOrderSync] Fetched ${imageMap.size}/${legacyIds.size} item images`);
+      }
+
       for (const order of orders) {
         try {
-          allOrders.push(mapEbayOrderToUIOrder(order));
+          allOrders.push(mapEbayOrderToUIOrder(order, imageMap));
         } catch (mapErr) {
           logger.warn('[EbayOrderSync] Failed to map order', { orderId: order.orderId, error: String(mapErr) });
         }
@@ -77,7 +108,7 @@ export async function fetchEbayOrders(
   return allOrders;
 }
 
-function mapEbayOrderToUIOrder(order: any): UIOrder {
+function mapEbayOrderToUIOrder(order: any, imageMap?: Map<string, string>): UIOrder {
   const shipTo = order.fulfillmentStartInstructions?.[0]?.shippingStep?.shipTo || {};
   const contactAddr = shipTo.contactAddress || {};
   const fullName = shipTo.fullName || order.buyer?.username || '';
@@ -95,7 +126,7 @@ function mapEbayOrderToUIOrder(order: any): UIOrder {
       quantity: li.quantity || 1,
       weight: 0.5,
       sku: li.sku || '',
-      image: li.image?.imageUrl || '',
+      image: li.image?.imageUrl || (li.legacyItemId && imageMap?.get(String(li.legacyItemId))) || '',
       variantInfo: variations || '',
     };
   });

@@ -1519,6 +1519,41 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   // All filtering (search, status, marketplace, date, label) is handled server-side via useOrders
   const filteredAndPaginatedItems = labelRows;
 
+  // Group flat LabelRows by orderId for unified order display
+  interface OrderGroup {
+    orderId: string;
+    orderNumber: string;
+    customerName: string;
+    marketplace: string;
+    orderDate: string;
+    orderTotalPrice: number;
+    currency: string;
+    status: string;
+    items: LabelRow[];
+    primaryRow: LabelRow;
+  }
+
+  const orderGroups: OrderGroup[] = useMemo(() => {
+    const map = new Map<string, LabelRow[]>();
+    for (const row of filteredAndPaginatedItems) {
+      const key = row.orderId;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(row);
+    }
+    return Array.from(map.entries()).map(([orderId, items]) => ({
+      orderId,
+      orderNumber: items[0].orderNumber,
+      customerName: `${items[0].recipientFirstName} ${items[0].recipientLastName}`.trim(),
+      marketplace: items[0].marketplace,
+      orderDate: items[0].orderDate,
+      orderTotalPrice: items[0].orderTotalPrice,
+      currency: items[0].currency || 'USD',
+      status: items[0].status || '',
+      items,
+      primaryRow: items[0],
+    }));
+  }, [filteredAndPaginatedItems]);
+
   // Reset pagination when filters change, but use a more stable approach
   useEffect(() => {
     // Use setTimeout to avoid race conditions with the filtering useMemo
@@ -2769,56 +2804,74 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         </Box>
       </Paper>
 
-      {/* Mobile Card Layout */}
-      <Box sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', flexGrow: 1, overflow: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
+      {/* Unified Card Layout — works on both mobile and desktop */}
+      <Box sx={{ flexGrow: 1, overflow: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
             <CircularProgress size={32} />
           </Box>
-        ) : filteredAndPaginatedItems.length === 0 ? (
+        ) : orderGroups.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
             <Typography variant="body2">{t('noOrdersFound')}</Typography>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, pb: 0.5 }}>
-            {filteredAndPaginatedItems.map((row) => {
-              const cardId = row.itemId || row.orderId;
-              const isExpanded = expandedCardId === cardId;
-              const labelSt = getLabelStatus(row);
-              const statusConfig = statusColors[row.status?.toUpperCase() || ''] || { bg: '#eee', text: '#333' };
-              const statusLabel = orderStatusOptions.find(o => o.value === row.status?.toUpperCase())?.label || row.status || '-';
-              const currSymbol = row.currency === 'TRY' ? '₺' : row.currency === 'EUR' ? '€' : row.currency === 'GBP' ? '£' : '$';
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, pb: 0.5 }}>
+            {orderGroups.map((group) => {
+              const isExpanded = expandedCardId === group.orderId;
+              const row = group.primaryRow;
+              const allLabeled = group.items.every(i => getLabelStatus(i) === 'labeled');
+              const someLabeled = group.items.some(i => getLabelStatus(i) === 'labeled');
+              const labelSt = allLabeled ? 'labeled' : someLabeled ? 'pending' : 'unlabeled';
+              const statusConfig = statusColors[group.status?.toUpperCase() || ''] || { bg: '#eee', text: '#333' };
+              const statusLabel = orderStatusOptions.find(o => o.value === group.status?.toUpperCase())?.label || group.status || '-';
+              const currSymbol = group.currency === 'TRY' ? '₺' : group.currency === 'EUR' ? '€' : group.currency === 'GBP' ? '£' : '$';
 
               return (
                 <Paper
-                  key={cardId}
+                  key={group.orderId}
                   elevation={isExpanded ? 3 : 1}
                   sx={{ border: '1px solid', borderColor: isExpanded ? 'primary.light' : 'divider', borderRadius: 1.5, overflow: 'hidden' }}
                 >
-                  {/* Collapsed header — always visible */}
+                  {/* Order header — always visible */}
                   <Box
-                    onClick={() => setExpandedCardId(isExpanded ? null : cardId)}
+                    onClick={() => setExpandedCardId(isExpanded ? null : group.orderId)}
                     sx={{ display: 'flex', gap: 1.5, p: 1.25, cursor: 'pointer', alignItems: 'center' }}
                   >
-                    {row.itemImageUrl && row.itemImageUrl !== '/placeholder.png' ? (
-                      <Box component="img" src={row.itemImageUrl} sx={{ width: 44, height: 44, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }} />
-                    ) : (
-                      <Box sx={{ width: 44, height: 44, borderRadius: 1, bgcolor: 'grey.100', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Typography variant="caption" color="text.disabled">-</Typography>
-                      </Box>
-                    )}
+                    {/* Stacked thumbnails for multi-item, single for 1 item */}
+                    <Box sx={{ position: 'relative', width: 44, height: 44, flexShrink: 0 }}>
+                      {group.items.slice(0, 2).map((item, idx) => (
+                        item.itemImageUrl && item.itemImageUrl !== '/placeholder.png' ? (
+                          <Box key={idx} component="img" src={item.itemImageUrl} sx={{
+                            width: group.items.length > 1 ? 36 : 44,
+                            height: group.items.length > 1 ? 36 : 44,
+                            borderRadius: 1, objectFit: 'cover',
+                            position: group.items.length > 1 ? 'absolute' : 'static',
+                            top: idx * 6, left: idx * 6,
+                            border: group.items.length > 1 ? '2px solid white' : 'none',
+                            zIndex: 2 - idx,
+                          }} />
+                        ) : idx === 0 ? (
+                          <Box key={idx} sx={{ width: 44, height: 44, borderRadius: 1, bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Typography variant="caption" color="text.disabled">-</Typography>
+                          </Box>
+                        ) : null
+                      ))}
+                    </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: '0.8rem' }}>
-                          {row.recipientFirstName} {row.recipientLastName}
+                          {group.customerName || '—'}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
-                          <Chip label={labelSt === 'labeled' ? t('received') : labelSt === 'pending' ? t('pending') : labelSt === 'failed' ? t('failed') : t('unlabeled')}
+                          {group.items.length > 1 && (
+                            <Chip label={t('itemCount', { count: group.items.length })} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: '#e3f2fd', color: '#1565c0' }} />
+                          )}
+                          <Chip label={labelSt === 'labeled' ? t('received') : labelSt === 'pending' ? t('pending') : t('unlabeled')}
                             size="small"
                             sx={{
                               height: 18, fontSize: '0.6rem', fontWeight: 600,
-                              bgcolor: labelSt === 'labeled' ? '#e8f5e9' : labelSt === 'pending' ? '#fff3e0' : labelSt === 'failed' ? '#ffebee' : 'grey.100',
-                              color: labelSt === 'labeled' ? '#2e7d32' : labelSt === 'pending' ? '#e65100' : labelSt === 'failed' ? '#c62828' : 'text.secondary',
+                              bgcolor: labelSt === 'labeled' ? '#e8f5e9' : labelSt === 'pending' ? '#fff3e0' : 'grey.100',
+                              color: labelSt === 'labeled' ? '#2e7d32' : labelSt === 'pending' ? '#e65100' : 'text.secondary',
                             }}
                           />
                           <ExpandMoreIcon sx={{ fontSize: 18, color: 'text.disabled', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
@@ -2835,8 +2888,9 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                             <>#{row.orderNumber}</>
                           );
                         })()} · {row.marketplace || '-'} · {row.orderDate ? formatDate(new Date(row.orderDate)) : '-'}
-                        {row.orderTotalPrice > 0 && ` · ${currSymbol}${row.orderTotalPrice.toFixed(2)}`}
+                        {group.orderTotalPrice > 0 && ` · ${currSymbol}${group.orderTotalPrice.toFixed(2)}`}
                       </Typography>
+                      {/* Show first item title in collapsed view */}
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.65rem' }}>
                         {row.listingUrl ? (
                           <a href={row.listingUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#1976d2', textDecoration: 'none' }}>
@@ -2844,6 +2898,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                           </a>
                         ) : (row.title || row.sku || '-')}
                         {row.variantInfo && row.variantInfo !== '—' ? ` · ${row.variantInfo}` : ''}
+                        {group.items.length > 1 ? ` (+${group.items.length - 1})` : ''}
                       </Typography>
                     </Box>
                   </Box>
@@ -2851,6 +2906,57 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                   {/* Expanded details */}
                   {isExpanded && (
                     <Box sx={{ px: 1.25, pb: 1.25, pt: 0, borderTop: '1px solid', borderColor: 'divider', overflow: 'hidden', wordBreak: 'break-word' }}>
+                      {/* Items list */}
+                      {group.items.length > 0 && (
+                        <Box sx={{ py: 0.75 }}>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5, mb: 0.5, display: 'block' }}>
+                            {t('itemCount', { count: group.items.length })}
+                          </Typography>
+                          {group.items.map((item, idx) => {
+                            const itemLabelSt = getLabelStatus(item);
+                            return (
+                              <Box key={item.itemId} sx={{ display: 'flex', gap: 1, py: 0.75, alignItems: 'center', borderBottom: idx < group.items.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
+                                {item.itemImageUrl && item.itemImageUrl !== '/placeholder.png' ? (
+                                  <Box component="img" src={item.itemImageUrl} sx={{ width: 36, height: 36, borderRadius: 0.5, objectFit: 'cover', flexShrink: 0 }} />
+                                ) : (
+                                  <Box sx={{ width: 36, height: 36, borderRadius: 0.5, bgcolor: 'grey.100', flexShrink: 0 }} />
+                                )}
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography variant="body2" noWrap sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                                    {item.listingUrl ? (
+                                      <a href={item.listingUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#1976d2', textDecoration: 'none' }}>
+                                        {item.title || '-'} <OpenInNewIcon sx={{ fontSize: 9, verticalAlign: 'middle' }} />
+                                      </a>
+                                    ) : (item.title || '-')}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                    {item.variantInfo && item.variantInfo !== '—' ? `${item.variantInfo} · ` : ''}
+                                    {item.sku !== '—' ? `SKU: ${item.sku} · ` : ''}
+                                    x{item.quantity} · {currSymbol}{item.unitPrice?.toFixed(2) || '0.00'}
+                                  </Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                                  <Chip
+                                    label={itemLabelSt === 'labeled' ? t('received') : itemLabelSt === 'pending' ? t('pending') : t('unlabeled')}
+                                    size="small"
+                                    sx={{
+                                      height: 16, fontSize: '0.55rem', fontWeight: 600,
+                                      bgcolor: itemLabelSt === 'labeled' ? '#e8f5e9' : itemLabelSt === 'pending' ? '#fff3e0' : 'grey.100',
+                                      color: itemLabelSt === 'labeled' ? '#2e7d32' : itemLabelSt === 'pending' ? '#e65100' : 'text.secondary',
+                                    }}
+                                  />
+                                  <Tooltip title={t('fedexLabel')}>
+                                    <IconButton size="small" onClick={() => openDrawer(item)} sx={{ p: 0.25 }}>
+                                      <FlightTakeoffIcon sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+
                       {/* Customer note / Personalization */}
                       {row.customerNote && row.customerNote.trim() !== '' && (
                         <Box sx={{ py: 0.75 }}>
@@ -2879,7 +2985,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         {row.trackingNumber && <Typography variant="caption" color="text.secondary">{t('tracking')}: {row.lastCarrier} {row.trackingNumber}</Typography>}
                       </Box>
 
-                      {/* Action buttons */}
+                      {/* Action buttons — order-level */}
                       <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
                         <Button
                           variant="contained"
@@ -2944,7 +3050,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                 </Paper>
               );
             })}
-            {/* Mobile pagination */}
+            {/* Pagination */}
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, py: 1 }}>
               <Button size="small" disabled={paginationModel.page === 0} onClick={() => setPaginationModel(prev => ({ ...prev, page: prev.page - 1 }))}>{t('previous')}</Button>
               <Typography variant="caption">{paginationModel.page + 1} / {Math.ceil(total / paginationModel.pageSize) || 1}</Typography>
@@ -2952,92 +3058,6 @@ function LabelsPage(props: { source?: string; channel?: string }) {
             </Box>
           </Box>
         )}
-      </Box>
-
-      {/* Desktop DataGrid */}
-      <Box sx={{ flexGrow: 1, width: '100%', overflow: 'hidden', minHeight: 0, display: { xs: 'none', md: 'flex' }, flexDirection: 'column' }}>
-        <div
-          style={{ flex: 1, minHeight: 0 }}
-          onSubmit={(e) => e.preventDefault()}
-          onClick={(e) => {
-            // Only stop propagation for specific pagination elements
-            const target = e.target as HTMLElement;
-            if (target.closest('.MuiTablePagination-root') || target.closest('[aria-label*="page"]')) {
-              e.stopPropagation();
-            }
-          }}
-        >
-          <DataGrid
-            rows={filteredAndPaginatedItems}
-            columns={columns}
-            rowCount={total}
-            loading={isLoading}
-            pageSizeOptions={[15, 25, 50]}
-            paginationModel={paginationModel}
-            paginationMode="server"
-            onPaginationModelChange={(newModel, details) => {
-              // Use requestAnimationFrame to ensure state update happens after current event
-              requestAnimationFrame(() => {
-                setPaginationModel(newModel);
-              });
-            }}
-            getRowId={(row) => row.itemId || row.orderId}
-            disableRowSelectionOnClick
-            onCellClick={(params, event) => {
-              // Don't open drawer for interactive columns
-              const skipFields = ['actions', 'delete', 'tracking', 'labelStatus', '__check__'];
-              if (skipFields.includes(params.field)) return;
-              // Don't open drawer if clicking buttons/links inside cells
-              const target = event.target as HTMLElement;
-              if (target.closest('button') || target.closest('a') || target.closest('.MuiCheckbox-root')) return;
-              openDrawer(params.row as LabelRow);
-            }}
-            rowHeight={68}
-            disableColumnResize={false}
-            keepNonExistentRowsSelected={etgbEnabled}
-            checkboxSelection={etgbEnabled}
-            onRowSelectionModelChange={etgbEnabled ? ((newSelection) => {
-              // Extract selected row ids robustly across MUI versions
-              let selectedIds: GridRowId[] = [];
-              const anyModel = newSelection as any;
-              if (Array.isArray(anyModel)) {
-                selectedIds = anyModel as GridRowId[];
-              } else if (anyModel && Array.isArray(anyModel.ids)) {
-                selectedIds = anyModel.ids as GridRowId[];
-              } else if (anyModel && anyModel.ids && typeof anyModel.ids.size === 'number') {
-                selectedIds = Array.from(anyModel.ids as Set<GridRowId>);
-              }
-
-              const orderIds = selectedIds
-                .map(id => {
-                  const row = filteredAndPaginatedItems.find(r => (r.itemId || r.orderId) === id);
-                  return row?.orderId;
-                })
-                .filter(Boolean) as string[];
-              const uniqueOrderIds = Array.from(new Set(orderIds));
-              setEtgbSelectedRows(uniqueOrderIds);
-            }) : undefined}
-            columnVisibilityModel={columnVisibilityModel}
-            onColumnVisibilityModelChange={(model) => setColumnVisibilityModel(model)}
-            initialState={{
-              sorting: {
-                sortModel: [{ field: 'orderDate', sort: 'desc' }],
-              },
-            }}
-            density="compact"
-            sx={{
-              height: '100%',
-              border: 0,
-              fontSize: { xs: '0.7rem', sm: '0.8rem', md: '0.875rem' },
-              '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f5f5f5', fontSize: { xs: '0.65rem', sm: '0.75rem' } },
-              '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 600 },
-              '& .MuiDataGrid-cell': { py: 0.5, px: { xs: 0.5, sm: 1 } },
-              '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cell:focus': {
-                outline: 'none !important',
-              },
-            }}
-          />
-        </div>
       </Box>
 
       {drawerOrder && (

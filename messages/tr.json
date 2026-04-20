@@ -575,6 +575,7 @@
     "labelFilter": "Etiket filtresi",
     "unlabeled": "Etiketsiz",
     "ordersCount": "{count} sipariş",
+    "itemCount": "{count, plural, one {# ürün} other {# ürün}}",
     "noOrdersFound": "Sipariş bulunamadı",
     "pending": "Bekliyor",
     "failed": "Hata",

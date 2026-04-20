@@ -615,6 +615,7 @@
     "labelFilter": "Label filter",
     "unlabeled": "Unlabeled",
     "ordersCount": "{count} orders",
+    "itemCount": "{count, plural, one {# item} other {# items}}",
     "noOrdersFound": "No orders found",
     "pending": "Pending",
     "failed": "Failed",

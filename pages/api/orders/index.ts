@@ -873,8 +873,7 @@ export default async function handler(
     const countResult = await prisma.$queryRawUnsafe(countQuery, ...params.slice(0, paramIndex - 1)) as any[];
     const total = parseInt(countResult[0]?.total || '0', 10);
 
-    // OPTIMIZED: Simple filtering without async deduplication
-    const cleanedOrders = processedOrders.filter(Boolean);
+    const cleanedOrders = await dedupeAndFilter(processedOrders.filter(Boolean) as UIOrder[]);
     
     
     return res.status(200).json({

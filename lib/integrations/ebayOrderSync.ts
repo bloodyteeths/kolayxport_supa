@@ -35,10 +35,20 @@ export async function fetchEbayOrders(
     console.log(`[EbayOrderSync] Fetching orders: offset=${offset}`);
 
     try {
-      const data = await callEbayRateLimited<any>(url, {
-        token: accessToken,
-        marketplaceId: 'EBAY_US',
+      console.log(`[EbayOrderSync] Calling eBay API: ${url.substring(0, 120)}...`);
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
       });
+      if (!response.ok) {
+        const errBody = await response.text();
+        console.error(`[EbayOrderSync] API error ${response.status}: ${errBody.substring(0, 300)}`);
+        break;
+      }
+      const data = await response.json();
 
       console.log(`[EbayOrderSync] API response: total=${data.total}, orders=${(data.orders || []).length}`);
       const orders = data.orders || [];

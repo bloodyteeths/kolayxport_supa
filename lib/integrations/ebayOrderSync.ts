@@ -11,9 +11,11 @@ export async function fetchEbayOrders(
 ): Promise<UIOrder[]> {
   let accessToken: string;
   try {
+    console.log(`[EbayOrderSync] Getting access token for user ${userId}`);
     accessToken = await getUserAccessToken(userId);
+    console.log(`[EbayOrderSync] Got access token (length: ${accessToken?.length})`);
   } catch (err) {
-    logger.info('[EbayOrderSync] No eBay credentials for user, skipping', { userId });
+    console.error('[EbayOrderSync] Token fetch failed:', err);
     return [];
   }
 
@@ -25,9 +27,12 @@ export async function fetchEbayOrders(
   while (hasMore) {
     let url = `${EBAY_API_BASE}/sell/fulfillment/v1/order?limit=${PAGE_LIMIT}&offset=${offset}`;
 
-    if (options?.lastSync) {
-      const isoDate = options.lastSync.toISOString();
-      url += `&filter=creationdate:[${isoDate}..NOW]`;
+    // Always use 30-day window like Etsy
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const filterDate = thirtyDaysAgo.toISOString();
+    url += `&filter=creationdate:[${filterDate}..NOW]`;
+
+    console.log(`[EbayOrderSync] Fetching orders: offset=${offset}`);
     }
 
     try {
@@ -36,6 +41,7 @@ export async function fetchEbayOrders(
         marketplaceId: 'EBAY_US',
       });
 
+      console.log(`[EbayOrderSync] API response: total=${data.total}, orders=${(data.orders || []).length}`);
       const orders = data.orders || [];
       for (const order of orders) {
         try {

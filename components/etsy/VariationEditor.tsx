@@ -280,6 +280,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [addPropertyId, setAddPropertyId] = useState<number>(200);
   const [addValues, setAddValues] = useState('');
+  const [addSecondValues, setAddSecondValues] = useState('');
   const [addPrice, setAddPrice] = useState('');
   const [addQuantity, setAddQuantity] = useState('1');
 
@@ -578,15 +579,22 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     const refProduct = products[products.length - 1];
     const refPrice = refProduct?.offerings[0]?.price;
 
+    const propertyValues: PropertyValue[] = [{
+      property_id: propId,
+      property_name: propName,
+      values: [val],
+      scale_id: selectedScaleId,
+    }];
+
+    // If a second property exists, copy it from the last product
+    if (secondPropertyId && refProduct?.property_values?.[1]) {
+      propertyValues.push({ ...refProduct.property_values[1] });
+    }
+
     const newProduct: Product = {
       product_id: 0,
       sku: '',
-      property_values: [{
-        property_id: propId,
-        property_name: propName,
-        values: [val],
-        scale_id: selectedScaleId,
-      }],
+      property_values: propertyValues,
       offerings: [{
         offering_id: 0,
         price: refPrice ? { ...refPrice } : { amount: 0, divisor: defaultDivisor, currency_code: currencyCode },
@@ -611,29 +619,58 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     const propName = existingProperties.find(p => p.id === addPropertyId)?.name
       || ETSY_PROPERTIES.find(p => p.id === addPropertyId)?.name || 'Variation';
 
-    const newProducts: Product[] = values.map(value => ({
-      product_id: 0,
-      sku: '',
-      property_values: [{
-        property_id: addPropertyId,
-        property_name: propName,
-        values: [value],
-        scale_id: selectedScaleId,
-      }],
-      offerings: [{
-        offering_id: 0,
-        price: { amount: Math.round(priceNum * defaultDivisor), divisor: defaultDivisor, currency_code: currencyCode },
-        quantity: qtyNum,
-        is_enabled: true,
-      }],
-    }));
+    const secondValues = secondPropertyId ? addSecondValues.split(',').map(v => v.trim()).filter(v => v.length > 0) : [];
+    const secondPropName = secondPropertyId
+      ? (existingProperties.find(p => p.id === secondPropertyId)?.name
+        || ETSY_PROPERTIES.find(p => p.id === secondPropertyId)?.name || 'Variation 2')
+      : '';
+
+    const newProducts: Product[] = [];
+    for (const value of values) {
+      if (secondPropertyId && secondValues.length > 0) {
+        for (const sv of secondValues) {
+          newProducts.push({
+            product_id: 0,
+            sku: '',
+            property_values: [
+              { property_id: addPropertyId, property_name: propName, values: [value], scale_id: selectedScaleId },
+              { property_id: secondPropertyId, property_name: secondPropName, values: [sv], scale_id: null },
+            ],
+            offerings: [{
+              offering_id: 0,
+              price: { amount: Math.round(priceNum * defaultDivisor), divisor: defaultDivisor, currency_code: currencyCode },
+              quantity: qtyNum,
+              is_enabled: true,
+            }],
+          });
+        }
+      } else {
+        newProducts.push({
+          product_id: 0,
+          sku: '',
+          property_values: [{
+            property_id: addPropertyId,
+            property_name: propName,
+            values: [value],
+            scale_id: selectedScaleId,
+          }],
+          offerings: [{
+            offering_id: 0,
+            price: { amount: Math.round(priceNum * defaultDivisor), divisor: defaultDivisor, currency_code: currencyCode },
+            quantity: qtyNum,
+            is_enabled: true,
+          }],
+        });
+      }
+    }
 
     setProducts(prev => [...prev, ...newProducts]);
     setAddDialogOpen(false);
     setAddValues('');
+    setAddSecondValues('');
     setAddPrice('');
     setAddQuantity('1');
-    toast.success(t('variationsAdded', { count: values.length }));
+    toast.success(t('variationsAdded', { count: newProducts.length }));
   };
 
   // --- Save inventory ---
@@ -641,9 +678,28 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Collect all unique property IDs used across products
+      const allPropertyIds = new Set<number>();
+      for (const p of products) {
+        for (const pv of p.property_values) {
+          allPropertyIds.add(pv.property_id);
+        }
+      }
+      const propertyIds = Array.from(allPropertyIds);
+
+      // Check if prices vary across products — if so, all property IDs are price_on_property
+      const prices = products.map(p => p.offerings?.[0]?.price?.amount).filter(a => a != null);
+      const pricesVary = prices.length > 1 && new Set(prices).size > 1;
+      const price_on_property = pricesVary ? propertyIds : [];
+
+      // Check if quantities vary
+      const quantities = products.map(p => p.offerings?.[0]?.quantity).filter(q => q != null);
+      const quantitiesVary = quantities.length > 1 && new Set(quantities).size > 1;
+      const quantity_on_property = quantitiesVary ? propertyIds : [];
+
       const res = await fetch(
         `/api/clawd/etsy?action=update_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`,
-        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products }) }
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products, price_on_property, quantity_on_property }) }
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1407,6 +1463,20 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
             placeholder={t('valuesPlaceholder')} autoFocus
             helperText={addValues ? t('variationsWillBeAdded', { count: addValues.split(',').filter(v => v.trim()).length }) : t('eachValueCreatesVariation')}
           />
+
+          {secondPropertyId && (
+            <TextField
+              label={`${t('secondVariation')} - ${ETSY_PROPERTIES.find(p => p.id === secondPropertyId)?.name || t('secondVariation')} ${t('valuesLabel')}`}
+              size="small" fullWidth multiline minRows={2}
+              value={addSecondValues} onChange={(e) => setAddSecondValues(e.target.value)}
+              placeholder={t('valuesPlaceholder')}
+              helperText={
+                addSecondValues && addValues
+                  ? t('cartesianHint', { count: addValues.split(',').filter(v => v.trim()).length * addSecondValues.split(',').filter(v => v.trim()).length })
+                  : t('secondValuesHint')
+              }
+            />
+          )}
 
           <Box display="flex" gap={2}>
             <TextField label={`${t('tabPrice')} (${sym})`} size="small" type="number"

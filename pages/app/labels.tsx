@@ -2675,12 +2675,12 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   };
 
   return (
-    <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px - 48px)' }, display: 'flex', flexDirection: 'column', p: { xs: 0.5, sm: 1, md: 1.5 }, overflow: 'auto', maxWidth: '100%' }}>
+    <Box sx={{ height: { xs: 'calc(100dvh - 56px)', md: 'calc(100dvh - 64px)' }, display: 'flex', flexDirection: 'column', p: 0, overflow: 'auto', maxWidth: '100%' }}>
       <Toaster position="top-right" reverseOrder={false} />
-      <Typography variant="h6" component="h1" sx={{ fontWeight: 'bold', mb: { xs: 0.5, sm: 0.5 }, fontSize: { xs: '1rem', sm: '1.15rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <Typography variant="h6" component="h1" sx={{ fontWeight: 'bold', mb: 0.25, fontSize: { xs: '0.95rem', sm: '1.1rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
         {t('labelManagement')}
       </Typography>
-      <Paper elevation={1} sx={{ p: { xs: 0.75, sm: 1 }, mb: 0.75, display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%', flexShrink: 0 }}>
+      <Paper elevation={1} sx={{ p: { xs: 0.5, sm: 0.75 }, mb: 0.5, display: 'flex', gap: 0.75, alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%', flexShrink: 0 }}>
         <Button variant="contained" color="primary" startIcon={<SyncIcon />} onClick={handleSync} disabled={syncingOrders || isLoading} size="small" sx={{ textTransform: 'none', fontSize: { xs: '0.7rem', sm: '0.8rem' }, px: { xs: 1, sm: 1.5 }, minWidth: 0, whiteSpace: 'nowrap' }}>
           {syncingOrders ? t('syncing') : t('syncButton')}
         </Button>
@@ -2756,7 +2756,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
             <Typography variant="body2">{t('noOrdersFound')}</Typography>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, pb: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, pb: 0.5 }}>
             {filteredAndPaginatedItems.map((row) => {
               const cardId = row.itemId || row.orderId;
               const isExpanded = expandedCardId === cardId;

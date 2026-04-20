@@ -529,9 +529,18 @@ export default async function handler(
             return bestEntries;
           };
 
-          // Match items and enrich
+          // Build orderId→marketplace lookup to skip non-Etsy orders
+          const orderMarketplaceMap = new Map<string, string>();
+          for (const rawOrder of (result as any[])) {
+            orderMarketplaceMap.set(rawOrder.id, (rawOrder.marketplace || '').toLowerCase());
+          }
+
+          // Match items and enrich — only for Etsy-sourced orders
           const imageUpdates: { id: string; image: string }[] = [];
           for (const item of allItems) {
+            const orderMp = orderMarketplaceMap.get(item.orderId) || '';
+            if (orderMp.includes('ebay') || orderMp.includes('trendyol') || orderMp.includes('amazon') || orderMp === 'wix') continue;
+
             const itemTitle = normalize(item.productName || '');
             if (!itemTitle) continue;
 

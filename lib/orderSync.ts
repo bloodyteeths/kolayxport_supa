@@ -1503,9 +1503,7 @@ async function createOrderItemsForBatch(
           await db.$transaction(async (tx) => {
             await tx.orderItem.deleteMany({ where: { orderId } });
             const lineItems = order.line_items || [];
-            if (order.marketplace === 'eBay') {
-              console.log(`[OrderItems] eBay items for ${order.orderNumber}:`, lineItems.map((i: any) => ({ title: i.title?.substring(0, 30), image: i.image?.substring(0, 50) || 'EMPTY', value: i.value })));
-            }
+            console.log(`[OrderItems] Refreshing ${lineItems.length} items for order ${order.orderNumber} (marketplace=${order.marketplace}, source=${order.source}), images: ${lineItems.map((i: any) => i.image ? 'YES' : 'NO').join(',')}`);
             const freshItems = lineItems.map((item, i) => ({
               orderId,
               productName: item.title || 'Unknown Product',

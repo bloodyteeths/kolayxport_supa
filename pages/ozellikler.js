@@ -107,7 +107,6 @@ export default function OzelliklerPage() {
         animate="visible"
       >
         <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-multiply"></div>
         </div>
         <div className="relative z-10">
           <motion.h1

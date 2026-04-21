@@ -62,7 +62,6 @@ export default function NasilKullanirimPage() {
       <div className="w-full">
         {/* Hero Section */}
         <section className="relative py-20 md:py-32 text-center px-6 lg:px-8 overflow-hidden bg-gradient-to-br from-slate-50 to-sky-100 animate-fadeIn">
-          <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-multiply pointer-events-none" />
           <div className="relative z-10">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-800 tracking-tight mb-6 animate-slideUp">
               KolayXport Nasıl Çalışır?

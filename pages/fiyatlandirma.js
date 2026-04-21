@@ -232,7 +232,6 @@ export default function FiyatlandirmaPage() {
         animate="visible"
       >
         <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-multiply"></div>
             <div 
                 className="absolute inset-0 animate-slow-spin opacity-30 md:opacity-40"
                 style={{

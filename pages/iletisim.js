@@ -111,7 +111,6 @@ export default function IletisimPage() {
         initial="hidden"
         animate="visible"
       >
-        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-multiply pointer-events-none" />
         <div className="relative z-10">
           <motion.h1
             className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-800 tracking-tight mb-6"

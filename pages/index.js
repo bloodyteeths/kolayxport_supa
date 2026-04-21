@@ -153,7 +153,6 @@ const StarRating = ({ rating }) => (
 
 const HeroSection = () => (
   <motion.section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-sky-50 to-indigo-50">
-    <div aria-hidden className="absolute inset-0 -z-10 bg-[url('/noise.png')] opacity-10" />
     <div className="mx-auto max-w-7xl px-6 pt-28 pb-20 sm:pt-36 sm:pb-24 text-center">
       <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900">
         AI Destekli <span className="text-primary">E-Ticaret Komuta Merkezi</span>

@@ -64,7 +64,6 @@ export default function EntegrasyonlarPage() {
         initial="hidden"
         animate="visible"
       >
-        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-multiply pointer-events-none" />
         <div className="relative z-10">
           <motion.h1
             className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-800 tracking-tight mb-6"

@@ -946,7 +946,9 @@
     "parasutCompanyId": "Paraşüt Company ID",
     "multiShopDescActive": "Birden fazla Etsy shop bağlayabilirsiniz. Takip numaraları otomatik olarak Etsy'ye gönderilir.",
     "etsyTrackingReconnect": "Takip numarası gönderimi için shop'u yeniden bağlayın",
-    "etsyTrackingReconnectDesc": "Etsy takip numarası otomasyonu aktif! Ancak daha önce bağlanan shop'ların yeni izinleri alması için \"Yeni Shop Bağla\" butonuyla tekrar bağlanması gerekiyor."
+    "etsyTrackingReconnectDesc": "Etsy takip numarası otomasyonu aktif! Ancak daha önce bağlanan shop'ların yeni izinleri alması için \"Yeni Shop Bağla\" butonuyla tekrar bağlanması gerekiyor.",
+    "etsyApiLimited": "Etsy API Kısıtlaması",
+    "etsyApiLimitedDesc": "Etsy, yeni entegratörlere takip numarası ve adres bilgisi API erişimi vermiyor. Takip numarası girmek için KolayXport Chrome eklentisini veya Etsy seller dashboard kullanın."
   },
   "importer": {
     "title": "Importer of Record Bilgileri",

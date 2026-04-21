@@ -83,9 +83,9 @@ export default async function handler(
 
     // Route to appropriate tracking submission based on marketplace
     if (source === 'etsy') {
-      // Etsy tracking requires transactions_w scope — shops connected before this scope
-      // was added need to reconnect via Settings → Etsy → Connect
-      await submitEtsyTracking(userSettings, order, trackingNumber, carrierId, user.id);
+      // Etsy restricts tracking/address endpoints to approved "full access" apps only.
+      // New integrators cannot use createReceiptShipment — use Chrome extension instead.
+      throw new Error('Etsy does not allow tracking submission via API for new integrators. Please use the KolayXport Chrome extension or enter tracking manually on Etsy.');
     } else if (source === 'wix') {
       // Submit fulfillment directly to Wix
       await submitWixFulfillment(userSettings, order, trackingNumber, carrierId, user.id);

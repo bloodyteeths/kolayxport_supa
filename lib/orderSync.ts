@@ -1255,7 +1255,8 @@ export async function syncAllOrders(userId: string, options: {
         const missingStatus = ((existing?.externalStatus ?? null) === null && prismaOrderData.externalStatus);
 
         const missingUiOrderDate = !(existing?.uiOrderDate);
-        if (hasChanged || missingStatus || missingUiOrderDate) {
+        const hasNewItemData = order.line_items?.some((item: any) => item.image || item.value > 0);
+        if (hasChanged || missingStatus || missingUiOrderDate || hasNewItemData) {
           ordersToProcess.push(order);
         } else {
           if (existing) {

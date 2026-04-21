@@ -1021,7 +1021,10 @@
     "parasutClientSecret": "Paraşüt Client Secret",
     "parasutUsername": "Paraşüt Username",
     "parasutPassword": "Paraşüt Password",
-    "parasutCompanyId": "Paraşüt Company ID"
+    "parasutCompanyId": "Paraşüt Company ID",
+    "multiShopDescActive": "You can connect multiple Etsy shops. Tracking numbers are automatically submitted to Etsy.",
+    "etsyTrackingReconnect": "Reconnect shop for tracking automation",
+    "etsyTrackingReconnectDesc": "Etsy tracking automation is now active! However, shops connected before this feature need to be reconnected via \"Connect New Shop\" to grant the required permissions."
   },
   "fedex": {
     "currencies": {

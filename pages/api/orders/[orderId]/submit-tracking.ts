@@ -83,6 +83,8 @@ export default async function handler(
 
     // Route to appropriate tracking submission based on marketplace
     if (source === 'etsy') {
+      // Etsy tracking requires transactions_w scope — shops connected before this scope
+      // was added need to reconnect via Settings → Etsy → Connect
       await submitEtsyTracking(userSettings, order, trackingNumber, carrierId, user.id);
     } else if (source === 'wix') {
       // Submit fulfillment directly to Wix

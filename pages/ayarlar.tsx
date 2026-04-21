@@ -663,16 +663,16 @@ const AyarlarPage = () => {
                   </Button>
                 </Box>
 
-                <Box sx={{ mb: 2, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
-                  <Typography variant="body2" color="warning.dark" fontWeight="bold">
-                    {t('etsyTrackingDisabled')}
+                <Box sx={{ mb: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+                  <Typography variant="body2" color="info.dark" fontWeight="bold">
+                    {t('etsyTrackingReconnect')}
                   </Typography>
-                  <Typography variant="caption" color="warning.dark">
-                    {t('etsyTrackingDisabledDesc')}
+                  <Typography variant="caption" color="info.dark">
+                    {t('etsyTrackingReconnectDesc')}
                   </Typography>
                 </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {t('multiShopDesc')}
+                  {t('multiShopDescActive')}
                 </Typography>
 
                 {etsyShopsLoading ? (

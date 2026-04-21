@@ -943,7 +943,10 @@
     "parasutClientSecret": "Paraşüt Client Secret",
     "parasutUsername": "Paraşüt Username",
     "parasutPassword": "Paraşüt Password",
-    "parasutCompanyId": "Paraşüt Company ID"
+    "parasutCompanyId": "Paraşüt Company ID",
+    "multiShopDescActive": "Birden fazla Etsy shop bağlayabilirsiniz. Takip numaraları otomatik olarak Etsy'ye gönderilir.",
+    "etsyTrackingReconnect": "Takip numarası gönderimi için shop'u yeniden bağlayın",
+    "etsyTrackingReconnectDesc": "Etsy takip numarası otomasyonu aktif! Ancak daha önce bağlanan shop'ların yeni izinleri alması için \"Yeni Shop Bağla\" butonuyla tekrar bağlanması gerekiyor."
   },
   "importer": {
     "title": "Importer of Record Bilgileri",

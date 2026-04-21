@@ -1804,27 +1804,12 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         const row = params.row;
         const originalOrder = row?.originalOrder as LocalUIOrder | undefined;
-        
-        // Determine source from marketplace like in the API
-        const source = (() => {
-          const marketplace = (row.marketplace || '').toLowerCase();
-          if (isEtsyOrderSync(marketplace)) return 'shippo';
-          if (marketplace.includes('trendyol')) return 'trendyol';
-          return 'veeqo';
-        })();
 
-        // Only show for Veeqo and Shippo orders
-        if (source !== 'veeqo' && source !== 'shippo') {
-          return <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>—</Box>;
-        }
-
-        // Check if tracking number exists (only manual entries, not from label generation)
-        // Check if this order has any manual tracking submissions
-        const hasManualTracking = originalOrder?.trackingSubmissions && 
+        // Check if tracking number exists (manual submissions, label generation, or order-level)
+        const hasManualTracking = originalOrder?.trackingSubmissions &&
                                  originalOrder.trackingSubmissions.length > 0;
-        
-        // Show tracking as active only if there's a manual tracking submission
-        const hasTracking = hasManualTracking;
+        const hasLabelTracking = row.trackingNumber;
+        const hasTracking = hasManualTracking || !!hasLabelTracking;
 
         const handleTrackingClick = () => {
           setSelectedOrderForTracking(row);

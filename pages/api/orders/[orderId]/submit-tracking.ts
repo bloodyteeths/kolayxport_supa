@@ -83,8 +83,7 @@ export default async function handler(
 
     // Route to appropriate tracking submission based on marketplace
     if (source === 'etsy') {
-      // Etsy tracking API temporarily disabled pending commercial access approval
-      throw new Error('Etsy tracking submission is temporarily unavailable while we await API approval from Etsy. Please submit tracking numbers manually through your Etsy seller dashboard.');
+      await submitEtsyTracking(userSettings, order, trackingNumber, carrierId, user.id);
     } else if (source === 'wix') {
       // Submit fulfillment directly to Wix
       await submitWixFulfillment(userSettings, order, trackingNumber, carrierId, user.id);

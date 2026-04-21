@@ -613,6 +613,455 @@ observer.observe(document.body, {
 
 log.info('Content script v5.3 initialization complete');
 
+// ─── Tracking Push Feature ─────────────────────────────────────────
+// When user navigates to an Etsy order detail page, check if KolayXport
+// has a pending tracking number and offer to fill it via DOM automation.
+
+let trackingPushActive = false;
+let pendingTrackingData = null;
+
+// Detect if we're on an order detail page
+function getReceiptIdFromUrl() {
+  const url = window.location.href;
+  // Patterns: /your/orders/1234567890, order_id=1234567890
+  const match = url.match(/\/your\/orders\/(\d+)/) ||
+                url.match(/order_id=(\d+)/);
+  return match ? match[1] : null;
+}
+
+// Random delay helper (human-like)
+function randomDelay(minMs, maxMs) {
+  const delay = minMs + Math.random() * (maxMs - minMs);
+  return new Promise(r => setTimeout(r, delay));
+}
+
+// Type text character by character with random delays
+async function humanType(input, text) {
+  input.focus();
+  input.value = '';
+  input.dispatchEvent(new Event('focus', { bubbles: true }));
+
+  for (const char of text) {
+    input.value += char;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keyup', { key: char, bubbles: true }));
+    await randomDelay(50, 180);
+  }
+
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+// Wait for an element to appear in DOM
+function waitForElement(selector, parent = document, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const existing = parent.querySelector(selector);
+    if (existing) return resolve(existing);
+
+    const obs = new MutationObserver(() => {
+      const el = parent.querySelector(selector);
+      if (el) { obs.disconnect(); resolve(el); }
+    });
+    obs.observe(parent, { childList: true, subtree: true });
+
+    setTimeout(() => { obs.disconnect(); reject(new Error(`Element "${selector}" not found within ${timeoutMs}ms`)); }, timeoutMs);
+  });
+}
+
+// Map KolayXport carrier names to Etsy carrier dropdown values
+function mapCarrierToEtsy(carrierName) {
+  const name = (carrierName || '').toLowerCase();
+  const mapping = {
+    'fedex': 'fedex',
+    'ups': 'ups',
+    'usps': 'usps',
+    'dhl': 'dhl',
+    'dhl express': 'dhl',
+    'royal mail': 'royal-mail',
+    'canada post': 'canada-post',
+    'australia post': 'australia-post',
+    'yurtici': 'yurtici-kargo',
+    'yurtiçi': 'yurtici-kargo',
+    'yurtiçi kargo': 'yurtici-kargo',
+    'aras': 'aras-kargo',
+    'aras kargo': 'aras-kargo',
+    'mng': 'mng-kargo',
+    'mng kargo': 'mng-kargo',
+    'ptt': 'ptt',
+    'sürat': 'surat-kargo',
+    'sürat kargo': 'surat-kargo',
+    'trendyol express': 'other',
+    'other': 'other',
+  };
+  return mapping[name] || 'other';
+}
+
+// Create floating banner UI
+function createTrackingBanner(data) {
+  // Remove existing banner if any
+  const existing = document.getElementById('kx-tracking-banner');
+  if (existing) existing.remove();
+
+  const banner = document.createElement('div');
+  banner.id = 'kx-tracking-banner';
+  banner.style.cssText = `
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    background: #1a1a2e !important;
+    color: #fff !important;
+    padding: 16px 20px !important;
+    border-radius: 12px !important;
+    z-index: 999999 !important;
+    font-size: 13px !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+    max-width: 360px !important;
+    line-height: 1.5 !important;
+  `;
+
+  banner.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <img src="${chrome.runtime.getURL('icons/icon-16.png')}" width="16" height="16" style="border-radius:2px;">
+      <strong style="color:#e0e0ff;">KolayXport Tracking</strong>
+      <span id="kx-banner-close" style="margin-left:auto;cursor:pointer;opacity:0.6;font-size:16px;">✕</span>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div style="color:#a0a0d0;font-size:11px;">Kargo Takip No</div>
+      <div style="font-weight:600;font-size:14px;color:#fff;">${data.trackingNumber}</div>
+      <div style="color:#a0a0d0;font-size:11px;margin-top:4px;">Kargo: ${data.carrierName}</div>
+    </div>
+    <button id="kx-push-tracking-btn" style="
+      background: #4CAF50 !important;
+      color: #fff !important;
+      border: none !important;
+      padding: 8px 16px !important;
+      border-radius: 6px !important;
+      cursor: pointer !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+      width: 100% !important;
+    ">Takip No Gir</button>
+    <div id="kx-tracking-status" style="margin-top:8px;font-size:11px;color:#a0a0d0;display:none;"></div>
+  `;
+
+  document.body.appendChild(banner);
+
+  document.getElementById('kx-banner-close').addEventListener('click', () => banner.remove());
+  document.getElementById('kx-push-tracking-btn').addEventListener('click', () => {
+    pushTrackingToEtsy(data);
+  });
+
+  return banner;
+}
+
+// Update banner status
+function updateBannerStatus(message, isError = false) {
+  const statusEl = document.getElementById('kx-tracking-status');
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = isError ? '#ff6b6b' : '#90ee90';
+    statusEl.textContent = message;
+  }
+}
+
+// Main DOM automation: fill tracking into Etsy order page
+async function pushTrackingToEtsy(data) {
+  if (trackingPushActive) {
+    log.warn('Tracking push already in progress');
+    return;
+  }
+  trackingPushActive = true;
+
+  const btn = document.getElementById('kx-push-tracking-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'İşleniyor...';
+    btn.style.opacity = '0.6';
+  }
+
+  try {
+    updateBannerStatus('Kargo bilgisi formu aranıyor...');
+    await randomDelay(1000, 2000);
+
+    // Step 1: Find and click "Mark as complete" / "Add tracking" / "Complete order" button
+    // Etsy uses various button texts depending on order state
+    const actionSelectors = [
+      'button[data-tracking-trigger]',
+      'button[data-action="add-tracking"]',
+      '[data-region="shipping-actions"] button',
+      'button.btn-transaction-action',
+    ];
+
+    const actionTexts = [
+      'mark as complete', 'add tracking', 'complete order',
+      'mark as shipped', 'kargo bilgisi ekle', 'gönderildi olarak işaretle',
+      'siparişi tamamla', 'tracking',
+    ];
+
+    let actionButton = null;
+
+    // Try selectors first
+    for (const sel of actionSelectors) {
+      actionButton = document.querySelector(sel);
+      if (actionButton) break;
+    }
+
+    // Fallback: search by button text
+    if (!actionButton) {
+      const allButtons = document.querySelectorAll('button, a.btn, [role="button"]');
+      for (const b of allButtons) {
+        const text = (b.textContent || '').toLowerCase().trim();
+        if (actionTexts.some(t => text.includes(t))) {
+          actionButton = b;
+          break;
+        }
+      }
+    }
+
+    if (!actionButton) {
+      // Maybe the tracking form is already visible
+      const existingForm = document.querySelector('input[name="tracking_code"], input[id*="tracking"], input[placeholder*="tracking"], input[aria-label*="tracking"]');
+      if (!existingForm) {
+        throw new Error('Kargo bilgisi butonu bulunamadı. Sipariş detay sayfasında olduğunuzdan emin olun.');
+      }
+      log.info('Tracking form already visible, skipping button click');
+    } else {
+      updateBannerStatus('Kargo formu açılıyor...');
+      actionButton.click();
+      await randomDelay(2000, 3500);
+    }
+
+    // Step 2: Find carrier dropdown and select carrier
+    updateBannerStatus('Kargo firması seçiliyor...');
+    await randomDelay(800, 1500);
+
+    const carrierValue = mapCarrierToEtsy(data.carrierName);
+    const carrierSelectors = [
+      'select[name="carrier_name"]',
+      'select[id*="carrier"]',
+      'select[aria-label*="carrier"]',
+      'select[data-test-id*="carrier"]',
+    ];
+
+    let carrierSelect = null;
+    for (const sel of carrierSelectors) {
+      carrierSelect = document.querySelector(sel);
+      if (carrierSelect) break;
+    }
+
+    if (carrierSelect) {
+      // Try to find matching option
+      const options = carrierSelect.querySelectorAll('option');
+      let matched = false;
+      for (const opt of options) {
+        const val = (opt.value || '').toLowerCase();
+        const text = (opt.textContent || '').toLowerCase();
+        if (val.includes(carrierValue) || text.includes(carrierValue) ||
+            text.includes(data.carrierName.toLowerCase())) {
+          carrierSelect.value = opt.value;
+          carrierSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          matched = true;
+          log.info(`Selected carrier: ${opt.textContent}`);
+          break;
+        }
+      }
+      if (!matched) {
+        // Default to "Other" if no match
+        for (const opt of options) {
+          if ((opt.value || '').toLowerCase() === 'other' || (opt.textContent || '').toLowerCase() === 'other') {
+            carrierSelect.value = opt.value;
+            carrierSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            break;
+          }
+        }
+        log.warn(`Carrier "${data.carrierName}" not found, selected Other`);
+      }
+      await randomDelay(1000, 2000);
+    } else {
+      log.warn('Carrier dropdown not found, proceeding with tracking number only');
+    }
+
+    // Step 3: Find tracking number input and type it
+    updateBannerStatus('Takip numarası giriliyor...');
+    await randomDelay(800, 1500);
+
+    const trackingSelectors = [
+      'input[name="tracking_code"]',
+      'input[id*="tracking"]',
+      'input[placeholder*="tracking"]',
+      'input[aria-label*="tracking"]',
+      'input[data-test-id*="tracking"]',
+      'input[name*="tracking"]',
+    ];
+
+    let trackingInput = null;
+    for (const sel of trackingSelectors) {
+      trackingInput = document.querySelector(sel);
+      if (trackingInput) break;
+    }
+
+    if (!trackingInput) {
+      throw new Error('Takip numarası alanı bulunamadı.');
+    }
+
+    await humanType(trackingInput, data.trackingNumber);
+    log.info('Tracking number typed successfully');
+
+    await randomDelay(1500, 3000);
+
+    // Step 4: Find and click submit/save button
+    updateBannerStatus('Gönderiliyor...');
+
+    const submitTexts = [
+      'submit', 'save', 'kaydet', 'gönder', 'complete', 'tamamla',
+      'mark as complete', 'ship', 'confirm',
+    ];
+
+    // Look for submit button within the tracking form area
+    const formArea = trackingInput.closest('form') || trackingInput.closest('[role="dialog"]') || trackingInput.closest('.overlay-body') || document.body;
+    const submitButtons = formArea.querySelectorAll('button[type="submit"], button.btn-primary, input[type="submit"], button[data-test-id*="submit"]');
+
+    let submitButton = null;
+
+    // First try type="submit" or primary buttons
+    if (submitButtons.length > 0) {
+      submitButton = submitButtons[submitButtons.length - 1]; // Usually the last primary button
+    }
+
+    // Fallback: search by text
+    if (!submitButton) {
+      const allBtns = formArea.querySelectorAll('button, input[type="submit"]');
+      for (const b of allBtns) {
+        const text = (b.textContent || '').toLowerCase().trim();
+        if (submitTexts.some(t => text.includes(t))) {
+          submitButton = b;
+          break;
+        }
+      }
+    }
+
+    if (!submitButton) {
+      updateBannerStatus('Takip no girildi. Lütfen kaydet butonuna manuel tıklayın.', false);
+      // Still confirm as submitted since the number was entered
+      await confirmSubmission(data.submissionId, 'submitted');
+      return;
+    }
+
+    await randomDelay(2000, 3500);
+    submitButton.click();
+    log.info('Submit button clicked');
+
+    // Step 5: Wait for success confirmation
+    await randomDelay(3000, 5000);
+
+    // Check for error messages
+    const errorEl = document.querySelector('.error-message, .alert-error, [role="alert"][class*="error"]');
+    if (errorEl && errorEl.textContent.trim()) {
+      throw new Error(`Etsy hata: ${errorEl.textContent.trim()}`);
+    }
+
+    // Success!
+    updateBannerStatus('Takip numarası başarıyla girildi!');
+    await confirmSubmission(data.submissionId, 'submitted');
+
+    // Update button to show success
+    if (btn) {
+      btn.textContent = '✓ Tamamlandı';
+      btn.style.background = '#2e7d32';
+    }
+
+    log.success('Tracking pushed to Etsy successfully', {
+      receiptId: data.receiptId,
+      trackingNumber: data.trackingNumber,
+    });
+
+  } catch (error) {
+    log.error('Tracking push failed', { message: error.message });
+    updateBannerStatus(error.message, true);
+    await confirmSubmission(data.submissionId, 'failed', error.message);
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Tekrar Dene';
+      btn.style.opacity = '1';
+    }
+  } finally {
+    trackingPushActive = false;
+  }
+}
+
+// Confirm submission status back to KolayXport
+async function confirmSubmission(submissionId, status, errorMsg) {
+  try {
+    const storeInfo = getEtsyStoreInfo();
+    await chrome.runtime.sendMessage({
+      action: 'confirmTrackingSubmission',
+      submissionId,
+      status,
+      error: errorMsg,
+      shopName: storeInfo.storeName,
+    });
+  } catch (e) {
+    log.error('Failed to confirm tracking submission', { error: e.message });
+  }
+}
+
+// Check for pending tracking when on order detail page
+async function checkPendingTracking() {
+  const receiptId = getReceiptIdFromUrl();
+  if (!receiptId) return;
+
+  log.info('On order detail page, checking for pending tracking', { receiptId });
+
+  try {
+    const storeInfo = getEtsyStoreInfo();
+    const response = await chrome.runtime.sendMessage({
+      action: 'fetchPendingTracking',
+      shopName: storeInfo.storeName,
+    });
+
+    if (!response?.success || !response.pending?.length) {
+      log.info('No pending tracking found');
+      return;
+    }
+
+    // Find tracking for this specific receipt
+    const match = response.pending.find(
+      p => p.receiptId === receiptId || p.marketplaceKey === receiptId
+    );
+
+    if (match) {
+      log.info('Found pending tracking for this order', match);
+      pendingTrackingData = match;
+      createTrackingBanner(match);
+    } else {
+      log.info('No pending tracking for receipt ' + receiptId, {
+        pendingReceipts: response.pending.map(p => p.receiptId),
+      });
+    }
+  } catch (e) {
+    log.error('Failed to check pending tracking', { error: e.message });
+  }
+}
+
+// Run tracking check after a delay (let the page load)
+setTimeout(checkPendingTracking, 4000);
+
+// Also listen for URL changes (Etsy is SPA-like)
+let lastUrl = window.location.href;
+const urlObserver = new MutationObserver(() => {
+  if (window.location.href !== lastUrl) {
+    lastUrl = window.location.href;
+    // Remove old banner
+    const old = document.getElementById('kx-tracking-banner');
+    if (old) old.remove();
+    // Check new page
+    setTimeout(checkPendingTracking, 3000);
+  }
+});
+urlObserver.observe(document.body, { childList: true, subtree: true });
+
 // Add visual indicator (removed after 3 seconds)
 const indicator = document.createElement('div');
 indicator.style.cssText = `
@@ -628,6 +1077,6 @@ indicator.style.cssText = `
   font-family: Arial, sans-serif !important;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
 `;
-indicator.textContent = '✅ Kolayxport v5.3 - Senkron Düzeltmeleri!';
+indicator.textContent = '✅ Kolayxport v5.4 - Kargo Takip Push!';
 document.body.appendChild(indicator);
 setTimeout(() => indicator.remove(), 5000);

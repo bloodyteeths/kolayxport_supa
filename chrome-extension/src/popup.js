@@ -17,6 +17,8 @@ const _t = {
     cacheTitle: 'Önbellek', researchData: 'Araştırma verileri',
     clear: 'Temizle', cleared: 'Temizlendi!',
     openApp: 'KolayXport\'u Aç', help: 'Yardım',
+    trackingTitle: 'Kargo Takip', pendingTracking: 'Bekleyen takip no',
+    goToEtsyOrders: 'Etsy Siparişlerine Git',
   },
   en: {
     status: 'Status', checking: 'Checking...', connected: 'Connected',
@@ -25,6 +27,8 @@ const _t = {
     cacheTitle: 'Cache', researchData: 'Research data',
     clear: 'Clear', cleared: 'Cleared!',
     openApp: 'Open KolayXport', help: 'Help',
+    trackingTitle: 'Tracking Push', pendingTracking: 'Pending tracking',
+    goToEtsyOrders: 'Go to Etsy Orders',
   },
 };
 
@@ -51,6 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await checkAuth();
   loadSettings();
   setupListeners();
+  checkPendingTracking();
 });
 
 // Auth check
@@ -93,6 +98,31 @@ function loadSettings() {
   chrome.storage.local.get('kx_overlays_enabled', (result) => {
     $('toggleOverlays').checked = result.kx_overlays_enabled !== false;
   });
+}
+
+// Check pending tracking count
+async function checkPendingTracking() {
+  try {
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action: 'fetchPendingTracking' }, (resp) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(resp);
+      });
+    });
+
+    if (response?.success && response.count > 0) {
+      $('trackingCard').style.display = '';
+      $('pendingCount').textContent = String(response.count);
+      $('pendingCount').style.background = '#ff9800';
+      $('pendingCount').style.color = '#fff';
+      $('pendingCount').style.padding = '2px 8px';
+      $('pendingCount').style.borderRadius = '10px';
+      $('pendingCount').style.fontSize = '12px';
+      $('pendingCount').style.fontWeight = '600';
+    }
+  } catch (_) {
+    // Silent fail — tracking card stays hidden
+  }
 }
 
 // Setup listeners

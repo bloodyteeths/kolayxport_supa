@@ -1799,7 +1799,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     {
       field: 'tracking',
       headerName: t('columnShipping'),
-      width: 30,
+      width: 50,
       sortable: false,
       renderCell: (params: GridRenderCellParams<LabelRow>) => {
         const row = params.row;
@@ -2931,9 +2931,13 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                                       color: itemLabelSt === 'labeled' ? '#2e7d32' : itemLabelSt === 'pending' ? '#e65100' : 'text.secondary',
                                     }}
                                   />
-                                  <Tooltip title={t('fedexLabel')}>
-                                    <IconButton size="small" onClick={() => openDrawer(item)} sx={{ p: 0.25 }}>
-                                      <FlightTakeoffIcon sx={{ fontSize: 14 }} />
+                                  <Tooltip title={t('addTracking')}>
+                                    <IconButton size="small" onClick={() => {
+                                      setSelectedOrderForTracking(item);
+                                      setTrackingFormData({ trackingNumber: '', carrierId: 3, notifyCustomer: true, updateRemoteOrder: true });
+                                      setTrackingDialogOpen(true);
+                                    }} sx={{ p: 0.25 }}>
+                                      <FlightIcon sx={{ fontSize: 14 }} />
                                     </IconButton>
                                   </Tooltip>
                                 </Box>
@@ -2974,9 +2978,21 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                       {/* Action buttons — order-level */}
                       <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
                         <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => {
+                            setSelectedOrderForTracking(row);
+                            setTrackingFormData({ trackingNumber: '', carrierId: 3, notifyCustomer: true, updateRemoteOrder: true });
+                            setTrackingDialogOpen(true);
+                          }}
+                          startIcon={<FlightIcon sx={{ fontSize: 14 }} />}
+                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
+                        >
+                          {t('addTracking')}
+                        </Button>
+                        <Button
                           variant="contained"
                           size="small"
-                          fullWidth
                           onClick={() => openDrawer(row)}
                           sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
                         >

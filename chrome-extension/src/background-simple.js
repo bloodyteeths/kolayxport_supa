@@ -181,6 +181,73 @@ async function handleMessage(request, sender, sendResponse) {
       });
       break;
 
+    case 'fetchPendingTracking':
+      try {
+        if (!authToken) await checkAuthentication();
+        if (!authToken) {
+          sendResponse({ success: false, error: 'Not authenticated' });
+          return;
+        }
+
+        const trackingUrl = `${getApiBase()}/api/integrations/etsy/tracking-pending${request.shopName ? '?shopName=' + encodeURIComponent(request.shopName) : ''}`;
+        const trackingResp = await fetch(trackingUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'X-Extension-Auth': authToken,
+            'X-Extension-Version': chrome.runtime.getManifest().version
+          }
+        });
+
+        if (trackingResp.ok) {
+          const trackingData = await trackingResp.json();
+          sendResponse({ success: true, ...trackingData });
+        } else {
+          const errorText = await trackingResp.text();
+          sendResponse({ success: false, error: `HTTP ${trackingResp.status}: ${errorText}` });
+        }
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
+    case 'confirmTrackingSubmission':
+      try {
+        if (!authToken) await checkAuthentication();
+        if (!authToken) {
+          sendResponse({ success: false, error: 'Not authenticated' });
+          return;
+        }
+
+        const confirmResp = await fetch(`${getApiBase()}/api/integrations/etsy/tracking-confirm`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'X-Extension-Auth': authToken,
+            'X-Extension-Version': chrome.runtime.getManifest().version
+          },
+          body: JSON.stringify({
+            submissionId: request.submissionId,
+            status: request.status,
+            error: request.error,
+            shopName: request.shopName
+          })
+        });
+
+        if (confirmResp.ok) {
+          const confirmData = await confirmResp.json();
+          sendResponse({ success: true, ...confirmData });
+        } else {
+          const errorText = await confirmResp.text();
+          sendResponse({ success: false, error: `HTTP ${confirmResp.status}: ${errorText}` });
+        }
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
+      break;
+
     case 'syncOrders':
       try {
         console.log('Background: Syncing orders to Kolayxport API');

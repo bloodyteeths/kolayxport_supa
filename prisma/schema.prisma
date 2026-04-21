@@ -471,6 +471,11 @@ model TrackingSubmission {
   errorMessage      String?
   veeqoResponse     Json?
 
+  // Etsy extension tracking push status
+  etsySubmittedAt   DateTime?
+  etsySubmitStatus  String?   @default("pending") // pending | submitted | failed
+  etsySubmitError   String?
+
   order Order @relation("OrderTrackingSubmissions", fields: [orderId], references: [id], onDelete: Cascade)
   user  User  @relation("UserTrackingSubmissions", fields: [submittedBy], references: [id], onDelete: Cascade)
 
@@ -479,6 +484,7 @@ model TrackingSubmission {
   @@index([submittedBy])
   @@index([submittedAt])
   @@index([orderId, trackingNumber])
+  @@index([etsySubmitStatus])
 }
 
 model EtsyShop {

@@ -178,3 +178,4 @@ public/swe-worker-*.js
 package-lock.json
 yarn.lock.backup
 kolay-xport/
+.next-old-root/

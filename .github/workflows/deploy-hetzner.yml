@@ -20,5 +20,6 @@ jobs:
             git pull origin main
             npm install --legacy-peer-deps
             npx prisma generate
-            npm run build
+            rm -rf .next
+            npx next build --webpack
             sudo systemctl restart kolayxport

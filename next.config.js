@@ -82,7 +82,7 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
     scrollRestoration: true,
-    middlewareClientMaxBodySize: '200mb',
+    proxyClientMaxBodySize: '200mb',
   },
 
   // Security headers

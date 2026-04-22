@@ -69,10 +69,25 @@ export default async function handler(
 
     // Determine source from marketplace
     const marketplace = (order.marketplace || '').toLowerCase();
-    const source = (() => {
+    const source = await (async () => {
       if (marketplace.includes('etsy')) return 'etsy';
       if (marketplace.includes('trendyol')) return 'trendyol';
       if (marketplace.includes('wix')) return 'wix';
+      if (marketplace.includes('ebay')) return 'veeqo';
+      if (marketplace.includes('amazon')) return 'veeqo';
+      if (marketplace.includes('veeqo')) return 'veeqo';
+      // Check if marketplace name matches an Etsy shop name (e.g. "bellecouturegifts")
+      const etsyShop = await prisma.etsyShop.findFirst({
+        where: { userId: user.id, shopName: { equals: order.marketplace, mode: 'insensitive' }, isActive: true },
+        select: { id: true },
+      });
+      if (etsyShop) return 'etsy';
+      // Also check EtsyAddress table for orders synced via Chrome extension
+      const etsyAddr = await prisma.etsyAddress.findFirst({
+        where: { userId: user.id, orderNumber: order.orderNumber },
+        select: { id: true },
+      });
+      if (etsyAddr) return 'etsy';
       return 'veeqo';
     })();
 

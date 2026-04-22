@@ -1035,6 +1035,18 @@ export default function BulkEditor({
     const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
     if (checked.length === 0) return;
 
+    function fileToBase64(file: File): Promise<string> {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
     setPhotoUploading(true);
     setPhotoProgress(0);
     let success = 0, failed = 0;
@@ -1042,13 +1054,22 @@ export default function BulkEditor({
     let done = 0;
 
     for (const listing of checked) {
-      for (const file of photoFiles) {
+      for (let i = 0; i < photoFiles.length; i++) {
+        const file = photoFiles[i];
         try {
-          const formData = new FormData();
-          formData.append('image', file);
+          const base64 = await fileToBase64(file);
           const res = await fetch(
             `/api/clawd/etsy?action=upload_image&listing_id=${listing.listing_id}&shop_id=${shopId}`,
-            { method: 'POST', body: formData }
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                image_base64: base64,
+                image_content_type: file.type || 'image/jpeg',
+                image_filename: file.name,
+                rank: i + 1,
+              }),
+            }
           );
           if (res.ok) success++; else failed++;
         } catch { failed++; }

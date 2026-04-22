@@ -84,8 +84,37 @@ export default async function handler(
     // Route to appropriate tracking submission based on marketplace
     if (source === 'etsy') {
       // Etsy restricts tracking/address endpoints to approved "full access" apps only.
-      // New integrators cannot use createReceiptShipment — use Chrome extension instead.
-      throw new Error('Etsy does not allow tracking submission via API for new integrators. Please use the KolayXport Chrome extension or enter tracking manually on Etsy.');
+      // Save tracking locally so the Chrome extension can push it to Etsy.
+      await prisma.trackingSubmission.create({
+        data: {
+          orderId: orderId as string,
+          trackingNumber: trackingNumber,
+          carrierId: carrierId,
+          carrierName: getCarrierName(carrierId),
+          notifyCustomer: notifyCustomer,
+          updateRemoteOrder: updateRemoteOrder,
+          submittedBy: user.id,
+          status: 'pending',
+          etsySubmitStatus: 'pending',
+        }
+      });
+
+      await prisma.order.update({
+        where: { id: orderId as string },
+        data: { trackingNumber: trackingNumber },
+      });
+
+      logger.info('Etsy tracking saved locally (pending Chrome extension push)', {
+        orderId,
+        trackingNumber,
+        userId: user.id,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Tracking saved. Use Chrome extension to push to Etsy.',
+        etsyPending: true,
+      });
     } else if (source === 'wix') {
       // Submit fulfillment directly to Wix
       await submitWixFulfillment(userSettings, order, trackingNumber, carrierId, user.id);

@@ -447,7 +447,31 @@ export default function BulkOperationsBar({
           `/api/clawd/etsy?action=copy_listing&listing_id=${listing.listing_id}&shop_id=${shopId}&target_shop_id=${targetShopId}`,
           { method: 'POST', headers: { 'Content-Type': 'application/json' } }
         );
-        if (res.ok) success++; else failed++;
+        if (res.ok) {
+          success++;
+          // Copy images to the new listing (best-effort)
+          const data = await res.json().catch(() => ({}));
+          if (data.source_images && data.source_images.length > 0 && data.new_listing_id) {
+            for (const image of data.source_images) {
+              try {
+                await fetch(
+                  `/api/clawd/etsy?action=upload_image&listing_id=${data.new_listing_id}&shop_id=${targetShopId}`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      image_url: image.url_fullxfull,
+                      rank: image.rank,
+                      overwrite: false,
+                    }),
+                  },
+                );
+              } catch (imgErr) {
+                console.error('Failed to copy image during bulk copy', imgErr);
+              }
+            }
+          }
+        } else { failed++; }
       } catch { failed++; }
       setCopyProgress(((i + 1) / selectedListings.length) * 100);
       if (i < selectedListings.length - 1) await delay(100);

@@ -1177,6 +1177,45 @@ export default function ListingEditorDrawer({
       if (data.new_listing_id && onOpenListing) {
         onOpenListing(String(data.new_listing_id));
       }
+
+      // Copy images to the new listing (best-effort, don't block)
+      if (data.source_images && data.source_images.length > 0 && data.new_listing_id) {
+        const totalImages = data.source_images.length;
+        const toastId = toast.loading(`Copying images (0/${totalImages})...`);
+        let copied = 0;
+        let imgFailed = 0;
+
+        for (const image of data.source_images) {
+          try {
+            await fetch(
+              `/api/clawd/etsy?action=upload_image&listing_id=${data.new_listing_id}&shop_id=${shopId}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  image_url: image.url_fullxfull,
+                  rank: image.rank,
+                  overwrite: false,
+                }),
+              },
+            );
+            copied++;
+          } catch (imgErr) {
+            console.error('Failed to copy image', imgErr);
+            imgFailed++;
+          }
+          toast.loading(`Copying images (${copied + imgFailed}/${totalImages})...`, { id: toastId });
+        }
+
+        if (imgFailed === 0) {
+          toast.success(`All ${copied} images copied`, { id: toastId });
+        } else {
+          toast.error(`${copied} images copied, ${imgFailed} failed`, { id: toastId });
+        }
+
+        // Refresh the listing so the new images show up
+        onSaved();
+      }
     } catch (err: any) {
       toast.error(err.message || t('editor.copyFailed'));
     } finally {

@@ -297,6 +297,8 @@ function MobileEtsyListingCard({
   onEdit,
   onCopy,
   onDelete,
+  onRenew,
+  onDeactivate,
   selected,
   onToggleSelect,
   sectionName,
@@ -305,6 +307,8 @@ function MobileEtsyListingCard({
   onEdit: (listingId: number) => void;
   onCopy: (listingId: number) => void;
   onDelete: (listingId: number) => void;
+  onRenew: (listingId: number) => void;
+  onDeactivate: (listingId: number) => void;
   selected?: boolean;
   onToggleSelect?: (listingId: number) => void;
   sectionName?: string;
@@ -522,6 +526,36 @@ function MobileEtsyListingCard({
             >
               {t('copy')}
             </Button>
+            {(listing.state === 'expired' || listing.state === 'inactive') && (
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<RefreshIcon sx={{ fontSize: '16px !important' }} />}
+                onClick={(e) => { e.stopPropagation(); onRenew(listing.listing_id); }}
+                sx={{
+                  flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                  background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 2px 8px rgba(22,163,74,0.25)',
+                  '&:hover': { background: 'linear-gradient(135deg, #16a34a, #15803d)' },
+                }}
+              >
+                {t('renew')}
+              </Button>
+            )}
+            {listing.state === 'active' && (
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={<RemoveCircleOutlineIcon sx={{ fontSize: '16px !important' }} />}
+                onClick={(e) => { e.stopPropagation(); onDeactivate(listing.listing_id); }}
+                sx={{
+                  flex: 1, minHeight: 42, borderRadius: '10px', textTransform: 'none', fontWeight: 600, fontSize: '0.8rem',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 2px 8px rgba(217,119,6,0.25)',
+                  '&:hover': { background: 'linear-gradient(135deg, #d97706, #b45309)' },
+                }}
+              >
+                {t('deactivate')}
+              </Button>
+            )}
             <Button
               size="small"
               variant="contained"
@@ -1256,6 +1290,56 @@ function EtsyListingsPage() {
     [selectedShopId, statusFilter]
   );
 
+  // --- Renew listing ---
+  const handleRenewListing = useCallback(
+    async (listingId: number) => {
+      try {
+        const res = await fetch(
+          `/api/clawd/etsy?action=renew_listing&listing_id=${listingId}&shop_id=${selectedShopId}`,
+          { method: 'POST' }
+        );
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+        toast.success(t('renewSuccess'));
+        setListings((prev) =>
+          prev.map((l) => l.listing_id === listingId ? { ...l, state: 'active' } : l)
+        );
+        const cacheKey = `${selectedShopId}:${statusFilter}`;
+        delete listingsCacheRef.current[cacheKey];
+      } catch (err: any) {
+        toast.error(t('renewFailed') + ': ' + err.message);
+      }
+    },
+    [selectedShopId, statusFilter]
+  );
+
+  // --- Deactivate listing ---
+  const handleDeactivateListing = useCallback(
+    async (listingId: number) => {
+      try {
+        const res = await fetch(
+          `/api/clawd/etsy?action=deactivate_listing&listing_id=${listingId}&shop_id=${selectedShopId}`,
+          { method: 'POST' }
+        );
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+        toast.success(t('deactivateSuccess'));
+        setListings((prev) =>
+          prev.map((l) => l.listing_id === listingId ? { ...l, state: 'inactive' } : l)
+        );
+        const cacheKey = `${selectedShopId}:${statusFilter}`;
+        delete listingsCacheRef.current[cacheKey];
+      } catch (err: any) {
+        toast.error(t('deactivateFailed') + ': ' + err.message);
+      }
+    },
+    [selectedShopId, statusFilter]
+  );
+
   // --- CSV Export ---
   const handleExportCSV = () => {
     if (filteredListings.length === 0) {
@@ -1664,6 +1748,20 @@ function EtsyListingsPage() {
                   <ContentCopyIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
+              {(params.row.state === 'expired' || params.row.state === 'inactive') && (
+                <Tooltip title={t('renew')} arrow>
+                  <IconButton size="small" color="success" onClick={() => handleRenewListing(params.row.listing_id)} sx={{ p: 0.5 }}>
+                    <RefreshIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {params.row.state === 'active' && (
+                <Tooltip title={t('deactivate')} arrow>
+                  <IconButton size="small" color="warning" onClick={() => handleDeactivateListing(params.row.listing_id)} sx={{ p: 0.5 }}>
+                    <RemoveCircleOutlineIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
               <Tooltip title={t('delete')} arrow>
                 <IconButton size="small" color="error" onClick={() => setDeleteConfirmId(params.row.listing_id)} sx={{ p: 0.5 }}>
                   <DeleteIcon sx={{ fontSize: 16 }} />
@@ -2218,6 +2316,8 @@ function EtsyListingsPage() {
                     onEdit={handleOpenEditor}
                     onCopy={handleCopyListing}
                     onDelete={(id) => setDeleteConfirmId(id)}
+                    onRenew={handleRenewListing}
+                    onDeactivate={handleDeactivateListing}
                     selected={mobileSelectedIds.has(listing.listing_id)}
                     onToggleSelect={handleMobileToggleSelect}
                     sectionName={listing.shop_section_id ? sectionNameMap[listing.shop_section_id] : undefined}

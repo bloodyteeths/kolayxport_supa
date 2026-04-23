@@ -6,9 +6,12 @@ import { fetchTrendyolCategoryProducts, TRENDYOL_CATEGORIES } from '../../../lib
 import { scanCategory, scanBatch, batchTranslateTitles, extractEnglishQuery, getCachedExchangeRate } from '../../../lib/arbitrage/scanner';
 import { discoverTrendyolCategories, getCategoryMappings, syncCategoryMappings, mapToEbayCategory } from '../../../lib/arbitrage/categoryMapper';
 import { startScanJob, getJobStatus, resumeStaleJobsOnce, getUserResults, getScanHistory, setTracked, recordPricePoint, getPriceHistory } from '../../../lib/arbitrage/jobRunner';
+import { refreshFullEbayIndex, indexEbayCategory, getIndexStatus } from '../../../lib/arbitrage/ebayIndexer';
+import { refreshFullTrendyolIndex, indexTrendyolCategory } from '../../../lib/arbitrage/trendyolIndexer';
+import { matchAndCalculateCategory } from '../../../lib/arbitrage/matcher';
 import type { ArbitrageResult, ArbitrageScanResponse } from '../../../lib/arbitrage/types';
 
-export const config = { runtime: 'nodejs' };
+export const config = { runtime: 'nodejs', maxDuration: 300 };
 
 function getUserId(req: NextApiRequest, res: NextApiResponse): { userId: string; authenticated: boolean } {
   // Try API key first
@@ -241,6 +244,82 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       case 'exchange_rate': {
         const rate = await getCachedExchangeRate();
         return res.json({ rate, source: 'open.er-api.com' });
+      }
+
+      // ================================================================
+      // INDEX MANAGEMENT (v2 — shared product indexes)
+      // ================================================================
+      case 'refresh_index': {
+        const { token: appToken } = await getEbayTokenFor(userId);
+        const target = req.body.target || 'all'; // 'all' | 'ebay' | 'trendyol' | specific slug
+
+        if (target === 'trendyol') {
+          const trendyolResult = await refreshFullTrendyolIndex();
+          return res.json({ trendyol: trendyolResult });
+        }
+
+        if (target === 'ebay') {
+          const ebayResult = await refreshFullEbayIndex(appToken);
+          return res.json({ ebay: ebayResult });
+        }
+
+        if (target !== 'all') {
+          // Specific category slug
+          const [tResult, eResult] = await Promise.all([
+            indexTrendyolCategory(target),
+            indexEbayCategory(target, appToken),
+          ]);
+          return res.json({ trendyol: tResult, ebay: eResult });
+        }
+
+        // target === 'all': full refresh both
+        const [trendyolResult, ebayResult] = await Promise.all([
+          refreshFullTrendyolIndex(),
+          refreshFullEbayIndex(appToken),
+        ]);
+
+        return res.json({
+          trendyol: trendyolResult,
+          ebay: ebayResult,
+        });
+      }
+
+      case 'index_status': {
+        const status = await getIndexStatus();
+        const totalProducts = status.reduce((sum, s) => sum + s.productCount, 0);
+        const staleCategories = status.filter(s => s.isStale).length;
+        return res.json({
+          categories: status,
+          summary: {
+            totalCategories: status.length,
+            totalProducts,
+            staleCategories,
+            freshCategories: status.length - staleCategories,
+          },
+        });
+      }
+
+      case 'match_category': {
+        const { slug: matchSlug, ...matchParams } = req.body;
+        if (!matchSlug) return res.status(400).json({ error: 'slug is required' });
+
+        const { results, productsScanned, matchStats } = await matchAndCalculateCategory(
+          matchSlug,
+          {
+            shippingCostUsd: matchParams.shippingCostUsd || 15,
+            includeInternationalFee: matchParams.includeInternationalFee ?? true,
+            feeOverridePercent: matchParams.feeOverridePercent,
+            highDefectRate: matchParams.highDefectRate || false,
+            exchangeRate: matchParams.exchangeRate,
+          },
+        );
+
+        return res.json({
+          results: results.sort((a, b) => b.score - a.score),
+          productsScanned,
+          matchStats,
+          profitable: results.filter(r => r.financials.profitUsd > 0).length,
+        });
       }
 
       case 'test_trendyol': {

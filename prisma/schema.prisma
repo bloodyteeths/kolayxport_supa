@@ -822,6 +822,77 @@ model TrendyolCategoryMap {
   @@index([ebayCategoryId])
 }
 
+// ---------------------------------------------------------------------------
+// Arbitrage v2 — Shared Product Indexes + AI Matching
+// ---------------------------------------------------------------------------
+
+model EbayProductIndex {
+  id           String   @id @default(cuid())
+  itemId       String   @unique
+  title        String
+  price        Float
+  currency     String   @default("USD")
+  condition    String?
+  imageUrl     String?
+  categoryId   String
+  categoryName String?
+  soldQuantity Int      @default(0)
+  sellerName   String?
+  itemUrl      String?
+  fetchedAt    DateTime @default(now())
+  expiresAt    DateTime
+  searchQuery  String
+
+  @@index([categoryId])
+  @@index([expiresAt])
+  @@index([searchQuery])
+}
+
+model TrendyolProductIndex {
+  id               String   @id @default(cuid())
+  productId        Int      @unique
+  name             String
+  brand            String
+  priceTry         Float
+  originalPriceTry Float
+  imageUrl         String?
+  url              String?
+  categorySlug     String
+  categoryName     String?
+  ratingScore      Float    @default(0)
+  ratingCount      Int      @default(0)
+  merchantName     String?
+  barcode          String?
+  favoriteCount    String?
+  orderCount       String?
+  fetchedAt        DateTime @default(now())
+  expiresAt        DateTime
+
+  @@index([categorySlug])
+  @@index([expiresAt])
+}
+
+model ArbitrageMatch {
+  id           String   @id @default(cuid())
+  trendyolId   Int
+  ebayItemId   String
+  confidence   Float
+  matchReason  String?
+  matchType    String
+  profitUsd    Float?
+  roiPercent   Float?
+  score        Int?
+  verdict      String?
+  categorySlug String
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  @@unique([trendyolId, ebayItemId])
+  @@index([categorySlug])
+  @@index([score])
+  @@index([expiresAt])
+}
+
 model ResearchCache {
   id        String   @id @default(cuid())
   userId    String

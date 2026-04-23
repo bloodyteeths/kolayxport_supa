@@ -3043,6 +3043,20 @@ export default async function handler(
             return res.status(200).json({ success: true, listing: data });
         }
 
+        // POST /api/clawd/etsy?action=deactivate_listing&listing_id=xxx
+        if (req.method === 'POST' && action === 'deactivate_listing' && listing_id) {
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}`,
+                accessToken,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({ state: 'inactive' }),
+                    headers: { 'Content-Type': 'application/json' },
+                }
+            );
+            return res.status(200).json({ success: true, listing: data });
+        }
+
         // --- Shipping Profile CRUD ---
 
         // POST /api/clawd/etsy?action=create_shipping_profile

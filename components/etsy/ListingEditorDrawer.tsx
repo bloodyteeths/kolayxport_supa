@@ -34,6 +34,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import PublishIcon from '@mui/icons-material/Publish';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BlockIcon from '@mui/icons-material/Block';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import UndoIcon from '@mui/icons-material/Undo';
 import AddIcon from '@mui/icons-material/Add';
@@ -336,11 +337,13 @@ export default function ListingEditorDrawer({
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+  const [renewing, setRenewing] = useState(false);
   const [copying, setCopying] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
+  const [renewDialogOpen, setRenewDialogOpen] = useState(false);
 
   // Template / profile state
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
@@ -1143,6 +1146,35 @@ export default function ListingEditorDrawer({
       toast.error(err.message || t('editor.deactivateFailed'));
     } finally {
       setDeactivating(false);
+    }
+  };
+
+  // --------------------------------------------------
+  // Renew (reactivate expired/inactive listing)
+  // --------------------------------------------------
+  const handleRenew = async () => {
+    if (!listingId) return;
+
+    setRenewing(true);
+    try {
+      const res = await fetch(
+        `/api/clawd/etsy?action=renew_listing&listing_id=${listingId}&shop_id=${shopId}`,
+        { method: 'POST' },
+      );
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || t('editor.renewFailed'));
+      }
+
+      toast.success(t('editor.renewSuccess'));
+      setRenewDialogOpen(false);
+      await fetchListing();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err.message || t('editor.renewFailed'));
+    } finally {
+      setRenewing(false);
     }
   };
 
@@ -2423,6 +2455,23 @@ export default function ListingEditorDrawer({
                     </Button>
                   )}
 
+                  {/* Renew — for expired/inactive */}
+                  {(listing.state === 'expired' || listing.state === 'inactive') && (
+                    <Button
+                      variant="outlined"
+                      color="success"
+                      startIcon={
+                        renewing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />
+                      }
+                      onClick={() => setRenewDialogOpen(true)}
+                      disabled={renewing}
+                      fullWidth
+                      sx={{ minHeight: 48, fontSize: '1rem' }}
+                    >
+                      {renewing ? t('editor.renewing') : t('editor.renewButton')}
+                    </Button>
+                  )}
+
                   {/* Copy */}
                   <Button
                     variant="outlined"
@@ -2707,6 +2756,35 @@ export default function ListingEditorDrawer({
             startIcon={deactivating ? <CircularProgress size={18} color="inherit" /> : <BlockIcon />}
           >
             {t('editor.deactivateButton')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ================================================================ */}
+      {/* Renew Confirmation Dialog */}
+      {/* ================================================================ */}
+      <Dialog open={renewDialogOpen} onClose={() => setRenewDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>{t('editor.renewListing')}</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {t('editor.renewConfirm')}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRenewDialogOpen(false)} disabled={renewing}>
+            {t('editor.cancel')}
+          </Button>
+          <Button
+            onClick={() => {
+              setRenewDialogOpen(false);
+              handleRenew();
+            }}
+            color="success"
+            variant="contained"
+            disabled={renewing}
+            startIcon={renewing ? <CircularProgress size={18} color="inherit" /> : <RefreshIcon />}
+          >
+            {t('editor.renewButton')}
           </Button>
         </DialogActions>
       </Dialog>

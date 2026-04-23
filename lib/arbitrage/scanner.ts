@@ -1,11 +1,12 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logger } from '../logger';
-import { getApplicationToken } from '../integrations/ebayClient';
 import { callEbayRateLimited } from '../integrations/ebayRateLimiter';
 import { fetchTrendyolCategoryProducts, getExchangeRate } from '../integrations/trendyolSearch';
 import { calculateArbitrage } from './calculator';
 import { getCached, setCache, cacheKey, TTL, maybeClearExpired } from './cache';
-import { mapToEbayCategory } from './categoryMapper';
+import { matchAndCalculateCategory } from './matcher';
+import { getTrendyolIndexForCategory, isCategoryFresh as isTrendyolFresh } from './trendyolIndexer';
+import { getEbayIndexForCategory } from './ebayIndexer';
 import type { ArbitrageResult, EbayComparable, TrendyolProduct } from './types';
 
 const EBAY_API_BASE = 'https://api.ebay.com';
@@ -23,24 +24,6 @@ interface ScanParams {
 async function callEbayAPI(endpoint: string, token: string, marketplaceId = 'EBAY_US'): Promise<any> {
   const url = endpoint.startsWith('http') ? endpoint : `${EBAY_API_BASE}${endpoint}`;
   return callEbayRateLimited(url, { token, marketplaceId });
-}
-
-async function getItemDetails(legacyItemId: string, appToken: string): Promise<EbayComparable> {
-  const item = await callEbayAPI(
-    `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyItemId}`,
-    appToken
-  );
-  return {
-    title: item.title || '',
-    price: parseFloat(item.price?.value || '0'),
-    currency: item.price?.currency || 'USD',
-    itemId: item.itemId || '',
-    soldQuantity: item.estimatedAvailabilities?.[0]?.estimatedSoldQuantity || 0,
-    condition: item.condition || '',
-    imageUrl: item.image?.imageUrl || '',
-    categoryId: item.categoryId || '',
-    categoryName: item.categoryPath || '',
-  };
 }
 
 /** Search eBay by GTIN/barcode (exact match) */
@@ -140,10 +123,7 @@ export function extractEnglishQuery(product: TrendyolProduct): string {
   return englishWords;
 }
 
-/** Search eBay with query and return items built from search-result metadata only.
- * We skip per-item enrichment (get_item_by_legacy_id) — title/price/condition from
- * item_summary/search is enough for arbitrage comparison, and enrichment adds 3-4x
- * more API calls per product that would starve the global eBay rate limiter. */
+/** Search eBay with query and return items built from search-result metadata only. */
 async function searchAndEnrichEbay(
   query: string,
   appToken: string,
@@ -190,9 +170,43 @@ async function searchAndEnrichEbay(
 
 /**
  * Scan a single Trendyol category against eBay.
- * Returns ArbitrageResult[] for all products in that category.
+ *
+ * v2: Uses shared product indexes + AI matching when available.
+ * Falls back to legacy per-product search if indexes are empty.
  */
 export async function scanCategory(
+  slug: string,
+  params: ScanParams,
+  appToken: string,
+  page = 1
+): Promise<{ results: ArbitrageResult[]; productsScanned: number }> {
+  // v2 path: try index-based matching first
+  const hasEbayIndex = (await getEbayIndexForCategory(slug)).length > 0;
+  const hasTrendyolIndex = await isTrendyolFresh(slug);
+
+  if (hasEbayIndex && hasTrendyolIndex) {
+    const { results, productsScanned } = await matchAndCalculateCategory(slug, {
+      shippingCostUsd: params.shippingCostUsd,
+      feeOverridePercent: params.feeOverridePercent,
+      includeInternationalFee: params.includeInternationalFee,
+      highDefectRate: params.highDefectRate,
+      exchangeRate: params.exchangeRate,
+      minProfitUsd: params.minProfitUsd,
+      minRoiPercent: params.minRoiPercent,
+    });
+    return { results, productsScanned };
+  }
+
+  // Legacy fallback: per-product eBay search
+  logger.info(`Index not available for "${slug}", using legacy per-product scan`);
+  return scanCategoryLegacy(slug, params, appToken, page);
+}
+
+/**
+ * Legacy scan — per-product eBay search (high API cost).
+ * Kept as fallback when indexes haven't been built yet.
+ */
+async function scanCategoryLegacy(
   slug: string,
   params: ScanParams,
   appToken: string,
@@ -224,7 +238,7 @@ export async function scanCategory(
 }
 
 /**
- * Scan a batch of Trendyol products against eBay.
+ * Scan a batch of Trendyol products against eBay (legacy per-product flow).
  */
 export async function scanBatch(
   products: TrendyolProduct[],

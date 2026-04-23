@@ -25,18 +25,28 @@ const log = {
   messages: [],
   add: function(level, message, data = null) {
     const timestamp = new Date().toISOString();
-    const logEntry = { timestamp, level, message, data };
+    // Sanitize data to ensure it's serializable (no DOM nodes, circular refs)
+    let safeData = null;
+    if (data !== null && data !== undefined) {
+      try {
+        safeData = JSON.parse(JSON.stringify(data));
+      } catch (e) {
+        safeData = String(data);
+      }
+    }
+    const logEntry = { timestamp, level, message, data: safeData };
     this.messages.push(logEntry);
-    
-    // Keep only last 100 log entries
+
     if (this.messages.length > 100) {
       this.messages = this.messages.slice(-100);
     }
-    
-    // Store in extension storage for popup to display
-    chrome.storage.local.set({ 'kx_logs': this.messages });
-    
-    // Also send critical logs to server
+
+    try {
+      chrome.storage.local.set({ 'kx_logs': this.messages });
+    } catch (e) {
+      // Silent fail if storage write fails
+    }
+
     if (level === 'error' || level === 'success') {
       this.sendToServer(logEntry);
     }
@@ -47,16 +57,30 @@ const log = {
   warn: function(message, data) { this.add('warn', message, data); },
   sendToServer: async function(logEntry) {
     try {
-      await fetch(API.replace('/orders', '/logs'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'chrome-extension', log: logEntry })
+      safeSendMessage({
+        action: 'sendLog',
+        log: logEntry
       });
     } catch (e) {
       // Silent fail for logging
     }
   }
 };
+
+// Safe wrapper for chrome.runtime.sendMessage — handles "context invalidated"
+function safeSendMessage(msg) {
+  try {
+    if (!chrome.runtime || !chrome.runtime.id) {
+      log.warn('Extension context invalidated');
+      return Promise.resolve(null);
+    }
+    return chrome.runtime.sendMessage(msg).catch(function(e) {
+      return null;
+    });
+  } catch (e) {
+    return Promise.resolve(null);
+  }
+}
 
 log.info('🚀 Kolayxport Etsy Address Enrichment v5.4 Loading', { url: window.location.href });
 
@@ -127,7 +151,7 @@ function getEtsyStoreInfo() {
 // Get authentication token from background service worker
 async function getAuthToken() {
   try {
-    const response = await chrome.runtime.sendMessage({ action: 'getAuthStatus' });
+    const response = await safeSendMessage({ action: 'getAuthStatus' });
     if (response?.authenticated && response.token) {
       log.info('Got auth token from background script');
       return response.token;
@@ -156,12 +180,16 @@ const pushBatch = async batch => {
     
     // Use background script to make the API call (avoids CORS issues)
     log.info('Sending sync request via background script');
-    const response = await chrome.runtime.sendMessage({
+    const response = await safeSendMessage({
       action: 'syncOrders',
       orders: batch,
       source: 'chrome-extension-v5.4-multistore',
       timestamp: new Date().toISOString()
     });
+    if (!response) {
+      log.error('Sync failed: extension not connected. Visit kolayxport.com to re-authenticate.');
+      return;
+    }
     
     if (response.success) {
       const result = response.result;
@@ -173,7 +201,7 @@ const pushBatch = async batch => {
       await chrome.storage.local.set({ [STORAGE_KEY]: newSynced });
       
       // Notify background script
-      chrome.runtime.sendMessage({
+      safeSendMessage({
         action: 'syncComplete',
         count: batch.length,
         totalSynced: newSynced.length
@@ -250,8 +278,6 @@ function expandAddressSections() {
   const toggleSelectors = [
     '[data-content-toggle][aria-expanded="false"]',
     '[aria-expanded="false"][class*="address"]',
-    'button[aria-expanded="false"]',
-    '[data-toggle][aria-expanded="false"]',
   ];
 
   let expandedCount = 0;
@@ -1144,7 +1170,7 @@ async function pushTrackingToEtsy(data) {
 async function confirmSubmission(submissionId, status, errorMsg) {
   try {
     const storeInfo = getEtsyStoreInfo();
-    await chrome.runtime.sendMessage({
+    await safeSendMessage({
       action: 'confirmTrackingSubmission',
       submissionId,
       status,
@@ -1165,10 +1191,16 @@ async function checkPendingTracking() {
 
   try {
     const storeInfo = getEtsyStoreInfo();
-    const response = await chrome.runtime.sendMessage({
+    const response = await safeSendMessage({
       action: 'fetchPendingTracking',
       shopName: storeInfo.storeName,
     });
+    if (!response) {
+      log.warn('Cannot check tracking: extension not connected');
+      return;
+    }
+
+    log.info('fetchPendingTracking response', { success: response?.success, count: response?.count, pendingLength: response?.pending?.length, error: response?.error });
 
     if (!response?.success || !response.pending?.length) {
       log.info('No pending tracking found');

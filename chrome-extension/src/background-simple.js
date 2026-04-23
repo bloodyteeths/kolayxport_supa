@@ -22,6 +22,18 @@ let syncStats = {
   errors: 0
 };
 
+// Restore auth token from storage on service worker wake-up
+chrome.storage.local.get(['kx_auth_token', 'kx_auth_token_time'], (result) => {
+  if (result.kx_auth_token && result.kx_auth_token_time) {
+    const age = Date.now() - result.kx_auth_token_time;
+    if (age < 30 * 60 * 1000) { // 30 min TTL
+      authToken = result.kx_auth_token;
+      console.log('Restored auth token from storage (age: ' + Math.round(age / 1000) + 's)');
+      updateBadge('authenticated');
+    }
+  }
+});
+
 function getApiBase() {
   return API_BASE;
 }
@@ -137,12 +149,13 @@ async function handleMessage(request, sender, sendResponse) {
         console.log('Received auth token from content script');
         authToken = request.token;
         updateBadge('authenticated');
-        if (request.user) {
-          chrome.storage.local.set({
-            'kx_user': request.user,
-            'kx_last_auth_check': Date.now()
-          });
-        }
+        const storageData = {
+          'kx_auth_token': request.token,
+          'kx_auth_token_time': Date.now(),
+          'kx_last_auth_check': Date.now()
+        };
+        if (request.user) storageData['kx_user'] = request.user;
+        chrome.storage.local.set(storageData);
       }
       sendResponse({ success: true });
       break;
@@ -184,12 +197,14 @@ async function handleMessage(request, sender, sendResponse) {
     case 'fetchPendingTracking':
       try {
         if (!authToken) await checkAuthentication();
+        console.log('[fetchPendingTracking] authToken:', authToken ? 'present (' + authToken.substring(0, 20) + '...)' : 'MISSING');
         if (!authToken) {
           sendResponse({ success: false, error: 'Not authenticated' });
           return;
         }
 
         const trackingUrl = `${getApiBase()}/api/integrations/etsy/tracking-pending${request.shopName ? '?shopName=' + encodeURIComponent(request.shopName) : ''}`;
+        console.log('[fetchPendingTracking] Fetching:', trackingUrl);
         const trackingResp = await fetch(trackingUrl, {
           method: 'GET',
           headers: {
@@ -200,14 +215,18 @@ async function handleMessage(request, sender, sendResponse) {
           }
         });
 
+        console.log('[fetchPendingTracking] Response status:', trackingResp.status);
         if (trackingResp.ok) {
           const trackingData = await trackingResp.json();
+          console.log('[fetchPendingTracking] Got data:', JSON.stringify(trackingData).substring(0, 200));
           sendResponse({ success: true, ...trackingData });
         } else {
           const errorText = await trackingResp.text();
+          console.log('[fetchPendingTracking] Error:', trackingResp.status, errorText.substring(0, 200));
           sendResponse({ success: false, error: `HTTP ${trackingResp.status}: ${errorText}` });
         }
       } catch (error) {
+        console.error('[fetchPendingTracking] Exception:', error.message);
         sendResponse({ success: false, error: error.message });
       }
       break;
@@ -246,6 +265,19 @@ async function handleMessage(request, sender, sendResponse) {
       } catch (error) {
         sendResponse({ success: false, error: error.message });
       }
+      break;
+
+    case 'sendLog':
+      try {
+        await fetch(`${getApiBase()}/api/integrations/etsy/logs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'chrome-extension', log: request.log })
+        });
+      } catch (e) {
+        // Silent fail for logging
+      }
+      sendResponse({ success: true });
       break;
 
     case 'syncOrders':
@@ -295,7 +327,14 @@ async function checkAuthentication() {
     console.log('Checking authentication...');
 
     // 1. If we already have a cached token that's fresh, reuse it
-    const stored = await chrome.storage.local.get(['kx_last_auth_check']);
+    const stored = await chrome.storage.local.get(['kx_last_auth_check', 'kx_auth_token', 'kx_auth_token_time']);
+    if (!authToken && stored.kx_auth_token && stored.kx_auth_token_time) {
+      const age = Date.now() - stored.kx_auth_token_time;
+      if (age < 30 * 60 * 1000) {
+        authToken = stored.kx_auth_token;
+        console.log('Restored token from storage during auth check');
+      }
+    }
     if (authToken && stored.kx_last_auth_check && (Date.now() - stored.kx_last_auth_check < 5 * 60 * 1000)) {
       console.log('Using cached auth token (less than 5 min old)');
       updateBadge('authenticated');

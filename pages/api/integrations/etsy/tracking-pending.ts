@@ -41,12 +41,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
+    logger.info('[tracking-pending] Authenticated user', { userId: user.id, email: user.email });
+
     // Resolve Etsy shop names to match orders by marketplace
     const etsyShops = await prisma.etsyShop.findMany({
       where: { userId: user.id, isActive: true },
       select: { shopName: true },
     });
     const etsyShopNames = etsyShops.map((s) => s.shopName).filter((n): n is string => !!n);
+    logger.info('[tracking-pending] Etsy shops for user', { userId: user.id, etsyShopNames });
 
     // Find tracking submissions for Etsy orders that haven't been pushed via extension yet
     // Orders may have shop name (e.g. "BelleCoutureGifts") as marketplace, not "etsy"
@@ -79,6 +82,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       orderBy: { submittedAt: 'desc' },
       take: 50,
     });
+
+    logger.info('[tracking-pending] Query result', { userId: user.id, pendingCount: pending.length, shopNames: etsyShopNames });
 
     const result = pending.map((ts) => ({
       submissionId: ts.id,

@@ -58,7 +58,7 @@ const log = {
   }
 };
 
-log.info('🚀 Kolayxport Etsy Address Enrichment v5.3 Loading', { url: window.location.href });
+log.info('🚀 Kolayxport Etsy Address Enrichment v5.4 Loading', { url: window.location.href });
 
 // Extract store information from current page
 function getEtsyStoreInfo() {
@@ -159,7 +159,7 @@ const pushBatch = async batch => {
     const response = await chrome.runtime.sendMessage({
       action: 'syncOrders',
       orders: batch,
-      source: 'chrome-extension-v5.3-multistore',
+      source: 'chrome-extension-v5.4-multistore',
       timestamp: new Date().toISOString()
     });
     
@@ -187,61 +187,197 @@ const pushBatch = async batch => {
   }
 };
 
-// Helper function to expand address sections if collapsed
-function expandAddressSections() {
-  // Look for collapsed address buttons and click them
-  const collapsedButtons = document.querySelectorAll('[data-content-toggle][aria-expanded="false"]');
-  let expandedCount = 0;
-  
-  collapsedButtons.forEach(button => {
-    // Check if this is an address-related toggle
-    const buttonText = button.textContent?.toLowerCase() || '';
-    if (buttonText.includes('ship to') || buttonText.includes('address')) {
-      try {
-        button.click();
-        expandedCount++;
-        log.info('Expanded address section');
-      } catch (e) {
-        log.warn('Failed to expand address section', e.message);
+// Parse address from a text block (handles multi-line or comma-separated addresses)
+function parseAddressText(text, fallbackName = '') {
+  const lines = text.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
+  const addr = { name: '', line1: '', line2: '', city: '', state: '', postalCode: '', country: '' };
+
+  if (lines.length >= 4) {
+    addr.name = lines[0];
+    addr.line1 = lines[1];
+    // Last line is usually country, second-to-last is "City, ST ZIP"
+    const lastLine = lines[lines.length - 1];
+    const cityLine = lines[lines.length - 2] || '';
+    if (lines.length > 4) addr.line2 = lines[2];
+
+    const cityMatch = cityLine.match(/^(.+?),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+    if (cityMatch) {
+      addr.city = cityMatch[1];
+      addr.state = cityMatch[2];
+      addr.postalCode = cityMatch[3];
+    } else {
+      addr.city = cityLine;
+    }
+    addr.country = lastLine;
+  } else if (lines.length >= 2) {
+    // "Name City, ST" format
+    const parts = text.split(/,\s*/);
+    if (parts.length >= 2) {
+      addr.name = parts[0].trim();
+      const locParts = parts[1].trim().split(/\s+/);
+      addr.state = locParts[locParts.length - 1] || '';
+      addr.city = locParts.slice(0, -1).join(' ');
+    }
+  } else {
+    addr.name = text;
+  }
+
+  if (!addr.name) addr.name = fallbackName;
+  return addr;
+}
+
+// Fallback: derive order row containers from order links
+function extractOrderRowsFromLinks(orderLinks) {
+  const containers = new Set();
+  orderLinks.forEach(link => {
+    // Walk up from the link to find a meaningful container
+    let el = link;
+    for (let i = 0; i < 8; i++) {
+      el = el.parentElement;
+      if (!el || el === document.body) break;
+      // A good container has multiple children and is reasonably sized
+      if (el.children.length >= 3 && el.offsetHeight > 50) {
+        containers.add(el);
+        break;
       }
     }
   });
-  
+  return [...containers];
+}
+
+// Helper function to expand address sections if collapsed
+function expandAddressSections() {
+  const toggleSelectors = [
+    '[data-content-toggle][aria-expanded="false"]',
+    '[aria-expanded="false"][class*="address"]',
+    'button[aria-expanded="false"]',
+    '[data-toggle][aria-expanded="false"]',
+  ];
+
+  let expandedCount = 0;
+
+  for (const sel of toggleSelectors) {
+    const collapsedButtons = document.querySelectorAll(sel);
+    collapsedButtons.forEach(button => {
+      const buttonText = button.textContent?.toLowerCase() || '';
+      const ariaLabel = (button.getAttribute('aria-label') || '').toLowerCase();
+      if (buttonText.includes('ship') || buttonText.includes('address') ||
+          ariaLabel.includes('ship') || ariaLabel.includes('address')) {
+        try {
+          button.click();
+          expandedCount++;
+          log.info('Expanded address section');
+        } catch (e) {
+          log.warn('Failed to expand address section', e.message);
+        }
+      }
+    });
+  }
+
   return expandedCount;
 }
 
-// Core extractor using REAL Etsy DOM structure
+// Core extractor using REAL Etsy DOM structure with fallback selectors
 async function extract() {
-  log.info('Starting order extraction with v3.2 selectors and address expansion');
-  
+  log.info('Starting order extraction v5.4 with multi-selector fallback');
+
   // First, try to expand any collapsed address sections
   const expandedCount = expandAddressSections();
   if (expandedCount > 0) {
     log.info(`Expanded ${expandedCount} address sections, waiting for DOM update`);
-    await new Promise(r => setTimeout(r, 1000)); // Wait for expansion animation
+    await new Promise(r => setTimeout(r, 1000));
   }
-  
+
   const synced = (await chrome.storage.local.get({ [STORAGE_KEY]: [] }))[STORAGE_KEY];
-  
-  // CORRECT SELECTOR: Look for order rows in Etsy's actual structure
-  const orderRows = document.querySelectorAll('.panel-body-row');
-  log.info(`Found ${orderRows.length} order rows using .panel-body-row`);
-  
-  if (orderRows.length === 0) {
-    log.warn('No order rows found with .panel-body-row selector');
-    return;
+
+  // Try multiple selectors for order rows — Etsy changes their DOM frequently
+  const orderRowSelectors = [
+    '.panel-body-row',
+    '[data-order-id]',
+    '[data-receipt-id]',
+    'tr[data-order-id]',
+    '.order-card',
+    '[class*="order-row"]',
+    '[class*="OrderRow"]',
+    '[data-test-id="order-row"]',
+    '[data-test-id*="order"]',
+    '.wt-grid__item-xs-12[class*="panel"]',
+  ];
+
+  let orderRows = null;
+  let usedSelector = '';
+  for (const sel of orderRowSelectors) {
+    const rows = document.querySelectorAll(sel);
+    if (rows.length > 0) {
+      orderRows = rows;
+      usedSelector = sel;
+      break;
+    }
+  }
+
+  log.info(`Order row detection: selector="${usedSelector}", found=${orderRows ? orderRows.length : 0}`);
+
+  // Diagnostic: if no rows found, log page structure for debugging
+  if (!orderRows || orderRows.length === 0) {
+    const bodyClasses = document.body.className;
+    const mainContent = document.querySelector('main, [role="main"], #content, .content-container');
+    const allDivs = document.querySelectorAll('div[class]');
+    const classNames = new Set();
+    allDivs.forEach(d => d.className.split(/\s+/).forEach(c => { if (c.length > 3) classNames.add(c); }));
+    const topClasses = [...classNames].slice(0, 30).join(', ');
+
+    // Check if page has order-related links (proves we're on orders page)
+    const orderLinks = document.querySelectorAll('a[href*="order_id="], a[href*="receipt_id="], a[href*="/orders/"]');
+
+    log.error('No order rows found with any selector', {
+      url: window.location.href,
+      bodyClasses,
+      hasMainContent: !!mainContent,
+      orderLinksCount: orderLinks.length,
+      topClasses,
+      pageTitle: document.title,
+    });
+
+    // Last resort: if we see order links, try to extract from their parent containers
+    if (orderLinks.length > 0) {
+      log.info(`Found ${orderLinks.length} order links, attempting parent-based extraction`);
+      orderRows = extractOrderRowsFromLinks(orderLinks);
+      usedSelector = 'link-parent-fallback';
+      if (orderRows && orderRows.length > 0) {
+        log.info(`Fallback found ${orderRows.length} order containers`);
+      } else {
+        log.warn('Link-parent fallback also failed');
+        return;
+      }
+    } else {
+      return;
+    }
   }
   
   const batch = [];
   
   orderRows.forEach((row, index) => {
     try {
-      // CORRECT: Extract order ID from checkbox name attribute
+      // Extract order ID from checkbox or data attributes or links
+      let orderId = null;
       const checkbox = row.querySelector('input[type="checkbox"][name]');
-      const orderId = checkbox?.getAttribute('name');
-      
+      orderId = checkbox?.getAttribute('name');
+      if (!orderId) orderId = row.getAttribute('data-order-id') || row.getAttribute('data-receipt-id');
       if (!orderId) {
-        log.warn(`Row ${index}: No order ID found in checkbox`);
+        const oLink = row.querySelector('a[href*="order_id="]');
+        orderId = oLink?.href?.match(/order_id=([^&]+)/)?.[1];
+      }
+      if (!orderId) {
+        const rLink = row.querySelector('a[href*="receipt_id="]');
+        orderId = rLink?.href?.match(/receipt_id=([^&]+)/)?.[1];
+      }
+      if (!orderId) {
+        const anyOrderLink = row.querySelector('a[href*="/orders/"]');
+        orderId = anyOrderLink?.href?.match(/\/orders\/(\d+)/)?.[1];
+      }
+
+      if (!orderId) {
+        log.warn(`Row ${index}: No order ID found via any method`);
         return;
       }
       
@@ -252,14 +388,38 @@ async function extract() {
       
       log.info(`Row ${index}: Processing order ${orderId}`);
       
-      // Extract buyer name from dropdown button
-      const buyerButton = row.querySelector('[data-dropdown-button="true"] [data-test-id="unsanitize"]');
-      const buyerName = buyerButton?.textContent?.trim() || '';
+      // Extract buyer name with fallbacks
+      let buyerName = '';
+      const buyerSelectors = [
+        '[data-dropdown-button="true"] [data-test-id="unsanitize"]',
+        '[data-test-id="buyer-name"]',
+        '[data-test-id="unsanitize"]',
+        '.buyer-name',
+        '[class*="buyer"]',
+        '[class*="customer"]',
+      ];
+      for (const sel of buyerSelectors) {
+        const el = row.querySelector(sel);
+        if (el?.textContent?.trim()) {
+          buyerName = el.textContent.trim();
+          break;
+        }
+      }
       log.info(`Order ${orderId}: Found buyer name: "${buyerName}"`);
       
-      // Extract order number from link
-      const orderLink = row.querySelector('a[href*="order_id="]');
-      const orderNumber = orderLink?.href?.match(/order_id=([^&]+)/)?.[1] || orderId;
+      // Extract order number from link with fallbacks
+      let orderNumber = orderId;
+      const oNumLink = row.querySelector('a[href*="order_id="]');
+      if (oNumLink) {
+        orderNumber = oNumLink.href.match(/order_id=([^&]+)/)?.[1] || orderId;
+      } else {
+        const rNumLink = row.querySelector('a[href*="receipt_id="]');
+        if (rNumLink) orderNumber = rNumLink.href.match(/receipt_id=([^&]+)/)?.[1] || orderId;
+        else {
+          const anyLink = row.querySelector('a[href*="/orders/"]');
+          if (anyLink) orderNumber = anyLink.href.match(/\/orders\/(\d+)/)?.[1] || orderId;
+        }
+      }
       log.info(`Order ${orderId}: Found order number: ${orderNumber}`);
       
       // Extract order total
@@ -315,85 +475,72 @@ async function extract() {
         }
       }
       
-      // Extract shipping address - Updated for correct HTML structure
+      // Extract shipping address with multiple fallback strategies
       let shippingAddress = {};
-      
-      // Look for expanded address view first (most detailed)
-      const addressContainer = row.querySelector('.address.break-word');
-      
+
+      // Strategy 1: Structured address with class-based selectors
+      const addressContainerSelectors = [
+        '.address.break-word',
+        '.address',
+        '[class*="address"]',
+        '[data-test-id*="address"]',
+        '[data-test-id*="shipping"]',
+      ];
+
+      let addressContainer = null;
+      for (const sel of addressContainerSelectors) {
+        addressContainer = row.querySelector(sel);
+        if (addressContainer) break;
+      }
+
       if (addressContainer) {
-        // Parse structured address from expanded view
-        const nameSpan = addressContainer.querySelector('.name');
-        const firstLineSpan = addressContainer.querySelector('.first-line');
-        const citySpan = addressContainer.querySelector('.city');
-        const stateSpan = addressContainer.querySelector('.state');
-        const zipSpan = addressContainer.querySelector('.zip');
-        const countrySpan = addressContainer.querySelector('.country-name');
-        
-        shippingAddress = {
-          name: nameSpan?.textContent?.trim() || '',
-          line1: firstLineSpan?.textContent?.trim() || '',
-          line2: '', // Not typically shown in summary view
-          city: citySpan?.textContent?.trim() || '',
-          state: stateSpan?.textContent?.trim() || '',
-          postalCode: zipSpan?.textContent?.trim() || '',
-          country: countrySpan?.textContent?.trim() || ''
-        };
-        
-        log.info(`Order ${orderId}: Found expanded address structure`, shippingAddress);
-      } else {
-        // Try looking for collapsible address button area
+        // Try structured fields first
+        const nameSpan = addressContainer.querySelector('.name, [class*="name"]');
+        const firstLineSpan = addressContainer.querySelector('.first-line, [class*="street"], [class*="line1"]');
+        const citySpan = addressContainer.querySelector('.city, [class*="city"]');
+        const stateSpan = addressContainer.querySelector('.state, [class*="state"], [class*="region"]');
+        const zipSpan = addressContainer.querySelector('.zip, [class*="zip"], [class*="postal"]');
+        const countrySpan = addressContainer.querySelector('.country-name, [class*="country"]');
+
+        if (nameSpan || firstLineSpan || citySpan) {
+          shippingAddress = {
+            name: nameSpan?.textContent?.trim() || '',
+            line1: firstLineSpan?.textContent?.trim() || '',
+            line2: '',
+            city: citySpan?.textContent?.trim() || '',
+            state: stateSpan?.textContent?.trim() || '',
+            postalCode: zipSpan?.textContent?.trim() || '',
+            country: countrySpan?.textContent?.trim() || ''
+          };
+          log.info(`Order ${orderId}: Found structured address`, shippingAddress);
+        } else {
+          // Address container found but no structured fields — parse as text block
+          const addressText = addressContainer.textContent.trim();
+          shippingAddress = parseAddressText(addressText, buyerName);
+          log.info(`Order ${orderId}: Parsed address from text block`, shippingAddress);
+        }
+      }
+
+      // Strategy 2: Collapsible address section
+      if (!shippingAddress.name && !shippingAddress.line1) {
         const shipToButton = row.querySelector('[data-content-toggle]');
         if (shipToButton) {
-          // Look for address in the collapsible content area
-          const addressContent = row.querySelector('.address');
+          const addressContent = row.querySelector('.address, [class*="address"]');
           if (addressContent) {
-            const nameSpan = addressContent.querySelector('.name');
-            const firstLineSpan = addressContent.querySelector('.first-line');
-            const citySpan = addressContent.querySelector('.city');
-            const stateSpan = addressContent.querySelector('.state');
-            const zipSpan = addressContent.querySelector('.zip');
-            const countrySpan = addressContent.querySelector('.country-name');
-            
-            shippingAddress = {
-              name: nameSpan?.textContent?.trim() || '',
-              line1: firstLineSpan?.textContent?.trim() || '',
-              line2: '',
-              city: citySpan?.textContent?.trim() || '',
-              state: stateSpan?.textContent?.trim() || '',
-              postalCode: zipSpan?.textContent?.trim() || '',
-              country: countrySpan?.textContent?.trim() || ''
-            };
-            
-            log.info(`Order ${orderId}: Found collapsible address`, shippingAddress);
+            const addressText = addressContent.textContent.trim();
+            shippingAddress = parseAddressText(addressText, buyerName);
+            log.info(`Order ${orderId}: Parsed collapsible address`, shippingAddress);
           }
         }
-        
-        // Final fallback: Look for any collapsed address summary
-        if (!shippingAddress.name) {
-          const collapsedAddress = row.querySelector('.break-word .text-body-smaller');
-          if (collapsedAddress) {
-            const addressText = collapsedAddress.textContent.trim();
-            // Parse "Adam Greco Rye Brook, NY" format
-            const parts = addressText.split(/,\s*/);
-            if (parts.length >= 2) {
-              const namePart = parts[0].trim();
-              const locationPart = parts[1].trim();
-              const stateParts = locationPart.split(/\s+/);
-              
-              shippingAddress = {
-                name: namePart,
-                line1: '',
-                line2: '',
-                city: stateParts.slice(0, -1).join(' '),
-                state: stateParts[stateParts.length - 1],
-                postalCode: '',
-                country: ''
-              };
-              
-              log.info(`Order ${orderId}: Parsed collapsed address fallback`, shippingAddress);
-            }
-          }
+      }
+
+      // Strategy 3: Collapsed summary text (e.g., "Adam Greco Rye Brook, NY")
+      if (!shippingAddress.name && !shippingAddress.line1) {
+        const collapsedAddress = row.querySelector('.break-word .text-body-smaller, [class*="ship-to"], [class*="destination"]');
+        if (collapsedAddress) {
+          const addressText = collapsedAddress.textContent.trim();
+          shippingAddress = parseAddressText(addressText, buyerName);
+          log.info(`Order ${orderId}: Parsed collapsed address fallback`, shippingAddress);
         }
       }
       
@@ -498,7 +645,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           totalOrdersOnPage: totalOrdersOnPage,
           url: window.location.href,
           scriptLoaded: true,
-          version: '5.3',
+          version: '5.4',
           isExtracting: isExtracting,
           lastExtractionTime: lastExtractionTime,
           logs: (result.kx_logs || []).slice(-10) // Last 10 logs
@@ -611,7 +758,7 @@ observer.observe(document.body, {
   subtree: true 
 });
 
-log.info('Content script v5.3 initialization complete');
+log.info('Content script v5.4 initialization complete');
 
 // ─── Tracking Push Feature ─────────────────────────────────────────
 // When user navigates to an Etsy order detail page, check if KolayXport
@@ -623,9 +770,11 @@ let pendingTrackingData = null;
 // Detect if we're on an order detail page
 function getReceiptIdFromUrl() {
   const url = window.location.href;
-  // Patterns: /your/orders/1234567890, order_id=1234567890
   const match = url.match(/\/your\/orders\/(\d+)/) ||
-                url.match(/order_id=(\d+)/);
+                url.match(/order_id=(\d+)/) ||
+                url.match(/receipt_id=(\d+)/) ||
+                url.match(/\/shop-manager\/[^/]+\/orders\/(\d+)/) ||
+                url.match(/\/orders\/sold\/(\d+)/);
   return match ? match[1] : null;
 }
 

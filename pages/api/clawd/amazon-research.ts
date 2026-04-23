@@ -748,23 +748,33 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, userId: str
 // ---------------------------------------------------------------------------
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const user = await getAuthUser(req, res);
-  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  // Auth: API key or session
+  let userId: string;
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const envApiKey = process.env.CLAWD_API_KEY;
+
+  if (envApiKey && apiKey === envApiKey) {
+    userId = (req.query.userId as string) || 'api-user';
+  } else {
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    userId = user.id;
+  }
 
   try {
     if (req.method === 'GET') {
-      return handleGet(req, res, user.id);
+      return handleGet(req, res, userId);
     }
     if (req.method === 'POST') {
-      return handlePost(req, res, user.id);
+      return handlePost(req, res, userId);
     }
     if (req.method === 'DELETE') {
       // Alias DELETE to POST with untrack/delete actions
-      return handlePost(req, res, user.id);
+      return handlePost(req, res, userId);
     }
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err: any) {
-    logger.error('Amazon research API error', err, { userId: user.id });
+    logger.error('Amazon research API error', err, { userId });
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 }

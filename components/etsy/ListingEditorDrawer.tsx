@@ -2455,8 +2455,8 @@ export default function ListingEditorDrawer({
                     </Button>
                   )}
 
-                  {/* Renew — for expired/inactive */}
-                  {(listing.state === 'expired' || listing.state === 'inactive') && (
+                  {/* Renew — for active/expired/inactive */}
+                  {(listing.state === 'active' || listing.state === 'expired' || listing.state === 'inactive') && (
                     <Button
                       variant="outlined"
                       color="success"

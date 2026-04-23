@@ -526,7 +526,7 @@ function MobileEtsyListingCard({
             >
               {t('copy')}
             </Button>
-            {(listing.state === 'expired' || listing.state === 'inactive') && (
+            {(listing.state === 'active' || listing.state === 'expired' || listing.state === 'inactive') && (
               <Button
                 size="small"
                 variant="contained"
@@ -1748,7 +1748,7 @@ function EtsyListingsPage() {
                   <ContentCopyIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
-              {(params.row.state === 'expired' || params.row.state === 'inactive') && (
+              {(params.row.state === 'active' || params.row.state === 'expired' || params.row.state === 'inactive') && (
                 <Tooltip title={t('renew')} arrow>
                   <IconButton size="small" color="success" onClick={() => handleRenewListing(params.row.listing_id)} sx={{ p: 0.5 }}>
                     <RefreshIcon sx={{ fontSize: 16 }} />

@@ -12,9 +12,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const action = req.query.action as string;
 
   try {
-    // Auth check
-    const user = await getAuthUser(req, res);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    // Auth: API key or session
+    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    const envApiKey = process.env.CLAWD_API_KEY;
+    if (!(envApiKey && apiKey === envApiKey)) {
+      const user = await getAuthUser(req, res);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     // ================================================================
     // BROWSE CATEGORY (single category scrape)

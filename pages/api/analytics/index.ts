@@ -18,8 +18,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const supabaseUser = await getAuthUser(req, res);
-    if (!supabaseUser) return res.status(401).json({ error: 'Not authenticated' });
+    // Auth: API key or session
+    let resolvedUserId: string | null = null;
+    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    const envApiKey = process.env.CLAWD_API_KEY;
+
+    if (envApiKey && apiKey === envApiKey) {
+      const qUserId = req.query.userId as string;
+      if (!qUserId) return res.status(400).json({ error: 'userId required with API key auth' });
+      resolvedUserId = qUserId;
+    } else {
+      const supabaseUser = await getAuthUser(req, res);
+      if (!supabaseUser) return res.status(401).json({ error: 'Not authenticated' });
+      if (!supabaseUser.email) return res.status(401).json({ error: 'User email not found' });
+      const dbUserLookup = await prisma.user.findUnique({ where: { email: supabaseUser.email } });
+      if (!dbUserLookup) return res.status(404).json({ error: 'User not found in database' });
+      resolvedUserId = dbUserLookup.id;
+    }
 
     const dateRange = (req.query.dateRange as string) || '7days';
     const monthParam = req.query.month as string | undefined; // e.g. "2026-03"
@@ -92,29 +107,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       }
     }
 
-    // Get user from database using Supabase user email
-    console.log('[Analytics API] Looking up user in database:', supabaseUser?.email);
-    console.log('[Analytics API] User object:', JSON.stringify(supabaseUser, null, 2));
-    
-    if (!supabaseUser?.email) {
-      console.log('[Analytics API] User email not found');
-      return res.status(401).json({ error: 'User email not found' });
-    }
-    
-    const dbUser = await prisma.user.findUnique({
-      where: { email: supabaseUser.email }
-    });
-
-    if (!dbUser) {
-      console.log('[Analytics API] User not found in database:', supabaseUser.email);
-      return res.status(404).json({ error: 'User not found in database' });
-    }
-
-    console.log('[Analytics API] Database user found:', dbUser.id);
+    const dbUserId = resolvedUserId!;
 
     // Build where clause — use uiOrderDate when available, fall back to createdAt
     const whereClause: any = {
-      userId: dbUser.id,
+      userId: dbUserId,
       OR: [
         { uiOrderDate: { gte: startDate, lte: endDate } },
         { uiOrderDate: null, createdAt: { gte: startDate, lte: endDate } },
@@ -241,7 +238,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           SUM("totalPrice") as revenue,
           "currency" as currency
         FROM "Order"
-        WHERE "userId" = ${dbUser.id}
+        WHERE "userId" = ${dbUserId}
           AND COALESCE("uiOrderDate", "createdAt") >= ${startDate}
           AND COALESCE("uiOrderDate", "createdAt") <= ${endDate}
         GROUP BY DATE(COALESCE("uiOrderDate", "createdAt")), "currency"
@@ -282,7 +279,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                COUNT(DISTINCT "customerName") as customers,
                "currency"
         FROM "Order"
-        WHERE "userId" = ${dbUser.id} AND COALESCE("uiOrderDate", "createdAt") >= ${twelveMonthsAgo}
+        WHERE "userId" = ${dbUserId} AND COALESCE("uiOrderDate", "createdAt") >= ${twelveMonthsAgo}
         GROUP BY DATE_TRUNC('month', COALESCE("uiOrderDate", "createdAt")), "currency"
         ORDER BY month ASC
       `,
@@ -296,7 +293,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                AVG("totalPrice") as avg_order_value,
                "currency"
         FROM "Order"
-        WHERE "userId" = ${dbUser.id}
+        WHERE "userId" = ${dbUserId}
           AND COALESCE("uiOrderDate", "createdAt") >= ${startDate}
           AND COALESCE("uiOrderDate", "createdAt") <= ${endDate}
         GROUP BY "marketplace", "currency"
@@ -304,23 +301,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       `,
 
       // 3. Shipping stats — total labels
-      prisma.shipment.count({ where: { order: { userId: dbUser.id } } }),
+      prisma.shipment.count({ where: { order: { userId: dbUserId } } }),
 
       // 3. Shipping stats — labels by carrier
       prisma.shipment.groupBy({
         by: ['carrier'],
-        where: { order: { userId: dbUser.id } },
+        where: { order: { userId: dbUserId } },
         _count: { _all: true }
       }),
 
       // 3. Shipping stats — pending labels
       prisma.order.count({
-        where: { userId: dbUser.id, labelStatus: 'pending' }
+        where: { userId: dbUserId, labelStatus: 'pending' }
       }),
 
       // 4. Recent activity — last 10 orders
       prisma.order.findMany({
-        where: { userId: dbUser.id },
+        where: { userId: dbUserId },
         select: {
           orderNumber: true,
           customerName: true,
@@ -376,7 +373,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const previousOrdersData = await prisma.order.findMany({
       where: {
-        userId: dbUser.id,
+        userId: dbUserId,
         ...(marketplace ? { marketplace } : {}),
         uiOrderDate: {
           gte: previousPeriodStart,
@@ -605,7 +602,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                  SUM("totalPrice") as revenue,
                  "currency"
           FROM "Order"
-          WHERE "userId" = ${dbUser.id}
+          WHERE "userId" = ${dbUserId}
             AND COALESCE("uiOrderDate", "createdAt") >= ${startDate}
             AND COALESCE("uiOrderDate", "createdAt") <= ${endDate}
           GROUP BY EXTRACT(HOUR FROM COALESCE("uiOrderDate", "createdAt"))::int, "currency"
@@ -617,7 +614,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                  SUM("totalPrice") as revenue,
                  "currency"
           FROM "Order"
-          WHERE "userId" = ${dbUser.id}
+          WHERE "userId" = ${dbUserId}
             AND COALESCE("uiOrderDate", "createdAt") >= ${previousPeriodStart}
             AND COALESCE("uiOrderDate", "createdAt") <= ${previousPeriodEnd}
           GROUP BY EXTRACT(HOUR FROM COALESCE("uiOrderDate", "createdAt"))::int, "currency"

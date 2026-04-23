@@ -11,8 +11,20 @@ export default async function handler(
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const user = await getAuthUser(req, res);
-  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  // Auth: API key or session
+  let userId: string;
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const envApiKey = process.env.CLAWD_API_KEY;
+
+  if (envApiKey && apiKey === envApiKey) {
+    const qUserId = req.query.userId as string;
+    if (!qUserId) return res.status(400).json({ error: 'userId required with API key auth' });
+    userId = qUserId;
+  } else {
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Not authenticated' });
+    userId = user.id;
+  }
 
   // --- Parse date range ---
   const range = (req.query.range as string) || '7days';
@@ -33,7 +45,6 @@ export default async function handler(
   }
 
   try {
-    const userId = user.id;
 
     // --- Total orders in range ---
     const totalOrders = await prisma.order.count({

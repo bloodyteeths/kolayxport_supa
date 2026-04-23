@@ -7,16 +7,27 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Authenticate user
-  const user = await getAuthUser(req, res);
-  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  // Auth: API key or session
+  let authUserId: string;
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const envApiKey = process.env.CLAWD_API_KEY;
+
+  if (envApiKey && apiKey === envApiKey) {
+    const qUserId = req.query.userId as string;
+    if (!qUserId) return res.status(400).json({ error: 'userId required with API key auth' });
+    authUserId = qUserId;
+  } else {
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    authUserId = user.id;
+  }
 
   if (req.method === 'GET') {
     // Get all Etsy shops for the user
     try {
       const etsyShops = await prisma.etsyShop.findMany({
         where: { 
-          userId: user.id,
+          userId: authUserId,
           isActive: true 
         },
         select: {
@@ -36,7 +47,7 @@ export default async function handler(
 
       // Also check for legacy connection in Credential model
       const legacyCredential = await prisma.credential.findUnique({
-        where: { userId: user.id },
+        where: { userId: authUserId },
         select: {
           etsyAccessToken: true,
           etsyShopId: true,
@@ -85,7 +96,7 @@ export default async function handler(
           const actualShopId = shopId.replace('legacy-', '');
           // Clear legacy credentials
           await prisma.credential.update({
-            where: { userId: user.id },
+            where: { userId: authUserId },
             data: {
               etsyAccessToken: null,
               etsyRefreshToken: null,
@@ -98,7 +109,7 @@ export default async function handler(
           await prisma.etsyShop.update({
             where: { 
               userId_shopId: { 
-                userId: user.id, 
+                userId: authUserId, 
                 shopId: shopId 
               }
             },

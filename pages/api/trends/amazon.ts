@@ -26,8 +26,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const user = await getAuthUser(req, res);
-  if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  // Auth: API key or session
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const envApiKey = process.env.CLAWD_API_KEY;
+  if (!(envApiKey && apiKey === envApiKey)) {
+    const user = await getAuthUser(req, res);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const action = getParam(req, 'action');
   const marketplace = getParam(req, 'marketplace') || 'US';
@@ -171,7 +176,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: `Unknown action: ${action}` });
     }
   } catch (err: any) {
-    logger.error('Amazon trends API error', err, { userId: user.id, action });
+    logger.error('Amazon trends API error', err, { action });
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 }

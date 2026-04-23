@@ -353,10 +353,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const user = await getAuthUser(req, res);
-    if (!user) return res.status(401).json({ error: 'Unauthorized. Please sign in.' });
+    // Auth: API key or session
+    let userId: string;
+    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    const envApiKey = process.env.CLAWD_API_KEY;
 
-    const userId = user.id;
+    if (envApiKey && apiKey === envApiKey) {
+      const qUserId = req.query.userId as string;
+      if (!qUserId) return res.status(400).json({ error: 'userId required with API key auth' });
+      userId = qUserId;
+    } else {
+      const user = await getAuthUser(req, res);
+      if (!user) return res.status(401).json({ error: 'Unauthorized. Please sign in.' });
+      userId = user.id;
+    }
     const marketplace = (req.query.marketplace as string) || 'trendyol';
     const groupBy = (req.query.groupBy as string) || 'month';
 

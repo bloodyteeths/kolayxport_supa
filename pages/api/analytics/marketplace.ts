@@ -14,8 +14,22 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const user = await getAuthUser(req, res);
-    if (!user) return res.status(401).json({ error: 'Not authenticated' });
+    // Auth: API key or session
+    let dbUserId: string;
+    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    const envApiKey = process.env.CLAWD_API_KEY;
+
+    if (envApiKey && apiKey === envApiKey) {
+      const qUserId = req.query.userId as string;
+      if (!qUserId) return res.status(400).json({ error: 'userId required with API key auth' });
+      dbUserId = qUserId;
+    } else {
+      const user = await getAuthUser(req, res);
+      if (!user) return res.status(401).json({ error: 'Not authenticated' });
+      const dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+      if (!dbUser) return res.status(404).json({ error: 'User not found' });
+      dbUserId = dbUser.id;
+    }
 
     const marketplace = req.query.marketplace as string | undefined;
     const dateRange = (req.query.dateRange as string) || '30days';
@@ -27,7 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     // Calculate date range
     const now = new Date();
     let startDate = new Date();
-    
+
     switch (dateRange) {
       case '7days':
         startDate.setDate(now.getDate() - 7);
@@ -42,17 +56,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         startDate.setDate(now.getDate() - 30);
     }
 
-    // Get user from database using Supabase user email
-    const dbUser = await prisma.user.findUnique({
-      where: { email: user.email }
-    });
-
-    if (!dbUser) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
     const whereClause = {
-      userId: dbUser.id,
+      userId: dbUserId,
       marketplace: marketplace,
       uiOrderDate: {
         gte: startDate,
@@ -122,7 +127,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           COUNT(*) as orders,
           SUM("totalPrice") as revenue
         FROM "Order" 
-        WHERE "userId" = ${dbUser.id}
+        WHERE "userId" = ${dbUserId}
           AND marketplace = ${marketplace}
           AND "uiOrderDate" >= ${startDate}
           AND "uiOrderDate" <= ${now}
@@ -138,7 +143,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           SUM("totalPrice") as revenue,
           COUNT(DISTINCT "customerName") as customers
         FROM "Order" 
-        WHERE "userId" = ${dbUser.id}
+        WHERE "userId" = ${dbUserId}
           AND marketplace = ${marketplace}
           AND "uiOrderDate" >= ${startDate}
           AND "uiOrderDate" <= ${now}
@@ -161,7 +166,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           MIN("uiOrderDate") as first_order,
           MAX("uiOrderDate") as last_order
         FROM "Order" 
-        WHERE "userId" = ${dbUser.id}
+        WHERE "userId" = ${dbUserId}
           AND marketplace = ${marketplace}
           AND "uiOrderDate" >= ${startDate}
           AND "uiOrderDate" <= ${now}

@@ -1134,8 +1134,8 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         fedexServiceType: order.fedexServiceType,
         fedexPackagingType: order.fedexPackagingType,
         countryOfOrigin: (isVeeqoItem ? item.sellable?.product?.origin_country : item.country_of_origin) || order.countryOfMfg,
-        labelJobStatus: latestLabelJob?.status,
-        trackingNumber: latestLabelJob?.trackingNumber,
+        labelJobStatus: latestLabelJob?.status || (order.trackingNumber ? 'created' : undefined),
+        trackingNumber: latestLabelJob?.trackingNumber || order.trackingNumber || undefined,
         shipByDate: item.shipBy || order.shipByDate || (addr as any)?._etsyShipByDate,
         customerNote: (addr as any)?._etsyCustomerNote || '',
         originalOrder: order,
@@ -2860,6 +2860,11 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                               color: labelSt === 'labeled' ? '#2e7d32' : labelSt === 'pending' ? '#e65100' : 'text.secondary',
                             }}
                           />
+                          {group.items[0]?.trackingNumber ? (
+                            <Tooltip title={`${t('tracking')}: ${group.items[0].trackingNumber}`}>
+                              <FlightTakeoffIcon sx={{ fontSize: 14, color: 'success.main' }} />
+                            </Tooltip>
+                          ) : null}
                           <ExpandMoreIcon sx={{ fontSize: 18, color: 'text.disabled', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                         </Box>
                       </Box>

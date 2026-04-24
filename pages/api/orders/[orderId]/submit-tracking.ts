@@ -101,18 +101,20 @@ export default async function handler(
     if (source === 'etsy') {
       // Etsy restricts tracking/address endpoints to approved "full access" apps only.
       // Save tracking locally so the Chrome extension can push it to Etsy.
-      await prisma.trackingSubmission.create({
-        data: {
+      await prisma.trackingSubmission.upsert({
+        where: { orderId_trackingNumber: { orderId: orderId as string, trackingNumber } },
+        update: { status: 'pending', etsySubmitStatus: 'pending', carrierId, carrierName: getCarrierName(carrierId) },
+        create: {
           orderId: orderId as string,
-          trackingNumber: trackingNumber,
-          carrierId: carrierId,
+          trackingNumber,
+          carrierId,
           carrierName: getCarrierName(carrierId),
-          notifyCustomer: notifyCustomer,
-          updateRemoteOrder: updateRemoteOrder,
+          notifyCustomer,
+          updateRemoteOrder,
           submittedBy: user.id,
           status: 'pending',
           etsySubmitStatus: 'pending',
-        }
+        },
       });
 
       await prisma.order.update({
@@ -178,8 +180,10 @@ export default async function handler(
           const errBody = await resp.text();
           logger.error(`[submit-tracking] eBay fulfillment API error: ${resp.status} ${errBody.substring(0, 200)}`);
           // Save locally even if eBay push fails
-          await prisma.trackingSubmission.create({
-            data: {
+          await prisma.trackingSubmission.upsert({
+            where: { orderId_trackingNumber: { orderId: orderId as string, trackingNumber } },
+            update: { status: 'failed', errorMessage: `eBay API ${resp.status}: ${errBody.substring(0, 200)}` },
+            create: {
               orderId: orderId as string,
               trackingNumber,
               carrierId,
@@ -203,8 +207,10 @@ export default async function handler(
       } catch (err: any) {
         logger.error(`[submit-tracking] eBay fulfillment error: ${err.message}`);
         // Save locally even on error
-        await prisma.trackingSubmission.create({
-          data: {
+        await prisma.trackingSubmission.upsert({
+          where: { orderId_trackingNumber: { orderId: orderId as string, trackingNumber } },
+          update: { status: 'failed', errorMessage: err.message },
+          create: {
             orderId: orderId as string,
             trackingNumber,
             carrierId,

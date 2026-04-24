@@ -145,9 +145,20 @@ export default async function handler(
         const ebayOrderId = order.marketplaceKey || order.orderNumber;
 
         // Get order line items for the fulfillment
+        // Extract line item IDs from rawData
+        let rawData = order.rawData;
+        if (typeof rawData === 'string') {
+          try { rawData = JSON.parse(rawData); } catch { rawData = {}; }
+        }
+        const rawLineItems = (rawData as any)?.lineItems || [];
+        const lineItems = rawLineItems
+          .filter((li: any) => li.lineItemId)
+          .map((li: any) => ({ lineItemId: li.lineItemId, quantity: li.quantity || 1 }));
+
         const fulfillmentPayload: any = {
           trackingNumber: trackingNumber,
           shippingCarrierCode: shippingCarrierCode,
+          ...(lineItems.length > 0 ? { lineItems } : {}),
         };
 
         const resp = await fetch(

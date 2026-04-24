@@ -2931,13 +2931,13 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                                       color: itemLabelSt === 'labeled' ? '#2e7d32' : itemLabelSt === 'pending' ? '#e65100' : 'text.secondary',
                                     }}
                                   />
-                                  <Tooltip title={t('addTracking')}>
+                                  <Tooltip title={item.trackingNumber ? t('trackingExists') : t('addTracking')}>
                                     <IconButton size="small" onClick={() => {
                                       setSelectedOrderForTracking(item);
                                       setTrackingFormData({ trackingNumber: '', carrierId: 3, notifyCustomer: true, updateRemoteOrder: true });
                                       setTrackingDialogOpen(true);
-                                    }} sx={{ p: 0.25 }}>
-                                      <FlightIcon sx={{ fontSize: 14 }} />
+                                    }} sx={{ p: 0.25, color: item.trackingNumber ? 'success.main' : 'text.secondary' }}>
+                                      {item.trackingNumber ? <FlightTakeoffIcon sx={{ fontSize: 14 }} /> : <FlightIcon sx={{ fontSize: 14 }} />}
                                     </IconButton>
                                   </Tooltip>
                                 </Box>
@@ -2985,10 +2985,10 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                             setTrackingFormData({ trackingNumber: '', carrierId: 3, notifyCustomer: true, updateRemoteOrder: true });
                             setTrackingDialogOpen(true);
                           }}
-                          startIcon={<FlightIcon sx={{ fontSize: 14 }} />}
-                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
+                          startIcon={row.trackingNumber ? <FlightTakeoffIcon sx={{ fontSize: 14 }} /> : <FlightIcon sx={{ fontSize: 14 }} />}
+                          sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75, ...(row.trackingNumber ? { color: 'success.main', borderColor: 'success.main' } : {}) }}
                         >
-                          {t('addTracking')}
+                          {row.trackingNumber ? t('trackingExists') : t('addTracking')}
                         </Button>
                         <Button
                           variant="contained"

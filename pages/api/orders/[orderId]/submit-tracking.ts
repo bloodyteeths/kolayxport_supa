@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth';
 import { logger } from '../../../../lib/logger';
 import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '../../../../lib/integrations/etsyClient';
 import { createWixClient } from '../../../../lib/integrations/wixClient';
+import { getUserAccessToken } from '../../../../lib/integrations/ebayClient';
 
 interface VeeqoAllocation {
   id: number;
@@ -73,7 +74,7 @@ export default async function handler(
       if (marketplace.includes('etsy')) return 'etsy';
       if (marketplace.includes('trendyol')) return 'trendyol';
       if (marketplace.includes('wix')) return 'wix';
-      if (marketplace.includes('ebay')) return 'veeqo';
+      if (marketplace.includes('ebay')) return 'ebay';
       if (marketplace.includes('amazon')) return 'veeqo';
       if (marketplace.includes('veeqo')) return 'veeqo';
       // Check if marketplace name matches an Etsy shop name (e.g. "bellecouturegifts")
@@ -130,6 +131,86 @@ export default async function handler(
         message: 'Tracking saved. Use Chrome extension to push to Etsy.',
         etsyPending: true,
       });
+    } else if (source === 'ebay') {
+      // Submit tracking directly via eBay Fulfillment API
+      const ebayCarrierMap: Record<string, string> = {
+        'UPS': 'UPS', 'FedEx': 'FEDEX', 'USPS': 'USPS', 'DHL': 'DHL',
+        'DHL Express': 'DHL', 'Royal Mail': 'ROYAL_MAIL',
+      };
+      const carrierLabel = getCarrierName(carrierId);
+      const shippingCarrierCode = ebayCarrierMap[carrierLabel] || 'OTHER';
+
+      try {
+        const accessToken = await getUserAccessToken(user.id);
+        const ebayOrderId = order.marketplaceKey || order.orderNumber;
+
+        // Get order line items for the fulfillment
+        const fulfillmentPayload: any = {
+          trackingNumber: trackingNumber,
+          shippingCarrierCode: shippingCarrierCode,
+        };
+
+        const resp = await fetch(
+          `https://api.ebay.com/sell/fulfillment/v1/order/${ebayOrderId}/shipping_fulfillment`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify(fulfillmentPayload),
+          }
+        );
+
+        if (!resp.ok) {
+          const errBody = await resp.text();
+          logger.error(`[submit-tracking] eBay fulfillment API error: ${resp.status} ${errBody.substring(0, 200)}`);
+          // Save locally even if eBay push fails
+          await prisma.trackingSubmission.create({
+            data: {
+              orderId: orderId as string,
+              trackingNumber,
+              carrierId,
+              carrierName: carrierLabel,
+              notifyCustomer,
+              updateRemoteOrder,
+              submittedBy: user.id,
+              status: 'failed',
+              errorMessage: `eBay API ${resp.status}: ${errBody.substring(0, 200)}`,
+            },
+          });
+          await prisma.order.update({ where: { id: orderId as string }, data: { trackingNumber } });
+          return res.status(200).json({
+            success: true,
+            message: `Tracking saved locally. eBay push failed: ${resp.status}`,
+            warning: errBody.substring(0, 200),
+          });
+        }
+
+        logger.info('[submit-tracking] eBay tracking submitted', { ebayOrderId, trackingNumber });
+      } catch (err: any) {
+        logger.error(`[submit-tracking] eBay fulfillment error: ${err.message}`);
+        // Save locally even on error
+        await prisma.trackingSubmission.create({
+          data: {
+            orderId: orderId as string,
+            trackingNumber,
+            carrierId,
+            carrierName: carrierLabel,
+            notifyCustomer,
+            updateRemoteOrder,
+            submittedBy: user.id,
+            status: 'failed',
+            errorMessage: err.message,
+          },
+        });
+        await prisma.order.update({ where: { id: orderId as string }, data: { trackingNumber } });
+        return res.status(200).json({
+          success: true,
+          message: `Tracking saved locally. eBay push error: ${err.message}`,
+        });
+      }
     } else if (source === 'wix') {
       // Submit fulfillment directly to Wix
       await submitWixFulfillment(userSettings, order, trackingNumber, carrierId, user.id);

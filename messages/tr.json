@@ -2157,6 +2157,9 @@
       "outOfStock": "Stokta yok",
       "pieces": "adet",
       "individualPrice": "Bireysel Fiyat",
+      "priceAffectedBy": "Fiyatı etkileyen seçenek",
+      "priceAffectedByHint": "Yalnızca fiyatı değiştiren seçeneği seçin; örneğin Renk değil, Beden.",
+      "pricePropertyRequired": "Fiyatı etkileyen en az bir varyasyon seçeneği seçin.",
       "individualStock": "Bireysel Stok",
       "set": "Belirle",
       "increase": "Artır",
@@ -2214,7 +2217,8 @@
       "photosSaved": "Varyasyon fotoğrafları kaydedildi",
       "photosSaveFailed": "Varyasyon fotoğrafları kaydedilemedi",
       "cartesianHint": "{count} kombinasyon oluşturulacak",
-      "secondValuesHint": "İkinci varyasyon değerlerini girin (virgülle ayırın)"
+      "secondValuesHint": "İkinci varyasyon değerlerini girin (virgülle ayırın)",
+      "secondVariationSetupHint": "İkinci varyasyon değerlerini girin. Editör, Etsy'nin istediği tam matrisi mevcut birinci varyasyonların her biri için oluşturur."
     },
     "smartPricing": {
       "title": "Akıllı Fiyatlandırma",

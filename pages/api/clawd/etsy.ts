@@ -2627,6 +2627,9 @@ export default async function handler(
                 listing_id: parseInt(listing_id),
                 products: data.products || [],
                 listing_offering_id: data.listing_offering_id,
+                price_on_property: data.price_on_property || [],
+                quantity_on_property: data.quantity_on_property || [],
+                sku_on_property: data.sku_on_property || [],
             });
         }
 
@@ -2671,9 +2674,9 @@ export default async function handler(
             });
 
             const payload: Record<string, any> = { products: cleanProducts };
-            if (price_on_property) payload.price_on_property = price_on_property;
-            if (quantity_on_property) payload.quantity_on_property = quantity_on_property;
-            if (sku_on_property) payload.sku_on_property = sku_on_property;
+            if (Array.isArray(price_on_property)) payload.price_on_property = price_on_property;
+            if (Array.isArray(quantity_on_property)) payload.quantity_on_property = quantity_on_property;
+            if (Array.isArray(sku_on_property)) payload.sku_on_property = sku_on_property;
 
             const result = await callEtsyAPI(
                 `/listings/${listing_id}/inventory`,

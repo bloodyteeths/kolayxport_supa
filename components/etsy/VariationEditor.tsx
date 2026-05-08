@@ -110,6 +110,40 @@ function getCurrencySymbol(code: string): string {
   return CURRENCY_SYMBOLS[code] || code;
 }
 
+function normalizePropertyIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.map(v => Number(v)).filter(v => Number.isFinite(v) && v > 0)));
+}
+
+function buildOtherPropertyKey(product: Product, propertyId: number): string {
+  return product.property_values
+    .filter(pv => pv.property_id !== propertyId)
+    .map(pv => `${pv.property_id}:${pv.values?.[0] ?? ''}`)
+    .sort()
+    .join('|');
+}
+
+function derivePropertyDrivers(products: Product[], getValue: (product: Product) => string | number | null | undefined): number[] {
+  const propertyIds = normalizePropertyIds(products.flatMap(product => product.property_values.map(pv => pv.property_id)));
+  const comparableValues = products.map(product => getValue(product)).filter(value => value !== null && value !== undefined && value !== '');
+  if (new Set(comparableValues.map(String)).size <= 1) return [];
+
+  const drivers = propertyIds.filter(propertyId => {
+    const groups = new Map<string, Set<string>>();
+    for (const product of products) {
+      if (!product.property_values.some(pv => pv.property_id === propertyId)) continue;
+      const value = getValue(product);
+      if (value === null || value === undefined || value === '') continue;
+      const key = buildOtherPropertyKey(product, propertyId);
+      if (!groups.has(key)) groups.set(key, new Set());
+      groups.get(key)!.add(String(value));
+    }
+    return Array.from(groups.values()).some(values => values.size > 1);
+  });
+
+  return drivers.length > 0 ? drivers : propertyIds;
+}
+
 // --- Processing time options ---
 const PROCESSING_OPTIONS = [
   { value: '1-1', tKey: 'days1_2', label: '1-1 business days' },
@@ -266,6 +300,9 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const [individualPrice, setIndividualPrice] = useState(false);
   const [priceAction, setPriceAction] = useState<'set' | 'increase' | 'decrease'>('set');
   const [priceValue, setPriceValue] = useState('');
+  const [priceOnPropertyIds, setPriceOnPropertyIds] = useState<number[]>([]);
+  const [originalPriceOnPropertyIds, setOriginalPriceOnPropertyIds] = useState<number[]>([]);
+  const [priceOnPropertyTouched, setPriceOnPropertyTouched] = useState(false);
 
   // Quantity tab controls
   const [individualQuantity, setIndividualQuantity] = useState(false);
@@ -296,6 +333,8 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
   // Second variation
   const [secondPropertyId, setSecondPropertyId] = useState<number | null>(null);
+  const [secondSetupOpen, setSecondSetupOpen] = useState(false);
+  const [secondSetupValues, setSecondSetupValues] = useState('');
 
   // Photos
   const [listingImages, setListingImages] = useState<ListingImage[]>([]);
@@ -319,8 +358,9 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   }, [products]);
 
   const hasChanges = useMemo(
-    () => JSON.stringify(products) !== JSON.stringify(originalProducts),
-    [products, originalProducts],
+    () => JSON.stringify(products) !== JSON.stringify(originalProducts)
+      || JSON.stringify(normalizePropertyIds(priceOnPropertyIds).sort((a, b) => a - b)) !== JSON.stringify(normalizePropertyIds(originalPriceOnPropertyIds).sort((a, b) => a - b)),
+    [products, originalProducts, priceOnPropertyIds, originalPriceOnPropertyIds],
   );
 
   // Existing properties
@@ -333,6 +373,20 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     }
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [products]);
+
+  const allPropertyIds = useMemo(
+    () => normalizePropertyIds(existingProperties.map(property => property.id)),
+    [existingProperties],
+  );
+
+  const derivedPriceOnPropertyIds = useMemo(
+    () => derivePropertyDrivers(products, product => product.offerings?.[0]?.price?.amount),
+    [products],
+  );
+
+  useEffect(() => {
+    if (!priceOnPropertyTouched) setPriceOnPropertyIds(derivedPriceOnPropertyIds);
+  }, [derivedPriceOnPropertyIds, priceOnPropertyTouched]);
 
   // Detect which property is primary (first property used)
   const primaryPropertyId = useMemo(() => {
@@ -406,8 +460,13 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       if (!res.ok) throw new Error(t('inventoryFetchFailed'));
       const data = await res.json();
       const fetched = sanitizeProducts(data.products || []);
+      const apiPriceOnProperty = normalizePropertyIds(data.price_on_property);
+      const initialPriceOnProperty = apiPriceOnProperty.length ? apiPriceOnProperty : derivePropertyDrivers(fetched, product => product.offerings?.[0]?.price?.amount);
       setProducts(fetched);
       setOriginalProducts(JSON.parse(JSON.stringify(fetched)));
+      setPriceOnPropertyIds(initialPriceOnProperty);
+      setOriginalPriceOnPropertyIds(initialPriceOnProperty);
+      setPriceOnPropertyTouched(apiPriceOnProperty.length > 0);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -568,13 +627,83 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     setProducts(prev => prev.map(p => ({ ...p, sku: uniformSku })));
   };
 
+  const getPropertyName = (propertyId: number, fallback = 'Variation') =>
+    existingProperties.find(p => p.id === propertyId)?.name
+    || taxonomyProperties.find(p => p.property_id === propertyId)?.display_name
+    || ETSY_PROPERTIES.find(p => p.id === propertyId)?.name
+    || fallback;
+
+  const parseCommaValues = (value: string) =>
+    value.split(',').map(v => v.trim()).filter(Boolean);
+
+  const togglePriceProperty = (propertyId: number) => {
+    setPriceOnPropertyTouched(true);
+    setPriceOnPropertyIds(prev =>
+      prev.includes(propertyId)
+        ? prev.filter(id => id !== propertyId)
+        : [...prev, propertyId]
+    );
+  };
+
+  const hasSecondPropertyProducts = (propertyId: number) =>
+    products.some(p => p.property_values.some((pv, idx) => idx > 0 && pv.property_id === propertyId));
+
+  const handleSecondPropertyChange = (propertyId: number | null) => {
+    setSecondPropertyId(propertyId);
+    if (propertyId && products.length > 0 && !hasSecondPropertyProducts(propertyId)) {
+      setSecondSetupValues('');
+      setSecondSetupOpen(true);
+    }
+  };
+
+  const applySecondVariationMatrix = () => {
+    if (!secondPropertyId) return;
+    const values = parseCommaValues(secondSetupValues);
+    if (values.length === 0) {
+      toast.error(t('secondValuesHint'));
+      return;
+    }
+
+    const primaryMap = new Map<string, Product>();
+    for (const product of products) {
+      const primaryValue = product.property_values[0]?.values?.[0];
+      if (primaryValue && !primaryMap.has(primaryValue)) {
+        primaryMap.set(primaryValue, product);
+      }
+    }
+
+    const secondPropName = getPropertyName(secondPropertyId, 'Variation 2');
+    const nextProducts: Product[] = [];
+    primaryMap.forEach((baseProduct) => {
+      const firstProperty = baseProduct.property_values[0];
+      for (const value of values) {
+        const clone: Product = JSON.parse(JSON.stringify(baseProduct));
+        clone.product_id = 0;
+        clone.property_values = [
+          { ...firstProperty, values: [...firstProperty.values] },
+          {
+            property_id: secondPropertyId,
+            property_name: secondPropName,
+            values: [value],
+            scale_id: null,
+          },
+        ];
+        nextProducts.push(clone);
+      }
+    });
+
+    setProducts(nextProducts);
+    setSecondSetupOpen(false);
+    setSecondSetupValues('');
+    toast.success(t('variationsAdded', { count: nextProducts.length }));
+  };
+
   // Inline add single variation
   const addInlineVariation = () => {
     const val = inlineAddValue.trim();
     if (!val) return;
     const propId = primaryPropertyId || existingProperties[0]?.id || 200;
-    const propName = existingProperties.find(p => p.id === propId)?.name
-      || ETSY_PROPERTIES.find(p => p.id === propId)?.name || 'Variation';
+    const propName = getPropertyName(propId);
 
     const refProduct = products[products.length - 1];
     const refPrice = refProduct?.offerings[0]?.price;
@@ -616,13 +745,11 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     if (isNaN(priceNum) || priceNum < 0) { toast.error(t('enterValidPrice')); return; }
     if (isNaN(qtyNum) || qtyNum < 0) { toast.error(t('enterValidStock')); return; }
 
-    const propName = existingProperties.find(p => p.id === addPropertyId)?.name
-      || ETSY_PROPERTIES.find(p => p.id === addPropertyId)?.name || 'Variation';
+    const propName = getPropertyName(addPropertyId);
 
     const secondValues = secondPropertyId ? addSecondValues.split(',').map(v => v.trim()).filter(v => v.length > 0) : [];
     const secondPropName = secondPropertyId
-      ? (existingProperties.find(p => p.id === secondPropertyId)?.name
-        || ETSY_PROPERTIES.find(p => p.id === secondPropertyId)?.name || 'Variation 2')
+      ? getPropertyName(secondPropertyId, 'Variation 2')
       : '';
 
     const newProducts: Product[] = [];
@@ -678,28 +805,17 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Collect all unique property IDs used across products
-      const allPropertyIds = new Set<number>();
-      for (const p of products) {
-        for (const pv of p.property_values) {
-          allPropertyIds.add(pv.property_id);
-        }
+      const price_on_property = normalizePropertyIds(priceOnPropertyIds).filter(id => allPropertyIds.includes(id));
+      const quantity_on_property = derivePropertyDrivers(products, product => product.offerings?.[0]?.quantity).filter(id => allPropertyIds.includes(id));
+      const sku_on_property = derivePropertyDrivers(products, product => product.sku).filter(id => allPropertyIds.includes(id));
+      const pricesVary = new Set(products.map(product => product.offerings?.[0]?.price?.amount).filter(value => value !== null && value !== undefined)).size > 1;
+      if (pricesVary && price_on_property.length === 0) {
+        throw new Error(t('pricePropertyRequired'));
       }
-      const propertyIds = Array.from(allPropertyIds);
-
-      // Check if prices vary across products — if so, all property IDs are price_on_property
-      const prices = products.map(p => p.offerings?.[0]?.price?.amount).filter(a => a != null);
-      const pricesVary = prices.length > 1 && new Set(prices).size > 1;
-      const price_on_property = pricesVary ? propertyIds : [];
-
-      // Check if quantities vary
-      const quantities = products.map(p => p.offerings?.[0]?.quantity).filter(q => q != null);
-      const quantitiesVary = quantities.length > 1 && new Set(quantities).size > 1;
-      const quantity_on_property = quantitiesVary ? propertyIds : [];
 
       const res = await fetch(
         `/api/clawd/etsy?action=update_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`,
-        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products, price_on_property, quantity_on_property }) }
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products, price_on_property, quantity_on_property, sku_on_property }) }
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -707,6 +823,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       }
       toast.success(t('variationsSavedToEtsy'));
       setOriginalProducts(JSON.parse(JSON.stringify(products)));
+      setOriginalPriceOnPropertyIds(price_on_property);
       onSaved();
     } catch (err: any) {
       toast.error(err.message);
@@ -746,6 +863,12 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     }
     return Array.from(seen.values());
   }, [products]);
+
+  const addValuesCount = parseCommaValues(addValues).length;
+  const addSecondValuesCount = secondPropertyId ? parseCommaValues(addSecondValues).length : 0;
+  const addDialogCreateCount = secondPropertyId && addSecondValuesCount > 0
+    ? addValuesCount * addSecondValuesCount
+    : addValuesCount;
 
   // --- Render ---
 
@@ -850,7 +973,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
               <Select
                 size="small"
                 value={secondPropertyId || ''}
-                onChange={(e) => setSecondPropertyId(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => handleSecondPropertyChange(e.target.value ? Number(e.target.value) : null)}
                 displayEmpty
                 sx={{ minWidth: 160, height: 32, fontSize: '0.82rem' }}
               >
@@ -868,7 +991,10 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
               size="small"
               variant="outlined"
               startIcon={<AddIcon />}
-              onClick={() => setAddDialogOpen(true)}
+              onClick={() => {
+                setAddPropertyId(primaryPropertyId || existingProperties[0]?.id || 200);
+                setAddDialogOpen(true);
+              }}
               sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', borderColor: '#667eea', color: '#667eea' }}
             >
               {t('batchAdd')}
@@ -1022,6 +1148,34 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
               </>
             )}
           </Box>
+
+          {allPropertyIds.length > 1 && (
+            <Paper variant="outlined" sx={{ borderRadius: '8px', p: 1.25, mb: 1.5, bgcolor: 'rgba(102,126,234,0.03)' }}>
+              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 0.5, textTransform: 'uppercase' }}>
+                {t('priceAffectedBy')}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                {existingProperties.map(prop => (
+                  <FormControlLabel
+                    key={prop.id}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={priceOnPropertyIds.includes(prop.id)}
+                        onChange={() => togglePriceProperty(prop.id)}
+                        sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' }, p: 0.5 }}
+                      />
+                    }
+                    label={<Typography variant="body2">{prop.name}</Typography>}
+                    sx={{ mr: 1 }}
+                  />
+                ))}
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                {t('priceAffectedByHint')}
+              </Typography>
+            </Paper>
+          )}
 
           <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
             {grouped.map(group => (
@@ -1386,7 +1540,11 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
             <Typography variant="caption" color="text.secondary" sx={{ mr: 'auto' }}>
               {t('changesNotSentToEtsy')}
             </Typography>
-            <Button variant="text" onClick={() => setProducts(JSON.parse(JSON.stringify(originalProducts)))}
+            <Button variant="text" onClick={() => {
+              setProducts(JSON.parse(JSON.stringify(originalProducts)));
+              setPriceOnPropertyIds(originalPriceOnPropertyIds);
+              setPriceOnPropertyTouched(true);
+            }}
               disabled={saving} sx={{ textTransform: 'none' }}>
               {t('cancel')}
             </Button>
@@ -1461,7 +1619,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
           <TextField label={t('valuesLabel')} size="small" fullWidth multiline minRows={2}
             value={addValues} onChange={(e) => setAddValues(e.target.value)}
             placeholder={t('valuesPlaceholder')} autoFocus
-            helperText={addValues ? t('variationsWillBeAdded', { count: addValues.split(',').filter(v => v.trim()).length }) : t('eachValueCreatesVariation')}
+            helperText={addValues ? t('variationsWillBeAdded', { count: addValuesCount }) : t('eachValueCreatesVariation')}
           />
 
           {secondPropertyId && (
@@ -1472,7 +1630,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
               placeholder={t('valuesPlaceholder')}
               helperText={
                 addSecondValues && addValues
-                  ? t('cartesianHint', { count: addValues.split(',').filter(v => v.trim()).length * addSecondValues.split(',').filter(v => v.trim()).length })
+                  ? t('cartesianHint', { count: addDialogCreateCount })
                   : t('secondValuesHint')
               }
             />
@@ -1494,7 +1652,44 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
           <Button onClick={() => setAddDialogOpen(false)} sx={{ textTransform: 'none' }}>{t('cancel')}</Button>
           <Button variant="contained" onClick={addVariations} disabled={!addValues.trim() || !addPrice}
             sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}>
-            {t('variationsAdded', { count: addValues.split(',').filter(v => v.trim()).length || 0 })}
+            {t('variationsAdded', { count: addDialogCreateCount || 0 })}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* --- Second Variation Setup Dialog --- */}
+      <Dialog open={secondSetupOpen} onClose={() => setSecondSetupOpen(false)} maxWidth="xs" fullWidth sx={{ zIndex: 1600 }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>{t('secondVariation')}</DialogTitle>
+        <DialogContent sx={{ pt: '12px !important' }}>
+          <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
+            {t('secondVariationSetupHint')}
+          </Alert>
+          <TextField
+            label={`${getPropertyName(secondPropertyId || 0, t('secondVariation'))} ${t('valuesLabel')}`}
+            size="small"
+            fullWidth
+            multiline
+            minRows={2}
+            value={secondSetupValues}
+            onChange={(e) => setSecondSetupValues(e.target.value)}
+            placeholder={t('valuesPlaceholder')}
+            helperText={
+              secondSetupValues
+                ? t('cartesianHint', { count: uniqueFirstPropValues.length * parseCommaValues(secondSetupValues).length })
+                : t('secondValuesHint')
+            }
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setSecondSetupOpen(false)} sx={{ textTransform: 'none' }}>{t('cancel')}</Button>
+          <Button
+            variant="contained"
+            onClick={applySecondVariationMatrix}
+            disabled={!secondSetupValues.trim()}
+            sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}
+          >
+            {t('variationsAdded', { count: uniqueFirstPropValues.length * parseCommaValues(secondSetupValues).length })}
           </Button>
         </DialogActions>
       </Dialog>

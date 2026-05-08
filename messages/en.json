@@ -2157,6 +2157,9 @@
       "outOfStock": "Out of stock",
       "pieces": "pcs",
       "individualPrice": "Individual Price",
+      "priceAffectedBy": "Price varies by",
+      "priceAffectedByHint": "Select only the option that changes price, for example Size but not Color.",
+      "pricePropertyRequired": "Select at least one variation option that affects price.",
       "individualStock": "Individual Stock",
       "set": "Set",
       "increase": "Increase",
@@ -2214,7 +2217,8 @@
       "photosSaved": "Variation photos saved",
       "photosSaveFailed": "Failed to save variation photos",
       "cartesianHint": "{count} combinations will be created",
-      "secondValuesHint": "Enter second variation values (separate with commas)"
+      "secondValuesHint": "Enter second variation values (separate with commas)",
+      "secondVariationSetupHint": "Enter the second variation values. The editor will create the full matrix Etsy requires for every existing first variation."
     },
     "smartPricing": {
       "title": "Smart Pricing",

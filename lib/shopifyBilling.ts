@@ -13,28 +13,28 @@ interface ShopifyBillingPlan {
 export const SHOPIFY_PLANS: Record<string, ShopifyBillingPlan> = {
   starter_month: {
     name: 'KolayXport Starter (Monthly)',
-    amount: 9.99,
+    amount: 29.99,
     currencyCode: 'USD',
     interval: 'EVERY_30_DAYS',
     trialDays: 30,
   },
   starter_year: {
     name: 'KolayXport Starter (Annual)',
-    amount: 99.99,
+    amount: 287.99,
     currencyCode: 'USD',
     interval: 'ANNUAL',
     trialDays: 30,
   },
   growth_month: {
     name: 'KolayXport Growth (Monthly)',
-    amount: 24.99,
+    amount: 79.99,
     currencyCode: 'USD',
     interval: 'EVERY_30_DAYS',
     trialDays: 30,
   },
   growth_year: {
     name: 'KolayXport Growth (Annual)',
-    amount: 249.99,
+    amount: 767.99,
     currencyCode: 'USD',
     interval: 'ANNUAL',
     trialDays: 30,

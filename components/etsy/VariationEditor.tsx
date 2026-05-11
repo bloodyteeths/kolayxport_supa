@@ -14,7 +14,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
-import { stageEtsyDraft } from '@/lib/etsy/draftClient';
+import { stageEtsyDraft, fetchEtsyDrafts } from '@/lib/etsy/draftClient';
 
 // --- Types ---
 
@@ -459,13 +459,20 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const fetchInventory = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=get_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`
-      );
-      if (!res.ok) throw new Error(t('inventoryFetchFailed'));
-      const data = await res.json();
-      const fetched = sanitizeProducts(data.products || []);
-      const apiPriceOnProperty = normalizePropertyIds(data.price_on_property);
+      const [inventoryRes, draftsRes] = await Promise.all([
+        fetch(`/api/clawd/etsy?action=get_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`),
+        fetchEtsyDrafts(shopId, listingId).catch(() => []),
+      ]);
+      if (!inventoryRes.ok) throw new Error(t('inventoryFetchFailed'));
+      const data = await inventoryRes.json();
+
+      const pendingDraft = Array.isArray(draftsRes)
+        ? draftsRes.find((d: any) => ['draft', 'failed', 'conflict'].includes(d.status) && d.inventoryPatch && Array.isArray(d.inventoryPatch.products) && d.inventoryPatch.products.length > 0)
+        : null;
+
+      const source = pendingDraft ? pendingDraft.inventoryPatch : data;
+      const fetched = sanitizeProducts(source.products || []);
+      const apiPriceOnProperty = normalizePropertyIds(source.price_on_property);
       const initialPriceOnProperty = apiPriceOnProperty.length ? apiPriceOnProperty : derivePropertyDrivers(fetched, product => product.offerings?.[0]?.price?.amount);
       setProducts(fetched);
       setOriginalProducts(JSON.parse(JSON.stringify(fetched)));
@@ -653,12 +660,28 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const hasSecondPropertyProducts = (propertyId: number) =>
     products.some(p => p.property_values.some((pv, idx) => idx > 0 && pv.property_id === propertyId));
 
+  const getExistingSecondValues = useCallback((propertyId: number) => {
+    const values = new Set<string>();
+    for (const p of products) {
+      const pv = p.property_values.find((v, idx) => idx > 0 && v.property_id === propertyId);
+      if (pv?.values?.[0]) values.add(pv.values[0]);
+    }
+    return Array.from(values);
+  }, [products]);
+
   const handleSecondPropertyChange = (propertyId: number | null) => {
     setSecondPropertyId(propertyId);
     if (propertyId && products.length > 0 && !hasSecondPropertyProducts(propertyId)) {
       setSecondSetupValues('');
       setSecondSetupOpen(true);
     }
+  };
+
+  const openSecondVariationDialog = () => {
+    if (!secondPropertyId) return;
+    const existing = getExistingSecondValues(secondPropertyId);
+    setSecondSetupValues(existing.join(', '));
+    setSecondSetupOpen(true);
   };
 
   const applySecondVariationMatrix = () => {
@@ -978,10 +1001,12 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
               </Select>
               {secondPropertyId && (
                 <Chip
-                  label={getPropertyName(secondPropertyId, t('secondVariation'))}
+                  label={`${getPropertyName(secondPropertyId, t('secondVariation'))} (${getExistingSecondValues(secondPropertyId).length})`}
                   size="small"
                   color="primary"
                   variant="outlined"
+                  onClick={openSecondVariationDialog}
+                  sx={{ cursor: 'pointer' }}
                 />
               )}
             </Box>

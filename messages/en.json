@@ -941,7 +941,7 @@
     "shopifyAccountConnection": "Shopify Store Connection",
     "connectShopify": "Connect Shopify Store",
     "shopifyDesc": "Connect your Shopify store to sync orders and manage products.",
-    "shopifyShopDomainPlaceholder": "yourstore.myshopify.com",
+    "shopifyShopDomainPlaceholder": "yourstore",
     "checkingShopifyStatus": "Checking Shopify connection status...",
     "shopifyConnected": "Shopify Store Connected",
     "noShopifyConnected": "No Shopify store connected yet.",

@@ -27,9 +27,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  const shop = req.query.shop as string;
-  if (!shop || !shop.includes('.myshopify.com')) {
-    return res.status(400).json({ error: 'Invalid shop domain. Must be like yourstore.myshopify.com' });
+  let shop = (req.query.shop as string || '').trim();
+  if (!shop) {
+    return res.status(400).json({ error: 'Missing shop name' });
+  }
+  if (!shop.includes('.myshopify.com')) {
+    shop = `${shop}.myshopify.com`;
   }
 
   // Encode userId in state for callback verification

@@ -863,7 +863,7 @@
     "shopifyAccountConnection": "Shopify Mağaza Bağlantısı",
     "connectShopify": "Shopify Mağaza Bağla",
     "shopifyDesc": "Shopify mağazanızı bağlayarak siparişleri senkronize edin ve ürünleri yönetin.",
-    "shopifyShopDomainPlaceholder": "magazaniz.myshopify.com",
+    "shopifyShopDomainPlaceholder": "magazaniz",
     "checkingShopifyStatus": "Shopify bağlantı durumu kontrol ediliyor...",
     "shopifyConnected": "Shopify Mağaza Bağlı",
     "noShopifyConnected": "Henüz Shopify mağaza bağlanmadı.",

@@ -871,14 +871,15 @@ const AyarlarPage = () => {
                       size="small"
                       placeholder={t('shopifyShopDomainPlaceholder')}
                       value={shopifyDomain}
-                      onChange={(e) => setShopifyDomain(e.target.value)}
+                      onChange={(e) => setShopifyDomain(e.target.value.replace(/\s/g, '').replace(/\.myshopify\.com$/i, ''))}
                       sx={{ flex: 1 }}
+                      InputProps={{ endAdornment: <span style={{ color: '#888', whiteSpace: 'nowrap' }}>.myshopify.com</span> }}
                     />
                     <Button
                       variant="contained"
                       color="primary"
-                      disabled={!shopifyDomain.includes('.myshopify.com')}
-                      href={`/api/integrations/shopify/connect?shop=${encodeURIComponent(shopifyDomain)}`}
+                      disabled={!shopifyDomain.trim()}
+                      href={`/api/integrations/shopify/connect?shop=${encodeURIComponent(shopifyDomain.trim() + '.myshopify.com')}`}
                       sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
                       {t('connectShopify')}

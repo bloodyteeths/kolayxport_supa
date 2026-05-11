@@ -33,6 +33,8 @@ model User {
   stripeCustomerId      String?                 @unique
   subscriptionPlan      String?
   subscriptionStatus    String?
+  billingProvider       String?                 // 'stripe' | 'shopify'
+  shopifySubscriptionId String?                 @unique
   trialExpiresAt        DateTime?
   usageResetAt          DateTime?
   accounts              Account[]

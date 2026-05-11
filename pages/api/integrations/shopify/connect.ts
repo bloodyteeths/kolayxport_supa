@@ -4,7 +4,7 @@ import { getAuthUser } from '../../../../lib/auth';
 import { logger } from '../../../../lib/logger';
 import crypto from 'crypto';
 
-const SCOPES = 'read_orders,read_products,write_products,read_inventory,write_inventory';
+const SCOPES = 'read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {

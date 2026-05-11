@@ -156,6 +156,28 @@ async function handler(
           );
         }
 
+        // Add Shopify sync if enabled and shops connected
+        if (hasShopify) {
+          syncPromises.push(
+            (async () => {
+              try {
+                logger.info(`[Fast Sync] Starting Shopify sync for user ${userId}`);
+                const result = await syncShopifyRecentOrdersForUser(userId);
+                return {
+                  newOrders: result?.successfulOrders || 0,
+                  updatedOrders: 0,
+                  skippedOrders: 0,
+                  failedOrders: result?.failedOrders || 0,
+                  errors: result?.errors || [],
+                };
+              } catch (error: any) {
+                logger.error(`[Fast Sync] Shopify sync failed for user ${userId}:`, error);
+                return { newOrders: 0, updatedOrders: 0, skippedOrders: 0, failedOrders: 1, errors: [{ orderId: 'shopify_sync', error: error.message }] };
+              }
+            })()
+          );
+        }
+
         // Execute all syncs in parallel
         const results = await Promise.all(syncPromises);
         

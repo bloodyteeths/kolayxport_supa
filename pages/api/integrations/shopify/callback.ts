@@ -112,6 +112,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
+    // Register subscription update webhook
+    try {
+      const baseUrl = process.env.NEXTAUTH_URL || process.env.APP_URL || 'https://kolayxport.com';
+      await fetch(`https://${shop}/admin/api/2024-10/webhooks.json`, {
+        method: 'POST',
+        headers: {
+          'X-Shopify-Access-Token': access_token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          webhook: {
+            topic: 'app_subscriptions/update',
+            address: `${baseUrl}/api/shopify/webhooks/subscription-update`,
+            format: 'json',
+          },
+        }),
+      });
+    } catch (webhookErr: any) {
+      logger.warn('Failed to register subscription webhook (non-fatal)', { error: webhookErr.message });
+    }
+
     logger.info('Shopify store connected successfully', { userId, shop, scopes: scope });
     return res.redirect('/ayarlar?success=shopify_connected');
   } catch (error: any) {

@@ -348,6 +348,29 @@ async function callUpdateListing(shopId: string, listingId: number, body: Record
   });
 }
 
+async function callSetSimplePersonalization(
+  shopId: string,
+  listingId: number,
+  changes: Pick<PendingChange, 'personalization_is_required' | 'personalization_instructions' | 'personalization_char_count_max'>
+) {
+  return fetch(`/api/clawd/etsy?action=set_simple_personalization&listing_id=${listingId}&shop_id=${shopId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question_text: 'Personalization',
+      required: changes.personalization_is_required || false,
+      instructions: changes.personalization_instructions || '',
+      max_characters: changes.personalization_char_count_max || 256,
+    }),
+  });
+}
+
+async function callRemovePersonalization(shopId: string, listingId: number) {
+  return fetch(`/api/clawd/etsy?action=remove_personalization&listing_id=${listingId}&shop_id=${shopId}`, {
+    method: 'POST',
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Inline tag editor for per-listing tag management
 // ---------------------------------------------------------------------------
@@ -1268,18 +1291,33 @@ export default function BulkEditor({
         if (changes.return_policy_id !== undefined) body.return_policy_id = changes.return_policy_id;
         if (changes.processing_min !== undefined) body.processing_min = changes.processing_min;
         if (changes.processing_max !== undefined) body.processing_max = changes.processing_max;
-        if (changes.is_personalizable !== undefined) body.is_personalizable = changes.is_personalizable;
-        if (changes.personalization_is_required !== undefined) body.personalization_is_required = changes.personalization_is_required;
-        if (changes.personalization_instructions !== undefined) body.personalization_instructions = changes.personalization_instructions;
-        if (changes.personalization_char_count_max !== undefined) body.personalization_char_count_max = changes.personalization_char_count_max;
         if (changes.taxonomy_id !== undefined) body.taxonomy_id = changes.taxonomy_id;
 
-        const res = await callUpdateListing(shopId, listingId, body);
-        if (res.ok) {
+        let personalizationOk = true;
+        if (changes.is_personalizable !== undefined) {
+          const personalizationRes = changes.is_personalizable
+            ? await callSetSimplePersonalization(shopId, listingId, changes)
+            : await callRemovePersonalization(shopId, listingId);
+          personalizationOk = personalizationRes.ok;
+          if (!personalizationOk) {
+            const errBody = await personalizationRes.json().catch(() => ({ error: personalizationRes.statusText }));
+            console.error(`[BulkEditor] Failed to update personalization for listing ${listingId}:`, errBody);
+          }
+        }
+
+        let listingOk = true;
+        if (Object.keys(body).length > 0) {
+          const listingRes = await callUpdateListing(shopId, listingId, body);
+          listingOk = listingRes.ok;
+          if (!listingOk) {
+            const errBody = await listingRes.json().catch(() => ({ error: listingRes.statusText }));
+            console.error(`[BulkEditor] Failed to update listing ${listingId}:`, errBody);
+          }
+        }
+
+        if (personalizationOk && listingOk) {
           success++;
         } else {
-          const errBody = await res.json().catch(() => ({ error: res.statusText }));
-          console.error(`[BulkEditor] Failed to update listing ${listingId}:`, errBody);
           failedIds.push(listingId);
           failed++;
         }

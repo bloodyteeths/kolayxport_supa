@@ -230,14 +230,20 @@ function validatePersonalizationQuestions(questions: PersonalizationQuestion[]):
             }
         }
         if (q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload') {
-            if (q.max_allowed_files !== undefined) {
-                if (q.max_allowed_files < 1 || q.max_allowed_files > 10) {
-                    return `Question ${i + 1}: max_allowed_files must be 1-10 for upload types`;
-                }
+            if (!q.max_allowed_files) {
+                return `Question ${i + 1}: max_allowed_files is required for upload types (1-10)`;
             }
-            if (q.question_type === 'labeled_upload' && q.options && q.max_allowed_files) {
-                if (q.options.length !== q.max_allowed_files) {
+            if (q.max_allowed_files < 1 || q.max_allowed_files > 10) {
+                return `Question ${i + 1}: max_allowed_files must be 1-10 for upload types`;
+            }
+            if (q.question_type === 'labeled_upload') {
+                if (!q.options || !Array.isArray(q.options) || q.options.length !== q.max_allowed_files) {
                     return `Question ${i + 1}: labeled_upload options count must equal max_allowed_files`;
+                }
+                for (let j = 0; j < q.options.length; j++) {
+                    if (!q.options[j].label || q.options[j].label.length < 1 || q.options[j].label.length > 20) {
+                        return `Question ${i + 1}, file label ${j + 1}: label must be 1-20 characters`;
+                    }
                 }
             }
         }
@@ -1578,8 +1584,6 @@ export default async function handler(
                 item_weight, item_weight_unit,
                 item_length, item_width, item_height, item_dimensions_unit,
                 processing_min, processing_max, state,
-                is_personalizable, personalization_is_required,
-                personalization_instructions, personalization_char_count_max,
             } = req.body;
 
             // Build update payload with only provided fields
@@ -1606,10 +1610,6 @@ export default async function handler(
             if (processing_min !== undefined) updatePayload.processing_min = processing_min;
             if (processing_max !== undefined) updatePayload.processing_max = processing_max;
             if (state !== undefined) updatePayload.state = state;
-            if (is_personalizable !== undefined) updatePayload.is_personalizable = is_personalizable;
-            if (personalization_is_required !== undefined) updatePayload.personalization_is_required = personalization_is_required;
-            if (personalization_instructions !== undefined) updatePayload.personalization_instructions = personalization_instructions;
-            if (personalization_char_count_max !== undefined) updatePayload.personalization_char_count_max = personalization_char_count_max;
 
             if (Object.keys(updatePayload).length === 0) {
                 return res.status(400).json({

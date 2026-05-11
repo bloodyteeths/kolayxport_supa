@@ -16,7 +16,6 @@ import {
   FormControl,
   InputLabel,
   CircularProgress,
-  Alert,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -70,24 +69,34 @@ function createEmptyQuestion(): PersonalizationQuestion {
   };
 }
 
-// ─── Legacy Mode Component ───────────────────────────────────────────────────
+// ─── Simple Mode Component ───────────────────────────────────────────────────
 
-function LegacyModeEditor({
+function SimpleModeEditor({
   listingId,
   shopId,
+  initialQuestions,
   legacy,
   onSaved,
 }: {
   listingId: string;
   shopId: string;
+  initialQuestions: PersonalizationQuestion[];
   legacy: LegacyPersonalization;
   onSaved: () => void;
 }) {
   const t = useTranslations('etsy.personalization');
-  const [isPersonalizable, setIsPersonalizable] = useState(legacy.is_personalizable);
-  const [isRequired, setIsRequired] = useState(legacy.personalization_is_required);
-  const [instructions, setInstructions] = useState(legacy.personalization_instructions || '');
-  const [charCountMax, setCharCountMax] = useState(legacy.personalization_char_count_max || 256);
+  const existingTextQuestion = initialQuestions.find((q) => q.question_type === 'text_input');
+  const [isPersonalizable, setIsPersonalizable] = useState(
+    initialQuestions.length > 0 || legacy.is_personalizable
+  );
+  const [questionText, setQuestionText] = useState(existingTextQuestion?.question_text || 'Personalization');
+  const [isRequired, setIsRequired] = useState(existingTextQuestion?.required ?? legacy.personalization_is_required);
+  const [instructions, setInstructions] = useState(
+    existingTextQuestion?.instructions || legacy.personalization_instructions || ''
+  );
+  const [charCountMax, setCharCountMax] = useState(
+    existingTextQuestion?.max_allowed_characters || legacy.personalization_char_count_max || 256
+  );
   const [saving, setSaving] = useState(false);
 
   const handleSave = async (overrideOff?: boolean) => {
@@ -95,26 +104,28 @@ function LegacyModeEditor({
 
     setSaving(true);
     try {
-      const body: Record<string, any> = {
-        is_personalizable: personalizable,
-      };
-
-      if (personalizable) {
-        body.personalization_is_required = isRequired;
-        body.personalization_instructions = instructions;
-        body.personalization_char_count_max = Math.min(Math.max(charCountMax, 1), 1024);
-      }
-
-      const res = await fetch(
-        `/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${shopId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        }
-      );
+      const res = personalizable
+        ? await fetch(
+            `/api/clawd/etsy?action=set_simple_personalization&listing_id=${listingId}&shop_id=${shopId}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                question_text: questionText.trim() || 'Personalization',
+                instructions,
+                required: isRequired,
+                max_characters: Math.min(Math.max(charCountMax, 1), 1024),
+              }),
+            }
+          )
+        : await fetch(
+            `/api/clawd/etsy?action=remove_personalization&listing_id=${listingId}&shop_id=${shopId}`,
+            {
+              method: 'POST',
+            }
+          );
 
       const data = await res.json();
       if (!res.ok) {
@@ -151,6 +162,18 @@ function LegacyModeEditor({
 
       {isPersonalizable && (
         <>
+          <TextField
+            label={t('questionText')}
+            size="small"
+            fullWidth
+            value={questionText}
+            onChange={(e) => setQuestionText(e.target.value)}
+            inputProps={{ maxLength: 45 }}
+            helperText={t('charCount', { count: questionText.length })}
+            disabled={saving}
+            error={questionText.length > 45}
+          />
+
           <FormControlLabel
             control={
               <Switch
@@ -298,14 +321,17 @@ function AdvancedModeEditor({
       }
 
       if (q.question_type === 'unlabeled_upload' || q.question_type === 'labeled_upload') {
-        if (q.max_allowed_files !== undefined) {
-          if (q.max_allowed_files < 1 || q.max_allowed_files > 10) {
-            return t('validateFileCountRange', { index: i + 1 });
-          }
+        if (!q.max_allowed_files || q.max_allowed_files < 1 || q.max_allowed_files > 10) {
+          return t('validateFileCountRange', { index: i + 1 });
         }
-        if (q.question_type === 'labeled_upload' && q.options && q.max_allowed_files) {
-          if (q.options.length !== q.max_allowed_files) {
+        if (q.question_type === 'labeled_upload') {
+          if (!q.options || q.options.length !== q.max_allowed_files) {
             return t('validateLabelCountMatch', { index: i + 1 });
+          }
+          for (let j = 0; j < q.options.length; j++) {
+            if (!q.options[j].label || q.options[j].label.length < 1 || q.options[j].label.length > 20) {
+              return t('validateOptionLabelLength', { index: i + 1, optIndex: j + 1 });
+            }
           }
         }
       }
@@ -517,10 +543,6 @@ function AdvancedModeEditor({
 
   return (
     <Box>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        {t('advancedInfo')}
-      </Alert>
-
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="subtitle1" fontWeight={600}>
           {t('questionsTitle', { count: questions.length, max: MAX_QUESTIONS })}
@@ -828,7 +850,9 @@ export default function PersonalizationEditor({
   onSaved,
 }: PersonalizationEditorProps) {
   const t = useTranslations('etsy.personalization');
-  const [advancedMode, setAdvancedMode] = useState(false);
+  const [advancedMode, setAdvancedMode] = useState(
+    initialQuestions.length > 1 || initialQuestions.some((q) => q.question_type !== 'text_input')
+  );
 
   const handleFallbackToLegacy = useCallback(() => {
     setAdvancedMode(false);
@@ -868,9 +892,10 @@ export default function PersonalizationEditor({
           onFallbackToLegacy={handleFallbackToLegacy}
         />
       ) : (
-        <LegacyModeEditor
+        <SimpleModeEditor
           listingId={listingId}
           shopId={shopId}
+          initialQuestions={initialQuestions}
           legacy={legacy}
           onSaved={onSaved}
         />

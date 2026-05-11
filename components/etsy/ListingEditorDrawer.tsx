@@ -69,6 +69,7 @@ import ScheduledUpdateDialog, {
   useScheduledUpdateExecutor,
   type ScheduledChanges,
 } from './ScheduledUpdateDialog';
+import { discardEtsyDraft, fetchEtsyDrafts, stageEtsyDraft, syncEtsyDraft } from '@/lib/etsy/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -153,6 +154,29 @@ interface ListingData {
   personalization_char_count_max: number;
   personalization_questions: PersonalizationQuestion[];
   images: ImageInfo[];
+}
+
+interface TaxonomyProperty {
+  property_id: number;
+  display_name: string;
+  name?: string;
+  supports_variations?: boolean;
+  is_required?: boolean;
+  possible_values?: Array<{ value_id: number; name: string }>;
+  scales?: Array<{ scale_id: number; display_name: string }>;
+}
+
+interface ListingPropertyValue {
+  property_id: number;
+  property_name?: string;
+  values: string[];
+  value_ids?: number[];
+  scale_id?: number | null;
+}
+
+interface TaxonomyOption {
+  value_id?: number;
+  name: string;
 }
 
 // Editable fields tracked for dirty-checking
@@ -328,6 +352,11 @@ export default function ListingEditorDrawer({
   const [fields, setFields] = useState<EditableFields | null>(null);
   const fieldsRef = useRef<EditableFields | null>(null);
   const originalFieldsRef = useRef<EditableFields | null>(null);
+  const [taxonomyProperties, setTaxonomyProperties] = useState<TaxonomyProperty[]>([]);
+  const [listingProperties, setListingProperties] = useState<Record<number, ListingPropertyValue>>({});
+  const [taxonomyLoading, setTaxonomyLoading] = useState(false);
+  const [savingTaxonomy, setSavingTaxonomy] = useState(false);
+  const originalListingPropertiesRef = useRef<Record<number, ListingPropertyValue>>({});
 
   // Videos (fetched separately)
   const [videos, setVideos] = useState<VideoInfo[]>([]);
@@ -344,6 +373,9 @@ export default function ListingEditorDrawer({
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
   const [renewDialogOpen, setRenewDialogOpen] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [syncingDraft, setSyncingDraft] = useState(false);
+  const [discardingDraft, setDiscardingDraft] = useState(false);
 
   // Template / profile state
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
@@ -403,6 +435,9 @@ export default function ListingEditorDrawer({
   const [createReturnOpen, setCreateReturnOpen] = useState(false);
   const [createSectionOpen, setCreateSectionOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+  const [stagedShopSections, setStagedShopSections] = useState<Array<{ shop_section_id: number; title: string }>>([]);
+  const [stagedShippingProfiles, setStagedShippingProfiles] = useState<Array<{ shipping_profile_id: number; title: string }>>([]);
+  const [stagedReturnPolicies, setStagedReturnPolicies] = useState<Array<{ return_policy_id: number; description?: string; accepts_returns?: boolean; accepts_exchanges?: boolean }>>([]);
 
   // Shipping profile creation form
   const [newShipping, setNewShipping] = useState({
@@ -420,6 +455,7 @@ export default function ListingEditorDrawer({
   const [newSectionTitle, setNewSectionTitle] = useState('');
 
   const handleCreateShippingProfile = async () => {
+    if (!listingId) return;
     if (!newShipping.title.trim()) {
       toast.error(t('editor.profileNameRequired'));
       return;
@@ -430,6 +466,7 @@ export default function ListingEditorDrawer({
     }
     setCreateLoading(true);
     try {
+      const tempId = -Date.now();
       const payload: Record<string, any> = {
         title: newShipping.title.trim(),
         origin_country_iso: newShipping.origin_country_iso,
@@ -442,19 +479,18 @@ export default function ListingEditorDrawer({
         payload.destination_country_iso = newShipping.destination_country_iso;
       }
 
-      const res = await fetch(`/api/clawd/etsy?shop_id=${shopId}&action=create_shipping_profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+      const draft = await stageEtsyDraft({
+        shopId,
+        listingId,
+        fields: { shipping_profile_id: tempId },
+        queuedActions: [{ type: 'create_shipping_profile', tempId, payload }],
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('editor.shippingProfileFailed'));
-      }
-      toast.success(t('editor.shippingProfileCreated'));
+      setDraftId(draft?.id || null);
+      setStagedShippingProfiles(prev => [...prev, { shipping_profile_id: tempId, title: `${payload.title} (pending)` }]);
+      updateField('shipping_profile_id', tempId);
+      toast.success('Shipping profile saved to draft. Sync to Etsy to create it.');
       setCreateShippingOpen(false);
       setNewShipping({ title: '', origin_country_iso: config.defaultCountryOfOrigin || 'TR', primary_cost: '0', secondary_cost: '0', min_processing_days: '1', max_processing_days: '3', destination_country_iso: '' });
-      onSaved();
     } catch (e: any) {
       toast.error(e.message || t('editor.errorOccurred'));
     } finally {
@@ -463,22 +499,27 @@ export default function ListingEditorDrawer({
   };
 
   const handleCreateReturnPolicy = async () => {
+    if (!listingId) return;
     setCreateLoading(true);
     try {
-      const res = await fetch(`/api/clawd/etsy?shop_id=${shopId}&action=create_return_policy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accepts_returns: newReturn.accepts_returns,
-          accepts_exchanges: newReturn.accepts_exchanges,
-          return_deadline: newReturn.return_deadline ? parseInt(newReturn.return_deadline) : undefined,
-        }),
+      const tempId = -Date.now();
+      const payload = {
+        accepts_returns: newReturn.accepts_returns,
+        accepts_exchanges: newReturn.accepts_exchanges,
+        return_deadline: newReturn.return_deadline ? parseInt(newReturn.return_deadline) : undefined,
+      };
+      const draft = await stageEtsyDraft({
+        shopId,
+        listingId,
+        fields: { return_policy_id: tempId },
+        queuedActions: [{ type: 'create_return_policy', tempId, payload }],
       });
-      if (!res.ok) throw new Error(t('editor.returnPolicyFailed'));
-      toast.success(t('editor.returnPolicyCreated'));
+      setDraftId(draft?.id || null);
+      setStagedReturnPolicies(prev => [...prev, { return_policy_id: tempId, description: 'Pending return policy', accepts_returns: payload.accepts_returns, accepts_exchanges: payload.accepts_exchanges }]);
+      updateField('return_policy_id', tempId);
+      toast.success('Return policy saved to draft. Sync to Etsy to create it.');
       setCreateReturnOpen(false);
       setNewReturn({ accepts_returns: true, accepts_exchanges: true, return_deadline: '30' });
-      onSaved();
     } catch (e: any) {
       toast.error(e.message || t('editor.errorOccurred'));
     } finally {
@@ -487,18 +528,23 @@ export default function ListingEditorDrawer({
   };
 
   const handleCreateSection = async () => {
+    if (!listingId) return;
     setCreateLoading(true);
     try {
-      const res = await fetch(`/api/clawd/etsy?shop_id=${shopId}&action=create_shop_section`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newSectionTitle }),
+      const tempId = -Date.now();
+      const title = newSectionTitle.trim();
+      const draft = await stageEtsyDraft({
+        shopId,
+        listingId,
+        fields: { shop_section_id: tempId },
+        queuedActions: [{ type: 'create_shop_section', tempId, payload: { title } }],
       });
-      if (!res.ok) throw new Error(t('editor.shopSectionFailed'));
-      toast.success(t('editor.shopSectionCreated'));
+      setDraftId(draft?.id || null);
+      setStagedShopSections(prev => [...prev, { shop_section_id: tempId, title: `${title} (pending)` }]);
+      updateField('shop_section_id', tempId);
+      toast.success('Shop section saved to draft. Sync to Etsy to create it.');
       setCreateSectionOpen(false);
       setNewSectionTitle('');
-      onSaved();
     } catch (e: any) {
       toast.error(e.message || t('editor.errorOccurred'));
     } finally {
@@ -538,6 +584,69 @@ export default function ListingEditorDrawer({
       setLoading(false);
     }
   }, [listingId, shopId]);
+
+  const fetchTaxonomyDetails = useCallback(async (taxonomyId?: number) => {
+    if (!listingId || !shopId || !taxonomyId) {
+      setTaxonomyProperties([]);
+      setListingProperties({});
+      originalListingPropertiesRef.current = {};
+      return;
+    }
+
+    setTaxonomyLoading(true);
+    try {
+      const [taxonomyRes, listingPropsRes] = await Promise.all([
+        fetch(`/api/clawd/etsy?action=get_taxonomy_properties&taxonomy_id=${taxonomyId}&shop_id=${shopId}`),
+        fetch(`/api/clawd/etsy?action=get_listing_properties&listing_id=${listingId}&shop_id=${shopId}`),
+      ]);
+
+      const taxonomyData = taxonomyRes.ok ? await taxonomyRes.json() : { results: [] };
+      const listingPropsData = listingPropsRes.ok ? await listingPropsRes.json() : { results: [] };
+
+      const nextTaxonomy = Array.isArray(taxonomyData.results)
+        ? taxonomyData.results.map((prop: any) => ({
+          property_id: Number(prop.property_id) || 0,
+          display_name: String(prop.display_name || prop.name || ''),
+          name: prop.name,
+          supports_variations: Boolean(prop.supports_variations),
+          is_required: Boolean(prop.is_required),
+          possible_values: Array.isArray(prop.possible_values) ? prop.possible_values : [],
+          scales: Array.isArray(prop.scales) ? prop.scales : [],
+        })).filter((prop: TaxonomyProperty) => prop.property_id && prop.display_name)
+        : [];
+
+      const nextListingProps: Record<number, ListingPropertyValue> = {};
+      if (Array.isArray(listingPropsData.results)) {
+        for (const prop of listingPropsData.results) {
+          const propertyId = Number(prop.property_id) || 0;
+          if (!propertyId) continue;
+          nextListingProps[propertyId] = {
+            property_id: propertyId,
+            property_name: prop.property_name || prop.name,
+            values: Array.isArray(prop.values) ? prop.values.map((v: any) => String(v)) : [],
+            value_ids: Array.isArray(prop.value_ids) ? prop.value_ids.map((id: any) => Number(id)).filter(Boolean) : [],
+            scale_id: prop.scale_id != null ? Number(prop.scale_id) : null,
+          };
+        }
+      }
+
+      setTaxonomyProperties(nextTaxonomy);
+      setListingProperties(nextListingProps);
+      originalListingPropertiesRef.current = JSON.parse(JSON.stringify(nextListingProps));
+    } catch {
+      setTaxonomyProperties([]);
+      setListingProperties({});
+      originalListingPropertiesRef.current = {};
+    } finally {
+      setTaxonomyLoading(false);
+    }
+  }, [listingId, shopId]);
+
+  useEffect(() => {
+    if (listing?.taxonomy_id) {
+      fetchTaxonomyDetails(listing.taxonomy_id);
+    }
+  }, [listing?.taxonomy_id, fetchTaxonomyDetails]);
 
   // --------------------------------------------------
   // Fetch videos
@@ -812,6 +921,9 @@ export default function ListingEditorDrawer({
       setListing(null);
       setFields(null);
       originalFieldsRef.current = null;
+      setStagedShopSections([]);
+      setStagedShippingProfiles([]);
+      setStagedReturnPolicies([]);
       setFetchError(null);
       setVideos([]);
       setActiveTab('basics');
@@ -991,6 +1103,27 @@ export default function ListingEditorDrawer({
 
     const changed = getChangedFields(originalFieldsRef.current, fields);
     if (Object.keys(changed).length === 0) {
+      if (draftId) {
+        setSaving(true);
+        try {
+          const draft = await stageEtsyDraft({ shopId, listingId, fields: {}, replaceFields: true });
+          setDraftId(draft?.id || null);
+          if (listingId) clearDraft(listingId);
+          if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+          }
+          setAutoSaveStatus('saved');
+          setLastSavedAt(new Date());
+          toast.success('Draft field changes cleared. Sync to Etsy will not apply reverted fields.');
+          onSaved();
+        } catch (err: any) {
+          toast.error(err.message || t('editor.updateFailed'));
+        } finally {
+          setSaving(false);
+        }
+        return;
+      }
       toast(t('editor.noChanges'), { icon: '\u2139\uFE0F' });
       return;
     }
@@ -1045,43 +1178,90 @@ export default function ListingEditorDrawer({
         return;
       }
 
-      const res = await fetch(
-        `/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${shopId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        },
-      );
+      const draft = await stageEtsyDraft({ shopId, listingId, fields: payload, replaceFields: true });
+      setDraftId(draft?.id || null);
+      toast.success('Draft saved. Sync to Etsy when ready.');
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-
-      toast.success(t('editor.listingUpdated'));
-
-      // Clear the localStorage draft — changes are now on Etsy
+      // Clear the localStorage draft — changes are now in the DB-backed draft
       if (listingId) clearDraft(listingId);
 
-      // Reset auto-save state and history
+      // Reset auto-save state, but keep undo history available after saving the draft.
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
         autoSaveTimerRef.current = null;
       }
       setAutoSaveStatus('saved');
       setLastSavedAt(new Date());
-      setHistory([]);
 
-      // Refresh listing data to reset dirty state
-      await fetchListing();
       onSaved();
     } catch (err: any) {
       toast.error(err.message || t('editor.updateFailed'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateListingPropertyDraft = (propertyId: number, selected: TaxonomyOption[]) => {
+    setListingProperties((prev) => ({
+      ...prev,
+      [propertyId]: {
+        ...(prev[propertyId] || { property_id: propertyId, values: [] }),
+        property_id: propertyId,
+        values: selected.map((option) => option.name),
+        value_ids: selected.map((option) => option.value_id).filter((id): id is number => typeof id === 'number'),
+      },
+    }));
+  };
+
+  const updateListingPropertyScale = (propertyId: number, scaleId: number | null) => {
+    setListingProperties((prev) => ({
+      ...prev,
+      [propertyId]: {
+        ...(prev[propertyId] || { property_id: propertyId, values: [] }),
+        property_id: propertyId,
+        scale_id: scaleId,
+      },
+    }));
+  };
+
+  const getChangedListingProperties = () => {
+    const changed: ListingPropertyValue[] = [];
+    const ids = new Set([
+      ...Object.keys(originalListingPropertiesRef.current).map(Number),
+      ...Object.keys(listingProperties).map(Number),
+    ]);
+
+    ids.forEach((propertyId) => {
+      const current = listingProperties[propertyId];
+      const original = originalListingPropertiesRef.current[propertyId];
+      if (!current) return;
+      if (JSON.stringify(current.values || []) !== JSON.stringify(original?.values || [])
+        || JSON.stringify(current.value_ids || []) !== JSON.stringify(original?.value_ids || [])
+        || current.scale_id !== original?.scale_id) {
+        changed.push(current);
+      }
+    });
+    return changed;
+  };
+
+  const handleSaveTaxonomyDetails = async () => {
+    if (!listingId || !shopId) return;
+    const changed = getChangedListingProperties();
+    if (changed.length === 0) {
+      toast(t('editor.noChanges'), { icon: '\u2139\uFE0F' });
+      return;
+    }
+
+    setSavingTaxonomy(true);
+    try {
+      const draft = await stageEtsyDraft({ shopId, listingId, taxonomy: { properties: changed } });
+      setDraftId(draft?.id || null);
+      toast.success('Category details saved to draft');
+      onSaved();
+    } catch (err: any) {
+      toast.error(err.message || 'Could not update Etsy category details');
+    } finally {
+      setSavingTaxonomy(false);
     }
   };
 
@@ -1093,20 +1273,9 @@ export default function ListingEditorDrawer({
 
     setPublishing(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=publish&listing_id=${listingId}&shop_id=${shopId}`,
-        {
-          method: 'POST',
-        },
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('editor.publishFailed'));
-      }
-
-      toast.success(t('editor.publishSuccess'));
-      await fetchListing();
+      const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'publish' }] });
+      setDraftId(draft?.id || null);
+      toast.success('Publish queued in draft. Sync to Etsy to apply.');
       onSaved();
     } catch (err: any) {
       toast.error(err.message || t('editor.publishFailed'));
@@ -1123,24 +1292,9 @@ export default function ListingEditorDrawer({
 
     setDeactivating(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${shopId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ state: 'inactive' }),
-        },
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('editor.deactivateFailed'));
-      }
-
-      toast.success(t('editor.deactivateSuccess'));
-      await fetchListing();
+      const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'deactivate' }] });
+      setDraftId(draft?.id || null);
+      toast.success('Deactivate queued in draft. Sync to Etsy to apply.');
       onSaved();
     } catch (err: any) {
       toast.error(err.message || t('editor.deactivateFailed'));
@@ -1157,19 +1311,10 @@ export default function ListingEditorDrawer({
 
     setRenewing(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=renew_listing&listing_id=${listingId}&shop_id=${shopId}`,
-        { method: 'POST' },
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('editor.renewFailed'));
-      }
-
-      toast.success(t('editor.renewSuccess'));
+      const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'renew' }] });
+      setDraftId(draft?.id || null);
+      toast.success('Renew queued in draft. Sync to Etsy to apply.');
       setRenewDialogOpen(false);
-      await fetchListing();
       onSaved();
     } catch (err: any) {
       toast.error(err.message || t('editor.renewFailed'));
@@ -1186,68 +1331,10 @@ export default function ListingEditorDrawer({
 
     setCopying(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=copy_listing&shop_id=${shopId}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ source_listing_id: listingId }),
-        },
-      );
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || t('editor.copyFailed'));
-      }
-
-      toast.success(t('editor.listingCopied'));
-      onSaved(); // refresh parent listing list
-
-      // Open the copied listing in the editor
-      if (data.new_listing_id && onOpenListing) {
-        onOpenListing(String(data.new_listing_id));
-      }
-
-      // Copy images to the new listing (best-effort, don't block)
-      if (data.source_images && data.source_images.length > 0 && data.new_listing_id) {
-        const totalImages = data.source_images.length;
-        const toastId = toast.loading(`Copying images (0/${totalImages})...`);
-        let copied = 0;
-        let imgFailed = 0;
-
-        for (const image of data.source_images) {
-          try {
-            await fetch(
-              `/api/clawd/etsy?action=upload_image&listing_id=${data.new_listing_id}&shop_id=${shopId}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  image_url: image.url_fullxfull,
-                  rank: image.rank,
-                  overwrite: false,
-                }),
-              },
-            );
-            copied++;
-          } catch (imgErr) {
-            console.error('Failed to copy image', imgErr);
-            imgFailed++;
-          }
-          toast.loading(`Copying images (${copied + imgFailed}/${totalImages})...`, { id: toastId });
-        }
-
-        if (imgFailed === 0) {
-          toast.success(`All ${copied} images copied`, { id: toastId });
-        } else {
-          toast.error(`${copied} images copied, ${imgFailed} failed`, { id: toastId });
-        }
-
-        // Refresh the listing so the new images show up
-        onSaved();
-      }
+      const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'copy' }] });
+      setDraftId(draft?.id || null);
+      toast.success('Copy queued in draft. Sync to Etsy to apply.');
+      onSaved();
     } catch (err: any) {
       toast.error(err.message || t('editor.copyFailed'));
     } finally {
@@ -1263,26 +1350,61 @@ export default function ListingEditorDrawer({
 
     setDeleting(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=delete_listing&listing_id=${listingId}&shop_id=${shopId}`,
-        {
-          method: 'DELETE',
-        },
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || err.details || t('editor.deleteFailed'));
-      }
-
-      toast.success(t('editor.listingDeleted'));
+      const draft = await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'delete' }] });
+      setDraftId(draft?.id || null);
+      toast.success('Delete queued in draft. Sync to Etsy to apply.');
       setDeleteDialogOpen(false);
       onSaved();
-      onClose();
     } catch (err: any) {
       toast.error(err.message || t('editor.deleteFailed'));
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const refreshDraftState = useCallback(async () => {
+    if (!shopId || !listingId) return;
+    try {
+      const drafts = await fetchEtsyDrafts(shopId, listingId);
+      setDraftId(drafts[0]?.id || null);
+    } catch {
+      setDraftId(null);
+    }
+  }, [shopId, listingId]);
+
+  useEffect(() => {
+    if (open) refreshDraftState();
+  }, [open, refreshDraftState]);
+
+  const handleSyncDraft = async () => {
+    if (!draftId) return;
+    setSyncingDraft(true);
+    try {
+      const result = await syncEtsyDraft(draftId);
+      toast.success('Draft synced to Etsy');
+      setDraftId(null);
+      await fetchListing();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err.message || 'Could not sync draft');
+    } finally {
+      setSyncingDraft(false);
+    }
+  };
+
+  const handleDiscardDraft = async () => {
+    if (!draftId) return;
+    setDiscardingDraft(true);
+    try {
+      await discardEtsyDraft(draftId);
+      setDraftId(null);
+      toast.success('Draft discarded');
+      await fetchListing();
+      onSaved();
+    } catch (err: any) {
+      toast.error(err.message || 'Could not discard draft');
+    } finally {
+      setDiscardingDraft(false);
     }
   };
 
@@ -2073,7 +2195,7 @@ export default function ListingEditorDrawer({
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
                   images={listing.images}
-                  onImagesChanged={fetchListing}
+                  onImagesChanged={() => { fetchListing(); refreshDraftState(); }}
                 />
               </Box>
             )}
@@ -2098,7 +2220,7 @@ export default function ListingEditorDrawer({
                     listingId={String(listing.listing_id)}
                     shopId={shopId}
                     videos={videos}
-                    onVideoChanged={fetchVideos}
+                    onVideoChanged={() => { fetchVideos(); refreshDraftState(); }}
                   />
                 )}
               </Box>
@@ -2119,7 +2241,7 @@ export default function ListingEditorDrawer({
                     personalization_instructions: listing.personalization_instructions || '',
                     personalization_char_count_max: listing.personalization_char_count_max || 0,
                   }}
-                  onSaved={fetchListing}
+                  onSaved={() => { fetchListing(); refreshDraftState(); }}
                 />
               </Box>
             )}
@@ -2133,7 +2255,7 @@ export default function ListingEditorDrawer({
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
                   taxonomyId={listing?.taxonomy_id}
-                  onSaved={fetchListing}
+                  onSaved={() => { fetchListing(); refreshDraftState(); }}
                 />
               </Box>
             )}
@@ -2203,7 +2325,7 @@ export default function ListingEditorDrawer({
                         <MenuItem value="">
                           <em>{t('editor.notSelected')}</em>
                         </MenuItem>
-                        {shopSections.map((sec) => (
+                        {[...shopSections, ...stagedShopSections].map((sec) => (
                           <MenuItem key={sec.shop_section_id} value={String(sec.shop_section_id)}>
                             {sec.title}
                           </MenuItem>
@@ -2236,7 +2358,7 @@ export default function ListingEditorDrawer({
                         <MenuItem value="">
                           <em>{t('editor.notSelected')}</em>
                         </MenuItem>
-                        {shippingProfiles.map((sp) => (
+                        {[...shippingProfiles, ...stagedShippingProfiles].map((sp) => (
                           <MenuItem key={sp.shipping_profile_id} value={String(sp.shipping_profile_id)}>
                             {sp.title}
                           </MenuItem>
@@ -2269,7 +2391,7 @@ export default function ListingEditorDrawer({
                         <MenuItem value="">
                           <em>{t('editor.notSelected')}</em>
                         </MenuItem>
-                        {returnPolicies.map((rp) => {
+                        {[...returnPolicies, ...stagedReturnPolicies].map((rp) => {
                           const label = rp.description
                             ? rp.description
                             : [
@@ -2412,6 +2534,109 @@ export default function ListingEditorDrawer({
                         ))}
                       </Select>
                     </FormControl>
+                  </Box>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                      <Box>
+                        <Typography variant="subtitle2" fontWeight={600}>
+                          Etsy category details
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Category-specific attributes from Etsy taxonomy
+                        </Typography>
+                      </Box>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={savingTaxonomy ? <CircularProgress size={14} /> : <SaveIcon />}
+                        onClick={handleSaveTaxonomyDetails}
+                        disabled={taxonomyLoading || savingTaxonomy || getChangedListingProperties().length === 0}
+                        sx={{ textTransform: 'none', fontWeight: 600 }}
+                      >
+                        Save details
+                      </Button>
+                    </Box>
+
+                    {taxonomyLoading ? (
+                      <Box sx={{ py: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CircularProgress size={18} />
+                        <Typography variant="body2" color="text.secondary">Loading Etsy details...</Typography>
+                      </Box>
+                    ) : taxonomyProperties.length === 0 ? (
+                      <Alert severity="info">No Etsy category details were returned for this category.</Alert>
+                    ) : (
+                      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
+                        {taxonomyProperties
+                          .map((prop) => {
+                            const draft = listingProperties[prop.property_id] || { property_id: prop.property_id, values: [] };
+                            const possibleOptions: TaxonomyOption[] = (prop.possible_values || [])
+                              .map((value) => ({ value_id: Number(value.value_id) || undefined, name: value.name }))
+                              .filter((value) => value.name);
+                            const selectedOptions: TaxonomyOption[] = (draft.values || []).map((value, index) => {
+                              const byId = draft.value_ids?.[index]
+                                ? possibleOptions.find((option) => option.value_id === draft.value_ids?.[index])
+                                : undefined;
+                              return byId || possibleOptions.find((option) => option.name === value) || { name: value };
+                            });
+                            return (
+                              <Box key={prop.property_id} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                                <Autocomplete
+                                  multiple
+                                  freeSolo
+                                  options={possibleOptions}
+                                  getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
+                                  isOptionEqualToValue={(option, value) => option.name === value.name}
+                                  value={selectedOptions}
+                                  onChange={(_, value) => updateListingPropertyDraft(
+                                    prop.property_id,
+                                    value.map((option) => typeof option === 'string' ? { name: option } : option)
+                                  )}
+                                  renderTags={(value, getTagProps) =>
+                                    value.map((option, index) => (
+                                      <Chip {...getTagProps({ index })} key={`${prop.property_id}-${typeof option === 'string' ? option : option.name}`} label={typeof option === 'string' ? option : option.name} size="small" />
+                                    ))
+                                  }
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params}
+                                      label={`${prop.display_name}${prop.is_required ? ' *' : ''}`}
+                                      size="small"
+                                      placeholder="Add value"
+                                      helperText={prop.supports_variations ? 'Can also be used for variations' : undefined}
+                                    />
+                                  )}
+                                  sx={{ flex: 1 }}
+                                />
+                                {prop.supports_variations && (
+                                  <Chip label="Variation" size="small" variant="outlined" sx={{ mt: 1 }} />
+                                )}
+                                {prop.scales && prop.scales.length > 0 && (
+                                  <FormControl size="small" sx={{ minWidth: 110 }}>
+                                    <InputLabel>Scale</InputLabel>
+                                    <Select
+                                      value={draft.scale_id ? String(draft.scale_id) : ''}
+                                      label="Scale"
+                                      onChange={(e: SelectChangeEvent) => updateListingPropertyScale(prop.property_id, e.target.value ? Number(e.target.value) : null)}
+                                    >
+                                      <MenuItem value="">
+                                        <em>None</em>
+                                      </MenuItem>
+                                      {prop.scales.map((scale) => (
+                                        <MenuItem key={scale.scale_id} value={String(scale.scale_id)}>
+                                          {scale.display_name}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                  </FormControl>
+                                )}
+                              </Box>
+                            );
+                          })}
+                      </Box>
+                    )}
                   </Box>
                 </Box>
               </Box>
@@ -2646,6 +2871,31 @@ export default function ListingEditorDrawer({
             {/* Spacer */}
             <Box sx={{ flex: 1 }} />
 
+            {draftId && (
+              <>
+                <Button
+                  variant="outlined"
+                  size="medium"
+                  sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', minHeight: 48 }}
+                  disabled={syncingDraft || discardingDraft}
+                  onClick={handleDiscardDraft}
+                >
+                  {discardingDraft ? 'Discarding...' : 'Discard Draft'}
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="medium"
+                  sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', minHeight: 48 }}
+                  disabled={syncingDraft || discardingDraft || hasChanges()}
+                  startIcon={syncingDraft ? <CircularProgress size={18} color="inherit" /> : <PublishIcon />}
+                  onClick={handleSyncDraft}
+                >
+                  {syncingDraft ? 'Syncing...' : hasChanges() ? 'Save Draft First' : 'Sync to Etsy'}
+                </Button>
+              </>
+            )}
+
             {/* Save/Publish — green button, rightmost */}
             <Button
               variant="contained"
@@ -2665,7 +2915,7 @@ export default function ListingEditorDrawer({
               onClick={handleSave}
               disabled={saving || !hasChanges()}
             >
-              {saving ? t('editor.saving') : t('editor.save')}
+              {saving ? t('editor.saving') : 'Save Draft'}
             </Button>
           </Box>
         )}

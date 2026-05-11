@@ -8,15 +8,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Tech Stack
 
-- **Framework**: Next.js 15.3.2 with React 18.2.0 (Pages Router)
+- **Framework**: Next.js 16.1.6 with React 18.2.0 (Pages Router)
 - **Language**: TypeScript (primary) with some JavaScript
-- **Database**: PostgreSQL via Supabase, using Prisma ORM
+- **Database**: PostgreSQL on Hetzner VPS, using Prisma ORM
 - **Authentication**: NextAuth v4 with Supabase Auth integration
 - **Styling**: Tailwind CSS v4 + Material-UI components
 - **State Management**: Zustand
 - **Data Fetching**: SWR for client-side caching
 - **Testing**: Vitest (unit), Playwright (E2E)
-- **Deployment**: Vercel
+- **Deployment**: Hetzner VPS
+
+## Current Production Environment
+
+KolayXport is fully Hetzner-hosted. Do not assume Vercel or Supabase production hosting.
+
+- **Domain**: `https://kolayxport.com`
+- **VPS**: Hetzner server `46.224.169.225`
+- **Production app path**: `/home/deploy/kolayxport`
+- **Production process**: systemd service `kolayxport.service`
+- **Production DB**: local PostgreSQL database `kolayxport` on the VPS
+- **Health check**: `https://kolayxport.com/api/health`
+- **Uploads**: staged Etsy draft media files are stored under `/home/deploy/kolayxport/uploads/etsy-drafts/...`
+
+Useful production commands:
+
+```bash
+ssh deploy@46.224.169.225 'cd /home/deploy/kolayxport && npm run build'
+ssh root@46.224.169.225 'systemctl restart kolayxport.service && systemctl is-active kolayxport.service'
+ssh root@46.224.169.225 'journalctl -u kolayxport.service --since "30 minutes ago" --no-pager'
+curl -fsS https://kolayxport.com/api/health
+```
+
+Local `.env` in some older local copies may still point at Supabase. For production truth, use Hetzner `.env` in `/home/deploy/kolayxport`.
 
 ## Key Commands
 
@@ -81,6 +104,46 @@ Key models (defined in `/prisma/schema.prisma`):
 - **Credential**: Encrypted marketplace API credentials
 - **ShipperProfile**: User's shipping configuration
 - **Shipment**: Generated labels and tracking info
+- **EtsyListing**: Synced Etsy listing cache
+- **EtsyListingDraft**: DB-backed staged Etsy changes before sync
+- **EtsyDraftMedia**: Pending Etsy media operations and local staged file metadata
+- **EtsyDraftSyncAttempt**: Per-draft sync attempts, results, failures, and conflicts
+
+## Etsy Editing Architecture
+
+Etsy listing editing has been migrated toward a staged-draft workflow. UI edits should not directly mutate Etsy. They should create/update local draft records, and Etsy is changed only by an explicit "Sync to Etsy" action.
+
+Primary implementation files:
+
+- `/lib/etsy/draftService.ts` - draft CRUD helpers, sync executor, Etsy token helper, media sync safety logic
+- `/lib/etsy/draftClient.ts` - browser helpers for staging draft patches and media uploads
+- `/pages/api/etsy-drafts/*` - draft API surface, media upload, single sync, bulk sync
+- `/components/etsy/ListingEditorDrawer.tsx` - single listing editor staging
+- `/components/etsy/BulkEditor.tsx` - bulk editor staging
+- `/components/etsy/ImageManager.tsx` - single listing photo staging and reordering
+- `/components/etsy/VideoUploader.tsx` - video staging
+- `/components/etsy/VariationEditor.tsx` - inventory/variation staging
+- `/pages/api/clawd/etsy.ts` - still exists as low-level Etsy executor/read API; UI should not call mutation actions directly when a staged draft path exists
+
+Current behavior:
+
+- Core listing fields, taxonomy details, personalization, inventory/variations, variation images, media upload/delete/reorder/alt text, state actions, copy/delete/renew/deactivate/publish are staged as drafts where migrated.
+- `EtsyListingDraft.status` includes `draft`, `syncing`, `conflict`, `failed`, `synced`, `cancelled`.
+- Conflict protection blocks sync when Etsy remote `updated_timestamp` changed after the draft base snapshot.
+- Failed syncs preserve the draft and record an `EtsyDraftSyncAttempt`.
+- Staged media files live on the Hetzner filesystem, not Postgres.
+
+Important sync hardening from May 2026:
+
+- Media sync validates current Etsy image IDs before delete/reorder/alt updates.
+- Missing/wrong-listing image/video IDs are skipped instead of crashing the whole sync.
+- Duplicate staged image deletes are ignored.
+- Reorder/alt staged ops keep the latest operation per image.
+- Duplicate queued actions are deduped.
+
+Known caution:
+
+- A conflict may be correct if a previous partial sync changed Etsy before failing. Do not blindly force a conflicted draft. Inspect `EtsyListingDraft`, `EtsyDraftMedia`, and `EtsyDraftSyncAttempt` first, especially `queuedActions` because a queued `delete` can delete the listing.
 
 ## Current Integrations
 
@@ -113,14 +176,16 @@ Key models (defined in `/prisma/schema.prisma`):
 - Run `npm run test:all` before committing
 
 ### Environment Variables
-Required in `.env.local`:
-- `DATABASE_URL` - PostgreSQL connection string
-- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
-- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service key
-- `STRIPE_SECRET_KEY` - Stripe API key for billing
+Required in production `.env` on Hetzner:
+- `DATABASE_URL` - PostgreSQL connection string for local Hetzner Postgres
+- `DIRECT_URL` - direct Prisma/Postgres connection when configured
 - `NEXTAUTH_SECRET` - NextAuth session secret
+- `ETSY_API_KEY` / `ETSY_API_SECRET` - Etsy API credentials
+- `ETSY_DRAFT_UPLOAD_DIR` - optional override for staged Etsy draft media root
+- `STRIPE_SECRET_KEY` - Stripe API key for billing
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - OAuth credentials
+
+Older Supabase variables may still exist in stale local files. Do not infer production DB/server from those.
 
 ### Feature Flags
 Control features via environment variables:
@@ -165,14 +230,31 @@ PRICE_GROWTH_YEAR
 
 ## Current Development Focus
 
-The `feature/trendyol` branch is actively implementing:
-- Trendyol API client with authentication
-- Order synchronization from Trendyol
-- Product image handling
-- Comprehensive test coverage
-- Architecture documentation for shipping limitations
+Recent work has focused on Etsy listing editing quality and safety:
 
-Additionally, Stripe billing integration is being enhanced with user-facing subscription management features.
+- DB-backed staged editing instead of direct Etsy writes
+- Explicit sync-to-Etsy workflow with conflict protection
+- Single and bulk photo management: show all photos, preview/enlarge, drag reorder, alt text, bulk upload, staged delete/upload/reorder
+- Video upload/delete staging
+- Variation editor staging and second variation UX
+- Category-specific Etsy details in single and bulk editors
+- Bulk editor category search/autocomplete using Etsy taxonomy tree
+- Hetzner production deployment and log-based debugging
+
+When auditing Etsy bugs, always check:
+
+```sql
+SELECT id,status,"etsyListingId","etsyShopId","baseEtsyUpdatedTimestamp","lastSyncError","updatedAt",
+       "fieldPatch","taxonomyPatch","inventoryPatch","variationImagesPatch","personalizationPatch","queuedActions"
+FROM "EtsyListingDraft"
+WHERE status IN ('draft','failed','conflict','syncing')
+ORDER BY "updatedAt" DESC;
+
+SELECT id,"draftId",status,"startedAt","finishedAt",error,"requestPlan"
+FROM "EtsyDraftSyncAttempt"
+ORDER BY "startedAt" DESC
+LIMIT 20;
+```
 
 ## Debugging Tools
 

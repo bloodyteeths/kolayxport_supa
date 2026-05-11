@@ -21,6 +21,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { stageEtsyDraft } from '@/lib/etsy/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -106,19 +107,7 @@ export function useScheduledUpdateExecutor() {
           if (update.changes.price !== undefined) payload.price = update.changes.price;
           if (update.changes.quantity !== undefined) payload.quantity = update.changes.quantity;
 
-          const res = await fetch(
-            `/api/clawd/etsy?action=update_listing&listing_id=${update.listing_id}&shop_id=${update.shop_id}`,
-            {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            },
-          );
-
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || `HTTP ${res.status}`);
-          }
+          await stageEtsyDraft({ shopId: update.shop_id, listingId: update.listing_id, fields: payload });
 
           toast.success(t('toastApplied', { listingId: update.listing_id }));
         } catch (err: any) {

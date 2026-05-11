@@ -3,9 +3,10 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { syncAllOrders } from '@/lib/orderSync';
 import { getAuthUser } from '@/lib/auth';
-import { isTrendyolEnabled, isWixEnabled } from '@/lib/config';
+import { isTrendyolEnabled, isWixEnabled, isShopifyEnabled } from '@/lib/config';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 import { syncWixRecentOrdersForUser } from '@/lib/sync/wix';
+import { syncShopifyRecentOrdersForUser } from '@/lib/sync/shopify';
 // Import Trendyol sync function from auto-sync script
 const { syncTrendyolRecentOrders } = require('../../../scripts/auto-sync-all-users.js');
 
@@ -45,7 +46,13 @@ async function handler(
     const wixSite = await prisma.wixSite.findFirst({ where: { userId, isActive: true } });
     const hasWix = !!(wixSite || (userSettings?.wixInstanceId && userSettings?.wixSiteId)) && isWixEnabled(userId);
 
-    if (!hasVeeqo && !hasShippo && !hasTrendyol && !hasWix) {
+    // Shopify: check for active shops
+    const shopifyShopCount = isShopifyEnabled(userId)
+      ? await prisma.shopifyShop.count({ where: { userId, isActive: true } })
+      : 0;
+    const hasShopify = shopifyShopCount > 0;
+
+    if (!hasVeeqo && !hasShippo && !hasTrendyol && !hasWix && !hasShopify) {
       logger.error('No integration credentials found', undefined, { userId, operation: 'order-sync' });
       return res.status(400).json({ error: 'No integration credentials found. Please check your settings.' });
     }

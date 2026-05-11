@@ -1971,8 +1971,8 @@
       "header": {
         "editingListings": "{count} liste düzenleniyor",
         "changes": "{count} değişiklik",
-        "syncUpdates": "Güncellemeleri Gönder",
-        "sync": "Gönder",
+        "syncUpdates": "Taslakları Kaydet",
+        "sync": "Kaydet",
         "cancel": "İptal",
         "discard": "Vazgeç"
       },
@@ -1993,13 +1993,33 @@
       },
       "photos": {
         "selectFiles": "Fotoğraf Seç",
+        "dropToStage": "Fotoğrafları seçin veya buraya sürükleyin, sonra işaretli listeler için taslağa ekleyin.",
+        "chooseFilesFirst": "Önce fotoğraf seç",
+        "unsupportedFiles": "Bazı dosyalar atlandı. JPG, PNG, GIF veya WebP kullanın.",
         "filesSelected": "{count} dosya seçildi",
         "uploadToAll": "Tümüne Yükle",
+        "replaceAll": "Tümünü Değiştir",
+        "appendMode": "Ekle",
+        "replaceAllMode": "Tümünü değiştir",
         "deleteAll": "Tüm Fotoğrafları Sil",
         "aiGenerateAltText": "AI Alt Metin Oluştur",
         "aiAltTextProgress": "AI Alt Metin... %{progress}",
         "altTextHelper": "Seçili listelerin tüm görselleri için SEO odaklı alt metin oluşturulur",
-        "photosHelper": "Fotoğraflar listede görünür. Alt metin tüm görsellere uygulanır."
+        "photosHelper": "Fotoğraflar listede görünür. Alt metin tüm görsellere uygulanır.",
+        "loadingImages": "Fotoğraflar yükleniyor...",
+        "imageCount": "{count} fotoğraf",
+        "noImages": "Fotoğraf yok",
+        "dragPreviewHelper": "Liste içindeki fotoğrafları sürükleyerek sıralayın. Önizleme ve alt metin için fotoğrafa tıklayın.",
+        "clickToPreview": "Önizle / alt metni düzenle",
+        "previewTitle": "Fotoğraf Önizleme",
+        "rankLabel": "Sıra {rank}",
+        "altTextLabel": "Alt Metin (SEO)",
+        "altTextPlaceholder": "Bu görseli arama motorları için açıklayın",
+        "saveAltText": "Alt Metni Kaydet",
+        "altTextSaved": "Alt metin kaydedildi",
+        "altTextSaveFailed": "Alt metin kaydedilemedi",
+        "orderSaved": "Fotoğraf sırası kaydedildi",
+        "orderSaveFailed": "Fotoğraf sırası kaydedilemedi"
       },
       "videos": {
         "urlPlaceholder": "Video URL (MP4, MOV — maks 100MB, 5-60 saniye)...",
@@ -2047,6 +2067,8 @@
         "draft": "Taslak"
       },
       "categorySection": {
+        "categoryLabel": "Etsy Kategorisi",
+        "categoryPlaceholder": "Kategori adı veya ID ara",
         "taxonomyIdLabel": "Taksonomi ID",
         "taxonomyIdPlaceholder": "ör. 2078",
         "taxonomyIdHelper": "Kategori için Etsy taksonomi ID'sini girin. ID'leri Etsy taksonomi referansından bulabilirsiniz.",
@@ -2094,8 +2116,8 @@
         "altTextSuccess": "Alt metin: {count} liste güncellendi",
         "altTextPartial": "Alt metin: {success} başarılı, {failed} başarısız",
         "noChangesToSave": "Kaydedilecek değişiklik yok",
-        "saveSuccess": "{count} liste başarıyla güncellendi",
-        "savePartial": "{success} başarılı, {failed} başarısız",
+        "saveSuccess": "{count} liste için taslak kaydedildi",
+        "savePartial": "{success} taslak kaydedildi, {failed} başarısız",
         "allChangesDiscarded": "Tüm değişiklikler iptal edildi",
         "photoUploadSuccess": "{count} fotoğraf {listings} listeye yüklendi",
         "photoUploadPartial": "Fotoğraf: {success} yüklendi, {failed} başarısız",
@@ -2109,11 +2131,12 @@
         "sectionCreateFailed": "Bölüm oluşturulamadı"
       },
       "footer": {
-        "publishToEtsy": "Etsy'ye Gönder"
+        "publishToEtsy": "Taslakları Kaydet"
       },
       "confirm": {
         "unsavedChanges": "{count} kaydedilmemiş değişiklik var. Çıkmak istediğinizden emin misiniz?",
         "deleteAllPhotos": "{count} listeden TÜM fotoğraflar silinecek. Bu işlem geri alınamaz.",
+        "replaceAllPhotos": "{count} listedeki TÜM fotoğraflar seçili dosyalarla değiştirilecek. Bu işlem geri alınamaz.",
         "deleteAllVideos": "{count} listeden TÜM videolar silinecek. Bu işlem geri alınamaz."
       },
       "shopLabel": "Etsy"
@@ -3159,6 +3182,9 @@
       "reorderFailedStep2": "Siralama degistirilemedi (adim 2)",
       "reorderSuccess": "Siralama guncellendi",
       "reorderError": "Siralama degistirilirken hata olustu",
+      "unsavedOrderHint": "Fotoğraf sırası uygulamada değişti. Etsy'ye göndermek için kaydedin.",
+      "saveOrder": "Sıralamayı kaydet",
+      "discardOrder": "Sıralamayı geri al",
       "enterPrompt": "Bir prompt girin",
       "generateFailed": "Gorsel olusturulamadi",
       "generateSuccess": "Gorsel olusturuldu!",
@@ -3168,8 +3194,10 @@
       "altTextUpdateSuccess": "Alt metin guncellendi",
       "altTextUpdateError": "Alt metin guncellenirken hata olustu",
       "uploadDialogTitle": "Gorsel Yukle",
-      "clickToSelectImage": "Gorsel secmek icin tiklayin",
+      "clickToSelectImage": "Fotoğraf seçin veya buraya bırakın",
       "formatsList": "JPEG, PNG, GIF, WebP",
+      "multiUploadHint": "Aynı anda birden fazla fotoğraf seçebilirsiniz.",
+      "filesSelected": "{count} görsel seçildi",
       "preview": "Onizleme",
       "selectDifferentImage": "Farkli gorsel sec",
       "altTextSeoLabel": "Alt Metin (SEO)",
@@ -6065,9 +6093,11 @@
     "compact": "Kompakt",
     "detailed": "Detaylı",
     "all": "Tümü",
-    "selected": "{count} selected",
-    "bulkEdit": "Bulk Edit",
-    "editShort": "Edit",
+    "selected": "{count} seçili",
+    "syncDraftsShort": "{count} senk.",
+    "syncDraftsToEtsy": "{count} Taslağı Etsy'ye Senkronize Et",
+    "bulkEdit": "Toplu Düzenle",
+    "editShort": "Düzenle",
     "sectionChip": "Bölüm: {name}",
     "healthChip": "Sağlık: {filter}",
     "healthChipIssues": "Sorunlu",

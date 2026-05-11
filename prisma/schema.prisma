@@ -12,59 +12,60 @@ datasource db {
 }
 
 model User {
-  id                  String                  @id
-  name                String?
-  email               String?                 @unique
-  emailVerified       DateTime?
-  image               String?
-  password            String?
-  googleAccountId     String?                 @unique
-  googleSheetId       String?                 @unique
-  driveFolderId       String?
-  userAppsScriptId    String?                 @unique
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  lastSyncedAt        DateTime?
-  onboardingStep      Int?                    @default(0)
-  shippingSettings    Json?
-  billingInterval     String?
-  labelCount          Int                     @default(0)
-  orderSyncCount      Int                     @default(0)
-  stripeCustomerId    String?                 @unique
-  subscriptionPlan    String?
-  subscriptionStatus  String?
-  trialExpiresAt      DateTime?
-  usageResetAt        DateTime?
-  accounts            Account[]
-  marketplaceConfigs  MarketplaceConfig[]
-  orders              Order[]
-  products            Product[]
-  sessions            Session[]
-  shipperProfile      ShipperProfile?
-  syncLogs            SyncLog[]
-  syncOperations      SyncOperation[]
-  integrationSettings Credential?
-  etsyAddresses       EtsyAddress[]
-  trackingSubmissions TrackingSubmission[]    @relation("UserTrackingSubmissions")
-  senkronOrderData    SenkronOrderData[]      @relation("UserSenkronData")
-  etsyShops           EtsyShop[]              @relation("UserEtsyShops")
-  ebayTrackedProducts EbayTrackedProduct[]
-  ebayTrackedSellers  EbayTrackedSeller[]
-  ebayNicheResearch   EbayNicheResearch[]
-  rankTrackedKeywords RankTrackedKeyword[]
-  arbitrageScanJobs   ArbitrageScanJob[]
-  arbitrageResults    ArbitrageResultRecord[]
+  id                    String                  @id
+  name                  String?
+  email                 String?                 @unique
+  emailVerified         DateTime?
+  image                 String?
+  password              String?
+  googleAccountId       String?                 @unique
+  googleSheetId         String?                 @unique
+  driveFolderId         String?
+  userAppsScriptId      String?                 @unique
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  lastSyncedAt          DateTime?
+  onboardingStep        Int?                    @default(0)
+  shippingSettings      Json?
+  billingInterval       String?
+  labelCount            Int                     @default(0)
+  orderSyncCount        Int                     @default(0)
+  stripeCustomerId      String?                 @unique
+  subscriptionPlan      String?
+  subscriptionStatus    String?
+  trialExpiresAt        DateTime?
+  usageResetAt          DateTime?
+  accounts              Account[]
+  marketplaceConfigs    MarketplaceConfig[]
+  orders                Order[]
+  products              Product[]
+  sessions              Session[]
+  shipperProfile        ShipperProfile?
+  syncLogs              SyncLog[]
+  syncOperations        SyncOperation[]
+  integrationSettings   Credential?
+  etsyAddresses         EtsyAddress[]
+  trackingSubmissions   TrackingSubmission[]    @relation("UserTrackingSubmissions")
+  senkronOrderData      SenkronOrderData[]      @relation("UserSenkronData")
+  etsyShops             EtsyShop[]              @relation("UserEtsyShops")
+  ebayTrackedProducts   EbayTrackedProduct[]
+  ebayTrackedSellers    EbayTrackedSeller[]
+  ebayNicheResearch     EbayNicheResearch[]
+  rankTrackedKeywords   RankTrackedKeyword[]
+  arbitrageScanJobs     ArbitrageScanJob[]
+  arbitrageResults      ArbitrageResultRecord[]
   productCosts          ProductCost[]
   financialTransactions FinancialTransaction[]
   financialSyncCursors  FinancialSyncCursor[]
   trendyolProducts      TrendyolProduct[]
   wixSites              WixSite[]               @relation("UserWixSites")
   wixProducts           WixProduct[]
-  shopifyShops              ShopifyShop[]            @relation("UserShopifyShops")
-  shopifyProducts           ShopifyProduct[]
-  amazonTrackedProducts     AmazonTrackedProduct[]
-  amazonPriceSnapshots      AmazonPriceSnapshot[]
-  amazonNicheResearch       AmazonNicheResearch[]
+  shopifyShops          ShopifyShop[]           @relation("UserShopifyShops")
+  shopifyProducts       ShopifyProduct[]
+  amazonTrackedProducts AmazonTrackedProduct[]
+  amazonPriceSnapshots  AmazonPriceSnapshot[]
+  amazonNicheResearch   AmazonNicheResearch[]
+  etsyListingDrafts     EtsyListingDraft[]
 }
 
 model Account {
@@ -472,9 +473,9 @@ model TrackingSubmission {
   veeqoResponse     Json?
 
   // Etsy extension tracking push status
-  etsySubmittedAt   DateTime?
-  etsySubmitStatus  String?   @default("pending") // pending | submitted | failed
-  etsySubmitError   String?
+  etsySubmittedAt  DateTime?
+  etsySubmitStatus String?   @default("pending") // pending | submitted | failed
+  etsySubmitError  String?
 
   order Order @relation("OrderTrackingSubmissions", fields: [orderId], references: [id], onDelete: Cascade)
   user  User  @relation("UserTrackingSubmissions", fields: [submittedBy], references: [id], onDelete: Cascade)
@@ -501,8 +502,9 @@ model EtsyShop {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  user     User          @relation("UserEtsyShops", fields: [userId], references: [id], onDelete: Cascade)
-  listings EtsyListing[] @relation("EtsyShopListings")
+  user     User                @relation("UserEtsyShops", fields: [userId], references: [id], onDelete: Cascade)
+  listings EtsyListing[]       @relation("EtsyShopListings")
+  drafts   EtsyListingDraft[]  @relation("EtsyShopDrafts")
 
   @@unique([userId, shopId]) // One record per user-shop combination
   @@index([userId])
@@ -583,6 +585,73 @@ model EtsyListing {
   @@index([etsyShopId])
   @@index([etsyShopId, state])
   @@index([etsyShopId, etsyCreatedTimestamp])
+}
+
+model EtsyListingDraft {
+  id                       String    @id @default(cuid())
+  userId                   String
+  etsyShopId               String
+  etsyListingId            BigInt
+  status                   String    @default("draft")
+  baseEtsyUpdatedTimestamp Int       @default(0)
+  baseSnapshot             Json      @default("{}")
+  fieldPatch               Json      @default("{}")
+  taxonomyPatch            Json?
+  inventoryPatch           Json?
+  variationImagesPatch     Json?
+  personalizationPatch     Json?
+  queuedActions            Json      @default("[]")
+  lastSyncError            String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  syncedAt                 DateTime?
+
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  etsyShop     EtsyShop               @relation("EtsyShopDrafts", fields: [etsyShopId], references: [shopId], onDelete: Cascade)
+  media        EtsyDraftMedia[]
+  syncAttempts EtsyDraftSyncAttempt[]
+
+  @@index([userId, etsyShopId])
+  @@index([etsyShopId, etsyListingId])
+  @@index([status])
+}
+
+model EtsyDraftMedia {
+  id            String   @id @default(cuid())
+  draftId       String
+  etsyListingId BigInt
+  kind          String
+  operation     String
+  etsyMediaId   BigInt?
+  localPath     String?
+  sourceUrl     String?
+  contentType   String?
+  filename      String?
+  rank          Int?
+  altText       String?
+  payload       Json?
+  createdAt     DateTime @default(now())
+
+  draft EtsyListingDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+  @@index([etsyListingId])
+}
+
+model EtsyDraftSyncAttempt {
+  id          String    @id @default(cuid())
+  draftId     String
+  status      String    @default("running")
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  requestPlan Json      @default("{}")
+  result      Json?
+  error       String?
+
+  draft EtsyListingDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+  @@index([status])
 }
 
 model WebhookEvent {
@@ -970,22 +1039,22 @@ model FinancialSyncCursor {
 // ---------------------------------------------------------------------------
 
 model TrendyolProduct {
-  id        String @id @default(cuid())
-  userId    String
+  id         String @id @default(cuid())
+  userId     String
   supplierId String
 
   // Trendyol identifiers
   barcode       String
   stockCode     String?
   productMainId String?
-  trendyolId    String?   // Trendyol's internal product ID
+  trendyolId    String? // Trendyol's internal product ID
 
   // Content
-  title       String
-  description String?  @db.Text
-  brandId     Int?
-  brandName   String?
-  categoryId  Int?
+  title        String
+  description  String? @db.Text
+  brandId      Int?
+  brandName    String?
+  categoryId   Int?
   categoryName String?
 
   // Pricing
@@ -1004,11 +1073,11 @@ model TrendyolProduct {
   attributes Json?
 
   // Status flags from Trendyol
-  approved    Boolean @default(false)
-  onSale      Boolean @default(false)
-  rejected    Boolean @default(false)
-  blacklisted Boolean @default(false)
-  archived    Boolean @default(false)
+  approved      Boolean @default(false)
+  onSale        Boolean @default(false)
+  rejected      Boolean @default(false)
+  blacklisted   Boolean @default(false)
+  archived      Boolean @default(false)
   rejectReasons Json?
 
   // Shipping
@@ -1059,10 +1128,10 @@ model WixProduct {
   wixProductId String
   slug         String?
 
-  title       String
-  description String? @db.Text
-  productType String?
-  brand       String?
+  title         String
+  description   String? @db.Text
+  productType   String?
+  brand         String?
   collectionIds Json?
 
   price         Decimal? @db.Decimal(10, 2)
@@ -1088,9 +1157,9 @@ model WixProduct {
 
   wixCreatedDate DateTime?
   wixUpdatedDate DateTime?
-  syncedAt       DateTime @default(now())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  syncedAt       DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   site WixSite @relation("WixSiteProducts", fields: [wixSiteId], references: [id], onDelete: Cascade)
   user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1112,25 +1181,25 @@ model ShopifyShop {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  user     User              @relation("UserShopifyShops", fields: [userId], references: [id], onDelete: Cascade)
-  products ShopifyProduct[]  @relation("ShopifyShopProducts")
+  user     User             @relation("UserShopifyShops", fields: [userId], references: [id], onDelete: Cascade)
+  products ShopifyProduct[] @relation("ShopifyShopProducts")
 
   @@unique([userId, shopDomain])
   @@index([userId])
 }
 
 model ShopifyProduct {
-  id               String  @id @default(cuid())
+  id               String @id @default(cuid())
   userId           String
   shopifyShopId    String
-  shopifyProductId String  // Shopify's product numeric ID as string
+  shopifyProductId String // Shopify's product numeric ID as string
 
   // Content
   title       String
   description String?  @db.Text
   vendor      String?
   productType String?
-  status      String?  // active, draft, archived
+  status      String? // active, draft, archived
   tags        String[]
   handle      String?
 
@@ -1151,7 +1220,7 @@ model ShopifyProduct {
   // Variants (JSON array of variant objects)
   variants     Json?
   options      Json?
-  variantCount Int     @default(0)
+  variantCount Int   @default(0)
 
   // SEO
   seoTitle       String?
@@ -1177,28 +1246,28 @@ model ShopifyProduct {
 // ---------------------------------------------------------------------------
 
 model AmazonTrackedProduct {
-  id              String   @id @default(cuid())
-  userId          String
-  asin            String
-  title           String?
-  imageUrl        String?
-  categoryId      String?
-  categoryName    String?
-  seller          String?
-  currentPrice    Float?
-  currency        String   @default("USD")
-  currentRank     Int?
-  reviewCount     Int?
-  rating          Float?
-  notes           String?
-  tags            String[]
-  isActive        Boolean  @default(true)
-  lastCheckedAt   DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String    @id @default(cuid())
+  userId        String
+  asin          String
+  title         String?
+  imageUrl      String?
+  categoryId    String?
+  categoryName  String?
+  seller        String?
+  currentPrice  Float?
+  currency      String    @default("USD")
+  currentRank   Int?
+  reviewCount   Int?
+  rating        Float?
+  notes         String?
+  tags          String[]
+  isActive      Boolean   @default(true)
+  lastCheckedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   snapshots AmazonPriceSnapshot[]
-  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, asin])
   @@index([userId, isActive])

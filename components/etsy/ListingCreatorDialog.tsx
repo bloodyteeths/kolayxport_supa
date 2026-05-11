@@ -33,6 +33,7 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import { toast } from 'react-hot-toast';
+import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 import { useTranslations } from 'next-intl';
 import SEOIndicator from './SEOIndicator';
 import type { MarketResearchData } from './MarketResearch';
@@ -64,7 +65,7 @@ interface ListingCreatorDialogProps {
   shopSections: Array<{ shop_section_id: number; title: string }>;
   shippingProfiles: Array<{ shipping_profile_id: number; title: string }>;
   returnPolicies: Array<{ return_policy_id: number; description?: string }>;
-  onCreated: (listingId: number) => void;
+  onCreated: (listingId: number, draftId?: string) => void;
   marketResearchData?: MarketResearchData | null;
   copySource?: CopySourceData | null;
 }
@@ -598,6 +599,7 @@ export default function ListingCreatorDialog({
   const handleCreate = async (publish: boolean) => {
     setCreating(true);
     try {
+      const localDraftListingId = -Date.now();
       const body: Record<string, unknown> = {
         title: title.trim(),
         description: description.trim(),
@@ -627,22 +629,12 @@ export default function ListingCreatorDialog({
         body.item_dimensions_unit = itemDimensionsUnit;
       }
 
-      const createRes = await fetch(
-        `/api/clawd/etsy?action=create_listing&shop_id=${shopId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        }
-      );
-
-      if (!createRes.ok) {
-        const err = await createRes.json().catch(() => ({}));
-        throw new Error(err.error || t('listingCreateFailed'));
-      }
-
-      const created = await createRes.json();
-      const newId = created.listing_id;
+      const draft = await stageEtsyDraft({
+        shopId,
+        listingId: localDraftListingId,
+        fields: body,
+        queuedActions: [{ type: 'create_listing', payload: body }, ...(publish ? [{ type: 'publish' }] : [])],
+      });
 
       // Upload images
       if (selectedFiles.length > 0) {
@@ -651,28 +643,16 @@ export default function ListingCreatorDialog({
           setUploadProgress(i + 1);
           const file = selectedFiles[i];
 
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve((reader.result as string).split(',')[1]);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-
-          const uploadRes = await fetch(
-            `/api/clawd/etsy?action=upload_image&listing_id=${newId}&shop_id=${shopId}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                image_base64: base64,
-                image_content_type: file.type,
-                image_filename: file.name,
-                rank: i + 1,
-              }),
-            }
-          );
-
-          if (!uploadRes.ok) {
+          try {
+            await stageEtsyDraftFile({
+              shopId,
+              listingId: localDraftListingId,
+              file,
+              kind: 'image',
+              operation: 'upload',
+              rank: i + 1,
+            });
+          } catch {
             toast.error(t('imageUploadFailed', { index: i + 1 }));
           }
         }
@@ -680,20 +660,12 @@ export default function ListingCreatorDialog({
 
       // Publish if requested
       if (publish) {
-        const pubRes = await fetch(
-          `/api/clawd/etsy?action=publish&listing_id=${newId}&shop_id=${shopId}`,
-          { method: 'POST' }
-        );
-        if (!pubRes.ok) {
-          toast.error(t('publishFailed'));
-        } else {
-          toast.success(t('createdAndPublished'));
-        }
+        toast.success('Listing draft saved locally. Sync to Etsy to create and publish it.');
       } else {
-        toast.success(t('createdAsDraft'));
+        toast.success('Listing draft saved locally. Sync to Etsy to create it.');
       }
 
-      onCreated(newId);
+      onCreated(localDraftListingId, draft?.id);
       resetForm();
       onClose();
     } catch (err: any) {

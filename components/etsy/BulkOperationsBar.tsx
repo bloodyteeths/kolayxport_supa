@@ -61,6 +61,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { stageEtsyDraft } from '@/lib/etsy/draftClient';
 
 interface ListingPrice {
   amount: number;
@@ -128,24 +129,16 @@ async function callUpdateListing(
   listingId: number,
   body: Record<string, any>
 ): Promise<Response> {
-  return fetch(
-    `/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${shopId}`,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }
-  );
+  await stageEtsyDraft({ shopId, listingId, fields: body });
+  return { ok: true, status: 200, clone: () => ({ json: async () => ({}) }), json: async () => ({}) } as any;
 }
 
 async function callDeleteListing(
   shopId: string,
   listingId: number
 ): Promise<Response> {
-  return fetch(
-    `/api/clawd/etsy?action=delete_listing&listing_id=${listingId}&shop_id=${shopId}`,
-    { method: 'DELETE' }
-  );
+  await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'delete' }] });
+  return { ok: true, status: 200, clone: () => ({ json: async () => ({}) }), json: async () => ({}) } as any;
 }
 
 export default function BulkOperationsBar({
@@ -443,35 +436,8 @@ export default function BulkOperationsBar({
     for (let i = 0; i < selectedListings.length; i++) {
       const listing = selectedListings[i];
       try {
-        const res = await fetch(
-          `/api/clawd/etsy?action=copy_listing&listing_id=${listing.listing_id}&shop_id=${shopId}&target_shop_id=${targetShopId}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' } }
-        );
-        if (res.ok) {
-          success++;
-          // Copy images to the new listing (best-effort)
-          const data = await res.json().catch(() => ({}));
-          if (data.source_images && data.source_images.length > 0 && data.new_listing_id) {
-            for (const image of data.source_images) {
-              try {
-                await fetch(
-                  `/api/clawd/etsy?action=upload_image&listing_id=${data.new_listing_id}&shop_id=${targetShopId}`,
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      image_url: image.url_fullxfull,
-                      rank: image.rank,
-                      overwrite: false,
-                    }),
-                  },
-                );
-              } catch (imgErr) {
-                console.error('Failed to copy image during bulk copy', imgErr);
-              }
-            }
-          }
-        } else { failed++; }
+        await stageEtsyDraft({ shopId, listingId: listing.listing_id, queuedActions: [{ type: 'copy', targetShopId }] });
+        success++;
       } catch { failed++; }
       setCopyProgress(((i + 1) / selectedListings.length) * 100);
       if (i < selectedListings.length - 1) await delay(100);
@@ -507,11 +473,11 @@ export default function BulkOperationsBar({
         let listingSuccess = true;
         for (let j = 0; j < images.length; j++) {
           try {
-            const updateRes = await fetch(
-              `/api/clawd/etsy?action=update_listing_image&listing_id=${listing.listing_id}&image_id=${images[j].listing_image_id}&shop_id=${shopId}`,
-              { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alt_text: generatedAltText }) }
-            );
-            if (!updateRes.ok) listingSuccess = false;
+            await stageEtsyDraft({
+              shopId,
+              listingId: listing.listing_id,
+              media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: images[j].listing_image_id, altText: generatedAltText }],
+            });
           } catch { listingSuccess = false; }
           if (j < images.length - 1) await delay(50);
         }
@@ -535,8 +501,8 @@ export default function BulkOperationsBar({
     for (let i = 0; i < selectedListings.length; i++) {
       const listing = selectedListings[i];
       try {
-        const res = await fetch(`/api/clawd/etsy?action=renew_listing&listing_id=${listing.listing_id}&shop_id=${shopId}`, { method: 'POST' });
-        if (res.ok) success++; else failed++;
+        await stageEtsyDraft({ shopId, listingId: listing.listing_id, queuedActions: [{ type: 'renew' }] });
+        success++;
       } catch { failed++; }
       setRenewProgress(((i + 1) / selectedListings.length) * 100);
       if (i < selectedListings.length - 1) await delay(100);
@@ -619,11 +585,8 @@ export default function BulkOperationsBar({
           return { ...product, offerings: updatedOfferings };
         });
         if (!hasMatch) { skipped++; setVariationProgress(((i + 1) / selectedListings.length) * 100); if (i < selectedListings.length - 1) await delay(100); continue; }
-        const updateRes = await fetch(
-          `/api/clawd/etsy?action=update_listing_inventory&listing_id=${listing.listing_id}&shop_id=${shopId}`,
-          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products: updatedProducts }) }
-        );
-        if (updateRes.ok) success++; else failed++;
+        await stageEtsyDraft({ shopId, listingId: listing.listing_id, inventory: { products: updatedProducts } });
+        success++;
       } catch { failed++; }
       setVariationProgress(((i + 1) / selectedListings.length) * 100);
       if (i < selectedListings.length - 1) await delay(100);

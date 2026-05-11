@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Box,
@@ -22,6 +22,7 @@ import StarIcon from '@mui/icons-material/Star';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import EditIcon from '@mui/icons-material/Edit';
 import { toast } from 'react-hot-toast';
+import { fetchEtsyDrafts, stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 
 interface ImageInfo {
   listing_image_id: number;
@@ -31,6 +32,9 @@ interface ImageInfo {
   url_fullxfull?: string;
   rank: number;
   alt_text?: string;
+  is_pending_upload?: boolean;
+  pending_filename?: string;
+  pending_media_id?: string;
 }
 
 interface ImageManagerProps {
@@ -53,19 +57,49 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+function sortImagesByRank(images: ImageInfo[]): ImageInfo[] {
+  return [...(images || [])].sort((a, b) => a.rank - b.rank);
+}
+
+function stableNegativeId(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return -Math.max(1, Math.abs(hash));
+}
+
+function base64ToFile(base64: string, mimeType: string, filename: string): File {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], filename, { type: mimeType });
+}
+
 export default function ImageManager({ listingId, shopId, images, onImagesChanged }: ImageManagerProps) {
   const t = useTranslations('etsy.imageManager');
+  const reorderToastId = `etsy-image-reorder-${listingId}`;
   const [uploading, setUploading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<ImageInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [swapping, setSwapping] = useState<number | null>(null);
+  const [draggingImageId, setDraggingImageId] = useState<number | null>(null);
+  const [previewImage, setPreviewImage] = useState<ImageInfo | null>(null);
+  const [previewImageLoaded, setPreviewImageLoaded] = useState(false);
+  const [localImages, setLocalImages] = useState<ImageInfo[]>(() => sortImagesByRank(images));
+  const [hasPendingOrder, setHasPendingOrder] = useState(false);
+  const [draftMediaReloadKey, setDraftMediaReloadKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const reorderInFlightRef = useRef(false);
+  const pendingObjectUrlsRef = useRef<string[]>([]);
 
   // Upload dialog state
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
   const [uploadAltText, setUploadAltText] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // AI Image generation state
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
@@ -84,76 +118,192 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const [editAltText, setEditAltText] = useState('');
   const [savingAlt, setSavingAlt] = useState(false);
 
-  const sortedImages = [...(images || [])].sort((a, b) => a.rank - b.rank);
+  const sourceImageKey = useMemo(
+    () => sortImagesByRank(images).map((img) => `${img.listing_image_id}:${img.rank}`).join('|'),
+    [images],
+  );
+  const originalRankByImageId = useMemo(
+    () => new Map(sortImagesByRank(images).map((img) => [img.listing_image_id, img.rank])),
+    [sourceImageKey, images],
+  );
 
-  const uploadEndpoint = `/api/clawd/etsy?action=upload_image&listing_id=${listingId}&shop_id=${shopId}`;
+  useEffect(() => {
+    pendingObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    pendingObjectUrlsRef.current = [];
+    setLocalImages(sortImagesByRank(images));
+    setHasPendingOrder(false);
+    setDraggingImageId(null);
+  }, [listingId, sourceImageKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDraftMedia = async () => {
+      try {
+        const drafts = await fetchEtsyDrafts(shopId, listingId);
+        if (cancelled) return;
+        const baseImages = sortImagesByRank(images);
+        const pendingUploads: ImageInfo[] = [];
+        for (const draft of drafts || []) {
+          for (const media of draft.media || []) {
+            if (media.kind !== 'image' || !['upload', 'ai_upload'].includes(media.operation)) continue;
+            const previewUrl = media.sourceUrl || `/api/etsy-drafts/media-preview?id=${encodeURIComponent(media.id)}`;
+            pendingUploads.push({
+              listing_image_id: stableNegativeId(media.id),
+              url_75x75: previewUrl,
+              url_170x135: previewUrl,
+              url_570xN: previewUrl,
+              url_fullxfull: previewUrl,
+              rank: Number(media.rank) || baseImages.length + pendingUploads.length + 1,
+              alt_text: media.altText || '',
+              is_pending_upload: true,
+              pending_filename: media.filename,
+              pending_media_id: media.id,
+            });
+          }
+        }
+        setLocalImages(sortImagesByRank([...baseImages, ...pendingUploads]));
+      } catch {
+        if (!cancelled) setLocalImages(sortImagesByRank(images));
+      }
+    };
+    loadDraftMedia();
+    return () => { cancelled = true; };
+  }, [shopId, listingId, sourceImageKey, draftMediaReloadKey, images]);
+
+  const sortedImages = localImages;
+
+  useEffect(() => () => {
+    pendingObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    uploadPreviews.forEach((url) => URL.revokeObjectURL(url));
+    if (aiRefPreview?.startsWith('blob:')) URL.revokeObjectURL(aiRefPreview);
+  }, []);
+
+  const appendPendingUploads = useCallback((files: File[], startRank: number, altText?: string, stagedMedia: any[] = []) => {
+    const pendingImages = files.map((file, index) => {
+      const media = stagedMedia[index]?.media || stagedMedia[index];
+      const objectUrl = media?.id
+        ? `/api/etsy-drafts/media-preview?id=${encodeURIComponent(media.id)}`
+        : URL.createObjectURL(file);
+      if (!media?.id) pendingObjectUrlsRef.current.push(objectUrl);
+      return {
+        listing_image_id: media?.id ? stableNegativeId(media.id) : -Date.now() - index,
+        url_75x75: objectUrl,
+        url_170x135: objectUrl,
+        url_570xN: objectUrl,
+        url_fullxfull: objectUrl,
+        rank: startRank + index,
+        alt_text: files.length === 1 ? altText : undefined,
+        is_pending_upload: true,
+        pending_filename: file.name,
+        pending_media_id: media?.id,
+      };
+    });
+
+    setLocalImages((current) => {
+      const existingPendingIds = new Set(current.map((image) => image.pending_media_id).filter(Boolean));
+      return sortImagesByRank([...current, ...pendingImages.filter((image) => !image.pending_media_id || !existingPendingIds.has(image.pending_media_id))]);
+    });
+  }, []);
 
   // --- Upload Dialog ---
 
   const openUploadDialog = () => {
-    setUploadFile(null);
-    setUploadPreview(null);
+    uploadPreviews.forEach((url) => URL.revokeObjectURL(url));
+    setUploadFiles([]);
+    setUploadPreviews([]);
     setUploadAltText('');
+    setUploadProgress(0);
     setUploadDialogOpen(true);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const selected = Array.from(e.target.files || []);
+    applySelectedUploadFiles(selected);
+  };
+
+  const applySelectedUploadFiles = (selected: File[]) => {
+    if (selected.length === 0) return;
 
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
+    const validFiles = selected.filter((file) => validTypes.includes(file.type));
+    if (validFiles.length !== selected.length) {
       toast.error(t('supportedFormats'));
+    }
+    if (validFiles.length === 0) {
       return;
     }
 
-    setUploadFile(file);
-    const url = URL.createObjectURL(file);
-    setUploadPreview(url);
+    const remainingSlots = Math.max(0, 10 - sortedImages.length);
+    const files = validFiles.slice(0, remainingSlots);
+    if (validFiles.length > remainingSlots) {
+      toast.error(t('maxImagesError'));
+    }
+
+    uploadPreviews.forEach((url) => URL.revokeObjectURL(url));
+    setUploadFiles(files);
+    setUploadPreviews(files.map((file) => URL.createObjectURL(file)));
+  };
+
+  const handleUploadDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (uploading) return;
+    applySelectedUploadFiles(Array.from(e.dataTransfer.files || []));
+  };
+
+  const openPreview = (img: ImageInfo) => {
+    setPreviewImageLoaded(false);
+    setPreviewImage(img);
+  };
+
+  const closePreview = () => {
+    setPreviewImage(null);
+    setPreviewImageLoaded(false);
   };
 
   const handleUploadSubmit = async () => {
-    if (!uploadFile) return;
+    if (uploadFiles.length === 0) return;
 
-    if (sortedImages.length >= 10) {
+    if (sortedImages.length + uploadFiles.length > 10) {
       toast.error(t('maxImagesError'));
       return;
     }
 
     setUploading(true);
+    setUploadProgress(0);
     try {
-      const base64 = await fileToBase64(uploadFile);
-      const nextRank = sortedImages.length > 0
+      const startRank = sortedImages.length > 0
         ? Math.max(...sortedImages.map((i) => i.rank)) + 1
         : 1;
 
-      const body: Record<string, unknown> = {
-        image_base64: base64,
-        image_content_type: uploadFile.type,
-        rank: nextRank,
-      };
-      if (uploadAltText.trim()) {
-        body.alt_text = uploadAltText.trim();
+      const stagedMedia: any[] = [];
+      for (let i = 0; i < uploadFiles.length; i++) {
+        const file = uploadFiles[i];
+        const staged = await stageEtsyDraftFile({
+          shopId,
+          listingId,
+          file,
+          kind: 'image',
+          operation: 'upload',
+          rank: startRank + i,
+          altText: uploadAltText.trim() && uploadFiles.length === 1 ? uploadAltText.trim() : undefined,
+        });
+        stagedMedia.push(staged.media);
+        setUploadProgress(Math.round(((i + 1) / uploadFiles.length) * 100));
       }
 
-      const res = await fetch(uploadEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || t('uploadFailed'));
-      }
-
-      toast.success(t('uploadSuccess'));
+      appendPendingUploads(uploadFiles, startRank, uploadAltText.trim() || undefined, stagedMedia);
+      toast.success('Image upload saved to draft. Sync to Etsy when ready.');
       setUploadDialogOpen(false);
+      uploadPreviews.forEach((url) => URL.revokeObjectURL(url));
+      setUploadFiles([]);
+      setUploadPreviews([]);
+      setDraftMediaReloadKey((key) => key + 1);
       onImagesChanged();
     } catch (err: any) {
       toast.error(err.message || t('uploadError'));
     } finally {
       setUploading(false);
+      setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -164,17 +314,22 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     if (!deleteConfirm) return;
     setDeleting(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=delete_image&listing_id=${listingId}&image_id=${deleteConfirm.listing_image_id}&shop_id=${shopId}`,
-        { method: 'DELETE' }
-      );
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || t('deleteFailed'));
+      if (deleteConfirm.is_pending_upload) {
+        setLocalImages((current) => (
+          sortImagesByRank(current.filter((img) => img.listing_image_id !== deleteConfirm.listing_image_id))
+            .map((img, index) => ({ ...img, rank: index + 1 }))
+        ));
+        toast.success('Pending image removed from this view. Discard the draft to remove it permanently.');
+        setDeleteConfirm(null);
+        return;
       }
 
-      toast.success(t('deleteSuccess'));
+      await stageEtsyDraft({
+        shopId,
+        listingId,
+        media: [{ kind: 'image', operation: 'delete', etsyMediaId: deleteConfirm.listing_image_id }],
+      });
+      toast.success('Image delete saved to draft. Sync to Etsy when ready.');
       setDeleteConfirm(null);
       onImagesChanged();
     } catch (err: any) {
@@ -186,53 +341,84 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
   // --- Reorder (swap) ---
 
-  const handleSwap = useCallback(async (direction: 'up' | 'down', img: ImageInfo) => {
+  const reorderLocally = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex || reorderInFlightRef.current) return;
+
+    setLocalImages((current) => {
+      if (fromIndex >= current.length || toIndex >= current.length) return current;
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next.map((image, index) => ({ ...image, rank: index + 1 }));
+    });
+    setHasPendingOrder(true);
+  }, []);
+
+  const handleSwap = useCallback((direction: 'up' | 'down', img: ImageInfo) => {
+    if (reorderInFlightRef.current || swapping !== null) return;
+    if (img.is_pending_upload) {
+      toast.error('Pending uploads can be reordered after they are synced to Etsy.');
+      return;
+    }
+
     const currentIndex = sortedImages.findIndex((i) => i.listing_image_id === img.listing_image_id);
     const neighborIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
     if (neighborIndex < 0 || neighborIndex >= sortedImages.length) return;
 
-    const neighbor = sortedImages[neighborIndex];
-    const rankA = img.rank;
-    const rankB = neighbor.rank;
+    reorderLocally(currentIndex, neighborIndex);
+  }, [sortedImages, reorderLocally, swapping]);
 
-    setSwapping(img.rank);
+  const saveImageOrder = useCallback(async () => {
+    if (reorderInFlightRef.current || !hasPendingOrder) return;
+
+    reorderInFlightRef.current = true;
+    setSwapping(-1);
     try {
-      const uploadA = await fetch(uploadEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_url: img.url_fullxfull || img.url_570xN,
-          rank: rankB,
-          overwrite: true,
-        }),
-      });
-      if (!uploadA.ok) {
-        const err = await uploadA.json();
-        throw new Error(err.error || t('reorderFailedStep1'));
-      }
+      for (let i = 0; i < sortedImages.length; i++) {
+        const img = sortedImages[i];
+        if (img.is_pending_upload) continue;
+        const nextRank = i + 1;
+        if (originalRankByImageId.get(img.listing_image_id) === nextRank) continue;
 
-      const uploadB = await fetch(uploadEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_url: neighbor.url_fullxfull || neighbor.url_570xN,
-          rank: rankA,
-          overwrite: true,
-        }),
-      });
-      if (!uploadB.ok) {
-        const err = await uploadB.json();
-        throw new Error(err.error || t('reorderFailedStep2'));
+        await stageEtsyDraft({
+          shopId,
+          listingId,
+          media: [{ kind: 'image', operation: 'reorder', etsyMediaId: img.listing_image_id, rank: nextRank }],
+        });
       }
-
-      toast.success(t('reorderSuccess'));
+      toast.success('Image order saved to draft. Sync to Etsy when ready.', { id: reorderToastId });
+      setHasPendingOrder(false);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || t('reorderError'));
+      toast.error(t('reorderError'), { id: reorderToastId });
+      onImagesChanged();
     } finally {
+      reorderInFlightRef.current = false;
       setSwapping(null);
+      setDraggingImageId(null);
     }
-  }, [sortedImages, uploadEndpoint, onImagesChanged]);
+  }, [listingId, shopId, onImagesChanged, t, reorderToastId, sortedImages, hasPendingOrder, originalRankByImageId]);
+
+  const discardImageOrder = useCallback(() => {
+    setLocalImages(sortImagesByRank(images));
+    setHasPendingOrder(false);
+    setDraggingImageId(null);
+  }, [images]);
+
+  const handleDropImage = useCallback((e: React.DragEvent<HTMLDivElement>, targetImageId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggingImageId || draggingImageId === targetImageId || swapping !== null || reorderInFlightRef.current) return;
+    if (draggingImageId < 0 || targetImageId < 0) {
+      setDraggingImageId(null);
+      toast.error('Pending uploads can be reordered after they are synced to Etsy.');
+      return;
+    }
+
+    const fromIndex = sortedImages.findIndex((img) => img.listing_image_id === draggingImageId);
+    const toIndex = sortedImages.findIndex((img) => img.listing_image_id === targetImageId);
+    reorderLocally(fromIndex, toIndex);
+  }, [draggingImageId, sortedImages, reorderLocally, swapping]);
 
   // --- AI Image Generation ---
 
@@ -313,24 +499,21 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       const nextRank = sortedImages.length > 0
         ? Math.max(...sortedImages.map((i) => i.rank)) + 1
         : 1;
+      const aiFile = base64ToFile(aiResult.base64, aiResult.mimeType, `ai-image-${Date.now()}.png`);
 
-      const res = await fetch(uploadEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_base64: aiResult.base64,
-          image_content_type: aiResult.mimeType,
-          rank: nextRank,
-        }),
+      const staged = await stageEtsyDraftFile({
+        shopId,
+        listingId,
+        file: aiFile,
+        kind: 'image',
+        operation: 'ai_upload',
+        rank: nextRank,
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('uploadFailed'));
-      }
-
-      toast.success(t('aiUploadSuccess'));
+      appendPendingUploads([aiFile], nextRank, undefined, [staged.media]);
+      toast.success('AI image saved to draft. Sync to Etsy when ready.');
       setAiDialogOpen(false);
+      setDraftMediaReloadKey((key) => key + 1);
       onImagesChanged();
     } catch (err: any) {
       toast.error(err.message || t('uploadError'));
@@ -348,21 +531,18 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
 
   const handleSaveAltText = async () => {
     if (!editAltImage) return;
+    if (editAltImage.is_pending_upload) {
+      toast.error('Alt text for pending uploads is saved during upload. Sync or discard the draft first.');
+      return;
+    }
     setSavingAlt(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=update_listing_image&listing_id=${listingId}&image_id=${editAltImage.listing_image_id}&shop_id=${shopId}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ alt_text: editAltText.trim() }),
-        }
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('altTextUpdateFailed'));
-      }
-      toast.success(t('altTextUpdateSuccess'));
+      await stageEtsyDraft({
+        shopId,
+        listingId,
+        media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: editAltImage.listing_image_id, altText: editAltText.trim() }],
+      });
+      toast.success('Alt text saved to draft. Sync to Etsy when ready.');
       setEditAltImage(null);
       onImagesChanged();
     } catch (err: any) {
@@ -380,6 +560,32 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         {t('imagesCount', { count: sortedImages.length })}
       </Typography>
 
+      {hasPendingOrder && (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
+          <Typography variant="caption" color="text.secondary">
+            {t('unsavedOrderHint')}
+          </Typography>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={saveImageOrder}
+            disabled={swapping !== null}
+            sx={{ textTransform: 'none', borderRadius: 1 }}
+          >
+            {swapping === -1 ? <CircularProgress size={16} color="inherit" /> : t('saveOrder')}
+          </Button>
+          <Button
+            size="small"
+            variant="text"
+            onClick={discardImageOrder}
+            disabled={swapping !== null}
+            sx={{ textTransform: 'none' }}
+          >
+            {t('discardOrder')}
+          </Button>
+        </Box>
+      )}
+
       <Box
         sx={{
           display: 'grid',
@@ -389,20 +595,36 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       >
         {sortedImages.map((img, idx) => {
           const isPrimary = img.rank === 1;
-          const isSwapping = swapping === img.rank;
+          const isSwapping = swapping === img.rank || swapping === -1;
+          const isPendingUpload = !!img.is_pending_upload;
 
           return (
             <Box
               key={img.listing_image_id}
+              draggable={!isSwapping && !isPendingUpload}
+              onDragStart={(e) => {
+                if (reorderInFlightRef.current || isPendingUpload) return;
+                e.dataTransfer.effectAllowed = 'move';
+                setDraggingImageId(img.listing_image_id);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+              }}
+              onDrop={(e) => handleDropImage(e, img.listing_image_id)}
+              onDragEnd={() => setDraggingImageId(null)}
+              onClick={() => openPreview(img)}
               sx={{
                 position: 'relative',
                 aspectRatio: '1',
                 borderRadius: 1,
                 overflow: 'hidden',
                 border: isPrimary ? '2px solid #f59e0b' : '1px solid #e5e7eb',
-                opacity: isSwapping ? 0.5 : 1,
-                transition: 'opacity 0.2s',
+                opacity: isSwapping ? 0.5 : draggingImageId === img.listing_image_id ? 0.65 : 1,
+                cursor: isSwapping ? 'wait' : isPendingUpload ? 'pointer' : 'grab',
+                transition: 'opacity 0.2s, border-color 0.2s',
                 '&:hover .img-controls': { opacity: 1 },
+                '&:active': { cursor: isPendingUpload ? 'pointer' : 'grabbing' },
               }}
             >
               <img
@@ -423,6 +645,25 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   }}
                 >
                   <CircularProgress size={28} />
+                </Box>
+              )}
+
+              {isPendingUpload && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 4,
+                    px: 0.75,
+                    py: 0.25,
+                    borderRadius: '999px',
+                    bgcolor: 'rgba(37,99,235,0.9)',
+                    color: 'white',
+                    fontSize: 10,
+                    fontWeight: 700,
+                  }}
+                >
+                  Draft
                 </Box>
               )}
 
@@ -461,9 +702,9 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               </Box>
 
               {/* Alt text indicator — click to edit */}
-              <Tooltip title={img.alt_text ? t('altTextClickToEdit', { text: img.alt_text }) : t('addAltText')}>
+              <Tooltip title={isPendingUpload ? 'Pending upload. Sync to Etsy before editing alt text.' : img.alt_text ? t('altTextClickToEdit', { text: img.alt_text }) : t('addAltText')}>
                 <Box
-                  onClick={(e) => { e.stopPropagation(); openAltEdit(img); }}
+                  onClick={(e) => { e.stopPropagation(); if (!isPendingUpload) openAltEdit(img); }}
                   sx={{
                     position: 'absolute',
                     bottom: 0,
@@ -477,11 +718,11 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    cursor: 'pointer',
+                    cursor: isPendingUpload ? 'default' : 'pointer',
                     '&:hover': { backgroundColor: img.alt_text ? 'rgba(0,0,0,0.8)' : 'rgba(245,158,11,0.9)' },
                   }}
                 >
-                  {img.alt_text || t('addAltTextShort')}
+                  {isPendingUpload ? 'Pending upload' : img.alt_text || t('addAltTextShort')}
                 </Box>
               </Tooltip>
 
@@ -501,7 +742,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               >
                 <IconButton
                   size="small"
-                  onClick={() => setDeleteConfirm(img)}
+                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm(img); }}
                   disabled={isSwapping}
                   sx={{
                     backgroundColor: 'rgba(239,68,68,0.9)',
@@ -518,8 +759,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   <Tooltip title={t('moveUp')} placement="left">
                     <IconButton
                       size="small"
-                      onClick={() => handleSwap('up', img)}
-                      disabled={!!swapping}
+                      onClick={(e) => { e.stopPropagation(); handleSwap('up', img); }}
+                      disabled={!!swapping || isPendingUpload}
                       sx={{
                         backgroundColor: 'rgba(59,130,246,0.85)',
                         color: 'white',
@@ -537,8 +778,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   <Tooltip title={t('moveDown')} placement="left">
                     <IconButton
                       size="small"
-                      onClick={() => handleSwap('down', img)}
-                      disabled={!!swapping}
+                      onClick={(e) => { e.stopPropagation(); handleSwap('down', img); }}
+                      disabled={!!swapping || isPendingUpload}
                       sx={{
                         backgroundColor: 'rgba(59,130,246,0.85)',
                         color: 'white',
@@ -555,8 +796,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 <Tooltip title={t('editAltText')} placement="left">
                   <IconButton
                     size="small"
-                    onClick={() => openAltEdit(img)}
-                    disabled={!!swapping}
+                    onClick={(e) => { e.stopPropagation(); if (!isPendingUpload) openAltEdit(img); }}
+                    disabled={!!swapping || isPendingUpload}
                     sx={{
                       backgroundColor: 'rgba(16,185,129,0.85)',
                       color: 'white',
@@ -629,6 +870,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         ref={fileInputRef}
         type="file"
         accept="image/jpeg,image/png,image/gif,image/webp"
+        multiple
         style={{ display: 'none' }}
         onChange={handleFileSelect}
       />
@@ -642,9 +884,11 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       >
         <DialogTitle>{t('uploadDialogTitle')}</DialogTitle>
         <DialogContent>
-          {!uploadPreview ? (
+          {uploadPreviews.length === 0 ? (
             <Box
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleUploadDrop}
               sx={{
                 border: '2px dashed #cbd5e1',
                 borderRadius: 2,
@@ -662,19 +906,32 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               <Typography variant="caption" color="text.secondary">
                 {t('formatsList')}
               </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                {t('multiUploadHint')}
+              </Typography>
             </Box>
           ) : (
             <Box sx={{ textAlign: 'center', mb: 2 }}>
-              <img
-                src={uploadPreview}
-                alt={t('preview')}
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: 200,
-                  borderRadius: 8,
-                  objectFit: 'contain',
-                }}
-              />
+              <Box sx={{ display: 'grid', gridTemplateColumns: uploadPreviews.length > 1 ? 'repeat(3, 1fr)' : '1fr', gap: 1 }}>
+                {uploadPreviews.slice(0, 9).map((preview, idx) => (
+                  <img
+                    key={preview}
+                    src={preview}
+                    alt={`${t('preview')} ${idx + 1}`}
+                    style={{
+                      width: '100%',
+                      height: uploadPreviews.length > 1 ? 120 : 320,
+                      borderRadius: 8,
+                      objectFit: 'cover',
+                    }}
+                  />
+                ))}
+              </Box>
+              {uploadFiles.length > 1 && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  {t('filesSelected', { count: uploadFiles.length })}
+                </Typography>
+              )}
               <Typography
                 variant="caption"
                 color="primary"
@@ -695,7 +952,18 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
             onChange={(e) => setUploadAltText(e.target.value)}
             sx={{ mt: 2 }}
             helperText={t('altTextHelperText')}
+            disabled={uploadFiles.length > 1}
           />
+          {uploading && uploadFiles.length > 1 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                {uploadProgress}%
+              </Typography>
+              <Box sx={{ height: 4, borderRadius: 999, bgcolor: '#e5e7eb', overflow: 'hidden', mt: 0.5 }}>
+                <Box sx={{ width: `${uploadProgress}%`, height: '100%', bgcolor: 'primary.main', transition: 'width 0.2s' }} />
+              </Box>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setUploadDialogOpen(false)} disabled={uploading}>
@@ -704,7 +972,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
           <Button
             onClick={handleUploadSubmit}
             variant="contained"
-            disabled={!uploadFile || uploading}
+            disabled={uploadFiles.length === 0 || uploading}
           >
             {uploading ? <CircularProgress size={20} /> : t('upload')}
           </Button>
@@ -968,7 +1236,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               <img
                 src={editAltImage.url_570xN}
                 alt={t('imageToEdit')}
-                style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8, objectFit: 'contain' }}
+                style={{ maxWidth: '100%', maxHeight: 420, borderRadius: 8, objectFit: 'contain' }}
               />
             </Box>
           )}
@@ -1001,6 +1269,99 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
           >
             {savingAlt ? <CircularProgress size={20} /> : t('save')}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Image preview dialog */}
+      <Dialog
+        open={!!previewImage}
+        onClose={closePreview}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>{previewImage ? t('imageRankAlt', { rank: previewImage.rank }) : t('preview')}</DialogTitle>
+        <DialogContent>
+          {previewImage && (
+            <Box
+              sx={{
+                position: 'relative',
+                minHeight: { xs: 280, sm: 420 },
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: '#f8fafc',
+                borderRadius: 2,
+                overflow: 'hidden',
+              }}
+            >
+              {!previewImageLoaded && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundImage: previewImage.url_170x135 ? `url(${previewImage.url_170x135})` : undefined,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      inset: 0,
+                      backdropFilter: previewImage.url_170x135 ? 'blur(14px)' : 'none',
+                      backgroundColor: previewImage.url_170x135 ? 'rgba(248,250,252,0.72)' : '#f8fafc',
+                    },
+                  }}
+                >
+                  <CircularProgress size={28} sx={{ position: 'relative', zIndex: 1 }} />
+                </Box>
+              )}
+              <img
+                src={previewImage.url_fullxfull || previewImage.url_570xN}
+                alt={previewImage.alt_text || t('imageRankAlt', { rank: previewImage.rank })}
+                onLoad={() => setPreviewImageLoaded(true)}
+                onError={() => setPreviewImageLoaded(true)}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '72vh',
+                  borderRadius: 8,
+                  objectFit: 'contain',
+                  opacity: previewImageLoaded ? 1 : 0,
+                  transition: 'opacity 0.18s ease',
+                }}
+              />
+              {previewImage.alt_text && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{
+                    position: 'absolute',
+                    left: 12,
+                    right: 12,
+                    bottom: 12,
+                    bgcolor: 'rgba(15,23,42,0.68)',
+                    color: 'white',
+                    borderRadius: 1,
+                    px: 1,
+                    py: 0.5,
+                    opacity: previewImageLoaded ? 1 : 0,
+                    transition: 'opacity 0.18s ease',
+                  }}
+                >
+                  {previewImage.alt_text}
+                </Typography>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {previewImage && (
+            <Button onClick={() => { openAltEdit(previewImage); closePreview(); }}>
+              {t('editAltText')}
+            </Button>
+          )}
+          <Button onClick={closePreview}>{t('close')}</Button>
         </DialogActions>
       </Dialog>
     </Box>

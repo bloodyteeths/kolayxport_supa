@@ -2758,6 +2758,72 @@ export default async function handler(
             }
         }
 
+        // GET /api/clawd/etsy?action=get_listing_properties&listing_id=XXXXX
+        if (req.method === 'GET' && action === 'get_listing_properties' && listing_id) {
+            const data = await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}/properties`,
+                accessToken
+            );
+            return res.status(200).json({
+                listing_id: parseInt(listing_id),
+                results: data.results || [],
+            });
+        }
+
+        // PUT /api/clawd/etsy?action=update_listing_property&listing_id=XXXXX&property_id=XXXXX
+        if ((req.method === 'PUT' || req.method === 'POST') && action === 'update_listing_property' && listing_id) {
+            const property_id = req.query.property_id as string;
+            if (!property_id) {
+                return res.status(400).json({ error: 'property_id is required' });
+            }
+
+            const { values, value_ids, scale_id } = req.body || {};
+            const payload: Record<string, any> = {};
+            if (Array.isArray(values)) payload.values = values;
+            if (Array.isArray(value_ids)) payload.value_ids = value_ids;
+            if (scale_id !== undefined && scale_id !== null && scale_id !== '') payload.scale_id = scale_id;
+
+            if (!payload.values && !payload.value_ids) {
+                return res.status(400).json({ error: 'values or value_ids is required' });
+            }
+
+            const result = await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}/properties/${property_id}`,
+                accessToken,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify(payload),
+                }
+            );
+
+            return res.status(200).json({
+                success: true,
+                listing_id: parseInt(listing_id),
+                property_id: parseInt(property_id),
+                result,
+            });
+        }
+
+        // DELETE /api/clawd/etsy?action=delete_listing_property&listing_id=XXXXX&property_id=XXXXX
+        if (req.method === 'DELETE' && action === 'delete_listing_property' && listing_id) {
+            const property_id = req.query.property_id as string;
+            if (!property_id) {
+                return res.status(400).json({ error: 'property_id is required' });
+            }
+
+            await callEtsyAPI(
+                `/shops/${shopId}/listings/${listing_id}/properties/${property_id}`,
+                accessToken,
+                { method: 'DELETE' }
+            );
+
+            return res.status(200).json({
+                success: true,
+                listing_id: parseInt(listing_id),
+                property_id: parseInt(property_id),
+            });
+        }
+
         // DELETE /api/clawd/etsy?action=delete_listing&listing_id=XXXXX
         if (req.method === 'DELETE' && action === 'delete_listing' && listing_id) {
             logger.info('Deleting Etsy listing', { listing_id, shopId });

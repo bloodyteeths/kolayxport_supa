@@ -25,6 +25,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { stageEtsyDraft } from '@/lib/etsy/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -183,16 +184,8 @@ export default function BackupManager({
       if (listing.quantity !== undefined) body.quantity = listing.quantity;
 
       try {
-        const res = await fetch(
-          `/api/clawd/etsy?action=update_listing&listing_id=${listing.listing_id}&shop_id=${shopId}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          }
-        );
-        if (res.ok) succeeded++;
-        else failed++;
+        await stageEtsyDraft({ shopId, listingId: listing.listing_id, fields: body });
+        succeeded++;
       } catch {
         failed++;
       }

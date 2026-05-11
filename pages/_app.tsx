@@ -51,7 +51,7 @@ function MyApp({ Component, pageProps }: AppProps) {
   return (
     <SessionProvider session={pageProps.session}>
     <AuthProvider>
-      <NextIntlClientProvider locale={locale} messages={messages[locale]}>
+      <NextIntlClientProvider locale={locale} messages={messages[locale]} timeZone="Europe/Istanbul">
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Head>
@@ -113,4 +113,4 @@ function MyApp({ Component, pageProps }: AppProps) {
   );
 }
 
-export default MyApp; 
+export default MyApp;

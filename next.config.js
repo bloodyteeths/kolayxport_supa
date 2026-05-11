@@ -6,8 +6,8 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   fallbacks: {
     document: '/offline',
   },
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+  cacheOnFrontEndNav: false,
+  aggressiveFrontEndNavCaching: false,
   reloadOnOnline: true,
   workboxOptions: {
     runtimeCaching: [
@@ -21,10 +21,11 @@ const withPWA = require('@ducanh2912/next-pwa').default({
       },
       {
         urlPattern: /\.(?:js|css)$/i,
-        handler: 'StaleWhileRevalidate',
+        handler: 'NetworkFirst',
         options: {
           cacheName: 'static-resources',
-          expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 },
+          networkTimeoutSeconds: 3,
         },
       },
       {

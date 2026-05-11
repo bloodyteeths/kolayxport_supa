@@ -195,10 +195,19 @@ const pushBatch = async batch => {
       const result = response.result;
       log.success(`Successfully synced ${batch.length} orders`, result);
       
-      // Update synced orders storage
-      const synced = (await chrome.storage.local.get({ [STORAGE_KEY]: [] }))[STORAGE_KEY];
-      const newSynced = [...synced, ...batch.map(o => o.orderId)].slice(-MAX_STORED_IDS);
-      await chrome.storage.local.set({ [STORAGE_KEY]: newSynced });
+      // Update synced orders storage with timestamp for TTL
+      const syncedData = (await chrome.storage.local.get({ [STORAGE_KEY]: {} }))[STORAGE_KEY];
+      // Migrate from old array format to object format {orderNumber: timestamp}
+      var syncedMap = (typeof syncedData === 'object' && !Array.isArray(syncedData)) ? syncedData : {};
+      var now = Date.now();
+      batch.forEach(function(o) { if (o.orderNumber) syncedMap[o.orderNumber] = now; });
+      // Prune entries older than 24 hours and keep max entries
+      var pruned = {};
+      var keys = Object.keys(syncedMap).slice(-MAX_STORED_IDS);
+      keys.forEach(function(k) {
+        if (now - syncedMap[k] < 24 * 60 * 60 * 1000) pruned[k] = syncedMap[k];
+      });
+      await chrome.storage.local.set({ [STORAGE_KEY]: pruned });
       
       // Notify background script
       safeSendMessage({
@@ -228,7 +237,12 @@ function parseAddressText(text, fallbackName = '') {
     const cityLine = lines[lines.length - 2] || '';
     if (lines.length > 4) addr.line2 = lines[2];
 
-    const cityMatch = cityLine.match(/^(.+?),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+    // US: "City, ST 12345" or "City, ST 12345-6789"
+    // Canada: "City, ON A1B 2C3"
+    // Other: "City, Province PostalCode"
+    var cityMatch = cityLine.match(/^(.+?),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/) ||
+                    cityLine.match(/^(.+?),?\s+([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$/) ||
+                    cityLine.match(/^(.+?),?\s+([A-Z]{2,3})\s+(.+)$/);
     if (cityMatch) {
       addr.city = cityMatch[1];
       addr.state = cityMatch[2];
@@ -314,7 +328,10 @@ async function extract() {
     await new Promise(r => setTimeout(r, 1000));
   }
 
-  const synced = (await chrome.storage.local.get({ [STORAGE_KEY]: [] }))[STORAGE_KEY];
+  // Load synced orders map {orderNumber: timestamp} — orders re-sync after 24h
+  var syncedRaw = (await chrome.storage.local.get({ [STORAGE_KEY]: {} }))[STORAGE_KEY];
+  var syncedMap = (typeof syncedRaw === 'object' && !Array.isArray(syncedRaw)) ? syncedRaw : {};
+  var syncNow = Date.now();
 
   // Try multiple selectors for order rows — Etsy changes their DOM frequently
   const orderRowSelectors = [
@@ -407,9 +424,9 @@ async function extract() {
         return;
       }
       
-      if (synced.includes(orderId)) {
-        log.info(`Row ${index}: Order ${orderId} already synced, skipping`);
-        return;
+      // Skip if synced within last 24 hours
+      if (syncedMap[orderId] && (syncNow - syncedMap[orderId] < 24 * 60 * 60 * 1000)) {
+        return; // Recently synced, skip
       }
       
       log.info(`Row ${index}: Processing order ${orderId}`);
@@ -520,13 +537,16 @@ async function extract() {
       }
 
       if (addressContainer) {
-        // Try structured fields first
-        const nameSpan = addressContainer.querySelector('.name, [class*="name"]');
-        const firstLineSpan = addressContainer.querySelector('.first-line, [class*="street"], [class*="line1"]');
-        const citySpan = addressContainer.querySelector('.city, [class*="city"]');
-        const stateSpan = addressContainer.querySelector('.state, [class*="state"], [class*="region"]');
-        const zipSpan = addressContainer.querySelector('.zip, [class*="zip"], [class*="postal"]');
-        const countrySpan = addressContainer.querySelector('.country-name, [class*="country"]');
+        // Log raw address HTML for debugging
+        log.info('Order ' + orderId + ': address container innerHTML', { html: addressContainer.innerHTML.substring(0, 500) });
+
+        // Try structured fields first — Etsy uses class names like .name, .first-line, etc.
+        const nameSpan = addressContainer.querySelector('.name');
+        const firstLineSpan = addressContainer.querySelector('.first-line');
+        const citySpan = addressContainer.querySelector('.city');
+        const stateSpan = addressContainer.querySelector('.state');
+        const zipSpan = addressContainer.querySelector('.zip');
+        const countrySpan = addressContainer.querySelector('.country-name');
 
         if (nameSpan || firstLineSpan || citySpan) {
           shippingAddress = {
@@ -538,12 +558,26 @@ async function extract() {
             postalCode: zipSpan?.textContent?.trim() || '',
             country: countrySpan?.textContent?.trim() || ''
           };
-          log.info(`Order ${orderId}: Found structured address`, shippingAddress);
+          log.info('Order ' + orderId + ': Found structured address', shippingAddress);
         } else {
-          // Address container found but no structured fields — parse as text block
-          const addressText = addressContainer.textContent.trim();
-          shippingAddress = parseAddressText(addressText, buyerName);
-          log.info(`Order ${orderId}: Parsed address from text block`, shippingAddress);
+          // No structured fields — parse entire address as a text block
+          // Etsy renders address as line-separated text: Name\nStreet\nCity, ST ZIP\nCountry
+          var addressText = addressContainer.innerText || addressContainer.textContent || '';
+          shippingAddress = parseAddressText(addressText.trim(), buyerName);
+          log.info('Order ' + orderId + ': Parsed address from text block', shippingAddress);
+        }
+
+        // If country still empty, try to find it from the last line of the address text
+        if (!shippingAddress.country) {
+          var addrLines = (addressContainer.innerText || '').split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+          if (addrLines.length >= 3) {
+            var lastLine = addrLines[addrLines.length - 1];
+            // If last line looks like a country name (not a zip code or state)
+            if (lastLine.length > 2 && !/^\d{5}/.test(lastLine) && !/^[A-Z]{2}\s+\d/.test(lastLine)) {
+              shippingAddress.country = lastLine;
+              log.info('Order ' + orderId + ': Extracted country from last line: ' + lastLine);
+            }
+          }
         }
       }
 
@@ -596,7 +630,7 @@ async function extract() {
           city: shippingAddress.city || '',
           state: shippingAddress.state || '',
           postalCode: shippingAddress.postalCode || '',
-          country: shippingAddress.country || 'US'
+          country: shippingAddress.country || ''
         },
         notes: notes || '',
         shipByDate: shipByDate || '',
@@ -661,12 +695,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
     case 'getStatus':
       chrome.storage.local.get([STORAGE_KEY, 'kx_logs']).then(result => {
-        const syncedOrderIds = result[STORAGE_KEY] || [];
+        const syncedData = result[STORAGE_KEY] || {};
+        const syncedCount = typeof syncedData === 'object' && !Array.isArray(syncedData) ? Object.keys(syncedData).length : (Array.isArray(syncedData) ? syncedData.length : 0);
         const totalOrdersOnPage = document.querySelectorAll('.panel-body-row').length;
-        const pendingCount = Math.max(0, totalOrdersOnPage - syncedOrderIds.length);
-        
+        const pendingCount = Math.max(0, totalOrdersOnPage - syncedCount);
+
         const status = {
-          syncedCount: syncedOrderIds.length,
+          syncedCount: syncedCount,
           pendingCount: pendingCount,
           totalOrdersOnPage: totalOrdersOnPage,
           url: window.location.href,
@@ -968,10 +1003,17 @@ async function pushTrackingToEtsy(data) {
       'button.btn-transaction-action',
     ];
 
+    // Texts that open the tracking form — order matters, most specific first
     const actionTexts = [
-      'mark as complete', 'add tracking', 'complete order',
-      'mark as shipped', 'kargo bilgisi ekle', 'gönderildi olarak işaretle',
-      'siparişi tamamla', 'tracking',
+      'complete order', 'mark as complete', 'mark as shipped',
+      'add tracking', 'complete',
+      'siparişi tamamla', 'gönderildi olarak işaretle', 'kargo bilgisi ekle',
+    ];
+
+    // Texts to AVOID clicking (these are NOT the tracking form opener)
+    const avoidTexts = [
+      'create a shipping label', 'buy shipping label', 'purchase label',
+      'get shipping label', 'kargo etiketi',
     ];
 
     let actionButton = null;
@@ -982,12 +1024,13 @@ async function pushTrackingToEtsy(data) {
       if (actionButton) break;
     }
 
-    // Fallback: search by button text
+    // Fallback: search by button text, but skip "create shipping label" buttons
     if (!actionButton) {
       const allButtons = document.querySelectorAll('button, a.btn, [role="button"]');
       for (const b of allButtons) {
-        const text = (b.textContent || '').toLowerCase().trim();
-        if (actionTexts.some(t => text.includes(t))) {
+        var text = (b.textContent || '').toLowerCase().trim();
+        if (avoidTexts.some(function(t) { return text.includes(t); })) continue;
+        if (actionTexts.some(function(t) { return text.includes(t); })) {
           actionButton = b;
           break;
         }
@@ -1026,20 +1069,30 @@ async function pushTrackingToEtsy(data) {
     }
 
     if (carrierSelect) {
-      // Try to find matching option
+      // Try to find matching option — prefer exact match over partial
       const options = carrierSelect.querySelectorAll('option');
       let matched = false;
+      var exactMatch = null;
+      var partialMatch = null;
       for (const opt of options) {
-        const val = (opt.value || '').toLowerCase();
-        const text = (opt.textContent || '').toLowerCase();
-        if (val.includes(carrierValue) || text.includes(carrierValue) ||
-            text.includes(data.carrierName.toLowerCase())) {
-          carrierSelect.value = opt.value;
-          carrierSelect.dispatchEvent(new Event('change', { bubbles: true }));
-          matched = true;
-          log.info(`Selected carrier: ${opt.textContent}`);
+        const val = (opt.value || '').toLowerCase().trim();
+        const text = (opt.textContent || '').toLowerCase().trim();
+        // Exact match: value or text equals carrier name exactly
+        if (val === carrierValue || text === carrierValue || text === data.carrierName.toLowerCase()) {
+          exactMatch = opt;
           break;
         }
+        // Partial match: value or text contains carrier name (but not preferred)
+        if (!partialMatch && (val.includes(carrierValue) || text.includes(carrierValue))) {
+          partialMatch = opt;
+        }
+      }
+      var bestMatch = exactMatch || partialMatch;
+      if (bestMatch) {
+        carrierSelect.value = bestMatch.value;
+        carrierSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        matched = true;
+        log.info('Selected carrier: ' + bestMatch.textContent + (exactMatch ? ' (exact)' : ' (partial)'));
       }
       if (!matched) {
         // Default to "Other" if no match
@@ -1089,27 +1142,38 @@ async function pushTrackingToEtsy(data) {
     updateBannerStatus('Gönderiliyor...');
 
     const submitTexts = [
-      'submit', 'save', 'kaydet', 'gönder', 'complete', 'tamamla',
-      'mark as complete', 'ship', 'confirm',
+      'submit', 'save', 'kaydet', 'gönder', 'tamamla',
+      'mark as complete', 'confirm', 'complete order',
+    ];
+
+    // Texts to NEVER click as submit
+    const avoidSubmitTexts = [
+      'create a shipping label', 'buy shipping label', 'purchase label',
+      'get shipping label', 'kargo etiketi', 'cancel', 'iptal',
     ];
 
     // Look for submit button within the tracking form area
     const formArea = trackingInput.closest('form') || trackingInput.closest('[role="dialog"]') || trackingInput.closest('.overlay-body') || document.body;
-    const submitButtons = formArea.querySelectorAll('button[type="submit"], button.btn-primary, input[type="submit"], button[data-test-id*="submit"]');
+    const submitButtons = formArea.querySelectorAll('button[type="submit"], input[type="submit"]');
 
     let submitButton = null;
 
-    // First try type="submit" or primary buttons
-    if (submitButtons.length > 0) {
-      submitButton = submitButtons[submitButtons.length - 1]; // Usually the last primary button
+    // First try type="submit" buttons, filtering out bad ones
+    for (const sb of submitButtons) {
+      var sbText = (sb.textContent || '').toLowerCase().trim();
+      if (!avoidSubmitTexts.some(function(t) { return sbText.includes(t); })) {
+        submitButton = sb;
+        break;
+      }
     }
 
-    // Fallback: search by text
+    // Fallback: search by text, skip dangerous buttons
     if (!submitButton) {
       const allBtns = formArea.querySelectorAll('button, input[type="submit"]');
       for (const b of allBtns) {
-        const text = (b.textContent || '').toLowerCase().trim();
-        if (submitTexts.some(t => text.includes(t))) {
+        var btnText = (b.textContent || '').toLowerCase().trim();
+        if (avoidSubmitTexts.some(function(t) { return btnText.includes(t); })) continue;
+        if (submitTexts.some(function(t) { return btnText.includes(t); })) {
           submitButton = b;
           break;
         }

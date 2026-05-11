@@ -3,15 +3,16 @@ import type { MngCredentials } from './mng.types';
 
 /**
  * Loads MNG/DHL eCommerce credentials for a user.
- * - appId/appSecret come from env vars (platform-level, KolayXport's app)
- * - customerNumber/password come from the user's Credential table (per-merchant)
+ * - appId/appSecret: platform-level from env vars (KolayXport's app)
+ * - customerNumber/password: per-user from DB
+ * - environment: per-user from DB (default: 'test')
  */
-export async function getMngCredentialsForUser(userId: string): Promise<MngCredentials & { customerNumber: string; customerPassword: string }> {
+export async function getMngCredentialsForUser(userId: string): Promise<MngCredentials> {
   const appId = process.env.MNG_APP_ID;
   const appSecret = process.env.MNG_APP_SECRET;
 
   if (!appId || !appSecret) {
-    throw new Error('MNG_APP_ID and MNG_APP_SECRET environment variables are required.');
+    throw new Error('MNG_APP_ID ve MNG_APP_SECRET ortam değişkenleri gereklidir.');
   }
 
   const creds = await prisma.credential.findUnique({
@@ -19,10 +20,11 @@ export async function getMngCredentialsForUser(userId: string): Promise<MngCrede
     select: {
       mngCustomerNumber: true,
       mngPassword: true,
+      mngApiEnvironment: true,
     },
   });
 
-  if (!creds || !creds.mngCustomerNumber || !creds.mngPassword) {
+  if (!creds?.mngCustomerNumber || !creds?.mngPassword) {
     throw new Error('DHL eCommerce müşteri numarası ve şifre ayarlardan girilmelidir.');
   }
 
@@ -31,5 +33,6 @@ export async function getMngCredentialsForUser(userId: string): Promise<MngCrede
     appSecret,
     customerNumber: creds.mngCustomerNumber,
     customerPassword: creds.mngPassword,
+    environment: (creds.mngApiEnvironment as 'test' | 'production') || 'test',
   };
 }

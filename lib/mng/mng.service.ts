@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { logger } from '../logger';
-import { MNG_ENDPOINTS } from './mng.config';
+import { getMngEndpoints } from './mng.config';
 import type {
   MngCredentials,
   MngAuthResponse,
@@ -32,7 +32,7 @@ const TOKEN_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
  * Tokens are cached per appId and refreshed before expiry.
  */
 export async function getMngToken(credentials: MngCredentials): Promise<string> {
-  const cacheKey = credentials.appId;
+  const cacheKey = `${credentials.appId}:${credentials.customerNumber}`;
   const cached = tokenCache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {
@@ -42,12 +42,15 @@ export async function getMngToken(credentials: MngCredentials): Promise<string> 
   const body = {
     appId: credentials.appId,
     appSecret: credentials.appSecret,
+    customerNumber: credentials.customerNumber,
+    password: credentials.customerPassword,
     identityType: 1,
   };
 
-  logger.info(`[MNG] Requesting JWT token from ${MNG_ENDPOINTS.token}`);
+  const endpoints = getMngEndpoints(credentials.environment);
+  logger.info(`[MNG] Requesting JWT token from ${endpoints.token}`);
 
-  const res = await fetch(MNG_ENDPOINTS.token, {
+  const res = await fetch(endpoints.token, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -84,7 +87,8 @@ async function mngRequest<T = any>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = await getMngToken(credentials);
-  const baseUrl = MNG_ENDPOINTS.base;
+  const endpoints = getMngEndpoints(credentials.environment);
+  const baseUrl = endpoints.base;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

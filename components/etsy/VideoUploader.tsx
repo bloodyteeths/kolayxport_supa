@@ -6,6 +6,7 @@ import AddLinkIcon from '@mui/icons-material/AddLink';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 
 interface VideoInfo {
   video_id: number;
@@ -60,40 +61,9 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
     setUploadProgress(0);
 
     try {
-      const formData = new FormData();
-      formData.append('video', file);
-      formData.append('listing_id', listingId);
-      formData.append('shop_id', shopId);
-
-      // Use XMLHttpRequest for upload progress
-      const result = await new Promise<any>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/clawd/etsy-video-upload');
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            setUploadProgress(Math.round((event.loaded / event.total) * 100));
-          }
-        };
-
-        xhr.onload = () => {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(data);
-            } else {
-              reject(new Error(data.error || t('uploadFailed')));
-            }
-          } catch {
-            reject(new Error(t('uploadFailed')));
-          }
-        };
-
-        xhr.onerror = () => reject(new Error(t('uploadError')));
-        xhr.send(formData);
-      });
-
-      toast.success(t('uploadSuccess'));
+      await stageEtsyDraftFile({ shopId, listingId, file, kind: 'video', operation: 'upload' });
+      setUploadProgress(100);
+      toast.success('Video upload saved to draft. Sync to Etsy when ready.');
       onVideoChanged();
     } catch (err: any) {
       toast.error(err.message || t('uploadError'));
@@ -117,21 +87,12 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
     setUploading(true);
 
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=upload_video&listing_id=${listingId}&shop_id=${shopId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ video_url: videoUrl.trim() }),
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || t('uploadFailed'));
-      }
-
-      toast.success(t('uploadSuccess'));
+      await stageEtsyDraft({
+        shopId,
+        listingId,
+        media: [{ kind: 'video', operation: 'upload', sourceUrl: videoUrl.trim() }],
+      });
+      toast.success('Video URL saved to draft. Sync to Etsy when ready.');
       setUrlDialogOpen(false);
       setVideoUrl('');
       onVideoChanged();
@@ -146,19 +107,12 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
     if (!deleteConfirm) return;
     setDeleting(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=delete_video&listing_id=${listingId}&video_id=${deleteConfirm.video_id}&shop_id=${shopId}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || t('deleteFailed'));
-      }
-
-      toast.success(t('deleteSuccess'));
+      await stageEtsyDraft({
+        shopId,
+        listingId,
+        media: [{ kind: 'video', operation: 'delete', etsyMediaId: deleteConfirm.video_id }],
+      });
+      toast.success('Video delete saved to draft. Sync to Etsy when ready.');
       setDeleteConfirm(null);
       onVideoChanged();
     } catch (err: any) {

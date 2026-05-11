@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import FindReplaceIcon from '@mui/icons-material/FindReplace';
 import { toast } from 'react-hot-toast';
+import { stageEtsyDraft } from '@/lib/etsy/draftClient';
 
 interface Listing {
   listing_id: number;
@@ -191,22 +192,7 @@ export default function FindReplaceDialog({
         if (changes.tags !== undefined) body.tags = changes.tags;
         if (changes.materials !== undefined) body.materials = changes.materials;
 
-        const res = await fetch(
-          `/api/clawd/etsy?action=update_listing&listing_id=${listing.listing_id}&shop_id=${shopId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body),
-          }
-        );
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || `HTTP ${res.status}`);
-        }
-
+        await stageEtsyDraft({ shopId, listingId: listing.listing_id, fields: body });
         success++;
       } catch (err) {
         errors++;

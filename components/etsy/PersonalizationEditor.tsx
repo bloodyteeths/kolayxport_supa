@@ -24,6 +24,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { stageEtsyDraft } from '@/lib/etsy/draftClient';
 
 type PersonalizationQuestionType = 'text_input' | 'dropdown' | 'unlabeled_upload' | 'labeled_upload';
 
@@ -104,41 +105,27 @@ function SimpleModeEditor({
 
     setSaving(true);
     try {
-      const res = personalizable
-        ? await fetch(
-            `/api/clawd/etsy?action=set_simple_personalization&listing_id=${listingId}&shop_id=${shopId}`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
+      await stageEtsyDraft({
+        shopId,
+        listingId,
+        personalization: personalizable
+          ? {
+              personalization_questions: [{
+                question_type: 'text_input',
                 question_text: questionText.trim() || 'Personalization',
                 instructions,
                 required: isRequired,
-                max_characters: Math.min(Math.max(charCountMax, 1), 1024),
-              }),
+                max_allowed_characters: Math.min(Math.max(charCountMax, 1), 1024),
+              }],
             }
-          )
-        : await fetch(
-            `/api/clawd/etsy?action=remove_personalization&listing_id=${listingId}&shop_id=${shopId}`,
-            {
-              method: 'POST',
-            }
-          );
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || t('toastSaveFailed'));
-      }
+          : { remove: true },
+      });
 
       if (overrideOff) {
         setIsPersonalizable(false);
       }
 
-      toast.success(
-        overrideOff ? t('toastTurnedOff') : t('toastSaved')
-      );
+      toast.success(overrideOff ? 'Personalization removal saved to draft' : 'Personalization saved to draft');
       onSaved();
     } catch (err: any) {
       toast.error(err.message || t('toastError'));
@@ -481,29 +468,8 @@ function AdvancedModeEditor({
         return cleaned;
       });
 
-      const res = await fetch(
-        `/api/clawd/etsy?action=set_personalization&listing_id=${listingId}&shop_id=${shopId}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ personalization_questions: payload }),
-        }
-      );
-
-      const data = await res.json();
-      if (!res.ok) {
-        // If multi-question API is not available, fall back to legacy
-        if (res.status === 400 || res.status === 404) {
-          toast.error(t('toastMultiQuestionNotAvailable'));
-          onFallbackToLegacy();
-          return;
-        }
-        throw new Error(data.error || t('toastSaveFailed'));
-      }
-
-      toast.success(t('toastQuestionsSaved'));
+      await stageEtsyDraft({ shopId, listingId, personalization: { personalization_questions: payload } });
+      toast.success('Personalization questions saved to draft');
       onSaved();
     } catch (err: any) {
       toast.error(err.message || t('toastError'));
@@ -519,20 +485,10 @@ function AdvancedModeEditor({
 
     setRemoving(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=remove_personalization&listing_id=${listingId}&shop_id=${shopId}`,
-        {
-          method: 'POST',
-        }
-      );
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || t('toastRemoveFailed'));
-      }
+      await stageEtsyDraft({ shopId, listingId, personalization: { remove: true } });
 
       setQuestions([]);
-      toast.success(t('toastAllRemoved'));
+      toast.success('Personalization removal saved to draft');
       onSaved();
     } catch (err: any) {
       toast.error(err.message || t('toastError'));

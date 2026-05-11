@@ -1971,8 +1971,8 @@
       "header": {
         "editingListings": "Editing {count} listings",
         "changes": "{count} changes",
-        "syncUpdates": "Sync Updates",
-        "sync": "Sync",
+        "syncUpdates": "Save Drafts",
+        "sync": "Save",
         "cancel": "Cancel",
         "discard": "Discard"
       },
@@ -1993,13 +1993,33 @@
       },
       "photos": {
         "selectFiles": "Select Photos",
+        "dropToStage": "Select or drop photos here, then stage them for the checked listings.",
+        "chooseFilesFirst": "Choose photos first",
+        "unsupportedFiles": "Some files were skipped. Use JPG, PNG, GIF, or WebP.",
         "filesSelected": "{count} files selected",
         "uploadToAll": "Upload to All",
+        "replaceAll": "Replace All",
+        "appendMode": "Append",
+        "replaceAllMode": "Replace all",
         "deleteAll": "Delete All Photos",
         "aiGenerateAltText": "AI Generate Alt Text",
         "aiAltTextProgress": "AI Alt Text... {progress}%",
         "altTextHelper": "Automatically generate SEO-optimized alt text for all images",
-        "photosHelper": "Photos are displayed in the listing. Alt text will be applied to all images."
+        "photosHelper": "Photos are displayed in the listing. Alt text will be applied to all images.",
+        "loadingImages": "Loading photos...",
+        "imageCount": "{count} photos",
+        "noImages": "No photos",
+        "dragPreviewHelper": "Drag photos inside a listing to reorder. Click a photo to preview it and edit alt text.",
+        "clickToPreview": "Preview / edit alt text",
+        "previewTitle": "Photo Preview",
+        "rankLabel": "Position {rank}",
+        "altTextLabel": "Alt Text (SEO)",
+        "altTextPlaceholder": "Describe this image for search engines",
+        "saveAltText": "Save Alt Text",
+        "altTextSaved": "Alt text saved",
+        "altTextSaveFailed": "Could not save alt text",
+        "orderSaved": "Photo order saved",
+        "orderSaveFailed": "Could not save photo order"
       },
       "videos": {
         "urlPlaceholder": "Video URL (MP4, MOV — max 100MB, 5-60 seconds)...",
@@ -2047,6 +2067,8 @@
         "draft": "Draft"
       },
       "categorySection": {
+        "categoryLabel": "Etsy Category",
+        "categoryPlaceholder": "Search category name or ID",
         "taxonomyIdLabel": "Taxonomy ID",
         "taxonomyIdPlaceholder": "e.g. 2078",
         "taxonomyIdHelper": "Enter the Etsy taxonomy ID for the category. Find IDs in Etsy's taxonomy reference.",
@@ -2094,8 +2116,8 @@
         "altTextSuccess": "Alt text: {count} listings updated",
         "altTextPartial": "Alt text: {success} ok, {failed} failed",
         "noChangesToSave": "No changes to save",
-        "saveSuccess": "{count} listings updated successfully",
-        "savePartial": "{success} ok, {failed} failed",
+        "saveSuccess": "Drafts saved for {count} listings",
+        "savePartial": "{success} drafts saved, {failed} failed",
         "allChangesDiscarded": "All changes discarded",
         "photoUploadSuccess": "{count} photos uploaded to {listings} listings",
         "photoUploadPartial": "Photos: {success} uploaded, {failed} failed",
@@ -2109,11 +2131,12 @@
         "sectionCreateFailed": "Failed to create section"
       },
       "footer": {
-        "publishToEtsy": "Publish to Etsy"
+        "publishToEtsy": "Save Drafts"
       },
       "confirm": {
         "unsavedChanges": "{count} unsaved changes. Are you sure you want to exit?",
         "deleteAllPhotos": "Delete ALL photos from {count} listings? This cannot be undone.",
+        "replaceAllPhotos": "Replace ALL photos on {count} listings with the selected files? This cannot be undone.",
         "deleteAllVideos": "Delete ALL videos from {count} listings? This cannot be undone."
       },
       "shopLabel": "Etsy"
@@ -3159,6 +3182,9 @@
       "reorderFailedStep2": "Could not change order (step 2)",
       "reorderSuccess": "Order updated",
       "reorderError": "Error changing order",
+      "unsavedOrderHint": "Photo order changed in app. Save to update Etsy.",
+      "saveOrder": "Save order",
+      "discardOrder": "Discard order",
       "enterPrompt": "Enter a prompt",
       "generateFailed": "Image could not be generated",
       "generateSuccess": "Image generated!",
@@ -3168,8 +3194,10 @@
       "altTextUpdateSuccess": "Alt text updated",
       "altTextUpdateError": "Error updating alt text",
       "uploadDialogTitle": "Upload Image",
-      "clickToSelectImage": "Click to select an image",
+      "clickToSelectImage": "Click or drop photos here",
       "formatsList": "JPEG, PNG, GIF, WebP",
+      "multiUploadHint": "You can select multiple photos at once.",
+      "filesSelected": "{count} images selected",
       "preview": "Preview",
       "selectDifferentImage": "Select a different image",
       "altTextSeoLabel": "Alt Text (SEO)",
@@ -6066,6 +6094,8 @@
     "detailed": "Detailed",
     "all": "All",
     "selected": "{count} selected",
+    "syncDraftsShort": "Sync {count}",
+    "syncDraftsToEtsy": "Sync {count} Drafts to Etsy",
     "bulkEdit": "Bulk Edit",
     "editShort": "Edit",
     "sectionChip": "Section: {name}",

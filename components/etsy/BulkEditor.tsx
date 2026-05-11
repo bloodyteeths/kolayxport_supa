@@ -5,6 +5,7 @@ import {
   CircularProgress, LinearProgress, SwipeableDrawer, List, ListItem, ListItemButton,
   ListItemText, Dialog, DialogTitle, DialogContent, DialogActions, ToggleButton, ToggleButtonGroup,
   Collapse, Checkbox, Tooltip, Badge, Switch, FormControlLabel, Alert,
+  Autocomplete,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -40,7 +41,6 @@ import {
   Storefront as StorefrontIcon,
   Settings as SettingsIcon,
   TextFields as TextFieldsIcon,
-  Sync as SyncIcon,
   ContentCopy as CopyIcon,
   Delete as DeleteIcon,
   Add as AddIcon,
@@ -56,6 +56,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import VariationEditor from './VariationEditor';
+import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,6 +95,18 @@ interface SelectedListing {
   taxonomy_id?: number | null;
 }
 
+interface ListingImage {
+  listing_image_id: number;
+  url_75x75?: string;
+  url_170x135?: string;
+  url_570xN?: string;
+  url_fullxfull?: string;
+  rank: number;
+  alt_text?: string;
+  is_pending_upload?: boolean;
+  pending_filename?: string;
+}
+
 interface ShopSection {
   shop_section_id: number;
   title: string;
@@ -125,7 +138,7 @@ interface BulkEditorProps {
 
 type FieldCategory =
   | 'photos' | 'videos'
-  | 'title' | 'description' | 'tags' | 'materials' | 'about' | 'category' | 'section' | 'personalization'
+  | 'title' | 'description' | 'tags' | 'materials' | 'about' | 'category' | 'etsy_details' | 'section' | 'personalization'
   | 'variations' | 'price' | 'quantity' | 'sku'
   | 'processing_time' | 'shipping_profile' | 'item_weight' | 'item_size' | 'return_policy'
   | 'state';
@@ -164,6 +177,52 @@ interface PendingChange {
   personalization_instructions?: string;
   personalization_char_count_max?: number;
   taxonomy_id?: number;
+  taxonomyProperties?: ListingPropertyPatch[];
+}
+
+interface TaxonomyOption {
+  value_id?: number;
+  name: string;
+}
+
+interface TaxonomyNode {
+  id: number;
+  name: string;
+  children?: TaxonomyNode[];
+}
+
+interface FlatTaxonomy {
+  id: number;
+  label: string;
+}
+
+interface TaxonomyProperty {
+  property_id: number;
+  display_name: string;
+  name?: string;
+  supports_variations?: boolean;
+  is_required?: boolean;
+  possible_values?: Array<{ value_id: number; name: string }>;
+  scales?: Array<{ scale_id: number; display_name: string }>;
+}
+
+interface ListingPropertyPatch {
+  property_id: number;
+  values: string[];
+  value_ids?: number[];
+  scale_id?: number | null;
+}
+
+function flattenTaxonomy(nodes: TaxonomyNode[], prefix = ''): FlatTaxonomy[] {
+  const result: FlatTaxonomy[] = [];
+  for (const node of nodes) {
+    const label = prefix ? `${prefix} > ${node.name}` : node.name;
+    result.push({ id: node.id, label });
+    if (node.children?.length) {
+      result.push(...flattenTaxonomy(node.children, label));
+    }
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +313,11 @@ const FIELD_DEFS: FieldDef[] = [
     operations: [{ value: 'set_value', label: 'operations.setCategory' }],
   },
   {
+    key: 'etsy_details', label: 'Etsy details', group: 'groups.listings',
+    icon: <TuneIcon fontSize="small" />,
+    operations: [{ value: 'set_value', label: 'Edit details' }],
+  },
+  {
     key: 'section', label: 'fields.section', group: 'groups.listings',
     icon: <FolderIcon fontSize="small" />,
     operations: [{ value: 'set_section', label: 'operations.setSection' }],
@@ -340,12 +404,9 @@ const DIMENSION_UNITS = ['in', 'ft', 'mm', 'cm'];
 // API helpers
 // ---------------------------------------------------------------------------
 
-async function callUpdateListing(shopId: string, listingId: number, body: Record<string, any>) {
-  return fetch(`/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${shopId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+async function callUpdateListing(shopId: string, listingId: number, body: Record<string, any>, queuedActions?: Array<Record<string, any>>) {
+  await stageEtsyDraft({ shopId, listingId, fields: body, queuedActions });
+  return { ok: true, json: async () => ({ success: true }) } as Response;
 }
 
 async function callSetSimplePersonalization(
@@ -353,22 +414,25 @@ async function callSetSimplePersonalization(
   listingId: number,
   changes: Pick<PendingChange, 'personalization_is_required' | 'personalization_instructions' | 'personalization_char_count_max'>
 ) {
-  return fetch(`/api/clawd/etsy?action=set_simple_personalization&listing_id=${listingId}&shop_id=${shopId}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      question_text: 'Personalization',
-      required: changes.personalization_is_required || false,
-      instructions: changes.personalization_instructions || '',
-      max_characters: changes.personalization_char_count_max || 256,
-    }),
+  await stageEtsyDraft({
+    shopId,
+    listingId,
+    personalization: {
+      personalization_questions: [{
+        question_type: 'text_input',
+        question_text: 'Personalization',
+        required: changes.personalization_is_required || false,
+        instructions: changes.personalization_instructions || '',
+        max_allowed_characters: changes.personalization_char_count_max || 256,
+      }],
+    },
   });
+  return { ok: true, json: async () => ({ success: true }) } as Response;
 }
 
 async function callRemovePersonalization(shopId: string, listingId: number) {
-  return fetch(`/api/clawd/etsy?action=remove_personalization&listing_id=${listingId}&shop_id=${shopId}`, {
-    method: 'POST',
-  });
+  await stageEtsyDraft({ shopId, listingId, personalization: { remove: true } });
+  return { ok: true, json: async () => ({ success: true }) } as Response;
 }
 
 // ---------------------------------------------------------------------------
@@ -582,12 +646,51 @@ export default function BulkEditor({
   const [personalizationRequired, setPersonalizationRequired] = useState(false);
   const [personalizationInstructions, setPersonalizationInstructions] = useState('');
   const [personalizationCharMax, setPersonalizationCharMax] = useState('');
+  const taxonomyGroups = useMemo(() => {
+    const groups = new Map<number, SelectedListing[]>();
+    listings.forEach((listing) => {
+      if (!listing.taxonomy_id) return;
+      const group = groups.get(listing.taxonomy_id) || [];
+      group.push(listing);
+      groups.set(listing.taxonomy_id, group);
+    });
+    return Array.from(groups.entries()).map(([taxonomyId, groupListings]) => ({ taxonomyId, listings: groupListings }));
+  }, [listings]);
+  const [selectedTaxonomyGroup, setSelectedTaxonomyGroup] = useState<number | ''>('');
+  const [bulkTaxonomyProperties, setBulkTaxonomyProperties] = useState<Record<number, TaxonomyProperty[]>>({});
+  const [bulkTaxonomyLoading, setBulkTaxonomyLoading] = useState(false);
+  const [bulkTaxonomyDraft, setBulkTaxonomyDraft] = useState<Record<number, ListingPropertyPatch>>({});
+  const [taxonomyOptions, setTaxonomyOptions] = useState<FlatTaxonomy[]>([]);
+  const [taxonomyLoading, setTaxonomyLoading] = useState(false);
+  const [selectedBulkTaxonomy, setSelectedBulkTaxonomy] = useState<FlatTaxonomy | null>(null);
 
   // Photo bulk upload
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoMode, setPhotoMode] = useState<'append' | 'replace_all'>('append');
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoProgress, setPhotoProgress] = useState(0);
+  const [listingImagesById, setListingImagesById] = useState<Record<number, ListingImage[]>>({});
+  const [listingImagesLoading, setListingImagesLoading] = useState(false);
+  const [draggingBulkImage, setDraggingBulkImage] = useState<{ listingId: number; imageId: number } | null>(null);
+  const [bulkPreview, setBulkPreview] = useState<{ listing: SelectedListing; image: ListingImage } | null>(null);
+  const [bulkPreviewLoaded, setBulkPreviewLoaded] = useState(false);
+  const [bulkAltText, setBulkAltText] = useState('');
+  const [savingBulkAlt, setSavingBulkAlt] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const bulkPendingObjectUrlsRef = useRef<string[]>([]);
+
+  useEffect(() => () => {
+    bulkPendingObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+  }, []);
+
+  const applyPhotoFiles = useCallback((files: File[]) => {
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const validFiles = files.filter((file) => validTypes.includes(file.type));
+    if (validFiles.length !== files.length) {
+      toast.error(t('photos.unsupportedFiles'));
+    }
+    setPhotoFiles(validFiles.slice(0, 10));
+  }, [t]);
 
   // Video bulk
   const [videoUrl, setVideoUrl] = useState('');
@@ -598,6 +701,7 @@ export default function BulkEditor({
   const [newSectionName, setNewSectionName] = useState('');
   const [creatingSec, setCreatingSec] = useState(false);
   const [localSections, setLocalSections] = useState<ShopSection[]>([]);
+  const [stagedSectionPayloads, setStagedSectionPayloads] = useState<Record<number, { title: string }>>({});
   const allSections = useMemo(() => {
     const ids = new Set(shopSections.map(s => s.shop_section_id));
     return [...shopSections, ...localSections.filter(s => !ids.has(s.shop_section_id))];
@@ -637,7 +741,111 @@ export default function BulkEditor({
     );
   }, [listings, searchTerm]);
 
+  const refreshListingImages = useCallback(async (listingIds: number[], force = false) => {
+    const ids = Array.from(new Set(listingIds));
+    const missing = force ? ids : ids.filter(id => listingImagesById[id] === undefined);
+    if (missing.length === 0) return;
+
+    setListingImagesLoading(true);
+    const next: Record<number, ListingImage[]> = {};
+
+    for (const listingId of missing) {
+      try {
+        const res = await fetch(
+          `/api/clawd/etsy?action=get_listing_images&listing_id=${listingId}&shop_id=${shopId}`
+        );
+        if (!res.ok) {
+          next[listingId] = [];
+          continue;
+        }
+        const data = await res.json();
+        const images = data.images || data.results || [];
+        next[listingId] = images
+          .map((img: any) => ({
+            listing_image_id: Number(img.listing_image_id) || 0,
+            url_75x75: img.url_75x75,
+            url_170x135: img.url_170x135,
+            url_570xN: img.url_570xN,
+            url_fullxfull: img.url_fullxfull,
+            rank: Number(img.rank) || 0,
+            alt_text: img.alt_text || '',
+          }))
+          .filter((img: ListingImage) => img.listing_image_id)
+          .sort((a: ListingImage, b: ListingImage) => a.rank - b.rank);
+      } catch {
+        next[listingId] = [];
+      }
+    }
+
+    setListingImagesById(prev => ({ ...prev, ...next }));
+    setListingImagesLoading(false);
+  }, [listingImagesById, shopId]);
+
+  useEffect(() => {
+    if (!open || activeField !== 'photos') return;
+
+    let cancelled = false;
+    const loadImages = async () => {
+      if (!cancelled) {
+        await refreshListingImages(filteredListings.map(l => l.listing_id));
+      }
+    };
+
+    loadImages();
+    return () => { cancelled = true; };
+  }, [open, activeField, filteredListings, refreshListingImages]);
+
   const pendingCount = pendingChanges.size;
+
+  useEffect(() => {
+    if (activeField !== 'etsy_details') return;
+    if (taxonomyGroups.length > 0 && selectedTaxonomyGroup === '') {
+      setSelectedTaxonomyGroup(taxonomyGroups[0].taxonomyId);
+    }
+  }, [activeField, selectedTaxonomyGroup, taxonomyGroups]);
+
+  useEffect(() => {
+    if (!open || activeField !== 'category' || taxonomyOptions.length > 0 || taxonomyLoading) return;
+    let cancelled = false;
+    setTaxonomyLoading(true);
+    fetch(`/api/clawd/etsy?action=taxonomy&shop_id=${shopId}`)
+      .then((res) => res.ok ? res.json() : { categories: [] })
+      .then((data) => {
+        if (cancelled) return;
+        const nodes: TaxonomyNode[] = data.categories || data.results || data || [];
+        setTaxonomyOptions(flattenTaxonomy(Array.isArray(nodes) ? nodes : []));
+      })
+      .catch(() => {
+        if (!cancelled) setTaxonomyOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTaxonomyLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [activeField, open, shopId, taxonomyLoading, taxonomyOptions.length]);
+
+  useEffect(() => {
+    if (activeField !== 'etsy_details' || selectedTaxonomyGroup === '') return;
+    const taxonomyId = Number(selectedTaxonomyGroup);
+    if (bulkTaxonomyProperties[taxonomyId]) return;
+
+    let cancelled = false;
+    setBulkTaxonomyLoading(true);
+    fetch(`/api/clawd/etsy?action=get_taxonomy_properties&taxonomy_id=${taxonomyId}&shop_id=${shopId}`)
+      .then((res) => res.ok ? res.json() : { results: [] })
+      .then((data) => {
+        if (cancelled) return;
+        setBulkTaxonomyProperties((prev) => ({ ...prev, [taxonomyId]: data.results || [] }));
+      })
+      .catch(() => {
+        if (!cancelled) setBulkTaxonomyProperties((prev) => ({ ...prev, [taxonomyId]: [] }));
+      })
+      .finally(() => {
+        if (!cancelled) setBulkTaxonomyLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [activeField, bulkTaxonomyProperties, selectedTaxonomyGroup, shopId]);
 
   // Reset only when the SET of listing IDs actually changes (not on every parent re-render).
   // Using listings reference directly would clear pendingChanges whenever parent re-renders
@@ -658,6 +866,7 @@ export default function BulkEditor({
     const def = FIELD_DEFS.find(f => f.key === field)!;
     setOperation('');
     setInputValue('');
+    setSelectedBulkTaxonomy(null);
     setFindValue('');
     setReplaceValue('');
     setTagsInput('');
@@ -699,6 +908,29 @@ export default function BulkEditor({
       next.set(listingId, { ...existing, ...changes });
       return next;
     });
+  }, []);
+
+  const updateBulkTaxonomyProperty = useCallback((propertyId: number, selected: TaxonomyOption[]) => {
+    setBulkTaxonomyDraft((prev) => ({
+      ...prev,
+      [propertyId]: {
+        ...(prev[propertyId] || { property_id: propertyId, values: [] }),
+        property_id: propertyId,
+        values: selected.map((option) => option.name),
+        value_ids: selected.map((option) => option.value_id).filter((id): id is number => typeof id === 'number'),
+      },
+    }));
+  }, []);
+
+  const updateBulkTaxonomyScale = useCallback((propertyId: number, scaleId: number | null) => {
+    setBulkTaxonomyDraft((prev) => ({
+      ...prev,
+      [propertyId]: {
+        ...(prev[propertyId] || { property_id: propertyId, values: [] }),
+        property_id: propertyId,
+        scale_id: scaleId,
+      },
+    }));
   }, []);
 
   // Apply bulk operation to all checked listings
@@ -875,9 +1107,17 @@ export default function BulkEditor({
           break;
         }
         case 'category': {
-          const tid = parseInt(inputValue);
+          const tid = selectedBulkTaxonomy?.id || parseInt(inputValue);
           if (!isNaN(tid) && tid > 0) {
             updatePending(listing.listing_id, { taxonomy_id: tid });
+          }
+          break;
+        }
+        case 'etsy_details': {
+          if (selectedTaxonomyGroup === '' || listing.taxonomy_id !== Number(selectedTaxonomyGroup)) break;
+          const patches = Object.values(bulkTaxonomyDraft);
+          if (patches.length > 0) {
+            updatePending(listing.listing_id, { taxonomyProperties: patches });
           }
           break;
         }
@@ -889,7 +1129,8 @@ export default function BulkEditor({
       targetSectionId, getFieldValue, updatePending, whoMade, whenMade, isSupply,
       weightValue, weightUnit, lengthValue, widthValue, heightValue, dimensionUnit,
       processingMin, processingMax, selectedShippingProfileId, selectedReturnPolicyId,
-      isPersonalizable, personalizationRequired, personalizationInstructions, personalizationCharMax]);
+      isPersonalizable, personalizationRequired, personalizationInstructions, personalizationCharMax,
+      selectedTaxonomyGroup, selectedBulkTaxonomy, bulkTaxonomyDraft]);
 
   // AI optimize / rewrite
   const handleAIAction = useCallback(async () => {
@@ -1035,11 +1276,11 @@ export default function BulkEditor({
         let ok = true;
         for (const img of images) {
           try {
-            const r = await fetch(
-              `/api/clawd/etsy?action=update_listing_image&listing_id=${listing.listing_id}&image_id=${img.listing_image_id}&shop_id=${shopId}`,
-              { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ alt_text: altText }) }
-            );
-            if (!r.ok) ok = false;
+            await stageEtsyDraft({
+              shopId,
+              listingId: listing.listing_id,
+              media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: img.listing_image_id, altText }],
+            });
           } catch { ok = false; }
         }
         if (ok) success++; else failed++;
@@ -1052,49 +1293,86 @@ export default function BulkEditor({
     else toast.error(t('toast.altTextPartial', { success, failed }));
   }, [filteredListings, checkedIds, shopId]);
 
+  const deleteListingImages = useCallback(async (listingId: number): Promise<boolean> => {
+    const imagesRes = await fetch(
+      `/api/clawd/etsy?action=get_listing_images&listing_id=${listingId}&shop_id=${shopId}`
+    );
+    if (!imagesRes.ok) return false;
+    const imagesData = await imagesRes.json();
+    const images = imagesData.images || imagesData.results || [];
+
+    let ok = true;
+    for (const img of images) {
+      try {
+        await stageEtsyDraft({
+          shopId,
+          listingId,
+          media: [{ kind: 'image', operation: 'delete', etsyMediaId: img.listing_image_id }],
+        });
+      } catch {
+        ok = false;
+      }
+    }
+    return ok;
+  }, [shopId]);
+
   // Bulk photo upload to all checked listings
   const handleBulkPhotoUpload = useCallback(async () => {
     if (photoFiles.length === 0) return;
     const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
     if (checked.length === 0) return;
-
-    function fileToBase64(file: File): Promise<string> {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1]);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
+    if (photoMode === 'replace_all' && !confirm(t('confirm.replaceAllPhotos', { count: checked.length }))) return;
 
     setPhotoUploading(true);
     setPhotoProgress(0);
     let success = 0, failed = 0;
-    const total = checked.length * photoFiles.length;
+    const total = checked.length * (photoFiles.length + (photoMode === 'replace_all' ? 1 : 0));
     let done = 0;
 
     for (const listing of checked) {
+      if (photoMode === 'replace_all') {
+        try {
+          const deleted = await deleteListingImages(listing.listing_id);
+          if (!deleted) failed++;
+        } catch {
+          failed++;
+        }
+        done++;
+        setPhotoProgress(Math.round((done / total) * 100));
+      }
+
       for (let i = 0; i < photoFiles.length; i++) {
         const file = photoFiles[i];
         try {
-          const base64 = await fileToBase64(file);
-          const res = await fetch(
-            `/api/clawd/etsy?action=upload_image&listing_id=${listing.listing_id}&shop_id=${shopId}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                image_base64: base64,
-                image_content_type: file.type || 'image/jpeg',
-                image_filename: file.name,
-                rank: i + 1,
-              }),
-            }
-          );
-          if (res.ok) success++; else failed++;
+          await stageEtsyDraftFile({
+            shopId,
+            listingId: listing.listing_id,
+            file,
+            kind: 'image',
+            operation: 'upload',
+            rank: i + 1,
+          });
+          const objectUrl = URL.createObjectURL(file);
+          bulkPendingObjectUrlsRef.current.push(objectUrl);
+          setListingImagesById(prev => {
+            const current = prev[listing.listing_id] || [];
+            const base = photoMode === 'replace_all' ? current.filter(img => img.is_pending_upload) : current;
+            const pendingImage: ListingImage = {
+              listing_image_id: -Date.now() - i - listing.listing_id,
+              url_75x75: objectUrl,
+              url_170x135: objectUrl,
+              url_570xN: objectUrl,
+              url_fullxfull: objectUrl,
+              rank: base.length + 1,
+              is_pending_upload: true,
+              pending_filename: file.name,
+            };
+            return {
+              ...prev,
+              [listing.listing_id]: [...base, pendingImage].map((img, index) => ({ ...img, rank: index + 1 })),
+            };
+          });
+          success++;
         } catch { failed++; }
         done++;
         setPhotoProgress(Math.round((done / total) * 100));
@@ -1109,7 +1387,7 @@ export default function BulkEditor({
     if (failed === 0) toast.success(t('toast.photoUploadSuccess', { count: success, listings: checked.length }));
     else toast.error(t('toast.photoUploadPartial', { success, failed }));
     onCompleted();
-  }, [photoFiles, filteredListings, checkedIds, shopId, onCompleted]);
+  }, [photoFiles, photoMode, filteredListings, checkedIds, shopId, onCompleted, t, deleteListingImages]);
 
   // Bulk delete all photos from checked listings
   const handleBulkPhotoDelete = useCallback(async () => {
@@ -1124,23 +1402,7 @@ export default function BulkEditor({
     for (let i = 0; i < checked.length; i++) {
       const listing = checked[i];
       try {
-        const imagesRes = await fetch(
-          `/api/clawd/etsy?action=get_listing_images&listing_id=${listing.listing_id}&shop_id=${shopId}`
-        );
-        if (!imagesRes.ok) { failed++; continue; }
-        const imagesData = await imagesRes.json();
-        const images = imagesData.images || imagesData.results || [];
-
-        let ok = true;
-        for (const img of images) {
-          try {
-            const r = await fetch(
-              `/api/clawd/etsy?action=delete_image&listing_id=${listing.listing_id}&image_id=${img.listing_image_id}&shop_id=${shopId}`,
-              { method: 'DELETE' }
-            );
-            if (!r.ok) ok = false;
-          } catch { ok = false; }
-        }
+        const ok = await deleteListingImages(listing.listing_id);
         if (ok) success++; else failed++;
       } catch { failed++; }
       setPhotoProgress(Math.round(((i + 1) / checked.length) * 100));
@@ -1150,8 +1412,93 @@ export default function BulkEditor({
     setPhotoUploading(false);
     if (failed === 0) toast.success(t('toast.photoDeleteSuccess', { count: success }));
     else toast.error(t('toast.photoDeletePartial', { success, failed }));
+    await refreshListingImages(checked.map(l => l.listing_id), true);
     onCompleted();
-  }, [filteredListings, checkedIds, shopId, onCompleted]);
+  }, [filteredListings, checkedIds, shopId, onCompleted, deleteListingImages, refreshListingImages]);
+
+  const handleBulkImageDrop = useCallback(async (listing: SelectedListing, targetImageId: number) => {
+    if (!draggingBulkImage || draggingBulkImage.listingId !== listing.listing_id || draggingBulkImage.imageId === targetImageId) {
+      setDraggingBulkImage(null);
+      return;
+    }
+    if (draggingBulkImage.imageId < 0 || targetImageId < 0) {
+      toast.error('Pending uploads can be reordered after they are synced to Etsy.');
+      setDraggingBulkImage(null);
+      return;
+    }
+
+    const currentImages = listingImagesById[listing.listing_id] || [];
+    const fromIndex = currentImages.findIndex(img => img.listing_image_id === draggingBulkImage.imageId);
+    const toIndex = currentImages.findIndex(img => img.listing_image_id === targetImageId);
+    if (fromIndex < 0 || toIndex < 0) {
+      setDraggingBulkImage(null);
+      return;
+    }
+
+    const nextImages = [...currentImages];
+    const [moved] = nextImages.splice(fromIndex, 1);
+    nextImages.splice(toIndex, 0, moved);
+    setListingImagesById(prev => ({ ...prev, [listing.listing_id]: nextImages.map((img, idx) => ({ ...img, rank: idx + 1 })) }));
+
+    setPhotoUploading(true);
+    setPhotoProgress(0);
+    try {
+      for (let i = 0; i < nextImages.length; i++) {
+        const img = nextImages[i];
+        const nextRank = i + 1;
+        if (img.rank === nextRank) continue;
+        await stageEtsyDraft({
+          shopId,
+          listingId: listing.listing_id,
+          media: [{ kind: 'image', operation: 'reorder', etsyMediaId: img.listing_image_id, rank: nextRank }],
+        });
+        setPhotoProgress(Math.round(((i + 1) / nextImages.length) * 100));
+      }
+      toast.success('Photo order saved to draft. Sync to Etsy when ready.');
+      onCompleted();
+    } catch (err: any) {
+      toast.error(err.message || t('photos.orderSaveFailed'));
+      await refreshListingImages([listing.listing_id], true);
+    } finally {
+      setPhotoUploading(false);
+      setPhotoProgress(0);
+      setDraggingBulkImage(null);
+    }
+  }, [draggingBulkImage, listingImagesById, shopId, t, refreshListingImages, onCompleted]);
+
+  const openBulkPreview = (listing: SelectedListing, image: ListingImage) => {
+    setBulkPreviewLoaded(false);
+    setBulkPreview({ listing, image });
+    setBulkAltText(image.alt_text || '');
+  };
+
+  const closeBulkPreview = () => {
+    setBulkPreview(null);
+    setBulkPreviewLoaded(false);
+  };
+
+  const handleSaveBulkAltText = async () => {
+    if (!bulkPreview) return;
+    if (bulkPreview.image.is_pending_upload) {
+      toast.error('Pending uploads can be edited after they are synced to Etsy.');
+      return;
+    }
+    setSavingBulkAlt(true);
+    try {
+      await stageEtsyDraft({
+        shopId,
+        listingId: bulkPreview.listing.listing_id,
+        media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: bulkPreview.image.listing_image_id, altText: bulkAltText.trim() }],
+      });
+      toast.success('Alt text saved to draft. Sync to Etsy when ready.');
+      await refreshListingImages([bulkPreview.listing.listing_id], true);
+      setBulkPreview(null);
+    } catch (err: any) {
+      toast.error(err.message || t('photos.altTextSaveFailed'));
+    } finally {
+      setSavingBulkAlt(false);
+    }
+  };
 
   // Bulk video upload (by URL) to all checked listings
   const handleBulkVideoUpload = useCallback(async () => {
@@ -1166,11 +1513,12 @@ export default function BulkEditor({
     for (let i = 0; i < checked.length; i++) {
       const listing = checked[i];
       try {
-        const res = await fetch(
-          `/api/clawd/etsy?action=upload_video&listing_id=${listing.listing_id}&shop_id=${shopId}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ video_url: videoUrl.trim() }) }
-        );
-        if (res.ok) success++; else failed++;
+        await stageEtsyDraft({
+          shopId,
+          listingId: listing.listing_id,
+          media: [{ kind: 'video', operation: 'upload', sourceUrl: videoUrl.trim() }],
+        });
+        success++;
       } catch { failed++; }
       setVideoProgress(Math.round(((i + 1) / checked.length) * 100));
       if (i < checked.length - 1) await new Promise(r => setTimeout(r, 200));
@@ -1206,11 +1554,11 @@ export default function BulkEditor({
         let ok = true;
         for (const vid of videos) {
           try {
-            const r = await fetch(
-              `/api/clawd/etsy?action=delete_video&listing_id=${listing.listing_id}&video_id=${vid.video_id}&shop_id=${shopId}`,
-              { method: 'DELETE' }
-            );
-            if (!r.ok) ok = false;
+            await stageEtsyDraft({
+              shopId,
+              listingId: listing.listing_id,
+              media: [{ kind: 'video', operation: 'delete', etsyMediaId: vid.video_id }],
+            });
           } catch { ok = false; }
         }
         if (ok) success++; else failed++;
@@ -1230,28 +1578,24 @@ export default function BulkEditor({
     if (!newSectionName.trim()) return;
     setCreatingSec(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=create_shop_section&shop_id=${shopId}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: newSectionName.trim() }) }
-      );
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
+      const tempId = -Date.now();
       const newSection: ShopSection = {
-        shop_section_id: data.shop_section_id || data.section?.shop_section_id,
-        title: newSectionName.trim(),
+        shop_section_id: tempId,
+        title: `${newSectionName.trim()} (pending)`,
       };
+      setStagedSectionPayloads(prev => ({ ...prev, [tempId]: { title: newSectionName.trim() } }));
       setLocalSections(prev => [...prev, newSection]);
       setTargetSectionId(newSection.shop_section_id);
       setNewSectionName('');
-      toast.success(t('toast.sectionCreated', { name: newSection.title }));
+      toast.success('Shop section will be created when drafts sync to Etsy.');
     } catch {
       toast.error(t('toast.sectionCreateFailed'));
     } finally {
       setCreatingSec(false);
     }
-  }, [newSectionName, shopId]);
+  }, [newSectionName, t]);
 
-  // Save all pending changes to Etsy
+  // Save all pending changes to local Etsy drafts. Explicit sync writes drafts to Etsy later.
   const handleSave = useCallback(async () => {
     if (pendingChanges.size === 0) {
       toast(t('toast.noChangesToSave'));
@@ -1292,6 +1636,7 @@ export default function BulkEditor({
         if (changes.processing_min !== undefined) body.processing_min = changes.processing_min;
         if (changes.processing_max !== undefined) body.processing_max = changes.processing_max;
         if (changes.taxonomy_id !== undefined) body.taxonomy_id = changes.taxonomy_id;
+        const taxonomyProperties = changes.taxonomyProperties;
 
         let personalizationOk = true;
         if (changes.is_personalizable !== undefined) {
@@ -1307,12 +1652,22 @@ export default function BulkEditor({
 
         let listingOk = true;
         if (Object.keys(body).length > 0) {
-          const listingRes = await callUpdateListing(shopId, listingId, body);
+          const queuedActions: Array<Record<string, any>> = [];
+          if (typeof body.shop_section_id === 'number' && body.shop_section_id < 0) {
+            const staged = stagedSectionPayloads[body.shop_section_id];
+            if (staged) {
+              queuedActions.push({ type: 'create_shop_section', tempId: body.shop_section_id, payload: staged });
+            }
+          }
+          const listingRes = await callUpdateListing(shopId, listingId, body, queuedActions.length ? queuedActions : undefined);
           listingOk = listingRes.ok;
           if (!listingOk) {
             const errBody = await listingRes.json().catch(() => ({ error: listingRes.statusText }));
             console.error(`[BulkEditor] Failed to update listing ${listingId}:`, errBody);
           }
+        }
+        if (taxonomyProperties && taxonomyProperties.length > 0) {
+          await stageEtsyDraft({ shopId, listingId, taxonomy: { properties: taxonomyProperties } });
         }
 
         if (personalizationOk && listingOk) {
@@ -1335,6 +1690,7 @@ export default function BulkEditor({
     if (failed === 0) {
       toast.success(t('toast.saveSuccess', { count: success }));
       setPendingChanges(new Map());
+      setStagedSectionPayloads({});
       onCompleted();
     } else {
       // Keep only failed listings in pendingChanges so user can retry
@@ -1346,7 +1702,7 @@ export default function BulkEditor({
       setPendingChanges(remainingChanges);
       toast.error(t('toast.savePartial', { success, failed }));
     }
-  }, [pendingChanges, shopId, onCompleted]);
+  }, [pendingChanges, shopId, onCompleted, stagedSectionPayloads]);
 
   // Toggle all checkboxes
   const handleToggleAll = useCallback(() => {
@@ -1600,6 +1956,24 @@ export default function BulkEditor({
               {t("section.createBtn")}
             </Button>
           </>
+        ) : activeField === 'etsy_details' ? (
+          <FormControl size="small" sx={{ minWidth: 260 }}>
+            <InputLabel>Category group</InputLabel>
+            <Select
+              value={selectedTaxonomyGroup}
+              label="Category group"
+              onChange={(e) => {
+                setSelectedTaxonomyGroup(e.target.value as number);
+                setBulkTaxonomyDraft({});
+              }}
+            >
+              {taxonomyGroups.map((group) => (
+                <MenuItem key={group.taxonomyId} value={group.taxonomyId}>
+                  {group.taxonomyId} ({group.listings.length} listings)
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         ) : activeField === 'price' ? (
           <TextField
             size="small"
@@ -1663,14 +2037,32 @@ export default function BulkEditor({
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               {/* Photo upload */}
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Box
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (photoUploading || aiProcessing) return;
+                  applyPhotoFiles(Array.from(e.dataTransfer.files || []));
+                }}
+                sx={{
+                  display: 'flex',
+                  gap: 1,
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  p: 1,
+                  border: '1px dashed',
+                  borderColor: photoFiles.length ? 'primary.main' : 'divider',
+                  borderRadius: 1.5,
+                  bgcolor: photoFiles.length ? 'primary.50' : 'background.default',
+                }}
+              >
                 <input
                   ref={photoInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/gif,image/webp"
                   multiple
                   style={{ display: 'none' }}
-                  onChange={(e) => setPhotoFiles(Array.from(e.target.files || []))}
+                  onChange={(e) => applyPhotoFiles(Array.from(e.target.files || []))}
                 />
                 <Button
                   variant="outlined"
@@ -1682,6 +2074,9 @@ export default function BulkEditor({
                 >
                   {t('photos.selectFiles')}
                 </Button>
+                <Typography variant="caption" color="text.secondary">
+                  {t('photos.dropToStage')}
+                </Typography>
                 {photoFiles.length > 0 && (
                   <>
                     <Chip
@@ -1689,6 +2084,20 @@ export default function BulkEditor({
                       size="small"
                       onDelete={() => { setPhotoFiles([]); if (photoInputRef.current) photoInputRef.current.value = ''; }}
                     />
+                    <ToggleButtonGroup
+                      size="small"
+                      exclusive
+                      value={photoMode}
+                      onChange={(_, value) => value && setPhotoMode(value)}
+                      disabled={photoUploading}
+                    >
+                      <ToggleButton value="append" sx={{ px: 1.5, textTransform: 'none' }}>
+                        {t('photos.appendMode')}
+                      </ToggleButton>
+                      <ToggleButton value="replace_all" sx={{ px: 1.5, textTransform: 'none' }}>
+                        {t('photos.replaceAllMode')}
+                      </ToggleButton>
+                    </ToggleButtonGroup>
                     <Button
                       variant="contained"
                       size="small"
@@ -1697,9 +2106,20 @@ export default function BulkEditor({
                       disabled={photoUploading}
                       sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
                     >
-                      {photoUploading ? `${photoProgress}%` : t('photos.uploadToAll')}
+                      {photoUploading ? `${photoProgress}%` : photoMode === 'replace_all' ? t('photos.replaceAll') : t('photos.uploadToAll')}
                     </Button>
                   </>
+                )}
+                {photoFiles.length === 0 && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<ImageIcon />}
+                    disabled
+                    sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
+                  >
+                    {t('photos.chooseFilesFirst')}
+                  </Button>
                 )}
                 <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
                 <Button
@@ -1733,6 +2153,9 @@ export default function BulkEditor({
                   {t("photos.altTextHelper")}
                 </Typography>
               </Box>
+              <Typography variant="caption" color="text.secondary">
+                {t('photos.dragPreviewHelper')}
+              </Typography>
               {photoUploading && (
                 <LinearProgress variant="determinate" value={photoProgress} sx={{ borderRadius: 1 }} />
               )}
@@ -1951,17 +2374,58 @@ export default function BulkEditor({
         return (
           <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Autocomplete
+                size="small"
+                options={taxonomyOptions}
+                getOptionLabel={(option) => option.label}
+                value={selectedBulkTaxonomy}
+                onChange={(_, value) => {
+                  setSelectedBulkTaxonomy(value);
+                  setInputValue(value ? String(value.id) : '');
+                }}
+                loading={taxonomyLoading}
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+                filterOptions={(options, state) => {
+                  const query = state.inputValue.trim().toLowerCase();
+                  if (!query) return options.slice(0, 80);
+                  return options
+                    .filter((option) => option.label.toLowerCase().includes(query) || String(option.id).includes(query))
+                    .slice(0, 80);
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label={t('categorySection.categoryLabel')}
+                    placeholder={t('categorySection.categoryPlaceholder')}
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {taxonomyLoading ? <CircularProgress color="inherit" size={16} /> : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
+                )}
+                sx={{ minWidth: { xs: '100%', sm: 420 }, flex: 1 }}
+              />
               <TextField
                 size="small"
                 type="number"
                 label={t('categorySection.taxonomyIdLabel')}
                 placeholder={t('categorySection.taxonomyIdPlaceholder')}
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                sx={{ minWidth: 200 }}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  if (selectedBulkTaxonomy && String(selectedBulkTaxonomy.id) !== e.target.value) {
+                    setSelectedBulkTaxonomy(null);
+                  }
+                }}
+                sx={{ width: 150 }}
               />
               <Button
-                variant="contained" size="small" onClick={handleApply} disabled={saving || !inputValue}
+                variant="contained" size="small" onClick={handleApply} disabled={saving || (!selectedBulkTaxonomy && !inputValue)}
                 sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
               >
                 {t("actionBar.apply")}
@@ -1972,6 +2436,118 @@ export default function BulkEditor({
             </Box>
           </Paper>
         );
+
+      case 'etsy_details': {
+        const taxonomyId = selectedTaxonomyGroup === '' ? null : Number(selectedTaxonomyGroup);
+        const properties = taxonomyId ? (bulkTaxonomyProperties[taxonomyId] || []) : [];
+        return (
+          <Paper elevation={0} sx={{ px: 2, py: 1.5, mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                <FormControl size="small" sx={{ minWidth: 260 }}>
+                  <InputLabel>Category group</InputLabel>
+                  <Select
+                    value={selectedTaxonomyGroup}
+                    label="Category group"
+                    onChange={(e) => {
+                      setSelectedTaxonomyGroup(e.target.value as number);
+                      setBulkTaxonomyDraft({});
+                    }}
+                  >
+                    {taxonomyGroups.map((group) => (
+                      <MenuItem key={group.taxonomyId} value={group.taxonomyId}>
+                        {group.taxonomyId} ({group.listings.length} listings)
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleApply}
+                  disabled={saving || !taxonomyId || Object.keys(bulkTaxonomyDraft).length === 0}
+                  sx={{ minHeight: 40, px: 3, fontWeight: 700, textTransform: 'none', borderRadius: '8px' }}
+                >
+                  Apply to this category group
+                </Button>
+              </Box>
+              {bulkTaxonomyLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CircularProgress size={18} />
+                  <Typography variant="body2" color="text.secondary">Loading Etsy details...</Typography>
+                </Box>
+              ) : !taxonomyId ? (
+                <Alert severity="info">Selected listings do not have category IDs.</Alert>
+              ) : properties.length === 0 ? (
+                <Alert severity="info">No Etsy details returned for this category.</Alert>
+              ) : (
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
+                  {properties.map((prop) => {
+                    const patch = bulkTaxonomyDraft[prop.property_id] || { property_id: prop.property_id, values: [] };
+                    const options: TaxonomyOption[] = (prop.possible_values || [])
+                      .map((value) => ({ value_id: Number(value.value_id) || undefined, name: value.name }))
+                      .filter((value) => value.name);
+                    const selected: TaxonomyOption[] = (patch.values || []).map((value, index) => {
+                      const byId = patch.value_ids?.[index]
+                        ? options.find((option) => option.value_id === patch.value_ids?.[index])
+                        : undefined;
+                      return byId || options.find((option) => option.name === value) || { name: value };
+                    });
+                    return (
+                      <Box key={prop.property_id} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <Autocomplete
+                          multiple
+                          freeSolo
+                          options={options}
+                          getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
+                          isOptionEqualToValue={(option, value) => option.name === value.name}
+                          value={selected}
+                          onChange={(_, value) => updateBulkTaxonomyProperty(
+                            prop.property_id,
+                            value.map((option) => typeof option === 'string' ? { name: option } : option)
+                          )}
+                          renderTags={(value, getTagProps) =>
+                            value.map((option, index) => (
+                              <Chip {...getTagProps({ index })} key={`${prop.property_id}-${typeof option === 'string' ? option : option.name}`} label={typeof option === 'string' ? option : option.name} size="small" />
+                            ))
+                          }
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label={`${prop.display_name || prop.name}${prop.is_required ? ' *' : ''}`}
+                              size="small"
+                              helperText={prop.supports_variations ? 'Can also be used for variations' : undefined}
+                            />
+                          )}
+                          sx={{ flex: 1 }}
+                        />
+                        {prop.supports_variations && <Chip label="Variation" size="small" variant="outlined" sx={{ mt: 1 }} />}
+                        {prop.scales && prop.scales.length > 0 && (
+                          <FormControl size="small" sx={{ minWidth: 110 }}>
+                            <InputLabel>Scale</InputLabel>
+                            <Select
+                              value={patch.scale_id ? String(patch.scale_id) : ''}
+                              label="Scale"
+                              onChange={(e) => updateBulkTaxonomyScale(prop.property_id, e.target.value ? Number(e.target.value) : null)}
+                            >
+                              <MenuItem value=""><em>None</em></MenuItem>
+                              {prop.scales.map((scale) => (
+                                <MenuItem key={scale.scale_id} value={String(scale.scale_id)}>
+                                  {scale.display_name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
+            </Box>
+          </Paper>
+        );
+      }
 
       case 'personalization':
         return (
@@ -2041,6 +2617,7 @@ export default function BulkEditor({
     const isChecked = checkedIds.has(listing.listing_id);
     const hasPending = pendingChanges.has(listing.listing_id);
     const value = getFieldValue(listing, activeField);
+    const listingImages = listingImagesById[listing.listing_id] || [];
 
     return (
       <Paper
@@ -2293,21 +2870,118 @@ export default function BulkEditor({
             )}
 
             {activeField === 'photos' && (
-              <Typography variant="caption" color="text.secondary">
-                {t('photos.photosHelper')}
-              </Typography>
+              <Box>
+                <Typography variant="caption" color="text.secondary">
+                  {listingImagesLoading && listingImagesById[listing.listing_id] === undefined
+                    ? t('photos.loadingImages')
+                    : t('photos.imageCount', { count: listingImages.length })}
+                </Typography>
+                <Box sx={{ mt: 0.75, display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                  {listingImages.map((img) => {
+                    const src = img.url_170x135 || img.url_75x75 || img.url_570xN;
+                    if (!src) return null;
+                    const isPendingUpload = !!img.is_pending_upload;
+                    return (
+                      <Tooltip key={img.listing_image_id} title={isPendingUpload ? 'Pending upload saved to draft' : t('photos.clickToPreview')}>
+                        <Box
+                          draggable={!photoUploading && !isPendingUpload}
+                          onDragStart={() => {
+                            if (isPendingUpload) return;
+                            setDraggingBulkImage({ listingId: listing.listing_id, imageId: img.listing_image_id });
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => handleBulkImageDrop(listing, img.listing_image_id)}
+                          onDragEnd={() => setDraggingBulkImage(null)}
+                          onClick={() => openBulkPreview(listing, img)}
+                          sx={{
+                            position: 'relative',
+                            cursor: photoUploading ? 'wait' : isPendingUpload ? 'pointer' : 'grab',
+                            opacity: draggingBulkImage?.imageId === img.listing_image_id ? 0.65 : 1,
+                            transition: 'opacity 0.15s, transform 0.15s',
+                            '&:hover': { transform: 'translateY(-1px)' },
+                            '&:active': { cursor: 'grabbing' },
+                          }}
+                        >
+                          <img
+                            src={src}
+                            alt={img.alt_text || `Image ${img.rank}`}
+                            style={{ width: 76, height: 76, borderRadius: 6, objectFit: 'cover', border: '1px solid #e5e7eb' }}
+                          />
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: 3,
+                              left: 3,
+                              minWidth: 16,
+                              height: 16,
+                              px: 0.4,
+                              borderRadius: '999px',
+                              bgcolor: 'rgba(15,23,42,0.72)',
+                              color: 'white',
+                              fontSize: 10,
+                              lineHeight: '16px',
+                              textAlign: 'center',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {img.rank}
+                          </Box>
+                          {img.alt_text && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                right: 3,
+                                bottom: 3,
+                                width: 16,
+                                height: 16,
+                                borderRadius: '50%',
+                                bgcolor: 'rgba(16,185,129,0.9)',
+                                color: 'white',
+                                fontSize: 10,
+                                lineHeight: '16px',
+                                textAlign: 'center',
+                                fontWeight: 700,
+                              }}
+                            >
+                              A
+                            </Box>
+                          )}
+                          {isPendingUpload && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                left: 3,
+                                bottom: 3,
+                                px: 0.5,
+                                height: 16,
+                                borderRadius: '999px',
+                                bgcolor: 'rgba(37,99,235,0.9)',
+                                color: 'white',
+                                fontSize: 9,
+                                lineHeight: '16px',
+                                fontWeight: 700,
+                              }}
+                            >
+                              Draft
+                            </Box>
+                          )}
+                        </Box>
+                      </Tooltip>
+                    );
+                  })}
+                  {!listingImagesLoading && listingImages.length === 0 && (
+                    <Typography variant="caption" color="text.secondary">
+                      {t('photos.noImages')}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
             )}
 
             {activeField === 'videos' && (
               <Typography variant="caption" color="text.secondary">
                 {t('videos.videoHelper')}
               </Typography>
-            )}
-
-            {activeField === 'photos' && listing.thumbnail?.url_170x135 && (
-              <Box sx={{ mt: 0.5, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                <img src={listing.thumbnail.url_170x135} alt="" style={{ width: 48, height: 48, borderRadius: 4, objectFit: 'cover' }} />
-              </Box>
             )}
 
             {activeField === 'item_weight' && (
@@ -2369,6 +3043,17 @@ export default function BulkEditor({
                   {t('categorySection.notSet')}
                 </Typography>
               );
+            })()}
+
+            {activeField === 'etsy_details' && (() => {
+              const pending = pendingChanges.get(listing.listing_id);
+              if (selectedTaxonomyGroup !== '' && listing.taxonomy_id !== Number(selectedTaxonomyGroup)) {
+                return <Typography variant="caption" color="text.secondary">Different category group</Typography>;
+              }
+              if (pending?.taxonomyProperties?.length) {
+                return <Chip label={`${pending.taxonomyProperties.length} detail changes`} size="small" color="primary" variant="outlined" />;
+              }
+              return <Typography variant="caption" color="text.secondary">No detail changes staged</Typography>;
             })()}
 
             {activeField === 'personalization' && (() => {
@@ -2521,7 +3206,7 @@ export default function BulkEditor({
           size="small"
           onClick={handleSave}
           disabled={saving || pendingCount === 0}
-          startIcon={saving ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <SyncIcon />}
+          startIcon={saving ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <SaveIcon />}
           sx={{
             minHeight: 36, textTransform: 'none', fontWeight: 700, borderRadius: '8px',
             px: { xs: 2, sm: 3 },
@@ -2703,7 +3388,7 @@ export default function BulkEditor({
             variant="contained"
             onClick={handleSave}
             disabled={saving}
-            startIcon={saving ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <SyncIcon />}
+          startIcon={saving ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <SaveIcon />}
             sx={{
               minHeight: 44, px: 4, fontWeight: 700, textTransform: 'none', borderRadius: '10px',
               fontSize: '0.95rem',
@@ -2716,6 +3401,106 @@ export default function BulkEditor({
           </Button>
         </Paper>
       )}
+
+      <Dialog
+        open={!!bulkPreview}
+        onClose={() => !savingBulkAlt && closeBulkPreview()}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {t('photos.previewTitle')}
+        </DialogTitle>
+        <DialogContent>
+          {bulkPreview && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(280px, 1fr) 320px' }, gap: 2, alignItems: 'start' }}>
+              <Box
+                sx={{
+                  position: 'relative',
+                  minHeight: { xs: 280, sm: 420 },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: '#f8fafc',
+                  borderRadius: 2,
+                  p: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                {!bulkPreviewLoaded && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundImage: bulkPreview.image.url_170x135 ? `url(${bulkPreview.image.url_170x135})` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        inset: 0,
+                        backdropFilter: bulkPreview.image.url_170x135 ? 'blur(14px)' : 'none',
+                        backgroundColor: bulkPreview.image.url_170x135 ? 'rgba(248,250,252,0.72)' : '#f8fafc',
+                      },
+                    }}
+                  >
+                    <CircularProgress size={28} sx={{ position: 'relative', zIndex: 1 }} />
+                  </Box>
+                )}
+                <img
+                  src={bulkPreview.image.url_fullxfull || bulkPreview.image.url_570xN || bulkPreview.image.url_170x135 || bulkPreview.image.url_75x75}
+                  alt={bulkPreview.image.alt_text || `Image ${bulkPreview.image.rank}`}
+                  onLoad={() => setBulkPreviewLoaded(true)}
+                  onError={() => setBulkPreviewLoaded(true)}
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '70vh',
+                    objectFit: 'contain',
+                    borderRadius: 8,
+                    opacity: bulkPreviewLoaded ? 1 : 0,
+                    transition: 'opacity 0.18s ease',
+                  }}
+                />
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                  {bulkPreview.listing.title}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                  {t('photos.rankLabel', { rank: bulkPreview.image.rank })}
+                </Typography>
+                <TextField
+                  label={t('photos.altTextLabel')}
+                  placeholder={t('photos.altTextPlaceholder')}
+                  fullWidth
+                  multiline
+                  minRows={4}
+                  value={bulkAltText}
+                  onChange={(e) => setBulkAltText(e.target.value.slice(0, 250))}
+                  disabled={savingBulkAlt}
+                  helperText={`${bulkAltText.length}/250`}
+                />
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeBulkPreview} disabled={savingBulkAlt}>
+            {t('header.cancel')}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveBulkAltText}
+            disabled={savingBulkAlt || !bulkPreview}
+            startIcon={savingBulkAlt ? <CircularProgress size={16} /> : undefined}
+          >
+            {t('photos.saveAltText')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 }

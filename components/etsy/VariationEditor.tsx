@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { stageEtsyDraft } from '@/lib/etsy/draftClient';
 
 // --- Types ---
 
@@ -91,7 +92,7 @@ const ETSY_PROPERTIES = [
   { id: 505, name: 'Diameter', tKey: 'diameter' },
   { id: 506, name: 'Dimensions', tKey: 'dimensions' },
   { id: 507, name: 'Fabric', tKey: 'fabric' },
-  { id: 508, name: 'Style', tKey: 'style' },
+  { id: 513, name: 'Style', tKey: 'style' },
   { id: 509, name: 'Material', tKey: 'material' },
   { id: 510, name: 'Pattern', tKey: 'pattern' },
 ];
@@ -208,9 +209,13 @@ function EditableText({ value, onChange, fontWeight = 600 }: { value: string; on
       <Typography
         variant="body2"
         fontWeight={fontWeight}
-        noWrap
         onClick={() => setEditing(true)}
-        sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline dotted', textDecorationColor: 'rgba(0,0,0,0.3)' } }}
+        sx={{
+          cursor: 'pointer',
+          lineHeight: 1.25,
+          overflowWrap: 'anywhere',
+          '&:hover': { textDecoration: 'underline dotted', textDecorationColor: 'rgba(0,0,0,0.3)' },
+        }}
       >
         {value}
       </Typography>
@@ -813,15 +818,8 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
         throw new Error(t('pricePropertyRequired'));
       }
 
-      const res = await fetch(
-        `/api/clawd/etsy?action=update_listing_inventory&listing_id=${listingId}&shop_id=${shopId}`,
-        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products, price_on_property, quantity_on_property, sku_on_property }) }
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('inventoryUpdateFailed'));
-      }
-      toast.success(t('variationsSavedToEtsy'));
+      await stageEtsyDraft({ shopId, listingId, inventory: { products, price_on_property, quantity_on_property, sku_on_property } });
+      toast.success('Variations saved to draft. Sync to Etsy when ready.');
       setOriginalProducts(JSON.parse(JSON.stringify(products)));
       setOriginalPriceOnPropertyIds(price_on_property);
       onSaved();
@@ -837,12 +835,8 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const handleSavePhotos = async () => {
     setSavingPhotos(true);
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=set_variation_images&listing_id=${listingId}&shop_id=${shopId}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ variation_images: variationImages }) }
-      );
-      if (!res.ok) throw new Error(t('photosSaveFailed'));
-      toast.success(t('photosSaved'));
+      await stageEtsyDraft({ shopId, listingId, variationImages: { variation_images: variationImages } });
+      toast.success('Variation photos saved to draft. Sync to Etsy when ready.');
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -968,7 +962,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
             )}
 
             {/* Second variation selector */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <Typography variant="caption" fontWeight={600} color="text.secondary">{t('secondVariation')}:</Typography>
               <Select
                 size="small"
@@ -982,6 +976,14 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                   <MenuItem key={prop.id} value={prop.id}>{t(prop.tKey)}</MenuItem>
                 ))}
               </Select>
+              {secondPropertyId && (
+                <Chip
+                  label={getPropertyName(secondPropertyId, t('secondVariation'))}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                />
+              )}
             </Box>
           </Box>
 
@@ -1042,15 +1044,33 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                           </IconButton>
                         </Box>
 
-                        {/* Label — editable */}
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* Variation values — editable */}
+                        <Box sx={{ flex: 1, minWidth: { xs: '100%', sm: 260 } }}>
+                          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(auto-fit, minmax(120px, 1fr))' }, gap: 0.75, alignItems: 'stretch' }}>
                             {product.property_values?.map((pv, pvIdx) => (
-                              <EditableText
-                                key={pvIdx}
-                                value={pv.values?.[0] || ''}
-                                onChange={(v) => updatePropertyValue(globalIdx, pvIdx, v)}
-                              />
+                              <Box
+                                key={`${pv.property_id}-${pvIdx}`}
+                                sx={{
+                                  minWidth: 0,
+                                  px: 0.75,
+                                  py: 0.5,
+                                  borderRadius: '6px',
+                                  border: '1px solid rgba(102,126,234,0.18)',
+                                  bgcolor: pvIdx === 0 ? 'rgba(102,126,234,0.05)' : 'rgba(16,185,129,0.06)',
+                                }}
+                              >
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.1, mb: 0.2 }}
+                                >
+                                  {pv.property_name || (pvIdx === 0 ? t('tabVariations') : t('secondVariation'))}
+                                </Typography>
+                                <EditableText
+                                  value={pv.values?.[0] || ''}
+                                  onChange={(v) => updatePropertyValue(globalIdx, pvIdx, v)}
+                                />
+                              </Box>
                             ))}
                           </Box>
                           {product.sku && (

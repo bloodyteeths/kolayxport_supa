@@ -26,6 +26,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
+import { stageEtsyDraft } from '@/lib/etsy/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -201,16 +202,8 @@ export default function DuplicateDetector({
 
     for (const listing of toDeactivate) {
       try {
-        const res = await fetch(
-          `/api/clawd/etsy?action=update_listing&listing_id=${listing.listing_id}&shop_id=${shopId}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state: 'inactive' }),
-          }
-        );
-        if (res.ok) succeeded++;
-        else failed++;
+        await stageEtsyDraft({ shopId, listingId: listing.listing_id, queuedActions: [{ type: 'deactivate' }] });
+        succeeded++;
       } catch {
         failed++;
       }

@@ -67,6 +67,7 @@ import {
   Close as CloseIcon,
   Circle as CircleIcon,
   Store as StoreIcon,
+  Sync as SyncIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -83,6 +84,7 @@ import BulkEditor from '@/components/etsy/BulkEditor';
 import SmartPricing from '@/components/etsy/SmartPricing';
 import DuplicateDetector from '@/components/etsy/DuplicateDetector';
 import BackupManager from '@/components/etsy/BackupManager';
+import { fetchEtsyDrafts, stageEtsyDraft, syncEtsyDrafts } from '@/lib/etsy/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -885,6 +887,7 @@ function EtsyListingsPage() {
   });
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [pendingDraftsByListing, setPendingDraftsByListing] = useState<Record<string, any>>({});
 
   // Mobile card pagination
   const [mobileVisibleCount, setMobileVisibleCount] = useState(25);
@@ -990,6 +993,7 @@ function EtsyListingsPage() {
 
   // Sync state
   const [syncing, setSyncing] = useState(false);
+  const [bulkSyncingDrafts, setBulkSyncingDrafts] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
   // Load listings from Etsy API (with in-memory cache)
@@ -1158,12 +1162,30 @@ function EtsyListingsPage() {
     }
   }, [selectedShopId]);
 
+  const fetchPendingDrafts = useCallback(async () => {
+    if (!selectedShopId) {
+      setPendingDraftsByListing({});
+      return;
+    }
+    try {
+      const drafts = await fetchEtsyDrafts(selectedShopId);
+      const next: Record<string, any> = {};
+      for (const draft of drafts) {
+        next[String(draft.etsyListingId)] = draft;
+      }
+      setPendingDraftsByListing(next);
+    } catch (err) {
+      console.error('Failed to fetch Etsy drafts:', err);
+    }
+  }, [selectedShopId]);
+
   useEffect(() => {
     if (selectedShopId) {
       fetchListings().then(() => fetchStatusCounts());
       fetchShopMeta();
+      fetchPendingDrafts();
     }
-  }, [selectedShopId, statusFilter, fetchListings, fetchShopMeta, fetchStatusCounts]);
+  }, [selectedShopId, statusFilter, fetchListings, fetchShopMeta, fetchStatusCounts, fetchPendingDrafts]);
 
   // NOTE: Auto-sync removed — sync is manual only (Sync button)
 
@@ -1264,80 +1286,43 @@ function EtsyListingsPage() {
   const handleDeleteListing = useCallback(
     async (listingId: number) => {
       try {
-        const res = await fetch(
-          `/api/clawd/etsy?action=delete_listing&listing_id=${listingId}&shop_id=${selectedShopId}`,
-          { method: 'DELETE' }
-        );
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          const errMsg = errData.error || `HTTP ${res.status}`;
-          if (res.status === 403 && errMsg.includes('removed')) {
-            // Already deleted on Etsy - just remove from our UI
-          } else {
-            throw new Error(errMsg);
-          }
-        }
-        toast.success(t('listingDeleted'));
+        await stageEtsyDraft({ shopId: selectedShopId, listingId, queuedActions: [{ type: 'delete' }] });
+        await fetchPendingDrafts();
+        toast.success('Delete queued in draft. Sync to Etsy to apply.');
         setDeleteConfirmId(null);
-        setListings((prev) => prev.filter((l) => l.listing_id !== listingId));
-        setTotalCount((prev) => Math.max(0, prev - 1));
-        const cacheKey = `${selectedShopId}:${statusFilter}`;
-        delete listingsCacheRef.current[cacheKey];
       } catch (err: any) {
         toast.error(t('deleteFailed', { error: err.message }));
       }
     },
-    [selectedShopId, statusFilter]
+    [selectedShopId, fetchPendingDrafts]
   );
 
   // --- Renew listing ---
   const handleRenewListing = useCallback(
     async (listingId: number) => {
       try {
-        const res = await fetch(
-          `/api/clawd/etsy?action=renew_listing&listing_id=${listingId}&shop_id=${selectedShopId}`,
-          { method: 'POST' }
-        );
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `HTTP ${res.status}`);
-        }
-        toast.success(t('renewSuccess'));
-        setListings((prev) =>
-          prev.map((l) => l.listing_id === listingId ? { ...l, state: 'active' } : l)
-        );
-        const cacheKey = `${selectedShopId}:${statusFilter}`;
-        delete listingsCacheRef.current[cacheKey];
+        await stageEtsyDraft({ shopId: selectedShopId, listingId, queuedActions: [{ type: 'renew' }] });
+        await fetchPendingDrafts();
+        toast.success('Renew queued in draft. Sync to Etsy to apply.');
       } catch (err: any) {
         toast.error(t('renewFailed') + ': ' + err.message);
       }
     },
-    [selectedShopId, statusFilter]
+    [selectedShopId, fetchPendingDrafts]
   );
 
   // --- Deactivate listing ---
   const handleDeactivateListing = useCallback(
     async (listingId: number) => {
       try {
-        const res = await fetch(
-          `/api/clawd/etsy?action=deactivate_listing&listing_id=${listingId}&shop_id=${selectedShopId}`,
-          { method: 'POST' }
-        );
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `HTTP ${res.status}`);
-        }
-        toast.success(t('deactivateSuccess'));
-        setListings((prev) =>
-          prev.map((l) => l.listing_id === listingId ? { ...l, state: 'inactive' } : l)
-        );
-        const cacheKey = `${selectedShopId}:${statusFilter}`;
-        delete listingsCacheRef.current[cacheKey];
+        await stageEtsyDraft({ shopId: selectedShopId, listingId, queuedActions: [{ type: 'deactivate' }] });
+        await fetchPendingDrafts();
+        toast.success('Deactivate queued in draft. Sync to Etsy to apply.');
       } catch (err: any) {
         toast.error(t('deactivateFailed') + ': ' + err.message);
       }
     },
-    [selectedShopId, statusFilter]
+    [selectedShopId, fetchPendingDrafts]
   );
 
   // --- CSV Export ---
@@ -1483,16 +1468,8 @@ function EtsyListingsPage() {
       }
 
       try {
-        const res = await fetch(
-          `/api/clawd/etsy?action=update_listing&listing_id=${listingId}&shop_id=${selectedShopId}`,
-          {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          }
-        );
-        if (res.ok) succeeded++;
-        else failed++;
+        await stageEtsyDraft({ shopId: selectedShopId, listingId, fields: body });
+        succeeded++;
       } catch {
         failed++;
       }
@@ -1515,7 +1492,7 @@ function EtsyListingsPage() {
       toast.error(t('csvImportPartial', { succeeded, failed }));
     }
 
-    fetchListings();
+    fetchPendingDrafts();
   };
 
   // --- Inline edit handler (double-click title/price in DataGrid) ---
@@ -1530,25 +1507,16 @@ function EtsyListingsPage() {
       if (Object.keys(body).length === 0) return oldRow;
 
       try {
-        const res = await fetch(
-          `/api/clawd/etsy?action=update_listing&listing_id=${newRow.listing_id}&shop_id=${selectedShopId}`,
-          { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-        );
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${res.status}`);
-        }
-        toast.success(t('updated'));
-        setListings((prev) => prev.map((l) => (l.listing_id === newRow.listing_id ? { ...l, ...body } : l)));
-        const cacheKey = `${selectedShopId}:${statusFilter}`;
-        delete listingsCacheRef.current[cacheKey];
-        return newRow;
+        await stageEtsyDraft({ shopId: selectedShopId, listingId: newRow.listing_id, fields: body });
+        await fetchPendingDrafts();
+        toast.success('Draft saved. Sync to Etsy to apply.');
+        return oldRow;
       } catch (err: any) {
         toast.error(t('updateFailed', { error: err.message }));
         return oldRow;
       }
     },
-    [selectedShopId, statusFilter]
+    [selectedShopId, fetchPendingDrafts]
   );
 
   // --- Open editor drawer ---
@@ -1563,51 +1531,9 @@ function EtsyListingsPage() {
     if (!shopId) return;
     const toastId = toast.loading(t('copyCreating'));
     try {
-      const res = await fetch(
-        `/api/clawd/etsy?action=copy_listing&shop_id=${shopId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source_listing_id: listingId }),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      const draftCacheKey = `${shopId}:draft`;
-      delete listingsCacheRef.current[draftCacheKey];
-
-      setDrawerListingId(String(data.new_listing_id));
-      setDrawerOpen(true);
-
-      const sourceImages: Array<{ url_fullxfull: string; rank: number }> = data.source_images || [];
-      if (sourceImages.length > 0) {
-        toast.loading(t('copyingImages', { copied: 0, total: sourceImages.length }), { id: toastId });
-        let copied = 0;
-        for (const img of sourceImages.sort((a, b) => (a.rank || 1) - (b.rank || 1))) {
-          if (!img.url_fullxfull) continue;
-          try {
-            const uploadRes = await fetch(
-              `/api/clawd/etsy?action=upload_image&listing_id=${data.new_listing_id}&shop_id=${shopId}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image_url: img.url_fullxfull, rank: img.rank || 1, overwrite: false }),
-              }
-            );
-            if (!uploadRes.ok) {
-              const errData = await uploadRes.json().catch(() => ({}));
-              console.warn(`Image copy rank ${img.rank} failed:`, errData);
-              continue;
-            }
-            copied++;
-            toast.loading(t('copyingImages', { copied, total: sourceImages.length }), { id: toastId });
-          } catch { /* skip failed image */ }
-        }
-        setDrawerRefreshKey((k) => k + 1);
-        toast.success(t('copyCompleteWithImages', { copied }), { id: toastId });
-      } else {
-        toast.success(t('copyCreated'), { id: toastId });
-      }
+      await stageEtsyDraft({ shopId, listingId, queuedActions: [{ type: 'copy' }] });
+      await fetchPendingDrafts();
+      toast.success('Copy queued in draft. Sync to Etsy to apply.', { id: toastId });
     } catch (err: any) {
       toast.error(err.message || t('copyFailed'), { id: toastId });
     }
@@ -1649,6 +1575,43 @@ function EtsyListingsPage() {
   }, [selectedIds, filteredListings]);
 
   const selectedCount = useMemo(() => ('ids' in selectedIds ? selectedIds.ids.size : 0), [selectedIds]);
+  const selectedDraftIds = useMemo(
+    () =>
+      selectedListings
+        .map((listing) => pendingDraftsByListing[String(listing.listing_id)]?.id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0),
+    [selectedListings, pendingDraftsByListing]
+  );
+
+  const handleSyncSelectedDrafts = useCallback(async () => {
+    if (selectedDraftIds.length === 0 || bulkSyncingDrafts) return;
+
+    const confirmed = window.confirm(
+      `Sync ${selectedDraftIds.length} selected draft${selectedDraftIds.length === 1 ? '' : 's'} to Etsy? This will write the saved draft changes to Etsy.`
+    );
+    if (!confirmed) return;
+
+    setBulkSyncingDrafts(true);
+    const toastId = toast.loading(`Syncing ${selectedDraftIds.length} draft${selectedDraftIds.length === 1 ? '' : 's'} to Etsy...`);
+    try {
+      const result = await syncEtsyDrafts(selectedDraftIds);
+      const success = result.success ?? 0;
+      const failed = result.failed ?? 0;
+      const conflicts = result.conflicts ?? 0;
+
+      if (failed > 0 || conflicts > 0) {
+        toast.error(`Synced ${success}. ${failed} failed, ${conflicts} blocked by conflict.`, { id: toastId });
+      } else {
+        toast.success(`Synced ${success} draft${success === 1 ? '' : 's'} to Etsy.`, { id: toastId });
+      }
+
+      await Promise.all([fetchPendingDrafts(), fetchListings()]);
+    } catch (err: any) {
+      toast.error(err.message || 'Could not sync selected drafts to Etsy', { id: toastId });
+    } finally {
+      setBulkSyncingDrafts(false);
+    }
+  }, [selectedDraftIds, bulkSyncingDrafts, fetchPendingDrafts, fetchListings]);
 
   // --- DataGrid Columns (Vela-style: image, title+hover actions, stock, price, expires, section, score) ---
   const columns: GridColDef[] = useMemo(
@@ -1694,82 +1657,96 @@ function EtsyListingsPage() {
         flex: 1,
         minWidth: 280,
         editable: true,
-        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              width: '100%',
-              position: 'relative',
-              '& .row-actions': {
-                opacity: 0,
-                transition: 'opacity 0.15s ease',
-                position: 'absolute',
-                right: 0,
-                top: '50%',
-                transform: 'translateY(-50%)',
+        renderCell: (params: GridRenderCellParams<EtsyListingRow>) => {
+          const pendingDraft = pendingDraftsByListing[String(params.row.listing_id)];
+          const draftedTitle = pendingDraft?.fieldPatch?.title;
+          return (
+            <Box
+              sx={{
                 display: 'flex',
-                gap: 0.25,
-                bgcolor: 'background.paper',
-                borderRadius: 1,
-                boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-                px: 0.5,
-                py: 0.25,
-              },
-              '&:hover .row-actions': {
-                opacity: 1,
-              },
-            }}
-          >
-            <Tooltip title={params.row.title} arrow>
-              <Typography
-                variant="body2"
-                sx={{
-                  cursor: 'pointer',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  pr: 8,
-                  '&:hover': { color: 'primary.main', textDecoration: 'underline' },
-                }}
-                onClick={() => handleOpenEditor(params.row.listing_id)}
-              >
-                {params.row.title}
-              </Typography>
-            </Tooltip>
-            <Box className="row-actions">
-              <Tooltip title={t('edit')} arrow>
-                <IconButton size="small" onClick={() => handleOpenEditor(params.row.listing_id)} sx={{ p: 0.5 }}>
-                  <EditIcon sx={{ fontSize: 16 }} />
-                </IconButton>
+                alignItems: 'center',
+                width: '100%',
+                position: 'relative',
+                '& .row-actions': {
+                  opacity: 0,
+                  transition: 'opacity 0.15s ease',
+                  position: 'absolute',
+                  right: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  gap: 0.25,
+                  bgcolor: 'background.paper',
+                  borderRadius: 1,
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                  px: 0.5,
+                  py: 0.25,
+                },
+                '&:hover .row-actions': {
+                  opacity: 1,
+                },
+              }}
+            >
+              <Tooltip title={draftedTitle ? `${params.row.title} → ${draftedTitle}` : params.row.title} arrow>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    pr: pendingDraft ? 16 : 8,
+                    fontStyle: draftedTitle ? 'italic' : 'normal',
+                    '&:hover': { color: 'primary.main', textDecoration: 'underline' },
+                  }}
+                  onClick={() => handleOpenEditor(params.row.listing_id)}
+                >
+                  {draftedTitle || params.row.title}
+                </Typography>
               </Tooltip>
-              <Tooltip title={t('copy')} arrow>
-                <IconButton size="small" onClick={() => handleCopyListing(params.row.listing_id)} sx={{ p: 0.5 }}>
-                  <ContentCopyIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Tooltip>
-              {(params.row.state === 'active' || params.row.state === 'expired' || params.row.state === 'inactive') && (
-                <Tooltip title={t('renew')} arrow>
-                  <IconButton size="small" color="success" onClick={() => handleRenewListing(params.row.listing_id)} sx={{ p: 0.5 }}>
-                    <RefreshIcon sx={{ fontSize: 16 }} />
+              {pendingDraft && (
+                <Chip
+                  size="small"
+                  color={pendingDraft.status === 'conflict' ? 'warning' : pendingDraft.status === 'failed' ? 'error' : 'primary'}
+                  variant="outlined"
+                  label={pendingDraft.status === 'draft' ? 'Pending' : pendingDraft.status}
+                  sx={{ ml: 1, height: 20, fontSize: 11 }}
+                />
+              )}
+              <Box className="row-actions">
+                <Tooltip title={t('edit')} arrow>
+                  <IconButton size="small" onClick={() => handleOpenEditor(params.row.listing_id)} sx={{ p: 0.5 }}>
+                    <EditIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
-              )}
-              {params.row.state === 'active' && (
-                <Tooltip title={t('deactivate')} arrow>
-                  <IconButton size="small" color="warning" onClick={() => handleDeactivateListing(params.row.listing_id)} sx={{ p: 0.5 }}>
-                    <RemoveCircleOutlineIcon sx={{ fontSize: 16 }} />
+                <Tooltip title={t('copy')} arrow>
+                  <IconButton size="small" onClick={() => handleCopyListing(params.row.listing_id)} sx={{ p: 0.5 }}>
+                    <ContentCopyIcon sx={{ fontSize: 16 }} />
                   </IconButton>
                 </Tooltip>
-              )}
-              <Tooltip title={t('delete')} arrow>
-                <IconButton size="small" color="error" onClick={() => setDeleteConfirmId(params.row.listing_id)} sx={{ p: 0.5 }}>
-                  <DeleteIcon sx={{ fontSize: 16 }} />
-                </IconButton>
-              </Tooltip>
+                {(params.row.state === 'active' || params.row.state === 'expired' || params.row.state === 'inactive') && (
+                  <Tooltip title={t('renew')} arrow>
+                    <IconButton size="small" color="success" onClick={() => handleRenewListing(params.row.listing_id)} sx={{ p: 0.5 }}>
+                      <RefreshIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {params.row.state === 'active' && (
+                  <Tooltip title={t('deactivate')} arrow>
+                    <IconButton size="small" color="warning" onClick={() => handleDeactivateListing(params.row.listing_id)} sx={{ p: 0.5 }}>
+                      <RemoveCircleOutlineIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                <Tooltip title={t('delete')} arrow>
+                  <IconButton size="small" color="error" onClick={() => setDeleteConfirmId(params.row.listing_id)} sx={{ p: 0.5 }}>
+                    <DeleteIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
             </Box>
-          </Box>
-        ),
+          );
+        },
       },
       {
         field: 'quantity',
@@ -1907,7 +1884,7 @@ function EtsyListingsPage() {
         },
       },
     ],
-    [sectionNameMap, t] // eslint-disable-line react-hooks/exhaustive-deps
+    [pendingDraftsByListing, sectionNameMap, t] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // --- Column visibility for mobile ---
@@ -2222,10 +2199,35 @@ function EtsyListingsPage() {
                 allShops={shops}
                 onOpenBulkEditor={() => setBulkEditorOpen(true)}
                 onCompleted={() => {
-                  setSelectedIds({ type: 'include' as const, ids: new Set<GridRowId>() });
-                  syncListings();
+                  fetchPendingDrafts();
+                  fetchListings();
                 }}
               />
+              {selectedDraftIds.length > 0 && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleSyncSelectedDrafts}
+                  disabled={bulkSyncingDrafts}
+                  startIcon={
+                    bulkSyncingDrafts
+                      ? <CircularProgress size={16} />
+                      : <SyncIcon sx={{ fontSize: '16px !important' }} />
+                  }
+                  sx={{
+                    minHeight: 36,
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    whiteSpace: 'nowrap',
+                    bgcolor: 'background.paper',
+                  }}
+                >
+                  {isMobile
+                    ? t('syncDraftsShort', { count: selectedDraftIds.length })
+                    : t('syncDraftsToEtsy', { count: selectedDraftIds.length })}
+                </Button>
+              )}
               <Button
                 variant="contained"
                 size="small"
@@ -2535,10 +2537,10 @@ function EtsyListingsPage() {
         shippingProfiles={shippingProfiles}
         returnPolicies={returnPolicies}
         onSaved={() => {
-          // After single listing save, re-sync to update DB cache
           Object.keys(listingsCacheRef.current).forEach(key => {
             if (key.startsWith(selectedShopId)) delete listingsCacheRef.current[key];
           });
+          fetchPendingDrafts();
           fetchListings();
         }}
         onOpenListing={(newId) => {
@@ -2559,6 +2561,11 @@ function EtsyListingsPage() {
         marketResearchData={null}
         onCreated={(listingId) => {
           setCreateDialogOpen(false);
+          if (listingId < 0) {
+            toast.success('Listing draft saved locally. Use Sync to Etsy from the draft to create it.');
+            fetchPendingDrafts();
+            return;
+          }
           toast.success(t('listingCreated', { id: listingId }));
           fetchListings();
         }}
@@ -2578,7 +2585,8 @@ function EtsyListingsPage() {
         shopId={selectedShopId}
         onCompleted={() => {
           setFindReplaceOpen(false);
-          syncListings();
+          fetchPendingDrafts();
+          fetchListings();
         }}
       />
 
@@ -2614,6 +2622,7 @@ function EtsyListingsPage() {
         onEdit={(listingId) => handleOpenEditor(listingId)}
         onCompleted={() => {
           setDuplicateDetectorOpen(false);
+          fetchPendingDrafts();
           fetchListings();
         }}
       />
@@ -2625,7 +2634,8 @@ function EtsyListingsPage() {
         shopId={selectedShopId}
         onRestored={() => {
           setBackupManagerOpen(false);
-          syncListings();
+          fetchPendingDrafts();
+          fetchListings();
         }}
       />
 
@@ -2641,9 +2651,8 @@ function EtsyListingsPage() {
         returnPolicies={returnPolicies}
         onCompleted={() => {
           setBulkEditorOpen(false);
-          setSelectedIds({ type: 'include' as const, ids: new Set<GridRowId>() });
-          // Re-sync from Etsy to update DB cache with latest changes
-          syncListings();
+          fetchPendingDrafts();
+          fetchListings();
         }}
       />
 

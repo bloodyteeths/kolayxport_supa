@@ -30,33 +30,62 @@ async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<s
   return newAccessToken;
 }
 
-async function getEtsyAccessToken(shopId: string): Promise<string> {
+type EtsyTokenContext = {
+  shopId: string;
+  accessToken: string;
+};
+
+function firstFormValue(value: string | string[] | undefined): string {
+  return (Array.isArray(value) ? value[0] : value || '').trim();
+}
+
+async function getEtsyTokenContext(shopInput: string, userId: string): Promise<EtsyTokenContext> {
+  const normalizedShopInput = shopInput.trim();
   const etsyShop = await prisma.etsyShop.findFirst({
-    where: { shopId, isActive: true },
-    select: { accessToken: true, refreshToken: true, tokenExpiresAt: true },
+    where: {
+      userId,
+      isActive: true,
+      OR: [
+        { shopId: normalizedShopInput },
+        { shopName: normalizedShopInput },
+      ],
+    },
+    select: { shopId: true, accessToken: true, refreshToken: true, tokenExpiresAt: true },
   });
 
   if (etsyShop) {
     const now = new Date();
     if (!etsyShop.tokenExpiresAt || etsyShop.tokenExpiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
       if (!etsyShop.refreshToken) throw new Error('No refresh token available');
-      return await refreshEtsyToken(shopId, etsyShop.refreshToken);
+      return {
+        shopId: etsyShop.shopId,
+        accessToken: await refreshEtsyToken(etsyShop.shopId, etsyShop.refreshToken),
+      };
     }
-    return etsyShop.accessToken;
+    return { shopId: etsyShop.shopId, accessToken: etsyShop.accessToken };
   }
 
   const credential = await prisma.credential.findFirst({
-    where: { etsyShopId: shopId },
+    where: { userId, etsyShopId: normalizedShopInput },
     select: { etsyAccessToken: true, etsyRefreshToken: true, etsyTokenExpiresAt: true },
   });
-  if (!credential?.etsyAccessToken) throw new Error('Etsy shop not found or not connected');
+  if (!credential?.etsyAccessToken) {
+    logger.warn('Etsy video upload shop lookup failed', {
+      userId,
+      receivedShopId: normalizedShopInput,
+    });
+    throw new Error('Etsy shop not found or not connected');
+  }
 
   const now = new Date();
   if (!credential.etsyTokenExpiresAt || credential.etsyTokenExpiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
     if (!credential.etsyRefreshToken) throw new Error('No refresh token available');
-    return await refreshEtsyToken(shopId, credential.etsyRefreshToken);
+    return {
+      shopId: normalizedShopInput,
+      accessToken: await refreshEtsyToken(normalizedShopInput, credential.etsyRefreshToken),
+    };
   }
-  return credential.etsyAccessToken;
+  return { shopId: normalizedShopInput, accessToken: credential.etsyAccessToken };
 }
 
 // Disable default body parser to handle multipart form data
@@ -93,13 +122,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const user = await getAuthUser(req, res);
   if (!user) return;
+  let tempVideoPath: string | null = null;
 
   try {
     const { fields, files } = await parseForm(req);
 
-    const listing_id = (fields.listing_id?.[0] || fields.listing_id) as string;
-    const shop_id = (fields.shop_id?.[0] || fields.shop_id) as string;
-    const videoName = (fields.name?.[0] || fields.name || `Video for listing ${listing_id}`) as string;
+    const listing_id = firstFormValue(fields.listing_id as string | string[] | undefined);
+    const shop_id = firstFormValue(fields.shop_id as string | string[] | undefined);
+    const videoName = firstFormValue(fields.name as string | string[] | undefined) || `Video for listing ${listing_id}`;
 
     if (!listing_id || !shop_id) {
       return res.status(400).json({ error: 'listing_id and shop_id are required' });
@@ -110,6 +140,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!videoFile) {
       return res.status(400).json({ error: 'No video file provided' });
     }
+    tempVideoPath = videoFile.filepath;
 
     // Validate content type
     const allowedTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/mpeg'];
@@ -131,12 +162,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Get Etsy access token (handles token refresh)
     let accessToken: string;
+    let canonicalShopId: string;
     try {
-      accessToken = await getEtsyAccessToken(shop_id);
+      const tokenContext = await getEtsyTokenContext(shop_id, user.id);
+      accessToken = tokenContext.accessToken;
+      canonicalShopId = tokenContext.shopId;
     } catch (err: any) {
       return res.status(400).json({ error: err.message || 'Etsy not connected' });
     }
-    const shopId = shop_id;
 
     // Build multipart form data for Etsy API
     const boundary = '----EtsyVideoUpload' + Date.now();
@@ -169,7 +202,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     bodyParts.set(footerBytes, offset);
 
     // Upload to Etsy
-    const uploadUrl = `${ETSY_API_BASE}/shops/${shopId}/listings/${listing_id}/videos`;
+    const uploadUrl = `${ETSY_API_BASE}/shops/${canonicalShopId}/listings/${listing_id}/videos`;
     const uploadResponse = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
@@ -181,7 +214,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Clean up temp file
-    try { fs.unlinkSync(videoFile.filepath); } catch {}
+    try {
+      fs.unlinkSync(videoFile.filepath);
+      tempVideoPath = null;
+    } catch {}
 
     if (!uploadResponse.ok) {
       const errorText = await uploadResponse.text();
@@ -207,5 +243,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (err: any) {
     logger.error('Video upload error', err);
     return res.status(500).json({ error: err.message || 'Video upload failed' });
+  } finally {
+    if (tempVideoPath) {
+      try { fs.unlinkSync(tempVideoPath); } catch {}
+    }
   }
 }

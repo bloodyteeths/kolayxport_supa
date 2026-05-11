@@ -5,6 +5,9 @@
 export interface MngCredentials {
   appId: string;
   appSecret: string;
+  customerNumber: string;
+  customerPassword: string;
+  environment: 'test' | 'production';
 }
 
 export interface MngAuthResponse {

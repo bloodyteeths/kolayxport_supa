@@ -73,6 +73,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { access_token, scope, refresh_token, expires_in } = tokenData;
     const tokenExpiresAt = expires_in ? new Date(Date.now() + expires_in * 1000) : null;
 
+    logger.info('Shopify token exchange response', {
+      hasAccessToken: !!access_token,
+      hasRefreshToken: !!refresh_token,
+      expiresIn: expires_in,
+      tokenExpiresAt: tokenExpiresAt?.toISOString(),
+      scope,
+    });
+
     // Fetch shop info
     const shopInfoResponse = await fetch(`https://${shop}/admin/api/2024-10/shop.json`, {
       headers: { 'X-Shopify-Access-Token': access_token },

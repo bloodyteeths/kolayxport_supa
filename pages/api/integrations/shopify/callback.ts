@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Exchange code for permanent access token
+    // Exchange code for expiring access token (required since April 2026)
     const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -70,7 +70,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const tokenData = await tokenResponse.json();
-    const { access_token, scope } = tokenData;
+    const { access_token, scope, refresh_token, expires_in } = tokenData;
+    const tokenExpiresAt = expires_in ? new Date(Date.now() + expires_in * 1000) : null;
 
     // Fetch shop info
     const shopInfoResponse = await fetch(`https://${shop}/admin/api/2024-10/shop.json`, {
@@ -86,12 +87,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         shopDomain: shop,
         shopName: shopInfo?.name || shop.split('.')[0],
         accessToken: access_token,
+        refreshToken: refresh_token || null,
+        tokenExpiresAt,
         scopes: scope,
         isActive: true,
       },
       update: {
         userId,
         accessToken: access_token,
+        refreshToken: refresh_token || null,
+        tokenExpiresAt,
         scopes: scope,
         shopName: shopInfo?.name || undefined,
         isActive: true,

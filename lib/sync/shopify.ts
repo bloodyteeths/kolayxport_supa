@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { isShopifyEnabled } from '@/lib/config';
 import { startSync, updateSyncProgress, completeSync, cleanupStaleSyncs } from '@/lib/sync-status';
-import { ShopifyClient } from '@/lib/integrations/shopifyClient';
+import { ShopifyClient, getValidAccessToken } from '@/lib/integrations/shopifyClient';
 import { toOrder } from '@/lib/mappers/shopify';
 
 type SyncMetrics = {
@@ -48,8 +48,9 @@ export async function syncShopifyRecentOrdersForUser(userId: string): Promise<Sy
 
     for (const shop of shops) {
       try {
+        const accessToken = await getValidAccessToken(shop.id);
         const client = new ShopifyClient({
-          accessToken: shop.accessToken,
+          accessToken,
           shopDomain: shop.shopDomain,
         });
 

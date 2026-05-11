@@ -1,8 +1,56 @@
 // lib/integrations/shopifyClient.ts
 import { logger } from '../logger';
+import prisma from '../prisma';
 
 const API_VERSION = '2024-10';
 const MIN_GAP_MS = 500; // 2 req/s for Shopify REST API
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
+
+export async function getValidAccessToken(shopId: string): Promise<string> {
+  const shop = await prisma.shopifyShop.findUniqueOrThrow({ where: { id: shopId } });
+
+  if (!shop.tokenExpiresAt || !shop.refreshToken) {
+    return shop.accessToken;
+  }
+
+  if (new Date(shop.tokenExpiresAt).getTime() - Date.now() > TOKEN_REFRESH_BUFFER_MS) {
+    return shop.accessToken;
+  }
+
+  logger.info('Shopify token expired, refreshing', { shopId, shopDomain: shop.shopDomain });
+
+  const res = await fetch(`https://${shop.shopDomain}/admin/oauth/access_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: process.env.SHOPIFY_API_KEY,
+      client_secret: process.env.SHOPIFY_API_SECRET,
+      grant_type: 'refresh_token',
+      refresh_token: shop.refreshToken,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    logger.error('Shopify token refresh failed', undefined, { shopId, status: res.status, body: err });
+    throw new Error(`Token refresh failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const tokenExpiresAt = data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : null;
+
+  await prisma.shopifyShop.update({
+    where: { id: shopId },
+    data: {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token || shop.refreshToken,
+      tokenExpiresAt,
+    },
+  });
+
+  logger.info('Shopify token refreshed', { shopId, expiresAt: tokenExpiresAt });
+  return data.access_token;
+}
 
 let lastRequestTime = 0;
 

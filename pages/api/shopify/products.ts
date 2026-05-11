@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../lib/auth';
 import prisma from '../../../lib/prisma';
-import { ShopifyClient } from '../../../lib/integrations/shopifyClient';
+import { ShopifyClient, getValidAccessToken } from '../../../lib/integrations/shopifyClient';
 import { logger } from '../../../lib/logger';
 
 export const config = {
@@ -27,8 +27,9 @@ async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
     return { error: 'No active Shopify store connected', status: 400 };
   }
 
+  const accessToken = await getValidAccessToken(shop.id);
   const client = new ShopifyClient({
-    accessToken: shop.accessToken,
+    accessToken,
     shopDomain: shop.shopDomain,
   });
 

@@ -1171,17 +1171,19 @@ model WixProduct {
 }
 
 model ShopifyShop {
-  id                String    @id @default(cuid())
-  userId            String
-  shopDomain        String    @unique // e.g. "mystore.myshopify.com"
-  shopName          String?
-  accessToken       String
-  scopes            String?
-  isActive          Boolean   @default(true)
-  lastOrderSyncAt   DateTime?
-  lastProductSyncAt DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  userId              String
+  shopDomain          String    @unique // e.g. "mystore.myshopify.com"
+  shopName            String?
+  accessToken         String
+  refreshToken        String?
+  tokenExpiresAt      DateTime?
+  scopes              String?
+  isActive            Boolean   @default(true)
+  lastOrderSyncAt     DateTime?
+  lastProductSyncAt   DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   user     User             @relation("UserShopifyShops", fields: [userId], references: [id], onDelete: Cascade)
   products ShopifyProduct[] @relation("ShopifyShopProducts")

@@ -52,15 +52,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Exchange code for expiring access token (required since April 2026)
+    // Exchange code for an expiring offline access token (required since April 2026).
+    // Shopify defaults to non-expiring offline tokens unless expiring=1 is supplied.
+    const tokenParams = new URLSearchParams({
+      client_id: SHOPIFY_API_KEY,
+      client_secret: SHOPIFY_API_SECRET,
+      code,
+      expiring: '1',
+    });
+
     const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: SHOPIFY_API_KEY,
-        client_secret: SHOPIFY_API_SECRET,
-        code,
-      }),
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: tokenParams.toString(),
     });
 
     if (!tokenResponse.ok) {
@@ -80,6 +87,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       tokenExpiresAt: tokenExpiresAt?.toISOString(),
       scope,
     });
+
+    if (!access_token || !refresh_token || !expires_in || !tokenExpiresAt) {
+      logger.error('Shopify returned a non-expiring token response', undefined, {
+        hasAccessToken: !!access_token,
+        hasRefreshToken: !!refresh_token,
+        expiresIn: expires_in,
+        shop,
+      });
+      return res.redirect('/ayarlar?error=shopify_expiring_token_required');
+    }
 
     // Fetch shop info
     const shopInfoResponse = await fetch(`https://${shop}/admin/api/2024-10/shop.json`, {

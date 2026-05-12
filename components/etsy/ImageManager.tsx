@@ -89,10 +89,12 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const [hasPendingOrder, setHasPendingOrder] = useState(false);
   const [draftMediaReloadKey, setDraftMediaReloadKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const reorderInFlightRef = useRef(false);
   const pendingObjectUrlsRef = useRef<string[]>([]);
   const imagesRef = useRef(images);
   imagesRef.current = images;
+  const localImagesRef = useRef(localImages);
+  localImagesRef.current = localImages;
+  const hasPendingOrderRef = useRef(false);
 
   // Upload dialog state
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -124,7 +126,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   );
   const originalRankByImageId = useMemo(
     () => new Map(sortImagesByRank(images).map((img) => [img.listing_image_id, img.rank])),
-    [sourceImageKey, images],
+    [sourceImageKey],
   );
 
   useEffect(() => {
@@ -132,6 +134,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     pendingObjectUrlsRef.current = [];
     setLocalImages(sortImagesByRank(images));
     setHasPendingOrder(false);
+    hasPendingOrderRef.current = false;
     setDraggingImageId(null);
   }, [listingId, sourceImageKey]);
 
@@ -140,31 +143,49 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     const loadDraftMedia = async () => {
       try {
         const drafts = await fetchEtsyDrafts(shopId, listingId);
-        if (cancelled) return;
+        if (cancelled || hasPendingOrderRef.current) return;
         const currentImages = imagesRef.current;
         const baseImages = sortImagesByRank(currentImages);
+
+        const reorderMap = new Map<number, number>();
         const pendingUploads: ImageInfo[] = [];
         for (const draft of drafts || []) {
           for (const media of draft.media || []) {
-            if (media.kind !== 'image' || !['upload', 'ai_upload'].includes(media.operation)) continue;
-            const previewUrl = media.sourceUrl || `/api/etsy-drafts/media-preview?id=${encodeURIComponent(media.id)}`;
-            pendingUploads.push({
-              listing_image_id: stableNegativeId(media.id),
-              url_75x75: previewUrl,
-              url_170x135: previewUrl,
-              url_570xN: previewUrl,
-              url_fullxfull: previewUrl,
-              rank: Number(media.rank) || baseImages.length + pendingUploads.length + 1,
-              alt_text: media.altText || '',
-              is_pending_upload: true,
-              pending_filename: media.filename,
-              pending_media_id: media.id,
-            });
+            if (media.kind !== 'image') continue;
+            if (media.operation === 'reorder' && media.etsyMediaId != null && media.rank != null) {
+              reorderMap.set(Number(media.etsyMediaId), Number(media.rank));
+            } else if (['upload', 'ai_upload'].includes(media.operation)) {
+              const previewUrl = media.sourceUrl || `/api/etsy-drafts/media-preview?id=${encodeURIComponent(media.id)}`;
+              pendingUploads.push({
+                listing_image_id: stableNegativeId(media.id),
+                url_75x75: previewUrl,
+                url_170x135: previewUrl,
+                url_570xN: previewUrl,
+                url_fullxfull: previewUrl,
+                rank: Number(media.rank) || baseImages.length + pendingUploads.length + 1,
+                alt_text: media.altText || '',
+                is_pending_upload: true,
+                pending_filename: media.filename,
+                pending_media_id: media.id,
+              });
+            }
           }
         }
-        setLocalImages(sortImagesByRank([...baseImages, ...pendingUploads]));
+
+        const reorderedBase = reorderMap.size > 0
+          ? baseImages.map((img) => ({
+            ...img,
+            rank: reorderMap.get(img.listing_image_id) ?? img.rank,
+          }))
+          : baseImages;
+
+        if (!cancelled && !hasPendingOrderRef.current) {
+          setLocalImages(sortImagesByRank([...reorderedBase, ...pendingUploads]));
+        }
       } catch {
-        if (!cancelled) setLocalImages(sortImagesByRank(imagesRef.current));
+        if (!cancelled && !hasPendingOrderRef.current) {
+          setLocalImages(sortImagesByRank(imagesRef.current));
+        }
       }
     };
     loadDraftMedia();
@@ -343,16 +364,19 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   // --- Reorder (swap) ---
 
   const reorderLocally = useCallback((fromIndex: number, toIndex: number) => {
-    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex || reorderInFlightRef.current) return;
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
 
     setLocalImages((current) => {
       if (fromIndex >= current.length || toIndex >= current.length) return current;
       const next = [...current];
       const [moved] = next.splice(fromIndex, 1);
       next.splice(toIndex, 0, moved);
-      return next.map((image, index) => ({ ...image, rank: index + 1 }));
+      const result = next.map((image, index) => ({ ...image, rank: index + 1 }));
+      if (result.length !== current.length) return current;
+      return result;
     });
     setHasPendingOrder(true);
+    hasPendingOrderRef.current = true;
   }, []);
 
   const handleSwap = useCallback((direction: 'up' | 'down', img: ImageInfo) => {
@@ -361,66 +385,54 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       return;
     }
 
-    const currentIndex = sortedImages.findIndex((i) => i.listing_image_id === img.listing_image_id);
+    const currentIndex = localImagesRef.current.findIndex((i) => i.listing_image_id === img.listing_image_id);
     const neighborIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (neighborIndex < 0 || neighborIndex >= sortedImages.length) return;
+    if (neighborIndex < 0 || neighborIndex >= localImagesRef.current.length) return;
 
     reorderLocally(currentIndex, neighborIndex);
-  }, [sortedImages, reorderLocally]);
+  }, [reorderLocally]);
 
   const reorderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stageReorderToDraft = useCallback(async (currentImages: ImageInfo[]) => {
-    if (reorderInFlightRef.current) return;
-    reorderInFlightRef.current = true;
-    try {
-      for (let i = 0; i < currentImages.length; i++) {
-        const img = currentImages[i];
-        if (img.is_pending_upload) continue;
-        const nextRank = i + 1;
-        if (originalRankByImageId.get(img.listing_image_id) === nextRank) continue;
-        await stageEtsyDraft({
-          shopId,
-          listingId,
-          media: [{ kind: 'image', operation: 'reorder', etsyMediaId: img.listing_image_id, rank: nextRank }],
-        });
-      }
-    } catch {
-    } finally {
-      reorderInFlightRef.current = false;
+    const mediaOps: Array<Record<string, any>> = [];
+    for (let i = 0; i < currentImages.length; i++) {
+      const img = currentImages[i];
+      if (img.is_pending_upload) continue;
+      const nextRank = i + 1;
+      if (originalRankByImageId.get(img.listing_image_id) === nextRank) continue;
+      mediaOps.push({ kind: 'image', operation: 'reorder', etsyMediaId: img.listing_image_id, rank: nextRank });
     }
+    if (mediaOps.length === 0) return;
+    try {
+      await stageEtsyDraft({ shopId, listingId, media: mediaOps });
+    } catch { /* staging failure doesn't affect local UI */ }
   }, [listingId, shopId, originalRankByImageId]);
 
   useEffect(() => {
     if (!hasPendingOrder) return;
     if (reorderDebounceRef.current) clearTimeout(reorderDebounceRef.current);
-    const snapshot = [...localImages];
     reorderDebounceRef.current = setTimeout(() => {
-      stageReorderToDraft(snapshot);
+      stageReorderToDraft([...localImagesRef.current]);
     }, 800);
     return () => { if (reorderDebounceRef.current) clearTimeout(reorderDebounceRef.current); };
   }, [hasPendingOrder, localImages, stageReorderToDraft]);
 
-  const discardImageOrder = useCallback(() => {
-    setLocalImages(sortImagesByRank(imagesRef.current));
-    setHasPendingOrder(false);
-    setDraggingImageId(null);
-  }, [images]);
-
   const handleDropImage = useCallback((e: React.DragEvent<HTMLDivElement>, targetImageId: number) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!draggingImageId || draggingImageId === targetImageId || reorderInFlightRef.current) return;
+    if (!draggingImageId || draggingImageId === targetImageId) return;
     if (draggingImageId < 0 || targetImageId < 0) {
       setDraggingImageId(null);
       toast.error('Pending uploads can be reordered after they are synced to Etsy.');
       return;
     }
 
-    const fromIndex = sortedImages.findIndex((img) => img.listing_image_id === draggingImageId);
-    const toIndex = sortedImages.findIndex((img) => img.listing_image_id === targetImageId);
+    const current = localImagesRef.current;
+    const fromIndex = current.findIndex((img) => img.listing_image_id === draggingImageId);
+    const toIndex = current.findIndex((img) => img.listing_image_id === targetImageId);
     reorderLocally(fromIndex, toIndex);
-  }, [draggingImageId, sortedImages, reorderLocally]);
+  }, [draggingImageId, reorderLocally]);
 
   // --- AI Image Generation ---
 
@@ -586,7 +598,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               key={img.listing_image_id}
               draggable={!isPendingUpload}
               onDragStart={(e) => {
-                if (reorderInFlightRef.current || isPendingUpload) return;
+                if (isPendingUpload) return;
                 e.dataTransfer.effectAllowed = 'move';
                 setDraggingImageId(img.listing_image_id);
               }}

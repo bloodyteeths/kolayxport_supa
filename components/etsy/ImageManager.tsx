@@ -79,11 +79,9 @@ function base64ToFile(base64: string, mimeType: string, filename: string): File 
 
 export default function ImageManager({ listingId, shopId, images, onImagesChanged }: ImageManagerProps) {
   const t = useTranslations('etsy.imageManager');
-  const reorderToastId = `etsy-image-reorder-${listingId}`;
   const [uploading, setUploading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<ImageInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [swapping, setSwapping] = useState<number | null>(null);
   const [draggingImageId, setDraggingImageId] = useState<number | null>(null);
   const [previewImage, setPreviewImage] = useState<ImageInfo | null>(null);
   const [previewImageLoaded, setPreviewImageLoaded] = useState(false);
@@ -358,7 +356,6 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   }, []);
 
   const handleSwap = useCallback((direction: 'up' | 'down', img: ImageInfo) => {
-    if (reorderInFlightRef.current || swapping !== null) return;
     if (img.is_pending_upload) {
       toast.error('Pending uploads can be reordered after they are synced to Etsy.');
       return;
@@ -369,41 +366,43 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     if (neighborIndex < 0 || neighborIndex >= sortedImages.length) return;
 
     reorderLocally(currentIndex, neighborIndex);
-  }, [sortedImages, reorderLocally, swapping]);
+  }, [sortedImages, reorderLocally]);
 
-  const saveImageOrder = useCallback(async () => {
-    if (reorderInFlightRef.current || !hasPendingOrder) return;
+  const reorderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const stageReorderToDraft = useCallback(async (currentImages: ImageInfo[]) => {
+    if (reorderInFlightRef.current) return;
     reorderInFlightRef.current = true;
-    setSwapping(-1);
     try {
-      for (let i = 0; i < sortedImages.length; i++) {
-        const img = sortedImages[i];
+      for (let i = 0; i < currentImages.length; i++) {
+        const img = currentImages[i];
         if (img.is_pending_upload) continue;
         const nextRank = i + 1;
         if (originalRankByImageId.get(img.listing_image_id) === nextRank) continue;
-
         await stageEtsyDraft({
           shopId,
           listingId,
           media: [{ kind: 'image', operation: 'reorder', etsyMediaId: img.listing_image_id, rank: nextRank }],
         });
       }
-      toast.success('Image order saved to draft. Sync to Etsy when ready.', { id: reorderToastId });
-      setHasPendingOrder(false);
-      onImagesChanged();
-    } catch (err: any) {
-      toast.error(t('reorderError'), { id: reorderToastId });
-      onImagesChanged();
+    } catch {
     } finally {
       reorderInFlightRef.current = false;
-      setSwapping(null);
-      setDraggingImageId(null);
     }
-  }, [listingId, shopId, onImagesChanged, t, reorderToastId, sortedImages, hasPendingOrder, originalRankByImageId]);
+  }, [listingId, shopId, originalRankByImageId]);
+
+  useEffect(() => {
+    if (!hasPendingOrder) return;
+    if (reorderDebounceRef.current) clearTimeout(reorderDebounceRef.current);
+    const snapshot = [...localImages];
+    reorderDebounceRef.current = setTimeout(() => {
+      stageReorderToDraft(snapshot);
+    }, 800);
+    return () => { if (reorderDebounceRef.current) clearTimeout(reorderDebounceRef.current); };
+  }, [hasPendingOrder, localImages, stageReorderToDraft]);
 
   const discardImageOrder = useCallback(() => {
-    setLocalImages(sortImagesByRank(images));
+    setLocalImages(sortImagesByRank(imagesRef.current));
     setHasPendingOrder(false);
     setDraggingImageId(null);
   }, [images]);
@@ -411,7 +410,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const handleDropImage = useCallback((e: React.DragEvent<HTMLDivElement>, targetImageId: number) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!draggingImageId || draggingImageId === targetImageId || swapping !== null || reorderInFlightRef.current) return;
+    if (!draggingImageId || draggingImageId === targetImageId || reorderInFlightRef.current) return;
     if (draggingImageId < 0 || targetImageId < 0) {
       setDraggingImageId(null);
       toast.error('Pending uploads can be reordered after they are synced to Etsy.');
@@ -421,7 +420,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
     const fromIndex = sortedImages.findIndex((img) => img.listing_image_id === draggingImageId);
     const toIndex = sortedImages.findIndex((img) => img.listing_image_id === targetImageId);
     reorderLocally(fromIndex, toIndex);
-  }, [draggingImageId, sortedImages, reorderLocally, swapping]);
+  }, [draggingImageId, sortedImages, reorderLocally]);
 
   // --- AI Image Generation ---
 
@@ -564,28 +563,10 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       </Typography>
 
       {hasPendingOrder && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
-          <Typography variant="caption" color="text.secondary">
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+          <Typography variant="caption" color="primary">
             {t('unsavedOrderHint')}
           </Typography>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={saveImageOrder}
-            disabled={swapping !== null}
-            sx={{ textTransform: 'none', borderRadius: 1 }}
-          >
-            {swapping === -1 ? <CircularProgress size={16} color="inherit" /> : t('saveOrder')}
-          </Button>
-          <Button
-            size="small"
-            variant="text"
-            onClick={discardImageOrder}
-            disabled={swapping !== null}
-            sx={{ textTransform: 'none' }}
-          >
-            {t('discardOrder')}
-          </Button>
         </Box>
       )}
 
@@ -598,13 +579,12 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       >
         {sortedImages.map((img, idx) => {
           const isPrimary = img.rank === 1;
-          const isSwapping = swapping === img.rank || swapping === -1;
           const isPendingUpload = !!img.is_pending_upload;
 
           return (
             <Box
               key={img.listing_image_id}
-              draggable={!isSwapping && !isPendingUpload}
+              draggable={!isPendingUpload}
               onDragStart={(e) => {
                 if (reorderInFlightRef.current || isPendingUpload) return;
                 e.dataTransfer.effectAllowed = 'move';
@@ -623,8 +603,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 borderRadius: 1,
                 overflow: 'hidden',
                 border: isPrimary ? '2px solid #f59e0b' : '1px solid #e5e7eb',
-                opacity: isSwapping ? 0.5 : draggingImageId === img.listing_image_id ? 0.65 : 1,
-                cursor: isSwapping ? 'wait' : isPendingUpload ? 'pointer' : 'grab',
+                opacity: draggingImageId === img.listing_image_id ? 0.65 : 1,
+                cursor: isPendingUpload ? 'pointer' : 'grab',
                 transition: 'opacity 0.2s, border-color 0.2s',
                 '&:hover .img-controls': { opacity: 1 },
                 '&:active': { cursor: isPendingUpload ? 'pointer' : 'grabbing' },
@@ -635,21 +615,6 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 alt={img.alt_text || t('imageRankAlt', { rank: img.rank })}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
-
-              {isSwapping && (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    inset: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'rgba(255,255,255,0.6)',
-                  }}
-                >
-                  <CircularProgress size={28} />
-                </Box>
-              )}
 
               {isPendingUpload && (
                 <Box
@@ -746,7 +711,6 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                 <IconButton
                   size="small"
                   onClick={(e) => { e.stopPropagation(); setDeleteConfirm(img); }}
-                  disabled={isSwapping}
                   sx={{
                     backgroundColor: 'rgba(239,68,68,0.9)',
                     color: 'white',
@@ -763,7 +727,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                     <IconButton
                       size="small"
                       onClick={(e) => { e.stopPropagation(); handleSwap('up', img); }}
-                      disabled={!!swapping || isPendingUpload}
+                      disabled={isPendingUpload}
                       sx={{
                         backgroundColor: 'rgba(59,130,246,0.85)',
                         color: 'white',
@@ -782,7 +746,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                     <IconButton
                       size="small"
                       onClick={(e) => { e.stopPropagation(); handleSwap('down', img); }}
-                      disabled={!!swapping || isPendingUpload}
+                      disabled={isPendingUpload}
                       sx={{
                         backgroundColor: 'rgba(59,130,246,0.85)',
                         color: 'white',
@@ -800,7 +764,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
                   <IconButton
                     size="small"
                     onClick={(e) => { e.stopPropagation(); if (!isPendingUpload) openAltEdit(img); }}
-                    disabled={!!swapping || isPendingUpload}
+                    disabled={isPendingUpload}
                     sx={{
                       backgroundColor: 'rgba(16,185,129,0.85)',
                       color: 'white',
@@ -820,7 +784,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         {/* Add image button */}
         {sortedImages.length < 10 && (
           <Box
-            onClick={() => !uploading && !swapping && openUploadDialog()}
+            onClick={() => !uploading && openUploadDialog()}
             sx={{
               aspectRatio: '1',
               borderRadius: 1,
@@ -829,7 +793,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: uploading || swapping ? 'wait' : 'pointer',
+              cursor: uploading ? 'wait' : 'pointer',
               '&:hover': { borderColor: '#3b82f6', backgroundColor: '#f0f9ff' },
               transition: 'all 0.2s',
               minHeight: 120,

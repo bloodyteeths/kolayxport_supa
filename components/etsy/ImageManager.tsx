@@ -93,6 +93,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   const fileInputRef = useRef<HTMLInputElement>(null);
   const reorderInFlightRef = useRef(false);
   const pendingObjectUrlsRef = useRef<string[]>([]);
+  const imagesRef = useRef(images);
+  imagesRef.current = images;
 
   // Upload dialog state
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -141,7 +143,8 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       try {
         const drafts = await fetchEtsyDrafts(shopId, listingId);
         if (cancelled) return;
-        const baseImages = sortImagesByRank(images);
+        const currentImages = imagesRef.current;
+        const baseImages = sortImagesByRank(currentImages);
         const pendingUploads: ImageInfo[] = [];
         for (const draft of drafts || []) {
           for (const media of draft.media || []) {
@@ -163,12 +166,12 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         }
         setLocalImages(sortImagesByRank([...baseImages, ...pendingUploads]));
       } catch {
-        if (!cancelled) setLocalImages(sortImagesByRank(images));
+        if (!cancelled) setLocalImages(sortImagesByRank(imagesRef.current));
       }
     };
     loadDraftMedia();
     return () => { cancelled = true; };
-  }, [shopId, listingId, sourceImageKey, draftMediaReloadKey, images]);
+  }, [shopId, listingId, sourceImageKey, draftMediaReloadKey]);
 
   const sortedImages = localImages;
 

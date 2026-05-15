@@ -773,6 +773,7 @@ export async function syncDraft(draftId: string, userId: string) {
   });
 
   await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'syncing', lastSyncError: null } });
+  const syncedMediaIds: string[] = [];
   try {
     let syncedListingId = BigInt(draft.etsyListingId);
     const isNewLocalListing = syncedListingId < BigInt(0);
@@ -883,19 +884,28 @@ export async function syncDraft(draftId: string, userId: string) {
         const hasValues = Array.isArray(prop.values) && prop.values.length > 0;
         const hasValueIds = Array.isArray(prop.value_ids) && prop.value_ids.length > 0;
         if (prop.remove || (!hasValues && !hasValueIds)) {
-          results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}/properties/${prop.property_id}`, accessToken, {
-            method: 'DELETE',
-          }));
+          try {
+            results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}/properties/${prop.property_id}`, accessToken, {
+              method: 'DELETE',
+            }));
+          } catch (propErr: any) {
+            logger.warn('Draft sync property delete failed', { draftId: draft.id, propertyId: prop.property_id, error: propErr.message });
+          }
           continue;
         }
-        const body: JsonMap = {};
-        if (hasValues) body.values = prop.values;
-        if (hasValueIds) body.value_ids = prop.value_ids;
-        if (prop.scale_id) body.scale_id = prop.scale_id;
-        results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}/properties/${prop.property_id}`, accessToken, {
-          method: 'PUT',
-          body: JSON.stringify(body),
-        }));
+        const body: JsonMap = {
+          values: hasValues ? prop.values : [],
+          value_ids: hasValueIds ? prop.value_ids : [],
+        };
+        if (prop.scale_id != null) body.scale_id = prop.scale_id;
+        try {
+          results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}/properties/${prop.property_id}`, accessToken, {
+            method: 'PUT',
+            body: JSON.stringify(body),
+          }));
+        } catch (propErr: any) {
+          logger.warn('Draft sync property update failed', { draftId: draft.id, propertyId: prop.property_id, error: propErr.message });
+        }
       }
     }
 
@@ -937,9 +947,11 @@ export async function syncDraft(draftId: string, userId: string) {
 
     for (const op of nonImageDeletes) {
       results.push(await syncMediaOperation(accessToken, draft, op, syncedListingId, draft.etsyShopId, mediaContext));
+      if (op.id) syncedMediaIds.push(op.id);
     }
     for (const op of uploads) {
       results.push(await syncMediaOperation(accessToken, draft, op, syncedListingId, draft.etsyShopId, mediaContext));
+      if (op.id) syncedMediaIds.push(op.id);
     }
     for (const op of imageDeletes) {
       if (mediaContext?.imageIds && mediaContext.imageIds.size <= 1) {
@@ -947,9 +959,11 @@ export async function syncDraft(draftId: string, userId: string) {
         continue;
       }
       results.push(await syncMediaOperation(accessToken, draft, op, syncedListingId, draft.etsyShopId, mediaContext));
+      if (op.id) syncedMediaIds.push(op.id);
     }
     for (const op of mediaOps.filter((m: any) => ['update_alt', 'reorder'].includes(m.operation))) {
       results.push(await syncMediaOperation(accessToken, draft, op, syncedListingId, draft.etsyShopId, mediaContext));
+      if (op.id) syncedMediaIds.push(op.id);
     }
 
     const variationImages = draft.variationImagesPatch as JsonMap | null;
@@ -1192,6 +1206,13 @@ export async function syncDraft(draftId: string, userId: string) {
     }
     return { status: 'success', draftId: draft.id, count: results.length };
   } catch (err: any) {
+    if (syncedMediaIds.length > 0) {
+      await prisma.etsyDraftMedia.deleteMany({ where: { id: { in: syncedMediaIds } } }).catch(() => undefined);
+      for (const m of draft.media.filter((m: any) => syncedMediaIds.includes(m.id))) {
+        if (m.localPath) await fs.promises.unlink(m.localPath).catch(() => undefined);
+      }
+      logger.info('Partial media sync: cleaned up completed media before marking draft failed', { draftId: draft.id, syncedCount: syncedMediaIds.length, totalMedia: draft.media.length });
+    }
     await prisma.etsyListingDraft.update({ where: { id: draft.id }, data: { status: 'failed', lastSyncError: err.message || 'Sync failed' } });
     await prisma.etsyDraftSyncAttempt.update({ where: { id: attempt.id }, data: { status: 'failed', finishedAt: new Date(), error: err.message || 'Sync failed' } });
     throw err;

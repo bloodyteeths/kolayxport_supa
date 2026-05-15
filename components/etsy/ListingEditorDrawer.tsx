@@ -357,6 +357,7 @@ export default function ListingEditorDrawer({
   const [taxonomyLoading, setTaxonomyLoading] = useState(false);
   const [savingTaxonomy, setSavingTaxonomy] = useState(false);
   const originalListingPropertiesRef = useRef<Record<number, ListingPropertyValue>>({});
+  const [detailsSections, setDetailsSections] = useState<Record<string, boolean>>({ category: true, listing: false, policies: false, shipping: false });
 
   // Videos (fetched separately)
   const [videos, setVideos] = useState<VideoInfo[]>([]);
@@ -2195,7 +2196,7 @@ export default function ListingEditorDrawer({
                   listingId={String(listing.listing_id)}
                   shopId={shopId}
                   images={listing.images}
-                  onImagesChanged={() => { fetchListing(); refreshDraftState(); }}
+                  onImagesChanged={() => { refreshDraftState(); }}
                 />
               </Box>
             )}
@@ -2263,384 +2264,337 @@ export default function ListingEditorDrawer({
             {/* ============================================================ */}
             {/* Liste Detayları */}
             {/* ============================================================ */}
-            {activeTab === 'details' && (
-              <Box sx={{ p: { xs: 2, md: 2.5 } }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                  {/* Who made */}
-                  <FormControl size="medium" fullWidth>
-                    <InputLabel>{t('editor.whoMadeLabel')}</InputLabel>
-                    <Select
-                      value={fields.who_made}
-                      label={t('editor.whoMadeLabel')}
-                      onChange={(e: SelectChangeEvent) => updateField('who_made', e.target.value)}
-                    >
-                      {WHO_MADE_KEYS.map((val) => (
-                        <MenuItem key={val} value={val}>
-                          {t(`whoMade.${WHO_MADE_I18N[val]}`)}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+            {activeTab === 'details' && (() => {
+              const toggleSection = (key: string) => setDetailsSections((prev) => ({ ...prev, [key]: !prev[key] }));
+              const requiredProps = taxonomyProperties.filter((p) => p.is_required);
+              const variationProps = taxonomyProperties.filter((p) => !p.is_required && p.supports_variations);
+              const otherProps = taxonomyProperties.filter((p) => !p.is_required && !p.supports_variations);
+              const filledCount = taxonomyProperties.filter((p) => {
+                const d = listingProperties[p.property_id];
+                return d && d.values && d.values.length > 0;
+              }).length;
+              const totalCount = taxonomyProperties.length;
 
-                  {/* When made */}
-                  <FormControl size="medium" fullWidth>
-                    <InputLabel>{t('editor.whenMadeLabel')}</InputLabel>
-                    <Select
-                      value={fields.when_made}
-                      label={t('editor.whenMadeLabel')}
-                      onChange={(e: SelectChangeEvent) => updateField('when_made', e.target.value)}
-                    >
-                      {WHEN_MADE_KEYS.map((val) => (
-                        <MenuItem key={val} value={val}>
-                          {t(`whenMade.${WHEN_MADE_I18N[val]}`)}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+              const sectionHeaderSx = {
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                px: 2, py: 1.25, cursor: 'pointer', userSelect: 'none' as const,
+                borderRadius: 1.5,
+                bgcolor: 'action.hover',
+                '&:hover': { bgcolor: 'action.selected' },
+                transition: 'background-color 0.15s',
+              };
 
-                  {/* Is supply */}
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={fields.is_supply}
-                        onChange={(e) => updateField('is_supply', e.target.checked)}
-                      />
-                    }
-                    label={t('editor.isSupplyLabel')}
-                  />
+              const renderPropertyField = (prop: TaxonomyProperty) => {
+                const draft = listingProperties[prop.property_id] || { property_id: prop.property_id, values: [] };
+                const possibleOptions: TaxonomyOption[] = (prop.possible_values || [])
+                  .map((value) => ({ value_id: Number(value.value_id) || undefined, name: value.name }))
+                  .filter((value) => value.name);
+                const selectedOptions: TaxonomyOption[] = (draft.values || []).map((value, index) => {
+                  const byId = draft.value_ids?.[index]
+                    ? possibleOptions.find((option) => option.value_id === draft.value_ids?.[index])
+                    : undefined;
+                  return byId || possibleOptions.find((option) => option.name === value) || { name: value };
+                });
+                const isFilled = selectedOptions.length > 0;
 
-                  <Divider sx={{ my: 2 }} />
-
-                  {/* Shop section */}
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                    <FormControl size="medium" fullWidth>
-                      <InputLabel>{t('editor.shopSection')}</InputLabel>
-                      <Select
-                        value={String(fields.shop_section_id)}
-                        label={t('editor.shopSection')}
-                        onChange={(e: SelectChangeEvent) =>
-                          updateField('shop_section_id', e.target.value ? Number(e.target.value) : '')
-                        }
-                      >
-                        <MenuItem value="">
-                          <em>{t('editor.notSelected')}</em>
-                        </MenuItem>
-                        {[...shopSections, ...stagedShopSections].map((sec) => (
-                          <MenuItem key={sec.shop_section_id} value={String(sec.shop_section_id)}>
-                            {sec.title}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <Tooltip title={t('editor.addNewSection')}>
-                      <IconButton onClick={() => setCreateSectionOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
-                        <AddIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                  {shopSections.length === 0 && (
-                    <Typography variant="caption" color="warning.main">
-                      {t('editor.couldNotLoad')}
-                    </Typography>
-                  )}
-
-                  {/* Shipping profile */}
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                    <FormControl size="medium" fullWidth>
-                      <InputLabel>{t('editor.shippingProfile')}</InputLabel>
-                      <Select
-                        value={String(fields.shipping_profile_id)}
-                        label={t('editor.shippingProfile')}
-                        onChange={(e: SelectChangeEvent) =>
-                          updateField('shipping_profile_id', e.target.value ? Number(e.target.value) : '')
-                        }
-                      >
-                        <MenuItem value="">
-                          <em>{t('editor.notSelected')}</em>
-                        </MenuItem>
-                        {[...shippingProfiles, ...stagedShippingProfiles].map((sp) => (
-                          <MenuItem key={sp.shipping_profile_id} value={String(sp.shipping_profile_id)}>
-                            {sp.title}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    <Tooltip title={t('editor.addNewShippingProfile')}>
-                      <IconButton onClick={() => setCreateShippingOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
-                        <AddIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                  {shippingProfiles.length === 0 && (
-                    <Typography variant="caption" color="warning.main">
-                      {t('editor.couldNotLoad')}
-                    </Typography>
-                  )}
-
-                  {/* Return policy */}
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                    <FormControl size="medium" fullWidth>
-                      <InputLabel>{t('editor.returnPolicy')}</InputLabel>
-                      <Select
-                        value={String(fields.return_policy_id)}
-                        label={t('editor.returnPolicy')}
-                        onChange={(e: SelectChangeEvent) =>
-                          updateField('return_policy_id', e.target.value ? Number(e.target.value) : '')
-                        }
-                      >
-                        <MenuItem value="">
-                          <em>{t('editor.notSelected')}</em>
-                        </MenuItem>
-                        {[...returnPolicies, ...stagedReturnPolicies].map((rp) => {
-                          const label = rp.description
-                            ? rp.description
-                            : [
-                                rp.accepts_returns ? t('editor.acceptsReturnsLabel') : t('editor.noReturnsLabel'),
-                                rp.accepts_exchanges ? t('editor.acceptsExchangesLabel') : t('editor.noExchangesLabel'),
-                              ].join(', ');
-                          return (
-                            <MenuItem key={rp.return_policy_id} value={String(rp.return_policy_id)}>
-                              {label}
+                return (
+                  <Box key={prop.property_id} sx={{
+                    display: 'flex', gap: 1, alignItems: 'flex-start',
+                    p: 1, borderRadius: 1,
+                    bgcolor: isFilled ? 'success.50' : 'transparent',
+                    border: '1px solid',
+                    borderColor: isFilled ? 'success.200' : 'divider',
+                    transition: 'all 0.15s',
+                  }}>
+                    <Autocomplete
+                      multiple
+                      freeSolo
+                      options={possibleOptions}
+                      getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
+                      isOptionEqualToValue={(option, value) => option.name === value.name}
+                      value={selectedOptions}
+                      onChange={(_, value) => updateListingPropertyDraft(
+                        prop.property_id,
+                        value.map((option) => typeof option === 'string' ? { name: option } : option)
+                      )}
+                      renderTags={(value, getTagProps) =>
+                        value.map((option, index) => (
+                          <Chip
+                            {...getTagProps({ index })}
+                            key={`${prop.property_id}-${typeof option === 'string' ? option : option.name}`}
+                            label={typeof option === 'string' ? option : option.name}
+                            size="small"
+                            color={isFilled ? 'success' : 'default'}
+                            variant="outlined"
+                          />
+                        ))
+                      }
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label={prop.display_name}
+                          size="small"
+                          placeholder={isFilled ? '' : 'Select...'}
+                        />
+                      )}
+                      sx={{ flex: 1 }}
+                    />
+                    {prop.supports_variations && (
+                      <Chip label="Var" size="small" variant="outlined" color="info" sx={{ mt: 1, fontSize: '0.65rem', height: 20 }} />
+                    )}
+                    {prop.scales && prop.scales.length > 0 && (
+                      <FormControl size="small" sx={{ minWidth: 90, mt: 0.25 }}>
+                        <InputLabel sx={{ fontSize: '0.75rem' }}>Scale</InputLabel>
+                        <Select
+                          value={draft.scale_id ? String(draft.scale_id) : ''}
+                          label="Scale"
+                          onChange={(e: SelectChangeEvent) => updateListingPropertyScale(prop.property_id, e.target.value ? Number(e.target.value) : null)}
+                          sx={{ fontSize: '0.8rem' }}
+                        >
+                          <MenuItem value=""><em>-</em></MenuItem>
+                          {prop.scales.map((scale) => (
+                            <MenuItem key={scale.scale_id} value={String(scale.scale_id)}>
+                              {scale.display_name}
                             </MenuItem>
-                          );
-                        })}
-                      </Select>
-                    </FormControl>
-                    <Tooltip title={t('editor.addNewReturnPolicy')}>
-                      <IconButton onClick={() => setCreateReturnOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
-                        <AddIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                  {returnPolicies.length === 0 && (
-                    <Typography variant="caption" color="warning.main">
-                      {t('editor.couldNotLoad')}
-                    </Typography>
-                  )}
-
-                  <Divider sx={{ my: 2 }} />
-
-                  {/* Processing time */}
-                  <Typography variant="subtitle2" fontWeight={600}>
-                    {t('editor.processingTimeDays')}
-                  </Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                    <TextField
-                      label={t('editor.minLabel')}
-                      type="number"
-                      value={fields.processing_min}
-                      onChange={(e) =>
-                        updateField('processing_min', e.target.value ? parseInt(e.target.value) : '')
-                      }
-                      size="medium"
-                      sx={{ flex: 1 }}
-                      inputProps={{ min: 1 }}
-                    />
-                    <TextField
-                      label={t('editor.maxLabel')}
-                      type="number"
-                      value={fields.processing_max}
-                      onChange={(e) =>
-                        updateField('processing_max', e.target.value ? parseInt(e.target.value) : '')
-                      }
-                      size="medium"
-                      sx={{ flex: 1 }}
-                      inputProps={{ min: 1 }}
-                    />
-                  </Box>
-
-                  <Divider sx={{ my: 2 }} />
-
-                  {/* Weight */}
-                  <Typography variant="subtitle2" fontWeight={600}>
-                    {t('editor.weightTitle')}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <TextField
-                      label={t('editor.weightLabel')}
-                      type="number"
-                      value={fields.item_weight}
-                      onChange={(e) =>
-                        updateField('item_weight', e.target.value ? parseFloat(e.target.value) : '')
-                      }
-                      size="medium"
-                      sx={{ flex: 1 }}
-                      inputProps={{ min: 0, step: 0.1 }}
-                    />
-                    <FormControl size="medium" sx={{ minWidth: 80 }}>
-                      <InputLabel>{t('editor.unitLabel')}</InputLabel>
-                      <Select
-                        value={fields.item_weight_unit}
-                        label={t('editor.unitLabel')}
-                        onChange={(e: SelectChangeEvent) => updateField('item_weight_unit', e.target.value)}
-                      >
-                        {WEIGHT_UNITS.map((u) => (
-                          <MenuItem key={u.value} value={u.value}>
-                            {u.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Box>
-
-                  {/* Dimensions */}
-                  <Typography variant="subtitle2" fontWeight={600}>
-                    {t('editor.dimensionsTitle')}
-                  </Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr auto' }, gap: 1.5 }}>
-                    <TextField
-                      label={t('editor.lengthLabel')}
-                      type="number"
-                      value={fields.item_length}
-                      onChange={(e) =>
-                        updateField('item_length', e.target.value ? parseFloat(e.target.value) : '')
-                      }
-                      size="medium"
-                      inputProps={{ min: 0, step: 0.1 }}
-                    />
-                    <TextField
-                      label={t('editor.widthLabel')}
-                      type="number"
-                      value={fields.item_width}
-                      onChange={(e) =>
-                        updateField('item_width', e.target.value ? parseFloat(e.target.value) : '')
-                      }
-                      size="medium"
-                      inputProps={{ min: 0, step: 0.1 }}
-                    />
-                    <TextField
-                      label={t('editor.heightLabel')}
-                      type="number"
-                      value={fields.item_height}
-                      onChange={(e) =>
-                        updateField('item_height', e.target.value ? parseFloat(e.target.value) : '')
-                      }
-                      size="medium"
-                      inputProps={{ min: 0, step: 0.1 }}
-                    />
-                    <FormControl size="medium" sx={{ minWidth: 70 }}>
-                      <InputLabel>{t('editor.unitLabel')}</InputLabel>
-                      <Select
-                        value={fields.item_dimensions_unit}
-                        label={t('editor.unitLabel')}
-                        onChange={(e: SelectChangeEvent) =>
-                          updateField('item_dimensions_unit', e.target.value)
-                        }
-                      >
-                        {DIMENSION_UNITS.map((u) => (
-                          <MenuItem key={u.value} value={u.value}>
-                            {u.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Box>
-
-                  <Divider sx={{ my: 2 }} />
-
-                  <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight={600}>
-                          Etsy category details
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Category-specific attributes from Etsy taxonomy
-                        </Typography>
-                      </Box>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={savingTaxonomy ? <CircularProgress size={14} /> : <SaveIcon />}
-                        onClick={handleSaveTaxonomyDetails}
-                        disabled={taxonomyLoading || savingTaxonomy || getChangedListingProperties().length === 0}
-                        sx={{ textTransform: 'none', fontWeight: 600 }}
-                      >
-                        Save details
-                      </Button>
-                    </Box>
-
-                    {taxonomyLoading ? (
-                      <Box sx={{ py: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CircularProgress size={18} />
-                        <Typography variant="body2" color="text.secondary">Loading Etsy details...</Typography>
-                      </Box>
-                    ) : taxonomyProperties.length === 0 ? (
-                      <Alert severity="info">No Etsy category details were returned for this category.</Alert>
-                    ) : (
-                      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.5 }}>
-                        {taxonomyProperties
-                          .map((prop) => {
-                            const draft = listingProperties[prop.property_id] || { property_id: prop.property_id, values: [] };
-                            const possibleOptions: TaxonomyOption[] = (prop.possible_values || [])
-                              .map((value) => ({ value_id: Number(value.value_id) || undefined, name: value.name }))
-                              .filter((value) => value.name);
-                            const selectedOptions: TaxonomyOption[] = (draft.values || []).map((value, index) => {
-                              const byId = draft.value_ids?.[index]
-                                ? possibleOptions.find((option) => option.value_id === draft.value_ids?.[index])
-                                : undefined;
-                              return byId || possibleOptions.find((option) => option.name === value) || { name: value };
-                            });
-                            return (
-                              <Box key={prop.property_id} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                                <Autocomplete
-                                  multiple
-                                  freeSolo
-                                  options={possibleOptions}
-                                  getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
-                                  isOptionEqualToValue={(option, value) => option.name === value.name}
-                                  value={selectedOptions}
-                                  onChange={(_, value) => updateListingPropertyDraft(
-                                    prop.property_id,
-                                    value.map((option) => typeof option === 'string' ? { name: option } : option)
-                                  )}
-                                  renderTags={(value, getTagProps) =>
-                                    value.map((option, index) => (
-                                      <Chip {...getTagProps({ index })} key={`${prop.property_id}-${typeof option === 'string' ? option : option.name}`} label={typeof option === 'string' ? option : option.name} size="small" />
-                                    ))
-                                  }
-                                  renderInput={(params) => (
-                                    <TextField
-                                      {...params}
-                                      label={`${prop.display_name}${prop.is_required ? ' *' : ''}`}
-                                      size="small"
-                                      placeholder="Add value"
-                                      helperText={prop.supports_variations ? 'Can also be used for variations' : undefined}
-                                    />
-                                  )}
-                                  sx={{ flex: 1 }}
-                                />
-                                {prop.supports_variations && (
-                                  <Chip label="Variation" size="small" variant="outlined" sx={{ mt: 1 }} />
-                                )}
-                                {prop.scales && prop.scales.length > 0 && (
-                                  <FormControl size="small" sx={{ minWidth: 110 }}>
-                                    <InputLabel>Scale</InputLabel>
-                                    <Select
-                                      value={draft.scale_id ? String(draft.scale_id) : ''}
-                                      label="Scale"
-                                      onChange={(e: SelectChangeEvent) => updateListingPropertyScale(prop.property_id, e.target.value ? Number(e.target.value) : null)}
-                                    >
-                                      <MenuItem value="">
-                                        <em>None</em>
-                                      </MenuItem>
-                                      {prop.scales.map((scale) => (
-                                        <MenuItem key={scale.scale_id} value={String(scale.scale_id)}>
-                                          {scale.display_name}
-                                        </MenuItem>
-                                      ))}
-                                    </Select>
-                                  </FormControl>
-                                )}
-                              </Box>
-                            );
-                          })}
-                      </Box>
+                          ))}
+                        </Select>
+                      </FormControl>
                     )}
                   </Box>
+                );
+              };
+
+              const renderPropertyGroup = (label: string, props: TaxonomyProperty[], color: string) => {
+                if (props.length === 0) return null;
+                const groupFilled = props.filter((p) => {
+                  const d = listingProperties[p.property_id];
+                  return d && d.values && d.values.length > 0;
+                }).length;
+                return (
+                  <Box key={label} sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <Typography variant="caption" fontWeight={700} color={color} sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        {label}
+                      </Typography>
+                      <Chip
+                        label={`${groupFilled}/${props.length}`}
+                        size="small"
+                        color={groupFilled === props.length ? 'success' : 'default'}
+                        variant={groupFilled === props.length ? 'filled' : 'outlined'}
+                        sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700 }}
+                      />
+                    </Box>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1 }}>
+                      {props.map(renderPropertyField)}
+                    </Box>
+                  </Box>
+                );
+              };
+
+              return (
+              <Box sx={{ p: { xs: 1.5, md: 2 }, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+
+                {/* ── Category Attributes ── */}
+                <Box sx={{ border: '1px solid', borderColor: 'primary.200', borderRadius: 2, overflow: 'hidden' }}>
+                  <Box sx={{ ...sectionHeaderSx, bgcolor: 'primary.50', '&:hover': { bgcolor: 'primary.100' } }} onClick={() => toggleSection('category')}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <TuneIcon sx={{ fontSize: 20, color: 'primary.main' }} />
+                      <Box>
+                        <Typography variant="subtitle2" fontWeight={700}>Category Attributes</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {totalCount > 0 ? `${filledCount} of ${totalCount} filled` : 'No attributes for this category'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {totalCount > 0 && (
+                        <Box sx={{ width: 48, height: 4, borderRadius: 2, bgcolor: 'grey.200', overflow: 'hidden' }}>
+                          <Box sx={{ width: `${totalCount > 0 ? (filledCount / totalCount) * 100 : 0}%`, height: '100%', bgcolor: filledCount === totalCount ? 'success.main' : 'primary.main', borderRadius: 2, transition: 'width 0.3s' }} />
+                        </Box>
+                      )}
+                      <ExpandMoreIcon sx={{ fontSize: 20, transform: detailsSections.category ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                    </Box>
+                  </Box>
+
+                  <Collapse in={detailsSections.category}>
+                    <Box sx={{ p: 2, pt: 1.5 }}>
+                      {taxonomyLoading ? (
+                        <Box sx={{ py: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                          <CircularProgress size={18} />
+                          <Typography variant="body2" color="text.secondary">Loading category details...</Typography>
+                        </Box>
+                      ) : taxonomyProperties.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
+                          No Etsy category details for this category.
+                        </Typography>
+                      ) : (
+                        <>
+                          {renderPropertyGroup('Required', requiredProps, 'error.main')}
+                          {renderPropertyGroup('Variation-capable', variationProps, 'info.main')}
+                          {renderPropertyGroup('Optional', otherProps, 'text.secondary')}
+
+                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1, pt: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              disableElevation
+                              startIcon={savingTaxonomy ? <CircularProgress size={14} color="inherit" /> : <SaveIcon />}
+                              onClick={handleSaveTaxonomyDetails}
+                              disabled={taxonomyLoading || savingTaxonomy || getChangedListingProperties().length === 0}
+                              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 1.5 }}
+                            >
+                              Save category details
+                            </Button>
+                          </Box>
+                        </>
+                      )}
+                    </Box>
+                  </Collapse>
                 </Box>
+
+                {/* ── Listing Info ── */}
+                <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                  <Box sx={sectionHeaderSx} onClick={() => toggleSection('listing')}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <SettingsIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                      <Typography variant="subtitle2" fontWeight={700}>Listing Info</Typography>
+                    </Box>
+                    <ExpandMoreIcon sx={{ fontSize: 20, transform: detailsSections.listing ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </Box>
+                  <Collapse in={detailsSections.listing}>
+                    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>{t('editor.whoMadeLabel')}</InputLabel>
+                          <Select value={fields.who_made} label={t('editor.whoMadeLabel')} onChange={(e: SelectChangeEvent) => updateField('who_made', e.target.value)}>
+                            {WHO_MADE_KEYS.map((val) => (<MenuItem key={val} value={val}>{t(`whoMade.${WHO_MADE_I18N[val]}`)}</MenuItem>))}
+                          </Select>
+                        </FormControl>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>{t('editor.whenMadeLabel')}</InputLabel>
+                          <Select value={fields.when_made} label={t('editor.whenMadeLabel')} onChange={(e: SelectChangeEvent) => updateField('when_made', e.target.value)}>
+                            {WHEN_MADE_KEYS.map((val) => (<MenuItem key={val} value={val}>{t(`whenMade.${WHEN_MADE_I18N[val]}`)}</MenuItem>))}
+                          </Select>
+                        </FormControl>
+                      </Box>
+                      <FormControlLabel
+                        control={<Switch checked={fields.is_supply} onChange={(e) => updateField('is_supply', e.target.checked)} size="small" />}
+                        label={<Typography variant="body2">{t('editor.isSupplyLabel')}</Typography>}
+                      />
+                    </Box>
+                  </Collapse>
+                </Box>
+
+                {/* ── Shop & Policies ── */}
+                <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                  <Box sx={sectionHeaderSx} onClick={() => toggleSection('policies')}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <ViewModuleIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                      <Typography variant="subtitle2" fontWeight={700}>Shop & Policies</Typography>
+                    </Box>
+                    <ExpandMoreIcon sx={{ fontSize: 20, transform: detailsSections.policies ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </Box>
+                  <Collapse in={detailsSections.policies}>
+                    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>{t('editor.shopSection')}</InputLabel>
+                          <Select value={String(fields.shop_section_id)} label={t('editor.shopSection')} onChange={(e: SelectChangeEvent) => updateField('shop_section_id', e.target.value ? Number(e.target.value) : '')}>
+                            <MenuItem value=""><em>{t('editor.notSelected')}</em></MenuItem>
+                            {[...shopSections, ...stagedShopSections].map((sec) => (<MenuItem key={sec.shop_section_id} value={String(sec.shop_section_id)}>{sec.title}</MenuItem>))}
+                          </Select>
+                        </FormControl>
+                        <Tooltip title={t('editor.addNewSection')}><IconButton onClick={() => setCreateSectionOpen(true)} size="small"><AddIcon fontSize="small" /></IconButton></Tooltip>
+                      </Box>
+                      {shopSections.length === 0 && <Typography variant="caption" color="warning.main">{t('editor.couldNotLoad')}</Typography>}
+
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>{t('editor.shippingProfile')}</InputLabel>
+                          <Select value={String(fields.shipping_profile_id)} label={t('editor.shippingProfile')} onChange={(e: SelectChangeEvent) => updateField('shipping_profile_id', e.target.value ? Number(e.target.value) : '')}>
+                            <MenuItem value=""><em>{t('editor.notSelected')}</em></MenuItem>
+                            {[...shippingProfiles, ...stagedShippingProfiles].map((sp) => (<MenuItem key={sp.shipping_profile_id} value={String(sp.shipping_profile_id)}>{sp.title}</MenuItem>))}
+                          </Select>
+                        </FormControl>
+                        <Tooltip title={t('editor.addNewShippingProfile')}><IconButton onClick={() => setCreateShippingOpen(true)} size="small"><AddIcon fontSize="small" /></IconButton></Tooltip>
+                      </Box>
+                      {shippingProfiles.length === 0 && <Typography variant="caption" color="warning.main">{t('editor.couldNotLoad')}</Typography>}
+
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <FormControl size="small" fullWidth>
+                          <InputLabel>{t('editor.returnPolicy')}</InputLabel>
+                          <Select value={String(fields.return_policy_id)} label={t('editor.returnPolicy')} onChange={(e: SelectChangeEvent) => updateField('return_policy_id', e.target.value ? Number(e.target.value) : '')}>
+                            <MenuItem value=""><em>{t('editor.notSelected')}</em></MenuItem>
+                            {[...returnPolicies, ...stagedReturnPolicies].map((rp) => {
+                              const rpLabel = rp.description || [rp.accepts_returns ? t('editor.acceptsReturnsLabel') : t('editor.noReturnsLabel'), rp.accepts_exchanges ? t('editor.acceptsExchangesLabel') : t('editor.noExchangesLabel')].join(', ');
+                              return (<MenuItem key={rp.return_policy_id} value={String(rp.return_policy_id)}>{rpLabel}</MenuItem>);
+                            })}
+                          </Select>
+                        </FormControl>
+                        <Tooltip title={t('editor.addNewReturnPolicy')}><IconButton onClick={() => setCreateReturnOpen(true)} size="small"><AddIcon fontSize="small" /></IconButton></Tooltip>
+                      </Box>
+                      {returnPolicies.length === 0 && <Typography variant="caption" color="warning.main">{t('editor.couldNotLoad')}</Typography>}
+                    </Box>
+                  </Collapse>
+                </Box>
+
+                {/* ── Shipping & Packaging ── */}
+                <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                  <Box sx={sectionHeaderSx} onClick={() => toggleSection('shipping')}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <SettingsIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                      <Typography variant="subtitle2" fontWeight={700}>Shipping & Packaging</Typography>
+                    </Box>
+                    <ExpandMoreIcon sx={{ fontSize: 20, transform: detailsSections.shipping ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </Box>
+                  <Collapse in={detailsSections.shipping}>
+                    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        {t('editor.processingTimeDays')}
+                      </Typography>
+                      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                        <TextField label={t('editor.minLabel')} type="number" value={fields.processing_min} onChange={(e) => updateField('processing_min', e.target.value ? parseInt(e.target.value) : '')} size="small" inputProps={{ min: 1 }} />
+                        <TextField label={t('editor.maxLabel')} type="number" value={fields.processing_max} onChange={(e) => updateField('processing_max', e.target.value ? parseInt(e.target.value) : '')} size="small" inputProps={{ min: 1 }} />
+                      </Box>
+
+                      <Divider />
+
+                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        {t('editor.weightTitle')}
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1.5 }}>
+                        <TextField label={t('editor.weightLabel')} type="number" value={fields.item_weight} onChange={(e) => updateField('item_weight', e.target.value ? parseFloat(e.target.value) : '')} size="small" sx={{ flex: 1 }} inputProps={{ min: 0, step: 0.1 }} />
+                        <FormControl size="small" sx={{ minWidth: 70 }}>
+                          <InputLabel>{t('editor.unitLabel')}</InputLabel>
+                          <Select value={fields.item_weight_unit} label={t('editor.unitLabel')} onChange={(e: SelectChangeEvent) => updateField('item_weight_unit', e.target.value)}>
+                            {WEIGHT_UNITS.map((u) => (<MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>))}
+                          </Select>
+                        </FormControl>
+                      </Box>
+
+                      <Divider />
+
+                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        {t('editor.dimensionsTitle')}
+                      </Typography>
+                      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr auto' }, gap: 1.5 }}>
+                        <TextField label={t('editor.lengthLabel')} type="number" value={fields.item_length} onChange={(e) => updateField('item_length', e.target.value ? parseFloat(e.target.value) : '')} size="small" inputProps={{ min: 0, step: 0.1 }} />
+                        <TextField label={t('editor.widthLabel')} type="number" value={fields.item_width} onChange={(e) => updateField('item_width', e.target.value ? parseFloat(e.target.value) : '')} size="small" inputProps={{ min: 0, step: 0.1 }} />
+                        <TextField label={t('editor.heightLabel')} type="number" value={fields.item_height} onChange={(e) => updateField('item_height', e.target.value ? parseFloat(e.target.value) : '')} size="small" inputProps={{ min: 0, step: 0.1 }} />
+                        <FormControl size="small" sx={{ minWidth: 60 }}>
+                          <InputLabel>{t('editor.unitLabel')}</InputLabel>
+                          <Select value={fields.item_dimensions_unit} label={t('editor.unitLabel')} onChange={(e: SelectChangeEvent) => updateField('item_dimensions_unit', e.target.value)}>
+                            {DIMENSION_UNITS.map((u) => (<MenuItem key={u.value} value={u.value}>{u.label}</MenuItem>))}
+                          </Select>
+                        </FormControl>
+                      </Box>
+                    </Box>
+                  </Collapse>
+                </Box>
+
               </Box>
-            )}
+              );
+            })()}
 
             {/* ============================================================ */}
             {/* İşlemler */}

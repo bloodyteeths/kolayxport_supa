@@ -120,7 +120,7 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string): UI
       quantity: tx.quantity || 1,
       weight: 0.5,
       sku: tx.product_data?.sku || tx.sku || '',
-      image: tx.image_url || '',
+      image: '',
       variantInfo: variations || '',
     };
   });

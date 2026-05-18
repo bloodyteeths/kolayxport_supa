@@ -552,8 +552,8 @@ export default async function handler(
               if (best.isActive) {
                 item.etsyListingUrl = best.url;
               }
-              // Use image from any listing (image URLs stay valid even for expired)
-              if ((!item.image || item.image === '') && best.imageUrl) {
+              // Always prefer EtsyListing cached image (high-quality 570xN)
+              if (best.imageUrl && item.image !== best.imageUrl) {
                 item.image = best.imageUrl;
                 imageUpdates.push({ id: item.id, image: best.imageUrl });
               }
@@ -754,6 +754,7 @@ export default async function handler(
         recipientCountry,
         recipientPhone,
         line_items: line_items_for_ui,
+        images: line_items_for_ui.map((i: any) => i.image).filter(Boolean),
         marketplaceOrderDate,
         orderTotalPrice: rawOrder.totalPrice,
         source,

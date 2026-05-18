@@ -552,8 +552,8 @@ export default async function handler(
               if (best.isActive) {
                 item.etsyListingUrl = best.url;
               }
-              // Always prefer EtsyListing cached image (high-quality 570xN)
-              if (best.imageUrl && item.image !== best.imageUrl) {
+              // Only fill empty images — listing_id-based images from sync are more accurate
+              if (best.imageUrl && !item.image) {
                 item.image = best.imageUrl;
                 imageUpdates.push({ id: item.id, image: best.imageUrl });
               }

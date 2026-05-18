@@ -92,7 +92,43 @@ async function fetchReceiptsForShop(
     if (allReceipts.length > 500) break;
   }
 
-  return allReceipts.map((receipt) => mapReceiptToUIOrder(receipt, shopId, shopName));
+  // Resolve listing images from EtsyListing cache using listing_id from transactions
+  const listingIds = new Set<bigint>();
+  for (const receipt of allReceipts) {
+    for (const tx of (receipt.transactions || [])) {
+      if (tx.listing_id) listingIds.add(BigInt(tx.listing_id));
+    }
+  }
+
+  const imageMap = new Map<string, string>();
+  if (listingIds.size > 0) {
+    try {
+      const cached = await prisma.etsyListing.findMany({
+        where: { etsyListingId: { in: [...listingIds] } },
+        select: { etsyListingId: true, thumbnailUrl570xN: true, thumbnailUrl170x135: true },
+      });
+      for (const l of cached) {
+        const url = l.thumbnailUrl570xN || l.thumbnailUrl170x135 || '';
+        if (url) imageMap.set(String(l.etsyListingId), url);
+      }
+    } catch (err) {
+      logger.warn('[EtsyOrderSync] Failed to batch-fetch listing images from cache', { error: (err as Error).message });
+    }
+  }
+
+  // Fallback: fetch images from Etsy API for listings not in cache (max 20 to avoid rate limits)
+  const missingIds = [...listingIds].filter(id => !imageMap.has(String(id)));
+  if (missingIds.length > 0) {
+    const toFetch = missingIds.slice(0, 20);
+    logger.info(`[EtsyOrderSync] Fetching ${toFetch.length} listing images from Etsy API (${missingIds.length} missing from cache)`);
+    const fetches = toFetch.map(async (id) => {
+      const url = await client.getListingFirstImage(String(id));
+      if (url) imageMap.set(String(id), url);
+    });
+    await Promise.allSettled(fetches);
+  }
+
+  return allReceipts.map((receipt) => mapReceiptToUIOrder(receipt, shopId, shopName, imageMap));
 }
 
 function parseEtsyPrice(price: any): number {
@@ -105,13 +141,15 @@ function parseEtsyPrice(price: any): number {
   return 0;
 }
 
-function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string): UIOrder {
+function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, imageMap: Map<string, string>): UIOrder {
   const transactions = receipt.transactions || [];
 
   const lineItems = transactions.map((tx: any, idx: number) => {
     const variations = (tx.variations || [])
       .map((v: any) => `${v.formatted_name}: ${v.formatted_value}`)
       .join(', ');
+
+    const listingImage = tx.listing_id ? (imageMap.get(String(tx.listing_id)) || '') : '';
 
     return {
       id: String(tx.transaction_id || `${receipt.receipt_id}-${idx}`),
@@ -120,7 +158,7 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string): UI
       quantity: tx.quantity || 1,
       weight: 0.5,
       sku: tx.product_data?.sku || tx.sku || '',
-      image: '',
+      image: listingImage,
       variantInfo: variations || '',
     };
   });

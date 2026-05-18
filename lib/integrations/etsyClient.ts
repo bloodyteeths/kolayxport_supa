@@ -408,6 +408,22 @@ export class EtsyClient {
   }
 
   /**
+   * Fetch images for a listing. Returns the first image URL or empty string.
+   */
+  async getListingFirstImage(listingId: string): Promise<string> {
+    const url = `${this.baseUrl}/application/listings/${listingId}/images`;
+    try {
+      const response = await this.makeAuthenticatedRequest(url, { method: 'GET', headers: {} });
+      if (!response.ok) return '';
+      const data = await response.json();
+      const img = (data.results || [])[0];
+      return img?.url_570xN || img?.url_170x135 || '';
+    } catch {
+      return '';
+    }
+  }
+
+  /**
    * Fetch ledger entries for the shop.
    * Endpoint: GET /v3/application/shops/{shopId}/ledger/entries
    */

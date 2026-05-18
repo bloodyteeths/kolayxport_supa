@@ -116,16 +116,18 @@ async function fetchReceiptsForShop(
     }
   }
 
-  // Fallback: fetch images from Etsy API for listings not in cache (max 20 to avoid rate limits)
+  // Fallback: fetch images from Etsy API for listings not in cache
   const missingIds = [...listingIds].filter(id => !imageMap.has(String(id)));
   if (missingIds.length > 0) {
-    const toFetch = missingIds.slice(0, 20);
-    logger.info(`[EtsyOrderSync] Fetching ${toFetch.length} listing images from Etsy API (${missingIds.length} missing from cache)`);
-    const fetches = toFetch.map(async (id) => {
-      const url = await client.getListingFirstImage(String(id));
-      if (url) imageMap.set(String(id), url);
-    });
-    await Promise.allSettled(fetches);
+    logger.info(`[EtsyOrderSync] Fetching ${missingIds.length} listing images from Etsy API (not in cache)`);
+    // Batch in groups of 10 to avoid hammering the API
+    for (let i = 0; i < missingIds.length; i += 10) {
+      const batch = missingIds.slice(i, i + 10);
+      await Promise.allSettled(batch.map(async (id) => {
+        const url = await client.getListingFirstImage(String(id));
+        if (url) imageMap.set(String(id), url);
+      }));
+    }
   }
 
   return allReceipts.map((receipt) => mapReceiptToUIOrder(receipt, shopId, shopName, imageMap));

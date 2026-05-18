@@ -203,8 +203,10 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
 }
 
 function mapEtsyStatus(receipt: any): string {
-  if (receipt.was_shipped) return 'SHIPPED';
-  if (receipt.was_paid) return 'PAID';
+  if (receipt.is_shipped || receipt.was_shipped) return 'SHIPPED';
+  if (receipt.is_paid || receipt.was_paid) return 'PAID';
   if (receipt.is_dead) return 'CANCELLED';
+  if (receipt.status === 'Completed') return 'SHIPPED';
+  if (receipt.status === 'Paid') return 'PAID';
   return 'AWAITING_FULFILLMENT';
 }

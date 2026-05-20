@@ -37,6 +37,7 @@ model User {
   shopifySubscriptionId String?                 @unique
   trialExpiresAt        DateTime?
   usageResetAt          DateTime?
+  role                  String                  @default("user")
   accounts              Account[]
   marketplaceConfigs    MarketplaceConfig[]
   orders                Order[]

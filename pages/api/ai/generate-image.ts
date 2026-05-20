@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getAuthUser } from '@/lib/auth';
 import { GoogleGenAI } from '@google/genai';
 import sharp from 'sharp';
 
@@ -16,9 +17,39 @@ const MODEL = 'gemini-3.1-flash-image-preview';
 // Crop bottom pixels to remove AI watermark/branding
 const WATERMARK_CROP_PX = 20;
 
+/** Block SSRF: reject non-https or internal/private IPs */
+function isUnsafeUrl(url: string): boolean {
+  if (!url.startsWith('https://')) return true;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '[::1]' ||
+      host.startsWith('10.') ||
+      host.startsWith('192.168.') ||
+      host.startsWith('0.') ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+      /^169\.254\./.test(host)
+    ) {
+      return true;
+    }
+  } catch {
+    return true;
+  }
+  return false;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const user = await getAuthUser(req, res);
+  if (!user) {
+    return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -27,6 +58,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { prompt, reference_image, reference_mime_type, reference_image_url, aspect_ratio } = req.body;
+
+  // Validate reference_image_url against SSRF
+  if (reference_image_url && isUnsafeUrl(reference_image_url)) {
+    return res.status(400).json({ error: 'Invalid reference_image_url: must be a public https URL' });
+  }
 
   if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
     return res.status(400).json({ error: 'prompt is required' });

@@ -163,7 +163,7 @@ export default async function handler(
             logger.error(`[Retry] Failed to mark retry SyncOperation ${newSyncRetryRecordId} as failed:`, dbError);
         }
     }
-    return res.status(500).json({ error: `Failed to retry sync: ${error.message}`, details: error.stack });
+    return res.status(500).json({ error: `Failed to retry sync: ${error.message}`, details: 'Internal error' });
   } finally {
     await prisma.$disconnect();
   }

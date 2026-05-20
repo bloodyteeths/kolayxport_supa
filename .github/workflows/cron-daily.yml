@@ -1,0 +1,27 @@
+name: Daily Cron Jobs
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  reset-usage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reset usage counters and cancel expired trials
+        run: |
+          curl -fsS -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.KOLAYXPORT_BASE_URL }}/api/cron/reset-usage" \
+            --max-time 60 || true
+
+  track-ranks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Track listing ranks
+        run: |
+          curl -fsS -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.KOLAYXPORT_BASE_URL }}/api/cron/track-ranks" \
+            --max-time 120 || true

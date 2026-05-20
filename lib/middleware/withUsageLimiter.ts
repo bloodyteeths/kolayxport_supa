@@ -41,18 +41,19 @@ const checkUsage = async (userId: string, limitType: 'orderSync' | 'label') => {
     : true; // No reset date at all — treat as needing reset
 
   if (needsReset) {
+    const nextReset = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await prisma.user.update({
       where: { id: userId },
       data: {
         orderSyncCount: 0,
         labelCount: 0,
-        usageResetAt: now,
+        usageResetAt: nextReset,
       },
     });
     // Reflect the reset in the local copy so the limit check below uses 0
     user.orderSyncCount = 0;
     user.labelCount = 0;
-    user.usageResetAt = now;
+    user.usageResetAt = nextReset;
     logger.info('Monthly usage counters reset', { userId });
   }
 

@@ -1,17 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { getIntegrationCreds } from '../../../lib/config';
 import { createShipment, FedexPayload } from '@integrations/fedex';
 
 /**
- * POST { userId, orderId } → creates a FedEx shipment and
+ * POST { orderId } → creates a FedEx shipment and
  * stores a row in Shipment table.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-  const { userId, orderId } = req.body as { userId?: string; orderId?: string };
-  if (!userId || !orderId) return res.status(400).json({ error: 'Missing userId or orderId' });
+  const user = await getAuthUser(req, res);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+
+  const userId = user.id;
+  const { orderId } = req.body as { orderId?: string };
+  if (!orderId) return res.status(400).json({ error: 'Missing orderId' });
 
   try {
     // 1️⃣  Creds

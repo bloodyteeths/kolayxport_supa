@@ -85,19 +85,19 @@ export default function SupportPage() {
               {
                 title: "Kurulum Rehberi",
                 desc: "Adım adım kurulum talimatları",
-                link: "/docs/kurulum",
+                link: "/app/entegrasyonlar-ve-rehberler",
                 icon: "🚀"
               },
               {
                 title: "Video Rehberler",
                 desc: "Görsel anlatımlarla öğrenin",
-                link: "/docs/videolar",
+                link: "/app/entegrasyonlar-ve-rehberler",
                 icon: "🎥"
               },
               {
                 title: "API Dokümantasyonu",
                 desc: "Geliştiriciler için detaylı API rehberi",
-                link: "/docs/api",
+                link: "/app/entegrasyonlar-ve-rehberler",
                 icon: "📖"
               },
               {

@@ -167,7 +167,7 @@ export default function SubscriptionDashboard({
                     variant="contained"
                     color="primary"
                     startIcon={<UpgradeOutlined />}
-                    onClick={onUpgrade}
+                    onClick={plan === 'trial' ? onUpgrade : onManageSubscription}
                     fullWidth
                     sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
                   >

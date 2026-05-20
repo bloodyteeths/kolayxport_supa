@@ -19,6 +19,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import trMessages from '@/messages/tr.json';
 import enMessages from '@/messages/en.json';
+import CookieConsent from '@/components/CookieConsent';
 
 export type NextPageWithLayout<P = {}, IP = P> = NextPage<P, IP> & {
   getLayout?: (page: ReactElement) => ReactNode;
@@ -67,45 +68,40 @@ function MyApp({ Component, pageProps }: AppProps) {
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
-              "@type": ["Organization", "LocalBusiness", "SoftwareApplication"],
+              "@type": "Organization",
               "name": "KolayXport",
-              "description": "E-ticaret entegrasyon ve otomasyon platformu - Trendyol, Hepsiburada, Amazon entegrasyonu",
               "url": "https://kolayxport.com",
-              "logo": "https://kolayxport.com/logo.png",
-              "foundingDate": "2024",
-              "address": {
-                "@type": "PostalAddress",
-                "addressCountry": "TR",
-                "addressRegion": "Turkey"
-              },
-              "contactPoint": {
-                "@type": "ContactPoint",
-                "contactType": "customer service",
-                "availableLanguage": ["Turkish", "English"],
-                "telephone": "+90-XXX-XXX-XXXX"
-              },
+              "logo": "https://kolayxport.com/images/logo.png",
+              "email": "destek@kolayxport.com",
               "sameAs": [
-                "https://twitter.com/kolayxport"
-              ],
-              "serviceType": "E-commerce Integration Platform",
-              "areaServed": "TR",
+                "https://twitter.com/kolayxport",
+                "https://linkedin.com/company/kolayxport",
+                "https://youtube.com/kolayxport"
+              ]
+            })
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              "name": "KolayXport",
               "applicationCategory": "BusinessApplication",
-              "operatingSystem": "Web Browser",
+              "operatingSystem": "Web",
               "offers": {
                 "@type": "Offer",
-                "name": "KolayXport Starter Plan",
-                "price": "449",
+                "price": "0",
                 "priceCurrency": "TRY",
-                "priceSpecification": {
-                  "@type": "RecurringPaymentFrequency",
-                  "frequency": "monthly"
-                }
+                "description": "30 gun ucretsiz deneme"
               }
             })
           }}
         />
         <Component {...pageProps} />
         <Toaster position="top-center" />
+        <CookieConsent />
       </ThemeProvider>
       </NextIntlClientProvider>
     </AuthProvider>

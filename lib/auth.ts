@@ -28,8 +28,10 @@ export const authOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
+        const normalizedEmail = credentials.email.toLowerCase().trim();
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: normalizedEmail },
         });
         if (!user || !user.password) return null;
 
@@ -46,6 +48,22 @@ export const authOptions = {
   },
   pages: {
     signIn: '/login',
+  },
+  events: {
+    async createUser({ user }: any) {
+      // Auto-provision 30-day trial for new users (Google OAuth)
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          subscriptionPlan: 'trial',
+          subscriptionStatus: 'trialing',
+          trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          usageResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          orderSyncCount: 0,
+          labelCount: 0,
+        },
+      });
+    },
   },
   callbacks: {
     async signIn({ user, account }: any) {

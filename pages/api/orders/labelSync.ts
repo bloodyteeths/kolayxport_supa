@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { getIntegrationCreds } from '../../../lib/config';
 import { fetchVeeqoOrders, VeeqoOrder } from '@integrations/veeqo';
@@ -21,11 +22,12 @@ export default async function handler(
     return;
   }
 
-  const userId = (req.body.userId ?? req.query.userId) as string | undefined;
-  if (!userId) {
-    res.status(400).json({ error: 'Missing userId' });
+  const user = await getAuthUser(req, res);
+  if (!user) {
+    res.status(401).json({ error: 'Not authenticated' });
     return;
   }
+  const userId = user.id;
 
   try {
     /* Resolve creds */

@@ -43,11 +43,31 @@ export default async function handler(
   let userId = '';
 
   try {
-    // Decode state to get userId
+    // Decode state to get userId and CSRF token
     const stateData = JSON.parse(
       Buffer.from(state as string, 'base64url').toString(),
     );
     userId = stateData.userId;
+    const csrfTokenFromState = stateData.csrfToken;
+
+    // Verify CSRF token from cookie matches token in state
+    const cookies = req.headers.cookie || '';
+    const csrfCookie = cookies.split(';').map(c => c.trim()).find(c => c.startsWith('amazon_csrf='));
+    const csrfTokenFromCookie = csrfCookie?.split('=')[1];
+
+    if (!csrfTokenFromState || !csrfTokenFromCookie || csrfTokenFromState !== csrfTokenFromCookie) {
+      logger.error('Amazon OAuth CSRF validation failed', undefined, {
+        userId,
+        hasCsrfInState: !!csrfTokenFromState,
+        hasCsrfCookie: !!csrfTokenFromCookie,
+      });
+      // Clear the CSRF cookie
+      res.setHeader('Set-Cookie', 'amazon_csrf=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0');
+      return res.redirect('/ayarlar?error=amazon_csrf_failed');
+    }
+
+    // Clear the CSRF cookie after successful verification
+    res.setHeader('Set-Cookie', 'amazon_csrf=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0');
 
     logger.info('Decoded Amazon OAuth state', {
       userId,

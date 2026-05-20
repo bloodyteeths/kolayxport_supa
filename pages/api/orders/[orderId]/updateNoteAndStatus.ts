@@ -59,6 +59,6 @@ export default async function handler(
     return res.status(200).json({ success: true });
   } catch (error: any) {
     console.error('Error updating note and status:', error);
-    return res.status(500).json({ error: error.message, stack: error?.stack });
+    return res.status(500).json({ error: error.message });
   }
 }

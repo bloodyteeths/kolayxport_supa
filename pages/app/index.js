@@ -18,7 +18,7 @@ import {
   Truck,
   CheckCircle,
 } from 'lucide-react';
-import { signIn as nextAuthSignIn } from 'next-auth/react';
+import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
 
@@ -185,6 +185,13 @@ function AppIndexPage() {
 
   const status = authLoading ? 'loading' : (user ? 'authenticated' : 'unauthenticated');
 
+  useEffect(() => {
+    if (router.query.session_id) {
+      toast.success('Aboneliğiniz başarıyla aktif edildi!');
+      router.replace('/app', undefined, { shallow: true });
+    }
+  }, [router.query.session_id]);
+
   if (status === 'loading') {
     return (
       <AppLayout title={tAuth('loading')} simpleHeader>
@@ -198,7 +205,7 @@ function AppIndexPage() {
 
   if (status === 'unauthenticated') {
     if (typeof window !== 'undefined') {
-      nextAuthSignIn('google', { callbackUrl: '/app' });
+      router.push('/login');
     }
     return (
       <AppLayout title={tAuth('redirecting')} simpleHeader>

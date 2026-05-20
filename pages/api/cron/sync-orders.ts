@@ -11,14 +11,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (process.env.DISABLE_CRON_SYNC === 'true') {
     return res.status(503).json({ error: 'Cron sync temporarily disabled' });
   }
-  // Allow Vercel Cron (GET with x-vercel-cron header) and secured calls (POST with Bearer token)
-  const isVercelCron = req.headers["x-vercel-cron"] !== undefined;
   const authHeader = req.headers.authorization;
   const methodAllowed = req.method === 'GET' || req.method === 'POST';
   if (!methodAllowed) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!isVercelCron && process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

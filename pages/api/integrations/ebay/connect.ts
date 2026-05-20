@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import crypto from 'crypto';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 
@@ -27,9 +28,14 @@ export default async function handler(
       throw new Error('EBAY_CLIENT_ID and EBAY_RU_NAME environment variables are required');
     }
 
-    // Encode userId in state for the callback
+    // Generate CSRF token and store in HttpOnly cookie
+    const csrfToken = crypto.randomBytes(16).toString('hex');
+    res.setHeader('Set-Cookie', `ebay_csrf=${csrfToken}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=600`);
+
+    // Encode userId + CSRF token in state for the callback
     const state = Buffer.from(JSON.stringify({
       userId: user.id,
+      csrfToken,
     })).toString('base64url');
 
     // eBay OAuth scopes — must match scopes enabled in eBay Developer Portal

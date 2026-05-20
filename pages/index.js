@@ -75,25 +75,25 @@ const includedFeatures = [
 
 const testimonials = [
   {
-    quote: 'KolayXport sayesinde operasyonel yükümüz %70 azaldı! Artık işimizi büyütmeye odaklanabiliyoruz.',
-    name: 'Ayşe Yılmaz',
-    company: 'HarikaSepetim.com',
-    image: '/testimonials/ayse.jpeg',
+    quote: 'KolayXport sayesinde Etsy ve eBay siparislerimi tek panelden yonetiyorum. AI ozellikleri listeleme surecimi cok hizlandirdi.',
+    name: 'Etsy Saticisi',
+    company: '',
+    image: '',
     stars: 5,
   },
   {
-    quote: 'Envanter yönetimi kabusumuzdu. KolayXport ile tüm kanallarda stoklarımız anlık güncelleniyor.',
-    name: 'Mehmet Öztürk',
-    company: 'TrendEvim',
-    image: '/testimonials/mehmet.jpg',
+    quote: 'Kargo etiketlerini tek tikla olusturmak ve pazar arastirma araclari isimi tamamen degistirdi.',
+    name: 'E-ticaret Girisimcisi',
+    company: '',
+    image: '',
     stars: 5,
   },
   {
-    quote: 'Farklı kargo firmalarıyla uğraşmak yerine tek tıkla en uygun etiketi almak muazzam bir kolaylık.',
-    name: 'Zeynep Kaya',
-    company: 'ButikHarikalar',
-    image: '/testimonials/zeynep.jpg',
-    stars: 4,
+    quote: 'Tum pazaryerlerimi tek yerden takip edebilmek, finansal raporlari aninda gorebilmek muhtesem.',
+    name: 'Online Magaza Sahibi',
+    company: '',
+    image: '',
+    stars: 5,
   },
 ];
 
@@ -483,10 +483,12 @@ export default function HomePage() {
                 variants={sectionVariants}
               >
                 <div className="flex items-center mb-4">
-                  <Image src={testimonial.image} alt={`${testimonial.name} - ${testimonial.company} müşteri görüşü`} width={56} height={56} className="w-14 h-14 rounded-full mr-4 object-cover" loading="lazy" />
+                  <div className="w-14 h-14 rounded-full mr-4 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+                    {testimonial.name.charAt(0)}
+                  </div>
                   <div>
                     <h4 className="font-semibold text-slate-800">{testimonial.name}</h4>
-                    <p className="text-sm text-slate-500">{testimonial.company}</p>
+                    {testimonial.company && <p className="text-sm text-slate-500">{testimonial.company}</p>}
                   </div>
                 </div>
                 <StarRating rating={testimonial.stars} />

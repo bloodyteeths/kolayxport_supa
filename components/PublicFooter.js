@@ -4,8 +4,8 @@ import { Twitter, Linkedin, Youtube } from 'lucide-react'; // Using lucide-react
 import { useTranslations } from 'next-intl';
 
 const getProductLinks = (t) => [
-  { name: t('shipping'), href: '/features/shipping' },
-  { name: t('automation'), href: '/features/automation' },
+  { name: t('shipping'), href: '/ozellikler' },
+  { name: t('automation'), href: '/ozellikler' },
 ];
 
 const getResourceLinks = (t) => [

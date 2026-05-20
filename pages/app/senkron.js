@@ -36,6 +36,7 @@ import ListItemText from '@mui/material/ListItemText';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import InputLabel from '@mui/material/InputLabel';
 import FormControl from '@mui/material/FormControl';
+import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { useLocale } from '@/lib/i18n/useLocale';
 
@@ -248,10 +249,10 @@ function SenkronPage() {
         await mutate();
       }
       
-      alert(t('statusUpdateComplete', { count: response.data.updatedOrders }));
+      toast.success(t('statusUpdateComplete', { count: response.data.updatedOrders }));
     } catch (err) {
       console.error('Error syncing statuses:', err);
-      alert(t('statusUpdateError') + ': ' + (err.response?.data?.error || err.message));
+      toast.error(t('statusUpdateError') + ': ' + (err.response?.data?.error || err.message));
     } finally {
       setUpdatingStatuses(false);
     }

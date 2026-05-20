@@ -4,7 +4,7 @@ import PublicLayout from '../components/PublicLayout';
 import Breadcrumb from '../components/Breadcrumb';
 import { motion } from 'framer-motion';
 import { NextSeo } from 'next-seo';
-import { Zap, Shuffle, Edit3, Package, Link2, Settings, ShieldCheck, Gift, ArrowLeftRight } from 'lucide-react';
+import { Zap, Shuffle, Edit3, Package, Link2, Settings, ShieldCheck, Gift, ArrowLeftRight, Sparkles, Search, BarChart3, Layers } from 'lucide-react';
 // supabase browser client removed — auth now handled by NextAuth
 
 const featureSections = [
@@ -34,14 +34,34 @@ const featureSections = [
     description: 'Google hesabınızla saniyeler içinde kaydolun. Kullanıcı dostu arayüzümüz sayesinde karmaşık ayarlarla uğraşmadan otomasyona başlayın.'
   },
   {
+    icon: Sparkles,
+    title: 'AI Liste Optimizasyonu',
+    description: 'Gemini AI destekli akıllı asistan ile Etsy ve eBay listelerinizi optimize edin. Başlık, etiket ve açıklama önerileri alın, AI ile görsel oluşturun. Pazar araştırmasına dayalı, SEO uyumlu içeriklerle satışlarınızı artırın.',
+  },
+  {
+    icon: Search,
+    title: 'Pazar Araştırma Araçları',
+    description: 'Etsy ve eBay için derinlemesine pazar araştırması yapın. Rakip analizi, trend takibi, anahtar kelime araştırması ve mağaza analizi ile bilinçli kararlar verin. Paralel arama ve AI destekli içgörülerle avantaj yakalayın.',
+  },
+  {
     icon: ArrowLeftRight,
-    title: 'Trendyol → eBay Arbitraj Tarayıcı',
-    description: '65+ Trendyol kategorisinden ürünleri otomatik tarayın, Gemini AI ile İngilizce eBay sorgularına çevirin ve en kârlı arbitraj fırsatlarını bulun. Kâr, ROI, marj, 28 eBay komisyon oranı ve kargo maliyeti dahil tam finansal analiz. Arka planda tarama, fiyat takibi ve grafiklerle profesyonel arbitraj.',
+    title: 'Arbitraj Tarayıcı',
+    description: '65+ Trendyol kategorisinden ürünleri otomatik tarayın, Gemini AI ile İngilizce eBay sorgularına çevirin ve en karlı arbitraj fırsatlarını bulun. Kar, ROI, marj, komisyon oranı ve kargo maliyeti dahil tam finansal analiz.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Finansal Analiz Paneli',
+    description: 'Tüm pazaryerlerinden gelen gelir, gider, komisyon ve reklam harcamalarınızı tek panelde görüntüleyin. Dinamik döviz kuru, kar/zarar tablosu ve detaylı dönemsel raporlarla finansal performansınızı takip edin.',
+  },
+  {
+    icon: Layers,
+    title: 'Toplu Düzenleme',
+    description: 'Etsy listelerinizi toplu olarak düzenleyin: fotoğraf yükleme/silme, başlık ve etiket güncelleme, kategori değiştirme, kişiselleştirme ayarları ve daha fazlası. Taslak sistemi ile değişiklikleri önce kaydedin, sonra tek tıkla yayınlayın.',
   },
   {
     icon: ShieldCheck,
     title: 'Güvenli Veri Saklama',
-    description: 'API anahtarlarınız ve hassas verileriniz gelişmiş şifreleme yöntemleriyle korunur. Google Cloud altyapısının sunduğu güvenlik standartlarından faydalanın.'
+    description: 'API anahtarlarınız ve hassas verileriniz gelişmiş şifreleme yöntemleriyle korunur. Avrupa merkezli (Almanya) kurumsal sunucu altyapımızın sunduğu en yüksek güvenlik standartlarından faydalanın.'
   },
   {
     icon: Gift,

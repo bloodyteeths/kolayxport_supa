@@ -53,15 +53,10 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Idempotency: skip if this event was already processed
-  try {
-    await prisma.webhookEvent.create({ data: { id: event.id } });
-  } catch (err: any) {
-    // Unique constraint violation (P2002) means we already processed this event
-    if (err.code === 'P2002') {
-      return res.status(200).json({ received: true, duplicate: true });
-    }
-    throw err;
+  // Idempotency: check if this event was already processed
+  const existing = await prisma.webhookEvent.findUnique({ where: { id: event.id } });
+  if (existing) {
+    return res.status(200).json({ received: true, duplicate: true });
   }
 
   if (relevantEvents.has(event.type)) {
@@ -72,7 +67,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           if (checkoutSession.mode === 'subscription') {
             const subscriptionId = checkoutSession.subscription as string;
             const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-            
+
             // Derive plan and interval from the subscription's price object
             const priceId = subscription.items.data[0]?.price?.id;
             const interval = (subscription.items.data[0]?.price?.recurring?.interval || 'month') as IntervalKey;
@@ -107,7 +102,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           if (invoice.billing_reason === 'subscription_cycle' && invoice.subscription) {
             const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id;
             const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-            
+
             // Derive interval from the subscription's price object
             const renewalInterval = subscription.items.data[0]?.price?.recurring?.interval || 'month';
 
@@ -119,11 +114,11 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
             } else {
               nextResetDate.setFullYear(nextResetDate.getFullYear() + 1);
             }
-            
+
             await prisma.user.update({
               where: { stripeCustomerId: subscription.customer as string },
-              data: { 
-                orderSyncCount: 0, 
+              data: {
+                orderSyncCount: 0,
                 labelCount: 0,
                 usageResetAt: nextResetDate,
                 subscriptionStatus: 'active' as any,
@@ -155,25 +150,25 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           const updateData: any = {
             subscriptionStatus: updatedSubscription.status,
           };
-          
+
           // If subscription is canceled, clear the plan
           if (updatedSubscription.status === 'canceled') {
             updateData.subscriptionPlan = null;
             updateData.billingInterval = null;
             updateData.usageResetAt = null;
           }
-          
+
           await prisma.user.update({
             where: { stripeCustomerId: updatedSubscription.customer as string },
             data: updateData,
           });
           break;
-          
+
         case 'customer.subscription.deleted':
           const deletedSubscription = event.data.object as Stripe.Subscription;
           await prisma.user.update({
             where: { stripeCustomerId: deletedSubscription.customer as string },
-            data: { 
+            data: {
               subscriptionStatus: 'canceled' as any,
               subscriptionPlan: null,
               billingInterval: null,
@@ -186,8 +181,20 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       }
     } catch (error) {
       console.error('Webhook handler failed:', error);
+      // Do NOT record event — Stripe will retry and we can process again
       return res.status(500).send('Webhook handler failed. View logs.');
     }
+  }
+
+  // Record event AFTER successful processing (idempotency).
+  // Catch P2002 unique constraint in case a concurrent request already recorded it.
+  try {
+    await prisma.webhookEvent.create({ data: { id: event.id } });
+  } catch (err: any) {
+    if (err.code !== 'P2002') {
+      console.error('Failed to record webhook event:', err);
+    }
+    // P2002 = duplicate, safe to ignore — event was already processed by a concurrent request
   }
 
   res.status(200).json({ received: true });

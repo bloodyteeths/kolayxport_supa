@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 type CachedProduct = { url: string; channel: string; remoteId?: string };
@@ -12,6 +13,11 @@ type CachedProduct = { url: string; channel: string; remoteId?: string };
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const user = await getAuthUser(req, res);
+  if (!user) {
+    return res.status(401).json({ error: 'Not authenticated' });
   }
 
   const { productIds, titles, listingIds } = req.body;
@@ -47,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Only call Veeqo API for uncached products
       if (uncachedIds.length > 0) {
         const cred = await prisma.credential.findFirst({
-          where: { veeqoApiKey: { not: null } },
+          where: { userId: user.id, veeqoApiKey: { not: null } },
           select: { veeqoApiKey: true },
         });
 

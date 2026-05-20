@@ -65,12 +65,16 @@ export const AMAZON_MARKETPLACES: Record<string, { id: string; domain: string; r
 
 /**
  * Build the Amazon OAuth consent URL for seller authorization.
+ * Returns { url, csrfToken } so the connect handler can set the CSRF cookie.
  */
-export function buildAuthUrl(userId: string): string {
+export function buildAuthUrl(userId: string): { url: string; csrfToken: string } {
+  const { randomBytes } = require('crypto');
+
   const clientId = process.env.AMAZON_LWA_CLIENT_ID;
   if (!clientId) throw new Error('AMAZON_LWA_CLIENT_ID is required');
 
-  const state = Buffer.from(JSON.stringify({ userId })).toString('base64url');
+  const csrfToken = randomBytes(16).toString('hex');
+  const state = Buffer.from(JSON.stringify({ userId, csrfToken })).toString('base64url');
 
   const redirectUri = `${process.env.NEXTAUTH_URL || 'https://kolayxport.com'}/api/integrations/amazon/callback`;
 
@@ -80,7 +84,7 @@ export function buildAuthUrl(userId: string): string {
     redirect_uri: redirectUri,
   });
 
-  return `${AMAZON_AUTH_URL}?${params}`;
+  return { url: `${AMAZON_AUTH_URL}?${params}`, csrfToken };
 }
 
 /**

@@ -2,6 +2,7 @@ import { STRIPE_PRICES } from '@/lib/stripePrices';
 import prisma from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
 import { getAuthUser } from '@/lib/auth';
+import { logger } from '@/lib/logger';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -13,7 +14,6 @@ export default async function handler(req, res) {
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const userId = user.id;
-  console.log('API: Creating checkout for user:', user.email, 'plan:', req.body.plan);
 
   const { plan, interval } = req.body as { plan: 'starter' | 'growth' | 'kurumsal'; interval: 'month' | 'year' };
 
@@ -29,19 +29,15 @@ export default async function handler(req, res) {
     // Validate price configuration first
     const priceId = STRIPE_PRICES[plan as 'starter' | 'growth'][interval];
     if (!priceId) {
-      console.error('Missing price ID for plan:', plan, 'interval:', interval);
-      console.error('STRIPE_PRICES config:', JSON.stringify(STRIPE_PRICES, null, 2));
+      logger.error('Missing price ID for plan', undefined, { plan, interval });
       return res.status(400).json({ error: 'Price configuration missing for selected plan. Please check environment variables.' });
     }
 
-    console.log('Using price ID:', priceId);
-    
     // Verify the price exists in Stripe
     try {
-      const price = await stripe.prices.retrieve(priceId);
-      console.log('Price verified in Stripe:', { id: price.id, active: price.active });
+      await stripe.prices.retrieve(priceId);
     } catch (priceError: any) {
-      console.error('Invalid price ID:', priceError.message);
+      logger.error('Invalid Stripe price ID', priceError, { priceId });
       return res.status(400).json({ error: 'Invalid price configuration. The price ID does not exist in your Stripe account.' });
     }
 
@@ -61,7 +57,6 @@ export default async function handler(req, res) {
 
       // If not found by ID, try to find by email (for existing users with different IDs)
       if (!dbUser && user.email) {
-        console.log('User not found by ID, searching by email:', user.email);
         dbUser = await prisma.user.findUnique({
           where: { email: user.email },
           select: {
@@ -74,7 +69,6 @@ export default async function handler(req, res) {
 
         // If found by email but with different ID, update the ID to match Supabase
         if (dbUser && dbUser.id !== userId) {
-          console.log('Found user by email with different ID, updating:', { oldId: dbUser.id, newId: userId });
           dbUser = await prisma.user.update({
             where: { email: user.email },
             data: { id: userId },
@@ -88,7 +82,7 @@ export default async function handler(req, res) {
         }
       }
     } catch (dbError: any) {
-      console.error('Database query error:', dbError);
+      logger.error('Database query error during checkout', dbError);
       if (dbError.code === 'P2024') {
         return res.status(503).json({ error: 'Database temporarily unavailable. Please try again.' });
       }
@@ -98,7 +92,6 @@ export default async function handler(req, res) {
     // Create user only if not found by either ID or email
     if (!dbUser) {
       try {
-        console.log('Creating new user for:', user.email);
         dbUser = await prisma.user.create({
           data: {
             id: userId,
@@ -119,7 +112,7 @@ export default async function handler(req, res) {
           }
         });
       } catch (createError: any) {
-        console.error('User creation error:', createError);
+        logger.error('User creation error during checkout', createError);
         if (createError.code === 'P2024') {
           return res.status(503).json({ error: 'Database temporarily unavailable. Please try again.' });
         }
@@ -134,7 +127,6 @@ export default async function handler(req, res) {
 
     // Create a new Stripe customer if one doesn't exist or if there's a mode mismatch
     if (!stripeCustomerId) {
-      console.log('Creating new Stripe customer for user:', dbUser.email);
       try {
         const customer = await stripe.customers.create({
           email: dbUser.email ?? undefined,
@@ -144,38 +136,29 @@ export default async function handler(req, res) {
           },
         });
         stripeCustomerId = customer.id;
-        console.log('Stripe customer created successfully:', stripeCustomerId);
 
         try {
-          console.log('Updating database with Stripe customer ID...', { userId: dbUser.id, customerId: stripeCustomerId });
-          
           // Use a simpler approach for PgBouncer compatibility
-          const updatedUser = await prisma.$queryRaw`
-            UPDATE "User" 
+          await prisma.$queryRaw`
+            UPDATE "User"
             SET "stripeCustomerId" = ${stripeCustomerId}::text,
                 "updatedAt" = NOW()
             WHERE "id" = ${dbUser.id}::text
             RETURNING "id"
           `;
-          
-          console.log('Database updated with new Stripe customer ID:', updatedUser);
         } catch (updateError: any) {
-          console.error('Stripe customer ID update error:', updateError);
-          console.error('Error details:', { code: updateError.code, message: updateError.message });
+          logger.error('Stripe customer ID update failed', updateError);
           // Continue with checkout even if update fails - customer is created in Stripe
         }
       } catch (stripeError: any) {
-        console.error('Failed to create Stripe customer:', stripeError);
+        logger.error('Failed to create Stripe customer', stripeError);
         throw stripeError;
       }
     } else {
       // Verify the customer exists in current Stripe mode (test/live)
-      console.log('Checking existing Stripe customer:', stripeCustomerId);
       try {
         await stripe.customers.retrieve(stripeCustomerId);
-        console.log('Existing Stripe customer found:', stripeCustomerId);
       } catch (customerError: any) {
-        console.log('Stripe customer not found in current mode, creating new one:', customerError.message);
         // Customer exists in different mode (live vs test), create a new one
         try {
           const customer = await stripe.customers.create({
@@ -186,34 +169,27 @@ export default async function handler(req, res) {
             },
           });
           stripeCustomerId = customer.id;
-          console.log('New Stripe customer created for mode mismatch:', stripeCustomerId);
 
           try {
-            console.log('Updating database with new Stripe customer ID after mode mismatch...');
-            
             // Use a simpler approach for PgBouncer compatibility
-            const updatedUser = await prisma.$queryRaw`
-              UPDATE "User" 
+            await prisma.$queryRaw`
+              UPDATE "User"
               SET "stripeCustomerId" = ${stripeCustomerId}::text,
                   "updatedAt" = NOW()
               WHERE "id" = ${dbUser.id}::text
               RETURNING "id"
             `;
-            
-            console.log('Database updated with new Stripe customer ID after mode mismatch:', updatedUser);
           } catch (updateError: any) {
-            console.error('Stripe customer ID update error:', updateError);
-            console.error('Error details:', { code: updateError.code, message: updateError.message });
+            logger.error('Stripe customer ID update failed after mode mismatch', updateError);
             // Continue with checkout even if update fails - customer is created in Stripe
           }
         } catch (stripeError: any) {
-          console.error('Failed to create new Stripe customer:', stripeError);
+          logger.error('Failed to create Stripe customer after mode mismatch', stripeError);
           throw stripeError;
         }
       }
     }
 
-    console.log('Creating checkout session for customer:', stripeCustomerId);
     try {
       const checkoutSession = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
@@ -229,32 +205,31 @@ export default async function handler(req, res) {
             interval: interval,
           }
         },
-        success_url: `${req.headers.origin || 'http://localhost:3000'}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+        success_url: `${req.headers.origin || 'http://localhost:3000'}/app?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${req.headers.origin || 'http://localhost:3000'}/fiyatlandirma`,
       });
 
-      console.log('Checkout session created successfully:', checkoutSession.id);
       res.status(200).json({ sessionId: checkoutSession.id });
     } catch (checkoutError: any) {
-      console.error('Failed to create checkout session:', checkoutError);
+      logger.error('Failed to create checkout session', checkoutError);
       throw checkoutError;
     }
   } catch (error: any) {
-    console.error('Stripe Checkout Error:', error);
-    
+    logger.error('Stripe checkout error', error);
+
     // Better error handling based on error type
     if (error.code === 'P2024') {
       return res.status(503).json({ error: 'Database connection timeout. Please try again.' });
     }
-    
+
     if (error.code === 'P2002') {
       return res.status(409).json({ error: 'User account conflict. Please try again or contact support.' });
     }
-    
+
     if (error.type === 'StripeCardError' || error.type === 'StripeInvalidRequestError') {
       return res.status(400).json({ error: `Stripe error: ${error.message}` });
     }
-    
+
     res.status(500).json({ error: 'Internal Server Error' });
   }
-} 
+}

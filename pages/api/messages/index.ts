@@ -116,7 +116,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
           if (wixSite) await prisma.wixSite.update({ where: { id: wixSite.id }, data: { accessToken: creds.accessToken, tokenExpiresAt: creds.tokenExpiresAt } });
           if (credential) await prisma.credential.update({ where: { userId }, data: { wixAccessToken: creds.accessToken, wixTokenExpiresAt: creds.tokenExpiresAt } });
-        } catch {}
+        } catch (error: any) {
+          logger.warn('Wix token refresh failed', { error: error?.message });
+        }
       });
     }
 

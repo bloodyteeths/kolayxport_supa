@@ -25,8 +25,8 @@ const integrationsData = [
   // { name: 'n11', category: 'Pazaryerleri', logo: '/logos/n11.svg', icon: ShoppingCart, setupSteps: ['API Şifresi Oluşturun', 'Ürün Bilgilerini Aktarın', 'Stok Takibini Başlatın'], description: 'Türkiye\'nin önde gelen platformlarından n11 ile daha fazla müşteriye ulaşın.' },
   { name: 'Shopify', category: 'Pazaryerleri', logo: '/logos/shopify.svg', icon: Zap, setupSteps: ['KolayXport App Yükleyin', 'Mağazanızı Bağlayın', 'Otomatik Senkronizasyon'], description: 'Kendi e-ticaret sitenizi Shopify ile yönetin, KolayXport ile entegre edin.' },
   // { name: 'WooCommerce', category: 'Pazaryerleri', logo: '/logos/woocommerce.svg', icon: Zap, setupSteps: ['Eklentiyi Kurun', 'API İzinlerini Verin', 'Veri Akışını Ayarlayın'], description: 'WordPress tabanlı WooCommerce mağazanızı KolayXport ile güçlendirin.' },
-  { name: 'eBay', category: 'Pazaryerleri', logo: '/logos/ebay.svg', icon: ShoppingCart, setupSteps: ['Entegrasyon Hazırlanıyor'], description: 'Dünyanın en büyük online pazaryerlerinden eBay entegrasyonu. (Yakında)' },
-  { name: 'Etsy', category: 'Pazaryerleri', logo: '/logos/etsy.svg', icon: ShoppingCart, setupSteps: ['Entegrasyon Hazırlanıyor'], description: 'El yapımı ve vintage ürünler için global pazar yeri Etsy entegrasyonu. (Yakında)' },
+  { name: 'eBay', category: 'Pazaryerleri', logo: '/logos/ebay.svg', icon: ShoppingCart, setupSteps: ['eBay Hesabınızı Bağlayın', 'Ürünleri Listeleyin', 'Siparişleri Senkronize Edin'], description: 'Dünyanın en büyük online pazaryerlerinden eBay ile global satış yapın. Sipariş, listeleme ve araştırma araçları aktif.' },
+  { name: 'Etsy', category: 'Pazaryerleri', logo: '/logos/etsy.svg', icon: ShoppingCart, setupSteps: ['Etsy Mağazanızı Bağlayın', 'Listeleri Düzenleyin', 'Siparişleri Yönetin'], description: 'El yapımı ve vintage ürünler için Etsy entegrasyonu. Sipariş senkronizasyonu, toplu düzenleme, AI optimizasyon ve araştırma araçları aktif.' },
   
   // Kargo
   { name: 'FedEx', category: 'Kargo', logo: '/logos/fedex.svg', icon: Truck, setupSteps: ['Hesap Numaranızı Ekleyin', 'Servis Tiplerini Seçin', 'Uluslararası Gönderiler'], description: 'FedEx entegrasyonu ile global gönderilerinizi kolayca yönetin.' },
@@ -153,9 +153,8 @@ export default function EntegrasyonlarPage() {
                   </div>
                 </div>
                 <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-right">
-                    <a 
-                        href="#" // Replace with actual link to docs or setup later
-                        onClick={(e) => e.preventDefault()} // Prevent page jump for now
+                    <a
+                        href="/ayarlar"
                         className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">
                         Detayları Gör →
                     </a>

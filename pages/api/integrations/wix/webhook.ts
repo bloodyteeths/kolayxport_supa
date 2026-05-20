@@ -37,6 +37,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
           logger.info('Wix webhook JWT decoded', { payload });
 
+          // --- JWT claim validation ---
+          // NOTE: Full cryptographic signature verification requires Wix's public key,
+          // which is not currently available via their developer docs. For now, we
+          // validate the issuer and expiration claims as a defense-in-depth measure.
+          // TODO: Implement full signature verification when Wix exposes a JWKS endpoint.
+          const expectedIssuers = ['wix.com', 'www.wix.com', 'dev.wix.com'];
+          if (payload.iss && !expectedIssuers.includes(payload.iss)) {
+            logger.warn('Wix webhook JWT issuer mismatch', {
+              iss: payload.iss,
+              expected: expectedIssuers,
+            });
+            return res.status(200).json({ success: false, reason: 'invalid_jwt_issuer' });
+          }
+          if (payload.exp && typeof payload.exp === 'number') {
+            const now = Math.floor(Date.now() / 1000);
+            if (payload.exp < now) {
+              logger.warn('Wix webhook JWT expired', {
+                exp: payload.exp,
+                now,
+                expiredAgo: now - payload.exp,
+              });
+              return res.status(200).json({ success: false, reason: 'jwt_expired' });
+            }
+          }
+
           if (payload.data && typeof payload.data === 'string') {
             try {
               const eventData = JSON.parse(payload.data);

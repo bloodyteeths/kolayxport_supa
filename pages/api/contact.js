@@ -1,7 +1,10 @@
 import nodemailer from 'nodemailer';
+import { rateLimit } from '@/lib/middleware/rateLimit';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
+    if (!rateLimit(60_000, 3)(req, res)) return;
+
     const { name, email, subject, message } = req.body;
 
     // Basic validation (can be more robust)
@@ -9,9 +12,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Tüm alanlar zorunludur.' });
     }
 
+    // Sanitize name and email to prevent email header injection
+    // Strip CR, LF, angle brackets that could inject additional headers
+    const safeName = name.replace(/[\r\n<>]/g, '');
+    const safeEmail = email.replace(/[\r\n<>]/g, '');
+    const safeSubject = subject.replace(/[\r\n]/g, '');
+
     // Configure Nodemailer transporter
     // IMPORTANT: For Gmail, you'll likely need to enable "Less secure app access"
-    // or use an App Password if 2FA is enabled. 
+    // or use an App Password if 2FA is enabled.
     // For production, consider a dedicated email service like SendGrid, Mailgun, or AWS SES.
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -22,13 +31,13 @@ export default async function handler(req, res) {
     });
 
     const mailOptions = {
-      from: `"${name}" <${email}>`, // Sender address (shows name and their email)
-      replyTo: email, // So you can reply directly to the user
+      from: `"${safeName}" <${safeEmail}>`, // Sender address (shows name and their email)
+      replyTo: safeEmail, // So you can reply directly to the user
       to: 'destek@kolayxport.com', // Your receiving email address
-      subject: `Yeni İletişim Formu Mesajı: ${subject}`,
-      text: `Gönderen Adı: ${name}\nGönderen E-posta: ${email}\n\nMesaj:\n${message}`,
-      html: `<p><strong>Gönderen Adı:</strong> ${name}</p>
-             <p><strong>Gönderen E-posta:</strong> ${email}</p>
+      subject: `Yeni İletişim Formu Mesajı: ${safeSubject}`,
+      text: `Gönderen Adı: ${safeName}\nGönderen E-posta: ${safeEmail}\n\nMesaj:\n${message}`,
+      html: `<p><strong>Gönderen Adı:</strong> ${safeName}</p>
+             <p><strong>Gönderen E-posta:</strong> ${safeEmail}</p>
              <hr>
              <p><strong>Mesaj:</strong></p>
              <p>${message.replace(/\n/g, '<br>')}</p>`,

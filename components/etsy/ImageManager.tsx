@@ -130,6 +130,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
   );
 
   useEffect(() => {
+    if (images.length === 0 && localImagesRef.current.length > 0) return;
     pendingObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     pendingObjectUrlsRef.current = [];
     setLocalImages(sortImagesByRank(images));
@@ -183,7 +184,7 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
           setLocalImages(sortImagesByRank([...reorderedBase, ...pendingUploads]));
         }
       } catch {
-        if (!cancelled && !hasPendingOrderRef.current) {
+        if (!cancelled && !hasPendingOrderRef.current && imagesRef.current.length > 0) {
           setLocalImages(sortImagesByRank(imagesRef.current));
         }
       }

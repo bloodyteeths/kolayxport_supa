@@ -1,3 +1,5 @@
+const { withSentryConfig } = require('@sentry/nextjs');
+
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
@@ -114,6 +116,18 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin',
           },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.stripe.com https://*.etsy.com https://*.ebay.com https://*.trendyol.com https://*.sentry.io https://*.ingest.sentry.io; frame-src https://js.stripe.com https://hooks.stripe.com;",
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
         ],
       },
     ];
@@ -124,4 +138,7 @@ const nextConfig = {
   ],
 };
 
-module.exports = withPWA(nextConfig);
+module.exports = withSentryConfig(withPWA(nextConfig), {
+  silent: true,
+  hideSourceMaps: true,
+});

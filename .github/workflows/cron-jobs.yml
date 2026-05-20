@@ -1,0 +1,22 @@
+name: Scheduled Cron Jobs
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Job to run'
+        required: false
+        default: 'all'
+
+jobs:
+  sync-orders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger order sync
+        run: |
+          curl -fsS -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.KOLAYXPORT_BASE_URL }}/api/cron/sync-orders" \
+            --max-time 120 || true

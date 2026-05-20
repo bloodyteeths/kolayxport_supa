@@ -31,14 +31,19 @@ import {
   Target,
   Package,
   Wallet,
-  Mail
+  Mail,
+  Receipt,
+  Globe2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import useSWR from 'swr';
 import { useAuth } from '@/lib/auth-context';
 import useSidebar from '../hooks/useSidebar';
 import useScreenSize from '../hooks/useScreenSize';
 import { useTranslations } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 import useMessageCountStore from '@/lib/stores/useMessageCountStore';
+import TrialNotification from './TrialNotification';
 
 /**
  * AppLayout: For authenticated application routes (e.g., /app/*)
@@ -59,12 +64,13 @@ function getNavGroups(t) {
     {
       label: t('marketplaces'),
       items: [
-        { href: '/app/etsy-listings', icon: Store, label: 'Etsy Listings' },
+        { href: '/app/etsy-listings', icon: Store, label: t('etsyListings') },
         { href: '/app/etsy-research', icon: Target, label: t('etsyResearch') },
-        { href: '/app/ebay-listings', icon: ShoppingBag, label: 'eBay Listings' },
-        { href: '/app/ebay-research', icon: Target, label: 'eBay Research' },
-        { href: '/app/trendyol-urunler', icon: Package, label: 'Trendyol Ürünler' },
-        { href: '/app/trendyol-arastirma', icon: Target, label: 'Trendyol Araştırma' },
+        { href: '/app/ebay-listings', icon: ShoppingBag, label: t('ebayListings') },
+        { href: '/app/ebay-research', icon: Target, label: t('ebayResearch') },
+        { href: '/app/amazon-research', icon: Globe2, label: t('amazonResearch') },
+        { href: '/app/trendyol-urunler', icon: Package, label: t('trendyolProducts') },
+        { href: '/app/trendyol-arastirma', icon: Target, label: t('trendyolResearch') },
         { href: '/app/wix-urunler', icon: Package, label: t('wixProducts') },
         { href: '/app/shopify-urunler', icon: ShoppingBag, label: t('shopifyProducts') },
       ],
@@ -80,6 +86,7 @@ function getNavGroups(t) {
       items: [
         { href: '/app/entegrasyonlar-ve-rehberler', icon: Link2, label: t('integrations') },
         { href: '/ayarlar', icon: Settings, label: t('settings') },
+        { href: '/faturalar', icon: Receipt, label: t('invoices') },
       ],
     },
   ];
@@ -96,6 +103,14 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   const navGroups = getNavGroups(t);
   const messageCount = useMessageCountStore((s) => s.counts.total);
   const fetchMessageCounts = useMessageCountStore((s) => s.fetch);
+
+  // Fetch user subscription data for TrialNotification
+  const { data: settingsData } = useSWR(
+    session ? '/api/user/settings' : null,
+    (url) => fetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false, dedupingInterval: 300_000 }
+  );
+  const userSubscription = settingsData?.subscription ?? null;
 
   // Poll message counts every 3 minutes
   useEffect(() => {
@@ -493,12 +508,10 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
               </button>
 
               <button
-                onClick={() => alert(t('noNotifications'))}
+                onClick={() => toast(t('noNotifications'))}
                 className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
               >
                 <Bell size={19} />
-                {/* Notification dot */}
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full ring-2 ring-white" />
                 <span className="sr-only">{t('notifications')}</span>
               </button>
 
@@ -518,6 +531,7 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
           <main className={`flex-1 overflow-y-auto ${
             isMobile ? 'p-1.5' : 'p-2 sm:p-3 lg:p-4'
           }`} style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', backgroundColor: '#f8fafc' }}>
+            <TrialNotification userSubscription={userSubscription} />
             {children}
           </main>
         </div>

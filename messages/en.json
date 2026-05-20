@@ -80,6 +80,8 @@
     "ebayResearch": "eBay Research",
     "amazonResearch": "Amazon Research",
     "wixProducts": "Wix Products",
+    "trendyolProducts": "Trendyol Products",
+    "trendyolResearch": "Trendyol Research",
     "shopifyProducts": "Shopify Products",
     "labels": "Label",
     "labelsNav": "Orders",
@@ -90,7 +92,8 @@
     "pullToRefresh": "Pull to refresh",
     "noNotifications": "No new notifications.",
     "notifications": "Notifications",
-    "messages": "Messages"
+    "messages": "Messages",
+    "invoices": "Invoices"
   },
   "manualOrder": {
     "addButton": "Add Manual Order",
@@ -7130,5 +7133,23 @@
     "loadingOrders": "Loading orders...",
     "showContext": "Show details",
     "hideContext": "Hide details"
+  },
+  "errors": {
+    "notFoundTitle": "404 - Page Not Found",
+    "notFoundMessage": "Sorry, we couldn't find the page you're looking for.",
+    "goHome": "Go back home",
+    "oops": "Oops!",
+    "serverError": "An error {statusCode} occurred on the server.",
+    "clientError": "An unexpected error occurred.",
+    "somethingWrong": "Something went wrong",
+    "unexpectedError": "An unexpected error occurred. Please try again.",
+    "tryAgain": "Try Again",
+    "noItemsTitle": "No items found",
+    "noItemsMessage": "There are currently no items to display here."
+  },
+  "cookies": {
+    "message": "We use cookies to improve your experience. By continuing to use our site, you accept our cookie policy.",
+    "accept": "Accept",
+    "learnMore": "Learn More"
   }
 }

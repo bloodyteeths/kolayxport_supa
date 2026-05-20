@@ -20,6 +20,10 @@ jobs:
             git pull origin main
             npm install --legacy-peer-deps
             npx prisma generate
+            cp -r .next .next-backup 2>/dev/null || true
             rm -rf .next
-            npx next build --webpack
+            npx next build --webpack || { echo "Build failed, restoring backup"; cp -r .next-backup .next; exit 1; }
             sudo systemctl restart kolayxport
+            sleep 5
+            curl -fsS https://kolayxport.com/api/health || { echo "Health check failed, restoring backup"; rm -rf .next; cp -r .next-backup .next; sudo systemctl restart kolayxport; exit 1; }
+            rm -rf .next-backup

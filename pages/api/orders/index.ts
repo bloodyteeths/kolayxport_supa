@@ -562,12 +562,14 @@ export default async function handler(
 
           // Persist image updates back to DB (fire-and-forget)
           if (imageUpdates.length > 0) {
-            const ids = imageUpdates.map(u => u.id);
-            const cases = imageUpdates.map(u => `WHEN '${u.id}' THEN '${u.image.replace(/'/g, "''")}'`).join(' ');
-            prisma.$executeRawUnsafe(`
-              UPDATE "OrderItem" SET image = CASE id ${cases} END
-              WHERE id = ANY($1)
-            `, ids).catch(() => {});
+            Promise.all(
+              imageUpdates.map(u =>
+                prisma.orderItem.update({
+                  where: { id: u.id },
+                  data: { image: u.image },
+                })
+              )
+            ).catch(() => {});
           }
         } catch (err) {
           console.warn('[orders] Etsy enrichment failed:', err);

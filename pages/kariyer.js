@@ -189,8 +189,8 @@ export default function KariyerPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
           >
-            <a href="https://discord.gg/YOUR_DISCORD_INVITE" target="_blank" rel="noopener noreferrer" className="px-8 py-3.5 text-lg font-semibold text-white bg-gradient-to-r from-sky-500 to-cyan-500 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-400 focus:ring-offset-slate-900">
-              Discord'a Katıl
+            <a href="mailto:kariyer@kolayxport.com" className="px-8 py-3.5 text-lg font-semibold text-white bg-gradient-to-r from-sky-500 to-cyan-500 rounded-lg shadow-lg hover:scale-105 transform transition-transform duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-400 focus:ring-offset-slate-900">
+              Bize Yazın
             </a>
             <Link href="#open-roles">
               <a className="px-8 py-3.5 text-lg font-semibold text-sky-300 bg-slate-700/50 hover:bg-slate-600/70 rounded-lg shadow-lg hover:scale-105 transform transition-all duration-200 ease-out border border-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 focus:ring-offset-slate-900">
@@ -336,11 +336,9 @@ export default function KariyerPage() {
           >
             Sen de gel, commit mesafesinde fark yarat.
           </motion.h2>
-          <Link href="https://discord.gg/YOUR_DISCORD_INVITE" target="_blank" rel="noopener noreferrer">
-            <a className="px-10 py-4 text-lg font-semibold text-slate-900 bg-sky-400 hover:bg-sky-300 rounded-lg shadow-lg shadow-sky-500/30 hover:shadow-sky-400/40 transform transition-all duration-200 ease-out hover:scale-105">
-              Topluluğa Katıl ve Başvur!
-            </a>
-          </Link>
+          <a href="mailto:kariyer@kolayxport.com" className="px-10 py-4 text-lg font-semibold text-slate-900 bg-sky-400 hover:bg-sky-300 rounded-lg shadow-lg shadow-sky-500/30 hover:shadow-sky-400/40 transform transition-all duration-200 ease-out hover:scale-105">
+            Başvurunuzu Gönderin!
+          </a>
         </div>
       </motion.section>
 

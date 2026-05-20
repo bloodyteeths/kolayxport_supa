@@ -111,7 +111,9 @@ export async function runJobInBackground(jobId: string): Promise<void> {
         where: { id: jobId },
         data: { status: 'failed', error: String(err) },
       });
-    } catch { /* swallow */ }
+    } catch (error: any) {
+      logger.warn('Arbitrage job status update failed', { error: error?.message });
+    }
   } finally {
     runningJobs.delete(jobId);
   }

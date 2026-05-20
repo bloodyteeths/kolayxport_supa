@@ -3841,7 +3841,7 @@ Return JSON in Turkish (but keep all keywords/tags/titles in English):
         logger.error('Clawd Etsy API Error:', error);
         return res.status(500).json({
             error: error.message || 'Internal server error',
-            details: error.stack,
+            details: 'Internal error',
         });
     }
 }

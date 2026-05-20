@@ -80,6 +80,8 @@
     "ebayResearch": "eBay Research",
     "amazonResearch": "Amazon Araştırma",
     "wixProducts": "Wix Ürünler",
+    "trendyolProducts": "Trendyol Ürünler",
+    "trendyolResearch": "Trendyol Araştırma",
     "shopifyProducts": "Shopify Ürünler",
     "labels": "Label",
     "labelsNav": "Siparişler",
@@ -90,7 +92,8 @@
     "pullToRefresh": "Yenilemek için çek",
     "noNotifications": "Yeni bildiriminiz yok.",
     "notifications": "Bildirimler",
-    "messages": "Mesajlar"
+    "messages": "Mesajlar",
+    "invoices": "Faturalar"
   },
   "manualOrder": {
     "addButton": "Manuel Sipariş Ekle",
@@ -7130,5 +7133,23 @@
     "loadingOrders": "Siparişler yükleniyor...",
     "showContext": "Detayları göster",
     "hideContext": "Detayları gizle"
+  },
+  "errors": {
+    "notFoundTitle": "404 - Sayfa Bulunamadı",
+    "notFoundMessage": "Aradığınız sayfa bulunamadı.",
+    "goHome": "Ana sayfaya dön",
+    "oops": "Bir sorun oluştu!",
+    "serverError": "Sunucuda {statusCode} hatası oluştu.",
+    "clientError": "Beklenmedik bir hata oluştu.",
+    "somethingWrong": "Bir şeyler ters gitti",
+    "unexpectedError": "Beklenmedik bir hata oluştu. Lütfen tekrar deneyin.",
+    "tryAgain": "Tekrar Dene",
+    "noItemsTitle": "Öğe bulunamadı",
+    "noItemsMessage": "Burada görüntülenecek bir öğe yok."
+  },
+  "cookies": {
+    "message": "Deneyiminizi iyilestirmek icin cerezler kullaniyoruz. Sitemizi kullanmaya devam ederek cerez politikamizi kabul etmis olursunuz.",
+    "accept": "Kabul Et",
+    "learnMore": "Daha Fazla Bilgi"
   }
 }

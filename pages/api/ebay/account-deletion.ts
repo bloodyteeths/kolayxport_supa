@@ -1,10 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 
-const VERIFICATION_TOKEN = process.env.EBAY_VERIFICATION_TOKEN || 'ebay-kolayxport-2026-verify-token';
+const VERIFICATION_TOKEN = process.env.EBAY_VERIFICATION_TOKEN;
 const ENDPOINT_URL = process.env.EBAY_DELETION_ENDPOINT_URL || 'https://kolayxport.com/api/ebay/account-deletion';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!VERIFICATION_TOKEN) {
+    return res.status(500).json({ error: 'eBay verification not configured' });
+  }
+
   if (req.method === 'GET') {
     return handleChallenge(req, res);
   }
@@ -26,7 +30,7 @@ function handleChallenge(req: NextApiRequest, res: NextApiResponse) {
   const hash = crypto
     .createHash('sha256')
     .update(challengeCode)
-    .update(VERIFICATION_TOKEN)
+    .update(VERIFICATION_TOKEN!)
     .update(ENDPOINT_URL)
     .digest('hex');
 

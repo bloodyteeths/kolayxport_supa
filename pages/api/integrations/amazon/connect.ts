@@ -17,7 +17,10 @@ export default async function handler(
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    const authUrl = buildAuthUrl(user.id);
+    const { url: authUrl, csrfToken } = buildAuthUrl(user.id);
+
+    // Store CSRF token in HttpOnly cookie for callback verification
+    res.setHeader('Set-Cookie', `amazon_csrf=${csrfToken}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=600`);
 
     logger.info('Initiating Amazon OAuth flow', { userId: user.id });
 

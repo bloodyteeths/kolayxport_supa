@@ -678,7 +678,9 @@ async function refreshListingCache(shopId: string, listingId: bigint, accessToke
     const results = images.results || [];
     firstImage = results[0] || null;
     imageCount = results.length;
-  } catch {}
+  } catch (error: any) {
+    logger.warn('Etsy image fetch failed during draft', { error: error?.message });
+  }
 
   await prisma.etsyListing.upsert({
     where: { etsyShopId_etsyListingId: { etsyShopId: shopId, etsyListingId: listingId } },

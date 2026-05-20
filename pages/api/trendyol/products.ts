@@ -246,7 +246,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           logger.warn('Batch upsert failed, falling back to individual', { error: String(err) });
           // Fallback: try individually
           for (const op of upserts) {
-            try { await op; totalSynced++; } catch {}
+            try { await op; totalSynced++; } catch (error: any) {
+              logger.warn('Trendyol product sync failed', { error: error?.message });
+            }
           }
         }
       }

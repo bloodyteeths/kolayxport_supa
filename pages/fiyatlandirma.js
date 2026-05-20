@@ -135,24 +135,24 @@ const comparisonData = {
 
 const faqItems = [
   {
-    question: 'KolayXport gerçekten sonsuza kadar ücretsiz mi kalacak?',
-    answer: 'Evet, temel entegrasyon ve sipariş yönetimi özelliklerimiz her zaman ücretsiz olacaktır. Diğer entegratörlerin ücretli sunduğu çoğu özelliği ücretsiz sunarak sektöre yeni bir soluk getirmeyi hedefliyoruz. Gelecekte ekleyeceğimiz çok gelişmiş ve niş özellikler için opsiyonel ücretli paketlerimiz olabilir, ancak mevcut ücretsiz planımız her zaman güçlü ve yeterli kalacaktır.',
+    question: 'Ücretsiz deneme nasıl çalışıyor?',
+    answer: 'Hesap oluşturduğunuzda otomatik olarak 30 günlük ücretsiz deneme başlar. Deneme süresince 50 sipariş senkronizasyonu ve 10 kargo etiketi oluşturabilirsiniz. Deneme süresi dolduktan sonra kullanmaya devam etmek için Başlangıç veya Büyüme planlarından birini seçmeniz yeterli.',
   },
   {
-    question: 'Ücretsiz planda hangi entegrasyonlar mevcut?',
-    answer: 'Ücretsiz planımızda listelenen tüm pazaryeri (Trendyol, Hepsiburada, Amazon, n11, Shopify, WooCommerce vb.) ve temel kargo (Yurtiçi, Aras vb.) entegrasyonları dahildir. Entegrasyon listemizi sürekli genişletiyoruz.',
+    question: 'Deneme süresinde hangi entegrasyonlar mevcut?',
+    answer: 'Deneme süresince tüm pazaryeri (Etsy, eBay, Trendyol, Hepsiburada vb.) ve kargo (FedEx, UPS, DHL vb.) entegrasyonları dahildir. Entegrasyon listemizi sürekli genişletiyoruz.',
   },
   {
-    question: 'Sipariş veya ürün limiti var mı?',
-    answer: 'Hayır, ücretsiz planımızda herhangi bir sipariş, ürün veya ciro limiti bulunmamaktadır. İşletmenizin büyüklüğü ne olursa olsun KolayXport\'u kullanabilirsiniz.',
+    question: 'Sipariş veya etiket limitleri nelerdir?',
+    answer: 'Her planın aylık limitleri vardır. Deneme: 50 sipariş senkronizasyonu ve 10 kargo etiketi. Başlangıç (₺449/ay): 200 sipariş ve 100 etiket. Büyüme (₺999/ay): 2.000 sipariş ve 500 etiket. Kurumsal plan için limitsiz kullanım mevcuttur.',
   },
   {
     question: 'Veri güvenliğim nasıl sağlanıyor?',
-    answer: 'Veri güvenliğiniz en büyük önceliğimizdir. Tüm API anahtarları ve hassas veriler şifrelenerek saklanır. Google Cloud Platform altyapısını kullanıyoruz ve en güncel güvenlik standartlarına uyuyoruz.',
+    answer: 'Veri güvenliğiniz en büyük önceliğimizdir. Tüm API anahtarları ve hassas veriler şifrelenerek saklanır. Avrupa merkezli (Hetzner) sunucu altyapımızda en güncel güvenlik standartlarına uyuyoruz.',
   },
   {
     question: 'Daha fazla kullanıcıya veya özelliğe ihtiyacım olursa ne yapmalıyım?',
-    answer: 'Growth planımız ek kullanıcılar, gelişmiş raporlama ve API erişimi gibi özellikler sunar. Daha büyük ihtiyaçlarınız için Enterprise planımızla size özel çözümler üretebiliriz. Detaylar için bizimle iletişime geçebilirsiniz.',
+    answer: 'Büyüme planımız ek kullanıcılar, gelişmiş raporlama ve API erişimi gibi özellikler sunar. Daha büyük ihtiyaçlarınız için Kurumsal planımızla size özel çözümler üretebiliriz. Detaylar için bizimle iletişime geçebilirsiniz.',
   },
 ];
 
@@ -210,7 +210,7 @@ export default function FiyatlandirmaPage() {
   return (
     <PublicLayout
       title="KolayXport | Fiyatlandırma"
-      description="KolayXport\'un şeffaf ve esnek fiyatlandırma seçeneklerini keşfedin. Temel özellikler tüm entegratörler kapatana kadar ücretsiz!"
+      description="KolayXport\'un şeffaf ve esnek fiyatlandırma seçeneklerini keşfedin. 30 gün ücretsiz deneme ile hemen başlayın."
     >
       <NextSeo
         openGraph={{
@@ -249,7 +249,7 @@ export default function FiyatlandirmaPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            Diğer Entegrasyonlar Kapatana Kadar <span className="text-blue-600">ÜCRETSİZ</span>
+            30 Gün <span className="text-blue-600">ÜCRETSİZ</span> Deneyin
           </motion.h1>
           <motion.p
             className="mt-6 max-w-2xl mx-auto text-lg sm:text-xl text-slate-600"
@@ -257,7 +257,7 @@ export default function FiyatlandirmaPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
-            KolayXport'ta gönderi ve stok yönetimine istediğiniz kadar kullanıcı ekleyin, sınırsız sipariş işleyin. Hiçbir gizli ücret yok.
+            KolayXport'u 30 gün boyunca ücretsiz deneyin. Tüm pazaryeri entegrasyonları, kargo etiketi oluşturma ve AI araçları deneme süresince dahil.
           </motion.p>
           <motion.div
             className="mt-10 flex flex-col sm:flex-row justify-center items-center gap-4"

@@ -3,7 +3,7 @@ import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
 import { useForm, Controller } from 'react-hook-form';
 import toast, { Toaster } from 'react-hot-toast';
-import { Mail, Phone, MapPin, Send, Building, MessageSquare } from 'lucide-react';
+import { Mail, MapPin, Send, Building, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
 const sectionVariants = {
@@ -22,10 +22,10 @@ const mapVariants = {
 };
 
 // Floating Label Input Component
-const FloatingLabelInput = ({ name, label, register, errors, type = 'text', isTextArea = false, ...rest }) => {
+const FloatingLabelInput = ({ name, label, register, errors, type = 'text', isTextArea = false, rules, ...rest }) => {
   const commonProps = {
     id: name,
-    ...register(name),
+    ...register(name, rules),
     placeholder: ' ', // Important for floating label effect
     className: `block px-3.5 pb-2.5 pt-4 w-full text-sm text-slate-900 bg-transparent rounded-lg border ${errors[name] ? 'border-red-500 focus:border-red-600' : 'border-slate-300 focus:border-blue-600'} appearance-none focus:outline-none focus:ring-0 peer`,
     ...rest
@@ -215,15 +215,16 @@ export default function IletisimPage() {
                   <div className="flex items-start">
                     <MapPin size={20} className="mr-3 mt-1 text-blue-500 flex-shrink-0" />
                     <div>
-                      <h3 className="font-semibold text-slate-700">Adres</h3>
-                      <p>Örnek Mahallesi, Teknoloji Caddesi No:123, Kat:4 Daire:5, Üsküdar, İstanbul, Türkiye</p>
+                      <h3 className="font-semibold text-slate-700">Konum</h3>
+                      <p>Tamsar Tekstil Dis Tic. Ltd. Sti.</p>
+                      <p>Istanbul, Turkiye</p>
                     </div>
                   </div>
                   <div className="flex items-start">
-                    <Phone size={20} className="mr-3 mt-1 text-blue-500 flex-shrink-0" />
+                    <Mail size={20} className="mr-3 mt-1 text-blue-500 flex-shrink-0" />
                     <div>
-                      <h3 className="font-semibold text-slate-700">Telefon</h3>
-                      <Link href="tel:+902161234567" className="hover:text-blue-600 hover:underline">+90 (216) 123 45 67</Link>
+                      <h3 className="font-semibold text-slate-700">Destek</h3>
+                      <Link href="mailto:destek@kolayxport.com" className="hover:text-blue-600 hover:underline">destek@kolayxport.com</Link>
                     </div>
                   </div>
                   <div className="flex items-start">
@@ -245,12 +246,11 @@ export default function IletisimPage() {
               </div>
               
               <div>
-                <h3 className="text-xl font-bold text-slate-800 mb-4">Haritada Biz</h3>
+                <h3 className="text-xl font-bold text-slate-800 mb-4">Konumumuz</h3>
                 <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center shadow-xl border border-slate-200">
                   <div className="text-center">
                     <MapPin className="h-8 w-8 text-blue-500 mx-auto mb-2" />
                     <p className="text-gray-600 font-medium">Istanbul, Turkiye</p>
-                    <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-500 text-sm hover:underline mt-1 inline-block">Google Maps'te Ac</a>
                   </div>
                 </div>
               </div>
@@ -317,25 +317,25 @@ export default function IletisimPage() {
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <MessageSquare className="w-8 h-8 text-green-600" />
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-4">Canlı Sohbet</h3>
+              <h3 className="text-xl font-bold text-slate-800 mb-4">Iletisim Formu</h3>
               <p className="text-slate-600 mb-4">
-                Hızlı sorularınız için canlı sohbet özelliğimizi kullanabilirsiniz. (Çalışma saatleri içinde)
+                Detayli sorulariniz icin yukaridaki formu kullanabilir veya dogrudan e-posta gonderebilirsiniz.
               </p>
-              <button className="text-green-600 hover:text-green-700 font-semibold">
-                Sohbeti Başlat
-              </button>
+              <Link href="mailto:destek@kolayxport.com" className="text-green-600 hover:text-green-700 font-semibold">
+                destek@kolayxport.com
+              </Link>
             </div>
 
             <div className="text-center p-8 bg-purple-50 rounded-2xl">
               <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Phone className="w-8 h-8 text-purple-600" />
+                <Building className="w-8 h-8 text-purple-600" />
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-4">Telefon Desteği</h3>
+              <h3 className="text-xl font-bold text-slate-800 mb-4">Kurumsal Bilgiler</h3>
               <p className="text-slate-600 mb-4">
-                Acil durumlar ve önemli konular için telefon desteğimizden yararlanabilirsiniz.
+                Tamsar Tekstil Dis Tic. Ltd. Sti. Istanbul, Turkiye
               </p>
-              <Link href="tel:+902161234567" className="text-purple-600 hover:text-purple-700 font-semibold">
-                +90 (216) 123 45 67
+              <Link href="mailto:destek@kolayxport.com" className="text-purple-600 hover:text-purple-700 font-semibold">
+                destek@kolayxport.com
               </Link>
             </div>
           </div>

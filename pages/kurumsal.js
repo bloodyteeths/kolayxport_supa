@@ -19,13 +19,13 @@ const timelineEvents = [
   {
     year: '2022',
     title: 'Resmi Lansman ve Büyüme',
-    description: 'KolayXport resmi olarak piyasaya sürüldü, ilk 50 kullanıcıya ulaşıldı.',
+    description: 'KolayXport resmi olarak piyasaya suruldu, ilk kullanicilarla test edildi.',
     icon: TrendingUp,
   },
   {
     year: '2024',
     title: 'Yeni Entegrasyonlar ve Genişleme',
-    description: '10+ pazar yeri ve kargo entegrasyonu tamamlandı, kullanıcı sayısı 200+\'a ulaştı.',
+    description: '10+ pazar yeri ve kargo entegrasyonu tamamlandi, AI destekli araclar eklendi.',
     icon: Users,
   },
   {
@@ -62,7 +62,7 @@ export default function KurumsalPage() {
               Hakkımızda
             </h1>
             <p className="mt-4 max-w-2xl mx-auto text-lg sm:text-xl text-slate-600 animate-slideUp">
-              200+ satıcının süreçlerini hızlandıran KolayXport, İstanbul'da doğdu, dünyaya açıldı.
+              E-ticaret saticilarinin sureclerini hizlandiran KolayXport, Istanbul'da dogdu, dunyaya acildi.
             </p>
           </div>
         </section>
@@ -167,10 +167,10 @@ export default function KurumsalPage() {
             <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-16">Sayılarla KolayXport</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               {[
-                { number: '500+', label: 'Aktif Kullanıcı', desc: 'Güvenen e-ticaret satıcısı' },
-                { number: '15+', label: 'Entegrasyon', desc: 'Pazaryeri ve kargo firması' },
-                { number: '1M+', label: 'İşlem', desc: 'Başarıyla tamamlanan sipariş' },
-                { number: '%99.9', label: 'Uptime', desc: 'Sistem çalışma süresi' }
+                { number: 'Etsy & eBay', label: 'Coklu Pazaryeri', desc: 'Tek panelden yonetim' },
+                { number: '7/24', label: 'Erisim', desc: 'Her yerden ulasim' },
+                { number: 'AI Destekli', label: 'Akilli Araclar', desc: 'Listeleme ve arastirma' },
+                { number: 'TR & Global', label: 'Pazar Destegi', desc: 'Turkiye ve dunya pazarlari' }
               ].map((stat, index) => (
                 <div key={index} className="p-6 bg-slate-50 rounded-xl">
                   <div className="text-3xl md:text-4xl font-bold text-blue-600 mb-2">{stat.number}</div>

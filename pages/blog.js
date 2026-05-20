@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import PublicLayout from '../components/PublicLayout';
 import { NextSeo } from 'next-seo';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 const posts = [
   {
@@ -87,7 +88,27 @@ const posts = [
   }
 ];
 
+const allCategories = ['Tümü', ...Array.from(new Set(posts.map((p) => p.category)))];
+
 export default function BlogPage() {
+  const [activeCategory, setActiveCategory] = useState('Tümü');
+  const [email, setEmail] = useState('');
+
+  const filteredPosts = useMemo(() => {
+    if (activeCategory === 'Tümü') return posts;
+    return posts.filter((p) => p.category === activeCategory);
+  }, [activeCategory]);
+
+  const handleSubscribe = (e) => {
+    e.preventDefault();
+    if (!email || !email.includes('@')) {
+      toast.error('Lütfen geçerli bir e-posta adresi girin.');
+      return;
+    }
+    toast.success('Başarıyla abone oldunuz!');
+    setEmail('');
+  };
+
   return (
     <PublicLayout title="Blog - KolayXport" description="KolayXport Blog: E-ticaret otomasyonu, entegrasyon rehberleri ve en iyi uygulamalar hakkında makaleler.">
       <NextSeo title="KolayXport Blog" />
@@ -102,10 +123,15 @@ export default function BlogPage() {
 
         {/* Category Filter */}
         <div className="flex flex-wrap gap-3 mb-12 justify-center">
-          {['Tümü', 'Rehber', 'Entegrasyon', 'Optimizasyon', 'Teknik'].map((category) => (
+          {allCategories.map((category) => (
             <button
               key={category}
-              className="px-4 py-2 rounded-full bg-slate-100 text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors text-sm font-medium"
+              onClick={() => setActiveCategory(category)}
+              className={`px-4 py-2 rounded-full transition-colors text-sm font-medium ${
+                activeCategory === category
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-blue-100 hover:text-blue-700'
+              }`}
             >
               {category}
             </button>
@@ -113,9 +139,9 @@ export default function BlogPage() {
         </div>
 
         <div className="grid gap-8 md:gap-12">
-          {posts.map((post, index) => (
-            <motion.article 
-              key={post.slug} 
+          {filteredPosts.map((post, index) => (
+            <motion.article
+              key={post.slug}
               className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -128,13 +154,13 @@ export default function BlogPage() {
                   <span>• {post.readTime}</span>
                   <span>• {post.author}</span>
                 </div>
-                
+
                 <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 hover:text-blue-600 transition-colors">
                   <Link href={`/blog/${post.slug}`}>{post.title}</Link>
                 </h2>
-                
+
                 <p className="text-slate-600 text-lg leading-relaxed mb-6">{post.excerpt}</p>
-                
+
                 <div className="flex items-center justify-between">
                   <div className="flex flex-wrap gap-2">
                     {post.tags.map((tag) => (
@@ -143,12 +169,12 @@ export default function BlogPage() {
                       </span>
                     ))}
                   </div>
-                  
-                  <Link 
-                    href={`/blog/${post.slug}`} 
+
+                  <Link
+                    href={`/blog/${post.slug}`}
                     className="inline-flex items-center text-blue-600 hover:text-blue-700 font-semibold transition-colors"
                   >
-                    Devamını Oku 
+                    Devamını Oku
                     <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -159,23 +185,31 @@ export default function BlogPage() {
           ))}
         </div>
 
+        {filteredPosts.length === 0 && (
+          <div className="text-center py-16 text-slate-500">
+            <p className="text-lg">Bu kategoride henüz yazı bulunmuyor.</p>
+          </div>
+        )}
+
         {/* Newsletter Subscription */}
-        <div className="mt-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 text-center text-white">
+        <form onSubmit={handleSubscribe} className="mt-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-8 text-center text-white">
           <h3 className="text-2xl font-bold mb-4">E-Ticaret İçgörülerini Kaçırmayın</h3>
           <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
             Yeni blog yazılarımız, e-ticaret trendleri ve KolayXport güncellemeleri hakkında ilk siz haberdar olun.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-            <input 
-              type="email" 
-              placeholder="E-posta adresiniz" 
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="E-posta adresiniz"
               className="flex-1 px-4 py-3 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-white"
             />
-            <button className="px-6 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
+            <button type="submit" className="px-6 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors">
               Abone Ol
             </button>
           </div>
-        </div>
+        </form>
       </motion.div>
     </PublicLayout>
   );

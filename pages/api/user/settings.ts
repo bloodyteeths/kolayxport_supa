@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { withPrismaRetry } from '../../../lib/prismaWithRetry';
+import { encryptCredentials, decryptCredentials } from '@/lib/encryption';
 
 export default async function handler(
   req: NextApiRequest,
@@ -44,8 +45,11 @@ export default async function handler(
       if (!userWithSettings) {
         return res.status(404).json({ error: 'User not found.' });
       }
+      const decryptedCreds = userWithSettings.integrationSettings
+        ? decryptCredentials(userWithSettings.integrationSettings as Record<string, any>)
+        : null;
       res.status(200).json({
-        integrationSettings: userWithSettings.integrationSettings,
+        integrationSettings: decryptedCreds,
         shipperProfile: userWithSettings.shipperProfile,
         shippingSettings: userWithSettings.shippingSettings || {},
         subscription: {
@@ -97,56 +101,59 @@ export default async function handler(
           hasTrendyolSecret: !!integrationSettings.trendyolApiSecret,
           hasTrendyolSupplierId: !!integrationSettings.trendyolSupplierId,
         });
-        
+
         try {
+          // Encrypt sensitive credential fields before storing
+          const encrypted = encryptCredentials(integrationSettings);
+
           // Cast data objects to any to avoid Prisma type mismatches in certain build environments
           await prisma.credential.upsert({
             where: { userId: authUser.id },
             create: ({
               userId: authUser.id,
-              veeqoApiKey: integrationSettings.veeqoApiKey,
-              shippoToken: integrationSettings.shippoToken,
-              trendyolApiKey: integrationSettings.trendyolApiKey,
-              trendyolApiSecret: integrationSettings.trendyolApiSecret,
+              veeqoApiKey: encrypted.veeqoApiKey,
+              shippoToken: encrypted.shippoToken,
+              trendyolApiKey: encrypted.trendyolApiKey,
+              trendyolApiSecret: encrypted.trendyolApiSecret,
               trendyolSupplierId: integrationSettings.trendyolSupplierId,
-              fedexApiKey: integrationSettings.fedexApiKey,
-              fedexApiSecret: integrationSettings.fedexApiSecret,
+              fedexApiKey: encrypted.fedexApiKey,
+              fedexApiSecret: encrypted.fedexApiSecret,
               fedexAccountNumber: integrationSettings.fedexAccountNumber,
-              upsApiKey: integrationSettings.upsApiKey,
-              upsApiSecret: integrationSettings.upsApiSecret,
+              upsApiKey: encrypted.upsApiKey,
+              upsApiSecret: encrypted.upsApiSecret,
               upsAccountNumber: integrationSettings.upsAccountNumber,
-              mngCustomerNumber: integrationSettings.mngCustomerNumber,
-              mngPassword: integrationSettings.mngPassword,
+              mngCustomerNumber: encrypted.mngCustomerNumber,
+              mngPassword: encrypted.mngPassword,
               mngAppId: integrationSettings.mngAppId,
-              mngAppSecret: integrationSettings.mngAppSecret,
+              mngAppSecret: encrypted.mngAppSecret,
               mngApiEnvironment: integrationSettings.mngApiEnvironment,
-              parasutClientId: integrationSettings.parasutClientId,
-              parasutClientSecret: integrationSettings.parasutClientSecret,
-              parasutUsername: integrationSettings.parasutUsername,
-              parasutPassword: integrationSettings.parasutPassword,
+              parasutClientId: encrypted.parasutClientId,
+              parasutClientSecret: encrypted.parasutClientSecret,
+              parasutUsername: encrypted.parasutUsername,
+              parasutPassword: encrypted.parasutPassword,
               parasutCompanyId: integrationSettings.parasutCompanyId,
             } as any),
             update: ({
-              veeqoApiKey: integrationSettings.veeqoApiKey,
-              shippoToken: integrationSettings.shippoToken,
-              trendyolApiKey: integrationSettings.trendyolApiKey,
-              trendyolApiSecret: integrationSettings.trendyolApiSecret,
+              veeqoApiKey: encrypted.veeqoApiKey,
+              shippoToken: encrypted.shippoToken,
+              trendyolApiKey: encrypted.trendyolApiKey,
+              trendyolApiSecret: encrypted.trendyolApiSecret,
               trendyolSupplierId: integrationSettings.trendyolSupplierId,
-              fedexApiKey: integrationSettings.fedexApiKey,
-              fedexApiSecret: integrationSettings.fedexApiSecret,
+              fedexApiKey: encrypted.fedexApiKey,
+              fedexApiSecret: encrypted.fedexApiSecret,
               fedexAccountNumber: integrationSettings.fedexAccountNumber,
-              upsApiKey: integrationSettings.upsApiKey,
-              upsApiSecret: integrationSettings.upsApiSecret,
+              upsApiKey: encrypted.upsApiKey,
+              upsApiSecret: encrypted.upsApiSecret,
               upsAccountNumber: integrationSettings.upsAccountNumber,
-              mngCustomerNumber: integrationSettings.mngCustomerNumber,
-              mngPassword: integrationSettings.mngPassword,
+              mngCustomerNumber: encrypted.mngCustomerNumber,
+              mngPassword: encrypted.mngPassword,
               mngAppId: integrationSettings.mngAppId,
-              mngAppSecret: integrationSettings.mngAppSecret,
+              mngAppSecret: encrypted.mngAppSecret,
               mngApiEnvironment: integrationSettings.mngApiEnvironment,
-              parasutClientId: integrationSettings.parasutClientId,
-              parasutClientSecret: integrationSettings.parasutClientSecret,
-              parasutUsername: integrationSettings.parasutUsername,
-              parasutPassword: integrationSettings.parasutPassword,
+              parasutClientId: encrypted.parasutClientId,
+              parasutClientSecret: encrypted.parasutClientSecret,
+              parasutUsername: encrypted.parasutUsername,
+              parasutPassword: encrypted.parasutPassword,
               parasutCompanyId: integrationSettings.parasutCompanyId,
             } as any),
           });
@@ -213,10 +220,9 @@ export default async function handler(
       return res.status(200).json({ message: 'Settings saved successfully.' });
     } catch (error: any) {
       console.error('Settings save error:', error);
-      res.status(500).json({ 
-        error: 'Failed to save settings.', 
+      res.status(500).json({
+        error: 'Failed to save settings.',
         details: error.message,
-        stack: error.stack 
       });
     }
   } else {

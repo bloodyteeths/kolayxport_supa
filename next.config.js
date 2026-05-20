@@ -81,7 +81,6 @@ const nextConfig = {
 
   // Performance optimizations
   experimental: {
-    optimizeCss: true,
     scrollRestoration: true,
     proxyClientMaxBodySize: '200mb',
   },

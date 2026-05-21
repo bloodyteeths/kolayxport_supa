@@ -70,6 +70,7 @@ model User {
   amazonNicheResearch   AmazonNicheResearch[]
   etsyListingDrafts     EtsyListingDraft[]
   ebayListingDrafts     EbayListingDraft[]
+  ebayListings          EbayListing[]
 }
 
 model Account {
@@ -726,6 +727,84 @@ model EbayDraftSyncAttempt {
 model WebhookEvent {
   id        String   @id
   createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// eBay Listing Cache (synced from eBay, read-only mirror)
+// ---------------------------------------------------------------------------
+
+model EbayListing {
+  id     String @id @default(cuid())
+  userId String
+
+  // eBay identifiers
+  sku       String
+  offerId   String?
+  listingId String?
+
+  // Core content
+  title       String
+  description String  @db.Text
+  subtitle    String?
+
+  // Pricing
+  priceValue    String  @default("0.00")
+  priceCurrency String  @default("USD")
+
+  // Stock & condition
+  quantity             Int     @default(0)
+  condition            String  @default("NEW")
+  conditionDescription String?
+
+  // Classification
+  categoryId   String?
+  categoryName String?
+  format       String  @default("FIXED_PRICE")
+
+  // Status
+  status        String @default("DRAFT")
+  marketplaceId String @default("EBAY_US")
+
+  // Images (cached URLs)
+  imageUrl   String?
+  imageUrls  String[]
+  imageCount Int      @default(0)
+
+  // Item specifics (JSON blob)
+  aspects Json @default("{}")
+
+  // Package info
+  weightValue   Float?
+  weightUnit    String?
+  lengthValue   Float?
+  widthValue    Float?
+  heightValue   Float?
+  dimensionUnit String?
+
+  // Policies
+  fulfillmentPolicyId String?
+  returnPolicyId      String?
+  paymentPolicyId     String?
+
+  // Links
+  listingUrl String?
+
+  // Legacy listing flag
+  isLegacy Boolean @default(false)
+
+  // eBay timestamps
+  ebayCreatedAt String?
+  ebayUpdatedAt String?
+
+  // Cache control
+  syncedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sku])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, syncedAt])
 }
 
 // ---------------------------------------------------------------------------

@@ -64,6 +64,7 @@ import {
   AutoFixHigh as AutoFixHighIcon,
   Psychology as PsychologyIcon,
   Add as AddIcon,
+  Sync as SyncIcon,
 } from '@mui/icons-material';
 import { toast, Toaster } from 'react-hot-toast';
 import AppLayout from '@/components/AppLayout';
@@ -109,6 +110,7 @@ interface EbayListingRow {
   format: string;
   marketplaceId: string;
   listingUrl?: string;
+  isLegacy?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -395,6 +397,8 @@ function EbayListingsPage() {
   // --- State ---
   const [listings, setListings] = useState<EbayListingRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<GridRowSelectionModel>({
     type: 'include' as const,
@@ -450,113 +454,71 @@ function EbayListingsPage() {
   // Mobile "More" menu anchor
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
 
-  // --- Fetch listings ---
+  // --- Fetch listings from DB cache (instant) ---
   const fetchListings = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
     try {
-      // Step 1: Fetch Inventory API offers first (fast — single API call)
-      const inventoryRes = await fetch(`/api/clawd/ebay?action=listings&user_id=${userId}&marketplace_id=EBAY_US`).catch((e) => {
-        console.error('Inventory fetch failed:', e);
-        return null;
-      });
-
-      const rows: EbayListingRow[] = [];
-      const seenIds = new Set<string>();
-
-      if (inventoryRes?.ok) {
-        const data = await inventoryRes.json();
-        for (const l of data.offers || []) {
-          const id = l.offerId || l.sku || String(l.listingId);
-          if (seenIds.has(id)) continue;
-          seenIds.add(id);
-          rows.push({
-            id,
-            sku: l.sku || '',
-            offerId: l.offerId,
-            listingId: l.listingId,
-            title: l.title || l.sku || '',
-            description: l.description || '',
-            price: l.price || { value: '0', currency: 'USD' },
-            quantity: l.quantity ?? 0,
-            status: l.status || 'UNPUBLISHED',
-            condition: l.condition || 'NEW',
-            categoryId: l.categoryId || '',
-            categoryName: l.categoryName,
-            imageUrl: l.imageUrl,
-            imageCount: l.imageCount ?? 0,
-            aspects: l.aspects || {},
-            format: l.format || 'FIXED_PRICE',
-            marketplaceId: l.marketplaceId || 'EBAY_US',
-            listingUrl: l.listingUrl,
-            createdAt: l.createdAt,
-            updatedAt: l.updatedAt,
-          });
-        }
+      const res = await fetch(`/api/clawd/ebay?action=cached_listings&user_id=${userId}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
       }
-
-      // Show inventory listings immediately, stop loading spinner
+      const data = await res.json();
+      const rows: EbayListingRow[] = (data.listings || []).map((l: any) => ({
+        id: l.offerId || l.sku || l.listingId || l.id,
+        sku: l.sku || '',
+        offerId: l.offerId || undefined,
+        listingId: l.listingId || undefined,
+        title: l.title || l.sku || '',
+        description: l.description || '',
+        price: { value: l.priceValue || '0', currency: l.priceCurrency || 'USD' },
+        quantity: l.quantity ?? 0,
+        status: l.status || 'DRAFT',
+        condition: l.condition || 'NEW',
+        categoryId: l.categoryId || '',
+        categoryName: l.categoryName,
+        imageUrl: l.imageUrl,
+        imageCount: l.imageCount ?? 0,
+        aspects: l.aspects || {},
+        format: l.format || 'FIXED_PRICE',
+        marketplaceId: l.marketplaceId || 'EBAY_US',
+        listingUrl: l.listingUrl,
+        isLegacy: l.isLegacy || false,
+        createdAt: l.ebayCreatedAt,
+      }));
       setListings(rows);
-      setLoading(false);
-
-      // Step 2: Fetch legacy listings in background (slow — many API calls)
-      fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`)
-        .then(async (legacyRes) => {
-          if (!legacyRes?.ok) return;
-          const legacyData = await legacyRes.json();
-          const legacyRows: EbayListingRow[] = [];
-
-          for (const l of legacyData.listings || []) {
-            const id = l.legacyItemId || l.itemId;
-            if (!id || seenIds.has(id)) continue;
-            seenIds.add(id);
-
-            const aspects: Record<string, string[]> = {};
-            for (const a of l.localizedAspects || []) {
-              if (a.name && a.value) {
-                aspects[a.name] = [a.value];
-              }
-            }
-
-            legacyRows.push({
-              id,
-              sku: l.legacyItemId || '',
-              offerId: undefined,
-              listingId: l.legacyItemId,
-              title: l.title || '',
-              description: l.description || l.shortDescription || '',
-              price: l.price || { value: '0', currency: 'USD' },
-              quantity: (l.estimatedRemainingQuantity ?? 0) + (l.estimatedSoldQuantity ?? 0),
-              status: l.itemWebUrl ? 'PUBLISHED' : 'ENDED',
-              condition: l.condition || 'NEW',
-              categoryId: l.categoryId || '',
-              categoryName: l.categoryPath?.split('|').pop()?.trim(),
-              imageUrl: l.image?.imageUrl,
-              imageCount: (l.additionalImages?.length || 0) + (l.image ? 1 : 0),
-              aspects,
-              format: l.buyingOptions?.includes('AUCTION') ? 'AUCTION' : 'FIXED_PRICE',
-              marketplaceId: l.listingMarketplaceId || 'EBAY_US',
-              listingUrl: l.itemWebUrl || (l.legacyItemId ? `https://www.ebay.com/itm/${l.legacyItemId}` : undefined),
-              createdAt: l.itemCreationDate,
-            });
-          }
-
-          if (legacyRows.length > 0) {
-            setListings(prev => [...prev, ...legacyRows]);
-          }
-        })
-        .catch((e) => console.error('Legacy listings fetch failed:', e));
-
-      if (rows.length === 0 && !inventoryRes?.ok) {
-        const errData = inventoryRes ? await inventoryRes.json().catch(() => ({})) : {};
-        throw new Error(errData.error || t('loadFailed'));
-      }
+      setLastSyncAt(data.lastSyncAt || null);
     } catch (err: any) {
       console.error('Failed to fetch eBay listings:', err);
       toast.error(`${t('loadFailed')}: ${err.message}`);
+    } finally {
       setLoading(false);
     }
   }, [userId]);
+
+  // --- Sync from eBay (fetches all listings from API → saves to DB) ---
+  const syncFromEbay = useCallback(async () => {
+    if (!userId) return;
+    setSyncing(true);
+    toast(t('syncInProgress'));
+    try {
+      const res = await fetch(`/api/clawd/ebay?action=sync_listings&user_id=${userId}&marketplace_id=EBAY_US`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      toast.success(t('syncComplete', { count: data.synced }));
+      await fetchListings();
+    } catch (err: any) {
+      toast.error(`${t('syncFailed')}: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, [userId, fetchListings]);
 
   // --- AI Apply / Undo handlers (via draft system) ---
   const handleApplyAITitle = async (listingId: string, newTitle: string, originalTitle: string) => {
@@ -631,10 +593,18 @@ function EbayListingsPage() {
 
   useEffect(() => {
     if (userId) {
-      fetchListings();
+      fetchListings().then(() => {
+        // Auto-sync on first visit when DB cache is empty
+        setListings(prev => {
+          if (prev.length === 0 && !syncing) {
+            syncFromEbay();
+          }
+          return prev;
+        });
+      });
       fetchPolicies();
     }
-  }, [userId, fetchListings, fetchPolicies]);
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Client-side filtering ---
   const filteredListings = useMemo(() => {
@@ -1391,9 +1361,25 @@ function EbayListingsPage() {
             </Select>
           </FormControl>
 
-          <IconButton size="small" onClick={fetchListings} disabled={loading} sx={{ minWidth: 44, minHeight: 44 }}>
-            <RefreshIcon />
-          </IconButton>
+          <Tooltip title={t('syncFromEbay')}>
+            <span>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={syncFromEbay}
+                disabled={syncing || loading}
+                startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
+                sx={{ minHeight: 40, textTransform: 'none', fontWeight: 600, borderRadius: '10px', whiteSpace: 'nowrap' }}
+              >
+                {syncing ? t('syncing') : t('syncFromEbay')}
+              </Button>
+            </span>
+          </Tooltip>
+          {lastSyncAt && (
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5, whiteSpace: 'nowrap' }}>
+              {t('lastSync')}: {new Date(lastSyncAt).toLocaleString()}
+            </Typography>
+          )}
         </Box>
       </Paper>
 

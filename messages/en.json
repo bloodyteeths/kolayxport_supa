@@ -6165,6 +6165,12 @@
     "daysAgo": "{count}d ago"
   },
   "ebayListings": {
+    "syncFromEbay": "Sync from eBay",
+    "syncing": "Syncing...",
+    "syncInProgress": "Syncing listings from eBay...",
+    "syncComplete": "{count} listings synced from eBay",
+    "syncFailed": "Sync failed",
+    "lastSync": "Last sync",
     "stock": "Stock",
     "published": "Published",
     "draft": "Draft",

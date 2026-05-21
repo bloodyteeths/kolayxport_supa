@@ -389,15 +389,23 @@ export async function syncDraft(draftId: string, userId: string) {
               logger.warn('eBay draft sync: withdraw before delete failed', { offerId: draft.offerId, error: err.message });
             }
           }
+          try {
+            await callEbayRateLimited(
+              `${EBAY_API_BASE}/sell/inventory/v1/offer/${encodeURIComponent(draft.offerId)}`,
+              { token, marketplaceId, options: { method: 'DELETE' } }
+            );
+          } catch (err: any) {
+            if (!String(err.message).includes('25710') && !String(err.message).includes('404')) throw err;
+          }
+        }
+        try {
           await callEbayRateLimited(
-            `${EBAY_API_BASE}/sell/inventory/v1/offer/${encodeURIComponent(draft.offerId)}`,
+            `${EBAY_API_BASE}/sell/inventory/v1/inventory_item/${encodeURIComponent(draft.sku)}`,
             { token, marketplaceId, options: { method: 'DELETE' } }
           );
+        } catch (err: any) {
+          if (!String(err.message).includes('25710') && !String(err.message).includes('404')) throw err;
         }
-        await callEbayRateLimited(
-          `${EBAY_API_BASE}/sell/inventory/v1/inventory_item/${encodeURIComponent(draft.sku)}`,
-          { token, marketplaceId, options: { method: 'DELETE' } }
-        );
         results.push({ action: 'delete', sku: draft.sku });
 
         await prisma.ebayListingDraft.update({

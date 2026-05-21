@@ -6165,6 +6165,12 @@
     "daysAgo": "{count}g önce"
   },
   "ebayListings": {
+    "syncFromEbay": "eBay'den Senkronize Et",
+    "syncing": "Senkronize ediliyor...",
+    "syncInProgress": "eBay'den listeler senkronize ediliyor...",
+    "syncComplete": "{count} liste eBay'den senkronize edildi",
+    "syncFailed": "Senkronizasyon başarısız",
+    "lastSync": "Son senkronizasyon",
     "stock": "Stok",
     "published": "Yayında",
     "draft": "Taslak",

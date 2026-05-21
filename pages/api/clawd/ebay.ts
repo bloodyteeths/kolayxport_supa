@@ -1988,6 +1988,408 @@ export default async function handler(
     }
 
     // -----------------------------------------------------------------
+    // LISTING DB CACHE
+    // -----------------------------------------------------------------
+
+    // GET ?action=cached_listings — Read listings from local DB cache (instant)
+    if (req.method === 'GET' && action === 'cached_listings') {
+      const statusFilter = req.query.status as string | undefined;
+      const where: any = { userId };
+      if (statusFilter && statusFilter !== 'all') where.status = statusFilter;
+
+      const listings = await prisma.ebayListing.findMany({
+        where,
+        orderBy: { syncedAt: 'desc' },
+      });
+
+      return res.status(200).json({
+        total: listings.length,
+        listings: listings.map((l: any) => ({
+          ...l,
+          aspects: l.aspects || {},
+        })),
+        lastSyncAt: listings[0]?.syncedAt || null,
+      });
+    }
+
+    // POST ?action=sync_listings — Fetch from eBay APIs and upsert into DB cache
+    if (req.method === 'POST' && action === 'sync_listings') {
+      const syncedAt = new Date();
+      let synced = 0;
+      let errors = 0;
+
+      // Part 1: Inventory API offers + items (non-legacy)
+      try {
+        let offersArr: any[] = [];
+        try {
+          const offersData = await callEbayAPI(
+            `/sell/inventory/v1/offer?limit=200&offset=0`,
+            accessToken, {}, marketplaceId
+          );
+          offersArr = offersData.offers || [];
+        } catch (err: any) {
+          if (!err.message?.includes('25707') && !err.message?.includes('25710') && !err.message?.includes('25713')) {
+            logger.warn('sync_listings: offers fetch failed', { error: err.message?.substring(0, 300) });
+          }
+        }
+
+        // Bulk fetch all inventory items
+        const inventoryMap: Record<string, any> = {};
+        try {
+          const invData = await callEbayAPI(
+            `/sell/inventory/v1/inventory_item?limit=200&offset=0`,
+            accessToken, {}, marketplaceId
+          );
+          for (const item of invData.inventoryItems || []) {
+            if (item.sku) inventoryMap[item.sku] = item;
+          }
+        } catch { /* no inventory items */ }
+
+        // If no offers, build from inventory items only
+        if (offersArr.length === 0) {
+          for (const sku of Object.keys(inventoryMap)) {
+            const item = inventoryMap[sku];
+            const product = item.product || {};
+            const images = product.imageUrls || [];
+
+            // Try to find offer for this SKU
+            let offerData: any = null;
+            try {
+              const offersForSku = await callEbayAPI(
+                `/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}&limit=10`,
+                accessToken, {}, marketplaceId
+              );
+              offerData = offersForSku.offers?.[0];
+            } catch { /* no offer */ }
+
+            try {
+              await prisma.ebayListing.upsert({
+                where: { userId_sku: { userId, sku } },
+                create: {
+                  userId, sku,
+                  offerId: offerData?.offerId || null,
+                  listingId: offerData?.listing?.listingId || null,
+                  title: product.title || sku,
+                  description: product.description || offerData?.listingDescription || '',
+                  subtitle: product.subtitle || null,
+                  priceValue: offerData?.pricingSummary?.price?.value || '0.00',
+                  priceCurrency: offerData?.pricingSummary?.price?.currency || 'USD',
+                  quantity: item.availability?.shipToLocationAvailability?.quantity ?? 0,
+                  condition: item.condition || 'NEW',
+                  conditionDescription: item.conditionDescription || null,
+                  categoryId: offerData?.categoryId || null,
+                  format: offerData?.format || 'FIXED_PRICE',
+                  status: offerData?.status || 'DRAFT',
+                  marketplaceId: offerData?.marketplaceId || marketplaceId,
+                  imageUrl: images[0] || null,
+                  imageUrls: images,
+                  imageCount: images.length,
+                  aspects: product.aspects || {},
+                  weightValue: item.packageWeightAndSize?.weight?.value ?? null,
+                  weightUnit: item.packageWeightAndSize?.weight?.unit || null,
+                  lengthValue: item.packageWeightAndSize?.dimensions?.length ?? null,
+                  widthValue: item.packageWeightAndSize?.dimensions?.width ?? null,
+                  heightValue: item.packageWeightAndSize?.dimensions?.height ?? null,
+                  dimensionUnit: item.packageWeightAndSize?.dimensions?.unit || null,
+                  fulfillmentPolicyId: offerData?.listingPolicies?.fulfillmentPolicyId || null,
+                  returnPolicyId: offerData?.listingPolicies?.returnPolicyId || null,
+                  paymentPolicyId: offerData?.listingPolicies?.paymentPolicyId || null,
+                  listingUrl: offerData?.listing?.listingId ? `https://www.ebay.com/itm/${offerData.listing.listingId}` : null,
+                  isLegacy: false,
+                  syncedAt,
+                },
+                update: {
+                  offerId: offerData?.offerId || null,
+                  listingId: offerData?.listing?.listingId || null,
+                  title: product.title || sku,
+                  description: product.description || offerData?.listingDescription || '',
+                  subtitle: product.subtitle || null,
+                  priceValue: offerData?.pricingSummary?.price?.value || '0.00',
+                  priceCurrency: offerData?.pricingSummary?.price?.currency || 'USD',
+                  quantity: item.availability?.shipToLocationAvailability?.quantity ?? 0,
+                  condition: item.condition || 'NEW',
+                  conditionDescription: item.conditionDescription || null,
+                  categoryId: offerData?.categoryId || null,
+                  format: offerData?.format || 'FIXED_PRICE',
+                  status: offerData?.status || 'DRAFT',
+                  marketplaceId: offerData?.marketplaceId || marketplaceId,
+                  imageUrl: images[0] || null,
+                  imageUrls: images,
+                  imageCount: images.length,
+                  aspects: product.aspects || {},
+                  weightValue: item.packageWeightAndSize?.weight?.value ?? null,
+                  weightUnit: item.packageWeightAndSize?.weight?.unit || null,
+                  lengthValue: item.packageWeightAndSize?.dimensions?.length ?? null,
+                  widthValue: item.packageWeightAndSize?.dimensions?.width ?? null,
+                  heightValue: item.packageWeightAndSize?.dimensions?.height ?? null,
+                  dimensionUnit: item.packageWeightAndSize?.dimensions?.unit || null,
+                  fulfillmentPolicyId: offerData?.listingPolicies?.fulfillmentPolicyId || null,
+                  returnPolicyId: offerData?.listingPolicies?.returnPolicyId || null,
+                  paymentPolicyId: offerData?.listingPolicies?.paymentPolicyId || null,
+                  listingUrl: offerData?.listing?.listingId ? `https://www.ebay.com/itm/${offerData.listing.listingId}` : null,
+                  isLegacy: false,
+                  syncedAt,
+                },
+              });
+              synced++;
+            } catch (e) {
+              errors++;
+              logger.warn('sync_listings: upsert failed for inventory-only SKU', { sku, error: String(e) });
+            }
+          }
+        } else {
+          // Have offers — merge with inventory
+          for (const offer of offersArr) {
+            const inv = inventoryMap[offer.sku] || {};
+            const product = inv.product || {};
+            const images = product.imageUrls || [];
+            const sku = offer.sku;
+
+            try {
+              await prisma.ebayListing.upsert({
+                where: { userId_sku: { userId, sku } },
+                create: {
+                  userId, sku,
+                  offerId: offer.offerId || null,
+                  listingId: offer.listing?.listingId || null,
+                  title: product.title || sku,
+                  description: product.description || offer.listingDescription || '',
+                  subtitle: product.subtitle || null,
+                  priceValue: offer.pricingSummary?.price?.value || '0.00',
+                  priceCurrency: offer.pricingSummary?.price?.currency || 'USD',
+                  quantity: inv.availability?.shipToLocationAvailability?.quantity ?? offer.availableQuantity ?? 0,
+                  condition: inv.condition || 'NEW',
+                  conditionDescription: inv.conditionDescription || null,
+                  categoryId: offer.categoryId || null,
+                  format: offer.format || 'FIXED_PRICE',
+                  status: offer.status || 'UNPUBLISHED',
+                  marketplaceId: offer.marketplaceId || marketplaceId,
+                  imageUrl: images[0] || null,
+                  imageUrls: images,
+                  imageCount: images.length,
+                  aspects: product.aspects || {},
+                  weightValue: inv.packageWeightAndSize?.weight?.value ?? null,
+                  weightUnit: inv.packageWeightAndSize?.weight?.unit || null,
+                  lengthValue: inv.packageWeightAndSize?.dimensions?.length ?? null,
+                  widthValue: inv.packageWeightAndSize?.dimensions?.width ?? null,
+                  heightValue: inv.packageWeightAndSize?.dimensions?.height ?? null,
+                  dimensionUnit: inv.packageWeightAndSize?.dimensions?.unit || null,
+                  fulfillmentPolicyId: offer.listingPolicies?.fulfillmentPolicyId || null,
+                  returnPolicyId: offer.listingPolicies?.returnPolicyId || null,
+                  paymentPolicyId: offer.listingPolicies?.paymentPolicyId || null,
+                  listingUrl: offer.listing?.listingId ? `https://www.ebay.com/itm/${offer.listing.listingId}` : null,
+                  isLegacy: false,
+                  syncedAt,
+                },
+                update: {
+                  offerId: offer.offerId || null,
+                  listingId: offer.listing?.listingId || null,
+                  title: product.title || sku,
+                  description: product.description || offer.listingDescription || '',
+                  subtitle: product.subtitle || null,
+                  priceValue: offer.pricingSummary?.price?.value || '0.00',
+                  priceCurrency: offer.pricingSummary?.price?.currency || 'USD',
+                  quantity: inv.availability?.shipToLocationAvailability?.quantity ?? offer.availableQuantity ?? 0,
+                  condition: inv.condition || 'NEW',
+                  conditionDescription: inv.conditionDescription || null,
+                  categoryId: offer.categoryId || null,
+                  format: offer.format || 'FIXED_PRICE',
+                  status: offer.status || 'UNPUBLISHED',
+                  marketplaceId: offer.marketplaceId || marketplaceId,
+                  imageUrl: images[0] || null,
+                  imageUrls: images,
+                  imageCount: images.length,
+                  aspects: product.aspects || {},
+                  weightValue: inv.packageWeightAndSize?.weight?.value ?? null,
+                  weightUnit: inv.packageWeightAndSize?.weight?.unit || null,
+                  lengthValue: inv.packageWeightAndSize?.dimensions?.length ?? null,
+                  widthValue: inv.packageWeightAndSize?.dimensions?.width ?? null,
+                  heightValue: inv.packageWeightAndSize?.dimensions?.height ?? null,
+                  dimensionUnit: inv.packageWeightAndSize?.dimensions?.unit || null,
+                  fulfillmentPolicyId: offer.listingPolicies?.fulfillmentPolicyId || null,
+                  returnPolicyId: offer.listingPolicies?.returnPolicyId || null,
+                  paymentPolicyId: offer.listingPolicies?.paymentPolicyId || null,
+                  listingUrl: offer.listing?.listingId ? `https://www.ebay.com/itm/${offer.listing.listingId}` : null,
+                  isLegacy: false,
+                  syncedAt,
+                },
+              });
+              synced++;
+            } catch (e) {
+              errors++;
+              logger.warn('sync_listings: upsert failed for offer', { sku, error: String(e) });
+            }
+          }
+        }
+      } catch (err: any) {
+        logger.error('sync_listings: inventory phase failed', err, { userId });
+      }
+
+      // Part 2: Legacy listings (Browse API)
+      const seenSkus = new Set<string>();
+      try {
+        const existingSkus = await prisma.ebayListing.findMany({
+          where: { userId, syncedAt },
+          select: { sku: true },
+        });
+        for (const e of existingSkus) seenSkus.add(e.sku);
+      } catch { /* ok */ }
+
+      try {
+        const { token: appToken } = await getEbayTokenFor(userId);
+        const marketplace = marketplaceId;
+
+        // Get legacy listing IDs from analytics + orders + seller search
+        let listingIds: string[] = [];
+        try {
+          const yesterday = new Date(Date.now() - 86400000);
+          const ninetyAgo = new Date(Date.now() - 90 * 86400000);
+          const endDate = yesterday.toISOString().split('T')[0].replace(/-/g, '');
+          const startDate = ninetyAgo.toISOString().split('T')[0].replace(/-/g, '');
+          const analyticsData = await callEbayAPI(
+            `/sell/analytics/v1/traffic_report?dimension=LISTING&metric=LISTING_IMPRESSION_TOTAL,LISTING_VIEWS_TOTAL,CLICK_THROUGH_RATE&filter=date_range:[${startDate}..${endDate}]`,
+            accessToken, {}, marketplace
+          );
+          if (analyticsData.records) {
+            listingIds = analyticsData.records.map((r: any) => r.dimensionValues?.[0]?.value).filter(Boolean);
+          }
+        } catch { /* analytics failed */ }
+
+        try {
+          const ordersData = await callEbayAPI(`/sell/fulfillment/v1/order?limit=200`, accessToken);
+          for (const order of ordersData.orders || []) {
+            for (const li of order.lineItems || []) {
+              if (li.legacyItemId && !listingIds.includes(li.legacyItemId)) listingIds.push(li.legacyItemId);
+            }
+          }
+        } catch { /* orders failed */ }
+
+        // Seller search
+        try {
+          let sellerUsername = '';
+          if (listingIds.length > 0) {
+            try {
+              const sampleItem = await callEbayAPI(
+                `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${listingIds[0]}`,
+                appToken
+              );
+              sellerUsername = sampleItem.seller?.username || '';
+            } catch { /* skip */ }
+          }
+          if (sellerUsername) {
+            const sellerSearch = await fetch(`${EBAY_API_BASE}/buy/browse/v1/item_summary/search?limit=200&filter=sellers:{${encodeURIComponent(sellerUsername)}}&fieldgroups=MATCHING_ITEMS`, {
+              headers: {
+                'Authorization': `Bearer ${appToken}`,
+                'X-EBAY-C-MARKETPLACE-ID': marketplace,
+                'Content-Type': 'application/json',
+              },
+            });
+            if (sellerSearch.ok) {
+              const sellerData = await sellerSearch.json();
+              for (const item of sellerData.itemSummaries || []) {
+                if (item.legacyItemId && !listingIds.includes(item.legacyItemId)) listingIds.push(item.legacyItemId);
+              }
+            }
+          }
+        } catch { /* seller search failed */ }
+
+        // Fetch full details for each legacy listing
+        const results = await Promise.allSettled(
+          listingIds
+            .filter(id => !seenSkus.has(`legacy-${id}`))
+            .map(async (legacyId) => {
+              try {
+                const item = await callEbayAPI(
+                  `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${legacyId}`,
+                  appToken
+                );
+
+                const aspects: Record<string, string[]> = {};
+                for (const a of item.localizedAspects || []) {
+                  if (a.name && a.value) aspects[a.name] = [a.value];
+                }
+                const images = [item.image?.imageUrl, ...(item.additionalImages || []).map((i: any) => i.imageUrl)].filter(Boolean);
+                const sku = `legacy-${legacyId}`;
+
+                await prisma.ebayListing.upsert({
+                  where: { userId_sku: { userId, sku } },
+                  create: {
+                    userId, sku,
+                    listingId: legacyId,
+                    title: item.title || '',
+                    description: item.description || item.shortDescription || '',
+                    priceValue: item.price?.value || '0.00',
+                    priceCurrency: item.price?.currency || 'USD',
+                    quantity: (item.estimatedAvailabilities?.[0]?.estimatedRemainingQuantity ?? 0) + (item.estimatedAvailabilities?.[0]?.estimatedSoldQuantity ?? 0),
+                    condition: item.condition || 'NEW',
+                    conditionDescription: item.conditionDescription || null,
+                    categoryId: item.categoryId || null,
+                    categoryName: item.categoryPath?.split('|').pop()?.trim() || null,
+                    format: item.buyingOptions?.includes('AUCTION') ? 'AUCTION' : 'FIXED_PRICE',
+                    status: item.itemWebUrl ? 'PUBLISHED' : 'ENDED',
+                    marketplaceId: item.listingMarketplaceId || marketplace,
+                    imageUrl: images[0] || null,
+                    imageUrls: images,
+                    imageCount: images.length,
+                    aspects,
+                    listingUrl: item.itemWebUrl || `https://www.ebay.com/itm/${legacyId}`,
+                    isLegacy: true,
+                    ebayCreatedAt: item.itemCreationDate || null,
+                    syncedAt,
+                  },
+                  update: {
+                    listingId: legacyId,
+                    title: item.title || '',
+                    description: item.description || item.shortDescription || '',
+                    priceValue: item.price?.value || '0.00',
+                    priceCurrency: item.price?.currency || 'USD',
+                    quantity: (item.estimatedAvailabilities?.[0]?.estimatedRemainingQuantity ?? 0) + (item.estimatedAvailabilities?.[0]?.estimatedSoldQuantity ?? 0),
+                    condition: item.condition || 'NEW',
+                    conditionDescription: item.conditionDescription || null,
+                    categoryId: item.categoryId || null,
+                    categoryName: item.categoryPath?.split('|').pop()?.trim() || null,
+                    format: item.buyingOptions?.includes('AUCTION') ? 'AUCTION' : 'FIXED_PRICE',
+                    status: item.itemWebUrl ? 'PUBLISHED' : 'ENDED',
+                    marketplaceId: item.listingMarketplaceId || marketplace,
+                    imageUrl: images[0] || null,
+                    imageUrls: images,
+                    imageCount: images.length,
+                    aspects,
+                    listingUrl: item.itemWebUrl || `https://www.ebay.com/itm/${legacyId}`,
+                    isLegacy: true,
+                    ebayCreatedAt: item.itemCreationDate || null,
+                    syncedAt,
+                  },
+                });
+                synced++;
+              } catch (e) {
+                errors++;
+              }
+            })
+        );
+      } catch (err: any) {
+        logger.warn('sync_listings: legacy phase failed', { error: err.message?.substring(0, 300) });
+      }
+
+      // Delete stale listings (not updated in this sync)
+      let removed = 0;
+      try {
+        const deleted = await prisma.ebayListing.deleteMany({
+          where: { userId, syncedAt: { lt: syncedAt } },
+        });
+        removed = deleted.count;
+      } catch { /* ok */ }
+
+      return res.status(200).json({
+        success: true,
+        synced,
+        errors,
+        removed,
+        syncedAt: syncedAt.toISOString(),
+      });
+    }
+
+    // -----------------------------------------------------------------
     // No matching action
     // -----------------------------------------------------------------
     return res.status(400).json({
@@ -2030,6 +2432,9 @@ export default async function handler(
         // Orders
         'orders',
         'order',
+        // DB Cache
+        'cached_listings',
+        'sync_listings',
       ],
     });
 

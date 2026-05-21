@@ -125,3 +125,19 @@ export async function getAuthUser(req: NextApiRequest, res: NextApiResponse) {
 
   return null;
 }
+
+/**
+ * Authenticate via session OR CLAWD_API_KEY header.
+ * Used by internal API routes that must support both browser and script access.
+ */
+export async function getAuthUserOrApiKey(req: NextApiRequest, res: NextApiResponse) {
+  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const envApiKey = process.env.CLAWD_API_KEY;
+
+  if (envApiKey && apiKey === envApiKey) {
+    const userId = (req.query.userId as string) || (req.query.user_id as string) || (req.body?.userId as string);
+    if (userId) return { id: userId, email: null, name: null };
+  }
+
+  return getAuthUser(req, res);
+}

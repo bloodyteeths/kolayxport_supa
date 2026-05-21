@@ -1,11 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUserOrApiKey } from '@/lib/auth';
 import { discardDraft, toSerializable } from '@/lib/ebay/draftService';
 import { logger } from '@/lib/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const user = await getAuthUser(req, res);
+  const user = await getAuthUserOrApiKey(req, res);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
   const id = String(req.query.id || '');
   if (!id) return res.status(400).json({ error: 'id is required' });

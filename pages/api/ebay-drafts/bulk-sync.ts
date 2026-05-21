@@ -1,11 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getAuthUser } from '@/lib/auth';
+import { getAuthUserOrApiKey } from '@/lib/auth';
 import { syncDraft } from '@/lib/ebay/draftService';
 import { logger } from '@/lib/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const user = await getAuthUser(req, res);
+  const user = await getAuthUserOrApiKey(req, res);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const draftIds = Array.isArray(req.body?.draftIds) ? req.body.draftIds : [];

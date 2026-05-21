@@ -20,7 +20,17 @@ function mergeJson(existing: any, patch: any): any {
   if (patch === null) return null;
   if (Array.isArray(patch)) return patch;
   if (typeof patch !== 'object') return patch;
-  return { ...((existing && typeof existing === 'object' && !Array.isArray(existing)) ? existing : {}), ...patch };
+  const base = (existing && typeof existing === 'object' && !Array.isArray(existing)) ? { ...existing } : {};
+  for (const key of Object.keys(patch)) {
+    const pVal = patch[key];
+    const eVal = base[key];
+    if (pVal && typeof pVal === 'object' && !Array.isArray(pVal) && eVal && typeof eVal === 'object' && !Array.isArray(eVal)) {
+      base[key] = mergeJson(eVal, pVal);
+    } else {
+      base[key] = pVal;
+    }
+  }
+  return base;
 }
 
 function actionKey(action: any) {

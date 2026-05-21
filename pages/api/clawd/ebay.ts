@@ -282,25 +282,21 @@ export default async function handler(
         });
       }
 
-      // Step 2: Fetch inventory items in parallel to enrich offers
-      const skus = [...new Set(offers.map((o: any) => o.sku))];
+      // Step 2: Fetch all inventory items in one bulk call instead of per-SKU
       const inventoryMap: Record<string, any> = {};
-
-      await Promise.all(
-        skus.map(async (sku: string) => {
-          try {
-            const item = await callEbayAPI(
-              `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`,
-              accessToken,
-              {},
-              marketplaceId
-            );
-            inventoryMap[sku] = item;
-          } catch {
-            // SKU may have special chars or not exist — skip gracefully
-          }
-        })
-      );
+      try {
+        const bulkInv = await callEbayAPI(
+          `/sell/inventory/v1/inventory_item?limit=200&offset=0`,
+          accessToken,
+          {},
+          marketplaceId
+        );
+        for (const item of bulkInv.inventoryItems || []) {
+          if (item.sku) inventoryMap[item.sku] = item;
+        }
+      } catch {
+        // Bulk fetch failed — listings will show without inventory enrichment
+      }
 
       // Step 3: Merge and normalize for frontend
       const enrichedOffers = offers.map((offer: any) => {

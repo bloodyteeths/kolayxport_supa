@@ -627,6 +627,7 @@ export default function ListingCreatorDialog({
         }
 
         // 3. Create offers for each variation SKU
+        let publishFailed = 0;
         for (const row of variationRows) {
           const offerPayload: Record<string, any> = {
             sku: row.sku,
@@ -636,7 +637,7 @@ export default function ListingCreatorDialog({
             listingDuration: 'GTC',
             listingDescription: description.trim(),
             pricingSummary: {
-              price: { value: row.price || price, currency },
+              price: { value: String(row.price || price), currency },
             },
             listingPolicies: { fulfillmentPolicyId, returnPolicyId, paymentPolicyId },
             categoryId: selectedCategory!.id,
@@ -646,7 +647,7 @@ export default function ListingCreatorDialog({
           }
 
           const offerRes = await fetch(
-            `/api/clawd/ebay?action=create_offer&user_id=${userId}`,
+            `/api/clawd/ebay?action=create_offer&user_id=${userId}&marketplace_id=EBAY_US`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -659,16 +660,22 @@ export default function ListingCreatorDialog({
             throw new Error(offerData.error || t('variationOfferCreateFailed', { sku: row.sku }));
           }
 
-          // Publish each offer if requested
           if (publish && offerData.offerId) {
-            await fetch(
-              `/api/clawd/ebay?action=publish_offer&offer_id=${offerData.offerId}&user_id=${userId}`,
-              { method: 'POST' }
-            ).catch(() => {});
+            try {
+              const pubRes = await fetch(
+                `/api/clawd/ebay?action=publish_offer&offer_id=${offerData.offerId}&user_id=${userId}&marketplace_id=EBAY_US`,
+                { method: 'POST' }
+              );
+              if (!pubRes.ok) publishFailed++;
+            } catch { publishFailed++; }
           }
         }
 
-        toast.success(publish ? t('variationListingPublished') : t('variationDraftCreated'));
+        if (publish && publishFailed > 0) {
+          toast.error(t('variationPublishPartial', { failed: publishFailed }));
+        } else {
+          toast.success(publish ? t('variationListingPublished') : t('variationDraftCreated'));
+        }
       } else {
         // ---- SIMPLE LISTING FLOW ----
         // 1. Create inventory item
@@ -711,7 +718,7 @@ export default function ListingCreatorDialog({
           listingDuration: 'GTC',
           listingDescription: description.trim(),
           pricingSummary: {
-            price: { value: price, currency },
+            price: { value: String(price), currency },
           },
           listingPolicies: { fulfillmentPolicyId, returnPolicyId, paymentPolicyId },
           categoryId: selectedCategory!.id,
@@ -722,7 +729,7 @@ export default function ListingCreatorDialog({
         }
 
         const offerRes = await fetch(
-          `/api/clawd/ebay?action=create_offer&user_id=${userId}`,
+          `/api/clawd/ebay?action=create_offer&user_id=${userId}&marketplace_id=EBAY_US`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

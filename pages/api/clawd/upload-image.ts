@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseAdmin } from '../../../lib/supabase';
 import { getAuthUser } from '../../../lib/auth';
 import { logger } from '../../../lib/logger';
 import { IncomingForm } from 'formidable';
@@ -9,20 +8,23 @@ import crypto from 'crypto';
 
 export const config = {
   api: {
-    bodyParser: false, // Required for file uploads
+    bodyParser: false,
   },
 };
 
-const BUCKET = 'listing-images';
-const MAX_FILE_SIZE = 12 * 1024 * 1024; // 12MB — eBay max is 12MB
+const UPLOAD_ROOT = process.env.EBAY_IMAGE_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'ebay-images');
+const MAX_FILE_SIZE = 12 * 1024 * 1024; // 12MB — eBay max
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/tiff'];
+
+function getBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'https://kolayxport.com';
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Authenticate
   const apiKey = req.headers['x-api-key'] || req.query.apiKey;
   const envApiKey = process.env.CLAWD_API_KEY;
   let authenticated = false;
@@ -46,24 +48,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const admin = supabaseAdmin();
+    const userDir = path.join(UPLOAD_ROOT, userId);
+    fs.mkdirSync(userDir, { recursive: true });
 
-    // Ensure bucket exists (create if not)
-    const { data: buckets } = await admin.storage.listBuckets();
-    const bucketExists = buckets?.some(b => b.name === BUCKET);
-    if (!bucketExists) {
-      const { error: createErr } = await admin.storage.createBucket(BUCKET, {
-        public: true,
-        fileSizeLimit: MAX_FILE_SIZE,
-        allowedMimeTypes: ALLOWED_TYPES,
-      });
-      if (createErr) {
-        logger.error('Failed to create storage bucket', createErr as Error);
-        return res.status(500).json({ error: 'Storage yapilandirilamadi' });
-      }
-    }
-
-    // Parse multipart form
     const form = new IncomingForm({
       maxFileSize: MAX_FILE_SIZE,
       keepExtensions: true,
@@ -85,32 +72,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Desteklenmeyen format. JPEG, PNG, GIF, WebP veya TIFF kullanin.' });
     }
 
-    // Read file and upload to Supabase Storage
-    const fileBuffer = fs.readFileSync(file.filepath);
     const ext = path.extname(file.originalFilename || '.jpg') || '.jpg';
     const hash = crypto.randomBytes(8).toString('hex');
-    const storagePath = `${userId}/${Date.now()}-${hash}${ext}`;
+    const filename = `${Date.now()}-${hash}${ext}`;
+    const destPath = path.join(userDir, filename);
 
-    const { error: uploadErr } = await admin.storage
-      .from(BUCKET)
-      .upload(storagePath, fileBuffer, {
-        contentType: file.mimetype || 'image/jpeg',
-        upsert: false,
-      });
-
-    if (uploadErr) {
-      logger.error('Storage upload failed', uploadErr as Error);
-      return res.status(500).json({ error: 'Gorsel yuklenemedi: ' + uploadErr.message });
-    }
-
-    // Get public URL
-    const { data: urlData } = admin.storage.from(BUCKET).getPublicUrl(storagePath);
-    const publicUrl = urlData.publicUrl;
-
-    // Clean up temp file
+    fs.copyFileSync(file.filepath, destPath);
     try { fs.unlinkSync(file.filepath); } catch { /* ignore */ }
 
-    logger.info('Image uploaded to Supabase Storage', { userId, storagePath });
+    const storagePath = `${userId}/${filename}`;
+    const publicUrl = `${getBaseUrl()}/api/clawd/serve-image?path=${encodeURIComponent(storagePath)}`;
+
+    logger.info('Image uploaded to local storage', { userId, storagePath });
 
     return res.status(200).json({
       url: publicUrl,

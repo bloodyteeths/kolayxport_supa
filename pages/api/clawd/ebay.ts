@@ -519,6 +519,7 @@ export default async function handler(
       });
 
       // Step 1: Create/update inventory item
+      const parsedQty = parseInt(quantity) || 1;
       const inventoryItemPayload: Record<string, any> = {
         product: {
           title,
@@ -526,7 +527,7 @@ export default async function handler(
         condition,
         availability: {
           shipToLocationAvailability: {
-            quantity: parseInt(quantity),
+            quantity: parsedQty,
           },
         },
       };
@@ -536,18 +537,27 @@ export default async function handler(
       if (imageUrls && imageUrls.length > 0) inventoryItemPayload.product.imageUrls = imageUrls;
       if (upc) inventoryItemPayload.product.upc = [upc];
       if (ean) inventoryItemPayload.product.ean = [ean];
-      if (conditionDescription) inventoryItemPayload.conditionDescription = conditionDescription;
+      if (conditionDescription && condition !== 'NEW') inventoryItemPayload.conditionDescription = conditionDescription;
 
       const encodedSku = encodeURIComponent(sku);
-      await callEbayAPI(
-        `/sell/inventory/v1/inventory_item/${encodedSku}`,
-        accessToken,
-        {
-          method: 'PUT',
-          body: JSON.stringify(inventoryItemPayload),
-        },
-        marketplaceId
-      );
+      try {
+        await callEbayAPI(
+          `/sell/inventory/v1/inventory_item/${encodedSku}`,
+          accessToken,
+          {
+            method: 'PUT',
+            body: JSON.stringify(inventoryItemPayload),
+          },
+          marketplaceId
+        );
+      } catch (invErr: any) {
+        const msg = invErr.message || '';
+        logger.error('Failed to create inventory item', invErr instanceof Error ? invErr : new Error(msg), { sku });
+        return res.status(400).json({
+          error: `Envanter öğesi oluşturulamadı: ${msg.substring(0, 300)}`,
+          step: 'inventory_item',
+        });
+      }
 
       logger.info('eBay inventory item created', { sku });
 
@@ -556,7 +566,7 @@ export default async function handler(
         sku,
         marketplaceId: marketplaceId,
         format,
-        availableQuantity: parseInt(quantity),
+        availableQuantity: parsedQty,
         listingDuration: format === 'AUCTION' ? 'DAYS_7' : 'GTC',
         pricingSummary: {
           price: {
@@ -622,7 +632,7 @@ export default async function handler(
           });
 
           // Extract missing required aspects
-          const aspectRegex = /The item specific (\w[\w\s]*?) is missing/g;
+          const aspectRegex = /The item specific (.+?) is missing/g;
           let match;
           while ((match = aspectRegex.exec(errMsg)) !== null) {
             missingAspects.push(match[1].trim());
@@ -897,7 +907,7 @@ export default async function handler(
         const missingAspects: string[] = [];
 
         // Extract aspect names from eBay error messages like "The item specific Color is missing"
-        const aspectRegex = /The item specific (\w[\w\s]*?) is missing/g;
+        const aspectRegex = /The item specific (.+?) is missing/g;
         let match;
         while ((match = aspectRegex.exec(errMsg)) !== null) {
           missingAspects.push(match[1].trim());
@@ -1023,12 +1033,30 @@ export default async function handler(
 
     // POST ?action=create_offer — Create offer only (body contains offer payload)
     if (req.method === 'POST' && action === 'create_offer') {
-      const offerBody = { ...req.body };
+      const raw = req.body;
+      const ALLOWED_OFFER_FIELDS = [
+        'sku', 'marketplaceId', 'format', 'availableQuantity', 'listingDuration',
+        'listingDescription', 'pricingSummary', 'listingPolicies', 'categoryId',
+        'merchantLocationKey', 'storeCategoryNames', 'tax', 'charity',
+        'extendedProducerResponsibility', 'regulatoryInformation',
+        'quantityLimitPerBuyer', 'secondaryCategoryId', 'lotSize',
+      ];
+      const offerBody: Record<string, any> = {};
+      for (const key of ALLOWED_OFFER_FIELDS) {
+        if (raw[key] !== undefined) offerBody[key] = raw[key];
+      }
 
-      // Auto-inject merchantLocationKey if not provided
       if (!offerBody.merchantLocationKey) {
         const locationKey = await getDefaultMerchantLocationKey(accessToken, marketplaceId);
         if (locationKey) offerBody.merchantLocationKey = locationKey;
+      }
+
+      if (offerBody.pricingSummary?.price?.value !== undefined) {
+        offerBody.pricingSummary.price.value = String(offerBody.pricingSummary.price.value);
+      }
+
+      if (offerBody.availableQuantity !== undefined) {
+        offerBody.availableQuantity = parseInt(offerBody.availableQuantity) || 1;
       }
 
       const result = await callEbayAPI(

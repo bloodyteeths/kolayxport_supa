@@ -454,26 +454,15 @@ function EbayListingsPage() {
     if (!userId) return;
     setLoading(true);
     try {
-      // Fetch both Inventory API offers AND legacy listings in parallel
-      const [inventoryRes, legacyRes] = await Promise.all([
-        fetch(`/api/clawd/ebay?action=listings&user_id=${userId}&marketplace_id=EBAY_US`).catch((e) => {
-          console.error('Inventory fetch failed:', e);
-          return null;
-        }),
-        fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`).catch((e) => {
-          console.error('Legacy listings fetch failed:', e);
-          return null;
-        }),
-      ]);
-
-      // Debug: log response statuses
-      console.log('Inventory response:', inventoryRes?.status, inventoryRes?.ok);
-      console.log('Legacy response:', legacyRes?.status, legacyRes?.ok);
+      // Step 1: Fetch Inventory API offers first (fast — single API call)
+      const inventoryRes = await fetch(`/api/clawd/ebay?action=listings&user_id=${userId}&marketplace_id=EBAY_US`).catch((e) => {
+        console.error('Inventory fetch failed:', e);
+        return null;
+      });
 
       const rows: EbayListingRow[] = [];
       const seenIds = new Set<string>();
 
-      // Process Inventory API offers
       if (inventoryRes?.ok) {
         const data = await inventoryRes.json();
         for (const l of data.offers || []) {
@@ -505,56 +494,65 @@ function EbayListingsPage() {
         }
       }
 
-      // Process legacy listings (from Analytics + Orders + Browse API)
-      if (legacyRes?.ok) {
-        const legacyData = await legacyRes.json();
-        for (const l of legacyData.listings || []) {
-          const id = l.legacyItemId || l.itemId;
-          if (!id || seenIds.has(id)) continue;
-          seenIds.add(id);
+      // Show inventory listings immediately, stop loading spinner
+      setListings(rows);
+      setLoading(false);
 
-          // Convert localizedAspects to aspects map
-          const aspects: Record<string, string[]> = {};
-          for (const a of l.localizedAspects || []) {
-            if (a.name && a.value) {
-              aspects[a.name] = [a.value];
+      // Step 2: Fetch legacy listings in background (slow — many API calls)
+      fetch(`/api/clawd/ebay?action=my_legacy_listings&user_id=${userId}&marketplace_id=EBAY_US`)
+        .then(async (legacyRes) => {
+          if (!legacyRes?.ok) return;
+          const legacyData = await legacyRes.json();
+          const legacyRows: EbayListingRow[] = [];
+
+          for (const l of legacyData.listings || []) {
+            const id = l.legacyItemId || l.itemId;
+            if (!id || seenIds.has(id)) continue;
+            seenIds.add(id);
+
+            const aspects: Record<string, string[]> = {};
+            for (const a of l.localizedAspects || []) {
+              if (a.name && a.value) {
+                aspects[a.name] = [a.value];
+              }
             }
+
+            legacyRows.push({
+              id,
+              sku: l.legacyItemId || '',
+              offerId: undefined,
+              listingId: l.legacyItemId,
+              title: l.title || '',
+              description: l.description || l.shortDescription || '',
+              price: l.price || { value: '0', currency: 'USD' },
+              quantity: (l.estimatedRemainingQuantity ?? 0) + (l.estimatedSoldQuantity ?? 0),
+              status: l.itemWebUrl ? 'PUBLISHED' : 'ENDED',
+              condition: l.condition || 'NEW',
+              categoryId: l.categoryId || '',
+              categoryName: l.categoryPath?.split('|').pop()?.trim(),
+              imageUrl: l.image?.imageUrl,
+              imageCount: (l.additionalImages?.length || 0) + (l.image ? 1 : 0),
+              aspects,
+              format: l.buyingOptions?.includes('AUCTION') ? 'AUCTION' : 'FIXED_PRICE',
+              marketplaceId: l.listingMarketplaceId || 'EBAY_US',
+              listingUrl: l.itemWebUrl || (l.legacyItemId ? `https://www.ebay.com/itm/${l.legacyItemId}` : undefined),
+              createdAt: l.itemCreationDate,
+            });
           }
 
-          rows.push({
-            id,
-            sku: l.legacyItemId || '',
-            offerId: undefined,
-            listingId: l.legacyItemId,
-            title: l.title || '',
-            description: l.description || l.shortDescription || '',
-            price: l.price || { value: '0', currency: 'USD' },
-            quantity: (l.estimatedRemainingQuantity ?? 0) + (l.estimatedSoldQuantity ?? 0),
-            status: l.itemWebUrl ? 'PUBLISHED' : 'ENDED',
-            condition: l.condition || 'NEW',
-            categoryId: l.categoryId || '',
-            categoryName: l.categoryPath?.split('|').pop()?.trim(),
-            imageUrl: l.image?.imageUrl,
-            imageCount: (l.additionalImages?.length || 0) + (l.image ? 1 : 0),
-            aspects,
-            format: l.buyingOptions?.includes('AUCTION') ? 'AUCTION' : 'FIXED_PRICE',
-            marketplaceId: l.listingMarketplaceId || 'EBAY_US',
-            listingUrl: l.itemWebUrl || (l.legacyItemId ? `https://www.ebay.com/itm/${l.legacyItemId}` : undefined),
-            createdAt: l.itemCreationDate,
-          });
-        }
-      }
+          if (legacyRows.length > 0) {
+            setListings(prev => [...prev, ...legacyRows]);
+          }
+        })
+        .catch((e) => console.error('Legacy listings fetch failed:', e));
 
-      if (rows.length === 0 && !inventoryRes?.ok && !legacyRes?.ok) {
+      if (rows.length === 0 && !inventoryRes?.ok) {
         const errData = inventoryRes ? await inventoryRes.json().catch(() => ({})) : {};
         throw new Error(errData.error || t('loadFailed'));
       }
-
-      setListings(rows);
     } catch (err: any) {
       console.error('Failed to fetch eBay listings:', err);
       toast.error(`${t('loadFailed')}: ${err.message}`);
-    } finally {
       setLoading(false);
     }
   }, [userId]);
@@ -682,25 +680,27 @@ function EbayListingsPage() {
   const handleDeleteListing = useCallback(
     async (row: EbayListingRow) => {
       try {
-        const params = new URLSearchParams({ action: 'delete_listing', user_id: userId! });
-        params.set('sku', row.sku);
-        if (row.offerId) params.set('offerId', row.offerId);
-        const res = await fetch(
-          `/api/clawd/ebay?${params}`,
-          { method: 'DELETE' }
-        );
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `HTTP ${res.status}`);
+        if (row.offerId || row.sku) {
+          const params = new URLSearchParams({ action: 'delete_listing', user_id: userId! });
+          params.set('sku', row.sku);
+          if (row.offerId) params.set('offerId', row.offerId);
+          const res = await fetch(
+            `/api/clawd/ebay?${params}`,
+            { method: 'DELETE' }
+          );
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${res.status}`);
+          }
         }
         toast.success(t('listingDeleted'));
         setDeleteConfirm(null);
-        fetchListings();
+        setListings(prev => prev.filter(l => l.id !== row.id));
       } catch (err: any) {
         toast.error(`${t('deleteFailed')}: ${err.message}`);
       }
     },
-    [userId, fetchListings]
+    [userId]
   );
 
   // --- CSV Export ---

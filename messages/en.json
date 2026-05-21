@@ -4604,7 +4604,22 @@
       "width": "Width",
       "withdraw": "Withdraw",
       "aspectsAIFilled": "AI filled aspects",
-      "aspectsAIFailed": "AI aspect fill failed"
+      "aspectsAIFailed": "AI aspect fill failed",
+      "saveDraft": "Save Draft",
+      "syncToEbay": "Sync to eBay",
+      "syncing": "Syncing...",
+      "syncFailed": "Sync to eBay failed",
+      "syncConflict": "Conflict detected — listing was changed on eBay. Discard draft and re-edit.",
+      "unsyncedChanges": "Unsynced Changes",
+      "conflict": "Conflict",
+      "draftSaved": "Draft saved",
+      "draftDiscarded": "Draft discarded",
+      "discardDraft": "Discard Draft",
+      "discardFailed": "Discard failed",
+      "publishQueued": "Publish queued — sync to apply",
+      "withdrawQueued": "Withdraw queued — sync to apply",
+      "copyQueued": "Copy queued — sync to apply",
+      "deleteQueued": "Delete queued — sync to apply"
     },
     "financial": {
       "revenueCalculator": "Revenue Calculator",
@@ -6375,7 +6390,14 @@
       "currentSku": "Current SKU",
       "newSku": "New SKU",
       "titleCol": "Title",
-      "copyListingsBtn": "Copy {count} Listings"
+      "copyListingsBtn": "Copy {count} Listings",
+      "draftsStagedAll": "{count} {action} drafts staged — sync to apply",
+      "draftsStagedPartial": "{action}: {succeeded} staged, {failed} failed",
+      "syncDrafts": "Sync {count} Drafts",
+      "syncing": "Syncing...",
+      "syncedAll": "{count} drafts synced to eBay",
+      "syncedPartial": "Synced: {success} ok, {failed} failed, {conflicts} conflicts",
+      "syncFailed": "Bulk sync failed"
     }
   },
   "etsyResearch": {

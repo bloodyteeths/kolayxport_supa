@@ -34,12 +34,14 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import SaveIcon from '@mui/icons-material/Save';
+import SyncIcon from '@mui/icons-material/Sync';
 import PublishIcon from '@mui/icons-material/Publish';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BlockIcon from '@mui/icons-material/Block';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 
@@ -48,6 +50,7 @@ import ImageManager from './ImageManager';
 import ItemSpecificsEditor from './ItemSpecificsEditor';
 import ConditionSelector from './ConditionSelector';
 import VariationEditor from './VariationEditor';
+import { stageEbayDraft, syncEbayDraft, discardEbayDraft, fetchEbayDrafts } from '@/lib/ebay/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -279,6 +282,12 @@ export default function ListingEditorDrawer({
   // Accordion expanded state
   const [expanded, setExpanded] = useState<string | false>('basics');
 
+  // Draft system
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftStatus, setDraftStatus] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
   // AI & Market Research
   const [marketResearch, setMarketResearch] = useState<Record<string, any> | null>(null);
   const [marketLoading, setMarketLoading] = useState(false);
@@ -316,6 +325,19 @@ export default function ListingEditorDrawer({
       const categoryId = data.offers?.[0]?.categoryId;
       if (categoryId) {
         fetchItemAspects(categoryId);
+      }
+
+      // Check for existing draft
+      try {
+        const drafts = await fetchEbayDrafts(sku);
+        if (drafts.length > 0) {
+          const d = drafts[0];
+          setDraftId(d.id);
+          setDraftStatus(d.status);
+          setDraftError(d.lastSyncError || null);
+        }
+      } catch {
+        // Non-critical
       }
     } catch (err: any) {
       setFetchError(err.message || t('listingLoadFailed'));
@@ -399,6 +421,9 @@ export default function ListingEditorDrawer({
       setExpanded('basics');
       setRequiredAspects([]);
       setRecommendedAspects([]);
+      setDraftId(null);
+      setDraftStatus(null);
+      setDraftError(null);
     }
   }, [open, sku, fetchListing]);
 
@@ -576,30 +601,29 @@ export default function ListingEditorDrawer({
 
     setSaving(true);
     try {
-      // Build inventory item payload
-      const inventoryPayload: Record<string, any> = {};
-      const productPayload: Record<string, any> = {};
+      // Build inventory patch (eBay Inventory API format)
+      const inventoryFields: Record<string, any> = {};
+      const productPatch: Record<string, any> = {};
 
-      if (changed.title !== undefined) productPayload.title = changed.title;
-      if (changed.description !== undefined) productPayload.description = changed.description;
-      if (changed.subtitle !== undefined) productPayload.subtitle = changed.subtitle;
-      if (changed.images !== undefined) productPayload.imageUrls = changed.images;
-      if (changed.aspects !== undefined) productPayload.aspects = changed.aspects;
+      if (changed.title !== undefined) productPatch.title = changed.title;
+      if (changed.description !== undefined) productPatch.description = changed.description;
+      if (changed.subtitle !== undefined) productPatch.subtitle = changed.subtitle;
+      if (changed.images !== undefined) productPatch.imageUrls = changed.images;
+      if (changed.aspects !== undefined) productPatch.aspects = changed.aspects;
 
-      if (Object.keys(productPayload).length > 0) {
-        inventoryPayload.product = productPayload;
+      if (Object.keys(productPatch).length > 0) {
+        inventoryFields.product = productPatch;
       }
 
-      if (changed.condition !== undefined) inventoryPayload.condition = changed.condition;
-      if (changed.conditionDescription !== undefined) inventoryPayload.conditionDescription = changed.conditionDescription;
+      if (changed.condition !== undefined) inventoryFields.condition = changed.condition;
+      if (changed.conditionDescription !== undefined) inventoryFields.conditionDescription = changed.conditionDescription;
 
       if (changed.quantity !== undefined) {
-        inventoryPayload.availability = {
+        inventoryFields.availability = {
           shipToLocationAvailability: { quantity: changed.quantity },
         };
       }
 
-      // Build weight/dimensions
       if (changed.weight !== undefined || changed.weightUnit !== undefined ||
           changed.length !== undefined || changed.width !== undefined ||
           changed.height !== undefined || changed.dimensionUnit !== undefined) {
@@ -621,80 +645,98 @@ export default function ListingEditorDrawer({
             unit: du,
           };
         }
-        inventoryPayload.packageWeightAndSize = pkg;
+        inventoryFields.packageWeightAndSize = pkg;
       }
 
-      // Update inventory item
-      if (Object.keys(inventoryPayload).length > 0) {
-        const res = await fetch(
-          `/api/clawd/ebay?action=update_inventory_item&sku=${encodeURIComponent(sku)}&user_id=${userId}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(inventoryPayload),
-          }
-        );
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || t('inventoryUpdateFailed'));
-        }
-      }
-
-      // Update offer if price/policies/category changed
+      // Build offer patch (eBay Offer API format)
+      const offerFields: Record<string, any> = {};
       const offer = listing?.offers?.[0];
-      if (offer?.offerId) {
-        const offerPayload: Record<string, any> = {};
 
-        if (changed.price !== undefined || changed.currency !== undefined) {
-          offerPayload.pricingSummary = {
-            price: {
-              value: changed.price !== undefined ? changed.price : fields.price,
-              currency: changed.currency !== undefined ? changed.currency : fields.currency,
-            },
-          };
-        }
-
-        if (changed.fulfillmentPolicyId !== undefined || changed.returnPolicyId !== undefined || changed.paymentPolicyId !== undefined) {
-          offerPayload.listingPolicies = {
-            fulfillmentPolicyId: changed.fulfillmentPolicyId !== undefined ? changed.fulfillmentPolicyId : fields.fulfillmentPolicyId,
-            returnPolicyId: changed.returnPolicyId !== undefined ? changed.returnPolicyId : fields.returnPolicyId,
-            paymentPolicyId: changed.paymentPolicyId !== undefined ? changed.paymentPolicyId : fields.paymentPolicyId,
-          };
-        }
-
-        if (changed.categoryId !== undefined) {
-          offerPayload.categoryId = changed.categoryId;
-        }
-
-        if (Object.keys(offerPayload).length > 0) {
-          const res = await fetch(
-            `/api/clawd/ebay?action=update_offer&offer_id=${offer.offerId}&user_id=${userId}`,
-            {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(offerPayload),
-            }
-          );
-
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || t('offerUpdateFailed'));
-          }
-        }
+      if (changed.price !== undefined || changed.currency !== undefined) {
+        offerFields.pricingSummary = {
+          price: {
+            value: String(changed.price !== undefined ? changed.price : fields.price),
+            currency: changed.currency !== undefined ? changed.currency : fields.currency,
+          },
+        };
       }
 
-      toast.success(t('listingUpdated'));
-      await fetchListing();
-      onSaved();
+      if (changed.fulfillmentPolicyId !== undefined || changed.returnPolicyId !== undefined || changed.paymentPolicyId !== undefined) {
+        offerFields.listingPolicies = {
+          fulfillmentPolicyId: changed.fulfillmentPolicyId !== undefined ? changed.fulfillmentPolicyId : fields.fulfillmentPolicyId,
+          returnPolicyId: changed.returnPolicyId !== undefined ? changed.returnPolicyId : fields.returnPolicyId,
+          paymentPolicyId: changed.paymentPolicyId !== undefined ? changed.paymentPolicyId : fields.paymentPolicyId,
+        };
+      }
+
+      if (changed.categoryId !== undefined) {
+        offerFields.categoryId = changed.categoryId;
+      }
+
+      // Stage as draft
+      const draft = await stageEbayDraft({
+        sku,
+        offerId: offer?.offerId,
+        inventoryFields: Object.keys(inventoryFields).length > 0 ? inventoryFields : undefined,
+        offerFields: Object.keys(offerFields).length > 0 ? offerFields : undefined,
+      });
+
+      setDraftId(draft.id);
+      setDraftStatus(draft.status);
+      setDraftError(null);
+      originalFieldsRef.current = JSON.parse(JSON.stringify(fields));
+      toast.success(t('draftSaved'));
     } catch (err: any) {
       toast.error(err.message || t('updateFailed'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // --------------------------------------------------
+  // Sync to eBay
+  // --------------------------------------------------
+  const handleSyncToEbay = async () => {
+    if (!draftId) return;
+
+    setSyncing(true);
+    try {
+      const result = await syncEbayDraft(draftId);
+      if (result.status === 'conflict') {
+        setDraftStatus('conflict');
+        setDraftError(result.field ? `Conflict: ${result.field}` : 'Conflict detected');
+        toast.error(t('syncConflict'));
+      } else {
+        setDraftId(null);
+        setDraftStatus(null);
+        setDraftError(null);
+        toast.success(t('listingUpdated'));
+        await fetchListing();
+        onSaved();
+      }
+    } catch (err: any) {
+      setDraftStatus('failed');
+      setDraftError(err.message);
+      toast.error(err.message || t('syncFailed'));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // --------------------------------------------------
+  // Discard draft
+  // --------------------------------------------------
+  const handleDiscardDraft = async () => {
+    if (!draftId) return;
+    try {
+      await discardEbayDraft(draftId);
+      setDraftId(null);
+      setDraftStatus(null);
+      setDraftError(null);
+      await fetchListing();
+      toast.success(t('draftDiscarded'));
+    } catch (err: any) {
+      toast.error(err.message || t('discardFailed'));
     }
   };
 
@@ -710,21 +752,14 @@ export default function ListingEditorDrawer({
 
     setPublishing(true);
     try {
-      const res = await fetch(
-        `/api/clawd/ebay?action=publish_offer&offer_id=${offer.offerId}&user_id=${userId}`,
-        {
-          method: 'POST',
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('publishFailed'));
-      }
-
-      toast.success(t('listingPublished'));
-      await fetchListing();
-      onSaved();
+      const draft = await stageEbayDraft({
+        sku,
+        offerId: offer.offerId,
+        queuedActions: [{ type: 'publish' }],
+      });
+      setDraftId(draft.id);
+      setDraftStatus(draft.status);
+      toast.success(t('publishQueued'));
     } catch (err: any) {
       toast.error(err.message || t('publishFailed'));
     } finally {
@@ -741,21 +776,14 @@ export default function ListingEditorDrawer({
 
     setWithdrawing(true);
     try {
-      const res = await fetch(
-        `/api/clawd/ebay?action=withdraw_offer&offer_id=${offer.offerId}&user_id=${userId}`,
-        {
-          method: 'POST',
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('withdrawFailed'));
-      }
-
-      toast.success(t('listingWithdrawn'));
-      await fetchListing();
-      onSaved();
+      const draft = await stageEbayDraft({
+        sku,
+        offerId: offer.offerId,
+        queuedActions: [{ type: 'withdraw' }],
+      });
+      setDraftId(draft.id);
+      setDraftStatus(draft.status);
+      toast.success(t('withdrawQueued'));
     } catch (err: any) {
       toast.error(err.message || t('withdrawFailed'));
     } finally {
@@ -772,40 +800,14 @@ export default function ListingEditorDrawer({
     setCopying(true);
     try {
       const newSku = `${sku}-copy-${Date.now()}`;
-
-      // Create inventory item copy
-      const inventoryPayload: Record<string, any> = {
-        product: {
-          title: fields.title + ` (${t('copy')})`,
-          description: fields.description,
-          aspects: fields.aspects,
-          imageUrls: fields.images,
-        },
-        condition: fields.condition,
-        conditionDescription: fields.conditionDescription,
-        availability: {
-          shipToLocationAvailability: { quantity: fields.quantity },
-        },
-      };
-
-      const res = await fetch(
-        `/api/clawd/ebay?action=create_inventory_item&sku=${encodeURIComponent(newSku)}&user_id=${userId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(inventoryPayload),
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('copyFailed'));
-      }
-
-      toast.success(t('listingCopied'));
-      onSaved();
+      const draft = await stageEbayDraft({
+        sku,
+        offerId: listing?.offers?.[0]?.offerId,
+        queuedActions: [{ type: 'copy', newSku }],
+      });
+      setDraftId(draft.id);
+      setDraftStatus(draft.status);
+      toast.success(t('copyQueued'));
     } catch (err: any) {
       toast.error(err.message || t('copyFailed'));
     } finally {
@@ -821,22 +823,15 @@ export default function ListingEditorDrawer({
 
     setDeleting(true);
     try {
-      const res = await fetch(
-        `/api/clawd/ebay?action=delete_inventory_item&sku=${encodeURIComponent(sku)}&user_id=${userId}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || t('deleteFailed'));
-      }
-
-      toast.success(t('listingDeleted'));
+      const draft = await stageEbayDraft({
+        sku,
+        offerId: listing?.offers?.[0]?.offerId,
+        queuedActions: [{ type: 'delete' }],
+      });
+      setDraftId(draft.id);
+      setDraftStatus(draft.status);
       setDeleteDialogOpen(false);
-      onSaved();
-      onClose();
+      toast.success(t('deleteQueued'));
     } catch (err: any) {
       toast.error(err.message || t('deleteFailed'));
     } finally {
@@ -902,6 +897,26 @@ export default function ListingEditorDrawer({
               <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
                 SKU: {sku}
               </Typography>
+              {draftStatus && draftStatus !== 'synced' && (
+                <Chip
+                  label={
+                    draftStatus === 'draft' ? t('unsyncedChanges')
+                    : draftStatus === 'syncing' ? t('syncing')
+                    : draftStatus === 'failed' ? t('syncFailed')
+                    : draftStatus === 'conflict' ? t('conflict')
+                    : draftStatus
+                  }
+                  size="small"
+                  color={
+                    draftStatus === 'draft' ? 'info'
+                    : draftStatus === 'failed' ? 'error'
+                    : draftStatus === 'conflict' ? 'warning'
+                    : 'default'
+                  }
+                  icon={draftStatus === 'conflict' || draftStatus === 'failed' ? <WarningAmberIcon /> : undefined}
+                  sx={{ height: 26, fontSize: '0.8rem' }}
+                />
+              )}
             </Box>
           )}
         </Box>
@@ -1660,7 +1675,7 @@ export default function ListingEditorDrawer({
           </Box>
         ) : null}
 
-        {/* Footer — Save button */}
+        {/* Footer — Save Draft + Sync to eBay */}
         {fields && listing && !loading && !fetchError && !listing.isLegacy && (
           <Box
             sx={{
@@ -1673,16 +1688,45 @@ export default function ListingEditorDrawer({
               zIndex: 10,
             }}
           >
-            <Button
-              variant="contained"
-              fullWidth
-              size="large"
-              startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-              onClick={handleSave}
-              disabled={saving || !hasChanges()}
-            >
-              {saving ? t('saving') : t('save')}
-            </Button>
+            {draftError && (
+              <Alert severity={draftStatus === 'conflict' ? 'warning' : 'error'} sx={{ mb: 1, py: 0 }}>
+                {draftError}
+              </Alert>
+            )}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                onClick={handleSave}
+                disabled={saving || syncing || !hasChanges()}
+                sx={{ flex: 1 }}
+              >
+                {saving ? t('saving') : t('saveDraft')}
+              </Button>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={syncing ? <CircularProgress size={20} color="inherit" /> : <SyncIcon />}
+                onClick={handleSyncToEbay}
+                disabled={syncing || saving || !draftId}
+                sx={{ flex: 1 }}
+              >
+                {syncing ? t('syncing') : t('syncToEbay')}
+              </Button>
+            </Box>
+            {draftId && (draftStatus === 'failed' || draftStatus === 'conflict') && (
+              <Button
+                variant="text"
+                size="small"
+                color="error"
+                onClick={handleDiscardDraft}
+                sx={{ mt: 0.5 }}
+                fullWidth
+              >
+                {t('discardDraft')}
+              </Button>
+            )}
           </Box>
         )}
       </Drawer>

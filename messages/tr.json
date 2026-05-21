@@ -4745,7 +4745,22 @@
       "width": "Genişlik",
       "withdraw": "Geri Çek",
       "aspectsAIFilled": "AI özellikler dolduruldu",
-      "aspectsAIFailed": "AI özellik doldurma başarısız"
+      "aspectsAIFailed": "AI özellik doldurma başarısız",
+      "saveDraft": "Taslak Kaydet",
+      "syncToEbay": "eBay'a Gönder",
+      "syncing": "Gönderiliyor...",
+      "syncFailed": "eBay'a gönderim başarısız",
+      "syncConflict": "Çakışma — eBay'da değişiklik yapılmış. Taslağı silin ve tekrar düzenleyin.",
+      "unsyncedChanges": "Gönderilmemiş Değişiklikler",
+      "conflict": "Çakışma",
+      "draftSaved": "Taslak kaydedildi",
+      "draftDiscarded": "Taslak silindi",
+      "discardDraft": "Taslağı Sil",
+      "discardFailed": "Silme başarısız",
+      "publishQueued": "Yayınlama sıraya eklendi — gönder ile uygula",
+      "withdrawQueued": "Geri çekme sıraya eklendi — gönder ile uygula",
+      "copyQueued": "Kopyalama sıraya eklendi — gönder ile uygula",
+      "deleteQueued": "Silme sıraya eklendi — gönder ile uygula"
     },
     "financial": {
       "revenueCalculator": "Gelir Hesaplayıcı",
@@ -6375,7 +6390,14 @@
       "currentSku": "Mevcut SKU",
       "newSku": "Yeni SKU",
       "titleCol": "Baslik",
-      "copyListingsBtn": "{count} Listeleme Kopyala"
+      "copyListingsBtn": "{count} Listeleme Kopyala",
+      "draftsStagedAll": "{count} {action} taslağı oluşturuldu — göndermek için senkronla",
+      "draftsStagedPartial": "{action}: {succeeded} oluşturuldu, {failed} başarısız",
+      "syncDrafts": "{count} Taslağı Gönder",
+      "syncing": "Gönderiliyor...",
+      "syncedAll": "{count} taslak eBay'a gönderildi",
+      "syncedPartial": "Senkron: {success} başarılı, {failed} başarısız, {conflicts} çakışma",
+      "syncFailed": "Toplu senkron başarısız"
     }
   },
   "etsyResearch": {

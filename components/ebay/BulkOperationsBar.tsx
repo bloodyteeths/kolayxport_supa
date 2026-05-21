@@ -37,8 +37,10 @@ import {
   FileDownloadOutlined,
   ContentCopyOutlined,
 } from '@mui/icons-material';
+import SyncIcon from '@mui/icons-material/Sync';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
+import { stageEbayDraft, syncEbayDrafts } from '@/lib/ebay/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -139,6 +141,10 @@ export default function BulkOperationsBar({
   // Copy dialog state
   const [skuPrefix, setSkuPrefix] = useState('COPY-');
 
+  // Draft tracking
+  const [stagedDraftIds, setStagedDraftIds] = useState<string[]>([]);
+  const [bulkSyncing, setBulkSyncing] = useState(false);
+
   const visible = selectedCount > 0 && !processing;
 
   // Price preview calculation
@@ -175,38 +181,62 @@ export default function BulkOperationsBar({
       });
   }, [selectedListings, priceMode, priceAmount]);
 
-  // Execute bulk operation with progress tracking
-  async function executeBulk<T>(
+  async function executeBulkDraft<T>(
     items: T[],
-    operation: (item: T) => Promise<Response>,
+    buildDraft: (item: T) => Parameters<typeof stageEbayDraft>[0],
     actionLabel: string
   ) {
     setProcessing(true);
     setProgress(0);
 
-    const results: PromiseSettledResult<Response>[] = [];
+    const newDraftIds: string[] = [];
+    let succeeded = 0;
+    let failed = 0;
+
     for (let i = 0; i < items.length; i++) {
-      const result = await Promise.allSettled([operation(items[i])]);
-      results.push(result[0]);
+      try {
+        const draft = await stageEbayDraft(buildDraft(items[i]));
+        if (draft?.id) newDraftIds.push(draft.id);
+        succeeded++;
+      } catch {
+        failed++;
+      }
       setProgress(((i + 1) / items.length) * 100);
-      if (i < items.length - 1) await delay(100);
     }
 
-    const succeeded = results.filter(
-      (r) => r.status === 'fulfilled' && (r.value as Response).ok
-    ).length;
-    const failed = results.length - succeeded;
+    setStagedDraftIds((prev) => [...prev, ...newDraftIds]);
 
     if (failed === 0) {
-      toast.success(t('bulk.successAll', { action: actionLabel, count: succeeded }));
+      toast.success(t('bulk.draftsStagedAll', { action: actionLabel, count: succeeded }));
     } else {
-      toast.error(t('bulk.successPartial', { action: actionLabel, succeeded, failed }));
+      toast.error(t('bulk.draftsStagedPartial', { action: actionLabel, succeeded, failed }));
     }
 
     setProcessing(false);
     setProgress(0);
-    onCompleted();
   }
+
+  const handleBulkSync = async () => {
+    if (stagedDraftIds.length === 0) return;
+    setBulkSyncing(true);
+    try {
+      const result = await syncEbayDrafts(stagedDraftIds);
+      const s = result.success || 0;
+      const f = result.failed || 0;
+      const c = result.conflicts || 0;
+      if (f === 0 && c === 0) {
+        toast.success(t('bulk.syncedAll', { count: s }));
+      } else {
+        toast.error(t('bulk.syncedPartial', { success: s, failed: f, conflicts: c }));
+      }
+      setStagedDraftIds([]);
+      onCompleted();
+    } catch (err: any) {
+      toast.error(err.message || t('bulk.syncFailed'));
+    } finally {
+      setBulkSyncing(false);
+    }
+  };
 
   // =======================================================================
   // 1. Price Change
@@ -221,7 +251,7 @@ export default function BulkOperationsBar({
     const listingsWithPrice = selectedListings.filter((l) => l.price && l.offerId);
     setPriceDialogOpen(false);
 
-    await executeBulk(
+    await executeBulkDraft(
       listingsWithPrice,
       (listing) => {
         const current = parseFloat(listing.price.value);
@@ -242,21 +272,18 @@ export default function BulkOperationsBar({
         }
         newPrice = Math.max(0.01, Math.round(newPrice * 100) / 100);
 
-        return fetch(
-          `/api/clawd/ebay?action=update_offer&offer_id=${listing.offerId}&user_id=${userId}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              pricingSummary: {
-                price: {
-                  value: newPrice.toFixed(2),
-                  currency: listing.price.currency,
-                },
+        return {
+          sku: listing.sku,
+          offerId: listing.offerId,
+          offerFields: {
+            pricingSummary: {
+              price: {
+                value: newPrice.toFixed(2),
+                currency: listing.price.currency,
               },
-            }),
-          }
-        );
+            },
+          },
+        };
       },
       t('bulk.priceUpdate')
     );
@@ -277,22 +304,17 @@ export default function BulkOperationsBar({
 
     setStockDialogOpen(false);
 
-    await executeBulk(
+    await executeBulkDraft(
       selectedListings,
-      (listing) => {
-        return fetch(
-          `/api/clawd/ebay?action=update_inventory_item&sku=${encodeURIComponent(listing.sku)}&user_id=${userId}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              availability: {
-                shipToLocationAvailability: { quantity: qty },
-              },
-            }),
-          }
-        );
-      },
+      (listing) => ({
+        sku: listing.sku,
+        offerId: listing.offerId,
+        inventoryFields: {
+          availability: {
+            shipToLocationAvailability: { quantity: qty },
+          },
+        },
+      }),
       t('bulk.stockUpdate')
     );
 
@@ -312,14 +334,13 @@ export default function BulkOperationsBar({
       return;
     }
 
-    await executeBulk(
+    await executeBulkDraft(
       unpublished,
-      (listing) => {
-        return fetch(
-          `/api/clawd/ebay?action=publish_offer&offer_id=${listing.offerId}&user_id=${userId}`,
-          { method: 'POST' }
-        );
-      },
+      (listing) => ({
+        sku: listing.sku,
+        offerId: listing.offerId,
+        queuedActions: [{ type: 'publish' }],
+      }),
       t('bulk.publishAction')
     );
   };
@@ -337,14 +358,13 @@ export default function BulkOperationsBar({
       return;
     }
 
-    await executeBulk(
+    await executeBulkDraft(
       published,
-      (listing) => {
-        return fetch(
-          `/api/clawd/ebay?action=withdraw_offer&offer_id=${listing.offerId}&user_id=${userId}`,
-          { method: 'POST' }
-        );
-      },
+      (listing) => ({
+        sku: listing.sku,
+        offerId: listing.offerId,
+        queuedActions: [{ type: 'withdraw' }],
+      }),
       t('bulk.withdrawAction')
     );
   };
@@ -355,14 +375,13 @@ export default function BulkOperationsBar({
   const handleDeleteSubmit = async () => {
     setDeleteDialogOpen(false);
 
-    await executeBulk(
+    await executeBulkDraft(
       selectedListings,
-      (listing) => {
-        return fetch(
-          `/api/clawd/ebay?action=delete_inventory_item&sku=${encodeURIComponent(listing.sku)}&user_id=${userId}`,
-          { method: 'DELETE' }
-        );
-      },
+      (listing) => ({
+        sku: listing.sku,
+        offerId: listing.offerId,
+        queuedActions: [{ type: 'delete' }],
+      }),
       t('bulk.deleteAction')
     );
   };
@@ -378,23 +397,15 @@ export default function BulkOperationsBar({
 
     setCategoryDialogOpen(false);
 
-    await executeBulk(
+    await executeBulkDraft(
       selectedListings,
-      (listing) => {
-        return fetch(
-          `/api/clawd/ebay?action=update_inventory_item&sku=${encodeURIComponent(listing.sku)}&user_id=${userId}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              product: {
-                aspects: listing.aspects || {},
-              },
-              categoryId: newCategoryId.trim(),
-            }),
-          }
-        );
-      },
+      (listing) => ({
+        sku: listing.sku,
+        offerId: listing.offerId,
+        offerFields: {
+          categoryId: newCategoryId.trim(),
+        },
+      }),
       t('bulk.categoryUpdate')
     );
 
@@ -407,20 +418,15 @@ export default function BulkOperationsBar({
   const handleConditionSubmit = async () => {
     setConditionDialogOpen(false);
 
-    await executeBulk(
+    await executeBulkDraft(
       selectedListings,
-      (listing) => {
-        return fetch(
-          `/api/clawd/ebay?action=update_inventory_item&sku=${encodeURIComponent(listing.sku)}&user_id=${userId}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              condition: newCondition,
-            }),
-          }
-        );
-      },
+      (listing) => ({
+        sku: listing.sku,
+        offerId: listing.offerId,
+        inventoryFields: {
+          condition: newCondition,
+        },
+      }),
       t('bulk.conditionUpdate')
     );
 
@@ -438,7 +444,7 @@ export default function BulkOperationsBar({
 
     setDescriptionDialogOpen(false);
 
-    await executeBulk(
+    await executeBulkDraft(
       selectedListings,
       (listing) => {
         const currentDesc = listing.description || '';
@@ -446,18 +452,15 @@ export default function BulkOperationsBar({
           ? currentDesc + '\n' + appendText
           : appendText + '\n' + currentDesc;
 
-        return fetch(
-          `/api/clawd/ebay?action=update_inventory_item&sku=${encodeURIComponent(listing.sku)}&user_id=${userId}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              product: {
-                description: newDesc,
-              },
-            }),
-          }
-        );
+        return {
+          sku: listing.sku,
+          offerId: listing.offerId,
+          inventoryFields: {
+            product: {
+              description: newDesc,
+            },
+          },
+        };
       },
       t('bulk.descriptionUpdate')
     );
@@ -519,63 +522,13 @@ export default function BulkOperationsBar({
 
     setCopyDialogOpen(false);
 
-    await executeBulk(
+    await executeBulkDraft(
       selectedListings,
-      async (listing) => {
-        const newSku = `${skuPrefix}${listing.sku}`;
-
-        // Step 1: Create inventory item copy
-        const itemBody: Record<string, any> = {
-          product: {
-            title: listing.title,
-            description: listing.description || '',
-            aspects: listing.aspects || {},
-          },
-          condition: listing.condition || 'NEW',
-          availability: {
-            shipToLocationAvailability: {
-              quantity: listing.quantity || 0,
-            },
-          },
-        };
-
-        const itemRes = await fetch(
-          `/api/clawd/ebay?action=create_inventory_item&sku=${encodeURIComponent(newSku)}&user_id=${userId}`,
-          {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(itemBody),
-          }
-        );
-
-        if (!itemRes.ok) return itemRes;
-
-        // Step 2: Create offer for the copy
-        if (listing.price && listing.offerId) {
-          const offerBody: Record<string, any> = {
-            sku: newSku,
-            marketplaceId: listing.marketplaceId || 'EBAY_US',
-            format: listing.format || 'FIXED_PRICE',
-            pricingSummary: {
-              price: {
-                value: listing.price.value,
-                currency: listing.price.currency,
-              },
-            },
-          };
-
-          return fetch(
-            `/api/clawd/ebay?action=create_offer&user_id=${userId}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(offerBody),
-            }
-          );
-        }
-
-        return itemRes;
-      },
+      (listing) => ({
+        sku: listing.sku,
+        offerId: listing.offerId,
+        queuedActions: [{ type: 'copy', newSku: `${skuPrefix}${listing.sku}` }],
+      }),
       t('bulk.copyAction')
     );
 
@@ -746,6 +699,23 @@ export default function BulkOperationsBar({
           >
             {t('bulk.copy')}
           </Button>
+
+          {/* Sync All Drafts */}
+          {stagedDraftIds.length > 0 && (
+            <Button
+              size="small"
+              variant="contained"
+              color="primary"
+              startIcon={bulkSyncing ? <LinearProgress sx={{ width: 18, height: 18 }} /> : <SyncIcon />}
+              onClick={handleBulkSync}
+              disabled={bulkSyncing}
+              sx={{ fontSize: { xs: 11, sm: 13 }, ml: 'auto' }}
+            >
+              {bulkSyncing
+                ? t('bulk.syncing')
+                : t('bulk.syncDrafts', { count: stagedDraftIds.length })}
+            </Button>
+          )}
         </Paper>
       </Slide>
 

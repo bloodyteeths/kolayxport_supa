@@ -69,6 +69,7 @@ model User {
   amazonPriceSnapshots  AmazonPriceSnapshot[]
   amazonNicheResearch   AmazonNicheResearch[]
   etsyListingDrafts     EtsyListingDraft[]
+  ebayListingDrafts     EbayListingDraft[]
 }
 
 model Account {
@@ -652,6 +653,71 @@ model EtsyDraftSyncAttempt {
   error       String?
 
   draft EtsyListingDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+  @@index([status])
+}
+
+model EbayListingDraft {
+  id                      String    @id @default(cuid())
+  userId                  String
+  sku                     String
+  offerId                 String?
+  listingId               String?
+  status                  String    @default("draft")
+  baseSnapshotInventory   Json      @default("{}")
+  baseSnapshotOffer       Json      @default("{}")
+  baseUpdatedAt           DateTime?
+  inventoryPatch          Json      @default("{}")
+  offerPatch              Json      @default("{}")
+  variationPatch          Json?
+  queuedActions           Json      @default("[]")
+  lastSyncError           String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  syncedAt                DateTime?
+
+  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media        EbayDraftMedia[]
+  syncAttempts EbayDraftSyncAttempt[]
+
+  @@index([userId])
+  @@index([userId, sku])
+  @@index([status])
+}
+
+model EbayDraftMedia {
+  id          String   @id @default(cuid())
+  draftId     String
+  sku         String
+  kind        String
+  operation   String
+  imageUrl    String?
+  localPath   String?
+  sourceUrl   String?
+  contentType String?
+  filename    String?
+  rank        Int?
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  draft EbayListingDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@index([draftId])
+  @@index([sku])
+}
+
+model EbayDraftSyncAttempt {
+  id          String    @id @default(cuid())
+  draftId     String
+  status      String    @default("running")
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  requestPlan Json      @default("{}")
+  result      Json?
+  error       String?
+
+  draft EbayListingDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
 
   @@index([draftId])
   @@index([status])

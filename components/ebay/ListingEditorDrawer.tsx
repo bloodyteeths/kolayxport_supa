@@ -327,7 +327,7 @@ export default function ListingEditorDrawer({
         fetchItemAspects(categoryId);
       }
 
-      // Check for existing draft
+      // Check for existing draft and merge pending patches into UI
       try {
         const drafts = await fetchEbayDrafts(sku);
         if (drafts.length > 0) {
@@ -335,6 +335,43 @@ export default function ListingEditorDrawer({
           setDraftId(d.id);
           setDraftStatus(d.status);
           setDraftError(d.lastSyncError || null);
+
+          if (d.status === 'draft' || d.status === 'failed' || d.status === 'conflict') {
+            const inv = d.inventoryPatch || {};
+            const ofr = d.offerPatch || {};
+            setFields((prev) => {
+              if (!prev) return prev;
+              const merged = { ...prev };
+              const prod = inv.product || {};
+              if (prod.title) merged.title = prod.title;
+              if (prod.description) merged.description = prod.description;
+              if (prod.subtitle) merged.subtitle = prod.subtitle;
+              if (prod.imageUrls) merged.images = prod.imageUrls;
+              if (prod.aspects) merged.aspects = prod.aspects;
+              if (inv.condition) merged.condition = inv.condition;
+              if (inv.conditionDescription) merged.conditionDescription = inv.conditionDescription;
+              if (inv.availability?.shipToLocationAvailability?.quantity !== undefined)
+                merged.quantity = inv.availability.shipToLocationAvailability.quantity;
+              if (inv.packageWeightAndSize?.weight?.value !== undefined) {
+                merged.weight = inv.packageWeightAndSize.weight.value;
+                merged.weightUnit = inv.packageWeightAndSize.weight.unit || merged.weightUnit;
+              }
+              if (inv.packageWeightAndSize?.dimensions) {
+                const dim = inv.packageWeightAndSize.dimensions;
+                if (dim.length !== undefined) merged.length = dim.length;
+                if (dim.width !== undefined) merged.width = dim.width;
+                if (dim.height !== undefined) merged.height = dim.height;
+                if (dim.unit) merged.dimensionUnit = dim.unit;
+              }
+              if (ofr.pricingSummary?.price?.value) merged.price = ofr.pricingSummary.price.value;
+              if (ofr.pricingSummary?.price?.currency) merged.currency = ofr.pricingSummary.price.currency;
+              if (ofr.categoryId) merged.categoryId = ofr.categoryId;
+              if (ofr.listingPolicies?.fulfillmentPolicyId) merged.fulfillmentPolicyId = ofr.listingPolicies.fulfillmentPolicyId;
+              if (ofr.listingPolicies?.returnPolicyId) merged.returnPolicyId = ofr.listingPolicies.returnPolicyId;
+              if (ofr.listingPolicies?.paymentPolicyId) merged.paymentPolicyId = ofr.listingPolicies.paymentPolicyId;
+              return merged;
+            });
+          }
         }
       } catch {
         // Non-critical
@@ -494,9 +531,16 @@ export default function ListingEditorDrawer({
         categoryName: fields.categoryId,
         marketResearch: research,
       });
-      if (data.optimizedTitle) {
-        updateField('title', data.optimizedTitle);
-        toast.success(t('titleOptimized', { before: data.score?.before || '?', after: data.score?.after || '?' }));
+      const optimized = typeof data.optimizedTitle === 'string' ? data.optimizedTitle.trim().slice(0, 80) : '';
+      if (optimized && optimized !== fields.title) {
+        updateField('title', optimized);
+        const before = typeof data.score?.before === 'number' ? data.score.before : '?';
+        const after = typeof data.score?.after === 'number' ? data.score.after : '?';
+        toast.success(t('titleOptimized', { before, after }));
+      } else if (optimized) {
+        toast(t('titleOptimized', { before: data.score?.before || '?', after: data.score?.after || '?' }));
+      } else {
+        toast.error(t('titleOptimizeFailed'));
       }
     } catch (err: any) {
       toast.error(err.message || t('titleOptimizeFailed'));
@@ -517,9 +561,12 @@ export default function ListingEditorDrawer({
         price: fields.price ? parseFloat(fields.price) : undefined,
         marketResearch: research,
       });
-      if (data.description) {
-        updateField('description', data.description);
+      const desc = typeof data.description === 'string' ? data.description.trim() : '';
+      if (desc) {
+        updateField('description', desc);
         toast.success(t('descriptionGenerated'));
+      } else {
+        toast.error(t('descriptionGenerateFailed'));
       }
     } catch (err: any) {
       toast.error(err.message || t('descriptionGenerateFailed'));
@@ -538,9 +585,12 @@ export default function ListingEditorDrawer({
         condition: fields.condition,
         marketResearch: research,
       });
-      if (data.suggestedPrice) {
-        updateField('price', String(data.suggestedPrice));
-        toast.success(t('suggestedPrice', { price: data.suggestedPrice, min: data.priceRange?.min, max: data.priceRange?.max }));
+      const price = typeof data.suggestedPrice === 'number' ? data.suggestedPrice : parseFloat(String(data.suggestedPrice));
+      if (price && !isNaN(price) && price > 0) {
+        updateField('price', price.toFixed(2));
+        toast.success(t('suggestedPrice', { price: price.toFixed(2), currency: fields.currency, min: data.priceRange?.min ?? '?', max: data.priceRange?.max ?? '?' }));
+      } else {
+        toast.error(t('priceSuggestFailed'));
       }
     } catch (err: any) {
       toast.error(err.message || t('priceSuggestFailed'));
@@ -563,8 +613,16 @@ export default function ListingEditorDrawer({
         categoryName: fields.categoryId,
         marketResearch: research,
       });
-      setAiAnalysis(data);
-      setExpanded('ai');
+      if (data && typeof data === 'object' && typeof data.score === 'number') {
+        setAiAnalysis({
+          score: data.score,
+          issues: Array.isArray(data.issues) ? data.issues : [],
+          tips: Array.isArray(data.tips) ? data.tips : [],
+        });
+        setExpanded('ai');
+      } else {
+        toast.error(t('analysisFailed'));
+      }
     } catch (err: any) {
       toast.error(err.message || t('analysisFailed'));
     } finally {
@@ -606,7 +664,9 @@ export default function ListingEditorDrawer({
       const productPatch: Record<string, any> = {};
 
       if (changed.title !== undefined) productPatch.title = changed.title;
-      if (changed.description !== undefined) productPatch.description = changed.description;
+      if (changed.description !== undefined) {
+        productPatch.description = changed.description;
+      }
       if (changed.subtitle !== undefined) productPatch.subtitle = changed.subtitle;
       if (changed.images !== undefined) productPatch.imageUrls = changed.images;
       if (changed.aspects !== undefined) productPatch.aspects = changed.aspects;
@@ -671,6 +731,10 @@ export default function ListingEditorDrawer({
 
       if (changed.categoryId !== undefined) {
         offerFields.categoryId = changed.categoryId;
+      }
+
+      if (changed.description !== undefined) {
+        offerFields.listingDescription = changed.description;
       }
 
       // Stage as draft
@@ -1357,6 +1421,7 @@ export default function ListingEditorDrawer({
                     onChange={(_, value) => {
                       if (value && typeof value !== 'string') {
                         updateField('categoryId', value.id);
+                        updateField('aspects', {});
                         fetchItemAspects(value.id);
                         setCategorySearchQuery('');
                       }

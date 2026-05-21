@@ -84,6 +84,7 @@ import ScheduledUpdateDialog from '@/components/ebay/ScheduledUpdateDialog';
 import SmartPricing from '@/components/ebay/SmartPricing';
 import DuplicateDetector from '@/components/ebay/DuplicateDetector';
 import BackupManager from '@/components/ebay/BackupManager';
+import { stageEbayDraft, syncEbayDraft } from '@/lib/ebay/draftClient';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -557,18 +558,18 @@ function EbayListingsPage() {
     }
   }, [userId]);
 
-  // --- AI Apply / Undo handlers ---
+  // --- AI Apply / Undo handlers (via draft system) ---
   const handleApplyAITitle = async (listingId: string, newTitle: string, originalTitle: string) => {
     try {
       const listing = listings.find(l => l.id === listingId);
       if (!listing) return;
 
-      const res = await fetch(`/api/clawd/ebay?action=update_listing&user_id=${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sku: listing.sku, offerId: listing.offerId, title: newTitle }),
+      const draft = await stageEbayDraft({
+        sku: listing.sku,
+        offerId: listing.offerId,
+        inventoryFields: { product: { title: newTitle.slice(0, 80) } },
       });
-      if (!res.ok) throw new Error(t('updateFailed'));
+      await syncEbayDraft(draft.id);
 
       setAppliedTitles(prev => new Map(prev).set(listingId, originalTitle));
       toast.success(t('titleUpdated'));
@@ -586,12 +587,12 @@ function EbayListingsPage() {
     if (!listing) return;
 
     try {
-      const res = await fetch(`/api/clawd/ebay?action=update_listing&user_id=${userId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sku: listing.sku, offerId: listing.offerId, title: originalTitle }),
+      const draft = await stageEbayDraft({
+        sku: listing.sku,
+        offerId: listing.offerId,
+        inventoryFields: { product: { title: originalTitle } },
       });
-      if (!res.ok) throw new Error(t('revertFailed'));
+      await syncEbayDraft(draft.id);
 
       setAppliedTitles(prev => { const m = new Map(prev); m.delete(listingId); return m; });
       toast.success(t('titleReverted'));
@@ -676,22 +677,17 @@ function EbayListingsPage() {
     [listings]
   );
 
-  // --- Delete listing ---
+  // --- Delete listing (via draft system) ---
   const handleDeleteListing = useCallback(
     async (row: EbayListingRow) => {
       try {
         if (row.offerId || row.sku) {
-          const params = new URLSearchParams({ action: 'delete_listing', user_id: userId! });
-          params.set('sku', row.sku);
-          if (row.offerId) params.set('offerId', row.offerId);
-          const res = await fetch(
-            `/api/clawd/ebay?${params}`,
-            { method: 'DELETE' }
-          );
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || `HTTP ${res.status}`);
-          }
+          const draft = await stageEbayDraft({
+            sku: row.sku,
+            offerId: row.offerId,
+            queuedActions: [{ type: 'delete' }],
+          });
+          await syncEbayDraft(draft.id);
         }
         toast.success(t('listingDeleted'));
         setDeleteConfirm(null);
@@ -1459,7 +1455,7 @@ function EbayListingsPage() {
           slotProps={{ paper: { sx: { minWidth: 320 } } }}
         >
           <ListSubheader sx={{ lineHeight: '32px', fontSize: 12, fontWeight: 700, color: 'primary.main' }}>
-            🤖 AI Asistan
+            {t('aiAssistant')}
           </ListSubheader>
           <MenuItem onClick={() => { setMoreMenuAnchor(null); handleAIBulkOptimize(); }}>
             <ListItemIcon><AutoFixHighIcon fontSize="small" /></ListItemIcon>
@@ -2075,7 +2071,7 @@ function EbayListingsPage() {
         <BulkOperationsBar
           selectedCount={Array.from((selectedIds as any).ids || []).length}
           selectedListings={listings.filter(l =>
-            Array.from((selectedIds as any).ids || []).includes(l.sku)
+            Array.from((selectedIds as any).ids || []).includes(l.id)
           )}
           userId={userId}
           fulfillmentPolicies={fulfillmentPolicies}

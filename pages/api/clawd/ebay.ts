@@ -375,49 +375,27 @@ export default async function handler(
     }
 
     // GET ?action=listing&sku=XXX — Get single inventory item + its offers
-    // Falls back to Browse API for legacy listings that don't exist in Inventory API
+    // Checks DB cache first to determine routing (legacy → Browse API, normal → Inventory API)
     if (req.method === 'GET' && action === 'listing') {
       const sku = req.query.sku as string;
       if (!sku) {
         return res.status(400).json({ error: 'sku is required' });
       }
 
-      const encodedSku = encodeURIComponent(sku);
+      // Look up DB cache to determine if this is a legacy listing
+      const cached = await prisma.ebayListing.findUnique({
+        where: { userId_sku: { userId, sku } },
+      });
 
-      try {
-        // Try Inventory API first
-        const [inventoryItem, offersData] = await Promise.all([
-          callEbayAPI(`/sell/inventory/v1/inventory_item/${encodedSku}`, accessToken, {}, marketplaceId),
-          callEbayAPI(`/sell/inventory/v1/offer?sku=${encodedSku}`, accessToken, {}, marketplaceId).catch(() => ({ offers: [] })),
-        ]);
-
-        // Flatten inventoryItem fields to top level for consistent editor shape
-        return res.status(200).json({
-          sku,
-          isLegacy: false,
-          product: inventoryItem.product,
-          condition: inventoryItem.condition,
-          conditionDescription: inventoryItem.conditionDescription,
-          availability: inventoryItem.availability,
-          packageWeightAndSize: inventoryItem.packageWeightAndSize,
-          offers: offersData.offers || [],
-        });
-      } catch (inventoryErr: any) {
-        // If Inventory API returns 404, try Browse API with SKU as legacy item ID
-        if (!inventoryErr.message?.includes('404')) {
-          throw inventoryErr;
-        }
-
-        logger.info('Inventory item not found, falling back to Browse API', { sku });
-
+      // Helper to build legacy response from Browse API + cached fallback
+      const fetchLegacy = async (legacyId: string) => {
         try {
           const { token: appToken } = await getEbayTokenFor(userId);
           const browseItem = await callEbayAPI(
-            `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${sku}`,
+            `/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id=${encodeURIComponent(legacyId)}`,
             appToken
           );
 
-          // Map Browse API response to EbayListingData shape
           const aspects: Record<string, string[]> = {};
           for (const a of browseItem.localizedAspects || []) {
             if (a.name && a.value) {
@@ -432,10 +410,10 @@ export default async function handler(
             if (img.imageUrl) imageUrls.push(img.imageUrl);
           }
 
-          return res.status(200).json({
+          return {
             sku,
             isLegacy: true,
-            legacyItemId: browseItem.legacyItemId || sku,
+            legacyItemId: browseItem.legacyItemId || legacyId,
             itemWebUrl: browseItem.itemWebUrl,
             product: {
               title: browseItem.title || '',
@@ -459,7 +437,87 @@ export default async function handler(
               listingPolicies: {},
               categoryId: browseItem.categoryId || '',
             }],
+          };
+        } catch (browseErr: any) {
+          // Browse API failed (item may be ended/removed). Return DB cache as fallback.
+          if (cached) {
+            logger.info('Browse API failed, returning DB cache for legacy listing', { sku, legacyId });
+            return {
+              sku,
+              isLegacy: true,
+              legacyItemId: legacyId,
+              itemWebUrl: cached.listingUrl,
+              product: {
+                title: cached.title,
+                description: cached.description,
+                aspects: (cached.aspects as Record<string, string[]>) || {},
+                imageUrls: cached.imageUrls || [],
+              },
+              condition: cached.condition,
+              conditionDescription: cached.conditionDescription || '',
+              availability: {
+                shipToLocationAvailability: { quantity: cached.quantity },
+              },
+              offers: [{
+                offerId: null,
+                status: cached.status === 'PUBLISHED' ? 'ACTIVE' : 'ENDED',
+                pricingSummary: {
+                  price: { value: cached.priceValue, currency: cached.priceCurrency },
+                },
+                listingPolicies: {},
+                categoryId: cached.categoryId || '',
+              }],
+            };
+          }
+          throw browseErr;
+        }
+      };
+
+      // Legacy path: route by DB record to use the real listingId for Browse API
+      if (cached?.isLegacy) {
+        const legacyId = cached.listingId || sku.replace(/^legacy-/, '');
+        try {
+          const data = await fetchLegacy(legacyId);
+          return res.status(200).json(data);
+        } catch (err: any) {
+          logger.error('Legacy listing fetch failed', err, { sku, legacyId });
+          return res.status(404).json({
+            error: 'Listing not found in Browse API',
+            details: err.message,
           });
+        }
+      }
+
+      // Non-legacy path: Inventory API first, fall back to Browse API by SKU as legacy ID
+      const encodedSku = encodeURIComponent(sku);
+      try {
+        const [inventoryItem, offersData] = await Promise.all([
+          callEbayAPI(`/sell/inventory/v1/inventory_item/${encodedSku}`, accessToken, {}, marketplaceId),
+          callEbayAPI(`/sell/inventory/v1/offer?sku=${encodedSku}`, accessToken, {}, marketplaceId).catch(() => ({ offers: [] })),
+        ]);
+
+        return res.status(200).json({
+          sku,
+          isLegacy: false,
+          product: inventoryItem.product,
+          condition: inventoryItem.condition,
+          conditionDescription: inventoryItem.conditionDescription,
+          availability: inventoryItem.availability,
+          packageWeightAndSize: inventoryItem.packageWeightAndSize,
+          offers: offersData.offers || [],
+        });
+      } catch (inventoryErr: any) {
+        if (!inventoryErr.message?.includes('404')) {
+          throw inventoryErr;
+        }
+
+        logger.info('Inventory item not found, trying Browse API', { sku });
+
+        // Try Browse API with the raw SKU (could be a legacy item id that wasn't yet in DB)
+        try {
+          const legacyId = cached?.listingId || sku.replace(/^legacy-/, '');
+          const data = await fetchLegacy(legacyId);
+          return res.status(200).json(data);
         } catch (browseErr: any) {
           logger.error('Browse API fallback also failed', browseErr, { sku });
           return res.status(404).json({

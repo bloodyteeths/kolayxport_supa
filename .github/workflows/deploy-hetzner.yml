@@ -14,7 +14,9 @@ jobs:
           host: ${{ secrets.KOLAYXPORT_VPS_IP }}
           username: deploy
           key: ${{ secrets.KOLAYXPORT_SSH_KEY }}
-          script_stop: true
+          # Next.js build can run ~10 minutes on this VPS; default action timeout is 10m
+          # which has killed past deploys mid-build (verified Sprint 5 close).
+          command_timeout: 20m
           script: |
             cd /home/deploy/kolayxport
             git pull origin main

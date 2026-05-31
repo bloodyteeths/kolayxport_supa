@@ -1,5 +1,14 @@
 name: Daily Cron Jobs
 
+# Verified production cron source for /api/cron/reset-usage and /api/cron/track-ranks.
+# Frontend/API is served by Hetzner at https://kolayxport.com (see KOLAYXPORT_PRODUCTION_TOPOLOGY.md).
+# Required repository secrets:
+#   - KOLAYXPORT_BASE_URL  (e.g. https://kolayxport.com)
+#   - CRON_SECRET          (Bearer token expected by the API handler)
+#
+# This workflow fails loudly if either secret is missing or any endpoint returns non-2xx.
+# Idempotency is enforced server-side via lib/cron/idempotency.ts and the CronLock model.
+
 on:
   schedule:
     - cron: '0 0 * * *'
@@ -10,18 +19,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Reset usage counters and cancel expired trials
+        env:
+          KOLAYXPORT_BASE_URL: ${{ secrets.KOLAYXPORT_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsS -X GET \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.KOLAYXPORT_BASE_URL }}/api/cron/reset-usage" \
-            --max-time 60 || true
+          set -euo pipefail
+          if [ -z "${KOLAYXPORT_BASE_URL:-}" ]; then
+            echo "::error::Missing required secret KOLAYXPORT_BASE_URL"
+            exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Missing required secret CRON_SECRET"
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 60 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${KOLAYXPORT_BASE_URL}/api/cron/reset-usage"
 
   track-ranks:
     runs-on: ubuntu-latest
     steps:
       - name: Track listing ranks
+        env:
+          KOLAYXPORT_BASE_URL: ${{ secrets.KOLAYXPORT_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsS -X GET \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.KOLAYXPORT_BASE_URL }}/api/cron/track-ranks" \
-            --max-time 120 || true
+          set -euo pipefail
+          if [ -z "${KOLAYXPORT_BASE_URL:-}" ]; then
+            echo "::error::Missing required secret KOLAYXPORT_BASE_URL"
+            exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Missing required secret CRON_SECRET"
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${KOLAYXPORT_BASE_URL}/api/cron/track-ranks"

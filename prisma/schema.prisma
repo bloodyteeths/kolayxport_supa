@@ -71,6 +71,7 @@ model User {
   etsyListingDrafts     EtsyListingDraft[]
   ebayListingDrafts     EbayListingDraft[]
   ebayListings          EbayListing[]
+  adminAuditLogs        AdminAuditLog[]         @relation("AdminAuditLogs")
 }
 
 model Account {
@@ -394,6 +395,9 @@ model Shipment {
 model SyncLog {
   id        String   @id @default(cuid())
   level     String
+  /// Coarse domain bucket so the admin cockpit can filter quickly:
+  /// security | cron | integration | billing | extension | shipping | etgb | system | auth
+  category  String?
   message   String
   userId    String?
   operation String?
@@ -405,6 +409,8 @@ model SyncLog {
   @@index([userId])
   @@index([timestamp])
   @@index([level])
+  @@index([category])
+  @@index([level, timestamp])
 }
 
 model SyncOperation {
@@ -725,8 +731,49 @@ model EbayDraftSyncAttempt {
 }
 
 model WebhookEvent {
-  id        String   @id
-  createdAt DateTime @default(now())
+  id           String   @id
+  /// Provider that fired this event: stripe | wix | shopify | etsy | ebay | ...
+  provider     String?
+  /// Provider-specific event name, e.g. "invoice.payment_succeeded".
+  eventType    String?
+  /// received | processed | failed | ignored
+  status       String?
+  /// Short, redacted error string. Never the raw payload.
+  errorMessage String?
+  /// Tenant the event acted on, if resolvable. Null when no user could be matched.
+  userId       String?
+  createdAt    DateTime @default(now())
+
+  @@index([provider, eventType])
+  @@index([status])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+/// Audit trail for every admin write action.
+/// Insert-only; admins should never be able to delete or edit these rows
+/// (enforced at the API layer — no admin route exposes DELETE/PATCH).
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  adminUserId String
+  /// Stable code, e.g. "user.update.role" or "user.reset_usage".
+  action      String
+  /// Resource type touched, e.g. "user", "wixSite", "subscription".
+  targetType  String?
+  /// Resource id touched.
+  targetId    String?
+  /// Free-form, redacted metadata.
+  metadata    Json?
+  /// SHA-256 of (client IP + a server pepper). Never the raw IP.
+  ipHash      String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  admin       User     @relation("AdminAuditLogs", fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -1462,4 +1509,18 @@ model AmazonNicheResearch {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// Single-row-per-(jobName, bucket) lock to deduplicate cron triggers.
+/// Used by lib/cron/idempotency.ts. Inserted on entry, never updated.
+/// Old rows can be pruned with a simple createdAt cutoff; not done automatically.
+model CronLock {
+  id        String   @id @default(cuid())
+  jobName   String
+  bucket    String
+  createdAt DateTime @default(now())
+
+  @@unique([jobName, bucket])
+  @@index([jobName, bucket])
+  @@index([createdAt])
 }

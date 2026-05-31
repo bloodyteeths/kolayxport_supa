@@ -1,8 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { withAdmin } from '@/lib/middleware/withAdmin';
+import { recordAdminAction } from '@/lib/admin/audit';
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  adminUser: { id: string; email: string; name: string },
+) {
   const { userId } = req.query;
   if (typeof userId !== 'string') {
     return res.status(400).json({ error: 'Invalid userId' });
@@ -95,6 +100,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         trialExpiresAt: true,
         usageResetAt: true,
       },
+    });
+
+    await recordAdminAction(req, adminUser.id, {
+      action: 'user.update',
+      targetType: 'user',
+      targetId: userId,
+      // recordAdminAction redacts secrets. Only the change set is captured; never
+      // the resulting full user object (which would include billing fields).
+      metadata: { fields: Object.keys(updates), changes: updates },
     });
 
     return res.json(updated);

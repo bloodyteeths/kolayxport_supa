@@ -19,6 +19,11 @@ jobs:
             cd /home/deploy/kolayxport
             git pull origin main
             npm install --legacy-peer-deps
+            # Apply any pending Prisma migrations BEFORE generating the client. `migrate deploy`
+            # is the only Prisma command allowed in production — it applies migrations from
+            # prisma/migrations/* and exits non-zero on failure. NEVER run `prisma db push`
+            # or `prisma db push --accept-data-loss` here.
+            npx prisma migrate deploy
             npx prisma generate
             cp -r .next .next-backup 2>/dev/null || true
             rm -rf .next

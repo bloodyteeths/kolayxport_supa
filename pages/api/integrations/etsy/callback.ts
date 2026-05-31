@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { encryptIfNeeded } from '@/lib/crypto/credentials';
 
 export default async function handler(
   req: NextApiRequest,
@@ -213,8 +214,8 @@ export default async function handler(
         },
         update: {
           shopName: shopData.shop_name,
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
+          accessToken: encryptIfNeeded(tokens.access_token),
+          refreshToken: encryptIfNeeded(tokens.refresh_token),
           tokenExpiresAt: tokenExpiresAt,
           isActive: true,
           updatedAt: new Date()
@@ -223,8 +224,8 @@ export default async function handler(
           userId,
           shopId: shopData.shop_id.toString(),
           shopName: shopData.shop_name,
-          accessToken: tokens.access_token,
-          refreshToken: tokens.refresh_token,
+          accessToken: encryptIfNeeded(tokens.access_token),
+          refreshToken: encryptIfNeeded(tokens.refresh_token),
           tokenExpiresAt: tokenExpiresAt,
           isDefault: false, // No default shops - always auto-match
           isActive: true
@@ -245,21 +246,24 @@ export default async function handler(
       });
     }
 
-    // Update Credential table if this is the first shop OR if EtsyShop save failed (fallback)
+    // Update Credential table if this is the first shop OR if EtsyShop save failed (fallback).
+    // Tokens are wrapped through encryptIfNeeded so production rows are stored as `enc:v1:`.
     if (isFirstShop || !etsyShopSaved) {
+      const encAccess = encryptIfNeeded(tokens.access_token);
+      const encRefresh = encryptIfNeeded(tokens.refresh_token);
       await prisma.credential.upsert({
         where: { userId },
         update: {
-          etsyAccessToken: tokens.access_token,
-          etsyRefreshToken: tokens.refresh_token,
+          etsyAccessToken: encAccess,
+          etsyRefreshToken: encRefresh,
           etsyShopId: shopData.shop_id.toString(),
           etsyTokenExpiresAt: tokenExpiresAt,
           updatedAt: new Date()
         },
         create: {
           userId,
-          etsyAccessToken: tokens.access_token,
-          etsyRefreshToken: tokens.refresh_token,
+          etsyAccessToken: encAccess,
+          etsyRefreshToken: encRefresh,
           etsyShopId: shopData.shop_id.toString(),
           etsyTokenExpiresAt: tokenExpiresAt
         }

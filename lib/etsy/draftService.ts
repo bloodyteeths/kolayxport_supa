@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
 const UPLOAD_ROOT = process.env.ETSY_DRAFT_UPLOAD_DIR || path.join(process.cwd(), 'uploads', 'etsy-drafts');
@@ -43,6 +44,8 @@ function mediaIdentity(media: any) {
 }
 
 async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<string> {
+  // `refreshToken` arriving here must already be plaintext — `getEtsyAccessToken`
+  // calls `decryptIfNeeded` before invoking us.
   const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -58,14 +61,17 @@ async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<s
   const accessToken = data.access_token;
   const refreshTokenNext = data.refresh_token || refreshToken;
 
+  const encAccess = encryptIfNeeded(accessToken);
+  const encRefresh = encryptIfNeeded(refreshTokenNext);
+
   const updated = await prisma.etsyShop.updateMany({
     where: { shopId },
-    data: { accessToken, refreshToken: refreshTokenNext, tokenExpiresAt },
+    data: { accessToken: encAccess, refreshToken: encRefresh, tokenExpiresAt },
   });
   if (updated.count === 0) {
     await prisma.credential.updateMany({
       where: { etsyShopId: shopId },
-      data: { etsyAccessToken: accessToken, etsyRefreshToken: refreshTokenNext, etsyTokenExpiresAt: tokenExpiresAt },
+      data: { etsyAccessToken: encAccess, etsyRefreshToken: encRefresh, etsyTokenExpiresAt: tokenExpiresAt },
     });
   }
   return accessToken;
@@ -77,12 +83,13 @@ export async function getEtsyAccessToken(shopId: string, userId?: string): Promi
     select: { accessToken: true, refreshToken: true, tokenExpiresAt: true },
   });
   if (shop) {
+    const plainRefresh = decryptIfNeeded(shop.refreshToken) as string | null;
     const expiresAt = shop.tokenExpiresAt;
     if (!expiresAt || expiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
-      if (!shop.refreshToken) throw new Error('No refresh token available');
-      return refreshEtsyToken(shopId, shop.refreshToken);
+      if (!plainRefresh) throw new Error('No refresh token available');
+      return refreshEtsyToken(shopId, plainRefresh);
     }
-    return shop.accessToken;
+    return decryptIfNeeded(shop.accessToken) as string;
   }
 
   const credential = await prisma.credential.findFirst({
@@ -90,11 +97,12 @@ export async function getEtsyAccessToken(shopId: string, userId?: string): Promi
     select: { etsyAccessToken: true, etsyRefreshToken: true, etsyTokenExpiresAt: true },
   });
   if (!credential?.etsyAccessToken) throw new Error('Etsy shop not found or not connected');
+  const plainRefresh = decryptIfNeeded(credential.etsyRefreshToken) as string | null;
   if (!credential.etsyTokenExpiresAt || credential.etsyTokenExpiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
-    if (!credential.etsyRefreshToken) throw new Error('No refresh token available');
-    return refreshEtsyToken(shopId, credential.etsyRefreshToken);
+    if (!plainRefresh) throw new Error('No refresh token available');
+    return refreshEtsyToken(shopId, plainRefresh);
   }
-  return credential.etsyAccessToken;
+  return decryptIfNeeded(credential.etsyAccessToken) as string;
 }
 
 export async function callEtsyAPI(endpoint: string, accessToken: string, options: RequestInit = {}) {

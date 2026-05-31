@@ -5,20 +5,22 @@ import { syncTrendyolRecentOrdersForUser } from '@/lib/sync/trendyol';
 import { syncWixRecentOrdersForUser } from '@/lib/sync/wix';
 import { syncShopifyRecentOrdersForUser } from '@/lib/sync/shopify';
 import { isTrendyolEnabled, isWixEnabled, isShopifyEnabled } from '@/lib/config';
+import { runCronGuard } from '@/lib/cron/idempotency';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Temporary disable cron via env flag to avoid Hobby plan limits
   if (process.env.DISABLE_CRON_SYNC === 'true') {
     return res.status(503).json({ error: 'Cron sync temporarily disabled' });
   }
-  const authHeader = req.headers.authorization;
   const methodAllowed = req.method === 'GET' || req.method === 'POST';
   if (!methodAllowed) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // Constant-time CRON_SECRET check + 15-minute idempotency bucket.
+  // GitHub Actions cron-jobs.yml fires every 15 minutes; Vercel cron also defines a daily
+  // run; the lock prevents double-execution in any overlap window.
+  const guard = await runCronGuard(req, res, { jobName: 'sync-orders', intervalMinutes: 15 });
+  if (!guard.ok) return;
 
   try {
     const users = await prisma.user.findMany({ include: { integrationSettings: true } });

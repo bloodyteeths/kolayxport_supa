@@ -5,6 +5,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 
 // PrismaAdapter is only needed for OAuth (Google) to auto-create User + Account records.
@@ -127,16 +128,89 @@ export async function getAuthUser(req: NextApiRequest, res: NextApiResponse) {
 }
 
 /**
- * Authenticate via session OR CLAWD_API_KEY header.
+ * Constant-time compare two strings. Returns false on length mismatch.
+ */
+function safeEqualStr(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  try {
+    return crypto.timingSafeEqual(ab, bb);
+  } catch {
+    return false;
+  }
+}
+
+const CUID_RE = /^c[a-z0-9]{20,}$/i;
+
+/**
+ * Extract the internal API key strictly from HTTP headers.
+ *   - Authorization: Bearer <key>
+ *   - X-Internal-Api-Key: <key>
+ *
+ * The legacy X-Api-Key header is also accepted during the migration; query/body keys
+ * are explicitly rejected because they leak through proxy/CDN logs and browser history.
+ */
+function readInternalApiKeyFromHeaders(req: NextApiRequest): string | null {
+  const auth = req.headers['authorization'];
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) {
+    const token = auth.slice(7).trim();
+    if (token) return token;
+  }
+  const internal = req.headers['x-internal-api-key'];
+  if (typeof internal === 'string' && internal.trim()) return internal.trim();
+  const legacy = req.headers['x-api-key'];
+  if (typeof legacy === 'string' && legacy.trim()) return legacy.trim();
+  return null;
+}
+
+/**
+ * Authenticate via session OR internal API key (header-only).
+ *
  * Used by internal API routes that must support both browser and script access.
+ *
+ * Hardening notes:
+ *   - The API key is accepted only from request headers (Authorization: Bearer,
+ *     X-Internal-Api-Key, or legacy X-Api-Key). Query string and request body are
+ *     explicitly rejected because they leak through CDN/proxy logs and browser history.
+ *   - The comparison uses crypto.timingSafeEqual to avoid leaking the key one byte at a time.
+ *   - The acting user id must be supplied via the X-User-Id header and must look like a CUID.
+ *   - Responses authenticated this way are marked Cache-Control: no-store, private.
+ *   - Both CLAWD_API_KEY (legacy) and KOLAYXPORT_INTERNAL_API_KEY (new name) are accepted so
+ *     the env var can be renamed without coordinated changes across ~30 callers.
  */
 export async function getAuthUserOrApiKey(req: NextApiRequest, res: NextApiResponse) {
-  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
-  const envApiKey = process.env.CLAWD_API_KEY;
+  const presented = readInternalApiKeyFromHeaders(req);
 
-  if (envApiKey && apiKey === envApiKey) {
-    const userId = (req.query.userId as string) || (req.query.user_id as string) || (req.body?.userId as string);
-    if (userId) return { id: userId, email: null, name: null };
+  if (presented) {
+    const candidates = [
+      process.env.KOLAYXPORT_INTERNAL_API_KEY,
+      process.env.CLAWD_API_KEY,
+    ].filter((k): k is string => typeof k === 'string' && k.length > 0);
+
+    let matched = false;
+    for (const candidate of candidates) {
+      if (safeEqualStr(presented, candidate)) {
+        matched = true;
+        break;
+      }
+    }
+
+    if (matched) {
+      const headerUserId = req.headers['x-user-id'];
+      const userId = typeof headerUserId === 'string' ? headerUserId.trim() : '';
+      if (!userId || !CUID_RE.test(userId)) {
+        // Don't write a response here — let the caller emit its standard 401.
+        // The mark headers are still useful so any cache/proxy treats the response as private.
+        res.setHeader('Cache-Control', 'no-store, private');
+        res.setHeader('Vary', 'Authorization');
+        return null;
+      }
+      res.setHeader('Cache-Control', 'no-store, private');
+      res.setHeader('Vary', 'Authorization');
+      return { id: userId, email: null, name: null };
+    }
   }
 
   return getAuthUser(req, res);

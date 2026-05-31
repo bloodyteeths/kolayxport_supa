@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { encryptIfNeeded } from '@/lib/crypto/credentials';
 
 /**
  * POST: Claim a pending Wix connection for the authenticated user.
@@ -33,11 +34,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: { userId: user.id },
     });
 
-    // Update Credential
+    // Update Credential. pending.accessToken was already encrypted by the webhook
+    // write, but `encryptIfNeeded` is idempotent — passing an already-encrypted
+    // value back through is a no-op.
+    const encAccess = encryptIfNeeded(pending.accessToken);
     await prisma.credential.upsert({
       where: { userId: user.id },
       update: {
-        wixAccessToken: pending.accessToken,
+        wixAccessToken: encAccess,
         wixSiteId: pending.siteId,
         wixInstanceId: instanceId || pending.siteId,
         wixTokenExpiresAt: pending.tokenExpiresAt,
@@ -45,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
       create: {
         userId: user.id,
-        wixAccessToken: pending.accessToken,
+        wixAccessToken: encAccess,
         wixSiteId: pending.siteId,
         wixInstanceId: instanceId || pending.siteId,
         wixTokenExpiresAt: pending.tokenExpiresAt,

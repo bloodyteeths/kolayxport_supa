@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { encryptIfNeeded } from '@/lib/crypto/credentials';
 
 // Force serverless runtime (not edge) — Prisma requires Node.js
 export const config = {
@@ -127,19 +128,21 @@ export default async function handler(
     // Calculate token expiration
     const tokenExpiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
-    // Store tokens in Credential table
+    // Store tokens in Credential table, encrypted at rest via `enc:v1:` envelope.
+    const encAccess = encryptIfNeeded(tokens.access_token);
+    const encRefresh = encryptIfNeeded(tokens.refresh_token);
     await prisma.credential.upsert({
       where: { userId },
       update: {
-        ebayAccessToken: tokens.access_token,
-        ebayRefreshToken: tokens.refresh_token,
+        ebayAccessToken: encAccess,
+        ebayRefreshToken: encRefresh,
         ebayTokenExpiresAt: tokenExpiresAt,
         updatedAt: new Date(),
       },
       create: {
         userId,
-        ebayAccessToken: tokens.access_token,
-        ebayRefreshToken: tokens.refresh_token,
+        ebayAccessToken: encAccess,
+        ebayRefreshToken: encRefresh,
         ebayTokenExpiresAt: tokenExpiresAt,
       },
     });

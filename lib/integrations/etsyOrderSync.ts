@@ -2,6 +2,7 @@ import { EtsyClient, EtsyCredentials } from './etsyClient';
 import { UIOrder } from '../types';
 import { logger } from '../logger';
 import prisma from '../prisma';
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 export async function fetchEtsyOrders(
   userId: string,
@@ -25,17 +26,18 @@ export async function fetchEtsyOrders(
       await prisma.etsyShop.update({
         where: { id: shop.id },
         data: {
-          accessToken: newCreds.accessToken,
-          refreshToken: newCreds.refreshToken || undefined,
+          accessToken: encryptIfNeeded(newCreds.accessToken) as string,
+          refreshToken: encryptIfNeeded(newCreds.refreshToken) as string | undefined,
           tokenExpiresAt: newCreds.tokenExpiresAt || undefined,
         },
       });
     };
 
+    // Decrypt once before handing off to the client; the client treats them as plain bytes.
     const client = new EtsyClient(
       {
-        accessToken: shop.accessToken,
-        refreshToken: shop.refreshToken || undefined,
+        accessToken: decryptIfNeeded(shop.accessToken) as string,
+        refreshToken: (decryptIfNeeded(shop.refreshToken) as string | null) || undefined,
         shopId: shop.shopId,
         tokenExpiresAt: shop.tokenExpiresAt || undefined,
       },

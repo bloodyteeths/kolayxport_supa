@@ -1,5 +1,6 @@
 // lib/config.ts
 import prisma from './prisma';
+import { decryptIfNeeded } from './crypto/credentials';
 
 /**
  * Configuration and integration credential management.
@@ -19,16 +20,19 @@ export async function getIntegrationCreds(userId: string) {
   const integration = await prisma.credential.findUnique({ where: { userId } });
   if (!integration) throw new Error('No integration settings found');
 
+  // Every secret-bearing field is wrapped in `decryptIfNeeded` so callers always
+  // see plaintext, regardless of whether the row was written by the legacy
+  // `lib/encryption.ts` flow or the new `lib/crypto/credentials.ts` envelope.
   return {
-    veeqoApiKey: integration.veeqoApiKey,
-    shippoToken: integration.shippoToken,
-    fedexApiKey: integration.fedexApiKey,
-    fedexApiSecret: integration.fedexApiSecret,
+    veeqoApiKey: decryptIfNeeded(integration.veeqoApiKey),
+    shippoToken: decryptIfNeeded(integration.shippoToken),
+    fedexApiKey: decryptIfNeeded(integration.fedexApiKey),
+    fedexApiSecret: decryptIfNeeded(integration.fedexApiSecret),
     fedexAccountNumber: integration.fedexAccountNumber,
     fedexMeterNumber: integration.fedexMeterNumber,
     trendyolSupplierId: integration.trendyolSupplierId,
-    trendyolApiKey: integration.trendyolApiKey,
-    trendyolApiSecret: integration.trendyolApiSecret,
+    trendyolApiKey: decryptIfNeeded(integration.trendyolApiKey),
+    trendyolApiSecret: decryptIfNeeded(integration.trendyolApiSecret),
   };
 }
 

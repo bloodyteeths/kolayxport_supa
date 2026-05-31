@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { runCronGuard } from '@/lib/cron/idempotency';
 
 const ETSY_API_BASE = 'https://openapi.etsy.com/v3/application';
 const MAX_KEYWORDS_PER_RUN = 200; // Self-hosted: no timeout limit, process more per run
@@ -57,15 +58,14 @@ async function checkRankForKeyword(keyword: string, listingId: string): Promise<
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const authHeader = req.headers.authorization;
   const methodAllowed = req.method === 'GET' || req.method === 'POST';
 
   if (!methodAllowed) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // Constant-time CRON_SECRET check + daily idempotency bucket.
+  const guard = await runCronGuard(req, res, { jobName: 'track-ranks', intervalMinutes: 1440 });
+  if (!guard.ok) return;
 
   try {
     // Get all active tracked keywords, grouped by user

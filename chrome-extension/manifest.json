@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KolayXport — Etsy, eBay & Amazon Research Tool",
-  "version": "9.2.0",
+  "version": "9.3.0",
   "description": "Inline sales estimates, SEO scores, competition analysis & revenue data on Etsy, eBay and Amazon pages. AI-powered alternative to Helium 10.",
   "author": "Kolayxport",
   "icons": {
@@ -106,6 +106,13 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "externally_connectable": {
+    "matches": [
+      "https://kolayxport.com/*",
+      "https://www.kolayxport.com/*"
+    ],
+    "ids": []
   },
   "minimum_chrome_version": "88"
 }

@@ -1,22 +1,43 @@
 name: Scheduled Cron Jobs
 
+# Verified production cron source for /api/cron/sync-orders.
+# Frontend/API is served by Hetzner at https://kolayxport.com (see KOLAYXPORT_PRODUCTION_TOPOLOGY.md).
+# Required repository secrets:
+#   - KOLAYXPORT_BASE_URL  (e.g. https://kolayxport.com)
+#   - CRON_SECRET          (Bearer token expected by the API handler)
+#
+# This workflow fails loudly if either secret is missing or the endpoint returns non-2xx.
+# Idempotency is enforced server-side via lib/cron/idempotency.ts and the CronLock model,
+# so double-fires from manual workflow_dispatch (or Vercel cron) are safe.
+
 on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       job:
-        description: 'Job to run'
+        description: 'Job to run (currently only sync-orders)'
         required: false
-        default: 'all'
+        default: 'sync-orders'
 
 jobs:
   sync-orders:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger order sync
+        env:
+          KOLAYXPORT_BASE_URL: ${{ secrets.KOLAYXPORT_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsS -X GET \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.KOLAYXPORT_BASE_URL }}/api/cron/sync-orders" \
-            --max-time 120 || true
+          set -euo pipefail
+          if [ -z "${KOLAYXPORT_BASE_URL:-}" ]; then
+            echo "::error::Missing required secret KOLAYXPORT_BASE_URL"
+            exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Missing required secret CRON_SECRET"
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${KOLAYXPORT_BASE_URL}/api/cron/sync-orders"

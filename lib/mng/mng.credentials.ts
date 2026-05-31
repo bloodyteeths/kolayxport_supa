@@ -1,4 +1,5 @@
 import prisma from '../prisma';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
 import type { MngCredentials } from './mng.types';
 
 /**
@@ -24,7 +25,8 @@ export async function getMngCredentialsForUser(userId: string): Promise<MngCrede
     },
   });
 
-  if (!creds?.mngCustomerNumber || !creds?.mngPassword) {
+  const plainPassword = decryptIfNeeded(creds?.mngPassword) as string | null;
+  if (!creds?.mngCustomerNumber || !plainPassword) {
     throw new Error('DHL eCommerce müşteri numarası ve şifre ayarlardan girilmelidir.');
   }
 
@@ -32,7 +34,7 @@ export async function getMngCredentialsForUser(userId: string): Promise<MngCrede
     appId,
     appSecret,
     customerNumber: creds.mngCustomerNumber,
-    customerPassword: creds.mngPassword,
+    customerPassword: plainPassword,
     environment: (creds.mngApiEnvironment as 'test' | 'production') || 'test',
   };
 }

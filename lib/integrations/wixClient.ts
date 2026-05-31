@@ -1,3 +1,5 @@
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
+
 /**
  * Wix API client for orders and product management.
  * Uses Client Credentials OAuth (appId + appSecret + instanceId → access token).
@@ -27,7 +29,9 @@ export class WixApiClient {
   private lastRequestTime = 0;
 
   constructor(credentials: WixCredentials, onTokenRefresh?: TokenRefreshCallback) {
-    this.accessToken = credentials.accessToken || '';
+    // Tokens arriving from DB may be encrypted (enc:v1 or legacy base64). The client
+    // works with plaintext internally; `decryptIfNeeded` is the single chokepoint.
+    this.accessToken = (decryptIfNeeded(credentials.accessToken) as string) || '';
     this.instanceId = credentials.instanceId;
     this.siteId = credentials.siteId;
     this.tokenExpiresAt = credentials.tokenExpiresAt;
@@ -73,8 +77,10 @@ export class WixApiClient {
         this.tokenExpiresAt = new Date(Date.now() + (data.expires_in || 14400) * 1000);
 
         if (this.onTokenRefresh) {
+          // Hand the freshly minted token to the persistence callback already encrypted,
+          // so callers that pipe it straight into Prisma store it as `enc:v1:`.
           await this.onTokenRefresh({
-            accessToken: this.accessToken,
+            accessToken: encryptIfNeeded(this.accessToken) as string,
             instanceId: this.instanceId,
             siteId: this.siteId,
             tokenExpiresAt: this.tokenExpiresAt,

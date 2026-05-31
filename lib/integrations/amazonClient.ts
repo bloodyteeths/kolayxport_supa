@@ -1,4 +1,5 @@
 import { logger } from '../logger';
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -313,6 +314,9 @@ export async function getValidToken(
     return null;
   }
 
+  const plainAccess = decryptIfNeeded(credential.amazonAccessToken) as string;
+  const plainRefresh = decryptIfNeeded(credential.amazonRefreshToken) as string;
+
   // Check if token expires within 5 minutes
   const expiresAt = credential.amazonTokenExpiresAt
     ? new Date(credential.amazonTokenExpiresAt)
@@ -320,16 +324,18 @@ export async function getValidToken(
   const fiveMinFromNow = new Date(Date.now() + 5 * 60 * 1000);
 
   if (expiresAt > fiveMinFromNow) {
-    return credential.amazonAccessToken;
+    return plainAccess;
   }
 
   // Refresh the token
   logger.info('Amazon token expired or expiring soon, refreshing');
-  const newTokens = await refreshAccessToken(credential.amazonRefreshToken);
+  const newTokens = await refreshAccessToken(plainRefresh);
   const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
 
   if (onTokenRefreshed) {
-    await onTokenRefreshed(newTokens.access_token, newExpiresAt);
+    // Callers persist via Prisma — pass the already-encrypted shape so the row
+    // lands as `enc:v1:` regardless of the calling code's awareness.
+    await onTokenRefreshed(encryptIfNeeded(newTokens.access_token) as string, newExpiresAt);
   }
 
   return newTokens.access_token;

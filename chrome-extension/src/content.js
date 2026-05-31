@@ -213,7 +213,7 @@ const pushBatch = async batch => {
       safeSendMessage({
         action: 'syncComplete',
         count: batch.length,
-        totalSynced: newSynced.length
+        totalSynced: Object.keys(pruned).length
       });
       
     } else {
@@ -285,6 +285,26 @@ function extractOrderRowsFromLinks(orderLinks) {
     }
   });
   return [...containers];
+}
+
+function extractOrderIdFromHref(href) {
+  if (!href) return null;
+  return href.match(/order_id=([^&]+)/)?.[1] ||
+         href.match(/receipt_id=([^&]+)/)?.[1] ||
+         href.match(/\/shop-manager\/[^/]+\/orders\/(\d+)/)?.[1] ||
+         href.match(/\/orders\/sold\/(\d+)/)?.[1] ||
+         href.match(/\/orders\/(\d+)/)?.[1] ||
+         null;
+}
+
+function getOrderLinkSelector() {
+  return 'a[href*="order_id="], a[href*="receipt_id="], a[href*="/orders/"], a[href*="/shop-manager/"][href*="/orders"]';
+}
+
+function rowLooksLikeOrderContainer(node) {
+  if (!node || node.nodeType !== 1) return false;
+  const rowSelector = '.panel-body-row, [data-order-id], [data-receipt-id], tr[data-order-id], .order-card, [class*="order-row"], [class*="OrderRow"], [data-test-id="order-row"], [data-test-id*="order"]';
+  return node.matches?.(rowSelector) || !!node.querySelector?.(rowSelector + ', ' + getOrderLinkSelector());
 }
 
 // Helper function to expand address sections if collapsed
@@ -370,7 +390,7 @@ async function extract() {
     const topClasses = [...classNames].slice(0, 30).join(', ');
 
     // Check if page has order-related links (proves we're on orders page)
-    const orderLinks = document.querySelectorAll('a[href*="order_id="], a[href*="receipt_id="], a[href*="/orders/"]');
+    const orderLinks = document.querySelectorAll(getOrderLinkSelector());
 
     log.error('No order rows found with any selector', {
       url: window.location.href,
@@ -406,18 +426,7 @@ async function extract() {
       const checkbox = row.querySelector('input[type="checkbox"][name]');
       orderId = checkbox?.getAttribute('name');
       if (!orderId) orderId = row.getAttribute('data-order-id') || row.getAttribute('data-receipt-id');
-      if (!orderId) {
-        const oLink = row.querySelector('a[href*="order_id="]');
-        orderId = oLink?.href?.match(/order_id=([^&]+)/)?.[1];
-      }
-      if (!orderId) {
-        const rLink = row.querySelector('a[href*="receipt_id="]');
-        orderId = rLink?.href?.match(/receipt_id=([^&]+)/)?.[1];
-      }
-      if (!orderId) {
-        const anyOrderLink = row.querySelector('a[href*="/orders/"]');
-        orderId = anyOrderLink?.href?.match(/\/orders\/(\d+)/)?.[1];
-      }
+      if (!orderId) orderId = extractOrderIdFromHref(row.querySelector(getOrderLinkSelector())?.href);
 
       if (!orderId) {
         log.warn(`Row ${index}: No order ID found via any method`);
@@ -451,18 +460,7 @@ async function extract() {
       log.info(`Order ${orderId}: Found buyer name: "${buyerName}"`);
       
       // Extract order number from link with fallbacks
-      let orderNumber = orderId;
-      const oNumLink = row.querySelector('a[href*="order_id="]');
-      if (oNumLink) {
-        orderNumber = oNumLink.href.match(/order_id=([^&]+)/)?.[1] || orderId;
-      } else {
-        const rNumLink = row.querySelector('a[href*="receipt_id="]');
-        if (rNumLink) orderNumber = rNumLink.href.match(/receipt_id=([^&]+)/)?.[1] || orderId;
-        else {
-          const anyLink = row.querySelector('a[href*="/orders/"]');
-          if (anyLink) orderNumber = anyLink.href.match(/\/orders\/(\d+)/)?.[1] || orderId;
-        }
-      }
+      let orderNumber = extractOrderIdFromHref(row.querySelector(getOrderLinkSelector())?.href) || orderId;
       log.info(`Order ${orderId}: Found order number: ${orderNumber}`);
       
       // Extract order total
@@ -523,6 +521,7 @@ async function extract() {
 
       // Strategy 1: Structured address with class-based selectors
       const addressContainerSelectors = [
+        'address',
         '.address.break-word',
         '.address',
         '[class*="address"]',
@@ -697,7 +696,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       chrome.storage.local.get([STORAGE_KEY, 'kx_logs']).then(result => {
         const syncedData = result[STORAGE_KEY] || {};
         const syncedCount = typeof syncedData === 'object' && !Array.isArray(syncedData) ? Object.keys(syncedData).length : (Array.isArray(syncedData) ? syncedData.length : 0);
-        const totalOrdersOnPage = document.querySelectorAll('.panel-body-row').length;
+        const totalOrdersOnPage = document.querySelectorAll('.panel-body-row, [data-order-id], [data-receipt-id], [data-test-id="order-row"], [data-test-id*="order"]').length || document.querySelectorAll(getOrderLinkSelector()).length;
         const pendingCount = Math.max(0, totalOrdersOnPage - syncedCount);
 
         const status = {
@@ -799,11 +798,7 @@ const observer = new MutationObserver((mutations) => {
   const hasRelevantChanges = mutations.some(mutation => {
     // Only care about added nodes that might be order rows
     if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-      return Array.from(mutation.addedNodes).some(node => {
-        return node.nodeType === 1 && // Element node
-               (node.classList?.contains('panel-body-row') || 
-                node.querySelector?.('.panel-body-row'));
-      });
+      return Array.from(mutation.addedNodes).some(rowLooksLikeOrderContainer);
     }
     return false;
   });

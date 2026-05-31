@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { exchangeAuthCode } from '@/lib/integrations/amazonClient';
 import { logger } from '@/lib/logger';
+import { encryptIfNeeded } from '@/lib/crypto/credentials';
 
 export const config = { runtime: 'nodejs' };
 
@@ -83,12 +84,14 @@ export default async function handler(
     const region = 'eu'; // Default for Turkish sellers
     const marketplaceId = 'A33AVAJ2PDY3EV'; // Turkey default
 
-    // Store tokens in Credential table
+    // Store tokens in Credential table, encrypted at rest via `enc:v1:` envelope.
+    const encAccess = encryptIfNeeded(tokens.access_token);
+    const encRefresh = tokens.refresh_token ? encryptIfNeeded(tokens.refresh_token) : undefined;
     await prisma.credential.upsert({
       where: { userId },
       update: {
-        amazonAccessToken: tokens.access_token,
-        amazonRefreshToken: tokens.refresh_token || undefined,
+        amazonAccessToken: encAccess,
+        amazonRefreshToken: encRefresh,
         amazonTokenExpiresAt: tokenExpiresAt,
         amazonSellerId: (selling_partner_id as string) || undefined,
         amazonMarketplaceId: marketplaceId,
@@ -97,8 +100,8 @@ export default async function handler(
       },
       create: {
         userId,
-        amazonAccessToken: tokens.access_token,
-        amazonRefreshToken: tokens.refresh_token || undefined,
+        amazonAccessToken: encAccess,
+        amazonRefreshToken: encRefresh,
         amazonTokenExpiresAt: tokenExpiresAt,
         amazonSellerId: (selling_partner_id as string) || undefined,
         amazonMarketplaceId: marketplaceId,

@@ -1,18 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
+import { runCronGuard } from '@/lib/cron/idempotency';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const authHeader = req.headers.authorization;
   const methodAllowed = req.method === 'GET' || req.method === 'POST';
   if (!methodAllowed) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // Constant-time CRON_SECRET check + daily idempotency bucket.
+  const guard = await runCronGuard(req, res, { jobName: 'reset-usage', intervalMinutes: 1440 });
+  if (!guard.ok) return;
 
   try {
     const now = new Date();

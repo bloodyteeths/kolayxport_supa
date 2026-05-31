@@ -1,6 +1,50 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { logIntegrationEvent, logSecurityEvent } from '@/lib/admin/events';
+import { verifyWixJwt } from '@/lib/integrations/wix/verifyWebhook';
+import { encryptIfNeeded } from '@/lib/crypto/credentials';
+
+/**
+ * WebhookEvent rows have an `id @id` PK. Wix does not give us a stable event id we can
+ * dedupe on, so we synthesise one from the JWT body hash. Identical events therefore
+ * collapse on retry, while different events get their own row.
+ */
+function wixEventIdFor(jwt: string): string {
+  return 'wix_' + crypto.createHash('sha256').update(jwt).digest('hex').slice(0, 24);
+}
+
+async function recordWixWebhook(args: {
+  id: string;
+  status: 'received' | 'processed' | 'failed' | 'ignored';
+  eventType?: string;
+  errorMessage?: string;
+  userId?: string | null;
+}) {
+  try {
+    await (prisma as any).webhookEvent.upsert({
+      where: { id: args.id },
+      update: {
+        provider: 'wix',
+        eventType: args.eventType ?? null,
+        status: args.status,
+        errorMessage: args.errorMessage?.slice(0, 200) ?? null,
+        userId: args.userId ?? null,
+      },
+      create: {
+        id: args.id,
+        provider: 'wix',
+        eventType: args.eventType ?? null,
+        status: args.status,
+        errorMessage: args.errorMessage?.slice(0, 200) ?? null,
+        userId: args.userId ?? null,
+      },
+    });
+  } catch {
+    // Trace-only failure; do not propagate.
+  }
+}
 
 /**
  * Receives Wix webhook events (App Instance Installed).
@@ -34,33 +78,68 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         const parts = jwtToken.split('.');
         if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-          logger.info('Wix webhook JWT decoded', { payload });
+          // --- Full RS256 signature verification ---
+          // Requires WIX_WEBHOOK_PUBLIC_KEY env var (PEM public key from Wix Dev Center
+          // Webhooks tab). If unset, we degrade to claim-only validation and log a
+          // warning — this preserves the existing behaviour where Wix install must not
+          // hang on a 4xx response. Always return 200 from this route.
+          const verifyResult = verifyWixJwt(jwtToken);
 
-          // --- JWT claim validation ---
-          // NOTE: Full cryptographic signature verification requires Wix's public key,
-          // which is not currently available via their developer docs. For now, we
-          // validate the issuer and expiration claims as a defense-in-depth measure.
-          // TODO: Implement full signature verification when Wix exposes a JWKS endpoint.
-          const expectedIssuers = ['wix.com', 'www.wix.com', 'dev.wix.com'];
-          if (payload.iss && !expectedIssuers.includes(payload.iss)) {
-            logger.warn('Wix webhook JWT issuer mismatch', {
+          let payload: any;
+          if (verifyResult.ok) {
+            payload = verifyResult.payload;
+            logger.info('Wix webhook JWT verified', {
               iss: payload.iss,
-              expected: expectedIssuers,
+              exp: payload.exp,
             });
-            return res.status(200).json({ success: false, reason: 'invalid_jwt_issuer' });
-          }
-          if (payload.exp && typeof payload.exp === 'number') {
-            const now = Math.floor(Date.now() / 1000);
-            if (payload.exp < now) {
-              logger.warn('Wix webhook JWT expired', {
-                exp: payload.exp,
-                now,
-                expiredAgo: now - payload.exp,
+          } else if (verifyResult.reason === 'no_public_key') {
+            // Soft-fail: fall back to legacy claim-only validation so existing installs
+            // are not broken before WIX_WEBHOOK_PUBLIC_KEY is configured.
+            logger.warn('Wix webhook: signature verification unavailable, claim-only fallback', {
+              reason: verifyResult.reason,
+            });
+            payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+            const expectedIssuers = ['wix.com', 'www.wix.com', 'dev.wix.com'];
+            if (payload.iss && !expectedIssuers.includes(payload.iss)) {
+              logger.warn('Wix webhook JWT issuer mismatch', {
+                iss: payload.iss,
+                expected: expectedIssuers,
               });
-              return res.status(200).json({ success: false, reason: 'jwt_expired' });
+              return res.status(200).json({ success: false, reason: 'invalid_jwt_issuer' });
             }
+            if (payload.exp && typeof payload.exp === 'number') {
+              const now = Math.floor(Date.now() / 1000);
+              if (payload.exp < now) {
+                logger.warn('Wix webhook JWT expired', {
+                  exp: payload.exp,
+                  now,
+                  expiredAgo: now - payload.exp,
+                });
+                return res.status(200).json({ success: false, reason: 'jwt_expired' });
+              }
+            }
+          } else {
+            // Hard-fail: signature verification ran but rejected the token.
+            logSecurityEvent('warn', {
+              message: 'Wix webhook JWT rejected',
+              operation: 'wix.signature_failed',
+              details: { reason: verifyResult.reason },
+            });
+            await recordWixWebhook({
+              id: wixEventIdFor(jwtToken),
+              status: 'failed',
+              errorMessage: `jwt_${verifyResult.reason}`,
+            });
+            return res
+              .status(200)
+              .json({ success: false, reason: `jwt_${verifyResult.reason}` });
           }
+
+          logger.info('Wix webhook JWT decoded', {
+            iss: payload?.iss,
+            exp: payload?.exp,
+            hasData: !!payload?.data,
+          });
 
           if (payload.data && typeof payload.data === 'string') {
             try {
@@ -156,13 +235,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ success: true, siteId: resolvedSiteId, siteName });
     }
 
-    // Store pending connection keyed by siteId
+    // Store pending connection keyed by siteId. Tokens encrypted at rest.
+    const encAccess = encryptIfNeeded(tokenData.access_token);
     await prisma.wixSite.upsert({
       where: { siteId: resolvedSiteId },
       update: {
         instanceId,
         siteName,
-        accessToken: tokenData.access_token,
+        accessToken: encAccess,
         tokenExpiresAt,
         isActive: true,
         updatedAt: new Date(),
@@ -172,16 +252,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         siteId: resolvedSiteId,
         instanceId,
         siteName,
-        accessToken: tokenData.access_token,
+        accessToken: encAccess,
         tokenExpiresAt,
         isActive: true,
       },
     });
 
-    logger.info('Wix webhook: stored pending connection', { instanceId, siteId: resolvedSiteId, siteName });
+    logIntegrationEvent('info', {
+      message: 'Wix webhook: stored pending connection',
+      operation: 'wix.pending_connection',
+      details: { instanceId, siteId: resolvedSiteId, siteName },
+    });
+    if (typeof jwtToken === 'string' && jwtToken.includes('.')) {
+      await recordWixWebhook({
+        id: wixEventIdFor(jwtToken),
+        status: 'processed',
+        eventType: 'app.installed',
+      });
+    }
     return res.status(200).json({ success: true, siteId: resolvedSiteId, siteName });
   } catch (err) {
-    logger.error('Wix webhook failed', err instanceof Error ? err : new Error(String(err)));
+    logIntegrationEvent('error', {
+      message: 'Wix webhook failed',
+      operation: 'wix.internal_error',
+      error: err instanceof Error ? err : new Error(String(err)),
+    });
     // Always return 200 to prevent install from hanging
     return res.status(200).json({ success: false, reason: 'internal_error' });
   }
@@ -191,16 +286,17 @@ async function saveWixConnection(
   userId: string, instanceId: string, siteId: string,
   siteName: string, accessToken: string, tokenExpiresAt: Date
 ) {
+  const encAccess = encryptIfNeeded(accessToken);
   await prisma.wixSite.upsert({
     where: { userId_siteId: { userId, siteId } },
-    update: { instanceId, siteName, accessToken, tokenExpiresAt, isActive: true, updatedAt: new Date() },
-    create: { userId, siteId, instanceId, siteName, accessToken, tokenExpiresAt, isActive: true },
+    update: { instanceId, siteName, accessToken: encAccess, tokenExpiresAt, isActive: true, updatedAt: new Date() },
+    create: { userId, siteId, instanceId, siteName, accessToken: encAccess, tokenExpiresAt, isActive: true },
   });
 
   await prisma.credential.upsert({
     where: { userId },
     update: {
-      wixAccessToken: accessToken,
+      wixAccessToken: encAccess,
       wixSiteId: siteId,
       wixInstanceId: instanceId,
       wixTokenExpiresAt: tokenExpiresAt,
@@ -208,7 +304,7 @@ async function saveWixConnection(
     },
     create: {
       userId,
-      wixAccessToken: accessToken,
+      wixAccessToken: encAccess,
       wixSiteId: siteId,
       wixInstanceId: instanceId,
       wixTokenExpiresAt: tokenExpiresAt,

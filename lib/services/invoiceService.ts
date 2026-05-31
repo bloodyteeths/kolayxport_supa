@@ -2,6 +2,7 @@ import { ParasutClient, ParasutInvoiceData, ParasutCredentials } from '../integr
 import { Order, OrderItem } from '@prisma/client';
 import { logger } from '../logger';
 import prisma from '../prisma';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
 import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
@@ -329,16 +330,18 @@ export class InvoiceService {
       });
 
       const c: any = credential as any;
-      if (!c || !c.parasutClientId || !c.parasutClientSecret || 
-          !c.parasutUsername || !c.parasutPassword || !c.parasutCompanyId) {
+      const clientSecret = decryptIfNeeded(c?.parasutClientSecret) as string | null;
+      const password = decryptIfNeeded(c?.parasutPassword) as string | null;
+      if (!c || !c.parasutClientId || !clientSecret ||
+          !c.parasutUsername || !password || !c.parasutCompanyId) {
         return null;
       }
 
       return {
         clientId: c.parasutClientId,
-        clientSecret: c.parasutClientSecret,
+        clientSecret,
         username: c.parasutUsername,
-        password: c.parasutPassword,
+        password,
         companyId: c.parasutCompanyId
       };
 

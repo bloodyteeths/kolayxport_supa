@@ -1,8 +1,23 @@
-name: Auto Sync Orders
+name: Auto Sync Orders (DISABLED)
+
+# DISABLED from schedule because scripts/archive/auto-sync-all-users.js.disabled references
+# the removed prisma.userIntegrationSettings model (current model is Credential)
+# and the legacy Veeqo / Shippo integration clients (lib/integrations/veeqo.ts,
+# lib/integrations/shippo.ts). Running this every 15 minutes was failing silently
+# in production until 2026-05-31.
+#
+# To re-enable:
+#   1. Update scripts/archive/auto-sync-all-users.js.disabled to use the current Credential model
+#      and the current per-marketplace sync helpers (see lib/sync/*).
+#   2. Add idempotency through lib/cron/idempotency.ts so it cannot double-fire
+#      against /api/cron/sync-orders (which is already scheduled by cron-jobs.yml).
+#   3. Restore the schedule: trigger.
+#
+# Until then this workflow can only be invoked manually for debugging via
+# workflow_dispatch and must not run on schedule.
 
 on:
-  schedule:
-    - cron: '*/15 * * * *' # Every 15 minutes
+  workflow_dispatch:
 
 jobs:
   auto-sync-orders:
@@ -18,11 +33,9 @@ jobs:
         run: npm ci
       - name: Run auto-sync script
         env:
-          # These secrets must be configured in the repository settings
-          # Settings > Secrets and variables > Actions > Repository secrets
           KOLAYXPORT_BASE_URL: ${{ secrets.KOLAYXPORT_BASE_URL }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: npx tsx scripts/auto-sync-all-users.js
+        run: npx tsx scripts/archive/auto-sync-all-users.js.disabled

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../lib/auth';
 import prisma from '../../../lib/prisma';
 import { createTrendyolClient } from '../../../lib/integrations/trendyolApiClient';
+import { decryptIfNeeded } from '@/lib/crypto/credentials';
 import { logger } from '../../../lib/logger';
 
 export const config = {
@@ -28,7 +29,11 @@ async function getAuthAndClient(req: NextApiRequest, res: NextApiResponse) {
     return { error: 'Trendyol credentials not configured', status: 400 };
   }
 
-  const client = createTrendyolClient(credential);
+  const client = createTrendyolClient({
+    trendyolSupplierId: credential.trendyolSupplierId,
+    trendyolApiKey: decryptIfNeeded(credential.trendyolApiKey),
+    trendyolApiSecret: decryptIfNeeded(credential.trendyolApiSecret),
+  });
   return { userId: user.id, supplierId: credential.trendyolSupplierId, client };
 }
 

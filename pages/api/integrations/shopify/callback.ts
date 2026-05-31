@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../../lib/prisma';
 import { logger } from '../../../../lib/logger';
+import { encryptIfNeeded } from '@/lib/crypto/credentials';
 import crypto from 'crypto';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -104,6 +105,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     const shopInfo = shopInfoResponse.ok ? (await shopInfoResponse.json()).shop : null;
 
+    // Encrypt before persisting. Both ShopifyShop and Credential live behind
+    // the same encryption envelope, so reads through `decryptIfNeeded` work uniformly.
+    const encAccess = encryptIfNeeded(access_token);
+    const encRefresh = refresh_token ? encryptIfNeeded(refresh_token) : null;
+
     // Upsert ShopifyShop record
     await prisma.shopifyShop.upsert({
       where: { shopDomain: shop },
@@ -111,16 +117,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         userId,
         shopDomain: shop,
         shopName: shopInfo?.name || shop.split('.')[0],
-        accessToken: access_token,
-        refreshToken: refresh_token || null,
+        accessToken: encAccess,
+        refreshToken: encRefresh,
         tokenExpiresAt,
         scopes: scope,
         isActive: true,
       },
       update: {
         userId,
-        accessToken: access_token,
-        refreshToken: refresh_token || null,
+        accessToken: encAccess,
+        refreshToken: encRefresh,
         tokenExpiresAt,
         scopes: scope,
         shopName: shopInfo?.name || undefined,
@@ -133,11 +139,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { userId },
       create: {
         userId,
-        shopifyAccessToken: access_token,
+        shopifyAccessToken: encAccess,
         shopifyShopDomain: shop,
       },
       update: {
-        shopifyAccessToken: access_token,
+        shopifyAccessToken: encAccess,
         shopifyShopDomain: shop,
       },
     });
@@ -148,6 +154,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await fetch(`https://${shop}/admin/api/2024-10/webhooks.json`, {
         method: 'POST',
         headers: {
+          // raw token — webhook registration happens before we read the encrypted row back
           'X-Shopify-Access-Token': access_token,
           'Content-Type': 'application/json',
         },

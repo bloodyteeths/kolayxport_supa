@@ -1,5 +1,6 @@
 import { logger } from '../logger';
 import prisma from '@/lib/prisma';
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 /**
  * Thrown when the user has not connected their eBay account (no OAuth credential on file).
@@ -234,25 +235,29 @@ export async function getUserAccessToken(userId: string): Promise<string> {
   const now = new Date();
   const expiresAt = credential.ebayTokenExpiresAt;
 
+  // Decrypt the stored refresh token before sending it to eBay's OAuth endpoint.
+  const plainRefresh = decryptIfNeeded(credential.ebayRefreshToken);
+
   if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-    if (!credential.ebayRefreshToken) {
+    if (!plainRefresh) {
       throw new EbayNotConnectedError(
         'eBay refresh token not available. Please reconnect your eBay account.'
       );
     }
-    const data = await refreshUserToken(credential.ebayRefreshToken);
+    const data = await refreshUserToken(plainRefresh);
     await prisma.credential.update({
       where: { userId },
       data: {
-        ebayAccessToken: data.access_token,
-        ebayRefreshToken: data.refresh_token || credential.ebayRefreshToken,
+        ebayAccessToken: encryptIfNeeded(data.access_token),
+        ebayRefreshToken: encryptIfNeeded(data.refresh_token || plainRefresh),
         ebayTokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
       },
     });
     return data.access_token;
   }
 
-  return credential.ebayAccessToken;
+  // Stored token may be either format — decrypt before returning a usable string.
+  return decryptIfNeeded(credential.ebayAccessToken) as string;
 }
 
 /**

@@ -7,6 +7,7 @@
 // Configuration
 const KOLAYXPORT_DOMAIN = 'kolayxport.com';
 const API_BASE = 'https://kolayxport.com';
+const AUTH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const BADGE_COLORS = {
   success: '#4CAF50',
   error: '#F44336',
@@ -26,7 +27,7 @@ let syncStats = {
 chrome.storage.local.get(['kx_auth_token', 'kx_auth_token_time'], (result) => {
   if (result.kx_auth_token && result.kx_auth_token_time) {
     const age = Date.now() - result.kx_auth_token_time;
-    if (age < 30 * 60 * 1000) { // 30 min TTL
+    if (age < AUTH_TOKEN_MAX_AGE_MS) {
       authToken = result.kx_auth_token;
       console.log('Restored auth token from storage (age: ' + Math.round(age / 1000) + 's)');
       updateBadge('authenticated');
@@ -286,6 +287,10 @@ async function handleMessage(request, sender, sendResponse) {
         const { orders, source, timestamp } = request;
 
         if (!authToken) {
+          await checkAuthentication();
+        }
+
+        if (!authToken) {
           sendResponse({ success: false, error: 'Not authenticated' });
           return;
         }
@@ -307,6 +312,11 @@ async function handleMessage(request, sender, sendResponse) {
           sendResponse({ success: true, result });
         } else {
           const errorText = await response.text();
+          if (response.status === 401) {
+            authToken = null;
+            chrome.storage.local.remove(['kx_auth_token', 'kx_auth_token_time', 'kx_last_auth_check']);
+            updateBadge('unauthenticated');
+          }
           console.error('Background: Sync failed', response.status, errorText);
           sendResponse({ success: false, error: `Server error ${response.status}: ${errorText}` });
         }
@@ -330,13 +340,13 @@ async function checkAuthentication() {
     const stored = await chrome.storage.local.get(['kx_last_auth_check', 'kx_auth_token', 'kx_auth_token_time']);
     if (!authToken && stored.kx_auth_token && stored.kx_auth_token_time) {
       const age = Date.now() - stored.kx_auth_token_time;
-      if (age < 30 * 60 * 1000) {
+      if (age < AUTH_TOKEN_MAX_AGE_MS) {
         authToken = stored.kx_auth_token;
         console.log('Restored token from storage during auth check');
       }
     }
-    if (authToken && stored.kx_last_auth_check && (Date.now() - stored.kx_last_auth_check < 5 * 60 * 1000)) {
-      console.log('Using cached auth token (less than 5 min old)');
+    if (authToken) {
+      console.log('Using cached auth token');
       updateBadge('authenticated');
       return;
     }
@@ -366,7 +376,11 @@ async function checkAuthentication() {
           console.log('Got auth token from content script');
           authToken = response.token;
           updateBadge('authenticated');
-          chrome.storage.local.set({ 'kx_last_auth_check': Date.now() });
+          chrome.storage.local.set({
+            'kx_auth_token': response.token,
+            'kx_auth_token_time': Date.now(),
+            'kx_last_auth_check': Date.now()
+          });
           return;
         }
       } catch (e) {

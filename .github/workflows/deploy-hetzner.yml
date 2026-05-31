@@ -1,14 +1,24 @@
 name: Deploy to Hetzner
 
+# Source of truth for the deploy steps: scripts/deploy/hetzner-deploy.sh.
+# This workflow just SSHes in and invokes that script. Multi-line YAML in
+# appleboy/ssh-action's `script:` field gets collapsed into a single line on
+# the remote side, which broke earlier inline if/then/else logic; keeping
+# the logic in a real shell script avoids that pitfall entirely.
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
     inputs:
-      skip_build:
-        description: 'Skip next build (use existing .next on the server)'
+      mode:
+        description: 'Deploy mode: full (build + restart) or restart (no build)'
         required: false
-        default: 'false'
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - restart
 
 jobs:
   deploy:
@@ -20,30 +30,17 @@ jobs:
           host: ${{ secrets.KOLAYXPORT_VPS_IP }}
           username: deploy
           key: ${{ secrets.KOLAYXPORT_SSH_KEY }}
-          # Next.js build runs ~7–10 minutes on this VPS; the default 10m timeout has killed
-          # past deploys mid-build (verified Sprint 5 close). 30m gives us headroom for the
-          # build itself plus post-build sitemap generation.
+          # Next.js build runs ~7–10 minutes on this VPS; postbuild + restart adds
+          # ~2 minutes. 30m gives headroom for an unusually slow run without hiding
+          # legitimate hangs.
           command_timeout: 30m
-          envs: SKIP_BUILD
+          # Push events default to full deploy; workflow_dispatch can pick `restart`.
           script: |
+            set -euo pipefail
+            MODE="${{ github.event.inputs.mode || 'full' }}"
             cd /home/deploy/kolayxport
-            SKIP_BUILD="${{ github.event.inputs.skip_build }}"
-            git pull origin main
-            npm install --legacy-peer-deps
-            # Apply any pending Prisma migrations BEFORE generating the client. `migrate deploy`
-            # is the only Prisma command allowed in production — it applies migrations from
-            # prisma/migrations/* and exits non-zero on failure. NEVER run `prisma db push`
-            # or `prisma db push --accept-data-loss` here.
-            npx prisma migrate deploy
-            npx prisma generate
-            if [ "$SKIP_BUILD" = "true" ] && [ -f .next/BUILD_ID ]; then
-              echo "Skipping build (skip_build=true). Existing .next has BUILD_ID $(cat .next/BUILD_ID)"
-            else
-              cp -r .next .next-backup 2>/dev/null || true
-              rm -rf .next
-              npx next build --webpack || { echo "Build failed, restoring backup"; cp -r .next-backup .next; exit 1; }
-            fi
-            sudo systemctl restart kolayxport
-            sleep 5
-            curl -fsS https://kolayxport.com/api/health || { echo "Health check failed, restoring backup"; rm -rf .next; cp -r .next-backup .next; sudo systemctl restart kolayxport; exit 1; }
-            rm -rf .next-backup
+            # `git pull` lives in the workflow itself (not the script) so the latest version
+            # of scripts/deploy/hetzner-deploy.sh is present on disk before we invoke it.
+            # The script will perform any further pulls it considers necessary; idempotent.
+            git pull --ff-only origin main
+            bash scripts/deploy/hetzner-deploy.sh "$MODE"

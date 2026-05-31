@@ -66,12 +66,30 @@ fi
 
 # --- 5. Build only in full mode ---
 if [ "$MODE" = "full" ]; then
-  echo "==> backing up .next to .next-backup"
+  echo "==> backing up .next to .next-backup (full mode)"
   rm -rf .next-backup
   cp -r .next .next-backup 2>/dev/null || true
 
-  echo "==> removing old .next"
+  # Preserve Next.js incremental build cache between deploys.
+  # Without this, every deploy is a cold webpack build (~10 minutes on this VPS).
+  # With it, an incremental rebuild after a small code change drops to ~1–2 minutes.
+  if [ -d .next/cache ]; then
+    echo "==> preserving .next/cache between builds (size: $(du -sh .next/cache 2>/dev/null | cut -f1))"
+    rm -rf /tmp/kx-next-cache
+    mv .next/cache /tmp/kx-next-cache
+  else
+    rm -rf /tmp/kx-next-cache
+  fi
+
+  echo "==> removing old .next (cache preserved at /tmp/kx-next-cache)"
   rm -rf .next
+
+  # Re-seed the cache before the build so webpack picks it up.
+  if [ -d /tmp/kx-next-cache ]; then
+    mkdir -p .next
+    mv /tmp/kx-next-cache .next/cache
+    echo "==> .next/cache re-seeded for incremental build"
+  fi
 
   echo "==> next build --webpack"
   if ! npx next build --webpack; then
@@ -88,7 +106,7 @@ if [ "$MODE" = "full" ]; then
     exit 4
   fi
 
-  echo "==> new BUILD_ID=$(cat .next/BUILD_ID)"
+  echo "==> new BUILD_ID=$(cat .next/BUILD_ID), cache size=$(du -sh .next/cache 2>/dev/null | cut -f1 || echo none)"
 else
   # restart mode — ensure we have something to restart against
   if [ ! -f .next/BUILD_ID ]; then

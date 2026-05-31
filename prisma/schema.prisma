@@ -1511,6 +1511,26 @@ model AmazonNicheResearch {
   @@index([userId])
 }
 
+/// Single-use auth tokens for email verification and password reset.
+/// Distinct from NextAuth's VerificationToken (which is for the Email provider —
+/// not wired in this project). Tokens here are stored as SHA-256 hashes; the
+/// plaintext lives only in the URL we email to the user. Once `consumedAt` is
+/// set or `expires` passes, the row is dead.
+model AuthToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  /// Lowercased email of the account this token concerns.
+  identifier String
+  /// 'email_verify' | 'password_reset'.
+  purpose    String
+  expires    DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([identifier, purpose])
+  @@index([purpose, expires])
+}
+
 /// Single-row-per-(jobName, bucket) lock to deduplicate cron triggers.
 /// Used by lib/cron/idempotency.ts. Inserted on entry, never updated.
 /// Old rows can be pruned with a simple createdAt cutoff; not done automatically.

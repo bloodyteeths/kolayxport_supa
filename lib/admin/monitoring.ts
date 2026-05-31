@@ -387,6 +387,87 @@ export async function getSecurityEvents(opts: { limit?: number; offset?: number 
 }
 
 // --------------------------------------------------------------------------
+// I.5 Auth health (verification + password reset)
+// --------------------------------------------------------------------------
+export async function getAuthHealth() {
+  const last24h = new Date(Date.now() - DAY);
+
+  const [
+    unverifiedCredentials,
+    activeTokensVerify,
+    activeTokensReset,
+    resetRequests24h,
+    failedResetTokens24h,
+    emailFailures24h,
+    smtpMisconfigured24h,
+    recent,
+  ] = await Promise.all([
+    prisma.user.count({
+      where: { emailVerified: null, password: { not: null } },
+    }),
+    (prisma as any).authToken.count({
+      where: { purpose: 'email_verify', consumedAt: null, expires: { gt: new Date() } },
+    }),
+    (prisma as any).authToken.count({
+      where: { purpose: 'password_reset', consumedAt: null, expires: { gt: new Date() } },
+    }),
+    prisma.syncLog.count({
+      where: {
+        category: 'auth' as any,
+        operation: 'password.reset_requested',
+        timestamp: { gte: last24h },
+      } as any,
+    }),
+    prisma.syncLog.count({
+      where: {
+        category: 'auth' as any,
+        operation: 'password.reset_token_rejected',
+        timestamp: { gte: last24h },
+      } as any,
+    }),
+    prisma.syncLog.count({
+      where: {
+        category: 'auth' as any,
+        operation: { in: ['email.postmark_failed', 'email.postmark_threw'] },
+        timestamp: { gte: last24h },
+      } as any,
+    }),
+    prisma.syncLog.count({
+      where: {
+        category: 'auth' as any,
+        operation: 'email.config_missing',
+        timestamp: { gte: last24h },
+      } as any,
+    }),
+    prisma.syncLog.findMany({
+      take: 25,
+      orderBy: { timestamp: 'desc' },
+      where: { category: 'auth' as any } as any,
+      select: {
+        id: true,
+        level: true,
+        message: true,
+        operation: true,
+        userId: true,
+        timestamp: true,
+      },
+    }),
+  ]);
+
+  return {
+    unverifiedCredentialsUsers: unverifiedCredentials,
+    activeTokens: { emailVerify: activeTokensVerify, passwordReset: activeTokensReset },
+    last24h: {
+      passwordResetRequests: resetRequests24h,
+      failedResetTokens: failedResetTokens24h,
+      emailDeliveryFailures: emailFailures24h,
+      smtpNeedsConfig: smtpMisconfigured24h,
+    },
+    recent,
+  };
+}
+
+// --------------------------------------------------------------------------
 // I. Chrome extension events
 // --------------------------------------------------------------------------
 export async function getExtensionHealth() {

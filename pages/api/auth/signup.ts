@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '@/lib/prisma';
 import { rateLimit } from '@/lib/middleware/rateLimit';
+import { issueToken } from '@/lib/auth/tokens';
+import { sendEmail, verificationEmailBody, maskEmail } from '@/lib/auth/email';
+import { logAuthEvent } from '@/lib/admin/events';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -30,12 +33,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const hashedPassword = await bcrypt.hash(password, 12);
 
-  await prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       id: uuidv4(),
       email,
       name: name || email.split('@')[0],
       password: hashedPassword,
+      // emailVerified stays null until the user clicks the verification link.
       subscriptionPlan: 'trial',
       subscriptionStatus: 'trialing',
       trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
@@ -44,6 +48,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       labelCount: 0,
     },
   });
+
+  // Fire-and-forget the verification email. Don't block signup on Postmark.
+  try {
+    const plainToken = await issueToken({ identifier: email, purpose: 'email_verify' });
+    const base = process.env.NEXTAUTH_URL || 'https://kolayxport.com';
+    const url = `${base.replace(/\/$/, '')}/api/auth/verify-email?token=${encodeURIComponent(plainToken)}`;
+    const { subject, textBody } = verificationEmailBody(url);
+    const sendResult = await sendEmail({ to: email, subject, textBody });
+    logAuthEvent('info', {
+      message: 'Signup verification email queued',
+      operation: 'email.verify_signup',
+      details: { userId: user.id, to: maskEmail(email), sent: sendResult.sent, reason: sendResult.reason },
+    });
+  } catch (err) {
+    logAuthEvent('error', {
+      message: 'Signup verification email failed (signup itself succeeded)',
+      operation: 'email.verify_signup_error',
+      details: { userId: user.id, to: maskEmail(email) },
+      error: err instanceof Error ? err : new Error(String(err)),
+    });
+  }
 
   return res.status(201).json({ success: true });
 }

@@ -19,6 +19,7 @@ import {
   Lock,
   Chrome,
   Users,
+  Mail,
 } from 'lucide-react';
 
 const fetcher = (url: string) =>
@@ -461,6 +462,38 @@ function AuditFeed() {
   );
 }
 
+function AuthSection() {
+  const { data, error, isLoading } = useSWR('/api/admin/monitoring/auth', fetcher, {
+    refreshInterval: 60000,
+  });
+  const tone = !data
+    ? 'gray'
+    : (data.last24h?.emailDeliveryFailures ?? 0) > 0 || (data.last24h?.smtpNeedsConfig ?? 0) > 0
+      ? 'red'
+      : (data.last24h?.failedResetTokens ?? 0) > 0
+        ? 'yellow'
+        : 'green';
+  return (
+    <Card icon={Mail} title="Auth + email" tone={tone} loading={isLoading} error={error}>
+      {data && (
+        <div className="text-xs space-y-1 text-gray-700">
+          <div className="flex justify-between"><span>unverified credentials users</span><span>{data.unverifiedCredentialsUsers}</span></div>
+          <div className="flex justify-between"><span>active verify tokens</span><span>{data.activeTokens?.emailVerify ?? 0}</span></div>
+          <div className="flex justify-between"><span>active reset tokens</span><span>{data.activeTokens?.passwordReset ?? 0}</span></div>
+          <div className="flex justify-between"><span>reset requests 24h</span><span>{data.last24h?.passwordResetRequests ?? 0}</span></div>
+          <div className="flex justify-between"><span>failed reset tokens 24h</span><span className="text-red-600">{data.last24h?.failedResetTokens ?? 0}</span></div>
+          <div className="flex justify-between"><span>email delivery failures 24h</span><span className="text-red-600">{data.last24h?.emailDeliveryFailures ?? 0}</span></div>
+          {(data.last24h?.smtpNeedsConfig ?? 0) > 0 && (
+            <div className="mt-2 px-2 py-1 rounded bg-red-50 text-red-700 text-[10px]">
+              NEEDS_SMTP_CONFIG: {data.last24h.smtpNeedsConfig} send(s) skipped — set POSTMARK_SERVER_TOKEN + POSTMARK_FROM_EMAIL
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function UsersAtRiskSection() {
   const { data, error, isLoading } = useSWR('/api/admin/monitoring/users-at-risk', fetcher, {
     refreshInterval: 120000,
@@ -529,6 +562,7 @@ export default function AdminMonitoringDashboard() {
             <EtgbSection />
             <SecuritySection />
             <ExtensionSection />
+            <AuthSection />
             <UsersAtRiskSection />
           </div>
 

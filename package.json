@@ -19,7 +19,7 @@
     "test:unit": "vitest",
     "test:api": "vitest --environment node",
     "test:all": "npm run test:unit && npm run test:api && npm run test:smoke",
-    "security:smoke": "tsc --noEmit && vitest run --pool=forks test/lib/logger.redactor test/lib/crypto/credentials test/lib/auth.internal-key test/lib/cron.idempotency test/lib/admin test/api/stripe.webhook test/api/wix.webhook test/api/shopify.webhook test/api/auth.extension test/api/ext.telemetry test/api/admin"
+    "security:smoke": "tsc --noEmit && vitest run --pool=forks test/lib/logger.redactor test/lib/crypto/credentials test/lib/auth.internal-key test/lib/cron.idempotency test/lib/admin test/lib/auth/tokens test/api/stripe.webhook test/api/wix.webhook test/api/shopify.webhook test/api/auth.extension test/api/ext.telemetry test/api/admin test/api/auth/password-reset-flow"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

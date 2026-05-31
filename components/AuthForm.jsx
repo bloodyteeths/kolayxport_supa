@@ -11,11 +11,15 @@ export default function AuthForm() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [unverified, setUnverified] = useState(false);
+  const [resentStatus, setResentStatus] = useState('');
   const router = useRouter();
 
   const handleCredentials = async (e) => {
     e.preventDefault();
     setError('');
+    setUnverified(false);
+    setResentStatus('');
     setLoading(true);
 
     try {
@@ -31,6 +35,11 @@ export default function AuthForm() {
           setLoading(false);
           return;
         }
+        // After signup, surface the verification flow instead of trying to sign in.
+        setUnverified(true);
+        setError('');
+        setLoading(false);
+        return;
       }
 
       const result = await signIn('credentials', {
@@ -40,8 +49,12 @@ export default function AuthForm() {
         callbackUrl: '/app',
       });
 
-      if (result?.error) {
-        setError(isSignUp ? 'Account created but login failed. Try logging in.' : t('invalidCredentials') || 'Invalid email or password');
+      if (result?.error === 'EMAIL_NOT_VERIFIED') {
+        setUnverified(true);
+        setError('');
+        setLoading(false);
+      } else if (result?.error) {
+        setError(t('invalidCredentials') || 'Invalid email or password');
         setLoading(false);
       } else {
         router.push('/app');
@@ -49,6 +62,21 @@ export default function AuthForm() {
     } catch (err) {
       setError(err.message || 'An error occurred');
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!email) return;
+    setResentStatus('loading');
+    try {
+      await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      setResentStatus('sent');
+    } catch {
+      setResentStatus('error');
     }
   };
 
@@ -133,6 +161,30 @@ export default function AuthForm() {
       </p>
 
       {error && <div className="mt-4 text-red-600 text-center text-sm">{error}</div>}
+
+      {unverified && (
+        <div className="mt-4 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-medium mb-1">Please verify your email before signing in.</p>
+          <p className="text-xs mb-2">
+            Check your inbox for a confirmation link. If you can't find it, request a new one.
+          </p>
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={resentStatus === 'loading' || resentStatus === 'sent'}
+            className="text-blue-700 hover:underline text-xs font-medium disabled:opacity-60"
+          >
+            {resentStatus === 'sent'
+              ? 'Verification email sent.'
+              : resentStatus === 'loading'
+                ? 'Sending…'
+                : 'Resend verification email'}
+          </button>
+          <p className="mt-2 text-[11px] text-amber-700">
+            <a href="/auth/forgot" className="hover:underline">Forgot password?</a>
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import prisma from '@/lib/prisma';
+import { credentialsAuthorize } from '@/lib/auth/credentials';
 
 // PrismaAdapter is only needed for OAuth (Google) to auto-create User + Account records.
 // We wrap it to prevent it from interfering with CredentialsProvider sign-in,
@@ -27,19 +28,10 @@ export const authOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-
-        const normalizedEmail = credentials.email.toLowerCase().trim();
-
-        const user = await prisma.user.findUnique({
-          where: { email: normalizedEmail },
-        });
-        if (!user || !user.password) return null;
-
-        const valid = await bcrypt.compare(credentials.password, user.password);
-        if (!valid) return null;
-
-        return { id: user.id, email: user.email, name: user.name };
+        // Logic extracted into lib/auth/credentials.ts for testability.
+        // Throws `EMAIL_NOT_VERIFIED` when the password is correct but the email
+        // has not been verified yet — login UI watches for that exact code.
+        return credentialsAuthorize(credentials?.email, credentials?.password);
       },
     }),
   ],

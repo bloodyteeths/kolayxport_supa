@@ -91,3 +91,66 @@ Tests       94 passed (94)
 - Cross-tenant negative tests across every dynamic route. Pattern documented in `API_OWNERSHIP_AUDIT.md`; estimated 1 sprint.
 - Replacement of remaining `console.log/error` in `lib/integrations/*` and `pages/api/integrations/*` with the redacting logger.
 - Backfill `--apply` execution in production (key + dry-run must come first).
+
+---
+
+## Sprint 6 — Header-only API keys + Shopify HMAC + deploy reliability (2026-05-31, late)
+
+### S6-1. Header-only internal API key sweep
+- Removed `|| req.query.apiKey` from 19 routes that did their own ad-hoc `process.env.CLAWD_API_KEY === apiKey` check (Sprint 1 hardened `lib/auth.ts:getAuthUserOrApiKey` but never swept these). Each now reads only `req.headers['x-api-key']`.
+- Files touched: `pages/api/stats.ts`, `pages/api/clawd/{amazon-research,arbitrage,ebay,ebay-ai,ebay-research,etsy,trendyol,upload-image}.ts`, `pages/api/finance/{dashboard,product-costs,settlements}.ts`, `pages/api/analytics/{index,marketplace}.ts`, `pages/api/trends/{amazon,etsy}.ts`, `pages/api/integrations/etsy/shops.ts`, `pages/api/trendyol/research.ts`.
+- Functional behaviour unchanged for legitimate callers (extension + internal scripts already pass the header). Browser callers that accidentally put the key in a URL no longer succeed (the keys never belonged there).
+
+### S6-2. Shopify webhook hardening + cockpit instrumentation
+- New `lib/integrations/shopify/verifyWebhook.ts` exports:
+  - `verifyShopifyHmac(rawBody, headerHmac)` — pre-checks length, then `crypto.timingSafeEqual` (the bare `timingSafeEqual` throws on mismatched lengths and that throw could leak the same length-vs-content distinction to an attacker by response shape).
+  - `readRawBody(req)` — shared async iterator → utf-8 raw body. Both handlers now share this.
+- `pages/api/shopify/webhooks/{compliance,subscription-update}.ts` rewritten on top of those helpers. Signature failures now emit `security.shopify.signature_failed` events visible at `/admin/monitoring → Security`. Each event is recorded into `WebhookEvent(provider='shopify', eventType, status, errorMessage)` for the cockpit Billing card. Compliance events redact buyer ids to the last 4 characters.
+- Tests: `test/api/shopify.webhook.test.ts` (5 cases — valid HMAC, tampered body, length mismatch (no throw), missing secret, missing header).
+- `npm run security:smoke` updated to include the new file. Total at Sprint 6 close: **13 files, 99 tests** passing.
+
+### S6-3. Credential encryption fail-soft
+- `lib/crypto/credentials.ts:encryptIfNeeded` now falls back to plaintext when `CREDENTIAL_ENCRYPTION_KEY` is unset, instead of throwing. Without this, the new OAuth callbacks would throw on every marketplace connect/refresh in a fresh environment where the key hasn't been provisioned yet.
+- Verified: `CREDENTIAL_ENCRYPTION_KEY` IS set on the Hetzner production box, so the fail-soft is purely defensive for the case where it is ever removed.
+
+### S6-4. Deploy reliability rewrite
+The deploy workflow has been the most fragile piece this week. Sprint 6 took the following actions, each backed by a verified incident:
+
+| Action | Why | Reference |
+|---|---|---|
+| `script_stop: true` removed (was silently ignored by appleboy/ssh-action) | The first Sprint 1–5 deploy reported success but `git pull` had silently failed because `yarn.lock` was dirty on the box — the workflow continued past the failed pull and the runtime never updated. | Run `26716805400`. |
+| `command_timeout` bumped from default 10 m → 20 m → 30 m | Each previous bound killed the build mid-flight, leaving `.next` partial and the homepage 500. | Runs `26717036529` (10 m kill), `26718052475` (20 m kill). |
+| Multi-line inline `if/then/else/fi` REMOVED | `appleboy/ssh-action` collapses the YAML `script:` block into a single line on the remote shell, mashing `then`/`else`/`fi` together into an unparsable command. The result: `SKIP_BUILD=true` didn't actually skip the build. | Verified via `ps -ef \| grep next-build` showing the build still running despite skip flag. |
+| Logic moved into `scripts/deploy/hetzner-deploy.sh` | Real shell script avoids the multi-line YAML pitfall, runs under `set -euo pipefail`, can be invoked manually from SSH. README in `scripts/deploy/README.md`. |
+| Restart-only mode added | A complete `.next/BUILD_ID` on disk can be activated without rebuilding — useful when the previous workflow run died at the restart step. | Refuses to run if `BUILD_ID` is missing. |
+| `.next/cache/` preserved between builds | Webpack uses `.next/cache` for incremental compilation. Wiping it on every deploy turned every push into a cold build (~7–10 minutes on the cax21). Preserving it should drop incremental rebuilds to ~1–2 minutes. | Cold build measured at 7–10 min across three deploys. |
+
+### S6-5. Mid-incident manual recovery procedure
+Documented in `docs/deployment/PRODUCTION_TOPOLOGY.md` under "Recovery when the workflow is killed mid-build". The procedure used today:
+
+1. `gh run cancel <id>`.
+2. `ssh deploy@kolayxport.com 'pkill -9 -f "next build --webpack" || true'`.
+3. Check for a nested `.next-backup/.next/BUILD_ID` (created when the workflow's `cp -r .next .next-backup` runs twice). If present, `mv .next .next-broken-<ts>; mv .next-backup/.next .next`. The service starts serving HTML pages immediately on the next request — no restart needed because Next.js reads `.next` lazily.
+4. Trigger a clean deploy.
+
+This was used to recover the homepage from 500 → 200 during the third deploy attempt today.
+
+### S6-6. Known performance gaps (NOT done this sprint)
+| Gap | Severity | Plan |
+|---|---|---|
+| `rm -rf .next` causes homepage 500 during ~2-minute build window | High — customer-visible 500s on every deploy | Atomic swap: build into `.next-new` (Next.js `distDir` or symlink trick), then `mv` after `BUILD_ID` is written. |
+| Build runs on the deploy host | Medium — 7–10 min cold builds | Off-VPS build: GitHub Actions builds, `rsync` `.next/` to Hetzner, deploy script does only the restart. |
+| `--webpack` flag hardcoded | Medium — Turbopack is 2–3× faster | Verify Turbopack compatibility, then drop the flag. |
+| `appleboy/ssh-action` overhead | Low — ~30–60s per workflow | Stays. |
+
+---
+
+## Test suite result at Sprint 6 close
+
+```
+$ npm run security:smoke
+Test Files  13 passed (13)
+Tests       99 passed (99)
+```
+
+`tsc --noEmit` clean. New tests in this sprint: `test/api/shopify.webhook.test.ts` (5 cases).

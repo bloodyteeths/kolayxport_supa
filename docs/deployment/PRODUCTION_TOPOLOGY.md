@@ -25,25 +25,62 @@ Companion: see `KOLAYXPORT_PRODUCTION_TOPOLOGY.md` at the repo root for evidence
 
 ### Production deploy (Hetzner — canonical)
 
-Automatic on push to `main`:
-- `.github/workflows/deploy-hetzner.yml` SSHes as `deploy@46.224.169.225`, runs:
-  ```bash
-  cd /home/deploy/kolayxport
-  git pull origin main
-  npm install --legacy-peer-deps
-  npx prisma migrate deploy        # NEW since Sprint 5 — applies all pending migrations
-  npx prisma generate
-  cp -r .next .next-backup 2>/dev/null || true
-  rm -rf .next
-  npx next build --webpack || { echo "Build failed, restoring backup"; cp -r .next-backup .next; exit 1; }
-  sudo systemctl restart kolayxport
-  sleep 5
-  curl -fsS https://kolayxport.com/api/health \
-    || { echo "Health check failed, restoring backup"; rm -rf .next; cp -r .next-backup .next; sudo systemctl restart kolayxport; exit 1; }
-  rm -rf .next-backup
-  ```
-- The deploy script **now applies migrations automatically** as the first step after `npm install`. `migrate deploy` is the only Prisma migration command allowed in production (Prisma documents it as the production/staging command for applying pending migrations from `prisma/migrations/*`). It exits non-zero on failure, which trips `script_stop: true` and prevents the rest of the pipeline from running.
-- `prisma db push` and `prisma db push --accept-data-loss` are **forbidden in any production pipeline**.
+Automatic on push to `main`. Since Sprint 6 the deploy logic lives in `scripts/deploy/hetzner-deploy.sh`; `.github/workflows/deploy-hetzner.yml` is reduced to a thin SSH invocation that calls the script. This avoids the `appleboy/ssh-action` multi-line YAML pitfall that broke earlier inline `if/then/else/fi` branching.
+
+Two modes supported by the script:
+
+| Mode | When | What it does |
+|---|---|---|
+| `full` (push default) | code changes | `git pull --ff-only`, `npm install --legacy-peer-deps`, `npx prisma migrate deploy`, `npx prisma generate`, back up `.next` to `.next-backup`, **preserve `.next/cache/` for incremental webpack**, `rm -rf .next`, re-seed cache, `npx next build --webpack`, `sudo systemctl restart`, health check, cleanup backup. Refuses to mark success if `BUILD_ID` is missing from the new build. |
+| `restart` (workflow_dispatch only) | restart against an already-built `.next` | `git pull --ff-only`, `npx prisma migrate deploy` (no-op if none), `sudo systemctl restart`, health check. **Refuses to run if `.next/BUILD_ID` is missing** — partial builds will not be activated. |
+
+Cache preservation note: every deploy preserves `.next/cache/` between builds. A cold webpack build on the Hetzner cax21 (4 ARM cores, 8 GB RAM) takes ~7–10 minutes. An incremental rebuild with a warm cache for a small code change drops to ~1–2 minutes. The script moves `.next/cache/` to `/tmp/kx-next-cache` before `rm -rf .next` and restores it before `next build --webpack`.
+
+Manual invocation:
+```bash
+ssh deploy@kolayxport.com
+cd /home/deploy/kolayxport
+bash scripts/deploy/hetzner-deploy.sh full     # default
+bash scripts/deploy/hetzner-deploy.sh restart  # skip install + build (BUILD_ID must exist)
+```
+
+GitHub Actions invocation:
+```bash
+gh workflow run deploy-hetzner.yml                    # push-style, mode=full
+gh workflow run deploy-hetzner.yml -f mode=restart    # restart-only when build is already current
+```
+
+- `prisma db push` and `prisma db push --accept-data-loss` are **forbidden in any production pipeline**. Neither the workflow nor the script ever calls `db push`. Only `npx prisma migrate deploy`.
+- The script runs under `set -euo pipefail`. There is no `|| true` swallowing real failures. A failed `git pull` (e.g. dirty working tree blocking fast-forward), failed migration, failed build, or failed health-check exits non-zero and trips the workflow as a failed run.
+- Build failures restore `.next-backup` and exit 3. Missing `BUILD_ID` after build restores backup and exits 4. Health-check failures restore backup, restart, and exit 6.
+
+### Recovery when the workflow is killed mid-build
+
+If a workflow gets killed during `next build` (timeout, runner death, user cancel), the `.next` on the server is partial and the running service is now serving against an in-progress directory. Symptoms:
+
+- `/api/health` keeps returning 200 (handled by Next.js API routes, no static file lookup).
+- HTML pages (`/`, `/login`, etc.) return **500** because the service tries to read `.next/server/pages/<page>.html` which doesn't exist yet.
+
+Recovery in this order:
+
+1. **Cancel the workflow run** (`gh run cancel <id>`).
+2. **Kill the orphaned build** on the server: `ssh deploy@kolayxport.com 'pkill -9 -f "next build --webpack" || true'`.
+3. Check for a nested `.next-backup/.next/` — the workflow's pre-build `cp -r .next .next-backup` will create that when run repeatedly:
+   ```bash
+   ssh deploy@kolayxport.com 'cat /home/deploy/kolayxport/.next-backup/.next/BUILD_ID 2>/dev/null'
+   ```
+4. If `BUILD_ID` is present in the nested backup, restore it:
+   ```bash
+   ssh deploy@kolayxport.com '
+     cd /home/deploy/kolayxport
+     mv .next .next-broken-$(date +%s)
+     mv .next-backup/.next .next
+   '
+   ```
+   The running service starts serving HTML pages again immediately — no restart needed (Next.js reads `.next` lazily per request).
+5. Trigger a clean deploy: `gh workflow run deploy-hetzner.yml -f mode=full` (or push a tiny commit).
+
+This procedure was used on 2026-05-31 during the Sprint 1–5 deploy that timed out at 20 min mid-build, leaving homepage 500.
 
 #### Steps when shipping a Prisma migration
 
@@ -169,8 +206,24 @@ Required keys (match these wherever the app actually runs):
   npx prisma migrate dev --name <descriptive>  # locally
   # commit the new prisma/migrations/<timestamp>_<name>/ folder
   ```
-  Then on Hetzner: `npx prisma migrate deploy`.
+  Then on Hetzner: `npx prisma migrate deploy` (already automatic via the deploy script).
 - `db push` is fine in local development. It is fine for fast-iteration on feature branches against a throwaway DB. It is **never** fine against production data.
+
+---
+
+## Known performance gaps in the deploy pipeline
+
+Sprint 6 fixes the cheapest one (cache preservation). The rest are tracked but **not** done in this sprint:
+
+| Gap | Impact | Next-sprint fix |
+|---|---|---|
+| Cold webpack build on every deploy (FIXED Sprint 6) | First build ~7–10 min; subsequent ~1–2 min | Already shipped — `.next/cache/` preserved through `rm -rf .next`. |
+| `rm -rf .next` makes pages 500 during build | Customers see "Internal Server Error" on the homepage for the ~2 minutes between `rm -rf` and successful `mv` of new build | Build into `.next-new`, then atomic `mv .next .next-old && mv .next-new .next && rm -rf .next-old`. The service reads `.next` lazily per request, so the swap is effectively zero-downtime. |
+| `--webpack` flag is hardcoded | Webpack is ~2–3x slower than Turbopack on the same codebase | Verify the app builds cleanly under Turbopack (`npx next build`), then drop the `--webpack` flag. Mid-incident is the wrong time. |
+| Build runs on the deploy host | The Hetzner cax21 is undersized; GitHub-hosted runners have 4 vCPU x86 cores and would build in ~2 min | Move the build step to GitHub Actions: build `.next/`, archive it as an artifact, `rsync` to Hetzner, run `restart` mode. Bigger refactor. |
+| `appleboy/ssh-action` adds ~30–60s overhead | Negligible vs. the build cost above | Stays. |
+
+The user-facing 500 during build (item 2) is the next thing to fix because it directly affects experience during every deploy.
 
 ---
 

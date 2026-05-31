@@ -1079,7 +1079,7 @@ export default async function handler(
     res: NextApiResponse
 ) {
     // 1. Authenticate — accept API key OR session auth
-    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    const apiKey = req.headers['x-api-key'];
     const envApiKey = process.env.CLAWD_API_KEY;
     let authenticated = false;
 

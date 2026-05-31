@@ -9,7 +9,7 @@ export default async function handler(
 ) {
   // Auth: API key or session
   let authUserId: string;
-  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const apiKey = req.headers['x-api-key'];
   const envApiKey = process.env.CLAWD_API_KEY;
 
   if (envApiKey && apiKey === envApiKey) {

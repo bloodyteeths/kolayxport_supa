@@ -1,27 +1,40 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import crypto from 'crypto';
 import prisma from '../../../../lib/prisma';
 import { logger } from '../../../../lib/logger';
-import crypto from 'crypto';
+import { logSecurityEvent } from '@/lib/admin/events';
+import { verifyShopifyHmac, readRawBody } from '@/lib/integrations/shopify/verifyWebhook';
 
 export const config = { api: { bodyParser: false } };
 
-function verifyWebhookHmac(body: string, hmac: string | undefined): boolean {
-  const secret = process.env.SHOPIFY_API_SECRET;
-  if (!secret || !hmac) return false;
-  const generated = crypto.createHmac('sha256', secret).update(body).digest('base64');
+async function recordShopifyWebhook(args: {
+  rawBody: string;
+  eventType: string;
+  status: 'received' | 'processed' | 'failed' | 'ignored';
+  errorMessage?: string;
+  userId?: string | null;
+}) {
   try {
-    return crypto.timingSafeEqual(Buffer.from(generated), Buffer.from(hmac));
-  } catch {
-    return false;
-  }
-}
-
-async function getRawBody(req: NextApiRequest): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-  }
-  return Buffer.concat(chunks).toString('utf-8');
+    const id = 'shopify_' + crypto.createHash('sha256').update(args.rawBody).digest('hex').slice(0, 24);
+    await (prisma as any).webhookEvent.upsert({
+      where: { id },
+      update: {
+        provider: 'shopify',
+        eventType: args.eventType,
+        status: args.status,
+        errorMessage: args.errorMessage?.slice(0, 200) ?? null,
+        userId: args.userId ?? null,
+      },
+      create: {
+        id,
+        provider: 'shopify',
+        eventType: args.eventType,
+        status: args.status,
+        errorMessage: args.errorMessage?.slice(0, 200) ?? null,
+        userId: args.userId ?? null,
+      },
+    });
+  } catch { /* trace-only */ }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -29,11 +42,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const rawBody = await getRawBody(req);
+  const rawBody = await readRawBody(req);
   const hmac = req.headers['x-shopify-hmac-sha256'] as string | undefined;
 
-  if (!verifyWebhookHmac(rawBody, hmac)) {
-    logger.error('Shopify subscription webhook HMAC failed');
+  if (!verifyShopifyHmac(rawBody, hmac)) {
+    logSecurityEvent('warn', {
+      message: 'Shopify subscription webhook HMAC verification failed',
+      operation: 'shopify.signature_failed',
+    });
+    await recordShopifyWebhook({ rawBody, eventType: 'subscription_update', status: 'failed', errorMessage: 'hmac_failed' });
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -83,9 +100,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       status: internalStatus,
     });
 
+    await recordShopifyWebhook({
+      rawBody,
+      eventType: 'subscription_update',
+      status: 'processed',
+      userId: shop.userId,
+    });
     return res.status(200).json({ success: true });
   } catch (error: any) {
     logger.error('Shopify subscription webhook error', error);
+    await recordShopifyWebhook({
+      rawBody,
+      eventType: 'subscription_update',
+      status: 'failed',
+      errorMessage: error?.message ?? String(error),
+    });
     return res.status(200).json({ success: true });
   }
 }

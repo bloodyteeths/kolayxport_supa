@@ -15,7 +15,7 @@ export const config = { runtime: 'nodejs', maxDuration: 300 };
 
 function getUserId(req: NextApiRequest, res: NextApiResponse): { userId: string; authenticated: boolean } {
   // Try API key first
-  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const apiKey = req.headers['x-api-key'];
   const envApiKey = process.env.CLAWD_API_KEY;
   if (envApiKey && apiKey === envApiKey) {
     return { userId: 'api-user', authenticated: true };
@@ -35,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let authenticated = false;
   let userId = '';
 
-  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  const apiKey = req.headers['x-api-key'];
   const envApiKey = process.env.CLAWD_API_KEY;
 
   if (envApiKey && apiKey === envApiKey) {

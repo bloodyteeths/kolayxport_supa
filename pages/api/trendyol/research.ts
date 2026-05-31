@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     // Auth: API key or session
-    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    const apiKey = req.headers['x-api-key'];
     const envApiKey = process.env.CLAWD_API_KEY;
     if (!(envApiKey && apiKey === envApiKey)) {
       const user = await getAuthUser(req, res);

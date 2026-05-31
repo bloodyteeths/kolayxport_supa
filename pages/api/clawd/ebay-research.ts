@@ -77,7 +77,8 @@ export default async function handler(
   res: NextApiResponse
 ) {
   // 1. Authenticate — accept API key OR session auth
-  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  // Header-only since Sprint 5 (query-string keys leak via CDN/proxy logs).
+  const apiKey = req.headers['x-api-key'];
   const envApiKey = process.env.CLAWD_API_KEY;
   let authenticated = false;
   let sessionUserId: string | null = null;

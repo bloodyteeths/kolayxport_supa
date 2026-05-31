@@ -750,7 +750,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, userId: str
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Auth: API key or session
   let userId: string;
-  const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+  // Header-only since Sprint 5 (query-string keys leak via CDN/proxy logs).
+  const apiKey = req.headers['x-api-key'];
   const envApiKey = process.env.CLAWD_API_KEY;
 
   if (envApiKey && apiKey === envApiKey) {

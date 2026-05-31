@@ -117,8 +117,12 @@ else
 fi
 
 # --- 6. Restart the service ---
-echo "==> sudo systemctl restart kolayxport.service"
-sudo systemctl restart kolayxport.service
+# Note: sudoers NOPASSWD on this box is for `systemctl restart kolayxport`
+# (no `.service` suffix). Using the suffix breaks the rule match and sudo
+# falls back to a password prompt that the SSH session can't satisfy.
+# systemd accepts both forms interchangeably.
+echo "==> sudo systemctl restart kolayxport"
+sudo -n systemctl restart kolayxport
 
 # Give Next.js a moment to bind the port
 sleep 5
@@ -131,7 +135,7 @@ if ! curl -fsS --max-time 15 "${HEALTH_URL}" > /tmp/health-check-output; then
     echo "::error::Restoring .next-backup and restarting again"
     rm -rf .next
     cp -r .next-backup .next
-    sudo systemctl restart kolayxport.service
+    sudo -n systemctl restart kolayxport
     sleep 5
     curl -fsS --max-time 15 "${HEALTH_URL}" || true
   fi

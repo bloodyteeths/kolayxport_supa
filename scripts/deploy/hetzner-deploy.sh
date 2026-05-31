@@ -65,48 +65,51 @@ if [ "$MODE" = "full" ]; then
 fi
 
 # --- 5. Build only in full mode ---
+# Atomic .next swap: build into `.next-new` via NEXT_DIST_DIR (overridable in
+# next.config.js), then `mv` it into place on success. The live `.next` keeps
+# serving HTML pages throughout the build window — no more homepage 500.
+#
+# Webpack's incremental cache is seeded from the live `.next/cache/` via hardlinks
+# so the build still benefits from prior compilation.
 if [ "$MODE" = "full" ]; then
-  echo "==> backing up .next to .next-backup (full mode)"
-  rm -rf .next-backup
-  cp -r .next .next-backup 2>/dev/null || true
+  echo "==> preparing .next-new (build target)"
+  rm -rf .next-new .next-old
 
-  # Preserve Next.js incremental build cache between deploys.
-  # Without this, every deploy is a cold webpack build (~10 minutes on this VPS).
-  # With it, an incremental rebuild after a small code change drops to ~1–2 minutes.
+  # Hardlink the cache from the running .next so incremental webpack reuses it.
+  # `cp -al` creates hardlinks (one inode, two names) — costs no extra disk space
+  # and is instant. If the source is missing we just start cold.
   if [ -d .next/cache ]; then
-    echo "==> preserving .next/cache between builds (size: $(du -sh .next/cache 2>/dev/null | cut -f1))"
-    rm -rf /tmp/kx-next-cache
-    mv .next/cache /tmp/kx-next-cache
-  else
-    rm -rf /tmp/kx-next-cache
+    mkdir -p .next-new
+    cp -al .next/cache .next-new/cache 2>/dev/null || cp -r .next/cache .next-new/cache
+    echo "==> .next-new/cache seeded from running .next/cache"
   fi
 
-  echo "==> removing old .next (cache preserved at /tmp/kx-next-cache)"
-  rm -rf .next
-
-  # Re-seed the cache before the build so webpack picks it up.
-  if [ -d /tmp/kx-next-cache ]; then
-    mkdir -p .next
-    mv /tmp/kx-next-cache .next/cache
-    echo "==> .next/cache re-seeded for incremental build"
-  fi
-
-  echo "==> next build --webpack"
-  if ! npx next build --webpack; then
-    echo "::error::Build failed; restoring backup"
-    rm -rf .next
-    cp -r .next-backup .next
+  echo "==> NEXT_DIST_DIR=.next-new next build --webpack"
+  if ! NEXT_DIST_DIR=.next-new npx next build --webpack; then
+    echo "::error::Build failed; live .next untouched"
+    rm -rf .next-new
     exit 3
   fi
 
-  if [ ! -f .next/BUILD_ID ]; then
-    echo "::error::Build completed but .next/BUILD_ID missing; restoring backup"
-    rm -rf .next
-    cp -r .next-backup .next
+  if [ ! -f .next-new/BUILD_ID ]; then
+    echo "::error::Build completed but .next-new/BUILD_ID missing; live .next untouched"
+    rm -rf .next-new
     exit 4
   fi
 
-  echo "==> new BUILD_ID=$(cat .next/BUILD_ID), cache size=$(du -sh .next/cache 2>/dev/null | cut -f1 || echo none)"
+  echo "==> new BUILD_ID=$(cat .next-new/BUILD_ID); swapping .next <- .next-new"
+
+  # Atomic-ish swap: two rename(2) syscalls back-to-back. The window where
+  # .next does not exist is microseconds, vs. the multi-minute build window
+  # the previous rm-then-build approach exposed.
+  mv .next .next-old
+  mv .next-new .next
+
+  # Backup the previous build for the health-check rollback path below.
+  rm -rf .next-backup
+  mv .next-old .next-backup
+
+  echo "==> swap complete; cache size=$(du -sh .next/cache 2>/dev/null | cut -f1 || echo none)"
 else
   # restart mode — ensure we have something to restart against
   if [ ! -f .next/BUILD_ID ]; then
@@ -132,9 +135,10 @@ echo "==> curl ${HEALTH_URL}"
 if ! curl -fsS --max-time 15 "${HEALTH_URL}" > /tmp/health-check-output; then
   echo "::error::Health check failed"
   if [ "$MODE" = "full" ] && [ -d .next-backup ]; then
-    echo "::error::Restoring .next-backup and restarting again"
-    rm -rf .next
-    cp -r .next-backup .next
+    echo "::error::Rolling back to .next-backup and restarting again"
+    # Mirror the atomic swap, in reverse.
+    mv .next .next-broken-$(date +%s) 2>/dev/null || rm -rf .next
+    mv .next-backup .next
     sudo -n systemctl restart kolayxport
     sleep 5
     curl -fsS --max-time 15 "${HEALTH_URL}" || true

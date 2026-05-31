@@ -56,6 +56,10 @@ const withPWA = require('@ducanh2912/next-pwa').default({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // distDir overridable via env so the Hetzner deploy can build into a staging dir
+  // (`.next-new`) and atomically swap it with the live `.next` on success. The live
+  // service never sets NEXT_DIST_DIR so it defaults to `.next` at runtime.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   generateEtags: false,

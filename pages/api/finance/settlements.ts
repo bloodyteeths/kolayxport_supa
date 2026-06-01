@@ -5,6 +5,7 @@ import { logger } from '../../../lib/logger';
 import { EtsyClient } from '../../../lib/integrations/etsyClient';
 import type { EtsyCredentials } from '../../../lib/integrations/etsyClient';
 import { getUserAccessToken, EbayNotConnectedError } from '../../../lib/integrations/ebayClient';
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 const TRENDYOL_API_BASE = 'https://apigw.trendyol.com/integration';
 const EBAY_FINANCES_BASE = 'https://apiz.ebay.com';
@@ -472,9 +473,20 @@ async function getEtsyCredentials(userId: string): Promise<EtsyShopCredentials> 
     };
   }
 
+  // Tokens are stored as `enc:v1:...` envelopes by the OAuth callback.
+  // Etsy's API rejects encrypted blobs as "not a Bearer token" → 403, so
+  // decrypt here and let onTokenRefresh re-encrypt on write.
+  const accessTokenPlain = decryptIfNeeded(resolved.accessToken) as string;
+  const refreshTokenPlain = decryptIfNeeded(resolved.refreshToken) as string;
+  if (!accessTokenPlain || !refreshTokenPlain) {
+    throw {
+      status: 400,
+      message: 'Etsy credentials could not be decrypted. Please reconnect your Etsy shop in settings.',
+    };
+  }
   return {
-    accessToken: resolved.accessToken,
-    refreshToken: resolved.refreshToken,
+    accessToken: accessTokenPlain,
+    refreshToken: refreshTokenPlain,
     shopId: resolved.shopId,
     tokenExpiresAt: resolved.tokenExpiresAt,
     dbId: resolved.id,
@@ -495,13 +507,15 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
 
   const etsyCreds = await getEtsyCredentials(userId);
 
-  // Token refresh callback — persists new tokens to DB
+  // Token refresh callback — persists new tokens (encrypted) to DB
   const onTokenRefresh = async (newCreds: EtsyCredentials) => {
     await prisma.etsyShop.update({
       where: { id: etsyCreds.dbId },
       data: {
-        accessToken: newCreds.accessToken,
-        refreshToken: newCreds.refreshToken || undefined,
+        accessToken: encryptIfNeeded(newCreds.accessToken) as string,
+        refreshToken: newCreds.refreshToken
+          ? (encryptIfNeeded(newCreds.refreshToken) as string)
+          : undefined,
         tokenExpiresAt: newCreds.tokenExpiresAt || undefined,
       },
     });
@@ -896,8 +910,10 @@ async function handleDebugLedger(userId: string, body: any, res: NextApiResponse
     await prisma.etsyShop.update({
       where: { id: etsyCreds.dbId },
       data: {
-        accessToken: newCreds.accessToken,
-        refreshToken: newCreds.refreshToken || undefined,
+        accessToken: encryptIfNeeded(newCreds.accessToken) as string,
+        refreshToken: newCreds.refreshToken
+          ? (encryptIfNeeded(newCreds.refreshToken) as string)
+          : undefined,
         tokenExpiresAt: newCreds.tokenExpiresAt || undefined,
       },
     });

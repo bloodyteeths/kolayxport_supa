@@ -325,6 +325,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           currency: true,
           marketplace: true,
           externalStatus: true,
+          status: true,
           uiOrderDate: true,
           labelStatus: true
         },
@@ -393,9 +394,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return total + convertedAmount;
     }, 0);
 
+    // Render statuses like "Awaiting Fulfillment" regardless of how the source
+    // sync writes them (snake_case, UPPER, mixed). Returns '' if no input.
+    const prettyStatus = (s: string | null | undefined): string => {
+      if (!s) return '';
+      return s
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+    };
+
     // Calculate trends
-    const orderTrend = previousOrders > 0 
-      ? ((totalOrders - previousOrders) / previousOrders) * 100 
+    const orderTrend = previousOrders > 0
+      ? ((totalOrders - previousOrders) / previousOrders) * 100
       : 0;
 
     const revenueTrend = prevRevenue > 0 
@@ -423,11 +434,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       'manual': '#9CA3AF',
     };
 
-    // Normalize marketplace names (case-insensitive grouping)
+    // Normalize marketplace names — fold known platforms, keep brand casing.
     const normalizeMarketplace = (name: string | null | undefined): string => {
       if (!name) return 'Unknown';
       const lower = name.toLowerCase().trim();
-      // Group known variations
       if (lower.includes('amazon') && lower.includes('fba')) return 'Amazon FBA';
       if (lower.includes('amazon')) return 'Amazon';
       if (lower.includes('etsy')) return 'Etsy';
@@ -436,33 +446,34 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       if (lower.includes('shippo')) return 'Shippo';
       if (lower.includes('veeqo')) return 'Veeqo';
       if (lower === 'manual') return 'Manual';
-      // Title case for others
-      return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+      // Shop names: preserve the original casing the marketplace uses
+      // (e.g. "BelleCoutureGifts", not "Bellecouturegifts").
+      return name.trim();
     };
 
-    // Calculate marketplace breakdown with currency conversion + native currency tracking
+    // Case-insensitive bucketing so "Decorsweetart" and "decorsweetart" merge.
     const marketplaceBreakdown = marketplaceOrders.reduce((acc, order) => {
       const marketplace = normalizeMarketplace(order.marketplace);
+      const key = marketplace.toLowerCase();
       const rawAmount = order.totalPrice || 0;
       const currency = (order.currency || 'TRY').toUpperCase();
       const convertedRevenue = convertToTRY(rawAmount, order.currency);
 
-      if (!acc[marketplace]) {
-        acc[marketplace] = { orders: 0, revenue: 0, byCurrency: {} as Record<string, number> };
+      if (!acc[key]) {
+        acc[key] = { displayName: marketplace, orders: 0, revenue: 0, byCurrency: {} as Record<string, number> };
       }
-      acc[marketplace].orders += 1;
-      acc[marketplace].revenue += convertedRevenue;
-      // Track native currency amounts
-      acc[marketplace].byCurrency[currency] = (acc[marketplace].byCurrency[currency] || 0) + rawAmount;
+      acc[key].orders += 1;
+      acc[key].revenue += convertedRevenue;
+      acc[key].byCurrency[currency] = (acc[key].byCurrency[currency] || 0) + rawAmount;
       return acc;
-    }, {} as Record<string, { orders: number; revenue: number; byCurrency: Record<string, number> }>);
+    }, {} as Record<string, { displayName: string; orders: number; revenue: number; byCurrency: Record<string, number> }>);
 
-    const topMarketplaces = Object.entries(marketplaceBreakdown).map(([name, stats], index) => ({
-      name,
+    const topMarketplaces = Object.entries(marketplaceBreakdown).map(([key, stats], index) => ({
+      name: stats.displayName,
       orders: stats.orders,
       revenue: stats.revenue,
       byCurrency: stats.byCurrency,
-      color: marketplaceColors[name?.toLowerCase()] || marketplaceColorPalette[index % marketplaceColorPalette.length]
+      color: marketplaceColors[key] || marketplaceColorPalette[index % marketplaceColorPalette.length]
     }));
 
     // Format daily stats - convert each currency row to TRY, then aggregate by date
@@ -670,7 +681,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       monthlyStats,
       marketplaceBreakdown: formattedMarketplaceBreakdown,
       shippingStats,
-      recentActivity: recentActivity.map(o => ({ ...o, marketplace: normalizeMarketplace(o.marketplace) })),
+      recentActivity: recentActivity.map(o => ({
+        ...o,
+        marketplace: normalizeMarketplace(o.marketplace),
+        // Fall back to internal status when marketplace didn't return one.
+        // Title-case so "awaiting_fulfillment" and "AWAITING_FULFILLMENT" render the same way.
+        externalStatus: prettyStatus(o.externalStatus || o.status || ''),
+      })),
       ...(hourlyBreakdown ? { hourlyBreakdown } : {}),
     };
 

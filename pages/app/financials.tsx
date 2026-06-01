@@ -13,26 +13,38 @@ import dynamic from 'next/dynamic';
 
 const FinancialDashboard = dynamic(() => import('@/components/finance/FinancialDashboard'), { ssr: false });
 
+// Local-date YYYY-MM-DD formatter. Critical: do NOT use .toISOString().split('T')[0],
+// because the Date constructor for (year, month, day) builds a LOCAL midnight,
+// and toISOString converts to UTC — which silently shifts the day for any user
+// east of UTC. Istanbul (UTC+3) used to get "Bu Ay" starting on the last day
+// of the previous month.
+const toLocalDateStr = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 const DATE_PRESETS = [
   { key: 'thisMonth', tKey: 'thisMonth', getRange: () => {
     const now = new Date();
-    return { start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0], end: now.toISOString().split('T')[0] };
+    return { start: toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1)), end: toLocalDateStr(now) };
   }},
   { key: 'lastMonth', tKey: 'lastMonth', getRange: () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const end = new Date(now.getFullYear(), now.getMonth(), 0);
-    return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+    return { start: toLocalDateStr(start), end: toLocalDateStr(end) };
   }},
   { key: 'last30', tKey: 'last30Days', getRange: () => {
     const now = new Date();
     const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    return { start: start.toISOString().split('T')[0], end: now.toISOString().split('T')[0] };
+    return { start: toLocalDateStr(start), end: toLocalDateStr(now) };
   }},
   { key: 'last90', tKey: 'last90Days', getRange: () => {
     const now = new Date();
     const start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    return { start: start.toISOString().split('T')[0], end: now.toISOString().split('T')[0] };
+    return { start: toLocalDateStr(start), end: toLocalDateStr(now) };
   }},
 ];
 

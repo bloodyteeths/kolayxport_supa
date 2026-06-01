@@ -704,6 +704,11 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
   }
 
   // ---- PHASE 4: Fetch ledger entries for ad spend ----
+  // We persist ONE FinancialTransaction per Etsy ledger entry (keyed by
+  // entry_id), not one summary per sync window. The old summary approach
+  // produced overlapping rows (`adspend_<min>_<max>`) for every distinct date
+  // range the user picked — and the dashboard summed all of them, inflating
+  // ad spend by 4-5x. Keying by entry_id makes re-sync idempotent.
   let adSpendTotal = 0;
   let adSpendEntries = 0;
   try {
@@ -742,23 +747,66 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
       for (const entry of entries) {
         const ledgerType = (entry.ledger_type || '').toLowerCase();
         const description = (entry.description || '').toLowerCase();
-        // Match: prolist (Etsy Ads), offsite_ads_fee, or description-based matching
+        // Precise match only. Do NOT match `ledgerType.includes('ad')` —
+        // that picks up `payment_adjustment`, `card_processing`, etc.
         const isAdSpend = ledgerType === 'prolist'
           || ledgerType === 'offsite_ads_fee'
-          || ledgerType.includes('ad')
+          || ledgerType === 'offsite_ads'
           || description.includes('offsite ads')
           || description.includes('etsy ads')
-          || description.includes('promoted listing')
-          || description.includes('advertising');
+          || description.includes('promoted listing');
 
-        if (isAdSpend) {
-          // Ledger amounts are plain integers in cents, not Money objects
-          const rawAmount = typeof entry.amount === 'object'
-            ? EtsyClient.etsyMoney(entry.amount)
-            : (Number(entry.amount) || 0) / 100;
-          adSpendTotal += Math.abs(rawAmount);
-          adSpendEntries++;
+        if (!isAdSpend) continue;
+
+        // Ledger amounts are integers in cents, not Money objects
+        const rawAmount = typeof entry.amount === 'object'
+          ? EtsyClient.etsyMoney(entry.amount)
+          : (Number(entry.amount) || 0) / 100;
+
+        const entryId = entry.entry_id ?? entry.ledger_entry_id ?? entry.id;
+        if (entryId == null) {
+          // Defensive: Etsy should always return an id, but if not we can't
+          // dedup safely — skip rather than risk double-count on re-sync.
+          continue;
         }
+        const externalId = `etsy_ledger_${entryId}`;
+        const txDate = entry.create_date
+          ? new Date(entry.create_date * 1000)
+          : new Date();
+
+        await prisma.financialTransaction.upsert({
+          where: {
+            userId_marketplace_externalId: {
+              userId,
+              marketplace: 'etsy',
+              externalId,
+            },
+          },
+          update: {
+            amount: -Math.abs(rawAmount),
+            transactionDate: txDate,
+            syncedAt: new Date(),
+          },
+          create: {
+            userId,
+            marketplace: 'etsy',
+            externalId,
+            transactionType: 'AdSpend',
+            orderNumber: null,
+            barcode: null,
+            productName: description || (ledgerType === 'offsite_ads_fee' ? 'Offsite Ads' : 'Etsy Ads'),
+            quantity: 1,
+            amount: -Math.abs(rawAmount),
+            currency: entry.currency_code || 'USD',
+            commission: null,
+            shippingAmount: null,
+            transactionDate: txDate,
+          },
+        });
+
+        adSpendTotal += Math.abs(rawAmount);
+        adSpendEntries++;
+        totalUpserted++;
       }
 
       if (entries.length < PAGE_LIMIT) {
@@ -766,41 +814,6 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
       } else {
         ledgerOffset += PAGE_LIMIT;
       }
-    }
-
-    // Upsert a single AdSpend summary transaction for the period
-    if (adSpendTotal > 0) {
-      const adSpendId = `adspend_${minCreated}_${maxCreated}`;
-      await prisma.financialTransaction.upsert({
-        where: {
-          userId_marketplace_externalId: {
-            userId,
-            marketplace: 'etsy',
-            externalId: adSpendId,
-          },
-        },
-        update: {
-          amount: -adSpendTotal,
-          quantity: adSpendEntries,
-          syncedAt: new Date(),
-        },
-        create: {
-          userId,
-          marketplace: 'etsy',
-          externalId: adSpendId,
-          transactionType: 'AdSpend',
-          orderNumber: null,
-          barcode: null,
-          productName: 'Etsy Ads + Offsite Ads',
-          quantity: adSpendEntries,
-          amount: -adSpendTotal,
-          currency: 'USD',
-          commission: null,
-          shippingAmount: null,
-          transactionDate: new Date(endMs),
-        },
-      });
-      totalUpserted++;
     }
   } catch (err) {
     logger.warn('Failed to fetch Etsy ledger entries for ad spend', {

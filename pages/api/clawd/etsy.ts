@@ -1634,6 +1634,24 @@ export default async function handler(
                 });
             }
 
+            // Etsy rejects PATCH /listings if any of who_made / when_made /
+            // is_supply is present without the other two. Backfill from the
+            // current listing if the caller sent only a partial trio.
+            const PROVENANCE_KEYS = ['who_made', 'when_made', 'is_supply'] as const;
+            const touchesProvenance = PROVENANCE_KEYS.some((k) => k in updatePayload);
+            if (touchesProvenance && !PROVENANCE_KEYS.every((k) => k in updatePayload)) {
+                try {
+                    const current = await callEtsyAPI(`/listings/${listing_id}`, accessToken);
+                    for (const key of PROVENANCE_KEYS) {
+                        if (!(key in updatePayload) && current[key] != null) {
+                            updatePayload[key] = current[key];
+                        }
+                    }
+                } catch (e: any) {
+                    logger.warn('Failed to fetch current listing for provenance backfill', { listing_id, error: e.message });
+                }
+            }
+
             console.log(`[Etsy Update] listing=${listing_id} fields=${Object.keys(updatePayload).join(',')}`);
             logger.info('Updating Etsy listing', {
                 listing_id,

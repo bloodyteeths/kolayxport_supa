@@ -795,9 +795,13 @@ export async function syncDraft(draftId: string, userId: string) {
     let deletedListing = false;
     const mediaOnlyDraft = isMediaOnlyDraft(draft, queuedActions);
 
+    // Hoisted out of the if-block so the PATCH builder below can backfill the
+    // Etsy provenance trio (who_made/when_made/is_supply) from the current
+    // listing without re-fetching.
+    let remoteListing: any = null;
     if (!isNewLocalListing) {
-      const remote = await callEtsyAPI(`/listings/${syncedListingId}`, accessToken);
-      const remoteUpdated = remote.updated_timestamp || 0;
+      remoteListing = await callEtsyAPI(`/listings/${syncedListingId}`, accessToken);
+      const remoteUpdated = remoteListing.updated_timestamp || 0;
       if (draft.baseEtsyUpdatedTimestamp && remoteUpdated && remoteUpdated !== draft.baseEtsyUpdatedTimestamp) {
         if (hasDeleteAction || hasCopyAction || mediaOnlyDraft || draft.status === 'conflict') {
           logger.info('Draft sync skipping conflict check', { draftId: draft.id, reason: hasDeleteAction ? 'delete' : hasCopyAction ? 'copy' : mediaOnlyDraft ? 'media-only' : 'already-conflict' });
@@ -882,6 +886,18 @@ export async function syncDraft(draftId: string, userId: string) {
     }
 
     if (fields && Object.keys(fields).length > 0) {
+      // Etsy rejects PATCH /listings if any of who_made / when_made / is_supply
+      // is present without the other two. Backfill the missing ones from the
+      // current remote listing so a single-field UI edit still syncs cleanly.
+      const PROVENANCE_KEYS = ['who_made', 'when_made', 'is_supply'] as const;
+      const touchesProvenance = PROVENANCE_KEYS.some((k) => k in fields);
+      if (touchesProvenance && remoteListing) {
+        for (const key of PROVENANCE_KEYS) {
+          if (!(key in fields) && remoteListing[key] != null) {
+            (fields as JsonMap)[key] = remoteListing[key];
+          }
+        }
+      }
       results.push(await callEtsyAPI(`/shops/${draft.etsyShopId}/listings/${syncedListingId}?legacy=false`, accessToken, {
         method: 'PATCH',
         body: JSON.stringify(fields),

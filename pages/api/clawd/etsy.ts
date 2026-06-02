@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 // Raise body size limit for image uploads (base64 encoding inflates by ~33%,
 // so a 10MB Etsy image arrives as ~14MB JSON body)
@@ -74,6 +75,9 @@ function parseFullName(fullName: string): { firstName: string; lastName: string 
     return { firstName, lastName };
 }
 
+// Refresh the Etsy access token. `refreshToken` MUST be plaintext — callers
+// are expected to decrypt it before invoking this. Rotated tokens are written
+// back to the same row (EtsyShop or legacy Credential) in encrypted form.
 async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<string> {
     const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
         method: 'POST',
@@ -93,15 +97,18 @@ async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<s
 
     const data = await response.json();
     const newExpiresAt = new Date(Date.now() + data.expires_in * 1000);
-    const newAccessToken = data.access_token;
-    const newRefreshToken = data.refresh_token || refreshToken;
+    const newAccessToken = data.access_token as string;
+    const newRefreshToken = (data.refresh_token as string) || refreshToken;
+
+    const encAccess = encryptIfNeeded(newAccessToken) as string;
+    const encRefresh = encryptIfNeeded(newRefreshToken) as string;
 
     // Try updating EtsyShop table first
     const etsyShopUpdate = await prisma.etsyShop.updateMany({
         where: { shopId },
         data: {
-            accessToken: newAccessToken,
-            refreshToken: newRefreshToken,
+            accessToken: encAccess,
+            refreshToken: encRefresh,
             tokenExpiresAt: newExpiresAt,
         },
     });
@@ -111,8 +118,8 @@ async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<s
         await prisma.credential.updateMany({
             where: { etsyShopId: shopId },
             data: {
-                etsyAccessToken: newAccessToken,
-                etsyRefreshToken: newRefreshToken,
+                etsyAccessToken: encAccess,
+                etsyRefreshToken: encRefresh,
                 etsyTokenExpiresAt: newExpiresAt,
             },
         });
@@ -136,19 +143,25 @@ async function getEtsyAccessToken(shopId: string): Promise<string> {
     });
 
     if (etsyShop) {
-        // Check if token is expired or about to expire (within 5 minutes)
+        // Tokens are stored as `enc:v1:` envelopes — decrypt before use.
+        // Sending the encrypted blob as a Bearer token returns
+        // 403 "not a Bearer token or token format is incorrect".
+        const plainRefresh = decryptIfNeeded(etsyShop.refreshToken) as string | null;
         const now = new Date();
         const expiresAt = etsyShop.tokenExpiresAt;
 
         if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-            // Token expired or about to expire, refresh it
-            if (!etsyShop.refreshToken) {
+            if (!plainRefresh) {
                 throw new Error('No refresh token available');
             }
-            return await refreshEtsyToken(shopId, etsyShop.refreshToken);
+            return await refreshEtsyToken(shopId, plainRefresh);
         }
 
-        return etsyShop.accessToken;
+        const plainAccess = decryptIfNeeded(etsyShop.accessToken) as string;
+        if (!plainAccess) {
+            throw new Error('Etsy access token could not be decrypted');
+        }
+        return plainAccess;
     }
 
     // Fallback: check legacy Credential table
@@ -161,17 +174,21 @@ async function getEtsyAccessToken(shopId: string): Promise<string> {
         throw new Error('Etsy shop not found or not connected');
     }
 
-    // Check if legacy token needs refresh
+    const plainRefresh = decryptIfNeeded(credential.etsyRefreshToken) as string | null;
     const now = new Date();
     const expiresAt = credential.etsyTokenExpiresAt;
     if (!expiresAt || expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-        if (!credential.etsyRefreshToken) {
+        if (!plainRefresh) {
             throw new Error('No refresh token available');
         }
-        return await refreshEtsyToken(shopId, credential.etsyRefreshToken);
+        return await refreshEtsyToken(shopId, plainRefresh);
     }
 
-    return credential.etsyAccessToken;
+    const plainAccess = decryptIfNeeded(credential.etsyAccessToken) as string;
+    if (!plainAccess) {
+        throw new Error('Etsy access token could not be decrypted');
+    }
+    return plainAccess;
 }
 
 function validatePersonalizationQuestions(questions: PersonalizationQuestion[]): string | null {

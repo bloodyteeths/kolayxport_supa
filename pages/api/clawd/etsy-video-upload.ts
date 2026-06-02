@@ -2,9 +2,12 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { logger } from '../../../lib/logger';
 import { getAuthUser } from '../../../lib/auth';
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 import formidable from 'formidable';
 import fs from 'fs';
 
+// `refreshToken` must be plaintext; rotated tokens are persisted encrypted.
+// See pages/api/clawd/etsy.ts for the same pattern.
 async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<string> {
   const response = await fetch('https://api.etsy.com/v3/public/oauth/token', {
     method: 'POST',
@@ -17,13 +20,14 @@ async function refreshEtsyToken(shopId: string, refreshToken: string): Promise<s
   });
   if (!response.ok) throw new Error('Failed to refresh Etsy token');
   const data = await response.json();
-  const newAccessToken = data.access_token;
+  const newAccessToken = data.access_token as string;
+  const newRefreshToken = (data.refresh_token as string) || refreshToken;
 
   await prisma.etsyShop.updateMany({
     where: { shopId },
     data: {
-      accessToken: newAccessToken,
-      refreshToken: data.refresh_token || refreshToken,
+      accessToken: encryptIfNeeded(newAccessToken) as string,
+      refreshToken: encryptIfNeeded(newRefreshToken) as string,
       tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
     },
   });
@@ -55,14 +59,17 @@ async function getEtsyTokenContext(shopInput: string, userId: string): Promise<E
 
   if (etsyShop) {
     const now = new Date();
+    const plainRefresh = decryptIfNeeded(etsyShop.refreshToken) as string | null;
     if (!etsyShop.tokenExpiresAt || etsyShop.tokenExpiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-      if (!etsyShop.refreshToken) throw new Error('No refresh token available');
+      if (!plainRefresh) throw new Error('No refresh token available');
       return {
         shopId: etsyShop.shopId,
-        accessToken: await refreshEtsyToken(etsyShop.shopId, etsyShop.refreshToken),
+        accessToken: await refreshEtsyToken(etsyShop.shopId, plainRefresh),
       };
     }
-    return { shopId: etsyShop.shopId, accessToken: etsyShop.accessToken };
+    const plainAccess = decryptIfNeeded(etsyShop.accessToken) as string;
+    if (!plainAccess) throw new Error('Etsy access token could not be decrypted');
+    return { shopId: etsyShop.shopId, accessToken: plainAccess };
   }
 
   const credential = await prisma.credential.findFirst({
@@ -77,15 +84,18 @@ async function getEtsyTokenContext(shopInput: string, userId: string): Promise<E
     throw new Error('Etsy shop not found or not connected');
   }
 
+  const plainRefresh = decryptIfNeeded(credential.etsyRefreshToken) as string | null;
   const now = new Date();
   if (!credential.etsyTokenExpiresAt || credential.etsyTokenExpiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
-    if (!credential.etsyRefreshToken) throw new Error('No refresh token available');
+    if (!plainRefresh) throw new Error('No refresh token available');
     return {
       shopId: normalizedShopInput,
-      accessToken: await refreshEtsyToken(normalizedShopInput, credential.etsyRefreshToken),
+      accessToken: await refreshEtsyToken(normalizedShopInput, plainRefresh),
     };
   }
-  return { shopId: normalizedShopInput, accessToken: credential.etsyAccessToken };
+  const plainAccess = decryptIfNeeded(credential.etsyAccessToken) as string;
+  if (!plainAccess) throw new Error('Etsy access token could not be decrypted');
+  return { shopId: normalizedShopInput, accessToken: plainAccess };
 }
 
 // Disable default body parser to handle multipart form data

@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '@/lib/integrations/etsyClient';
 import { logger } from '@/lib/logger';
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 export default async function handler(
   req: NextApiRequest,
@@ -44,22 +45,34 @@ export default async function handler(
       });
     }
 
+    // Decrypt the enc:v1: envelopes before handing tokens to EtsyClient,
+    // which uses them as raw Bearer tokens.
+    const accessTokenPlain = decryptIfNeeded(credential.etsyAccessToken) as string;
+    const refreshTokenPlain = decryptIfNeeded(credential.etsyRefreshToken) as string | null;
+    if (!accessTokenPlain) {
+      return res.status(400).json({
+        error: 'Etsy credentials could not be decrypted. Please reconnect your Etsy shop.'
+      });
+    }
+
     const etsyCredentials = {
-      accessToken: credential.etsyAccessToken,
-      refreshToken: credential.etsyRefreshToken || undefined,
+      accessToken: accessTokenPlain,
+      refreshToken: refreshTokenPlain || undefined,
       shopId: shopId || credential.etsyShopId, // Use provided shopId or default to user's shop
       tokenExpiresAt: credential.etsyTokenExpiresAt || undefined
     };
 
-    // Create token refresh callback to update database
+    // Create token refresh callback to update database (re-encrypt on write).
     const onTokenRefresh = async (newCredentials: EtsyCredentials) => {
       await prisma.credential.update({
         where: {
           userId: user.id
         },
         data: {
-          etsyAccessToken: newCredentials.accessToken,
-          etsyRefreshToken: newCredentials.refreshToken,
+          etsyAccessToken: encryptIfNeeded(newCredentials.accessToken) as string,
+          etsyRefreshToken: newCredentials.refreshToken
+            ? (encryptIfNeeded(newCredentials.refreshToken) as string)
+            : null,
           etsyTokenExpiresAt: newCredentials.tokenExpiresAt
         }
       });

@@ -5,6 +5,7 @@ import { logger } from '../../../../lib/logger';
 import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '../../../../lib/integrations/etsyClient';
 import { createWixClient } from '../../../../lib/integrations/wixClient';
 import { getUserAccessToken } from '../../../../lib/integrations/ebayClient';
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 interface VeeqoAllocation {
   id: number;
@@ -660,7 +661,7 @@ async function submitEtsyTracking(
         const shopDetailsResponse = await fetch(shopDetailsUrl, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${shop.accessToken}`,
+            'Authorization': `Bearer ${decryptIfNeeded(shop.accessToken) as string}`,
             'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`
           }
         });
@@ -706,7 +707,7 @@ async function submitEtsyTracking(
           const testResponse = await fetch(testUrl, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${shop.accessToken}`,
+              'Authorization': `Bearer ${decryptIfNeeded(shop.accessToken) as string}`,
               'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`
             }
           });
@@ -766,22 +767,34 @@ async function submitEtsyTracking(
     isLegacy: targetShop.isLegacy || false
   });
 
+  // Tokens stored as enc:v1: envelopes — decrypt before handing to EtsyClient
+  // (which sends them as raw Bearer tokens) and re-encrypt before writing back.
+  const accessTokenPlain = decryptIfNeeded(targetShop.accessToken) as string;
+  const refreshTokenPlain = decryptIfNeeded(targetShop.refreshToken) as string | null;
+  if (!accessTokenPlain) {
+    throw new Error('Etsy credentials could not be decrypted. Please reconnect your Etsy shop.');
+  }
+
   const etsyCredentials: EtsyCredentials = {
-    accessToken: targetShop.accessToken,
-    refreshToken: targetShop.refreshToken || undefined,
+    accessToken: accessTokenPlain,
+    refreshToken: refreshTokenPlain || undefined,
     shopId: targetShop.shopId,
     tokenExpiresAt: targetShop.tokenExpiresAt || undefined
   };
 
-  // Create token refresh callback to update database
+  // Create token refresh callback to update database (re-encrypt on write).
   const onTokenRefresh = async (newCredentials: EtsyCredentials) => {
+    const encAccess = encryptIfNeeded(newCredentials.accessToken) as string;
+    const encRefresh = newCredentials.refreshToken
+      ? (encryptIfNeeded(newCredentials.refreshToken) as string)
+      : null;
     if (targetShop.isLegacy) {
       // Update legacy credential
       await prisma.credential.update({
         where: { userId },
         data: {
-          etsyAccessToken: newCredentials.accessToken,
-          etsyRefreshToken: newCredentials.refreshToken,
+          etsyAccessToken: encAccess,
+          etsyRefreshToken: encRefresh,
           etsyTokenExpiresAt: newCredentials.tokenExpiresAt
         }
       });
@@ -795,8 +808,8 @@ async function submitEtsyTracking(
           }
         },
         data: {
-          accessToken: newCredentials.accessToken,
-          refreshToken: newCredentials.refreshToken,
+          accessToken: encAccess,
+          refreshToken: encRefresh ?? undefined,
           tokenExpiresAt: newCredentials.tokenExpiresAt
         }
       });

@@ -21,6 +21,7 @@ import UPSLabelDrawer from '@/components/UPSLabelDrawer';
 import MngLabelDrawer from '@/components/MngLabelDrawer';
 import ManualOrderButton from '@/components/ManualOrderButton';
 import { isEtsyOrderSync } from '@/lib/utils/etsyDetection';
+import { buildTrendyolProductUrl } from '@/lib/utils/trendyolUrl';
 import withAuth from '@/components/withAuth';
 // supabase browser client removed — auth now handled by NextAuth cookies
 import {
@@ -1045,9 +1046,15 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelStockType: order.labelStockType,
         variantInfo: lineItems?.[0]?.variantInfo || '—',
         listingUrl: (() => {
-          // Trendyol: construct from contentId
+          // Trendyol: build from contentId + productName so we land on the real
+          // product page. `/x/x-p-<id>` used to redirect but Trendyol now 404s.
           if (isTrendyol && safeRaw?.lines?.[0]?.contentId) {
-            return `https://www.trendyol.com/x/x-p-${safeRaw.lines[0].contentId}`;
+            const line = safeRaw.lines[0];
+            return buildTrendyolProductUrl({
+              contentId: line.contentId,
+              productName: line.productName,
+              merchantId: line.merchantId,
+            });
           }
           // Use server-resolved active listing URL first
           const firstItem = lineItems?.[0];
@@ -1144,11 +1151,23 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelStockType: order.labelStockType,
         variantInfo: item.variantInfo || '—',
         listingUrl: (() => {
-          // Trendyol: construct from contentId in rawData.lines
+          // Trendyol: same logic as the order-level listingUrl above —
+          // resolve contentId + productName from rawData.lines to build a
+          // working product URL instead of the broken `/x/x-p-<id>`.
           if (isTrendyol) {
             const lineId = (item as any).remoteLineId || (item as any).marketplaceKey || item.id;
-            const contentId = trendyolContentMap.get(String(lineId)) || safeRaw?.lines?.[0]?.contentId;
-            if (contentId) return `https://www.trendyol.com/x/x-p-${contentId}`;
+            const matchedLine = safeRaw?.lines?.find(
+              (l: any) => String(l.lineId) === String(lineId) || String(l.id) === String(lineId),
+            ) || safeRaw?.lines?.[0];
+            const contentId =
+              trendyolContentMap.get(String(lineId)) || matchedLine?.contentId;
+            if (contentId) {
+              return buildTrendyolProductUrl({
+                contentId,
+                productName: matchedLine?.productName,
+                merchantId: matchedLine?.merchantId,
+              });
+            }
           }
           // Server-resolved active EtsyListing URL
           if (item.etsyListingUrl) return item.etsyListingUrl;

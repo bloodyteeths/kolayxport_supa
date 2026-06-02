@@ -45,22 +45,27 @@ export interface TrendyolUrlInput {
 export function buildTrendyolProductUrl({
   contentId,
   productName,
-  merchantId,
+  merchantId: _merchantId,
   barcode,
 }: TrendyolUrlInput): string {
-  // Barcode search is the only resolver that reliably lands on the user's
-  // exact product. Trendyol's order-line `contentId` / `productCode` look
-  // like product ids but they're an internal listing reference; the
-  // `https://www.trendyol.com/<slug>-p-<contentId>` URL gets matched to an
-  // unrelated catalog entry, so a kid-dress order would deep-link to a
-  // hardware seller's screws. Skip that whole path.
-  const search = (barcode && String(barcode).trim()) || (contentId && String(contentId).trim()) || '';
-  if (search) {
-    const merchantPart = merchantId ? `&wb=${encodeURIComponent(String(merchantId))}` : '';
-    return `https://www.trendyol.com/sr?q=${encodeURIComponent(search)}${merchantPart}`;
+  // The order-line `contentId`/`productCode` we get from Trendyol's
+  // Integration API is NOT the same id Trendyol's storefront uses in
+  // `/<slug>-p-<id>` URLs — emitting `/x/x-p-<contentId>` resolves to
+  // an unrelated catalog product (e.g. a hardware seller's screws when
+  // the order was for a kid's dress). The seller API also has no public
+  // URL field. The only reliable way to deep-link is to scrape it, so
+  // we route through `/api/trendyol/url?barcode=...` server-side which
+  // resolves the canonical URL and caches it. The browser sees a 302 to
+  // the real product page on first click.
+  const barcodeStr = barcode && String(barcode).trim();
+  if (barcodeStr) {
+    const params = new URLSearchParams({ barcode: barcodeStr });
+    if (contentId) params.set('contentId', String(contentId));
+    if (productName) params.set('name', productName);
+    return `/api/trendyol/url?${params.toString()}`;
   }
-  // Last-ditch fallback — the slug-only URL won't deep-link but at least
-  // takes the user somewhere on Trendyol that surfaces relevant products.
-  const slug = productName ? slugify(productName) : '';
-  return slug ? `https://www.trendyol.com/sr?q=${encodeURIComponent(slug)}` : 'https://www.trendyol.com';
+  // No barcode at all — fall back to Trendyol search by whatever we have.
+  // Don't pass &wb=<merchantId>; that filter sometimes hides the result.
+  const search = (contentId && String(contentId).trim()) || (productName ? slugify(productName) : '');
+  return search ? `https://www.trendyol.com/sr?q=${encodeURIComponent(search)}` : 'https://www.trendyol.com';
 }

@@ -1724,7 +1724,7 @@ function EtsyListingsPage() {
                   return raw.replace(/^Etsy API error:\s*\d+\s*-\s*/, '').slice(0, 280);
                 };
                 const tip = isFailed
-                  ? `Sync başarısız: ${friendly(pendingDraft.lastSyncError)}\n\nDüzenle → tekrar Sync'e bas ya da Discard'a basıp taslağı sil.`
+                  ? `Sync başarısız: ${friendly(pendingDraft.lastSyncError)}\n\nTıkla → düzenleyiciden Tekrar Sync ya da Taslağı Sil.`
                   : isConflict
                     ? "Etsy üzerinde bu listing değişmiş. Düzenleyiciden incele ve gerekiyorsa yeniden Sync."
                     : "Local taslak. Sync to Etsy'ye basana kadar Etsy'de bir şey değişmez.";
@@ -1736,12 +1736,32 @@ function EtsyListingsPage() {
                       variant="outlined"
                       label={isFailed ? 'Sync başarısız' : isConflict ? 'Etsy değişti' : pendingDraft.status === 'draft' ? 'Pending' : pendingDraft.status}
                       onClick={() => handleOpenEditor(params.row.listing_id)}
-                      sx={{ ml: 1, height: 20, fontSize: 11, cursor: 'pointer' }}
+                      sx={{
+                        ml: 1,
+                        height: 20,
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        // Keep the chip above the absolutely-positioned hover
+                        // action buttons so its tooltip stays reachable.
+                        position: 'relative',
+                        zIndex: 2,
+                      }}
                     />
                   </Tooltip>
                 );
               })()}
-              <Box className="row-actions">
+              {/*
+                When a draft is in failed/conflict state, suppress the on-hover
+                quick-action buttons so they don't cover the status chip — the
+                chip itself opens the editor on click, which is the path the
+                user actually needs.
+              */}
+              <Box
+                className="row-actions"
+                sx={pendingDraft && (pendingDraft.status === 'failed' || pendingDraft.status === 'conflict')
+                  ? { display: 'none !important' }
+                  : undefined}
+              >
                 <Tooltip title={t('edit')} arrow>
                   <IconButton size="small" onClick={() => handleOpenEditor(params.row.listing_id)} sx={{ p: 0.5 }}>
                     <EditIcon sx={{ fontSize: 16 }} />

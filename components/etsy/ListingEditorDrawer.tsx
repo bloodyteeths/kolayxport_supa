@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { validateEtsyFields, summarizeValidation, ETSY_REQUIRED_FIELDS } from '@/lib/etsy/validation';
 import {
   Drawer,
   Box,
@@ -1366,6 +1367,30 @@ export default function ListingEditorDrawer({
   const [draftStatus, setDraftStatus] = useState<string | null>(null);
   const [draftLastError, setDraftLastError] = useState<string | null>(null);
 
+  // Client-side Etsy validation. Recomputed whenever the user edits a field.
+  // canSyncToEtsy gates the Sync button; canSaveDraft only blocks the local
+  // save when the value is structurally wrong (e.g. a 50-char tag).
+  const validation = useMemo(() => {
+    if (!fields) {
+      return { errors: [], byField: {}, canSaveDraft: true, canSyncToEtsy: true, blockReason: null };
+    }
+    return summarizeValidation(
+      validateEtsyFields({
+        title: fields.title,
+        description: fields.description,
+        tags: fields.tags,
+        materials: fields.materials,
+        price: fields.price,
+        quantity: fields.quantity,
+        who_made: fields.who_made,
+        when_made: fields.when_made,
+        is_supply: fields.is_supply,
+        taxonomy_id: listing?.taxonomy_id,
+        shipping_profile_id: fields.shipping_profile_id,
+      }),
+    );
+  }, [fields, listing?.taxonomy_id]);
+
   const refreshDraftState = useCallback(async () => {
     if (!shopId || !listingId) return;
     try {
@@ -1626,6 +1651,30 @@ export default function ListingEditorDrawer({
           );
         })()}
 
+        {/* Validation banner — surfaces what the user must fix before Sync.
+            Only renders for non-failed drafts; the failed/conflict banner
+            above already explains its own cause. */}
+        {fields && validation.errors.length > 0 && draftStatus !== 'failed' && draftStatus !== 'conflict' && (
+          <Alert
+            severity={validation.canSaveDraft ? 'warning' : 'error'}
+            sx={{ borderRadius: 0, borderLeft: 0, borderRight: 0 }}
+          >
+            <Box sx={{ fontWeight: 600, mb: 0.5 }}>
+              {validation.canSaveDraft
+                ? 'Sync\'e basmadan önce şunları tamamla:'
+                : 'Bu değerlerle taslak bile kaydedilemiyor:'}
+            </Box>
+            <Box component="ul" sx={{ m: 0, pl: 2.5, fontSize: 13 }}>
+              {validation.errors.slice(0, 5).map((err) => (
+                <li key={`${err.field}-${err.message}`}>{err.message}</li>
+              ))}
+              {validation.errors.length > 5 && (
+                <li>… ve {validation.errors.length - 5} kontrol daha</li>
+              )}
+            </Box>
+          </Alert>
+        )}
+
         {/* Content — sidebar + main area */}
         {loading ? (
           renderLoadingState()
@@ -1853,7 +1902,10 @@ export default function ListingEditorDrawer({
                   {/* Title */}
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1 }}>{t('editor.titleLabel')}</Typography>
+                      <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1 }}>
+                        {t('editor.titleLabel')}
+                        <Box component="span" sx={{ color: 'error.main', ml: 0.25 }}>*</Box>
+                      </Typography>
                       <Button
                         size="medium"
                         startIcon={aiLoading.optimize_title ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
@@ -1873,7 +1925,12 @@ export default function ListingEditorDrawer({
                       }}
                       fullWidth
                       size="medium"
-                      helperText={`${fields.title.length}/140 karakter`}
+                      error={Boolean(validation.byField.title)}
+                      helperText={
+                        validation.byField.title
+                          ? validation.byField.title.message
+                          : `${fields.title.length}/140 karakter`
+                      }
                       inputProps={{ maxLength: 140 }}
                     />
                   </Box>
@@ -1881,7 +1938,10 @@ export default function ListingEditorDrawer({
                   {/* Description */}
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1 }}>{t('editor.descriptionLabel')}</Typography>
+                      <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1 }}>
+                        {t('editor.descriptionLabel')}
+                        <Box component="span" sx={{ color: 'error.main', ml: 0.25 }}>*</Box>
+                      </Typography>
                       <Button
                         size="medium"
                         startIcon={aiLoading.generate_description ? <CircularProgress size={14} /> : <AutoFixHighIcon sx={{ fontSize: 16 }} />}
@@ -1899,7 +1959,12 @@ export default function ListingEditorDrawer({
                       multiline
                       rows={8}
                       size="medium"
-                      helperText={`${fields.description.length} karakter`}
+                      error={Boolean(validation.byField.description)}
+                      helperText={
+                        validation.byField.description
+                          ? validation.byField.description.message
+                          : `${fields.description.length} karakter`
+                      }
                     />
                   </Box>
 
@@ -2912,41 +2977,67 @@ export default function ListingEditorDrawer({
                 >
                   {discardingDraft ? 'Discarding...' : 'Discard Draft'}
                 </Button>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="medium"
-                  sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', minHeight: 48 }}
-                  disabled={syncingDraft || discardingDraft || hasChanges()}
-                  startIcon={syncingDraft ? <CircularProgress size={18} color="inherit" /> : <PublishIcon />}
-                  onClick={handleSyncDraft}
+                <Tooltip
+                  title={
+                    validation.canSyncToEtsy
+                      ? ''
+                      : `Önce şu eksiği düzelt: ${validation.blockReason}`
+                  }
+                  arrow
+                  placement="top"
+                  disableHoverListener={validation.canSyncToEtsy}
                 >
-                  {syncingDraft ? 'Syncing...' : hasChanges() ? 'Save Draft First' : 'Sync to Etsy'}
-                </Button>
+                  <span>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="medium"
+                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', minHeight: 48 }}
+                      disabled={syncingDraft || discardingDraft || hasChanges() || !validation.canSyncToEtsy}
+                      startIcon={syncingDraft ? <CircularProgress size={18} color="inherit" /> : <PublishIcon />}
+                      onClick={handleSyncDraft}
+                    >
+                      {syncingDraft ? 'Syncing...' : hasChanges() ? 'Save Draft First' : 'Sync to Etsy'}
+                    </Button>
+                  </span>
+                </Tooltip>
               </>
             )}
 
             {/* Save/Publish — green button, rightmost */}
-            <Button
-              variant="contained"
-              size="medium"
-              sx={{
-                textTransform: 'none',
-                fontWeight: 700,
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #10b981, #059669)',
-                boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
-                px: 3,
-                minHeight: 48,
-                '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
-                '&.Mui-disabled': { background: '#e2e8f0', color: '#94a3b8' },
-              }}
-              startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
-              onClick={handleSave}
-              disabled={saving || !hasChanges()}
+            <Tooltip
+              title={
+                validation.canSaveDraft
+                  ? ''
+                  : `Önce şu hatayı düzelt: ${validation.blockReason}`
+              }
+              arrow
+              placement="top"
+              disableHoverListener={validation.canSaveDraft}
             >
-              {saving ? t('editor.saving') : 'Save Draft'}
-            </Button>
+              <span>
+                <Button
+                  variant="contained"
+                  size="medium"
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    boxShadow: '0 2px 8px rgba(5,150,105,0.3)',
+                    px: 3,
+                    minHeight: 48,
+                    '&:hover': { background: 'linear-gradient(135deg, #059669, #047857)' },
+                    '&.Mui-disabled': { background: '#e2e8f0', color: '#94a3b8' },
+                  }}
+                  startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
+                  onClick={handleSave}
+                  disabled={saving || !hasChanges() || !validation.canSaveDraft}
+                >
+                  {saving ? t('editor.saving') : 'Save Draft'}
+                </Button>
+              </span>
+            </Tooltip>
           </Box>
         )}
       </Drawer>

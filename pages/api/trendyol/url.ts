@@ -98,6 +98,12 @@ async function lookupViaIntegrationAPI(userId: string, barcode: string): Promise
     where: { userId },
     select: { trendyolApiKey: true, trendyolApiSecret: true, trendyolSupplierId: true },
   });
+  logger.info('Trendyol URL resolver: cred lookup', {
+    userId,
+    hasKey: !!cred?.trendyolApiKey,
+    hasSecret: !!cred?.trendyolApiSecret,
+    hasSupplier: !!cred?.trendyolSupplierId,
+  });
   if (!cred?.trendyolApiKey || !cred?.trendyolApiSecret || !cred?.trendyolSupplierId) {
     return null;
   }
@@ -121,6 +127,14 @@ async function lookupViaIntegrationAPI(userId: string, barcode: string): Promise
   }
   const json: any = await res.json().catch(() => null);
   const item = json?.content?.[0];
+  logger.info('Trendyol URL resolver: API response shape', {
+    barcode,
+    contentCount: Array.isArray(json?.content) ? json.content.length : 0,
+    itemKeys: item ? Object.keys(item).sort() : null,
+    hasProductUrl: !!item?.productUrl,
+    productContentId: item?.productContentId,
+    productMainId: item?.productMainId,
+  });
   if (!item) return null;
 
   const productUrl: string | null = item.productUrl || null;
@@ -156,14 +170,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.redirect(302, 'https://www.trendyol.com');
   }
 
+  const noCache = req.query.nocache === '1';
+  logger.info('Trendyol URL resolver: incoming', { barcode, contentId, noCache });
+
   try {
-    // 1) Cache hit — return immediately
-    if (barcode) {
+    // 1) Cache hit — return immediately (skipped when ?nocache=1)
+    if (barcode && !noCache) {
       const cached = await prisma.trendyolProductIndex.findFirst({
         where: { barcode, expiresAt: { gt: new Date() } },
         select: { url: true },
       });
       if (cached?.url) {
+        logger.info('Trendyol URL resolver: cache hit', { barcode, url: cached.url });
         res.setHeader('Cache-Control', 'private, max-age=300');
         return res.redirect(302, cached.url);
       }
@@ -175,9 +193,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let hit: ResolvedHit | null = null;
     if (barcode) {
       const user = await getAuthUser(req, res);
+      logger.info('Trendyol URL resolver: auth resolved', {
+        barcode,
+        userId: user?.id || null,
+        hasUser: !!user,
+      });
       if (user?.id) {
         try {
           hit = await lookupViaIntegrationAPI(user.id, barcode);
+          logger.info('Trendyol URL resolver: Integration API result', {
+            barcode,
+            hit: hit ? { productId: hit.productId, url: hit.url } : null,
+          });
         } catch (err: any) {
           logger.warn('Trendyol URL resolver: Integration API failed', {
             barcode,

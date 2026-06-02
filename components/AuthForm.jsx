@@ -131,6 +131,16 @@ export default function AuthForm() {
         >
           {loading ? '...' : isSignUp ? (t('signUp') || 'Sign Up') : (t('signIn') || 'Sign In')}
         </button>
+        {!isSignUp && (
+          <div className="text-right">
+            <a
+              href="/auth/forgot"
+              className="text-xs text-blue-600 hover:underline"
+            >
+              {t('forgotPassword') || 'Forgot password?'}
+            </a>
+          </div>
+        )}
       </form>
 
       <div className="my-4 flex items-center">

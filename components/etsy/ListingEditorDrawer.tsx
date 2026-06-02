@@ -1363,13 +1363,21 @@ export default function ListingEditorDrawer({
     }
   };
 
+  const [draftStatus, setDraftStatus] = useState<string | null>(null);
+  const [draftLastError, setDraftLastError] = useState<string | null>(null);
+
   const refreshDraftState = useCallback(async () => {
     if (!shopId || !listingId) return;
     try {
       const drafts = await fetchEtsyDrafts(shopId, listingId);
-      setDraftId(drafts[0]?.id || null);
+      const top = drafts[0];
+      setDraftId(top?.id || null);
+      setDraftStatus(top?.status || null);
+      setDraftLastError(top?.lastSyncError || null);
     } catch {
       setDraftId(null);
+      setDraftStatus(null);
+      setDraftLastError(null);
     }
   }, [shopId, listingId]);
 
@@ -1549,6 +1557,74 @@ export default function ListingEditorDrawer({
             )}
           </Box>
         </Box>
+
+        {/* Failed / conflict banner — explains why and offers next steps */}
+        {draftId && (draftStatus === 'failed' || draftStatus === 'conflict') && (() => {
+          const isConflict = draftStatus === 'conflict';
+          const friendly = (raw: string | null | undefined): string => {
+            if (!raw) return '';
+            if (/who_made|when_made|is_supply/i.test(raw)) {
+              return 'Etsy "kim yaptı", "ne zaman yapıldı" ve "malzeme mi" alanlarını birlikte ister. Yeni sürüm bu üçlüyü otomatik tamamlıyor — "Tekrar Sync" yeterli.';
+            }
+            if (/shop section not found/i.test(raw)) {
+              return 'Bu listing için seçili Etsy bölümü silinmiş. Aşağıdaki Temel sekmesinden başka bir bölüm seç veya boş bırak, sonra tekrar Sync.';
+            }
+            if (/Invalid access token|not a Bearer token/i.test(raw)) {
+              return 'Etsy bağlantın geçersiz görünüyor. Ayarlar → Etsy → "Yeniden Bağlan" yapıp dön.';
+            }
+            if (/shipping_profile/i.test(raw)) {
+              return 'Seçili kargo profili Etsy\'de yok. Fiyat / Kargo sekmesinden başka bir profil seç.';
+            }
+            return raw.replace(/^Etsy API error:\s*\d+\s*-\s*/, '');
+          };
+          return (
+            <Alert
+              severity={isConflict ? 'warning' : 'error'}
+              sx={{ borderRadius: 0, borderLeft: 0, borderRight: 0 }}
+              action={
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={handleSyncDraft}
+                    disabled={syncingDraft}
+                    startIcon={syncingDraft ? <CircularProgress size={14} color="inherit" /> : undefined}
+                  >
+                    {syncingDraft ? 'Sync...' : 'Tekrar Sync'}
+                  </Button>
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={handleDiscardDraft}
+                    disabled={discardingDraft}
+                  >
+                    {discardingDraft ? 'Siliniyor...' : 'Taslağı Sil'}
+                  </Button>
+                </Box>
+              }
+            >
+              <Box sx={{ fontWeight: 600, mb: 0.5 }}>
+                {isConflict ? 'Etsy üzerinde bu listing değişmiş.' : 'Bu taslak Etsy\'e gönderilemedi.'}
+              </Box>
+              <Box sx={{ fontSize: 13 }}>
+                {isConflict
+                  ? 'Değişikliklerini gözden geçir; istediğin halde uygula için tekrar Sync\'e bas. İptal etmek istersen "Taslağı Sil".'
+                  : friendly(draftLastError)}
+              </Box>
+              {!isConflict && draftLastError && (
+                <Box
+                  component="details"
+                  sx={{ mt: 0.5, fontSize: 11, opacity: 0.7, '& summary': { cursor: 'pointer' } }}
+                >
+                  <summary>Teknik hata</summary>
+                  <Box sx={{ mt: 0.5, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {draftLastError}
+                  </Box>
+                </Box>
+              )}
+            </Alert>
+          );
+        })()}
 
         {/* Content — sidebar + main area */}
         {loading ? (

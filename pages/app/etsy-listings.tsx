@@ -1704,15 +1704,43 @@ function EtsyListingsPage() {
                   {draftedTitle || params.row.title}
                 </Typography>
               </Tooltip>
-              {pendingDraft && (
-                <Chip
-                  size="small"
-                  color={pendingDraft.status === 'conflict' ? 'warning' : pendingDraft.status === 'failed' ? 'error' : 'primary'}
-                  variant="outlined"
-                  label={pendingDraft.status === 'draft' ? 'Pending' : pendingDraft.status}
-                  sx={{ ml: 1, height: 20, fontSize: 11 }}
-                />
-              )}
+              {pendingDraft && (() => {
+                const isFailed = pendingDraft.status === 'failed';
+                const isConflict = pendingDraft.status === 'conflict';
+                const friendly = (raw: string | null | undefined): string => {
+                  if (!raw) return '';
+                  if (/who_made|when_made|is_supply/i.test(raw)) {
+                    return "Etsy zorunlu üçlüsü (kim/ne zaman yapıldı, malzeme mi) eksik. Yeniden senkronizasyon dener — çoğu yeni denemede otomatik çözülür.";
+                  }
+                  if (/shop section not found/i.test(raw)) {
+                    return "Seçili Etsy bölümü artık yok. Düzenleyiciden başka bir bölüm seç ve tekrar dene.";
+                  }
+                  if (/Invalid access token|not a Bearer token/i.test(raw)) {
+                    return "Etsy bağlantın geçersiz. Ayarlar → Etsy'den yeniden bağlan.";
+                  }
+                  if (/shipping_profile/i.test(raw)) {
+                    return "Seçili kargo profili artık yok. Düzenleyiciden başka bir profil seç.";
+                  }
+                  return raw.replace(/^Etsy API error:\s*\d+\s*-\s*/, '').slice(0, 280);
+                };
+                const tip = isFailed
+                  ? `Sync başarısız: ${friendly(pendingDraft.lastSyncError)}\n\nDüzenle → tekrar Sync'e bas ya da Discard'a basıp taslağı sil.`
+                  : isConflict
+                    ? "Etsy üzerinde bu listing değişmiş. Düzenleyiciden incele ve gerekiyorsa yeniden Sync."
+                    : "Local taslak. Sync to Etsy'ye basana kadar Etsy'de bir şey değişmez.";
+                return (
+                  <Tooltip title={tip} arrow placement="top">
+                    <Chip
+                      size="small"
+                      color={isConflict ? 'warning' : isFailed ? 'error' : 'primary'}
+                      variant="outlined"
+                      label={isFailed ? 'Sync başarısız' : isConflict ? 'Etsy değişti' : pendingDraft.status === 'draft' ? 'Pending' : pendingDraft.status}
+                      onClick={() => handleOpenEditor(params.row.listing_id)}
+                      sx={{ ml: 1, height: 20, fontSize: 11, cursor: 'pointer' }}
+                    />
+                  </Tooltip>
+                );
+              })()}
               <Box className="row-actions">
                 <Tooltip title={t('edit')} arrow>
                   <IconButton size="small" onClick={() => handleOpenEditor(params.row.listing_id)} sx={{ p: 0.5 }}>

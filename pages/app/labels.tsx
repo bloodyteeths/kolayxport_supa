@@ -1048,12 +1048,13 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         listingUrl: (() => {
           // Trendyol: build from contentId + productName so we land on the real
           // product page. `/x/x-p-<id>` used to redirect but Trendyol now 404s.
-          if (isTrendyol && safeRaw?.lines?.[0]?.contentId) {
+          if (isTrendyol && safeRaw?.lines?.[0]) {
             const line = safeRaw.lines[0];
             return buildTrendyolProductUrl({
               contentId: line.contentId,
               productName: line.productName,
               merchantId: line.merchantId,
+              barcode: line.barcode || line.sku || line.merchantSku,
             });
           }
           // Use server-resolved active listing URL first
@@ -1161,11 +1162,14 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
             ) || safeRaw?.lines?.[0];
             const contentId =
               trendyolContentMap.get(String(lineId)) || matchedLine?.contentId;
-            if (contentId) {
+            const barcode =
+              matchedLine?.barcode || matchedLine?.sku || matchedLine?.merchantSku;
+            if (contentId || barcode) {
               return buildTrendyolProductUrl({
                 contentId,
                 productName: matchedLine?.productName,
                 merchantId: matchedLine?.merchantId,
+                barcode,
               });
             }
           }

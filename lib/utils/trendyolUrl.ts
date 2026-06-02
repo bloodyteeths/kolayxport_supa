@@ -35,16 +35,32 @@ export interface TrendyolUrlInput {
   contentId?: number | string | null;
   productName?: string | null;
   merchantId?: number | string | null;
+  /** Manufacturer barcode (EAN/UPC) from rawData.lines[].barcode. Universal,
+   *  always unique to a seller's listing, and Trendyol's `/sr?q=` resolver
+   *  lands on the exact product. Preferred over contentId/productCode which
+   *  in Trendyol's order API are NOT the product-detail-page id. */
+  barcode?: string | null;
 }
 
-export function buildTrendyolProductUrl({ contentId, productName, merchantId }: TrendyolUrlInput): string {
-  if (!contentId) return 'https://www.trendyol.com';
-  const slug = productName ? slugify(productName) : '';
-  if (slug.length >= 4) {
-    const base = `https://www.trendyol.com/${slug}-p-${contentId}`;
-    return merchantId ? `${base}?merchantId=${merchantId}` : base;
+export function buildTrendyolProductUrl({
+  contentId,
+  productName,
+  merchantId,
+  barcode,
+}: TrendyolUrlInput): string {
+  // Barcode search is the only resolver that reliably lands on the user's
+  // exact product. Trendyol's order-line `contentId` / `productCode` look
+  // like product ids but they're an internal listing reference; the
+  // `https://www.trendyol.com/<slug>-p-<contentId>` URL gets matched to an
+  // unrelated catalog entry, so a kid-dress order would deep-link to a
+  // hardware seller's screws. Skip that whole path.
+  const search = (barcode && String(barcode).trim()) || (contentId && String(contentId).trim()) || '';
+  if (search) {
+    const merchantPart = merchantId ? `&wb=${encodeURIComponent(String(merchantId))}` : '';
+    return `https://www.trendyol.com/sr?q=${encodeURIComponent(search)}${merchantPart}`;
   }
-  // No usable slug — Trendyol search resolves a numeric contentId straight to the
-  // product, even though the URL surface is /sr?q=...
-  return `https://www.trendyol.com/sr?q=${encodeURIComponent(String(contentId))}`;
+  // Last-ditch fallback — the slug-only URL won't deep-link but at least
+  // takes the user somewhere on Trendyol that surfaces relevant products.
+  const slug = productName ? slugify(productName) : '';
+  return slug ? `https://www.trendyol.com/sr?q=${encodeURIComponent(slug)}` : 'https://www.trendyol.com';
 }

@@ -88,13 +88,26 @@ function SummaryCards({ summary, marketplace }: { summary: DashboardSummary; mar
                   {t(card.subtKey)}
                 </Typography>
               )}
-              {card.key === 'grossRevenue' && summary.orderCount > 0 && (
-                <Chip
-                  label={`${summary.orderCount} ${t('orders')}`}
-                  size="small"
-                  sx={{ mt: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#f3f4f6', color: '#6b7280' }}
-                />
-              )}
+              {card.key === 'grossRevenue' && (summary.orderCount > 0 || (summary.totalOrderCount ?? 0) > 0) && (() => {
+                // Prefer Order-table count over FinancialTransaction count — it
+                // matches the labels page exactly. When the marketplace hasn't
+                // settled some receipts yet, show "X (+Y bekliyor)" so the
+                // delta is obvious instead of looking like a sync bug.
+                const displayCount = summary.totalOrderCount ?? summary.orderCount;
+                const pending = summary.pendingSettlementCount ?? 0;
+                return (
+                  <Chip
+                    label={pending > 0
+                      ? `${displayCount} ${t('orders')} (+${pending} bekliyor)`
+                      : `${displayCount} ${t('orders')}`}
+                    size="small"
+                    title={pending > 0
+                      ? `${summary.orderCount} sipariş Etsy/Trendyol tarafından ödeme olarak işlendi. ${pending} sipariş hâlâ market tarafından kapatılmayı bekliyor — 1-3 gün sürebilir.`
+                      : undefined}
+                    sx={{ mt: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: pending > 0 ? '#fef3c7' : '#f3f4f6', color: pending > 0 ? '#92400e' : '#6b7280' }}
+                  />
+                );
+              })()}
               {card.key === '_netRevenue' && summary.orderCount > 0 && (
                 <Chip
                   label={`${summary.orderCount - summary.returnCount} ${t('orders')}`}

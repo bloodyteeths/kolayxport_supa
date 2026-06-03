@@ -17,8 +17,15 @@ interface DashboardSummary {
   cogs: number;
   netProfit: number;
   margin: number;
+  // Orders Etsy / Trendyol have actually settled — what FinancialTransaction
+  // knows about. Always lags the user's actual receipts.
   orderCount: number;
   returnCount: number;
+  // Orders the labels page counts (Order table). Includes receipts that
+  // haven't settled yet. >= orderCount; the delta is "pending settlement".
+  totalOrderCount: number;
+  pendingSettlementCount: number;
+  totalOrderRevenue: number;
 }
 
 interface TimeSeriesPoint {
@@ -121,6 +128,55 @@ async function buildDashboard(
     },
     orderBy: { transactionDate: 'asc' },
   });
+
+  // Order-table totals for the same window. Etsy/Trendyol/eBay/Amazon hold
+  // payments 1-3 days before they post as ledger entries, so the
+  // `FinancialTransaction` Sale count is always behind the labels page.
+  // Cross-reference the Order table — it gets the receipt the moment the
+  // marketplace fires the webhook — so we can show the user the real order
+  // total and a "X pending settlement" delta.
+  // Match the same shop-name family that the marketplace tab represents
+  // (Etsy can land as "BelleCoutureGifts", "Decorsweetart", etc. — see
+  // reference_etsy_marketplace_detection memory).
+  const marketplaceMatchers: Record<string, string[]> = {
+    etsy: ['etsy', 'bellecouture', 'decorsweet', 'mybabybymerry', 'outletemporium'],
+    trendyol: ['trendyol'],
+    ebay: ['ebay'],
+    amazon: ['amazon'],
+  };
+  const orderMarketplacePatterns =
+    marketplaceMatchers[marketplace.toLowerCase()] || [marketplace.toLowerCase()];
+  const orderRows = await prisma.order
+    .findMany({
+      where: {
+        userId,
+        OR: orderMarketplacePatterns.map(p => ({
+          marketplace: { contains: p, mode: 'insensitive' as const },
+        })),
+        AND: [
+          {
+            OR: [
+              { uiOrderDate: { gte: startDate, lte: endDate } },
+              {
+                AND: [
+                  { uiOrderDate: null },
+                  { createdAt: { gte: startDate, lte: endDate } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      select: { id: true, status: true, totalPrice: true },
+    })
+    .catch(() => [] as Array<{ id: string; status: string | null; totalPrice: number | null }>);
+  const cancelledStatuses = new Set(['CANCELLED', 'cancelled', 'Cancelled', 'canceled', 'Canceled']);
+  const orderRowsActive = orderRows.filter(r => !cancelledStatuses.has(r.status || ''));
+  const orderTableCount = orderRowsActive.length;
+  const orderTableRevenue = orderRowsActive.reduce(
+    (acc, r) => acc + Number(r.totalPrice || 0),
+    0,
+  );
 
   // Fetch product costs for COGS lookup
   const productCosts = await prisma.productCost.findMany({
@@ -313,6 +369,9 @@ async function buildDashboard(
       margin: round2(margin),
       orderCount,
       returnCount,
+      totalOrderCount: orderTableCount,
+      pendingSettlementCount: Math.max(0, orderTableCount - orderCount),
+      totalOrderRevenue: round2(orderTableRevenue),
     },
     timeSeries,
     productBreakdown,

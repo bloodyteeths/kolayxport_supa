@@ -12,6 +12,12 @@ export interface DashboardSummary {
   margin: number;
   orderCount: number;
   returnCount: number;
+  // Orders the labels page counts (from `Order` table). >= orderCount.
+  // The delta is "pending settlement" — marketplace hasn't booked the
+  // ledger entry yet.
+  totalOrderCount?: number;
+  pendingSettlementCount?: number;
+  totalOrderRevenue?: number;
 }
 
 export interface TimeSeriesPoint {

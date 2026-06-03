@@ -74,8 +74,8 @@ function classifyTransactionType(type: string): 'revenue' | 'commission' | 'ship
   if (t.includes('commission') || t.includes('komisyon') || t.includes('service')) return 'commission';
   // Discount cancel (İndirim İptal / DiscountCancel) — revenue recovery
   if (orig === 'İndirim İptal' || t.includes('discountcancel') || (t.includes('indirim') && t.includes('iptal'))) return 'revenue';
-  // Returns (İade / Return)
-  if (orig.startsWith('İade') || t.includes('return') || t.includes('iade')) return 'return';
+  // Returns (İade / Return / Refund)
+  if (orig.startsWith('İade') || t.includes('return') || t.includes('iade') || t.includes('refund')) return 'return';
   // Discounts/coupons (İndirim / Kupon)
   if (orig.startsWith('İndirim') || t.includes('discount') || t.includes('indirim') || t.includes('coupon') || t.includes('kupon')) return 'discount';
   // Provision (weight/deci adjustments) — treat as shipping adjustment

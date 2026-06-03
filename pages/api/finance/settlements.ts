@@ -747,6 +747,7 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
       for (const entry of entries) {
         const ledgerType = (entry.ledger_type || '').toLowerCase();
         const description = (entry.description || '').toLowerCase();
+
         // Precise match only. Do NOT match `ledgerType.includes('ad')` —
         // that picks up `payment_adjustment`, `card_processing`, etc.
         const isAdSpend = ledgerType === 'prolist'
@@ -756,7 +757,16 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
           || description.includes('etsy ads')
           || description.includes('promoted listing');
 
-        if (!isAdSpend) continue;
+        // Refunds and cancellation losses. Etsy's `refund` ledger type
+        // covers full + partial buyer refunds; `seller_paid_for_return_shipping`
+        // also costs the seller money. Without persisting these the dashboard
+        // counts canceled Sale rows as revenue and net profit is overstated.
+        const isRefund = ledgerType === 'refund'
+          || ledgerType === 'refund_dispute'
+          || ledgerType === 'seller_paid_for_return_shipping'
+          || description.includes('refund');
+
+        if (!isAdSpend && !isRefund) continue;
 
         // Ledger amounts are integers in cents, not Money objects
         const rawAmount = typeof entry.amount === 'object'
@@ -774,6 +784,11 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
           ? new Date(entry.create_date * 1000)
           : new Date();
 
+        const txType = isAdSpend ? 'AdSpend' : 'Refund';
+        const txProductName = isAdSpend
+          ? (description || (ledgerType === 'offsite_ads_fee' ? 'Offsite Ads' : 'Etsy Ads'))
+          : (description || 'Refund');
+
         await prisma.financialTransaction.upsert({
           where: {
             userId_marketplace_externalId: {
@@ -786,15 +801,16 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
             amount: -Math.abs(rawAmount),
             transactionDate: txDate,
             syncedAt: new Date(),
+            transactionType: txType,
           },
           create: {
             userId,
             marketplace: 'etsy',
             externalId,
-            transactionType: 'AdSpend',
+            transactionType: txType,
             orderNumber: null,
             barcode: null,
-            productName: description || (ledgerType === 'offsite_ads_fee' ? 'Offsite Ads' : 'Etsy Ads'),
+            productName: txProductName,
             quantity: 1,
             amount: -Math.abs(rawAmount),
             currency: entry.currency_code || 'USD',
@@ -804,8 +820,10 @@ async function handleEtsySync(userId: string, body: any, res: NextApiResponse) {
           },
         });
 
-        adSpendTotal += Math.abs(rawAmount);
-        adSpendEntries++;
+        if (isAdSpend) {
+          adSpendTotal += Math.abs(rawAmount);
+          adSpendEntries++;
+        }
         totalUpserted++;
       }
 

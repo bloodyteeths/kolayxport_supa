@@ -207,10 +207,23 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
 }
 
 function mapEtsyStatus(receipt: any): string {
+  // Order matters: a canceled order can still have was_paid/was_shipped=true
+  // (they were paid+shipped before the cancel), so the cancel check has to
+  // win over both — otherwise refunded orders look perfectly healthy in our
+  // UI and the user can't tell what's been refunded.
+  const externalStatus = typeof receipt.status === 'string' ? receipt.status : '';
+  if (
+    receipt.is_dead ||
+    receipt.is_refunded ||
+    externalStatus === 'Canceled' ||
+    externalStatus === 'Cancelled' ||
+    externalStatus === 'Fully Refunded'
+  ) {
+    return 'CANCELLED';
+  }
   if (receipt.is_shipped || receipt.was_shipped) return 'SHIPPED';
   if (receipt.is_paid || receipt.was_paid) return 'PAID';
-  if (receipt.is_dead) return 'CANCELLED';
-  if (receipt.status === 'Completed') return 'SHIPPED';
-  if (receipt.status === 'Paid') return 'PAID';
+  if (externalStatus === 'Completed') return 'SHIPPED';
+  if (externalStatus === 'Paid') return 'PAID';
   return 'AWAITING_FULFILLMENT';
 }

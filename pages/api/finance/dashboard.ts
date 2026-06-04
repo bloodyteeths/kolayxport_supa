@@ -172,11 +172,18 @@ async function buildDashboard(
     .catch(() => [] as Array<{ id: string; status: string | null; totalPrice: number | null }>);
   const cancelledStatuses = new Set(['CANCELLED', 'cancelled', 'Cancelled', 'canceled', 'Canceled']);
   const orderRowsActive = orderRows.filter(r => !cancelledStatuses.has(r.status || ''));
+  const orderRowsCancelled = orderRows.filter(r => cancelledStatuses.has(r.status || ''));
   const orderTableCount = orderRowsActive.length;
   const orderTableRevenue = orderRowsActive.reduce(
     (acc, r) => acc + Number(r.totalPrice || 0),
     0,
   );
+  // Distinct refunded orders, NOT individual refund ledger events. Etsy emits
+  // multiple refund entries per order (partial refund + return-shipping refund
+  // + commission refund), so counting Refund FinancialTransaction rows shows
+  // misleadingly high "X orders refunded" badges. The Order table is the
+  // single source of truth for distinct-order counts.
+  const refundedOrderCount = orderRowsCancelled.length;
 
   // Fetch product costs for COGS lookup
   const productCosts = await prisma.productCost.findMany({
@@ -368,7 +375,11 @@ async function buildDashboard(
       netProfit: round2(netProfit),
       margin: round2(margin),
       orderCount,
-      returnCount,
+      // Distinct refunded orders (from Order table), not refund ledger
+      // events. Without this fix the Returns/Net chips showed 9 refunds
+      // against 10 sales — confusing the user into thinking nearly every
+      // order had been canceled when only 2 actually were.
+      returnCount: refundedOrderCount || returnCount,
       totalOrderCount: orderTableCount,
       pendingSettlementCount: Math.max(0, orderTableCount - orderCount),
       totalOrderRevenue: round2(orderTableRevenue),

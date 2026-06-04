@@ -455,12 +455,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const startDate = startDateRaw
       ? new Date(Number(startDateRaw) || startDateRaw)
       : defaultStart;
-    const endDate = endDateRaw
+    let endDate = endDateRaw
       ? new Date(Number(endDateRaw) || endDateRaw)
       : now;
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       return res.status(400).json({ error: 'Invalid date format. Use epoch ms or ISO string.' });
+    }
+
+    // Date-only inputs (YYYY-MM-DD) parse to midnight UTC on that day. Without
+    // this fix the dashboard misses everything placed *during* the last day of
+    // the range — labels page already does the same end-of-day bump so without
+    // it, the two views report different counts. (Off-by-one between "9
+    // orders" on financials and "10 orders" on labels was this exact issue.)
+    if (
+      typeof endDateRaw === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(endDateRaw) &&
+      endDate.getUTCHours() === 0 &&
+      endDate.getUTCMinutes() === 0
+    ) {
+      endDate = new Date(endDate.getTime() + 24 * 60 * 60 * 1000 - 1);
     }
 
     // Debug mode: show raw transaction type distribution

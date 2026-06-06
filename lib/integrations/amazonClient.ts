@@ -77,8 +77,15 @@ export function buildAuthUrl(
 ): { url: string; csrfToken: string } {
   const { randomBytes } = require('crypto');
 
-  const clientId = process.env.AMAZON_LWA_CLIENT_ID;
-  if (!clientId) throw new Error('AMAZON_LWA_CLIENT_ID is required');
+  // The consent URL's `application_id` is the SP-API Solution ID
+  // (amzn1.sp.solution.xxx), NOT the LWA OAuth client ID. The LWA client ID
+  // is used only at the token-exchange step (exchangeAuthCode/refreshAccessToken).
+  const solutionId = process.env.AMAZON_SOLUTION_ID;
+  if (!solutionId) {
+    throw new Error(
+      'AMAZON_SOLUTION_ID is required (amzn1.sp.solution.xxx — found in the SP-API developer console next to the app name)',
+    );
+  }
 
   const csrfToken = randomBytes(16).toString('hex');
   const state = Buffer.from(
@@ -88,7 +95,7 @@ export function buildAuthUrl(
   const redirectUri = `${process.env.NEXTAUTH_URL || 'https://kolayxport.com'}/api/integrations/amazon/callback`;
 
   const params = new URLSearchParams({
-    application_id: clientId,
+    application_id: solutionId,
     state,
     redirect_uri: redirectUri,
   });

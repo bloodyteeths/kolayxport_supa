@@ -76,6 +76,8 @@ export function toNormalizedOrder(order: any): UIOrder {
     },
     recipientEmail: order.BuyerInfo?.BuyerEmail || undefined,
     externalStatus: order.OrderStatus,
+    isFBA: isFba,
+    marketplaceId: order.MarketplaceId || undefined,
   };
 }
 
@@ -98,6 +100,8 @@ export function toNormalizedOrderFromReport(row: Record<string, string>): UIOrde
 
   const quantity = parseInt(row['quantity-purchased'] || '1', 10);
   const itemPrice = parseFloat(row['item-price'] || '0');
+  const isFBA = (row['fulfillment-channel'] || '').toUpperCase() === 'AFN';
+  const marketplaceId = row['sales-channel-marketplace-id'] || row['marketplace-id'] || undefined;
 
   return {
     id: row['order-id'],
@@ -124,6 +128,8 @@ export function toNormalizedOrderFromReport(row: Record<string, string>): UIOrde
     shipByDate: row['ship-by-date'] || undefined,
     rawData: row,
     externalStatus: row['order-status'],
+    isFBA,
+    marketplaceId,
   };
 }
 

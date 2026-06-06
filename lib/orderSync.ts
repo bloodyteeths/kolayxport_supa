@@ -1041,7 +1041,9 @@ export async function syncAllOrders(userId: string, options: {
 
           if (token) {
             const region = (cred.amazonRegion || 'eu') as 'na' | 'eu' | 'fe';
-            const marketplaceIds = [cred.amazonMarketplaceId || 'ATVPDKIKX0DER'];
+            const marketplaceIds: string[] = Array.isArray(cred.amazonMarketplaceIds) && cred.amazonMarketplaceIds.length > 0
+              ? cred.amazonMarketplaceIds
+              : [cred.amazonMarketplaceId || 'ATVPDKIKX0DER'];
 
             // Use 30-day window for orders
             const syncStart = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);

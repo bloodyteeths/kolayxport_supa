@@ -67,15 +67,23 @@ export const AMAZON_MARKETPLACES: Record<string, { id: string; domain: string; r
 /**
  * Build the Amazon OAuth consent URL for seller authorization.
  * Returns { url, csrfToken } so the connect handler can set the CSRF cookie.
+ *
+ * marketplaceIds is the list of Amazon marketplace IDs (e.g. ['ATVPDKIKX0DER','A33AVAJ2PDY3EV'])
+ * the seller wants to connect. Encoded in `state` and persisted in the callback.
  */
-export function buildAuthUrl(userId: string): { url: string; csrfToken: string } {
+export function buildAuthUrl(
+  userId: string,
+  marketplaceIds: string[] = [],
+): { url: string; csrfToken: string } {
   const { randomBytes } = require('crypto');
 
   const clientId = process.env.AMAZON_LWA_CLIENT_ID;
   if (!clientId) throw new Error('AMAZON_LWA_CLIENT_ID is required');
 
   const csrfToken = randomBytes(16).toString('hex');
-  const state = Buffer.from(JSON.stringify({ userId, csrfToken })).toString('base64url');
+  const state = Buffer.from(
+    JSON.stringify({ userId, csrfToken, marketplaceIds }),
+  ).toString('base64url');
 
   const redirectUri = `${process.env.NEXTAUTH_URL || 'https://kolayxport.com'}/api/integrations/amazon/callback`;
 
@@ -85,7 +93,22 @@ export function buildAuthUrl(userId: string): { url: string; csrfToken: string }
     redirect_uri: redirectUri,
   });
 
+  if (process.env.AMAZON_SANDBOX === 'true') {
+    params.set('version', 'beta');
+  }
+
   return { url: `${AMAZON_AUTH_URL}?${params}`, csrfToken };
+}
+
+/**
+ * Resolve a marketplace ID to its SP-API region.
+ * Returns 'eu' if not found.
+ */
+export function regionForMarketplaceId(marketplaceId: string): AmazonRegion {
+  for (const m of Object.values(AMAZON_MARKETPLACES)) {
+    if (m.id === marketplaceId) return m.region;
+  }
+  return 'eu';
 }
 
 /**
@@ -553,4 +576,147 @@ export class RateLimitError extends Error {
     this.name = 'RateLimitError';
     this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Feeds API — submit order fulfillment (tracking) directly to Amazon
+// ---------------------------------------------------------------------------
+
+/**
+ * Map our internal carrier names to Amazon's accepted CarrierCode values.
+ * Amazon expects specific strings — anything else can be sent under CarrierName instead.
+ */
+const AMAZON_CARRIER_CODES: Record<string, string> = {
+  'FedEx': 'FedEx',
+  'UPS': 'UPS',
+  'USPS': 'USPS',
+  'DHL': 'DHL',
+  'DHL Express': 'DHL Express',
+  'Royal Mail': 'Royal Mail',
+  'DPD': 'DPD',
+};
+
+function escapeXml(s: string): string {
+  return String(s).replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case "'": return '&apos;';
+      case '"': return '&quot;';
+      default: return c;
+    }
+  });
+}
+
+/**
+ * Build a POST_ORDER_FULFILLMENT_DATA XML feed for a single shipment.
+ * Schema: https://m.media-amazon.com/images/G/01/rainier/help/xsd/release_1_9/OrderFulfillment.xsd
+ */
+export function buildOrderFulfillmentFeed(params: {
+  sellerId: string;
+  amazonOrderId: string;
+  trackingNumber: string;
+  carrierName: string;
+  shipDate?: Date;
+}): string {
+  const code = AMAZON_CARRIER_CODES[params.carrierName];
+  const carrierEl = code
+    ? `<CarrierCode>${escapeXml(code)}</CarrierCode>`
+    : `<CarrierName>${escapeXml(params.carrierName)}</CarrierName>`;
+  const shipDate = (params.shipDate || new Date()).toISOString();
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<AmazonEnvelope>
+  <Header>
+    <DocumentVersion>1.01</DocumentVersion>
+    <MerchantIdentifier>${escapeXml(params.sellerId)}</MerchantIdentifier>
+  </Header>
+  <MessageType>OrderFulfillment</MessageType>
+  <Message>
+    <MessageID>1</MessageID>
+    <OrderFulfillment>
+      <AmazonOrderID>${escapeXml(params.amazonOrderId)}</AmazonOrderID>
+      <FulfillmentDate>${shipDate}</FulfillmentDate>
+      <FulfillmentData>
+        ${carrierEl}
+        <ShipperTrackingNumber>${escapeXml(params.trackingNumber)}</ShipperTrackingNumber>
+      </FulfillmentData>
+    </OrderFulfillment>
+  </Message>
+</AmazonEnvelope>`;
+}
+
+/**
+ * Submit an order-fulfillment (tracking) update to Amazon via the Feeds 2021-06-30 API.
+ *
+ * Flow:
+ *   1. createFeedDocument → returns signed S3 URL + feedDocumentId
+ *   2. PUT XML payload to the signed URL
+ *   3. createFeed referencing the feedDocumentId
+ * Returns the feedId. Polling status is the caller's responsibility (optional).
+ */
+export async function submitAmazonTracking(params: {
+  token: string;
+  region: AmazonRegion;
+  marketplaceId: string;
+  sellerId: string;
+  amazonOrderId: string;
+  trackingNumber: string;
+  carrierName: string;
+  shipDate?: Date;
+}): Promise<{ feedId: string; feedDocumentId: string }> {
+  const { token, region, marketplaceId, sellerId } = params;
+
+  // 1) Create a feed document — Amazon returns a signed S3 URL we can PUT to.
+  const createDoc = await callSpApi(
+    '/feeds/2021-06-30/documents',
+    token,
+    region,
+    {
+      method: 'POST',
+      body: JSON.stringify({ contentType: 'text/xml; charset=UTF-8' }),
+    },
+  );
+  const { feedDocumentId, url: uploadUrl } = createDoc as { feedDocumentId: string; url: string };
+
+  // 2) Upload the XML to the signed URL (no auth header).
+  const xml = buildOrderFulfillmentFeed({
+    sellerId,
+    amazonOrderId: params.amazonOrderId,
+    trackingNumber: params.trackingNumber,
+    carrierName: params.carrierName,
+    shipDate: params.shipDate,
+  });
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'text/xml; charset=UTF-8' },
+    body: xml,
+  });
+  if (!uploadRes.ok) {
+    const body = await uploadRes.text();
+    throw new Error(`Amazon feed upload failed: ${uploadRes.status} ${body.slice(0, 200)}`);
+  }
+
+  // 3) Create the feed referencing the uploaded document.
+  const created = await callSpApi(
+    '/feeds/2021-06-30/feeds',
+    token,
+    region,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        feedType: 'POST_ORDER_FULFILLMENT_DATA',
+        marketplaceIds: [marketplaceId],
+        inputFeedDocumentId: feedDocumentId,
+      }),
+    },
+  );
+
+  logger.info('Amazon tracking feed submitted', {
+    feedId: (created as any).feedId,
+    amazonOrderId: params.amazonOrderId,
+  });
+
+  return { feedId: (created as any).feedId, feedDocumentId };
 }

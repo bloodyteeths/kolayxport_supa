@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { exchangeAuthCode } from '@/lib/integrations/amazonClient';
+import { exchangeAuthCode, regionForMarketplaceId } from '@/lib/integrations/amazonClient';
 import { logger } from '@/lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
 
@@ -50,6 +50,9 @@ export default async function handler(
     );
     userId = stateData.userId;
     const csrfTokenFromState = stateData.csrfToken;
+    const marketplaceIdsFromState: string[] = Array.isArray(stateData.marketplaceIds)
+      ? stateData.marketplaceIds.filter((v: unknown): v is string => typeof v === 'string')
+      : [];
 
     // Verify CSRF token from cookie matches token in state
     const cookies = req.headers.cookie || '';
@@ -80,9 +83,13 @@ export default async function handler(
 
     const tokenExpiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
-    // Determine marketplace/region from selling_partner_id or default to EU
-    const region = 'eu'; // Default for Turkish sellers
-    const marketplaceId = 'A33AVAJ2PDY3EV'; // Turkey default
+    // Resolve marketplaces from state; first one is primary and decides region.
+    if (marketplaceIdsFromState.length === 0) {
+      logger.error('Amazon callback missing marketplaceIds in state', undefined, { userId });
+      return res.redirect('/ayarlar?error=amazon_no_marketplace_selected');
+    }
+    const primaryMarketplaceId = marketplaceIdsFromState[0];
+    const region = regionForMarketplaceId(primaryMarketplaceId);
 
     // Store tokens in Credential table, encrypted at rest via `enc:v1:` envelope.
     const encAccess = encryptIfNeeded(tokens.access_token);
@@ -94,7 +101,8 @@ export default async function handler(
         amazonRefreshToken: encRefresh,
         amazonTokenExpiresAt: tokenExpiresAt,
         amazonSellerId: (selling_partner_id as string) || undefined,
-        amazonMarketplaceId: marketplaceId,
+        amazonMarketplaceId: primaryMarketplaceId,
+        amazonMarketplaceIds: marketplaceIdsFromState,
         amazonRegion: region,
         updatedAt: new Date(),
       },
@@ -104,7 +112,8 @@ export default async function handler(
         amazonRefreshToken: encRefresh,
         amazonTokenExpiresAt: tokenExpiresAt,
         amazonSellerId: (selling_partner_id as string) || undefined,
-        amazonMarketplaceId: marketplaceId,
+        amazonMarketplaceId: primaryMarketplaceId,
+        amazonMarketplaceIds: marketplaceIdsFromState,
         amazonRegion: region,
       },
     });

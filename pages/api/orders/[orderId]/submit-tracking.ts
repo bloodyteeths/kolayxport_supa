@@ -5,6 +5,7 @@ import { logger } from '../../../../lib/logger';
 import { EtsyClient, EtsyTrackingData, EtsyCredentials } from '../../../../lib/integrations/etsyClient';
 import { createWixClient } from '../../../../lib/integrations/wixClient';
 import { getUserAccessToken } from '../../../../lib/integrations/ebayClient';
+import { getValidToken, submitAmazonTracking, regionForMarketplaceId } from '../../../../lib/integrations/amazonClient';
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/crypto/credentials';
 
 interface VeeqoAllocation {
@@ -76,7 +77,7 @@ export default async function handler(
       if (marketplace.includes('trendyol')) return 'trendyol';
       if (marketplace.includes('wix')) return 'wix';
       if (marketplace.includes('ebay')) return 'ebay';
-      if (marketplace.includes('amazon')) return 'veeqo';
+      if (marketplace.includes('amazon')) return 'amazon';
       if (marketplace.includes('veeqo')) return 'veeqo';
       // Check if marketplace name matches an Etsy shop name (e.g. "bellecouturegifts")
       const etsyShop = await prisma.etsyShop.findFirst({
@@ -227,6 +228,98 @@ export default async function handler(
         return res.status(200).json({
           success: true,
           message: `Tracking saved locally. eBay push error: ${err.message}`,
+        });
+      }
+    } else if (source === 'amazon') {
+      // Submit fulfillment directly to Amazon via SP-API Feeds (POST_ORDER_FULFILLMENT_DATA).
+      const carrierLabel = getCarrierName(carrierId);
+      const cred = userSettings as any;
+      if (!cred?.amazonAccessToken || !cred?.amazonRefreshToken || !cred?.amazonSellerId) {
+        return res.status(400).json({
+          error: 'Amazon account not connected. Connect it in Settings → Integrations.',
+        });
+      }
+      try {
+        const token = await getValidToken(cred, async (newToken: string, expiresAt: Date) => {
+          await prisma.credential.update({
+            where: { userId: user.id },
+            data: { amazonAccessToken: newToken, amazonTokenExpiresAt: expiresAt } as any,
+          });
+        });
+        if (!token) {
+          throw new Error('Unable to obtain Amazon access token');
+        }
+
+        // Resolve marketplace for the order. Prefer the per-order marketplaceId
+        // (stored in rawData by the report mapper) and fall back to the primary one.
+        let rawData = order.rawData as any;
+        if (typeof rawData === 'string') {
+          try { rawData = JSON.parse(rawData); } catch { rawData = {}; }
+        }
+        const orderMarketplaceId =
+          rawData?.['sales-channel-marketplace-id'] ||
+          rawData?.['marketplace-id'] ||
+          rawData?.MarketplaceId ||
+          cred.amazonMarketplaceId;
+        const region = regionForMarketplaceId(orderMarketplaceId);
+
+        const { feedId } = await submitAmazonTracking({
+          token,
+          region,
+          marketplaceId: orderMarketplaceId,
+          sellerId: cred.amazonSellerId,
+          amazonOrderId: order.marketplaceKey || order.orderNumber,
+          trackingNumber,
+          carrierName: carrierLabel,
+        });
+
+        await prisma.trackingSubmission.upsert({
+          where: { orderId_trackingNumber: { orderId: orderId as string, trackingNumber } },
+          update: { status: 'pending', carrierId, carrierName: carrierLabel, errorMessage: null },
+          create: {
+            orderId: orderId as string,
+            trackingNumber,
+            carrierId,
+            carrierName: carrierLabel,
+            notifyCustomer,
+            updateRemoteOrder,
+            submittedBy: user.id,
+            status: 'pending',
+          },
+        });
+        await prisma.order.update({ where: { id: orderId as string }, data: { trackingNumber } });
+
+        logger.info('[submit-tracking] Amazon tracking feed submitted', {
+          feedId,
+          amazonOrderId: order.marketplaceKey,
+          marketplaceId: orderMarketplaceId,
+        });
+        return res.status(200).json({
+          success: true,
+          message: 'Tracking submitted to Amazon. Processing may take a few minutes.',
+          feedId,
+        });
+      } catch (err: any) {
+        logger.error('[submit-tracking] Amazon feed error', err);
+        await prisma.trackingSubmission.upsert({
+          where: { orderId_trackingNumber: { orderId: orderId as string, trackingNumber } },
+          update: { status: 'failed', errorMessage: err.message?.slice(0, 200) },
+          create: {
+            orderId: orderId as string,
+            trackingNumber,
+            carrierId,
+            carrierName: carrierLabel,
+            notifyCustomer,
+            updateRemoteOrder,
+            submittedBy: user.id,
+            status: 'failed',
+            errorMessage: err.message?.slice(0, 200),
+          },
+        });
+        await prisma.order.update({ where: { id: orderId as string }, data: { trackingNumber } });
+        return res.status(200).json({
+          success: true,
+          message: `Tracking saved locally. Amazon push failed: ${err.message?.slice(0, 200)}`,
         });
       }
     } else if (source === 'wix') {

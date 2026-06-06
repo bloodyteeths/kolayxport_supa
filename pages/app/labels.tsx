@@ -1528,7 +1528,10 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         setLabelRows([]);
         return;
       }
-      const rows = await toLabelRows(fetchedOrders as LocalUIOrder[]);
+      // Amazon FBA orders are fulfilled by Amazon — the seller does not ship them,
+      // so they should never appear on the labels page.
+      const shippable = (fetchedOrders as LocalUIOrder[]).filter((o: any) => !o?.isFBA);
+      const rows = await toLabelRows(shippable);
       setLabelRows(dedupeLabelRows(rows));
     }
     processOrders();

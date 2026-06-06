@@ -304,6 +304,7 @@ model Credential {
   amazonTokenExpiresAt  DateTime?
   amazonSellerId        String?
   amazonMarketplaceId   String?
+  amazonMarketplaceIds  String[]  @default([])
   amazonRegion          String?   @default("eu")
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -117,6 +117,10 @@ export interface UIOrder {
   labelCreated?: boolean;
   createdAt?: string;
   customsValue?: number;
+  /** Amazon FBA orders (fulfilled by Amazon) — seller does not ship these. */
+  isFBA?: boolean;
+  /** Marketplace ID for multi-region Amazon orders (e.g. ATVPDKIKX0DER). */
+  marketplaceId?: string;
 }
 
 export interface VeeqoOrder {

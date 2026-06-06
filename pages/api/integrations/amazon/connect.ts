@@ -17,7 +17,17 @@ export default async function handler(
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
-    const { url: authUrl, csrfToken } = buildAuthUrl(user.id);
+    const marketplaceIdsParam = (req.query.marketplaceIds as string | undefined) || '';
+    const marketplaceIds = marketplaceIdsParam
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (marketplaceIds.length === 0) {
+      return res.redirect('/ayarlar?error=amazon_no_marketplace_selected');
+    }
+
+    const { url: authUrl, csrfToken } = buildAuthUrl(user.id, marketplaceIds);
 
     // Store CSRF token in HttpOnly cookie for callback verification
     res.setHeader('Set-Cookie', `amazon_csrf=${csrfToken}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=600`);

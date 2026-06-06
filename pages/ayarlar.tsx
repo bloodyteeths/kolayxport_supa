@@ -183,6 +183,16 @@ const AyarlarPage = () => {
   const [ebayTokenExpires, setEbayTokenExpires] = useState<string | null>(null);
   const [ebayLoading, setEbayLoading] = useState(false);
 
+  // --- Amazon Connection State ---
+  type AmazonMarketplaceOpt = { id: string; code: string; name: string; domain: string; region: string };
+  const [amazonConnected, setAmazonConnected] = useState(false);
+  const [amazonTokenExpires, setAmazonTokenExpires] = useState<string | null>(null);
+  const [amazonSellerId, setAmazonSellerId] = useState<string | null>(null);
+  const [amazonMarketplaces, setAmazonMarketplaces] = useState<AmazonMarketplaceOpt[]>([]);
+  const [amazonAvailable, setAmazonAvailable] = useState<AmazonMarketplaceOpt[]>([]);
+  const [amazonSelectedIds, setAmazonSelectedIds] = useState<string[]>(['A33AVAJ2PDY3EV']); // default TR
+  const [amazonLoading, setAmazonLoading] = useState(false);
+
   // --- Wix Connection State ---
   const [wixConnected, setWixConnected] = useState(false);
   const [wixSites, setWixSites] = useState<any[]>([]);
@@ -265,6 +275,48 @@ const AyarlarPage = () => {
       setSnackbar({ open: true, message: t('ebayDisconnected'), severity: 'success' });
     } catch {
       setSnackbar({ open: true, message: t('ebayDisconnectFailed'), severity: 'error' });
+    }
+  };
+
+  // --- Amazon Functions ---
+  const fetchAmazonStatus = async () => {
+    setAmazonLoading(true);
+    try {
+      const response = await axios.get('/api/integrations/amazon/status');
+      setAmazonConnected(response.data.connected);
+      setAmazonTokenExpires(response.data.tokenExpiresAt);
+      setAmazonSellerId(response.data.sellerId);
+      setAmazonMarketplaces(response.data.marketplaces || []);
+      setAmazonAvailable(response.data.availableMarketplaces || []);
+      if (response.data.marketplaceIds?.length) {
+        setAmazonSelectedIds(response.data.marketplaceIds);
+      }
+    } catch {
+      setAmazonConnected(false);
+    } finally {
+      setAmazonLoading(false);
+    }
+  };
+
+  const handleConnectAmazon = () => {
+    if (amazonSelectedIds.length === 0) {
+      setSnackbar({ open: true, message: t('amazonSelectMarketplaceFirst'), severity: 'error' });
+      return;
+    }
+    window.location.href = `/api/integrations/amazon/connect?marketplaceIds=${amazonSelectedIds.join(',')}`;
+  };
+
+  const handleDisconnectAmazon = async () => {
+    if (!window.confirm(t('disconnectAmazonConfirm'))) return;
+    try {
+      await axios.delete('/api/integrations/amazon/status');
+      setAmazonConnected(false);
+      setAmazonTokenExpires(null);
+      setAmazonSellerId(null);
+      setAmazonMarketplaces([]);
+      setSnackbar({ open: true, message: t('amazonDisconnected'), severity: 'success' });
+    } catch {
+      setSnackbar({ open: true, message: t('amazonDisconnectFailed'), severity: 'error' });
     }
   };
 
@@ -383,6 +435,7 @@ const AyarlarPage = () => {
     fetchSyncHistory();
     fetchEtsyShops();
     fetchEbayStatus();
+    fetchAmazonStatus();
     fetchWixStatus();
     fetchShopifyStatus();
 
@@ -405,6 +458,19 @@ const AyarlarPage = () => {
     } else if (error === 'ebay_auth_failed' || error === 'ebay_token_failed' || error === 'ebay_callback_failed') {
       const detailMsg = details ? ` ${decodeURIComponent(details as string)}` : '';
       setSnackbar({ open: true, message: `${t('ebayConnectionFailed')}${detailMsg}`, severity: 'error' });
+      router.replace('/ayarlar', undefined, { shallow: true });
+    } else if (success === 'amazon_connected') {
+      setSnackbar({ open: true, message: t('amazonConnectedSuccess'), severity: 'success' });
+      fetchAmazonStatus();
+      router.replace('/ayarlar', undefined, { shallow: true });
+    } else if (
+      error === 'amazon_auth_failed' ||
+      error === 'amazon_callback_failed' ||
+      error === 'amazon_csrf_failed' ||
+      error === 'amazon_no_marketplace_selected'
+    ) {
+      const detailMsg = details ? ` ${decodeURIComponent(details as string)}` : '';
+      setSnackbar({ open: true, message: `${t('amazonConnectionFailed')}${detailMsg}`, severity: 'error' });
       router.replace('/ayarlar', undefined, { shallow: true });
     } else if (error === 'etsy_callback_failed' || error === 'etsy_auth_failed' || error === 'etsy_token_failed') {
       const detailMsg = details ? ` ${decodeURIComponent(details as string)}` : '';
@@ -792,6 +858,108 @@ const AyarlarPage = () => {
                     >
                       {t('connectYourEbay')}
                     </Button>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Amazon Connection */}
+              <Box sx={{ mb: 3, mt: 4, pt: 3, borderTop: '1px solid #e0e0e0' }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, mb: 2, gap: 1 }}>
+                  <Typography variant="h6" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {t('amazonAccountConnection')}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  {t('amazonDesc')}
+                </Typography>
+
+                {amazonLoading ? (
+                  <Typography>{t('checkingAmazonStatus')}</Typography>
+                ) : amazonConnected ? (
+                  <Paper elevation={1} sx={{ p: 2, border: '1px solid #e0e0e0', overflow: 'hidden' }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, gap: 1.5 }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="subtitle1" fontWeight="bold" color="success.main" sx={{ mb: 0.5 }}>
+                          {t('amazonConnected')}
+                        </Typography>
+                        {amazonSellerId && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {t('amazonSellerId')}: {amazonSellerId}
+                          </Typography>
+                        )}
+                        {amazonTokenExpires && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {t('tokenValidity')}: {formatDateTime(amazonTokenExpires)}
+                          </Typography>
+                        )}
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
+                          {amazonMarketplaces.map((m) => (
+                            <Chip key={m.id} size="small" label={`${m.code} · ${m.domain}`} />
+                          ))}
+                        </Box>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={handleConnectAmazon}
+                        >
+                          {t('reconnect')}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={handleDisconnectAmazon}
+                        >
+                          {t('disconnect')}
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Paper>
+                ) : (
+                  <Box sx={{ p: 3, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {t('amazonSelectMarketplacesHelp')}
+                    </Typography>
+                    <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                      <InputLabel id="amazon-marketplaces-label">{t('amazonMarketplaces')}</InputLabel>
+                      <Select
+                        labelId="amazon-marketplaces-label"
+                        multiple
+                        value={amazonSelectedIds}
+                        onChange={(e: SelectChangeEvent<string[]>) => {
+                          const v = e.target.value;
+                          setAmazonSelectedIds(typeof v === 'string' ? v.split(',') : v);
+                        }}
+                        renderValue={(selected) => (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {(selected as string[]).map((id) => {
+                              const m = amazonAvailable.find((x) => x.id === id);
+                              return <Chip key={id} size="small" label={m ? `${m.code} · ${m.domain}` : id} />;
+                            })}
+                          </Box>
+                        )}
+                        label={t('amazonMarketplaces')}
+                      >
+                        {amazonAvailable.map((m) => (
+                          <MenuItem key={m.id} value={m.id}>
+                            {m.code} — {m.name} ({m.domain})
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      <FormHelperText>{t('amazonMarketplacesHelp')}</FormHelperText>
+                    </FormControl>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleConnectAmazon}
+                        disabled={amazonSelectedIds.length === 0}
+                      >
+                        {t('connectAmazon')}
+                      </Button>
+                    </Box>
                   </Box>
                 )}
               </Box>

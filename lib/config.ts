@@ -73,7 +73,9 @@ export function isWixEnabled(userId?: string): boolean {
 }
 
 // Shopify Marketplace Integration
-export const MARKETPLACE_SHOPIFY = process.env.MARKETPLACE_SHOPIFY === 'true';
+// Defaults to enabled — Shopify is a public App Store integration, not a gated beta.
+// Set MARKETPLACE_SHOPIFY=false in env to emergency-disable.
+export const MARKETPLACE_SHOPIFY = process.env.MARKETPLACE_SHOPIFY !== 'false';
 export const ALLOW_SHOPIFY_USERS = process.env.ALLOW_SHOPIFY_USERS?.split(',').map(id => id.trim()) || [];
 
 export function isShopifyEnabled(userId?: string): boolean {

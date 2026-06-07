@@ -15,6 +15,18 @@ export default async function handler(req, res) {
 
   const userId = user.id;
 
+  // Shopify-installed merchants are on the free Shopify tier. Shopify App Store
+  // rules forbid charging them outside Shopify Billing, so block Stripe checkout.
+  const billingCheck = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { billingProvider: true },
+  });
+  if (billingCheck?.billingProvider === 'shopify_free') {
+    return res.status(403).json({
+      error: 'Shopify-installed accounts use the free Shopify tier and cannot subscribe via Stripe.',
+    });
+  }
+
   const { plan, interval } = req.body as { plan: 'starter' | 'growth' | 'kurumsal'; interval: 'month' | 'year' };
 
   if (plan === 'kurumsal') {

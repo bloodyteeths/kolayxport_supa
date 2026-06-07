@@ -1,5 +1,6 @@
-import React, { Fragment, useState } from 'react';
+import React, { Fragment, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { loadStripe } from '@stripe/stripe-js';
 import PublicLayout from '../components/PublicLayout';
 import { motion } from 'framer-motion';
@@ -158,6 +159,25 @@ const faqItems = [
 
 export default function FiyatlandirmaPage() {
   const [billingInterval, setBillingInterval] = useState('month');
+  const router = useRouter();
+
+  // Shopify-installed merchants are on the free Shopify tier — App Store rules
+  // forbid showing them Stripe pricing. Redirect to /ayarlar so the reviewer (and
+  // any real Shopify merchant) never sees the paid plans page.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/user/settings', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (!cancelled && data?.subscription?.billingProvider === 'shopify_free') {
+          router.replace('/ayarlar');
+        }
+      } catch { /* fail open — public visitors still see the page */ }
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
 
   const handleCheckout = async (plan, interval) => {
     try {
@@ -176,6 +196,13 @@ export default function FiyatlandirmaPage() {
       if (res.status === 401) {
         // Not authenticated, redirect to sign in
         await nextAuthSignIn('google', { callbackUrl: '/fiyatlandirma' });
+        return;
+      }
+
+      // Shopify-installed merchants are on the free tier and can't checkout via Stripe.
+      if (res.status === 403) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Shopify üzerinden yüklenen hesaplar ücretsiz Shopify katmanını kullanır.');
         return;
       }
 

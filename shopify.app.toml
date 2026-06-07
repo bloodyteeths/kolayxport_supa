@@ -1,0 +1,22 @@
+name = "KolayXport"
+client_id = "f1c1b63632b2d02f5520b3e96113f0e1"
+application_url = "https://kolayxport.com"
+embedded = false
+
+[auth]
+redirect_urls = ["https://kolayxport.com/api/integrations/shopify/callback"]
+
+[webhooks]
+api_version = "2024-10"
+
+  [webhooks.privacy_compliance]
+  customer_deletion_url = "https://kolayxport.com/api/shopify/webhooks/compliance"
+  customer_data_request_url = "https://kolayxport.com/api/shopify/webhooks/compliance"
+  shop_deletion_url = "https://kolayxport.com/api/shopify/webhooks/compliance"
+
+[[webhooks.subscriptions]]
+topics = ["app_subscriptions/update"]
+uri = "https://kolayxport.com/api/shopify/webhooks/subscription-update"
+
+[access_scopes]
+scopes = "read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments"

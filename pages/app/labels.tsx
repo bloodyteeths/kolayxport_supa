@@ -3044,7 +3044,7 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                       </Box>
 
                       {/* Action buttons — order-level */}
-                      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
                         <Button
                           variant="outlined"
                           size="small"
@@ -3058,6 +3058,22 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         >
                           {row.trackingNumber ? t('trackingExists') : t('addTracking')}
                         </Button>
+                        {(row.marketplace || '').toLowerCase().includes('amazon') && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<EmailIcon sx={{ fontSize: 14 }} />}
+                            onClick={() => {
+                              const origOrder = row.originalOrder as any;
+                              const mpId = origOrder?.marketplaceId || origOrder?.rawData?.salesChannel || undefined;
+                              setAmazonMsgOrder({ orderId: row.orderNumber, marketplaceId: mpId });
+                              setAmazonMsgDialogOpen(true);
+                            }}
+                            sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
+                          >
+                            {t('amazonMsgTooltip')}
+                          </Button>
+                        )}
                         <Button
                           variant="contained"
                           size="small"

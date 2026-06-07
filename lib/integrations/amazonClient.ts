@@ -119,6 +119,32 @@ export function regionForMarketplaceId(marketplaceId: string): AmazonRegion {
 }
 
 /**
+ * Best-effort resolve a marketplace identifier — could be a real ID
+ * (`ATVPDKIKX0DER`), a country code (`US`), a domain (`amazon.com.mx`), or the
+ * `sales-channel` string Amazon emits on flat-file reports (`Amazon.com.mx`).
+ * Returns null when we can't recognise it; callers should fall back to the
+ * seller's primary marketplaceId in that case.
+ */
+export function resolveMarketplaceId(input: string | undefined | null): string | null {
+  if (!input) return null;
+  const s = String(input).trim();
+  if (!s) return null;
+  // Already an ID
+  if (/^[A-Z0-9]{13,14}$/.test(s) && Object.values(AMAZON_MARKETPLACES).some((m) => m.id === s)) {
+    return s;
+  }
+  // Country code (US/TR/MX/…)
+  const upper = s.toUpperCase();
+  if (AMAZON_MARKETPLACES[upper]) return AMAZON_MARKETPLACES[upper].id;
+  // Domain or sales-channel name match — drop `Amazon.`/`amazon.` prefix
+  const norm = s.toLowerCase().replace(/^amazon\./, '');
+  for (const m of Object.values(AMAZON_MARKETPLACES)) {
+    if (m.domain === norm || m.domain.replace(/^amazon\./, '') === norm) return m.id;
+  }
+  return null;
+}
+
+/**
  * Exchange an authorization code for LWA tokens.
  */
 export async function exchangeAuthCode(authCode: string): Promise<AmazonTokenResponse> {

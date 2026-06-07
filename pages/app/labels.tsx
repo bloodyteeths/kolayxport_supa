@@ -2226,7 +2226,15 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                 size="small"
                 onClick={() => {
                   const origOrder = params.row.originalOrder as any;
-                  const mpId = origOrder?.marketplaceId || origOrder?.rawData?.salesChannel || undefined;
+                  // Pass marketplaceId only when it's a real ID. salesChannel
+                  // is the human name ("Amazon.com.mx") which Amazon rejects.
+                  // Backend resolves loose inputs and falls back to the
+                  // seller's primary marketplaceId if missing.
+                  const mpId = origOrder?.marketplaceId
+                    || origOrder?.rawData?.['sales-channel-marketplace-id']
+                    || origOrder?.rawData?.['marketplace-id']
+                    || origOrder?.rawData?.salesChannel
+                    || undefined;
                   setAmazonMsgOrder({ orderId: params.row.orderNumber, marketplaceId: mpId });
                   setAmazonMsgDialogOpen(true);
                 }}

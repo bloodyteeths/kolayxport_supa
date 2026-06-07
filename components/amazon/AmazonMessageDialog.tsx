@@ -105,8 +105,12 @@ export default function AmazonMessageDialog({ open, onClose, orderId, marketplac
 
   const isAllowedTemplate = (mt: MessageType) =>
     !allowedActions || allowedActions.length === 0 || allowedActions.includes(mt);
-  const reviewAllowed = !allowedActions || allowedActions.length === 0 ||
-    allowedActions.some((a) => a.toLowerCase().includes('solicit') || a === 'productReviewAndSellerFeedback');
+  // The Solicitations API is a separate API from Messaging; its actions are
+  // never returned in /messaging/v1/orders/{id}'s allowed actions. So we
+  // can't gate the review request on that list — always allow the user to
+  // try, and let Amazon return the real verdict.
+  const hasSendInvoice = (allowedActions || []).includes('sendInvoice');
+  const hasUpdateFeedback = (allowedActions || []).includes('updateFeedback');
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -176,12 +180,48 @@ export default function AmazonMessageDialog({ open, onClose, orderId, marketplac
           <Button
             size="small"
             variant="outlined"
-            disabled={sending || !reviewAllowed}
+            disabled={sending}
             onClick={sendReviewRequest}
           >
             {t('amazonMsgRequestReview')}
           </Button>
         </Box>
+
+        {(hasSendInvoice || hasUpdateFeedback) && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>{t('amazonMsgOtherActions')}</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                {t('amazonMsgOtherActionsHelp')}
+              </Typography>
+              {hasSendInvoice && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  sx={{ mr: 1, mb: 1 }}
+                  href={`https://sellercentral.amazon.com/orders-v3/order/${orderId}/messaging-center`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t('amazonMsgSendInvoice')}
+                </Button>
+              )}
+              {hasUpdateFeedback && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  sx={{ mr: 1, mb: 1 }}
+                  href={`https://sellercentral.amazon.com/feedback-manager/index.html`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {t('amazonMsgRespondFeedback')}
+                </Button>
+              )}
+            </Box>
+          </>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={sending}>{t('cancel')}</Button>

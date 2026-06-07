@@ -340,12 +340,17 @@ export async function getValidToken(
   },
   onTokenRefreshed?: (newToken: string, expiresAt: Date) => Promise<void>,
 ): Promise<string | null> {
-  if (!credential.amazonAccessToken || !credential.amazonRefreshToken) {
+  // Refresh token is the only hard requirement — we can always derive a fresh
+  // access token from it. When the access token is missing (e.g. just after a
+  // refresh-token rotation) we go straight to LWA without bailing out.
+  if (!credential.amazonRefreshToken) {
     return null;
   }
 
-  const plainAccess = decryptIfNeeded(credential.amazonAccessToken) as string;
   const plainRefresh = decryptIfNeeded(credential.amazonRefreshToken) as string;
+  const plainAccess = credential.amazonAccessToken
+    ? (decryptIfNeeded(credential.amazonAccessToken) as string)
+    : null;
 
   // Check if token expires within 5 minutes
   const expiresAt = credential.amazonTokenExpiresAt
@@ -353,7 +358,7 @@ export async function getValidToken(
     : new Date(0);
   const fiveMinFromNow = new Date(Date.now() + 5 * 60 * 1000);
 
-  if (expiresAt > fiveMinFromNow) {
+  if (plainAccess && expiresAt > fiveMinFromNow) {
     return plainAccess;
   }
 

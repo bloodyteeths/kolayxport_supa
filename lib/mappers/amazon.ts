@@ -176,3 +176,107 @@ export function parseOrderReport(tsv: string): Record<string, string>[] {
 
   return rows;
 }
+
+/**
+ * Group the flat-file order report rows by amazon-order-id.
+ * Amazon's GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL emits ONE ROW
+ * PER LINE ITEM, so a 3-item order arrives as 3 rows that must be merged
+ * into a single UIOrder. Treating each row as its own order silently drops
+ * 2/3 of the items at dedup time — this grouper prevents that.
+ */
+export function groupReportRows(tsv: string): Map<string, Record<string, string>[]> {
+  const rows = parseOrderReport(tsv);
+  const groups = new Map<string, Record<string, string>[]>();
+  for (const row of rows) {
+    const id = row['order-id'];
+    if (!id) continue;
+    const arr = groups.get(id);
+    if (arr) arr.push(row); else groups.set(id, [row]);
+  }
+  return groups;
+}
+
+/** Combine per-row Amazon order statuses into one order-level normalized status. */
+function aggregateStatus(rows: Record<string, string>[]): { normalized: string; external: string } {
+  const externals = rows.map((r) => r['order-status'] || '').filter(Boolean);
+  const priority = ['Pending', 'Unshipped', 'PartiallyShipped', 'Shipped', 'Canceled', 'Unfulfillable'];
+  let pick = externals[0] || 'unknown';
+  for (const p of priority) {
+    if (externals.includes(p)) { pick = p; break; }
+  }
+  return { normalized: STATUS_MAP[pick] || pick || 'unknown', external: pick };
+}
+
+/**
+ * Build a single UIOrder from all report rows belonging to one Amazon order.
+ * Sums financials, merges line items, derives status. ASIN is stashed on each
+ * line item so the Catalog API enricher can add images / weight afterwards.
+ */
+export function toNormalizedOrderFromGroup(orderId: string, rows: Record<string, string>[]): UIOrder {
+  const first = rows[0];
+
+  const address: NormalizedAddress = {
+    name: first['recipient-name'] || '',
+    phone: first['ship-phone-number'] || '',
+    street1: first['ship-address-1'] || '',
+    street2: first['ship-address-2'] || '',
+    city: first['ship-city'] || '',
+    state: first['ship-state'] || '',
+    postal: first['ship-postal-code'] || '',
+    country: first['ship-country'] || '',
+    isResidential: true,
+  };
+
+  const lineItems = rows.map((row, idx) => {
+    const qty = parseInt(row['quantity-purchased'] || '1', 10);
+    const itemPrice = parseFloat(row['item-price'] || '0');
+    return {
+      id: row['order-item-id'] || `${orderId}-${idx}`,
+      title: row['product-name'] || row['sku'] || '',
+      value: qty > 0 ? itemPrice / qty : itemPrice,
+      quantity: qty,
+      weight: 0.5,
+      sku: row['sku'] || '',
+      image: undefined,
+      asin: row['asin'] || undefined,
+    };
+  });
+
+  let total = 0;
+  for (const row of rows) {
+    total += parseFloat(row['item-price'] || '0');
+    total += parseFloat(row['shipping-price'] || '0');
+    total += parseFloat(row['gift-wrap-price'] || '0');
+    total -= parseFloat(row['item-promotion-discount'] || '0');
+    total -= parseFloat(row['ship-promotion-discount'] || '0');
+  }
+
+  const status = aggregateStatus(rows);
+  const isFBA = (first['fulfillment-channel'] || '').toUpperCase() === 'AFN';
+  const marketplaceId =
+    first['sales-channel-marketplace-id'] ||
+    first['marketplace-id'] ||
+    undefined;
+
+  return {
+    id: orderId,
+    source: 'amazon',
+    channel: 'amazon',
+    marketplace: 'amazon',
+    marketplaceKey: orderId,
+    orderNumber: orderId,
+    customerName: first['recipient-name'] || first['buyer-email'] || 'Amazon Customer',
+    status: status.normalized,
+    currency: first['currency'] || 'USD',
+    totalPrice: total,
+    to_address: { ...address, isResidential: true },
+    line_items: lineItems,
+    marketplaceOrderDate: first['purchase-date'] || first['last-updated-date'],
+    shipByDate: first['ship-by-date'] || undefined,
+    rawData: { orderId, rows },
+    externalStatus: status.external,
+    recipientEmail: first['buyer-email'] || undefined,
+    isFBA,
+    marketplaceId,
+  };
+}

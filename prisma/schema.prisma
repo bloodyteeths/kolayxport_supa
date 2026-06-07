@@ -309,6 +309,21 @@ model Credential {
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model AmazonProductCache {
+  id              String   @id @default(uuid())
+  asin            String
+  marketplaceId   String
+  imageUrl        String?
+  weightKg        Float?
+  countryOfOrigin String?
+  brand           String?
+  title           String?
+  fetchedAt       DateTime @default(now())
+
+  @@unique([asin, marketplaceId])
+  @@index([fetchedAt])
+}
+
 model ShipperProfile {
   id                                String   @id @default(uuid())
   userId                            String   @unique

@@ -76,6 +76,8 @@ export interface UIOrder {
     variant_title?: string;
     product_variant?: { title?: string };
     shipBy?: string;
+    /** Amazon ASIN used to enrich images/weight via Catalog API. */
+    asin?: string;
   }>;
   marketplaceOrderDate?: string;
   shipByDate?: string; // Ship-by deadline date for the order (comes from Veeqo due_date)

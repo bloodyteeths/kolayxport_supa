@@ -846,7 +846,13 @@ export async function syncAllOrders(userId: string, options: {
               return await validateAndMapOrder(order, veeqoClient);
             }));
             logger.info(`[FastSync] Veeqo processedOrders after mapping: ${processedOrders.length}`);
-            return processedOrders.filter((order): order is UIOrder => order !== null);
+            // Direct Amazon SP-API sync owns Amazon orders now — skip them from Veeqo
+            // to prevent duplicate rows (Veeqo keys by its own internal ID, direct keys
+            // by Amazon Order ID, so unique constraint can't dedupe them automatically).
+            return processedOrders.filter(
+              (order): order is UIOrder =>
+                order !== null && !/amazon/i.test(order.marketplace || ''),
+            );
           })()
         );
       } else {
@@ -860,7 +866,13 @@ export async function syncAllOrders(userId: string, options: {
               return await validateAndMapOrder(order, veeqoClient);
             }));
             logger.info(`[FullSync] Veeqo processedOrders after mapping: ${processedOrders.length}`);
-            return processedOrders.filter((order): order is UIOrder => order !== null);
+            // Amazon orders are owned by the direct SP-API path now (see AmazonSync).
+            // Filtering here also prevents the (Veeqo internal id vs Amazon Order ID)
+            // duplicate-row bug since dedup keys are different shapes.
+            return processedOrders.filter(
+              (order): order is UIOrder =>
+                order !== null && !/amazon/i.test(order.marketplace || ''),
+            );
           })()
         );
       }
@@ -1028,9 +1040,9 @@ export async function syncAllOrders(userId: string, options: {
       try {
         const cred = await prisma.credential.findUnique({ where: { userId } }) as any;
         if (cred?.amazonAccessToken && cred?.amazonRefreshToken) {
-          const { getValidToken } = await import('./integrations/amazonClient');
+          const { getValidToken, fetchCatalogItems } = await import('./integrations/amazonClient');
           const { fetchOrderReport } = await import('./integrations/amazonReports');
-          const { toNormalizedOrderFromReport, parseOrderReport } = await import('./mappers/amazon');
+          const { toNormalizedOrderFromGroup, groupReportRows } = await import('./mappers/amazon');
 
           const token = await getValidToken(cred, async (newToken: string, expiresAt: Date) => {
             await prisma.credential.update({
@@ -1054,9 +1066,77 @@ export async function syncAllOrders(userId: string, options: {
                 try {
                   logger.info('[AmazonSync] Requesting order report', { userId, region });
                   const tsv = await fetchOrderReport(token, region, marketplaceIds, syncStart, syncEnd);
-                  const rows = parseOrderReport(tsv);
-                  const orders = rows.map(toNormalizedOrderFromReport);
-                  logger.info(`[AmazonSync] Parsed ${orders.length} orders from report`, { userId });
+                  const groups = groupReportRows(tsv);
+                  const orders = Array.from(groups.entries()).map(([orderId, rows]) =>
+                    toNormalizedOrderFromGroup(orderId, rows),
+                  );
+                  logger.info(`[AmazonSync] Parsed ${orders.length} orders from ${groups.size} groups`, { userId });
+
+                  // Enrich with product images / weights via the Catalog API.
+                  // Cache aggressively in AmazonProductCache to stay well under rate limits.
+                  const STALE_AFTER_DAYS = 7;
+                  const staleCutoff = new Date(Date.now() - STALE_AFTER_DAYS * 24 * 60 * 60 * 1000);
+                  const wantedAsins = new Set<string>();
+                  for (const o of orders) {
+                    for (const li of o.line_items) if (li.asin) wantedAsins.add(li.asin);
+                  }
+                  if (wantedAsins.size > 0) {
+                    const cached = await prisma.amazonProductCache.findMany({
+                      where: {
+                        asin: { in: Array.from(wantedAsins) },
+                        marketplaceId: marketplaceIds[0],
+                      },
+                    });
+                    const cacheMap = new Map(cached.map((c: any) => [c.asin, c]));
+                    const fresh = (c: any) => c && c.fetchedAt && new Date(c.fetchedAt) > staleCutoff;
+                    const missing = Array.from(wantedAsins).filter((a) => !fresh(cacheMap.get(a)));
+
+                    if (missing.length > 0) {
+                      logger.info(`[AmazonSync] Catalog enrichment: ${missing.length} ASIN(s) need fetch (${wantedAsins.size - missing.length} fresh in cache)`);
+                      const enrichments = await fetchCatalogItems(missing, marketplaceIds[0], token, region);
+                      for (const [asin, e] of enrichments.entries()) {
+                        await prisma.amazonProductCache.upsert({
+                          where: { asin_marketplaceId: { asin, marketplaceId: marketplaceIds[0] } },
+                          update: {
+                            imageUrl: e.imageUrl ?? null,
+                            weightKg: e.weightKg ?? null,
+                            countryOfOrigin: e.countryOfOrigin ?? null,
+                            brand: e.brand ?? null,
+                            title: e.title ?? null,
+                            fetchedAt: new Date(),
+                          },
+                          create: {
+                            asin,
+                            marketplaceId: marketplaceIds[0],
+                            imageUrl: e.imageUrl ?? null,
+                            weightKg: e.weightKg ?? null,
+                            countryOfOrigin: e.countryOfOrigin ?? null,
+                            brand: e.brand ?? null,
+                            title: e.title ?? null,
+                          },
+                        });
+                        cacheMap.set(asin, {
+                          asin,
+                          marketplaceId: marketplaceIds[0],
+                          ...e,
+                          fetchedAt: new Date(),
+                        });
+                      }
+                    }
+
+                    // Patch line_items with whatever we have.
+                    for (const o of orders) {
+                      for (const li of o.line_items) {
+                        if (!li.asin) continue;
+                        const c: any = cacheMap.get(li.asin);
+                        if (!c) continue;
+                        if (c.imageUrl) li.image = c.imageUrl;
+                        if (c.weightKg && c.weightKg > 0) li.weight = c.weightKg;
+                        if (c.countryOfOrigin) li.country_of_origin = c.countryOfOrigin;
+                      }
+                    }
+                  }
+
                   return orders;
                 } catch (err: any) {
                   logger.error('[AmazonSync] Order sync failed', err, { userId });

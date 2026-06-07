@@ -727,3 +727,113 @@ export async function submitAmazonTracking(params: {
 
   return { feedId: (created as any).feedId, feedDocumentId };
 }
+
+// ---------------------------------------------------------------------------
+// Catalog API — enrich orders with product images, weights, country of origin
+// ---------------------------------------------------------------------------
+
+export interface CatalogEnrichment {
+  imageUrl?: string;
+  weightKg?: number;
+  countryOfOrigin?: string;
+  brand?: string;
+  title?: string;
+}
+
+function weightToKg(value: number, unit: string | undefined): number | undefined {
+  if (!isFinite(value)) return undefined;
+  const u = (unit || '').toLowerCase();
+  if (u.startsWith('pound') || u === 'lb' || u === 'lbs') return value * 0.453592;
+  if (u.startsWith('ounce') || u === 'oz') return value * 0.0283495;
+  if (u.startsWith('gram') || u === 'g') return value / 1000;
+  if (u.startsWith('kilogram') || u === 'kg') return value;
+  // Unknown unit — assume the SP-API default of kg
+  return value;
+}
+
+/** Extract the best MAIN image URL for the requested marketplace. */
+function extractImageUrl(item: any, marketplaceId: string): string | undefined {
+  const groups: any[] = Array.isArray(item?.images) ? item.images : [];
+  const group =
+    groups.find((g) => g?.marketplaceId === marketplaceId) || groups[0];
+  const imgs: any[] = Array.isArray(group?.images) ? group.images : [];
+  const main = imgs.find((i) => i?.variant === 'MAIN' && i?.link);
+  return (main?.link as string) || (imgs[0]?.link as string) || undefined;
+}
+
+function extractAttribute(item: any, key: string): any[] | undefined {
+  const v = item?.attributes?.[key];
+  return Array.isArray(v) ? v : undefined;
+}
+
+function extractWeightKg(item: any): number | undefined {
+  const attrs = item?.attributes || {};
+  const candidates = [
+    attrs.item_weight,
+    attrs.item_package_weight,
+    attrs.package_weight,
+  ];
+  for (const c of candidates) {
+    const entry = Array.isArray(c) ? c[0] : c;
+    if (!entry) continue;
+    const raw = entry.value ?? entry.amount ?? entry;
+    const value = typeof raw === 'string' ? parseFloat(raw) : Number(raw);
+    if (!isFinite(value) || value <= 0) continue;
+    const kg = weightToKg(value, entry.unit);
+    if (kg && kg > 0) return kg;
+  }
+  // Also try summaries.itemDimensions.weight as a fallback (newer schema)
+  const summaries: any[] = item?.summaries || [];
+  for (const s of summaries) {
+    const w = s?.itemDimensions?.weight;
+    if (w?.value) {
+      const kg = weightToKg(parseFloat(String(w.value)), w.unit);
+      if (kg && kg > 0) return kg;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Fetch product details (image, weight, country) for a batch of ASINs.
+ * Catalog API supports up to 20 identifiers per request.
+ */
+export async function fetchCatalogItems(
+  asins: string[],
+  marketplaceId: string,
+  token: string,
+  region: AmazonRegion,
+): Promise<Map<string, CatalogEnrichment>> {
+  const result = new Map<string, CatalogEnrichment>();
+  const unique = Array.from(new Set(asins.filter(Boolean)));
+  if (unique.length === 0) return result;
+
+  for (let i = 0; i < unique.length; i += 20) {
+    const batch = unique.slice(i, i + 20);
+    const url =
+      `/catalog/2022-04-01/items?identifiers=${batch.join(',')}` +
+      `&identifiersType=ASIN&marketplaceIds=${marketplaceId}` +
+      `&includedData=images,attributes,summaries,dimensions`;
+    try {
+      const resp = await callSpApiWithRetry(url, token, region, { method: 'GET' }, marketplaceId);
+      const items: any[] = (resp as any)?.items || [];
+      for (const item of items) {
+        const asin = item.asin;
+        if (!asin) continue;
+        const summary = item?.summaries?.find?.((s: any) => s?.marketplaceId === marketplaceId) ||
+                        item?.summaries?.[0];
+        const countryAttr = extractAttribute(item, 'country_of_origin')?.[0];
+        result.set(asin, {
+          imageUrl: extractImageUrl(item, marketplaceId),
+          weightKg: extractWeightKg(item),
+          countryOfOrigin: countryAttr?.value || summary?.countryOfOrigin || undefined,
+          brand: summary?.brand || extractAttribute(item, 'brand')?.[0]?.value,
+          title: summary?.itemName || extractAttribute(item, 'item_name')?.[0]?.value,
+        });
+      }
+    } catch (err) {
+      logger.warn('Catalog API batch failed', { asins: batch, err: (err as any)?.message });
+    }
+  }
+  return result;
+}

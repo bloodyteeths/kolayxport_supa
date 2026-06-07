@@ -542,6 +542,7 @@
     "amazonMsgOrder": "Order {id}",
     "amazonMsgTooltip": "Send a message to the Amazon buyer",
     "amazonMsgOutboundOnly": "Amazon's SP-API only supports outbound templated messages. There is no inbox of incoming buyer messages.",
+    "amazonMsgMcf": "This is a Multi-Channel Fulfillment (MCF) order — Amazon fulfilled a sale that happened on another channel (your own website, Shopify, etc.). There is no Amazon buyer relationship for this order, so seller-to-buyer messaging and review requests are not available.",
     "amazonMsgCheckingActions": "Checking which templates are allowed for this order…",
     "amazonMsgAllowedActions": "Allowed actions for this order",
     "amazonMsgType": "Message type",

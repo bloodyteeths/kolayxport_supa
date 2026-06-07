@@ -43,6 +43,7 @@ export default function AmazonMessageDialog({ open, onClose, orderId, marketplac
   const [messageType, setMessageType] = useState<MessageType>(defaultType);
   const [text, setText] = useState('');
   const [allowedActions, setAllowedActions] = useState<string[] | null>(null);
+  const [isMCF, setIsMCF] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +53,7 @@ export default function AmazonMessageDialog({ open, onClose, orderId, marketplac
   useEffect(() => {
     if (!open || !orderId) return;
     setAllowedActions(null);
+    setIsMCF(false);
     setError(null);
     setSuccess(null);
     setText('');
@@ -60,7 +62,10 @@ export default function AmazonMessageDialog({ open, onClose, orderId, marketplac
       .get('/api/integrations/amazon/messages', {
         params: { orderId, ...(marketplaceId ? { marketplaceId } : {}) },
       })
-      .then((r) => setAllowedActions(r.data?.allowedActions || []))
+      .then((r) => {
+        setAllowedActions(r.data?.allowedActions || []);
+        setIsMCF(Boolean(r.data?.mcf));
+      })
       .catch((e) => setError(e.response?.data?.error || e.message))
       .finally(() => setLoading(false));
   }, [open, orderId, marketplaceId]);
@@ -125,6 +130,12 @@ export default function AmazonMessageDialog({ open, onClose, orderId, marketplac
           {t('amazonMsgOutboundOnly')}
         </Alert>
 
+        {isMCF && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            {t('amazonMsgMcf')}
+          </Alert>
+        )}
+
         {loading && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <CircularProgress size={16} />
@@ -180,7 +191,7 @@ export default function AmazonMessageDialog({ open, onClose, orderId, marketplac
           <Button
             size="small"
             variant="outlined"
-            disabled={sending}
+            disabled={sending || isMCF}
             onClick={sendReviewRequest}
           >
             {t('amazonMsgRequestReview')}
@@ -228,7 +239,7 @@ export default function AmazonMessageDialog({ open, onClose, orderId, marketplac
         <Button
           variant="contained"
           onClick={send}
-          disabled={sending || !text.trim() || !isAllowedTemplate(messageType)}
+          disabled={sending || isMCF || !text.trim() || !isAllowedTemplate(messageType)}
         >
           {sending ? <CircularProgress size={18} sx={{ color: 'inherit' }} /> : t('amazonMsgSend')}
         </Button>

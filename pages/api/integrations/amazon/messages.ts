@@ -99,6 +99,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch (err: any) {
       const msg = (err?.message || String(err)).slice(0, 500);
       logger.error('Amazon messaging: GET allowedActions failed', err, { orderId, marketplaceId });
+      if (msg.includes('multi-channel fulfillment')) {
+        // Surface as a "soft" failure — the order exists but no messaging is
+        // possible for this order type. The dialog uses this to render an
+        // explanatory banner instead of an error.
+        return res.status(200).json({
+          orderId,
+          marketplaceId,
+          allowedActions: [],
+          mcf: true,
+        });
+      }
       if (msg.includes('403')) {
         return res.status(403).json({
           error: `Amazon 403 on /messaging/v1/orders/${orderId}. Likely causes: (a) the Buyer Communication role isn't on this app and seller token, or (b) the order is in a marketplace not covered by the granted scope. Raw response: ${msg}`,
@@ -136,6 +147,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch (err: any) {
         const msg = (err?.message || String(err)).slice(0, 500);
         logger.error('Amazon solicitations failed', err, { orderId: oid, marketplaceId: mp });
+        if (msg.includes('multi-channel fulfillment')) {
+          return res.status(400).json({
+            error: 'This is a Multi-Channel Fulfillment (MCF) order — Amazon fulfilled an order placed on another channel (your own website, Shopify, etc.). There is no Amazon buyer relationship, so seller-to-buyer messaging and review requests are not available for this order type.',
+          });
+        }
         if (msg.includes('403')) {
           return res.status(403).json({
             error: `Amazon 403 on /solicitations/. The Solicitations API requires the "Buyer Solicitation" role on your SP-API app (separate from "Buyer Communication"). Add the role in the dev console, re-Self-Authorize this seller, then try again. Raw: ${msg}`,
@@ -168,6 +184,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch (err: any) {
       const msg = (err?.message || String(err)).slice(0, 500);
       logger.error('Amazon messaging: POST failed', err, { orderId: oid, marketplaceId: mp, messageType });
+      if (msg.includes('multi-channel fulfillment')) {
+        return res.status(400).json({
+          error: 'Multi-Channel Fulfillment order — Amazon shipped this on behalf of a non-Amazon sale. There is no Amazon buyer to message.',
+        });
+      }
       if (msg.includes('403')) {
         return res.status(403).json({
           error: `Amazon 403 on /messaging/v1/orders/${oid}/messages/${messageType}. Either the token lacks Buyer Communication scope, this message type isn't allowed for the order's current lifecycle stage (check allowedActions), or the marketplaceId is wrong. Raw: ${msg}`,

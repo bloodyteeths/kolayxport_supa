@@ -746,12 +746,33 @@ export default async function handler(
 
       // --- Simplified Source Detection ---
       const marketplace = (rawOrder.marketplace || '').toLowerCase();
-      const source = rawOrder.source || 
-        (marketplace.includes('etsy') ? 'shippo' : 
+      const source = rawOrder.source ||
+        (marketplace.includes('etsy') ? 'shippo' :
          marketplace.includes('trendyol') ? 'trendyol' : 'veeqo');
+
+      // --- isFBA derivation (Amazon only) -----------------------------------
+      // FBA / Multi-Channel Fulfillment orders cannot be shipped by the seller
+      // and have no buyer-message API surface. Filter them off the labels page
+      // and short-circuit messaging-related UI. Handle BOTH rawData shapes:
+      //   • direct sync:  rawData.rows[0]['fulfillment-channel'] = 'AFN' | 'Amazon' | 'Merchant'
+      //   • Veeqo legacy: rawData.channel.with_fba | type_code = 'amazon_fba'
+      //                   or rawData.channel.name including 'FBA'
+      let isFBA = false;
+      if (marketplace === 'amazon' && rawOrder.rawData) {
+        const rd = typeof rawOrder.rawData === 'string'
+          ? (() => { try { return JSON.parse(rawOrder.rawData); } catch { return {}; } })()
+          : rawOrder.rawData;
+        const fc = String(rd?.rows?.[0]?.['fulfillment-channel'] || '').toUpperCase();
+        if (fc === 'AFN' || fc === 'AMAZON') isFBA = true;
+        const channelName = String(rd?.channel?.name || '');
+        if (/fba/i.test(channelName)) isFBA = true;
+        if (rd?.channel?.with_fba === true) isFBA = true;
+        if (rd?.channel?.type_code === 'amazon_fba') isFBA = true;
+      }
 
       return {
         ...rawOrder,
+        isFBA,
         customerName: fullName || `${firstName} ${lastName}`.trim(),
         recipientFirstName: firstName,
         recipientLastName: lastName,

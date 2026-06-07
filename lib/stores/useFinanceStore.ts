@@ -11,7 +11,12 @@ export interface DashboardSummary {
   netProfit: number;
   margin: number;
   orderCount: number;
+  // Distinct orders with a finalized refund event in the period — money
+  // already paid back to the buyer.
   returnCount: number;
+  // Cancellations whose refund event hasn't posted yet (Amazon lags 14-30
+  // days). Rendered as a separate amber badge under the Returns card.
+  pendingCancellationCount?: number;
   // Orders the labels page counts (from `Order` table). >= orderCount.
   // The delta is "pending settlement" — marketplace hasn't booked the
   // ledger entry yet.

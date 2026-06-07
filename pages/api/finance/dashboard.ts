@@ -20,7 +20,14 @@ interface DashboardSummary {
   // Orders Etsy / Trendyol have actually settled — what FinancialTransaction
   // knows about. Always lags the user's actual receipts.
   orderCount: number;
+  // Distinct orders with at least one finalized refund event in the period —
+  // i.e., money already returned to the buyer. NOT a count of cancelled rows.
   returnCount: number;
+  // Cancellations whose refund event hasn't posted yet (Amazon lags 14-30
+  // days). UI surfaces this as a separate badge under Returns so users don't
+  // think they refunded $0 across 8 orders when reality is "0 settled, 8
+  // pending". Zero for marketplaces where settlement posts immediately.
+  pendingCancellationCount: number;
   // Orders the labels page counts (Order table). Includes receipts that
   // haven't settled yet. >= orderCount; the delta is "pending settlement".
   totalOrderCount: number;
@@ -210,7 +217,11 @@ async function buildDashboard(
   let adSpend = 0;
   let cogs = 0;
   let orderCount = 0;
-  let returnCount = 0;
+  // Distinct orderNumbers with at least one finalized refund event in the
+  // period. Some marketplaces emit several refund ledger rows per order
+  // (partial refund + commission refund + return-shipping refund) so a raw
+  // increment overcounts; this Set gives us "real orders refunded".
+  const refundedOrderNumbers = new Set<string>();
 
   // Transaction type summary
   const transactionTypeSummary: Record<string, { count: number; total: number }> = {};
@@ -257,7 +268,7 @@ async function buildDashboard(
         break;
       case 'return':
         returns += Math.abs(amount);
-        returnCount++;
+        if (tx.orderNumber) refundedOrderNumbers.add(tx.orderNumber);
         // Return transactions carry commission that should be refunded — subtract from total
         // Trendyol stores commissionAmount as positive even on returns
         if (commissionAmt > 0) {
@@ -375,11 +386,17 @@ async function buildDashboard(
       netProfit: round2(netProfit),
       margin: round2(margin),
       orderCount,
-      // Distinct refunded orders (from Order table), not refund ledger
-      // events. Without this fix the Returns/Net chips showed 9 refunds
-      // against 10 sales — confusing the user into thinking nearly every
-      // order had been canceled when only 2 actually were.
-      returnCount: refundedOrderCount || returnCount,
+      // Number of distinct orders whose refund event has actually posted in
+      // the period. Drives the Returns card's "X refunds" subtitle.
+      returnCount: refundedOrderNumbers.size,
+      // Orders cancelled in the period but with no matching refund event yet
+      // — Amazon settlement lags 14-30 days, so these will mature later.
+      // Surfaced as a separate "+N cancellations pending settlement" badge
+      // so the user understands why "$0 refunded across 8 cancellations".
+      pendingCancellationCount: Math.max(
+        0,
+        refundedOrderCount - refundedOrderNumbers.size,
+      ),
       totalOrderCount: orderTableCount,
       pendingSettlementCount: Math.max(0, orderTableCount - orderCount),
       totalOrderRevenue: round2(orderTableRevenue),

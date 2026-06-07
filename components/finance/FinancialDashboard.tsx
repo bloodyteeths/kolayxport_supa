@@ -110,17 +110,30 @@ function SummaryCards({ summary, marketplace }: { summary: DashboardSummary; mar
               })()}
               {card.key === '_netRevenue' && summary.orderCount > 0 && (
                 <Chip
-                  label={`${summary.orderCount - summary.returnCount} ${t('orders')}`}
+                  label={`${Math.max(0, summary.orderCount - summary.returnCount)} ${t('orders')}`}
                   size="small"
                   sx={{ mt: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#dcfce7', color: '#15803d' }}
                 />
               )}
-              {card.key === 'returns' && summary.returnCount > 0 && (
-                <Chip
-                  label={`${summary.returnCount} ${t('orders')}`}
-                  size="small"
-                  sx={{ mt: 0.5, height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#fecaca', color: '#dc2626' }}
-                />
+              {card.key === 'returns' && (summary.returnCount > 0 || (summary.pendingCancellationCount ?? 0) > 0) && (
+                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
+                  {summary.returnCount > 0 && (
+                    <Chip
+                      label={`${summary.returnCount} ${t('refunds')}`}
+                      size="small"
+                      title={t('refundsSettledTooltip')}
+                      sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#fecaca', color: '#dc2626' }}
+                    />
+                  )}
+                  {(summary.pendingCancellationCount ?? 0) > 0 && (
+                    <Chip
+                      label={`+${summary.pendingCancellationCount} ${t('pendingSettlement')}`}
+                      size="small"
+                      title={t('cancellationsPendingTooltip')}
+                      sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, bgcolor: '#fef3c7', color: '#92400e' }}
+                    />
+                  )}
+                </Box>
               )}
               {card.key === 'netProfit' && (
                 <Chip

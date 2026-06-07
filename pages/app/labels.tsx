@@ -6,7 +6,8 @@ import {
   Box, Button, CircularProgress, Tooltip, Dialog, DialogTitle, DialogContent, Snackbar, Alert, TextField, Select, MenuItem, InputLabel, FormControl, IconButton, Typography, Paper, Accordion, AccordionSummary, AccordionDetails, Chip, Drawer, Fade, List, ListItem, ListItemIcon, ListItemText, ToggleButton, ToggleButtonGroup, Grid, SelectChangeEvent
 } from '@mui/material';
 import { DataGrid, GridColDef, GridPaginationModel, GridRenderCellParams, GridValueGetter, GridRowSelectionModel, GridRowId } from '@mui/x-data-grid';
-import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, Edit as EditIcon, Check as CheckIcon, Warning as WarningIcon, Error as ErrorIcon, Info as InfoIcon, Lock as LockIcon, FlightTakeoff as FlightTakeoffIcon, Flight as FlightIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Sync as SyncIcon, Refresh as RefreshIcon, Search as SearchIcon, Close as CloseIcon, ExpandMore as ExpandMoreIcon, Edit as EditIcon, Check as CheckIcon, Warning as WarningIcon, Error as ErrorIcon, Info as InfoIcon, Lock as LockIcon, FlightTakeoff as FlightTakeoffIcon, Flight as FlightIcon, Delete as DeleteIcon, Email as EmailIcon } from '@mui/icons-material';
+import AmazonMessageDialog from '../../components/amazon/AmazonMessageDialog';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
@@ -1446,6 +1447,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
   // --- Tracking Submission State ---
   const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState<LabelRow | null>(null);
+  const [amazonMsgDialogOpen, setAmazonMsgDialogOpen] = useState(false);
+  const [amazonMsgOrder, setAmazonMsgOrder] = useState<{ orderId: string; marketplaceId?: string } | null>(null);
   const [trackingFormData, setTrackingFormData] = useState({
     trackingNumber: '',
     carrierId: 3, // Default to "Other"
@@ -2217,6 +2220,22 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           <IconButton onClick={() => openDrawer(params.row as LabelRow)} size="small">
             <EditIcon fontSize="small"/>
           </IconButton>
+          {(params.row.marketplace || '').toLowerCase().includes('amazon') && (
+            <Tooltip title={t('amazonMsgTooltip')}>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  const origOrder = params.row.originalOrder as any;
+                  const mpId = origOrder?.marketplaceId || origOrder?.rawData?.salesChannel || undefined;
+                  setAmazonMsgOrder({ orderId: params.row.orderNumber, marketplaceId: mpId });
+                  setAmazonMsgDialogOpen(true);
+                }}
+                sx={{ ml: 0.5 }}
+              >
+                <EmailIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
           <Button size="small" variant="outlined" sx={{ml:1}} onClick={() => {
             // Convert LabelRow to UIOrder format for UPS drawer
             const originalOrder = params.row.originalOrder as LocalUIOrder | undefined;
@@ -3430,6 +3449,13 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           </Button>
         </Box>
       </Dialog>
+
+      <AmazonMessageDialog
+        open={amazonMsgDialogOpen}
+        onClose={() => setAmazonMsgDialogOpen(false)}
+        orderId={amazonMsgOrder?.orderId || ''}
+        marketplaceId={amazonMsgOrder?.marketplaceId}
+      />
 </Box>
   );
 }

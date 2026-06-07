@@ -184,11 +184,16 @@ export function parseOrderReport(tsv: string): Record<string, string>[] {
  * into a single UIOrder. Treating each row as its own order silently drops
  * 2/3 of the items at dedup time — this grouper prevents that.
  */
+/** _GENERAL reports key the order by `amazon-order-id`; older reports use `order-id`. */
+function readOrderId(row: Record<string, string>): string | undefined {
+  return row['amazon-order-id'] || row['order-id'] || undefined;
+}
+
 export function groupReportRows(tsv: string): Map<string, Record<string, string>[]> {
   const rows = parseOrderReport(tsv);
   const groups = new Map<string, Record<string, string>[]>();
   for (const row of rows) {
-    const id = row['order-id'];
+    const id = readOrderId(row);
     if (!id) continue;
     const arr = groups.get(id);
     if (arr) arr.push(row); else groups.set(id, [row]);
@@ -215,6 +220,10 @@ function aggregateStatus(rows: Record<string, string>[]): { normalized: string; 
 export function toNormalizedOrderFromGroup(orderId: string, rows: Record<string, string>[]): UIOrder {
   const first = rows[0];
 
+  // _GENERAL report drops PII columns. We fall back to '' when absent so
+  // the UI gracefully shows city/state/postal/country only. To unlock full
+  // address fields the seller's SP-API app needs the Restricted PII role
+  // (Direct-to-Consumer Shipping) — without it Amazon strips name/street/phone.
   const address: NormalizedAddress = {
     name: first['recipient-name'] || '',
     phone: first['ship-phone-number'] || '',
@@ -228,7 +237,7 @@ export function toNormalizedOrderFromGroup(orderId: string, rows: Record<string,
   };
 
   const lineItems = rows.map((row, idx) => {
-    const qty = parseInt(row['quantity-purchased'] || '1', 10);
+    const qty = parseInt(row['quantity-purchased'] || row['quantity'] || '1', 10);
     const itemPrice = parseFloat(row['item-price'] || '0');
     return {
       id: row['order-item-id'] || `${orderId}-${idx}`,
@@ -252,7 +261,13 @@ export function toNormalizedOrderFromGroup(orderId: string, rows: Record<string,
   }
 
   const status = aggregateStatus(rows);
-  const isFBA = (first['fulfillment-channel'] || '').toUpperCase() === 'AFN';
+  // _GENERAL reports use "Merchant" / "Amazon" instead of MFN/AFN. Old reports
+  // used MFN/AFN. Treat anything Amazon-fulfilled as FBA.
+  const fc = (first['fulfillment-channel'] || '').toUpperCase();
+  const isFBA = fc === 'AFN' || fc === 'AMAZON';
+  // _GENERAL has sales-channel (e.g. "Amazon.com.mx"). Older reports have a
+  // direct marketplace id. Take either; the orderSync will fall back to
+  // cred.amazonMarketplaceIds[0] when this is empty.
   const marketplaceId =
     first['sales-channel-marketplace-id'] ||
     first['marketplace-id'] ||
@@ -273,7 +288,7 @@ export function toNormalizedOrderFromGroup(orderId: string, rows: Record<string,
     line_items: lineItems,
     marketplaceOrderDate: first['purchase-date'] || first['last-updated-date'],
     shipByDate: first['ship-by-date'] || undefined,
-    rawData: { orderId, rows },
+    rawData: { orderId, rows, salesChannel: first['sales-channel'] || null },
     externalStatus: status.external,
     recipientEmail: first['buyer-email'] || undefined,
     isFBA,

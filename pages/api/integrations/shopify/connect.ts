@@ -1,4 +1,11 @@
 // pages/api/integrations/shopify/connect.ts
+//
+// NOTE: This is the in-app "link an additional shop" path, NOT the Shopify App
+// Store install entry point. The App Store install URL is `/api/integrations/
+// shopify/install`, which receives the shop domain from Shopify with an HMAC.
+// This endpoint is only reachable by an already-authenticated KolayXport user
+// who wants to attach another myshopify.com store to their existing account,
+// which is permitted under App Store policy 2.3.1.
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '../../../../lib/auth';
 import { logger } from '../../../../lib/logger';

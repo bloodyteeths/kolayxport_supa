@@ -17,6 +17,10 @@ const plans = {
   starter: { orderSyncLimit: 200, labelLimit: 100 },
   growth: { orderSyncLimit: 2000, labelLimit: 500 },
   enterprise: { orderSyncLimit: Infinity, labelLimit: Infinity },
+  // Shopify-installed merchants — the app is listed free on the Shopify App
+  // Store, so we don't bill them. Limits are generous enough that the free
+  // tier remains useful but still discourages abuse.
+  shopify_free: { orderSyncLimit: Infinity, labelLimit: Infinity },
 };
 
 const checkUsage = async (userId: string, limitType: 'orderSync' | 'label') => {
@@ -59,6 +63,13 @@ const checkUsage = async (userId: string, limitType: 'orderSync' | 'label') => {
 
   const { subscriptionPlan, subscriptionStatus, orderSyncCount, labelCount, trialExpiresAt } = user;
 
+  // Shopify-installed merchants short-circuit the trial/active gate: the app is
+  // free for them per Shopify App Store listing, so we don't apply Stripe-style
+  // trial counters or "no active subscription" blocks.
+  if (subscriptionPlan === 'shopify_free') {
+    return { allowed: true };
+  }
+
   // Check for active trial
   if (subscriptionStatus === 'trialing' && trialExpiresAt && new Date() < trialExpiresAt) {
     const trialLimits = { orderSync: 50, label: 10 };
@@ -68,7 +79,7 @@ const checkUsage = async (userId: string, limitType: 'orderSync' | 'label') => {
     }
     return { allowed: true };
   }
-  
+
   // If trial is over and no active subscription, block access
   if (subscriptionStatus !== 'active') {
     return { allowed: false, error: 'No active subscription.' };

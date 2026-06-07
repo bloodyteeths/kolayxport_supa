@@ -8,7 +8,6 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
-import prisma from '../../../../lib/prisma';
 import { logger } from '../../../../lib/logger';
 
 const SCOPES = 'read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments';
@@ -80,21 +79,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).send('Invalid HMAC');
   }
 
-  // If the shop is already connected with a live token, skip OAuth and send the
-  // merchant straight to the app. The session cookie (if any) determines whether
-  // they land on /ayarlar logged in, or hit the login wall.
-  const existing = await prisma.shopifyShop.findUnique({ where: { shopDomain: shop } });
-  if (
-    existing &&
-    existing.isActive &&
-    existing.tokenExpiresAt &&
-    existing.tokenExpiresAt > new Date()
-  ) {
-    return res.redirect(`/ayarlar?shop=${encodeURIComponent(shop)}`);
-  }
-
-  // Start OAuth. State marks this as an App Store install so the callback knows
-  // to auto-provision a KolayXport user instead of requiring an existing one.
+  // App Store policy 2.3.4 requires OAuth to run on every install/reinstall hit,
+  // even when a valid token exists server-side. Token-reuse belongs in API call
+  // paths, not the install entry point.
   const nonce = crypto.randomBytes(16).toString('hex');
   const state = Buffer.from(
     JSON.stringify({ appStoreInstall: true, shop, nonce }),

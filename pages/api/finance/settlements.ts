@@ -1386,29 +1386,46 @@ async function handleAmazonSync(userId: string, body: any, res: NextApiResponse)
   const startISO = new Date(startMs).toISOString();
   const endISO = new Date(endMs).toISOString();
 
-  // ---- PHASE 1: Fetch transactions via Finances API v2024-06-19 ----
-  const allTransactions: any[] = [];
-  let nextToken: string | null = null;
+  // ---- PHASE 1: Fetch via Finances v0 ListFinancialEvents ----
+  //
+  // We previously used /finances/2024-06-19/transactions but it returns 0 rows
+  // for many sellers (the new endpoint has gaps depending on account type and
+  // region). The v0 ListFinancialEvents endpoint exposes the full event log:
+  //   ShipmentEventList, RefundEventList, ServiceFeeEventList,
+  //   AdjustmentEventList, ProductAdsPaymentEventList, ...
+  // It paginates via NextToken (separate parameter; not allowed alongside
+  // PostedAfter / PostedBefore on follow-up pages).
+  type EventMap = Record<string, any[]>;
+  const allEvents: EventMap = {};
+  let v0NextToken: string | null = null;
+  let pages = 0;
 
   do {
-    const params = new URLSearchParams({
-      postedAfter: startISO,
-      postedBefore: endISO,
-      ...(nextToken ? { nextToken } : {}),
-    });
-
+    const qs = v0NextToken
+      ? `NextToken=${encodeURIComponent(v0NextToken)}`
+      : `PostedAfter=${encodeURIComponent(startISO)}&PostedBefore=${encodeURIComponent(endISO)}&MaxResultsPerPage=100`;
     const data = await callSpApiWithRetry(
-      `/finances/2024-06-19/transactions?${params.toString()}`,
+      `/finances/v0/financialEvents?${qs}`,
       token,
       region,
     );
+    const events = (data as any)?.payload?.FinancialEvents || {};
+    for (const k of Object.keys(events)) {
+      if (!Array.isArray(events[k])) continue;
+      (allEvents[k] = allEvents[k] || []).push(...events[k]);
+    }
+    v0NextToken = (data as any)?.payload?.NextToken || (data as any)?.NextToken || null;
+    pages++;
+    if (pages > 100) break; // safety cap
+  } while (v0NextToken);
 
-    const txs = Array.isArray(data.transactions) ? data.transactions : [];
-    allTransactions.push(...txs);
-    nextToken = data.nextToken || null;
-  } while (nextToken);
-
-  logger.info('Amazon finance: fetched transactions', { total: allTransactions.length });
+  const eventTotal = Object.values(allEvents).reduce(
+    (s: number, a: any) => s + (Array.isArray(a) ? a.length : 0),
+    0,
+  );
+  // Keep allTransactions name for downstream stats logging.
+  const allTransactions = { pages, eventTotal } as any;
+  logger.info('Amazon finance v0: fetched events', { pages, eventTotal, perType: Object.fromEntries(Object.entries(allEvents).map(([k, v]) => [k, (v as any[]).length])) });
 
   // ---- PHASE 2: Process transactions ----
   const upsertBatch: Array<{
@@ -1429,162 +1446,173 @@ async function handleAmazonSync(userId: string, body: any, res: NextApiResponse)
   let adSpendTotal = 0;
   let adSpendCount = 0;
 
-  for (const tx of allTransactions) {
-    const txType = tx.transactionType || '';
-    const txId = tx.transactionId || tx.sellerOrderId || `amz_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const txDate = tx.postedDate ? new Date(tx.postedDate) : new Date();
-    const currency = tx.marketplaceDetails?.marketplaceId ? 'USD' : 'USD'; // Will be overridden per item
-    const orderId = tx.relatedIdentifiers?.find((r: any) => r.relatedIdentifierName === 'ORDER_ID')?.relatedIdentifierValue || tx.sellerOrderId || null;
+  const amt = (m: any): number =>
+    m && (m.CurrencyAmount ?? m.Amount) != null
+      ? parseFloat(String(m.CurrencyAmount ?? m.Amount))
+      : 0;
+  const curr = (m: any): string => (m && (m.CurrencyCode || 'USD')) || 'USD';
 
-    // Extract amounts from items array
-    const items = Array.isArray(tx.items) ? tx.items : [];
-
-    for (const item of items) {
-      const description = item.description || '';
-      const itemAmount = parseFloat(item.totalAmount?.amount || '0');
-      const itemCurrency = item.totalAmount?.currencyCode || currency;
-      const asin = item.relatedIdentifiers?.find((r: any) => r.relatedIdentifierName === 'FNSKU' || r.relatedIdentifierName === 'ASIN')?.relatedIdentifierValue || null;
-
-      // Classify by transaction type
-      switch (txType) {
-        case 'Shipment': {
-          // Product charges (revenue)
-          upsertBatch.push({
-            externalId: `${txId}_${asin || upsertBatch.length}`,
-            transactionType: 'ProductCharges',
-            orderNumber: orderId,
-            barcode: asin,
-            productName: description || null,
-            quantity: 1,
-            amount: itemAmount,
-            currency: itemCurrency,
-            commission: null,
-            shippingAmount: null,
-            transactionDate: txDate,
-            rawData: item,
-          });
-          break;
+  // ---- 2a. Shipment events → ProductCharges, AmazonCommission, FBAFee
+  for (const ev of (allEvents.ShipmentEventList || [])) {
+    const orderId = ev.AmazonOrderId || null;
+    const txDate = ev.PostedDate ? new Date(ev.PostedDate) : new Date();
+    const items = ev.ShipmentItemList || [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const asin = item.SellerSKU || item.OrderItemId || null;
+      const charges = item.ItemChargeList || [];
+      const fees = item.ItemFeeList || [];
+      // Revenue = sum of all Principal/Promotion charges (positive)
+      let revenue = 0;
+      let currency = 'USD';
+      for (const c of charges) {
+        if (['Principal', 'Tax', 'GiftWrap', 'Shipping', 'ShippingTax', 'GiftWrapTax', 'Promotion', 'ShippingDiscount'].includes(c.ChargeType)) {
+          revenue += amt(c.ChargeAmount);
+          currency = curr(c.ChargeAmount);
         }
-
-        case 'Refund': {
-          upsertBatch.push({
-            externalId: `${txId}_refund_${asin || upsertBatch.length}`,
-            transactionType: 'AmazonRefund',
-            orderNumber: orderId,
-            barcode: asin,
-            productName: description || 'Refund',
-            quantity: 1,
-            amount: -Math.abs(itemAmount),
-            currency: itemCurrency,
-            commission: null,
-            shippingAmount: null,
-            transactionDate: txDate,
-            rawData: item,
-          });
-          break;
-        }
-
-        case 'ServiceFee':
-        case 'OtherTransaction': {
-          const descLower = description.toLowerCase();
-
-          if (descLower.includes('fba') || descLower.includes('fulfillment')) {
-            upsertBatch.push({
-              externalId: `${txId}_fba_${upsertBatch.length}`,
-              transactionType: 'FBAFee',
-              orderNumber: orderId,
-              barcode: asin,
-              productName: description || 'FBA Fee',
-              quantity: 1,
-              amount: -Math.abs(itemAmount),
-              currency: itemCurrency,
-              commission: null,
-              shippingAmount: Math.abs(itemAmount),
-              transactionDate: txDate,
-              rawData: item,
-            });
-          } else if (descLower.includes('commission') || descLower.includes('referral')) {
-            upsertBatch.push({
-              externalId: `${txId}_comm_${upsertBatch.length}`,
-              transactionType: 'AmazonCommission',
-              orderNumber: orderId,
-              barcode: asin,
-              productName: description || 'Commission',
-              quantity: 1,
-              amount: -Math.abs(itemAmount),
-              currency: itemCurrency,
-              commission: Math.abs(itemAmount),
-              shippingAmount: null,
-              transactionDate: txDate,
-              rawData: item,
-            });
-          } else if (descLower.includes('storage')) {
-            upsertBatch.push({
-              externalId: `${txId}_storage_${upsertBatch.length}`,
-              transactionType: 'FBAStorage',
-              orderNumber: orderId,
-              barcode: asin,
-              productName: description || 'FBA Storage',
-              quantity: 1,
-              amount: -Math.abs(itemAmount),
-              currency: itemCurrency,
-              commission: null,
-              shippingAmount: null,
-              transactionDate: txDate,
-              rawData: item,
-            });
-          } else if (descLower.includes('sponsored') || descLower.includes('advertising')) {
-            adSpendTotal += Math.abs(itemAmount);
-            adSpendCount++;
-          } else {
-            upsertBatch.push({
-              externalId: `${txId}_other_${upsertBatch.length}`,
-              transactionType: 'AmazonOther',
-              orderNumber: orderId,
-              barcode: asin,
-              productName: description || 'Amazon Fee',
-              quantity: 1,
-              amount: itemAmount,
-              currency: itemCurrency,
-              commission: null,
-              shippingAmount: null,
-              transactionDate: txDate,
-              rawData: item,
-            });
-          }
-          break;
-        }
-
-        default:
-          break;
       }
-    }
-
-    // Handle transactions without items array (top-level amount)
-    if (items.length === 0 && tx.totalAmount) {
-      const totalAmt = parseFloat(tx.totalAmount.amount || '0');
-      const totalCurrency = tx.totalAmount.currencyCode || 'USD';
-      const descLower = (tx.description || txType || '').toLowerCase();
-
-      if (descLower.includes('sponsored') || descLower.includes('advertising')) {
-        adSpendTotal += Math.abs(totalAmt);
-        adSpendCount++;
-      } else {
+      if (revenue !== 0) {
         upsertBatch.push({
-          externalId: txId,
-          transactionType: txType === 'Refund' ? 'AmazonRefund' : 'AmazonOther',
+          externalId: `amz_ship_${orderId}_${item.OrderItemId || i}`,
+          transactionType: 'ProductCharges',
           orderNumber: orderId,
-          barcode: null,
-          productName: tx.description || txType || 'Amazon Transaction',
-          quantity: 1,
-          amount: totalAmt,
-          currency: totalCurrency,
+          barcode: asin,
+          productName: item.SellerSKU || null,
+          quantity: item.QuantityShipped || 1,
+          amount: revenue,
+          currency,
           commission: null,
           shippingAmount: null,
           transactionDate: txDate,
-          rawData: tx,
+          rawData: item,
         });
       }
+      // Fees per item
+      for (let j = 0; j < fees.length; j++) {
+        const fee = fees[j];
+        const feeAmt = amt(fee.FeeAmount);
+        const feeCur = curr(fee.FeeAmount);
+        const feeType = fee.FeeType || '';
+        const lower = feeType.toLowerCase();
+        let kind = 'AmazonOther';
+        if (lower.includes('commission') || lower.includes('referral')) kind = 'AmazonCommission';
+        else if (lower.includes('fba') || lower.includes('fulfillment')) kind = 'FBAFee';
+        upsertBatch.push({
+          externalId: `amz_shipfee_${orderId}_${item.OrderItemId || i}_${feeType}_${j}`,
+          transactionType: kind,
+          orderNumber: orderId,
+          barcode: asin,
+          productName: feeType,
+          quantity: 1,
+          amount: feeAmt,
+          currency: feeCur,
+          commission: kind === 'AmazonCommission' ? Math.abs(feeAmt) : null,
+          shippingAmount: kind === 'FBAFee' ? Math.abs(feeAmt) : null,
+          transactionDate: txDate,
+          rawData: fee,
+        });
+      }
+    }
+  }
+
+  // ---- 2b. Refund events → AmazonRefund
+  for (const ev of (allEvents.RefundEventList || [])) {
+    const orderId = ev.AmazonOrderId || null;
+    const txDate = ev.PostedDate ? new Date(ev.PostedDate) : new Date();
+    const items = ev.ShipmentItemAdjustmentList || ev.ShipmentItemList || [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const asin = item.SellerSKU || item.OrderItemId || null;
+      const charges = item.ItemChargeAdjustmentList || item.ItemChargeList || [];
+      let refund = 0;
+      let currency = 'USD';
+      for (const c of charges) {
+        refund += amt(c.ChargeAmount);
+        currency = curr(c.ChargeAmount);
+      }
+      if (refund !== 0) {
+        upsertBatch.push({
+          externalId: `amz_refund_${orderId}_${item.OrderItemId || i}`,
+          transactionType: 'AmazonRefund',
+          orderNumber: orderId,
+          barcode: asin,
+          productName: item.SellerSKU || 'Refund',
+          quantity: item.QuantityShipped || 1,
+          amount: refund,
+          currency,
+          commission: null,
+          shippingAmount: null,
+          transactionDate: txDate,
+          rawData: item,
+        });
+      }
+    }
+  }
+
+  // ---- 2c. Service Fee events → FBAFee / FBAStorage / AmazonOther
+  for (let i = 0; i < (allEvents.ServiceFeeEventList || []).length; i++) {
+    const ev = allEvents.ServiceFeeEventList[i];
+    const orderId = ev.AmazonOrderId || null;
+    const reason = (ev.FeeReason || ev.FeeDescription || '').toString();
+    const reasonLower = reason.toLowerCase();
+    const txDate = ev.PostedDate ? new Date(ev.PostedDate) : new Date();
+    const fees = ev.FeeList || [];
+    for (let j = 0; j < fees.length; j++) {
+      const fee = fees[j];
+      const feeAmt = amt(fee.FeeAmount);
+      const feeCur = curr(fee.FeeAmount);
+      let kind: string = 'AmazonOther';
+      if (reasonLower.includes('storage')) kind = 'FBAStorage';
+      else if (reasonLower.includes('fba') || reasonLower.includes('fulfillment')) kind = 'FBAFee';
+      else if (reasonLower.includes('sponsored') || reasonLower.includes('advertising')) {
+        adSpendTotal += Math.abs(feeAmt);
+        adSpendCount++;
+        continue;
+      }
+      upsertBatch.push({
+        externalId: `amz_svcfee_${ev.SellerId || ''}_${ev.PostedDate || ''}_${reason}_${i}_${j}`,
+        transactionType: kind,
+        orderNumber: orderId,
+        barcode: ev.ASIN || null,
+        productName: reason,
+        quantity: 1,
+        amount: feeAmt,
+        currency: feeCur,
+        commission: null,
+        shippingAmount: kind === 'FBAFee' ? Math.abs(feeAmt) : null,
+        transactionDate: txDate,
+        rawData: ev,
+      });
+    }
+  }
+
+  // ---- 2d. Adjustment events → AmazonOther (refund-style)
+  for (let i = 0; i < (allEvents.AdjustmentEventList || []).length; i++) {
+    const ev = allEvents.AdjustmentEventList[i];
+    const txDate = ev.PostedDate ? new Date(ev.PostedDate) : new Date();
+    const a = amt(ev.AdjustmentAmount);
+    upsertBatch.push({
+      externalId: `amz_adj_${ev.PostedDate || ''}_${ev.AdjustmentType || ''}_${i}`,
+      transactionType: 'AmazonOther',
+      orderNumber: null,
+      barcode: null,
+      productName: ev.AdjustmentType || 'Adjustment',
+      quantity: 1,
+      amount: a,
+      currency: curr(ev.AdjustmentAmount),
+      commission: null,
+      shippingAmount: null,
+      transactionDate: txDate,
+      rawData: ev,
+    });
+  }
+
+  // ---- 2e. Sponsored Ads payments → tally adSpendTotal
+  for (const ev of (allEvents.ProductAdsPaymentEventList || [])) {
+    const a = Math.abs(amt(ev.transactionValue || ev.TransactionValue));
+    if (a > 0) {
+      adSpendTotal += a;
+      adSpendCount++;
     }
   }
 
@@ -1652,7 +1680,8 @@ async function handleAmazonSync(userId: string, body: any, res: NextApiResponse)
 
   logger.info('Amazon settlement sync complete', {
     userId,
-    totalFetched: allTransactions.length,
+    totalFetched: allTransactions.eventTotal,
+    pages: allTransactions.pages,
     totalUpserted,
     adSpend: Math.round(adSpendTotal * 100) / 100,
     adSpendCount,
@@ -1660,7 +1689,7 @@ async function handleAmazonSync(userId: string, body: any, res: NextApiResponse)
 
   return res.status(200).json({
     success: true,
-    totalFetched: allTransactions.length,
+    totalFetched: allTransactions.eventTotal,
     totalUpserted,
     adSpend: Math.round(adSpendTotal * 100) / 100,
     syncedTo: new Date(endMs).toISOString(),

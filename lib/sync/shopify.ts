@@ -66,6 +66,40 @@ export async function syncShopifyRecentOrdersForUser(userId: string): Promise<Sy
 
         logger.info(`[SHOPIFY SYNC] Fetched ${rawOrders.length} orders from ${shop.shopDomain}`, { userId, shop: shop.shopDomain, orderCount: rawOrders.length });
 
+        // Shopify order line_items don't include an image field. Fetch each unique
+        // product_id once and stamp the featured image onto every line_item that
+        // references it, so the order/label UI shows product thumbnails.
+        const productIdsNeeded = new Set<string>();
+        for (const o of rawOrders) {
+          for (const li of (o.line_items || [])) {
+            if (li.product_id && !li.image) productIdsNeeded.add(String(li.product_id));
+          }
+        }
+        const imageByProductId: Record<string, string> = {};
+        const ids = Array.from(productIdsNeeded);
+        const CHUNK = 5;
+        for (let i = 0; i < ids.length; i += CHUNK) {
+          const chunk = ids.slice(i, i + CHUNK);
+          await Promise.all(chunk.map(async (pid) => {
+            try {
+              const product = await client.getProduct(pid);
+              const src = product?.image?.src || product?.images?.[0]?.src;
+              if (src) imageByProductId[pid] = src;
+            } catch (err: any) {
+              logger.warn(`[SHOPIFY SYNC] product ${pid} image fetch failed`, { err: err?.message });
+            }
+          }));
+        }
+        for (const o of rawOrders) {
+          for (const li of (o.line_items || [])) {
+            const src = imageByProductId[String(li.product_id)];
+            if (li.product_id && !li.image && src) li.image = { src };
+          }
+        }
+        if (ids.length) {
+          logger.info(`[SHOPIFY SYNC] Enriched ${Object.keys(imageByProductId).length}/${ids.length} product images`, { userId });
+        }
+
         // Map to UIOrder format
         const uiOrders = rawOrders.map((o: any) => toOrder(o, shop.shopDomain));
 

@@ -157,6 +157,7 @@ function convertWeightToKg(value: number, unit: string): number {
 
 /**
  * Parse a tab-separated report file into row objects.
+ * Accepts both legacy (`order-id`) and current `_GENERAL` (`amazon-order-id`) headers.
  */
 export function parseOrderReport(tsv: string): Record<string, string>[] {
   const lines = tsv.trim().split('\n');
@@ -171,7 +172,7 @@ export function parseOrderReport(tsv: string): Record<string, string>[] {
     headers.forEach((header, idx) => {
       row[header] = (values[idx] || '').trim();
     });
-    if (row['order-id']) rows.push(row);
+    if (row['amazon-order-id'] || row['order-id']) rows.push(row);
   }
 
   return rows;

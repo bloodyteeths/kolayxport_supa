@@ -12,8 +12,11 @@ import { gunzipSync } from 'zlib';
 // ---------------------------------------------------------------------------
 
 export const REPORT_TYPES = {
-  ALL_ORDERS_BY_DATE: 'GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE',
-  ALL_ORDERS_BY_UPDATE: 'GET_FLAT_FILE_ALL_ORDERS_DATA_BY_LAST_UPDATE',
+  // The non-_GENERAL variants were deprecated for non-Easy-Ship sellers and
+  // return 403 "Access to the resource is forbidden" for new apps. Use the
+  // _GENERAL variants which Amazon documents as the current default.
+  ALL_ORDERS_BY_DATE: 'GET_FLAT_FILE_ALL_ORDERS_DATA_BY_ORDER_DATE_GENERAL',
+  ALL_ORDERS_BY_UPDATE: 'GET_FLAT_FILE_ALL_ORDERS_DATA_BY_LAST_UPDATE_GENERAL',
   SETTLEMENT: 'GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE',
   ACTIVE_LISTINGS: 'GET_FLAT_FILE_OPEN_LISTINGS_DATA',
   ALL_LISTINGS: 'GET_MERCHANT_LISTINGS_ALL_DATA',

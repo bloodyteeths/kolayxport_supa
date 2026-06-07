@@ -33,21 +33,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const hashedPassword = await bcrypt.hash(password, 12);
 
-  const user = await prisma.user.create({
-    data: {
-      id: uuidv4(),
-      email,
-      name: name || email.split('@')[0],
-      password: hashedPassword,
-      // emailVerified stays null until the user clicks the verification link.
-      subscriptionPlan: 'trial',
-      subscriptionStatus: 'trialing',
-      trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      usageResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      orderSyncCount: 0,
-      labelCount: 0,
-    },
-  });
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: {
+        id: uuidv4(),
+        email,
+        name: name || email.split('@')[0],
+        password: hashedPassword,
+        // emailVerified stays null until the user clicks the verification link.
+        subscriptionPlan: 'trial',
+        subscriptionStatus: 'trialing',
+        trialExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        usageResetAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        orderSyncCount: 0,
+        labelCount: 0,
+      },
+    });
+  } catch (e: any) {
+    // Concurrent signup with the same email: the early findUnique check
+    // above let both requests through, and Prisma's unique constraint
+    // on email surfaces as P2002. Translate to the same 409 the fast
+    // path returns instead of leaking a 500.
+    if (e?.code === 'P2002') {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+    throw e;
+  }
 
   // Fire-and-forget the verification email. Don't block signup on Postmark.
   try {

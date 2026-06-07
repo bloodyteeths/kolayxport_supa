@@ -107,6 +107,19 @@ export default async function handler(
     if (payload.shippingAddress && typeof payload.shippingAddress === 'object') {
         updateData.shippingAddress = payload.shippingAddress;
     }
+
+    // Bug 1: when the user explicitly sets weight or package dimensions on
+    // the order, stamp weightEditedAt so the order sync writer won't blow
+    // these values away on the next resync.
+    const touchedWeightFields =
+      payload.weightKg !== undefined ||
+      payload.packageLength !== undefined ||
+      payload.packageWidth !== undefined ||
+      payload.packageHeight !== undefined ||
+      payload.dimensionUnits !== undefined;
+    if (touchedWeightFields) {
+      updateData.weightEditedAt = new Date();
+    }
     const extraFields: any = { ...payload };
     delete extraFields.status;
     delete extraFields.customerName;

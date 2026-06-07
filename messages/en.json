@@ -571,6 +571,7 @@
     "orderStatus": "Order Status",
     "trackingNumber": "Tracking Number",
     "customerNote": "Customer Note",
+    "giftMessage": "Gift Message",
     "copyCustomerNote": "Customer note copied",
     "copiFailed": "Copy failed",
     "clickToCopy": "Click to copy",

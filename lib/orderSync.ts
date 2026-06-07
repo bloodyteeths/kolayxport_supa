@@ -1383,7 +1383,7 @@ export async function syncAllOrders(userId: string, options: {
           const existingOrder = existingOrdersMap.get(order.marketplaceKey);
           
           // Create the base order data (without userId for updates)
-          const baseOrderData = {
+          const baseOrderData: any = {
             marketplace: order.marketplace,
             marketplaceKey: order.marketplaceKey,
             orderNumber: order.orderNumber,
@@ -1399,7 +1399,32 @@ export async function syncAllOrders(userId: string, options: {
             // shipByDate, channel, and source are UI-only fields, not stored in database
           };
 
+          // Persist Etsy gift_message / message_from_buyer (and any other source's
+          // equivalent) when the mapper supplied them. Only overwrite when we
+          // actually have new content so we don't blank out a previously-saved
+          // note on a later resync where the field is missing.
+          if (typeof (order as any).giftMessage === 'string' && (order as any).giftMessage.length > 0) {
+            baseOrderData.giftMessage = (order as any).giftMessage;
+          }
+          if (typeof (order as any).customerNote === 'string' && (order as any).customerNote.length > 0) {
+            baseOrderData.customerNote = (order as any).customerNote;
+          }
+
           if (existingOrder) {
+            // Bug 1 guard: if the user manually edited order-level weight /
+            // dimensions (weightEditedAt is set), do NOT clobber those fields
+            // from rawData on the next sync. We don't currently write
+            // Order.weightKg from sync (line item weights live on OrderItem),
+            // but keep the guard here in case future code starts pushing
+            // weight/dimensions into baseOrderData.
+            if ((existingOrder as any).weightEditedAt) {
+              delete baseOrderData.weightKg;
+              delete baseOrderData.packageLength;
+              delete baseOrderData.packageWidth;
+              delete baseOrderData.packageHeight;
+              delete baseOrderData.dimensionUnits;
+            }
+
             // Add to update list
             ordersToUpdate.push({
               where: { id: existingOrder.id },
@@ -1577,36 +1602,82 @@ async function createOrderItemsForBatch(
       // For existing orders, only recreate OrderItems if they don't exist or line items have changed
       const existingOrder = existingOrdersMap.get(order.marketplaceKey);
       if (existingOrder) {
-        const existingItemCount = await db.orderItem.count({
-          where: { orderId: existingOrder.id }
+        // Bug 1 guard: before we delete+recreate items, snapshot per-line
+        // manual weight edits so the next sync doesn't clobber what the user
+        // typed on the labels page. We key by remoteLineId first (stable
+        // marketplace line id), then fall back to uniqueLineKey for legacy
+        // rows that may not have had remoteLineId populated.
+        const existingItems = await db.orderItem.findMany({
+          where: { orderId: existingOrder.id },
+          select: {
+            remoteLineId: true,
+            uniqueLineKey: true,
+            weightKg: true,
+            weightEditedAt: true,
+          },
         });
+        const editedWeightByLineKey = new Map<
+          string,
+          { weightKg: number | null; weightEditedAt: Date | null }
+        >();
+        for (const ex of existingItems) {
+          if (!ex.weightEditedAt) continue;
+          const keys = [ex.remoteLineId, ex.uniqueLineKey].filter(
+            (k): k is string => typeof k === 'string' && k.length > 0,
+          );
+          for (const k of keys) {
+            editedWeightByLineKey.set(k, {
+              weightKg: ex.weightKg ?? null,
+              weightEditedAt: ex.weightEditedAt,
+            });
+          }
+        }
 
         // Always update OrderItems to reflect latest marketplace data (title, weight, hs_code, etc.)
-        if (existingItemCount > 0) {
+        if (existingItems.length > 0) {
           await db.$transaction(async (tx) => {
             await tx.orderItem.deleteMany({ where: { orderId } });
             const lineItems = order.line_items || [];
             console.log(`[OrderItems] Refreshing ${lineItems.length} items for order ${order.orderNumber} (marketplace=${order.marketplace}, source=${order.source}), images: ${lineItems.map((i: any) => i.image ? 'YES' : 'NO').join(',')}`);
-            const freshItems = lineItems.map((item, i) => ({
-              orderId,
-              productName: item.title || 'Unknown Product',
-              quantity: item.quantity || 1,
-              unitPrice: item.value || 0,
-              totalPrice: (item.value || 0) * (item.quantity || 1),
-              weightKg: item.weight || 0.5,
-              harmonizedCode: item.hs_code || '',
-              countryOfMfg: item.country_of_origin || '',
-              sku: item.sku || '',
-              image: item.image || '',
-              variantInfo: item.variantInfo || '',
-              notes: (item as any).notes || (item as any).description || (order as any).notes || '',
-              marketplaceKey: String(item.id || `${order.marketplaceKey}-${i}`),
-              orderNumber: order.orderNumber || '',
-              uniqueLineKey: String(item.id || `${order.marketplaceKey}-${i}`),
-              productId: null,
-              remoteLineId: String(item.id || ''),
-              shipBy: item.shipBy || order.shipByDate || null,
-            }));
+            const freshItems = lineItems.map((item, i) => {
+              const lineKeyCandidates = [
+                String(item.id || ''),
+                String(item.id || `${order.marketplaceKey}-${i}`),
+              ].filter(Boolean);
+              let preservedEdit:
+                | { weightKg: number | null; weightEditedAt: Date | null }
+                | undefined;
+              for (const k of lineKeyCandidates) {
+                const hit = editedWeightByLineKey.get(k);
+                if (hit) {
+                  preservedEdit = hit;
+                  break;
+                }
+              }
+              return {
+                orderId,
+                productName: item.title || 'Unknown Product',
+                quantity: item.quantity || 1,
+                unitPrice: item.value || 0,
+                totalPrice: (item.value || 0) * (item.quantity || 1),
+                weightKg: preservedEdit
+                  ? preservedEdit.weightKg ?? 0.5
+                  : item.weight || 0.5,
+                weightEditedAt: preservedEdit?.weightEditedAt ?? null,
+                harmonizedCode: item.hs_code || '',
+                countryOfMfg: item.country_of_origin || '',
+                sku: item.sku || '',
+                image: item.image || '',
+                variantInfo: item.variantInfo || '',
+                notes: (item as any).notes || (item as any).description || (order as any).notes || (order as any).customerNote || '',
+                marketplaceKey: String(item.id || `${order.marketplaceKey}-${i}`),
+                orderNumber: order.orderNumber || '',
+                uniqueLineKey: String(item.id || `${order.marketplaceKey}-${i}`),
+                productId: null,
+                remoteLineId: String(item.id || ''),
+                shipBy: item.shipBy || order.shipByDate || null,
+              };
+            });
             if (freshItems.length > 0) {
               await tx.orderItem.createMany({ data: freshItems, skipDuplicates: true });
             }
@@ -1631,7 +1702,7 @@ async function createOrderItemsForBatch(
           sku: item.sku || '',
           image: item.image || '',
           variantInfo: item.variantInfo || '',
-          notes: (item as any).notes || (item as any).description || (order as any).notes || '', // Extract notes from item or order level
+          notes: (item as any).notes || (item as any).description || (order as any).notes || (order as any).customerNote || '', // Extract notes from item or order level (falls back to Etsy customerNote / message_from_buyer)
           marketplaceKey: String(item.id || `${order.marketplaceKey}-${i}`),
           orderNumber: order.orderNumber || '',
           uniqueLineKey: String(item.id || `${order.marketplaceKey}-${i}`),

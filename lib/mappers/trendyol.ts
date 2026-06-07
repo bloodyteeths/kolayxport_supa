@@ -4,6 +4,37 @@
 
 import { NormalizedLineItem, UIOrder } from '../types';
 
+/**
+ * Normalize a raw Trendyol order status string to the app-wide enum used by
+ * the orders page filter, financial dashboard breakdown, and canceled-order
+ * strikethrough. Trendyol returns its own English vocabulary
+ * (`Created`, `Picking`, `Invoiced`, `Shipped`, `Delivered`, `Cancelled`,
+ * `UnPacked`, `UnSupplied`, `Returned`, ...). Keep the raw value in
+ * `Order.externalStatus` for the marketplace's-own-words display.
+ *
+ * Mirrors the shape of `mapEtsyStatus` in lib/integrations/etsyOrderSync.ts.
+ */
+export function mapTrendyolStatus(raw: string): string {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  switch (s) {
+    case 'Shipped':
+      return 'SHIPPED';
+    case 'Delivered':
+      return 'DELIVERED';
+    case 'Cancelled':
+    case 'Returned':
+      return 'CANCELLED';
+    case 'Created':
+    case 'Picking':
+    case 'Invoiced':
+    case 'UnPacked':
+    case 'UnSupplied':
+      return 'AWAITING_FULFILLMENT';
+    default:
+      return 'AWAITING_FULFILLMENT';
+  }
+}
+
 export function toOrderItem(line: any, orderShipByDate?: string): NormalizedLineItem {
   // Combine productSize and productColor for variant info
   const variantInfo = [line.productSize, line.productColor]
@@ -91,7 +122,10 @@ export async function toOrderWithImages(order: any, productImages: Record<string
       : undefined,
     line_items,
     // Additional fields with fallbacks
-    status: order.status || 'pending',
+    // Normalize Trendyol's own status vocabulary to the app-wide enum so
+    // orders-page filters, financial breakdowns, and canceled strikethroughs
+    // work. Raw Trendyol value is preserved in `externalStatus` below.
+    status: mapTrendyolStatus(order.status),
     currency: order.currencyCode || 'TRY',
     totalPrice: order.totalPrice || order.grossAmount || 0,
     source: 'trendyol' as const,

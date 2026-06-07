@@ -170,6 +170,36 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
   const customerName = receipt.name || '';
   const nameParts = customerName.trim().split(/\s+/);
 
+  // Etsy receipts surface two free-text fields the seller must see during
+  // fulfillment: gift_message (added by the buyer when checking out as a gift)
+  // and message_from_buyer (the "note to seller" / personalization request).
+  // Sellers doing custom orders rely on these — drop them and we silently lose
+  // customer requests.
+  const rawGiftMessage =
+    typeof receipt.gift_message === 'string' ? receipt.gift_message.trim() : '';
+  const rawBuyerMessage =
+    typeof receipt.message_from_buyer === 'string'
+      ? receipt.message_from_buyer.trim()
+      : '';
+
+  // Transactions can also carry per-line personalization in
+  // `personalization` / `buyer_request`. Pull them as a fallback so custom-order
+  // shops still get the buyer's instructions if Etsy puts them at the
+  // transaction level instead of the receipt level.
+  const transactionPersonalizations = transactions
+    .map((tx: any) => {
+      const personalization =
+        typeof tx.personalization === 'string' ? tx.personalization.trim() : '';
+      const buyerRequest =
+        typeof tx.buyer_request === 'string' ? tx.buyer_request.trim() : '';
+      return [personalization, buyerRequest].filter(Boolean).join(' | ');
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  const customerNote =
+    rawBuyerMessage || transactionPersonalizations || '';
+
   return {
     id: `etsy-${receipt.receipt_id}`,
     source: 'etsy-api',
@@ -201,6 +231,8 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
     shipByDate: receipt.expected_ship_date
       ? new Date(receipt.expected_ship_date * 1000).toISOString()
       : undefined,
+    giftMessage: rawGiftMessage || undefined,
+    customerNote: customerNote || undefined,
     rawData: receipt,
     commodityDesc: lineItems[0]?.title || '',
   };

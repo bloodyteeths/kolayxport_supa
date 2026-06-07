@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import { getAuthUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { signOAuthState } from '@/lib/auth/oauthState';
 
 // Force serverless runtime (not edge)
 export const config = {
@@ -32,11 +33,14 @@ export default async function handler(
     const csrfToken = crypto.randomBytes(16).toString('hex');
     res.setHeader('Set-Cookie', `ebay_csrf=${csrfToken}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=600`);
 
-    // Encode userId + CSRF token in state for the callback
-    const state = Buffer.from(JSON.stringify({
+    // Sign the state so the callback can detect tampering. The CSRF cookie
+    // is a second layer, but without an HMAC signature an attacker could
+    // still mint a state with a victim's userId and a CSRF value the
+    // attacker controls.
+    const state = signOAuthState({
       userId: user.id,
       csrfToken,
-    })).toString('base64url');
+    });
 
     // eBay OAuth scopes — must match scopes enabled in eBay Developer Portal
     const scopes = [

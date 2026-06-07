@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
+import { verifyOAuthState } from '@/lib/auth/oauthState';
 
 export default async function handler(
   req: NextApiRequest,
@@ -33,10 +34,16 @@ export default async function handler(
   try {
     logger.info('Starting Etsy OAuth callback processing', { hasCode: !!code, hasState: !!state });
 
-    // Decode state to get userId and codeVerifier
-    const stateData = JSON.parse(
-      Buffer.from(state as string, 'base64url').toString()
-    );
+    // Verify the HMAC-signed state. Unsigned state would let an attacker
+    // inject a victim's userId and write attacker-owned Etsy tokens to the
+    // victim's row.
+    const stateData = verifyOAuthState<{ userId?: string; codeVerifier?: string }>(state as string);
+    if (!stateData || typeof stateData.userId !== 'string' || typeof stateData.codeVerifier !== 'string') {
+      logger.error('Etsy OAuth state verification failed', undefined, {
+        hasState: !!state,
+      });
+      return res.redirect('/ayarlar?error=etsy_auth_failed');
+    }
     userId = stateData.userId;
     codeVerifier = stateData.codeVerifier;
 

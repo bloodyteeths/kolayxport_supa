@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import crypto from 'crypto';
 import { logger } from '@/lib/logger';
+import { signOAuthState } from '@/lib/auth/oauthState';
 
 export default async function handler(
   req: NextApiRequest,
@@ -23,12 +24,14 @@ export default async function handler(
       .update(codeVerifier)
       .digest('base64url');
 
-    // Store code verifier in session (you'll need this for token exchange)
-    // For now, we'll pass it in state (in production, use session storage)
-    const state = Buffer.from(JSON.stringify({
+    // Sign the state so the callback can detect tampering. Without a
+    // signature, an attacker could craft a `state` with a victim's userId
+    // and cause the victim's row to be linked to the attacker's Etsy shop
+    // tokens after a swapped redirect.
+    const state = signOAuthState({
       userId: user.id,
-      codeVerifier
-    })).toString('base64url');
+      codeVerifier,
+    });
 
     // Build Etsy OAuth URL
     const authParams = new URLSearchParams({

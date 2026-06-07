@@ -142,6 +142,8 @@ interface LocalUIOrder {
   trackingNumber?: string; // Added for UPS tracking
   labelStatus?: string; // Added for label status
   shippingLabelUrl?: string; // Added for label URL
+  giftMessage?: string; // Etsy gift_message persisted by sync
+  customerNote?: string; // Etsy message_from_buyer / personalization persisted by sync
   shipments?: Array<{
     id: string;
     trackingNumber?: string;
@@ -244,6 +246,7 @@ export interface LabelRow {
   trackingNumber?: string; // From item
   shipByDate?: string; // Effective ship by date
   customerNote?: string; // Customer personalization/notes (especially from Etsy)
+  giftMessage?: string; // Buyer-supplied gift message (Etsy gift_message)
 
   // Reference to the original full LocalUIOrder if complex data needed for actions not covered by LabelRow
   originalOrder?: LocalUIOrder; 
@@ -1039,7 +1042,11 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelJobStatus: hasOrderLabel ? 'created' : undefined,
         trackingNumber: latestShipment?.trackingNumber || order.trackingNumber || (safeRaw?.cargoTrackingNumber ? String(safeRaw.cargoTrackingNumber) : undefined),
         shipByDate: order.shipByDate || (addr as any)?._etsyShipByDate,
-        customerNote: (addr as any)?._etsyCustomerNote || '',
+        // Prefer DB-persisted Etsy message_from_buyer (synced from the receipt
+        // mapper) over the Chrome extension's _etsyCustomerNote scrape, so
+        // direct Etsy API orders show personalization too.
+        customerNote: order.customerNote || (addr as any)?._etsyCustomerNote || '',
+        giftMessage: order.giftMessage || '',
         originalOrder: order,
         labelCreated: hasOrderLabel,
         shippingLabelUrl: hasOrderLabel ? (latestShipment?.pdfUrl || order.shippingLabelUrl) : undefined,
@@ -1145,7 +1152,10 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelJobStatus: latestLabelJob?.status || (order.trackingNumber || safeRaw?.cargoTrackingNumber ? 'created' : undefined),
         trackingNumber: latestLabelJob?.trackingNumber || order.trackingNumber || (safeRaw?.cargoTrackingNumber ? String(safeRaw.cargoTrackingNumber) : undefined),
         shipByDate: item.shipBy || order.shipByDate || (addr as any)?._etsyShipByDate,
-        customerNote: (addr as any)?._etsyCustomerNote || '',
+        // Prefer DB-persisted Etsy message_from_buyer (synced from the receipt
+        // mapper) over the Chrome extension's _etsyCustomerNote scrape.
+        customerNote: order.customerNote || (addr as any)?._etsyCustomerNote || '',
+        giftMessage: order.giftMessage || '',
         originalOrder: order,
         labelCreated: latestLabelJob?.status === 'created' && !!latestLabelJob?.trackingNumber,
         shippingLabelUrl: latestLabelJob?.pdfUrl || (latestLabelJob?.status === 'created' && latestLabelJob?.trackingNumber ? `/api/labels/${item.id}/pdf` : undefined),
@@ -2983,6 +2993,14 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         <Box sx={{ py: 0.75 }}>
                           <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>{t('customerNote')}</Typography>
                           <Typography variant="body2" sx={{ fontSize: '0.78rem', mt: 0.25, bgcolor: '#fffde7', p: 0.75, borderRadius: 1, whiteSpace: 'pre-wrap' }}>{row.customerNote}</Typography>
+                        </Box>
+                      )}
+
+                      {/* Gift message (Etsy gift_message) */}
+                      {row.giftMessage && row.giftMessage.trim() !== '' && (
+                        <Box sx={{ py: 0.75 }}>
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase', fontSize: '0.6rem', letterSpacing: 0.5 }}>{t('giftMessage')}</Typography>
+                          <Typography variant="body2" sx={{ fontSize: '0.78rem', mt: 0.25, bgcolor: '#fce4ec', p: 0.75, borderRadius: 1, whiteSpace: 'pre-wrap' }}>{row.giftMessage}</Typography>
                         </Box>
                       )}
 

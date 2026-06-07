@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { encryptIfNeeded } from '@/lib/crypto/credentials';
+import { verifyOAuthState } from '@/lib/auth/oauthState';
 
 // Force serverless runtime (not edge) — Prisma requires Node.js
 export const config = {
@@ -48,10 +49,16 @@ export default async function handler(
       hasState: !!state,
     });
 
-    // Decode state to get userId and CSRF token
-    const stateData = JSON.parse(
-      Buffer.from(state as string, 'base64url').toString()
-    );
+    // Verify the HMAC-signed state. Unsigned state would let an attacker
+    // inject a victim's userId and write attacker-owned eBay tokens to the
+    // victim's row. The CSRF cookie remains a second layer below.
+    const stateData = verifyOAuthState<{ userId?: string; csrfToken?: string }>(state as string);
+    if (!stateData || typeof stateData.userId !== 'string' || typeof stateData.csrfToken !== 'string') {
+      logger.error('eBay OAuth state verification failed', undefined, {
+        hasState: !!state,
+      });
+      return res.redirect('/ayarlar?error=ebay_auth_failed');
+    }
     userId = stateData.userId;
     const csrfTokenFromState = stateData.csrfToken;
 

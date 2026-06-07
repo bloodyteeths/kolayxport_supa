@@ -73,6 +73,9 @@ export default async function handler(
           });
 
           // Create new items
+          // If the client passed a weightKg, treat it as a manual edit so the
+          // next order sync won't overwrite the user's value from rawData.
+          const now = new Date();
           await tx.orderItem.createMany({
             data: items.map((item: any) => ({
               orderId,
@@ -81,6 +84,7 @@ export default async function handler(
               unitPrice: item.unitPrice,
               totalPrice: item.totalPrice,
               weightKg: item.weightKg,
+              weightEditedAt: item.weightKg !== undefined ? now : null,
               harmonizedCode: item.harmonizedCode,
               countryOfMfg: item.countryOfMfg,
               sku: item.sku,

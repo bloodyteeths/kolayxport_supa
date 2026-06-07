@@ -120,7 +120,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (itemId && (weight !== undefined || hsCode !== undefined || countryOfOrigin !== undefined)) {
       const itemUpdateData: any = {};
-      if (weight !== undefined) itemUpdateData.weightKg = weight;
+      if (weight !== undefined) {
+        itemUpdateData.weightKg = weight;
+        // Mark this line item as user-edited so the order sync writer
+        // preserves the value on the next resync instead of clobbering it
+        // from rawData.
+        itemUpdateData.weightEditedAt = new Date();
+      }
       if (hsCode !== undefined) itemUpdateData.harmonizedCode = hsCode;
       if (countryOfOrigin !== undefined) itemUpdateData.countryOfMfg = countryOfOrigin;
       

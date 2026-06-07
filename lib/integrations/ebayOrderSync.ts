@@ -134,6 +134,20 @@ function mapEbayOrderToUIOrder(order: any, imageMap?: Map<string, string>): UIOr
   const totalPrice = parseFloat(order.pricingSummary?.total?.value) || 0;
   const currency = order.pricingSummary?.total?.currency || 'USD';
 
+  // Ship-by deadline lives on each line item's lineItemFulfillmentInstructions.shipByDate.
+  // The previously-used fulfillmentStartInstructions[0].maxEstimatedDeliveryDate is the
+  // latest *delivery* date promised to the buyer — using it as a ship-by tricks sellers
+  // into thinking they have several extra days to ship. Take the earliest shipByDate
+  // across line items so we surface the tightest deadline.
+  const shipByCandidates = (order.lineItems || [])
+    .map((li: any) => li?.lineItemFulfillmentInstructions?.shipByDate)
+    .filter((d: any): d is string => typeof d === 'string' && d.length > 0);
+  const earliestShipByDate = shipByCandidates.length
+    ? shipByCandidates.reduce((earliest: string, current: string) =>
+        new Date(current).getTime() < new Date(earliest).getTime() ? current : earliest
+      )
+    : undefined;
+
   return {
     id: `ebay-${order.orderId}`,
     source: 'ebay-api',
@@ -160,7 +174,7 @@ function mapEbayOrderToUIOrder(order: any, imageMap?: Map<string, string>): UIOr
     },
     line_items: lineItems,
     marketplaceOrderDate: order.creationDate || undefined,
-    shipByDate: order.fulfillmentStartInstructions?.[0]?.maxEstimatedDeliveryDate || undefined,
+    shipByDate: earliestShipByDate,
     rawData: order,
     commodityDesc: lineItems[0]?.title || '',
   };

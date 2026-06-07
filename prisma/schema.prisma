@@ -33,7 +33,7 @@ model User {
   stripeCustomerId      String?                 @unique
   subscriptionPlan      String?
   subscriptionStatus    String?
-  billingProvider       String?                 // 'stripe' | 'shopify'
+  billingProvider       String? // 'stripe' | 'shopify'
   shopifySubscriptionId String?                 @unique
   trialExpiresAt        DateTime?
   usageResetAt          DateTime?
@@ -157,6 +157,14 @@ model Order {
   weightKg                    Float?               @default(0.5)
   externalStatus              String?
   uiOrderDate                 DateTime?
+  // Marks when the user manually edited weight/dimensions on this order.
+  // Sync should skip overwriting weight-related fields when this is non-null.
+  weightEditedAt              DateTime?
+  // Buyer-provided gift message captured from marketplace (e.g. Etsy gift_message).
+  giftMessage                 String?
+  // Buyer-provided personalization / notes captured from marketplace
+  // (e.g. Etsy message_from_buyer). Surfaced on the labels page detail view.
+  customerNote                String?
   items                       OrderItem[]          @relation("OrderToOrderItem")
   user                        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   shipments                   Shipment[]           @relation("OrderToShipment")
@@ -194,6 +202,9 @@ model OrderItem {
   countryOfMfg   String?
   harmonizedCode String?
   weightKg       Float?     @default(0.5)
+  // Marks when the user manually edited this item's weight. When set, the
+  // order sync writer must not overwrite weightKg from marketplace rawData.
+  weightEditedAt DateTime?
   recipientEmail String?    @map("recipient_email")
   labelJobs      LabelJob[]
   order          Order      @relation("OrderToOrderItem", fields: [orderId], references: [id], onDelete: Cascade)
@@ -529,9 +540,9 @@ model EtsyShop {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  user     User                @relation("UserEtsyShops", fields: [userId], references: [id], onDelete: Cascade)
-  listings EtsyListing[]       @relation("EtsyShopListings")
-  drafts   EtsyListingDraft[]  @relation("EtsyShopDrafts")
+  user     User               @relation("UserEtsyShops", fields: [userId], references: [id], onDelete: Cascade)
+  listings EtsyListing[]      @relation("EtsyShopListings")
+  drafts   EtsyListingDraft[] @relation("EtsyShopDrafts")
 
   @@unique([userId, shopId]) // One record per user-shop combination
   @@index([userId])
@@ -682,25 +693,25 @@ model EtsyDraftSyncAttempt {
 }
 
 model EbayListingDraft {
-  id                      String    @id @default(cuid())
-  userId                  String
-  sku                     String
-  offerId                 String?
-  listingId               String?
-  status                  String    @default("draft")
-  baseSnapshotInventory   Json      @default("{}")
-  baseSnapshotOffer       Json      @default("{}")
-  baseUpdatedAt           DateTime?
-  inventoryPatch          Json      @default("{}")
-  offerPatch              Json      @default("{}")
-  variationPatch          Json?
-  queuedActions           Json      @default("[]")
-  lastSyncError           String?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-  syncedAt                DateTime?
+  id                    String    @id @default(cuid())
+  userId                String
+  sku                   String
+  offerId               String?
+  listingId             String?
+  status                String    @default("draft")
+  baseSnapshotInventory Json      @default("{}")
+  baseSnapshotOffer     Json      @default("{}")
+  baseUpdatedAt         DateTime?
+  inventoryPatch        Json      @default("{}")
+  offerPatch            Json      @default("{}")
+  variationPatch        Json?
+  queuedActions         Json      @default("[]")
+  lastSyncError         String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  syncedAt              DateTime?
 
-  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   media        EbayDraftMedia[]
   syncAttempts EbayDraftSyncAttempt[]
 
@@ -785,7 +796,7 @@ model AdminAuditLog {
   userAgent   String?
   createdAt   DateTime @default(now())
 
-  admin       User     @relation("AdminAuditLogs", fields: [adminUserId], references: [id], onDelete: Cascade)
+  admin User @relation("AdminAuditLogs", fields: [adminUserId], references: [id], onDelete: Cascade)
 
   @@index([adminUserId])
   @@index([targetType, targetId])
@@ -811,8 +822,8 @@ model EbayListing {
   subtitle    String?
 
   // Pricing
-  priceValue    String  @default("0.00")
-  priceCurrency String  @default("USD")
+  priceValue    String @default("0.00")
+  priceCurrency String @default("USD")
 
   // Stock & condition
   quantity             Int     @default(0)
@@ -1380,19 +1391,19 @@ model WixProduct {
 }
 
 model ShopifyShop {
-  id                  String    @id @default(cuid())
-  userId              String
-  shopDomain          String    @unique // e.g. "mystore.myshopify.com"
-  shopName            String?
-  accessToken         String
-  refreshToken        String?
-  tokenExpiresAt      DateTime?
-  scopes              String?
-  isActive            Boolean   @default(true)
-  lastOrderSyncAt     DateTime?
-  lastProductSyncAt   DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  userId            String
+  shopDomain        String    @unique // e.g. "mystore.myshopify.com"
+  shopName          String?
+  accessToken       String
+  refreshToken      String?
+  tokenExpiresAt    DateTime?
+  scopes            String?
+  isActive          Boolean   @default(true)
+  lastOrderSyncAt   DateTime?
+  lastProductSyncAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   user     User             @relation("UserShopifyShops", fields: [userId], references: [id], onDelete: Cascade)
   products ShopifyProduct[] @relation("ShopifyShopProducts")

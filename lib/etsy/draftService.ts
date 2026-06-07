@@ -197,6 +197,27 @@ function buildInventoryCopyPayload(sourceInventoryData: JsonMap) {
   };
 }
 
+// Canonical key for a product based on its variation tuple. Sorting by
+// property_id (then value_id/value) makes the key order-independent so the
+// same Size/Color combo always hashes to the same string even if the UI
+// emitted the property_values in a different order.
+function variationDedupKey(product: JsonMap): string {
+  const propertyValues = Array.isArray(product?.property_values) ? product.property_values : [];
+  const tuple = propertyValues
+    .map((pv: JsonMap) => {
+      const propertyId = Number(pv?.property_id) || pv?.property_id || null;
+      const valueIds = Array.isArray(pv?.value_ids)
+        ? [...pv.value_ids].map((v) => Number(v) || v).sort((a, b) => String(a).localeCompare(String(b)))
+        : [];
+      const values = Array.isArray(pv?.values)
+        ? [...pv.values].map((v) => String(v)).sort()
+        : [];
+      return { property_id: propertyId, value_ids: valueIds, values };
+    })
+    .sort((a: JsonMap, b: JsonMap) => String(a.property_id).localeCompare(String(b.property_id)));
+  return JSON.stringify(tuple);
+}
+
 function sanitizeInventoryForEtsy(inventory: JsonMap, fallbackReadinessStateId?: number | string | null) {
   const products = Array.isArray(inventory?.products) ? inventory.products : [];
   const propertyIdMap = new Map<number, number>([
@@ -237,7 +258,27 @@ function sanitizeInventoryForEtsy(inventory: JsonMap, fallbackReadinessStateId?:
     return clean;
   });
 
-  const payload: JsonMap = { products: cleanProducts };
+  // Dedupe by variation tuple. Etsy's PUT /listings/{id}/inventory replaces
+  // the entire variation set, so any duplicate { property_id, value(_id)s }
+  // tuple in the payload becomes a duplicate row on Etsy. We keep the *last*
+  // occurrence on the assumption that the patch already merged drafted edits
+  // on top of the snapshot, so the later entry reflects the user's intent.
+  const dedupedProducts: JsonMap[] = [];
+  const dedupIndex = new Map<string, number>();
+  for (const product of cleanProducts) {
+    const key = variationDedupKey(product);
+    // Empty tuples mean a product with no variations — keep at most one such
+    // row (Etsy already rejects multiple variation-less products).
+    const existingIndex = dedupIndex.get(key);
+    if (existingIndex !== undefined) {
+      dedupedProducts[existingIndex] = product;
+    } else {
+      dedupIndex.set(key, dedupedProducts.length);
+      dedupedProducts.push(product);
+    }
+  }
+
+  const payload: JsonMap = { products: dedupedProducts };
   if (Array.isArray(inventory.price_on_property)) payload.price_on_property = inventory.price_on_property.map(normalizePropertyId);
   if (Array.isArray(inventory.quantity_on_property)) payload.quantity_on_property = inventory.quantity_on_property.map(normalizePropertyId);
   if (Array.isArray(inventory.sku_on_property)) payload.sku_on_property = inventory.sku_on_property.map(normalizePropertyId);

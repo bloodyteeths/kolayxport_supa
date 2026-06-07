@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAuthUser } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
+import { safeIsoDate, safeDate } from '../../../lib/utils/safeDate';
 
 export default async function handler(
   req: NextApiRequest,
@@ -57,8 +58,10 @@ export default async function handler(
   // Only apply createdAt filter if at least one date is provided
   let createdAtFilter: any = {};
   if (startDate || endDate) {
-    if (startDate) createdAtFilter.gte = new Date(startDate as string);
-    if (endDate) createdAtFilter.lte = new Date(endDate as string);
+    const gte = safeDate(startDate);
+    const lte = safeDate(endDate);
+    if (gte) createdAtFilter.gte = gte;
+    if (lte) createdAtFilter.lte = lte;
   }
 
   // Build where clause
@@ -336,11 +339,15 @@ export default async function handler(
     }
 
     if (endDate) {
-      // Create end of day in UTC to properly filter orders
-      const endOfDay = new Date(endDate as string + 'T23:59:59.999Z');
-      whereClause += ` AND COALESCE(o."uiOrderDate", o."createdAt") <= $${paramIndex}::timestamp`;
-      params.push(endOfDay.toISOString());
-      paramIndex++;
+      // Create end of day in UTC to properly filter orders.
+      // Guard against malformed endDate query values that would otherwise
+      // throw RangeError on .toISOString() and 500 the whole endpoint.
+      const endOfDayIso = safeIsoDate((endDate as string) + 'T23:59:59.999Z');
+      if (endOfDayIso) {
+        whereClause += ` AND COALESCE(o."uiOrderDate", o."createdAt") <= $${paramIndex}::timestamp`;
+        params.push(endOfDayIso);
+        paramIndex++;
+      }
     }
 
     // Pagination
@@ -698,7 +705,7 @@ export default async function handler(
         variantInfo: item.variantInfo || '',
         labelJobStatus: item.labelJobStatus || '',
         trackingNumber: item.trackingNumber || '',
-        shipBy: item.shipBy ? new Date(item.shipBy).toISOString() : null,
+        shipBy: safeIsoDate(item.shipBy),
         labelJobs: item.labelJobStatus ? [{
           status: item.labelJobStatus,
           trackingNumber: item.labelJobTrackingNumber,
@@ -885,6 +892,11 @@ export default async function handler(
       LEFT JOIN "SenkronOrderData" sod ON sod."orderId" = o.id
       ${whereClause}
     `;
+    // Invariant: paramIndex starts at 2 ($1 = userId) and is incremented in
+    // lockstep with every filter `params.push(...)`, so it always equals
+    // `params.length + 1` BEFORE LIMIT/OFFSET are appended on line ~376.
+    // After that push, `params.slice(0, paramIndex - 1)` yields exactly the
+    // filter params (userId + all WHERE-clause bindings), excluding LIMIT/OFFSET.
     const countResult = await prisma.$queryRawUnsafe(countQuery, ...params.slice(0, paramIndex - 1)) as any[];
     const total = parseInt(countResult[0]?.total || '0', 10);
 

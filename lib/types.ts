@@ -81,6 +81,10 @@ export interface UIOrder {
   }>;
   marketplaceOrderDate?: string;
   shipByDate?: string; // Ship-by deadline date for the order (comes from Veeqo due_date)
+  /** Buyer-provided gift message (e.g. Etsy gift_message). */
+  giftMessage?: string;
+  /** Buyer-provided personalization / note to seller (e.g. Etsy message_from_buyer). */
+  customerNote?: string;
   rawData: any;
   // Optional fields for label/fulfillment
   /** Weight in kg */

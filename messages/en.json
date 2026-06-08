@@ -538,6 +538,10 @@
     "orders": "orders"
   },
   "labels": {
+    "fbaBadgeTooltip": "Fulfilled by Amazon — Amazon ships this from its warehouse. No label or tracking needed from you.",
+    "mcfBadgeTooltip": "Multi-Channel Fulfillment — Amazon ships from FBA inventory for a sale that happened on another channel.",
+    "fbaRowDisabled": "Amazon ships this order. Label generation and tracking submission aren't needed.",
+    "mcfRowDisabled": "MCF order — Amazon ships this for a non-Amazon sale. The other channel handles labels and tracking.",
     "amazonMsgTitle": "Message Amazon buyer",
     "amazonMsgOrder": "Order {id}",
     "amazonMsgTooltip": "Send a message to the Amazon buyer",
@@ -2288,7 +2292,14 @@
       "photosSaveFailed": "Failed to save variation photos",
       "cartesianHint": "{count} combinations will be created",
       "secondValuesHint": "Enter second variation values (separate with commas)",
-      "secondVariationSetupHint": "Enter the second variation values. The editor will create the full matrix Etsy requires for every existing first variation."
+      "secondVariationSetupHint": "Enter the second variation values. The editor will create the full matrix Etsy requires for every existing first variation.",
+      "thirdVariation": "Third Variation",
+      "noThirdVariation": "No third variation",
+      "thirdValuesHint": "Enter third variation values (separate with commas)",
+      "thirdVariationSetupHint": "Pick a taxonomy property and predefined values. Etsy only allows predefined values for the third variation — custom values will be rejected.",
+      "thirdRequiresSecond": "Add a second variation first",
+      "predefinedValues": "Predefined values",
+      "thirdVariationLimited": "Predefined only (no custom)"
     },
     "smartPricing": {
       "title": "Smart Pricing",

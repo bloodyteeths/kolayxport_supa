@@ -183,17 +183,23 @@ function buildInventoryCopyPayload(sourceInventoryData: JsonMap) {
     }
   }
 
+  // Etsy requires *_on_property arrays to be 0, 1, or all variation IDs.
+  // The source may legitimately set price_on_property to a single ID (per-property
+  // pricing), so prefer the source value but only when its length is valid.
+  const variationCount = propertyIds.size;
+  const safeOnProperty = (raw: any, fallback: any[]) => {
+    if (Array.isArray(raw)) {
+      if (raw.length === 0 || raw.length === 1 || raw.length === variationCount) return raw;
+    }
+    if (fallback.length === 0 || fallback.length === 1 || fallback.length === variationCount) return fallback;
+    return [];
+  };
+
   return {
     products,
-    price_on_property: Array.isArray(sourceInventoryData.price_on_property)
-      ? sourceInventoryData.price_on_property
-      : Array.from(propertyIds),
-    quantity_on_property: Array.isArray(sourceInventoryData.quantity_on_property)
-      ? sourceInventoryData.quantity_on_property
-      : [],
-    sku_on_property: Array.isArray(sourceInventoryData.sku_on_property)
-      ? sourceInventoryData.sku_on_property
-      : [],
+    price_on_property: safeOnProperty(sourceInventoryData.price_on_property, Array.from(propertyIds)),
+    quantity_on_property: safeOnProperty(sourceInventoryData.quantity_on_property, []),
+    sku_on_property: safeOnProperty(sourceInventoryData.sku_on_property, []),
   };
 }
 
@@ -279,9 +285,40 @@ function sanitizeInventoryForEtsy(inventory: JsonMap, fallbackReadinessStateId?:
   }
 
   const payload: JsonMap = { products: dedupedProducts };
-  if (Array.isArray(inventory.price_on_property)) payload.price_on_property = inventory.price_on_property.map(normalizePropertyId);
-  if (Array.isArray(inventory.quantity_on_property)) payload.quantity_on_property = inventory.quantity_on_property.map(normalizePropertyId);
-  if (Array.isArray(inventory.sku_on_property)) payload.sku_on_property = inventory.sku_on_property.map(normalizePropertyId);
+
+  // Etsy requires *_on_property arrays to contain 0, 1, or ALL variation
+  // property IDs. With 3-variation support, an array of length 2 throws
+  // "unsupported number of property IDs". Count distinct property IDs
+  // present across the products and drop any *_on_property field whose
+  // length doesn't match {0, 1, variationCount}.
+  const variationPropertyIds = new Set<number>();
+  for (const product of dedupedProducts) {
+    const propertyValues = Array.isArray(product?.property_values) ? product.property_values : [];
+    for (const pv of propertyValues) {
+      const pid = Number((pv as JsonMap)?.property_id);
+      if (pid) variationPropertyIds.add(pid);
+    }
+  }
+  const variationCount = variationPropertyIds.size;
+  const isValidOnPropertyLength = (length: number) =>
+    length === 0 || length === 1 || length === variationCount;
+  const assignOnProperty = (key: 'price_on_property' | 'quantity_on_property' | 'sku_on_property' | 'readiness_state_on_property', raw: any) => {
+    if (!Array.isArray(raw)) return;
+    const normalized = raw.map(normalizePropertyId);
+    if (!isValidOnPropertyLength(normalized.length)) {
+      logger.warn('Dropping invalid *_on_property array (length must be 0, 1, or variationCount)', {
+        field: key,
+        length: normalized.length,
+        variationCount,
+      });
+      return;
+    }
+    payload[key] = normalized;
+  };
+  assignOnProperty('price_on_property', inventory.price_on_property);
+  assignOnProperty('quantity_on_property', inventory.quantity_on_property);
+  assignOnProperty('sku_on_property', inventory.sku_on_property);
+  assignOnProperty('readiness_state_on_property', (inventory as JsonMap).readiness_state_on_property);
   return payload;
 }
 
@@ -997,7 +1034,7 @@ export async function syncDraft(draftId: string, userId: string) {
       } catch (err: any) {
         logger.warn('Could not fetch listing readiness state before inventory sync', { listingId: String(syncedListingId), error: err.message });
       }
-      results.push(await callEtsyAPI(`/listings/${syncedListingId}/inventory`, accessToken, {
+      results.push(await callEtsyAPI(`/listings/${syncedListingId}/inventory?max_variations_supported=3`, accessToken, {
         method: 'PUT',
         body: JSON.stringify(sanitizeInventoryForEtsy(inventory, fallbackReadinessStateId)),
       }));
@@ -1113,7 +1150,7 @@ export async function syncDraft(draftId: string, userId: string) {
         const inventoryPayload = sourceInventoryResult ? buildInventoryCopyPayload(sourceInventoryResult) : null;
         if (inventoryPayload) {
           try {
-            const inventoryCopyResult = await callEtsyAPI(`/listings/${syncedListingId}/inventory`, accessToken, {
+            const inventoryCopyResult = await callEtsyAPI(`/listings/${syncedListingId}/inventory?max_variations_supported=3`, accessToken, {
               method: 'PUT',
               body: JSON.stringify(inventoryPayload),
             });

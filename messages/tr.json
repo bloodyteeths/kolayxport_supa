@@ -498,6 +498,10 @@
     "orders": "sipariş"
   },
   "labels": {
+    "fbaBadgeTooltip": "Fulfilled by Amazon — Amazon, bu siparişi kendi deposundan kargolar. Sizin tarafınızdan etiket veya takip gerekmez.",
+    "mcfBadgeTooltip": "Multi-Channel Fulfillment — Amazon, başka bir kanalda gerçekleşen satış için kendi FBA stoğundan kargolar.",
+    "fbaRowDisabled": "Amazon bu siparişi kargolar. Etiket oluşturma veya takip iletme gerekmez.",
+    "mcfRowDisabled": "MCF siparişi — Amazon, Amazon dışı bir satış için kargolar. Etiket ve takip diğer kanal tarafından yönetilir.",
     "amazonMsgTitle": "Amazon alıcısına mesaj gönder",
     "amazonMsgOrder": "Sipariş {id}",
     "amazonMsgTooltip": "Amazon alıcısına mesaj gönder",
@@ -2288,7 +2292,14 @@
       "photosSaveFailed": "Varyasyon fotoğrafları kaydedilemedi",
       "cartesianHint": "{count} kombinasyon oluşturulacak",
       "secondValuesHint": "İkinci varyasyon değerlerini girin (virgülle ayırın)",
-      "secondVariationSetupHint": "İkinci varyasyon değerlerini girin. Editör, Etsy'nin istediği tam matrisi mevcut birinci varyasyonların her biri için oluşturur."
+      "secondVariationSetupHint": "İkinci varyasyon değerlerini girin. Editör, Etsy'nin istediği tam matrisi mevcut birinci varyasyonların her biri için oluşturur.",
+      "thirdVariation": "Üçüncü Varyasyon",
+      "noThirdVariation": "Üçüncü varyasyon yok",
+      "thirdValuesHint": "Üçüncü varyasyon değerlerini girin (virgülle ayırın)",
+      "thirdVariationSetupHint": "Taksonomi özelliği ve önceden tanımlı değerler seçin. Etsy üçüncü varyasyon için yalnızca önceden tanımlı değerlere izin verir — özel değerler reddedilir.",
+      "thirdRequiresSecond": "Önce ikinci varyasyon ekleyin",
+      "predefinedValues": "Önceden tanımlı değerler",
+      "thirdVariationLimited": "Sadece önceden tanımlı (özel değer yok)"
     },
     "smartPricing": {
       "title": "Akıllı Fiyatlandırma",

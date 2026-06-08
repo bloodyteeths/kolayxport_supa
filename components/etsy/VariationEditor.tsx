@@ -36,6 +36,7 @@ interface PropertyValue {
   property_name: string;
   values: string[];
   scale_id: number | null;
+  value_ids?: number[];
 }
 
 interface Product {
@@ -277,6 +278,9 @@ function sanitizeProducts(raw: any[]): Product[] {
       property_name: String(pv.property_name ?? ''),
       values: Array.isArray(pv.values) ? pv.values.map((v: any) => String(v)) : [],
       scale_id: pv.scale_id != null ? Number(pv.scale_id) : null,
+      ...(Array.isArray(pv.value_ids) && pv.value_ids.length
+        ? { value_ids: pv.value_ids.map((v: any) => Number(v)).filter((v: number) => Number.isFinite(v)) }
+        : {}),
     })) : [],
   }));
 }
@@ -340,6 +344,13 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   const [secondPropertyId, setSecondPropertyId] = useState<number | null>(null);
   const [secondSetupOpen, setSecondSetupOpen] = useState(false);
   const [secondSetupValues, setSecondSetupValues] = useState('');
+
+  // Third variation (Etsy: must be a taxonomy property with predefined values,
+  // cannot be property 513/514, cannot use custom values).
+  const [thirdPropertyId, setThirdPropertyId] = useState<number | null>(null);
+  const [thirdSetupOpen, setThirdSetupOpen] = useState(false);
+  const [thirdSetupValues, setThirdSetupValues] = useState('');
+  const [addThirdValues, setAddThirdValues] = useState('');
 
   // Photos
   const [listingImages, setListingImages] = useState<ListingImage[]>([]);
@@ -410,6 +421,37 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   useEffect(() => {
     if (detectedSecondPropertyId) setSecondPropertyId(detectedSecondPropertyId);
   }, [detectedSecondPropertyId]);
+
+  // Detect third property
+  const detectedThirdPropertyId = useMemo(() => {
+    for (const p of products) {
+      if (p.property_values.length >= 3) return p.property_values[2].property_id;
+    }
+    return null;
+  }, [products]);
+
+  useEffect(() => {
+    if (detectedThirdPropertyId) setThirdPropertyId(detectedThirdPropertyId);
+  }, [detectedThirdPropertyId]);
+
+  // Taxonomy properties eligible for the third variation: must have predefined
+  // possible_values and must not be the custom-variation slots (513/514).
+  // Also exclude properties already used as 1st or 2nd.
+  const thirdVariationCandidates = useMemo(() => {
+    return taxonomyProperties.filter(prop => {
+      if (!prop.possible_values || prop.possible_values.length === 0) return false;
+      if (prop.property_id === 513 || prop.property_id === 514) return false;
+      if (prop.property_id === primaryPropertyId) return false;
+      if (prop.property_id === secondPropertyId) return false;
+      return true;
+    });
+  }, [taxonomyProperties, primaryPropertyId, secondPropertyId]);
+
+  const thirdPropertyPossibleValues = useMemo(() => {
+    if (!thirdPropertyId) return [];
+    const prop = taxonomyProperties.find(p => p.property_id === thirdPropertyId);
+    return prop?.possible_values || [];
+  }, [thirdPropertyId, taxonomyProperties]);
 
   // Get available scales for a property
   const scalesForProperty = useMemo(() => {
@@ -684,6 +726,99 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     setSecondSetupOpen(true);
   };
 
+  // --- Third variation helpers ---
+
+  const hasThirdPropertyProducts = (propertyId: number) =>
+    products.some(p => p.property_values.some((pv, idx) => idx > 1 && pv.property_id === propertyId));
+
+  const getExistingThirdValues = useCallback((propertyId: number) => {
+    const values = new Set<string>();
+    for (const p of products) {
+      const pv = p.property_values.find((v, idx) => idx > 1 && v.property_id === propertyId);
+      if (pv?.values?.[0]) values.add(pv.values[0]);
+    }
+    return Array.from(values);
+  }, [products]);
+
+  const handleThirdPropertyChange = (propertyId: number | null) => {
+    setThirdPropertyId(propertyId);
+    if (propertyId && products.length > 0 && !hasThirdPropertyProducts(propertyId)) {
+      setThirdSetupValues('');
+      setThirdSetupOpen(true);
+    }
+  };
+
+  const openThirdVariationDialog = () => {
+    if (!thirdPropertyId) return;
+    const existing = getExistingThirdValues(thirdPropertyId);
+    setThirdSetupValues(existing.join(', '));
+    setThirdSetupOpen(true);
+  };
+
+  const applyThirdVariationMatrix = () => {
+    if (!thirdPropertyId) return;
+    const values = parseCommaValues(thirdSetupValues);
+    if (values.length === 0) {
+      toast.error(t('thirdValuesHint'));
+      return;
+    }
+
+    const thirdProp = taxonomyProperties.find(p => p.property_id === thirdPropertyId);
+    const thirdPropName = thirdProp?.display_name || getPropertyName(thirdPropertyId, 'Variation 3');
+    // Match user-entered values to predefined value_ids (case-insensitive).
+    const predefined = thirdProp?.possible_values || [];
+    const resolveValueId = (raw: string): number | null => {
+      const match = predefined.find(pv => pv.name.toLowerCase() === raw.toLowerCase());
+      return match ? Number(match.value_id) : null;
+    };
+
+    // Each existing product is a (1st, 2nd) combo. Multiply by N third values.
+    // Drop any existing 3rd entry on the source product so we rebuild fresh.
+    const sourceCombos: Product[] = [];
+    const sourceKeySeen = new Set<string>();
+    for (const p of products) {
+      const firstValue = p.property_values[0]?.values?.[0] || '';
+      const secondValue = p.property_values[1]?.values?.[0] || '';
+      const key = `${firstValue}|${secondValue}`;
+      if (sourceKeySeen.has(key)) continue;
+      sourceKeySeen.add(key);
+      sourceCombos.push(p);
+    }
+
+    const nextProducts: Product[] = [];
+    for (const baseProduct of sourceCombos) {
+      const firstProperty = baseProduct.property_values[0];
+      const secondProperty = baseProduct.property_values[1];
+      if (!firstProperty) continue;
+      for (const value of values) {
+        const valueId = resolveValueId(value);
+        const clone: Product = JSON.parse(JSON.stringify(baseProduct));
+        clone.product_id = 0;
+        const propertyValues: PropertyValue[] = [
+          { ...firstProperty, values: [...firstProperty.values] },
+        ];
+        if (secondProperty) {
+          propertyValues.push({ ...secondProperty, values: [...secondProperty.values] });
+        }
+        const thirdEntry: PropertyValue = {
+          property_id: thirdPropertyId,
+          property_name: thirdPropName,
+          values: [valueId ? (predefined.find(pv => Number(pv.value_id) === valueId)?.name || value) : value],
+          scale_id: null,
+        };
+        if (valueId) thirdEntry.value_ids = [valueId];
+        propertyValues.push(thirdEntry);
+        clone.property_values = propertyValues;
+        nextProducts.push(clone);
+      }
+    }
+
+    setProducts(nextProducts);
+    setThirdSetupOpen(false);
+    setThirdSetupValues('');
+    toast.success(t('variationsAdded', { count: nextProducts.length }));
+  };
+
   const applySecondVariationMatrix = () => {
     if (!secondPropertyId) return;
     const values = parseCommaValues(secondSetupValues);
@@ -748,6 +883,15 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       propertyValues.push({ ...refProduct.property_values[1] });
     }
 
+    // If a third property exists, copy it (preserves value_ids needed by Etsy)
+    if (thirdPropertyId && refProduct?.property_values?.[2]) {
+      const ref3 = refProduct.property_values[2];
+      propertyValues.push({
+        ...ref3,
+        ...(ref3.value_ids ? { value_ids: [...ref3.value_ids] } : {}),
+      });
+    }
+
     const newProduct: Product = {
       product_id: 0,
       sku: '',
@@ -780,41 +924,68 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       ? getPropertyName(secondPropertyId, 'Variation 2')
       : '';
 
+    const thirdValues = thirdPropertyId ? addThirdValues.split(',').map(v => v.trim()).filter(v => v.length > 0) : [];
+    const thirdProp = thirdPropertyId ? taxonomyProperties.find(p => p.property_id === thirdPropertyId) : null;
+    const thirdPropName = thirdProp?.display_name || (thirdPropertyId ? getPropertyName(thirdPropertyId, 'Variation 3') : '');
+    const thirdPredefined = thirdProp?.possible_values || [];
+    const resolveThirdValueId = (raw: string): number | null => {
+      const match = thirdPredefined.find(pv => pv.name.toLowerCase() === raw.toLowerCase());
+      return match ? Number(match.value_id) : null;
+    };
+
+    const makeOffering = () => ({
+      offering_id: 0,
+      price: { amount: Math.round(priceNum * defaultDivisor), divisor: defaultDivisor, currency_code: currencyCode },
+      quantity: qtyNum,
+      is_enabled: true,
+    });
+
+    const buildThirdEntry = (raw: string): PropertyValue => {
+      const valueId = resolveThirdValueId(raw);
+      const entry: PropertyValue = {
+        property_id: thirdPropertyId!,
+        property_name: thirdPropName,
+        values: [valueId ? (thirdPredefined.find(pv => Number(pv.value_id) === valueId)?.name || raw) : raw],
+        scale_id: null,
+      };
+      if (valueId) entry.value_ids = [valueId];
+      return entry;
+    };
+
     const newProducts: Product[] = [];
     for (const value of values) {
+      const firstEntry: PropertyValue = {
+        property_id: addPropertyId, property_name: propName, values: [value], scale_id: selectedScaleId,
+      };
       if (secondPropertyId && secondValues.length > 0) {
         for (const sv of secondValues) {
-          newProducts.push({
-            product_id: 0,
-            sku: '',
-            property_values: [
-              { property_id: addPropertyId, property_name: propName, values: [value], scale_id: selectedScaleId },
-              { property_id: secondPropertyId, property_name: secondPropName, values: [sv], scale_id: null },
-            ],
-            offerings: [{
-              offering_id: 0,
-              price: { amount: Math.round(priceNum * defaultDivisor), divisor: defaultDivisor, currency_code: currencyCode },
-              quantity: qtyNum,
-              is_enabled: true,
-            }],
-          });
+          const secondEntry: PropertyValue = {
+            property_id: secondPropertyId, property_name: secondPropName, values: [sv], scale_id: null,
+          };
+          if (thirdPropertyId && thirdValues.length > 0) {
+            for (const tv of thirdValues) {
+              newProducts.push({
+                product_id: 0,
+                sku: '',
+                property_values: [firstEntry, secondEntry, buildThirdEntry(tv)],
+                offerings: [makeOffering()],
+              });
+            }
+          } else {
+            newProducts.push({
+              product_id: 0,
+              sku: '',
+              property_values: [firstEntry, secondEntry],
+              offerings: [makeOffering()],
+            });
+          }
         }
       } else {
         newProducts.push({
           product_id: 0,
           sku: '',
-          property_values: [{
-            property_id: addPropertyId,
-            property_name: propName,
-            values: [value],
-            scale_id: selectedScaleId,
-          }],
-          offerings: [{
-            offering_id: 0,
-            price: { amount: Math.round(priceNum * defaultDivisor), divisor: defaultDivisor, currency_code: currencyCode },
-            quantity: qtyNum,
-            is_enabled: true,
-          }],
+          property_values: [firstEntry],
+          offerings: [makeOffering()],
         });
       }
     }
@@ -823,6 +994,7 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
     setAddDialogOpen(false);
     setAddValues('');
     setAddSecondValues('');
+    setAddThirdValues('');
     setAddPrice('');
     setAddQuantity('1');
     toast.success(t('variationsAdded', { count: newProducts.length }));
@@ -883,9 +1055,13 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
   const addValuesCount = parseCommaValues(addValues).length;
   const addSecondValuesCount = secondPropertyId ? parseCommaValues(addSecondValues).length : 0;
-  const addDialogCreateCount = secondPropertyId && addSecondValuesCount > 0
-    ? addValuesCount * addSecondValuesCount
-    : addValuesCount;
+  const addThirdValuesCount = thirdPropertyId ? parseCommaValues(addThirdValues).length : 0;
+  const addDialogCreateCount = (() => {
+    let count = addValuesCount;
+    if (secondPropertyId && addSecondValuesCount > 0) count *= addSecondValuesCount;
+    if (thirdPropertyId && addThirdValuesCount > 0) count *= addThirdValuesCount;
+    return count;
+  })();
 
   // --- Render ---
 
@@ -1006,6 +1182,41 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                   color="primary"
                   variant="outlined"
                   onClick={openSecondVariationDialog}
+                  sx={{ cursor: 'pointer' }}
+                />
+              )}
+            </Box>
+
+            {/* Third variation selector — only when a second exists. Restricted
+                to taxonomy properties with predefined values (Etsy rule). */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Tooltip title={!secondPropertyId ? t('thirdRequiresSecond') : t('thirdVariationLimited')} arrow>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" fontWeight={600} color="text.secondary">{t('thirdVariation')}:</Typography>
+                  <Select
+                    size="small"
+                    value={thirdPropertyId || ''}
+                    onChange={(e) => handleThirdPropertyChange(e.target.value ? Number(e.target.value) : null)}
+                    displayEmpty
+                    disabled={!secondPropertyId || thirdVariationCandidates.length === 0}
+                    sx={{ minWidth: 180, height: 32, fontSize: '0.82rem' }}
+                  >
+                    <MenuItem value=""><em>{t('noThirdVariation')}</em></MenuItem>
+                    {thirdVariationCandidates.map(prop => (
+                      <MenuItem key={prop.property_id} value={prop.property_id}>
+                        {prop.display_name || prop.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Box>
+              </Tooltip>
+              {thirdPropertyId && (
+                <Chip
+                  label={`${getPropertyName(thirdPropertyId, t('thirdVariation'))} (${getExistingThirdValues(thirdPropertyId).length})`}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  onClick={openThirdVariationDialog}
                   sx={{ cursor: 'pointer' }}
                 />
               )}
@@ -1681,6 +1892,45 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
             />
           )}
 
+          {thirdPropertyId && (
+            <Box>
+              <TextField
+                label={`${t('thirdVariation')} - ${getPropertyName(thirdPropertyId, t('thirdVariation'))} ${t('valuesLabel')}`}
+                size="small" fullWidth multiline minRows={2}
+                value={addThirdValues} onChange={(e) => setAddThirdValues(e.target.value)}
+                placeholder={t('valuesPlaceholder')}
+                helperText={
+                  addThirdValues && addValues
+                    ? t('cartesianHint', { count: addDialogCreateCount })
+                    : t('thirdValuesHint')
+                }
+              />
+              {thirdPropertyPossibleValues.length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                    {t('predefinedValues')}:
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxHeight: 120, overflowY: 'auto' }}>
+                    {thirdPropertyPossibleValues.map(pv => (
+                      <Chip
+                        key={pv.value_id}
+                        label={pv.name}
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          const cur = parseCommaValues(addThirdValues);
+                          if (cur.includes(pv.name)) return;
+                          setAddThirdValues(cur.length ? `${addThirdValues}, ${pv.name}` : pv.name);
+                        }}
+                        sx={{ fontSize: '0.7rem', cursor: 'pointer' }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          )}
+
           <Box display="flex" gap={2}>
             <TextField label={`${t('tabPrice')} (${sym})`} size="small" type="number"
               value={addPrice} onChange={(e) => setAddPrice(e.target.value)}
@@ -1735,6 +1985,68 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
             sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}
           >
             {t('variationsAdded', { count: uniqueFirstPropValues.length * parseCommaValues(secondSetupValues).length })}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* --- Third Variation Setup Dialog --- */}
+      <Dialog open={thirdSetupOpen} onClose={() => setThirdSetupOpen(false)} maxWidth="sm" fullWidth sx={{ zIndex: 1600 }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>{t('thirdVariation')}</DialogTitle>
+        <DialogContent sx={{ pt: '12px !important' }}>
+          <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
+            {t('thirdVariationSetupHint')}
+          </Alert>
+          <TextField
+            label={`${getPropertyName(thirdPropertyId || 0, t('thirdVariation'))} ${t('valuesLabel')}`}
+            size="small"
+            fullWidth
+            multiline
+            minRows={2}
+            value={thirdSetupValues}
+            onChange={(e) => setThirdSetupValues(e.target.value)}
+            placeholder={t('valuesPlaceholder')}
+            helperText={
+              thirdSetupValues
+                ? t('cartesianHint', {
+                    count: Math.max(1, new Set(products.map(p => `${p.property_values[0]?.values?.[0] || ''}|${p.property_values[1]?.values?.[0] || ''}`)).size) * parseCommaValues(thirdSetupValues).length,
+                  })
+                : t('thirdValuesHint')
+            }
+            autoFocus
+          />
+          {thirdPropertyPossibleValues.length > 0 && (
+            <Box sx={{ mt: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                {t('predefinedValues')}:
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxHeight: 160, overflowY: 'auto' }}>
+                {thirdPropertyPossibleValues.map(pv => (
+                  <Chip
+                    key={pv.value_id}
+                    label={pv.name}
+                    size="small"
+                    variant="outlined"
+                    onClick={() => {
+                      const cur = parseCommaValues(thirdSetupValues);
+                      if (cur.includes(pv.name)) return;
+                      setThirdSetupValues(cur.length ? `${thirdSetupValues}, ${pv.name}` : pv.name);
+                    }}
+                    sx={{ fontSize: '0.7rem', cursor: 'pointer' }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setThirdSetupOpen(false)} sx={{ textTransform: 'none' }}>{t('cancel')}</Button>
+          <Button
+            variant="contained"
+            onClick={applyThirdVariationMatrix}
+            disabled={!thirdSetupValues.trim()}
+            sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea' }}
+          >
+            {t('saveToEtsy')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -39,10 +39,16 @@ let taxonomyId = null;
 
 if (!listingId) {
   const drafts = await api(`/api/clawd/etsy?action=drafts&shop_id=${SHOP_ID}&limit=5`);
-  if (drafts.ok && Array.isArray(drafts.body?.results) && drafts.body.results.length > 0) {
-    const d = drafts.body.results[0];
+  const draftList = drafts.body?.drafts || drafts.body?.results || [];
+  if (drafts.ok && Array.isArray(draftList) && draftList.length > 0) {
+    const d = draftList[0];
     listingId = d.listing_id;
     taxonomyId = d.taxonomy_id;
+    // taxonomy_id may not be in drafts list response — fetch the listing detail
+    if (!taxonomyId) {
+      const detail = await api(`/api/clawd/etsy?action=listing&listing_id=${listingId}&shop_id=${SHOP_ID}`);
+      taxonomyId = detail.body?.taxonomy_id;
+    }
     pass(`Auto-picked draft listing ${listingId} (taxonomy ${taxonomyId})`);
   } else {
     fail('Auto-pick draft listing', `No drafts available: ${drafts.status} ${JSON.stringify(drafts.body).slice(0, 200)}`);

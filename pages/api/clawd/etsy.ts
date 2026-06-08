@@ -2714,7 +2714,7 @@ export default async function handler(
             if (Array.isArray(sku_on_property)) payload.sku_on_property = sku_on_property;
 
             const result = await callEtsyAPI(
-                `/listings/${listing_id}/inventory`,
+                `/listings/${listing_id}/inventory?max_variations_supported=3`,
                 accessToken,
                 {
                     method: 'PUT',

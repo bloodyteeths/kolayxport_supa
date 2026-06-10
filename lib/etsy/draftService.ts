@@ -558,6 +558,37 @@ async function uploadImageFromBuffer(accessToken: string, shopId: string, listin
   return response.json();
 }
 
+// Reassigns an EXISTING listing image to a new rank / alt text without re-uploading
+// its binary. Etsy's uploadListingImage endpoint accepts "either image OR
+// listing_image_id"; sending both together (as our reorder path used to) made
+// Etsy treat each reorder as a fresh upload at the target rank with `overwrite`
+// destroying whatever image already lived there. That deleted images on save —
+// a user-reported bug where 8 photos collapsed to 5 after re-saving a reorder.
+// Sending listing_image_id alone moves the existing image safely.
+async function reorderListingImage(
+  accessToken: string,
+  shopId: string,
+  listingId: bigint,
+  opts: { etsyMediaId: number | bigint | string; rank?: number | null; altText?: string | null },
+) {
+  const formData = new FormData();
+  formData.append('listing_image_id', String(opts.etsyMediaId));
+  if (opts.rank !== undefined && opts.rank !== null) formData.append('rank', String(opts.rank));
+  if (opts.altText !== undefined && opts.altText !== null) formData.append('alt_text', String(opts.altText));
+  formData.append('overwrite', 'true');
+
+  const response = await fetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/images`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'x-api-key': `${(process.env.ETSY_API_KEY || '').trim()}:${(process.env.ETSY_API_SECRET || '').trim()}`,
+    },
+    body: formData,
+  });
+  if (!response.ok) throw new Error(`Image reassign failed: ${response.status} - ${await response.text()}`);
+  return response.json();
+}
+
 async function uploadVideoFromBuffer(accessToken: string, shopId: string, listingId: bigint, buffer: Buffer, contentType: string, filename: string, name?: string) {
   const boundary = '----EtsyDraftVideo' + Date.now();
   const textEncoder = new TextEncoder();
@@ -711,31 +742,23 @@ async function syncMediaOperation(accessToken: string, draft: any, media: any, s
     if (context?.imageIds && !context.imageIds.has(mediaId)) {
       return { skipped: true, mediaId, operation: media.operation, reason: 'image_not_on_listing' };
     }
-    let current = context?.imagesById?.get(mediaId);
-    if (!current) {
-      try {
-        current = await callEtsyAPI(`/listings/${listingId}/images/${media.etsyMediaId}`, accessToken);
-      } catch (err: any) {
-        if (isMissingEtsyMediaError(err)) {
-          context?.imageIds?.delete(mediaId);
-          context?.imagesById?.delete(mediaId);
-          return { skipped: true, mediaId, operation: media.operation, reason: 'image_missing_or_wrong_listing' };
-        }
-        throw err;
+    const current = context?.imagesById?.get(mediaId);
+    try {
+      const updated = await reorderListingImage(accessToken, shopId, listingId, {
+        etsyMediaId: media.etsyMediaId,
+        rank: media.rank,
+        altText: media.altText,
+      });
+      context?.imagesById?.set(mediaId, { ...(current || {}), ...updated, rank: media.rank ?? updated.rank ?? current?.rank, alt_text: media.altText ?? updated.alt_text ?? current?.alt_text });
+      return updated;
+    } catch (err: any) {
+      if (isMissingEtsyMediaError(err)) {
+        context?.imageIds?.delete(mediaId);
+        context?.imagesById?.delete(mediaId);
+        return { skipped: true, mediaId, operation: media.operation, reason: 'image_missing_or_wrong_listing' };
       }
+      throw err;
     }
-    const imageResp = await fetch(current.url_fullxfull);
-    if (!imageResp.ok) throw new Error(`Failed to fetch current image ${media.etsyMediaId}`);
-    const buffer = Buffer.from(await imageResp.arrayBuffer());
-    const updated = await uploadImageFromBuffer(accessToken, shopId, listingId, buffer, imageResp.headers.get('content-type') || 'image/jpeg', {
-      filename: media.filename || 'image.jpg',
-      etsyMediaId: media.etsyMediaId,
-      rank: media.rank,
-      altText: media.altText,
-      overwrite: true,
-    });
-    context?.imagesById?.set(mediaId, { ...current, ...updated, rank: media.rank ?? current.rank, alt_text: media.altText ?? current.alt_text });
-    return updated;
   }
   if (media.kind === 'video' && media.operation === 'upload') {
     const buffer = media.localPath ? await fs.promises.readFile(media.localPath) : Buffer.from(await (await fetch(media.sourceUrl)).arrayBuffer());

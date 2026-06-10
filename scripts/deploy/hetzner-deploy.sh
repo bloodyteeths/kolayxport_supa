@@ -75,6 +75,12 @@ if [ "$MODE" = "full" ]; then
   echo "==> preparing .next-new (build target)"
   rm -rf .next-new .next-old
 
+  # The live .next/types/ holds auto-generated route validators from the
+  # PREVIOUS build. tsconfig includes them in the new build's typecheck, so a
+  # deleted API route makes the build fail with "Cannot find module ...".
+  # They are regenerated from scratch inside .next-new — safe to drop here.
+  rm -rf .next/types
+
   # Hardlink the cache from the running .next so incremental webpack reuses it.
   # `cp -al` creates hardlinks (one inode, two names) — costs no extra disk space
   # and is instant. If the source is missing we just start cold.

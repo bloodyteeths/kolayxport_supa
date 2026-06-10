@@ -46,6 +46,17 @@ export default async function handler(
       if (!userWithSettings) {
         return res.status(404).json({ error: 'User not found.' });
       }
+      // Any account with an active Shopify store is treated as the free Shopify
+      // tier (App Store rule 1.2.1: no off-platform billing surfaces for
+      // Shopify-installed merchants), even if the store was connected from the
+      // settings page before the User row was flagged.
+      const activeShopifyShops = await withPrismaRetry(() =>
+        prisma.shopifyShop.count({ where: { userId, isActive: true } })
+      );
+      const effectiveBillingProvider =
+        userWithSettings.billingProvider === 'shopify_free' || activeShopifyShops > 0
+          ? 'shopify_free'
+          : userWithSettings.billingProvider;
       const decryptedCreds = userWithSettings.integrationSettings
         ? decryptCredentials(userWithSettings.integrationSettings as Record<string, any>)
         : null;
@@ -54,10 +65,10 @@ export default async function handler(
         shipperProfile: userWithSettings.shipperProfile,
         shippingSettings: userWithSettings.shippingSettings || {},
         subscription: {
-          subscriptionPlan: userWithSettings.subscriptionPlan,
-          subscriptionStatus: userWithSettings.subscriptionStatus,
+          subscriptionPlan: effectiveBillingProvider === 'shopify_free' ? 'shopify_free' : userWithSettings.subscriptionPlan,
+          subscriptionStatus: effectiveBillingProvider === 'shopify_free' ? 'active' : userWithSettings.subscriptionStatus,
           billingInterval: userWithSettings.billingInterval,
-          billingProvider: userWithSettings.billingProvider,
+          billingProvider: effectiveBillingProvider,
           trialExpiresAt: userWithSettings.trialExpiresAt,
           usageResetAt: userWithSettings.usageResetAt,
           orderSyncCount: userWithSettings.orderSyncCount,

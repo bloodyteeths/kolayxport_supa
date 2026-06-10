@@ -10,7 +10,9 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import { logger } from '../../../../lib/logger';
 
-const SCOPES = 'read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments';
+// Scope-minimized per App Store policy 3.2: order sync reads orders, product
+// tools read/write products and inventory. No order/fulfillment writes exist.
+const SCOPES = 'read_orders,read_products,write_products,read_inventory,write_inventory';
 
 function isValidShopDomain(shop: string): boolean {
   return /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(shop);

@@ -240,26 +240,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
-    // Register subscription update webhook
-    try {
-      const baseUrl = process.env.NEXTAUTH_URL || process.env.APP_URL || 'https://kolayxport.com';
-      await fetch(`https://${shop}/admin/api/2024-10/webhooks.json`, {
-        method: 'POST',
-        headers: {
-          // raw token — webhook registration happens before we read the encrypted row back
-          'X-Shopify-Access-Token': access_token,
-          'Content-Type': 'application/json',
+    // Any account with a connected Shopify store is on the free Shopify tier —
+    // App Store rule 1.2.1 forbids exposing off-platform (Stripe) billing to
+    // Shopify-installed merchants, regardless of how the store was connected.
+    // Only an already-paying Stripe subscriber keeps their existing billing.
+    const billingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { billingProvider: true, subscriptionStatus: true },
+    });
+    const isPayingStripeCustomer =
+      billingUser?.billingProvider === 'stripe' &&
+      (billingUser.subscriptionStatus === 'active' || billingUser.subscriptionStatus === 'past_due');
+    if (!isPayingStripeCustomer && billingUser?.billingProvider !== 'shopify_free') {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          billingProvider: 'shopify_free',
+          subscriptionPlan: 'shopify_free',
+          subscriptionStatus: 'active',
         },
-        body: JSON.stringify({
-          webhook: {
-            topic: 'app_subscriptions/update',
-            address: `${baseUrl}/api/shopify/webhooks/subscription-update`,
-            format: 'json',
-          },
-        }),
       });
-    } catch (webhookErr: any) {
-      logger.warn('Failed to register subscription webhook (non-fatal)', { error: webhookErr.message });
+      logger.info('Shopify connect: user moved to free Shopify tier', { userId, shop });
     }
 
     // For App Store installs, log the merchant in immediately so they land

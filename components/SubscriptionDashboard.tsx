@@ -32,9 +32,10 @@ import { useTranslations } from 'next-intl';
 import useLocaleStore from '@/lib/stores/useLocaleStore';
 
 interface SubscriptionData {
-  subscriptionPlan: 'trial' | 'starter' | 'growth' | 'enterprise' | null;
+  subscriptionPlan: 'trial' | 'starter' | 'growth' | 'enterprise' | 'shopify_free' | null;
   subscriptionStatus: 'trialing' | 'active' | 'canceled' | 'past_due' | null;
   billingInterval: 'month' | 'year' | null;
+  billingProvider?: string | null;
   trialExpiresAt: string | null;
   usageResetAt: string | null;
   orderSyncCount: number;
@@ -51,6 +52,7 @@ const PLAN_LIMITS: Record<string, PlanLimits> = {
   starter: { orderSyncs: 200, labels: 100 },
   growth: { orderSyncs: 2000, labels: 500 },
   enterprise: { orderSyncs: Infinity, labels: Infinity },
+  shopify_free: { orderSyncs: Infinity, labels: Infinity },
 };
 
 const STATUS_COLORS: Record<string, 'default' | 'success' | 'warning' | 'error'> = {
@@ -81,6 +83,9 @@ export default function SubscriptionDashboard({
     const plan = subscriptionData.subscriptionPlan || 'trial';
     const status = subscriptionData.subscriptionStatus || 'trialing';
     const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.trial;
+    // Free Shopify-tier accounts must never see Stripe upgrade/portal/invoice
+    // buttons (App Store rule 1.2.1).
+    const isShopifyFree = plan === 'shopify_free' || subscriptionData.billingProvider === 'shopify_free';
 
   const orderSyncPercentage = Math.min((subscriptionData.orderSyncCount / limits.orderSyncs) * 100, 100);
   const labelPercentage = Math.min((subscriptionData.labelCount / limits.labels) * 100, 100);
@@ -162,7 +167,7 @@ export default function SubscriptionDashboard({
               )}
 
               <Box sx={{ mt: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, overflow: 'hidden' }}>
-                {(plan === 'trial' || plan === 'starter') && (
+                {!isShopifyFree && (plan === 'trial' || plan === 'starter') && (
                   <Button
                     variant="contained"
                     color="primary"
@@ -174,7 +179,7 @@ export default function SubscriptionDashboard({
                     {t('upgradePlan')}
                   </Button>
                 )}
-                {plan !== 'trial' && (
+                {!isShopifyFree && plan !== 'trial' && (
                   <Button
                     variant="outlined"
                     startIcon={<CreditCard />}
@@ -187,7 +192,7 @@ export default function SubscriptionDashboard({
                 )}
               </Box>
 
-              {plan !== 'trial' && (
+              {!isShopifyFree && plan !== 'trial' && (
                 <Box sx={{ mt: 2, overflow: 'hidden' }}>
                   <Button
                     variant="text"

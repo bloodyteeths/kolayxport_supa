@@ -25,6 +25,7 @@ interface TrialNotificationProps {
   userSubscription?: {
     subscriptionPlan: string | null;
     subscriptionStatus: string | null;
+    billingProvider?: string | null;
     trialExpiresAt: string | null;
     orderSyncCount: number;
     labelCount: number;
@@ -39,7 +40,11 @@ export default function TrialNotification({ userSubscription }: TrialNotificatio
   const locale = useLocaleStore((s) => s.locale);
   const dateFnsLocale = locale === 'tr' ? tr : enUS;
 
+  // Shopify-installed merchants are on the free tier — never show them
+  // trial countdowns or Stripe upgrade prompts (App Store rule 1.2.1).
   if (!userSubscription ||
+      userSubscription.billingProvider === 'shopify_free' ||
+      userSubscription.subscriptionPlan === 'shopify_free' ||
       userSubscription.subscriptionStatus !== 'trialing' ||
       !userSubscription.trialExpiresAt ||
       dismissed) {

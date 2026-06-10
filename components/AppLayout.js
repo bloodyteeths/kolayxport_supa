@@ -100,7 +100,6 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
   const t = useTranslations('nav');
   const locale = useLocaleStore((s) => s.locale);
   const setLocale = useLocaleStore((s) => s.setLocale);
-  const navGroups = getNavGroups(t);
   const messageCount = useMessageCountStore((s) => s.counts.total);
   const fetchMessageCounts = useMessageCountStore((s) => s.fetch);
 
@@ -111,6 +110,14 @@ const AppLayout = ({ children, title = 'KolayXport Dashboard' }) => {
     { revalidateOnFocus: false, dedupingInterval: 300_000 }
   );
   const userSubscription = settingsData?.subscription ?? null;
+
+  // Free Shopify-tier accounts never see Stripe billing surfaces, including
+  // the invoices page (App Store rule 1.2.1).
+  const isShopifyFree = userSubscription?.billingProvider === 'shopify_free';
+  const navGroups = getNavGroups(t).map((group) => ({
+    ...group,
+    items: isShopifyFree ? group.items.filter((item) => item.href !== '/faturalar') : group.items,
+  }));
 
   // Poll message counts every 3 minutes
   useEffect(() => {

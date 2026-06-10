@@ -18,8 +18,13 @@ export default async function handler(
     // Get user's stripe customer ID
     const user = await prisma.user.findUnique({
       where: { id: authUser.id },
-      select: { stripeCustomerId: true }
+      select: { stripeCustomerId: true, billingProvider: true }
     });
+
+    // Free Shopify-tier accounts have no Stripe billing to manage (App Store rule 1.2.1).
+    if (user?.billingProvider === 'shopify_free') {
+      return res.status(403).json({ error: 'Shopify-installed accounts use the free Shopify tier.' });
+    }
 
     if (!user?.stripeCustomerId) {
       return res.status(400).json({ error: 'No billing account found' });

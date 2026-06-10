@@ -1163,7 +1163,8 @@
       "trial": "Deneme",
       "starter": "Başlangıç",
       "growth": "Büyüme",
-      "enterprise": "Kurumsal"
+      "enterprise": "Kurumsal",
+      "shopify_free": "Shopify (Ücretsiz)"
     },
     "statusLabels": {
       "trialing": "Deneme Sürümü",

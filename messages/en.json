@@ -1163,7 +1163,8 @@
       "trial": "Trial",
       "starter": "Starter",
       "growth": "Growth",
-      "enterprise": "Enterprise"
+      "enterprise": "Enterprise",
+      "shopify_free": "Shopify (Free)"
     },
     "statusLabels": {
       "trialing": "Trial",

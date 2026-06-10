@@ -1,6 +1,6 @@
 name = "KolayXport"
 client_id = "f1c1b63632b2d02f5520b3e96113f0e1"
-application_url = "https://kolayxport.com"
+application_url = "https://kolayxport.com/api/integrations/shopify/install"
 embedded = false
 
 [auth]
@@ -15,8 +15,8 @@ api_version = "2024-10"
   shop_deletion_url = "https://kolayxport.com/api/shopify/webhooks/compliance"
 
 [[webhooks.subscriptions]]
-topics = ["app_subscriptions/update"]
-uri = "https://kolayxport.com/api/shopify/webhooks/subscription-update"
+topics = ["app/uninstalled"]
+uri = "https://kolayxport.com/api/shopify/webhooks/app-uninstalled"
 
 [access_scopes]
-scopes = "read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments"
+scopes = "read_orders,read_products,write_products,read_inventory,write_inventory"

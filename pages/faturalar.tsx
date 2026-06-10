@@ -58,7 +58,23 @@ export default function FaturalarPage() {
   const { formatCurrency: fmtCurrency } = useLocale();
 
   useEffect(() => {
-    fetchBillingHistory();
+    // Free Shopify-tier accounts have no Stripe invoices and must not see
+    // billing surfaces (App Store rule 1.2.1) — send them back to settings.
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/user/settings', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json().catch(() => null);
+          if (!cancelled && data?.subscription?.billingProvider === 'shopify_free') {
+            router.replace('/ayarlar');
+            return;
+          }
+        }
+      } catch { /* fall through to normal billing history fetch */ }
+      if (!cancelled) fetchBillingHistory();
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   const fetchBillingHistory = async () => {

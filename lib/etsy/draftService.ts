@@ -268,6 +268,7 @@ export function fillMissingCartesianCombinations(products: JsonMap[]): JsonMap[]
   const templateOffering = Array.isArray(template?.offerings) ? template.offerings[0] : null;
   const refPrice = templateOffering?.price ?? 0;
   const refQuantity = templateOffering?.quantity ?? 1;
+  const refReadinessStateId = templateOffering?.readiness_state_id ?? null;
 
   const filled: JsonMap[] = [...products];
   const addCombo = (idx: number, values: string[]) => {
@@ -287,14 +288,16 @@ export function fillMissingCartesianCombinations(products: JsonMap[]): JsonMap[]
         if (vid != null) entry.value_ids = [vid];
         return entry;
       });
+      const offering: JsonMap = {
+        price: typeof refPrice === 'object' && refPrice ? (refPrice.amount / (refPrice.divisor || 100)) : refPrice,
+        quantity: refQuantity,
+        is_enabled: true,
+      };
+      if (refReadinessStateId != null) offering.readiness_state_id = refReadinessStateId;
       filled.push({
         sku: '',
         property_values,
-        offerings: [{
-          price: typeof refPrice === 'object' && refPrice ? (refPrice.amount / (refPrice.divisor || 100)) : refPrice,
-          quantity: refQuantity,
-          is_enabled: true,
-        }],
+        offerings: [offering],
       });
       return;
     }

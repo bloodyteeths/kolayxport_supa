@@ -3,6 +3,7 @@ import formidable from 'formidable';
 import fs from 'fs';
 import { getAuthUser } from '@/lib/auth';
 import { createDraftMediaFile, toSerializable, upsertDraftPatch } from '@/lib/etsy/draftService';
+import { logger } from '@/lib/logger';
 
 export const config = {
   api: {
@@ -15,7 +16,9 @@ function first(value: string | string[] | undefined): string {
 }
 
 function parseForm(req: NextApiRequest): Promise<{ fields: formidable.Fields; files: formidable.Files }> {
-  const form = formidable({ maxFileSize: 120 * 1024 * 1024, keepExtensions: true });
+  // Etsy accepts videos up to ~105 MB. Allow a small overhead so we surface
+  // an Etsy-side error rather than a confusing formidable 500.
+  const form = formidable({ maxFileSize: 130 * 1024 * 1024, keepExtensions: true });
   return new Promise((resolve, reject) => {
     form.parse(req, (err, fields, files) => {
       if (err) reject(err);
@@ -29,6 +32,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const user = await getAuthUser(req, res);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
+  const startedAt = Date.now();
+  const contentLength = Number(req.headers['content-length'] || 0);
   try {
     const { fields, files } = await parseForm(req);
     const shopId = first(fields.shop_id as string | string[] | undefined);
@@ -43,25 +48,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const file = Array.isArray(files.file) ? files.file[0] : files.file;
     if (!file) return res.status(400).json({ error: 'file is required' });
 
-    const draft = await upsertDraftPatch({ userId: user.id, shopId, listingId, fields: {} });
-    if (!draft) return res.status(500).json({ error: 'Draft could not be created' });
-    const media = await createDraftMediaFile({
-      userId: user.id,
-      draftId: draft.id,
-      listingId,
-      kind,
-      operation,
-      tempPath: file.filepath,
-      filename: file.originalFilename || `${kind}-upload`,
-      contentType: file.mimetype || undefined,
-      rank: rankRaw ? Number(rankRaw) : undefined,
-      altText: altText || undefined,
-      payload: payloadRaw ? JSON.parse(payloadRaw) : undefined,
+    logger.info('etsy-drafts/media: parsed upload', {
+      userId: user.id, shopId, listingId, kind, operation,
+      filename: file.originalFilename, mimetype: file.mimetype, size: file.size,
+      contentLength, parseMs: Date.now() - startedAt,
     });
 
+    const draft = await upsertDraftPatch({ userId: user.id, shopId, listingId, fields: {} });
+    if (!draft) return res.status(500).json({ error: 'Draft could not be created' });
+
+    let media;
+    try {
+      media = await createDraftMediaFile({
+        userId: user.id,
+        draftId: draft.id,
+        listingId,
+        kind,
+        operation,
+        tempPath: file.filepath,
+        filename: file.originalFilename || `${kind}-upload`,
+        contentType: file.mimetype || undefined,
+        rank: rankRaw ? Number(rankRaw) : undefined,
+        altText: altText || undefined,
+        payload: payloadRaw ? JSON.parse(payloadRaw) : undefined,
+      });
+    } catch (writeErr: any) {
+      logger.error('etsy-drafts/media: createDraftMediaFile failed', writeErr, {
+        userId: user.id, draftId: draft.id, kind, size: file.size, mimetype: file.mimetype,
+      });
+      return res.status(500).json({ error: `Could not store ${kind}: ${writeErr.message || writeErr}` });
+    }
+
     try { fs.unlinkSync(file.filepath); } catch {}
+    logger.info('etsy-drafts/media: staged', { mediaId: media?.id, kind, totalMs: Date.now() - startedAt });
     return res.status(200).json({ draftId: draft.id, media: toSerializable(media) });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message || 'Media staging failed' });
+    // formidable parse errors carry useful codes (e.g., LIMIT_FILE_SIZE → 1009)
+    const code = (err as any)?.code;
+    const isSizeLimit = String(err?.message || '').includes('maxFileSize') || code === 1009;
+    logger.error('etsy-drafts/media: failed', err, {
+      userId: user.id, contentLength, code, isSizeLimit, elapsedMs: Date.now() - startedAt,
+    });
+    const status = isSizeLimit ? 413 : 500;
+    return res.status(status).json({
+      error: isSizeLimit
+        ? `File is too large (limit ~120MB; got ${(contentLength / 1024 / 1024).toFixed(1)}MB)`
+        : err.message || 'Media staging failed',
+    });
   }
 }

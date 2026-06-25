@@ -2300,7 +2300,11 @@
       "thirdVariationSetupHint": "Pick a taxonomy property and predefined values. Etsy only allows predefined values for the third variation — custom values will be rejected.",
       "thirdRequiresSecond": "Add a second variation first",
       "predefinedValues": "Predefined values",
-      "thirdVariationLimited": "Predefined only (no custom)"
+      "thirdVariationLimited": "Predefined only (no custom)",
+      "cartesianIncomplete": "Etsy requires every combination. Got {actual} of {expected} — missing rows will be auto-filled on save.",
+      "fillMissing": "Fill {count} missing",
+      "cartesianFilled": "Added {count} missing combinations",
+      "cartesianAutoFilled": "Auto-filled {count} missing combinations to satisfy Etsy"
     },
     "smartPricing": {
       "title": "Smart Pricing",

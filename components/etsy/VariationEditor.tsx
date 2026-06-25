@@ -125,6 +125,128 @@ function buildOtherPropertyKey(product: Product, propertyId: number): string {
     .join('|');
 }
 
+// Etsy rejects the inventory PUT with "All combinations of property values must
+// be supplied." whenever the product list is missing any cell of the full
+// N×M×K matrix. Build a per-axis ordered value list (preserving the order in
+// which the user added them), then enumerate the expected combinations and
+// diff against what's actually in `products`.
+type ComboCell = { values: string[]; valueIds: (number | null)[] };
+type CartesianStatus = {
+  axes: Array<{
+    property_id: number;
+    property_name: string;
+    scale_id: number | null;
+    values: string[];
+    valueIds: Map<string, number | null>; // value → predefined value_id (or null)
+  }>;
+  expected: number;
+  actual: number;
+  missing: ComboCell[];
+  complete: boolean;
+};
+
+function computeCartesianStatus(products: Product[]): CartesianStatus {
+  if (products.length === 0) {
+    return { axes: [], expected: 0, actual: 0, missing: [], complete: true };
+  }
+  // Number of axes = max property_values length seen.
+  const axisCount = Math.max(...products.map(p => p.property_values.length));
+  const axes: CartesianStatus['axes'] = [];
+  for (let axisIdx = 0; axisIdx < axisCount; axisIdx++) {
+    const valuesInOrder: string[] = [];
+    const valueIds = new Map<string, number | null>();
+    let propertyId = 0;
+    let propertyName = '';
+    let scaleId: number | null = null;
+    for (const p of products) {
+      const pv = p.property_values[axisIdx];
+      if (!pv) continue;
+      if (!propertyId) {
+        propertyId = pv.property_id;
+        propertyName = pv.property_name;
+        scaleId = pv.scale_id;
+      }
+      const v = pv.values?.[0];
+      if (v == null) continue;
+      if (!valueIds.has(v)) {
+        valuesInOrder.push(v);
+        valueIds.set(v, pv.value_ids?.[0] != null ? Number(pv.value_ids[0]) : null);
+      }
+    }
+    axes.push({ property_id: propertyId, property_name: propertyName, scale_id: scaleId, values: valuesInOrder, valueIds });
+  }
+
+  const expected = axes.reduce((acc, a) => acc * Math.max(1, a.values.length), 1);
+  const present = new Set(products.map(p =>
+    p.property_values.map(pv => pv.values?.[0] ?? '').join('')
+  ));
+
+  const missing: ComboCell[] = [];
+  // Enumerate expected combinations.
+  const enumerate = (axisIdx: number, currentValues: string[], currentValueIds: (number | null)[]) => {
+    if (axisIdx === axes.length) {
+      const key = currentValues.join('');
+      if (!present.has(key)) {
+        missing.push({ values: [...currentValues], valueIds: [...currentValueIds] });
+      }
+      return;
+    }
+    for (const v of axes[axisIdx].values) {
+      currentValues.push(v);
+      currentValueIds.push(axes[axisIdx].valueIds.get(v) ?? null);
+      enumerate(axisIdx + 1, currentValues, currentValueIds);
+      currentValues.pop();
+      currentValueIds.pop();
+    }
+  };
+  enumerate(0, [], []);
+
+  return {
+    axes,
+    expected,
+    actual: products.length,
+    missing,
+    complete: missing.length === 0 && products.length === expected,
+  };
+}
+
+function fillMissingCombinations(products: Product[], status: CartesianStatus): Product[] {
+  if (status.complete || products.length === 0) return products;
+  // Use the first product as a template for offering price/quantity/divisor/currency.
+  const template = products[0];
+  const templateOffering = template.offerings?.[0];
+  const refPrice = templateOffering?.price || { amount: 0, divisor: 100, currency_code: 'USD' };
+  const refQuantity = templateOffering?.quantity ?? 1;
+
+  const filled: Product[] = [...products];
+  for (const combo of status.missing) {
+    const property_values: PropertyValue[] = combo.values.map((value, axisIdx) => {
+      const axis = status.axes[axisIdx];
+      const entry: PropertyValue = {
+        property_id: axis.property_id,
+        property_name: axis.property_name,
+        values: [value],
+        scale_id: axis.scale_id,
+      };
+      const vid = combo.valueIds[axisIdx];
+      if (vid) entry.value_ids = [vid];
+      return entry;
+    });
+    filled.push({
+      product_id: 0,
+      sku: '',
+      property_values,
+      offerings: [{
+        offering_id: 0,
+        price: { ...refPrice },
+        quantity: refQuantity,
+        is_enabled: true,
+      }],
+    });
+  }
+  return filled;
+}
+
 function derivePropertyDrivers(products: Product[], getValue: (product: Product) => string | number | null | undefined): number[] {
   const propertyIds = normalizePropertyIds(products.flatMap(product => product.property_values.map(pv => pv.property_id)));
   const comparableValues = products.map(product => getValue(product)).filter(value => value !== null && value !== undefined && value !== '');
@@ -1002,6 +1124,14 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
 
   // --- Save inventory ---
 
+  const cartesianStatus = useMemo(() => computeCartesianStatus(products), [products]);
+
+  const handleFillMissing = () => {
+    const filled = fillMissingCombinations(products, cartesianStatus);
+    setProducts(filled);
+    toast.success(t('cartesianFilled', { count: cartesianStatus.missing.length }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -1013,9 +1143,18 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
         throw new Error(t('pricePropertyRequired'));
       }
 
-      await stageEtsyDraft({ shopId, listingId, inventory: { products, price_on_property, quantity_on_property, sku_on_property } });
+      // Etsy requires the full Cartesian. Auto-fill any missing cells before
+      // staging — the user can adjust the auto-filled rows after if needed.
+      let productsToSave = products;
+      if (!cartesianStatus.complete && cartesianStatus.missing.length > 0) {
+        productsToSave = fillMissingCombinations(products, cartesianStatus);
+        toast(t('cartesianAutoFilled', { count: cartesianStatus.missing.length }), { icon: 'ℹ️' });
+        setProducts(productsToSave);
+      }
+
+      await stageEtsyDraft({ shopId, listingId, inventory: { products: productsToSave, price_on_property, quantity_on_property, sku_on_property } });
       toast.success('Variations saved to draft. Sync to Etsy when ready.');
-      setOriginalProducts(JSON.parse(JSON.stringify(products)));
+      setOriginalProducts(JSON.parse(JSON.stringify(productsToSave)));
       setOriginalPriceOnPropertyIds(price_on_property);
       onSaved();
     } catch (err: any) {
@@ -1121,6 +1260,22 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       {hasChanges && (
         <Alert severity="warning" sx={{ py: 0.3, my: 0.5, borderRadius: '8px', fontSize: '0.8rem' }}>
           {t('unsavedChanges')}
+        </Alert>
+      )}
+
+      {/* Cartesian-incomplete warning. Etsy rejects partial matrices with
+          "All combinations of property values must be supplied". */}
+      {!cartesianStatus.complete && cartesianStatus.missing.length > 0 && (
+        <Alert
+          severity="error"
+          sx={{ py: 0.5, my: 0.5, borderRadius: '8px', fontSize: '0.8rem' }}
+          action={
+            <Button color="inherit" size="small" onClick={handleFillMissing} sx={{ textTransform: 'none', fontWeight: 600 }}>
+              {t('fillMissing', { count: cartesianStatus.missing.length })}
+            </Button>
+          }
+        >
+          {t('cartesianIncomplete', { actual: cartesianStatus.actual, expected: cartesianStatus.expected })}
         </Alert>
       )}
 

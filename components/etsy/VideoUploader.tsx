@@ -66,7 +66,9 @@ export default function VideoUploader({ listingId, shopId, videos, onVideoChange
       toast.success('Video upload saved to draft. Sync to Etsy when ready.');
       onVideoChanged();
     } catch (err: any) {
-      toast.error(err.message || t('uploadError'));
+      const detail = `${err?.message || t('uploadError')} (${(file.size / 1024 / 1024).toFixed(1)} MB, ${file.type || 'unknown'})`;
+      console.error('[VideoUploader] upload failed', { name: file.name, size: file.size, type: file.type, error: err });
+      toast.error(detail, { duration: 6000 });
     } finally {
       setUploading(false);
       setUploadProgress(0);

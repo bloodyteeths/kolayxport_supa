@@ -224,6 +224,98 @@ function variationDedupKey(product: JsonMap): string {
   return JSON.stringify(tuple);
 }
 
+// Etsy rejects PUT /listings/{id}/inventory with "All combinations of property
+// values must be supplied." whenever any cell of the variation matrix is
+// missing. Detect missing combos in the dedup'd product set, fill them with a
+// template offering cloned from the first product, and log the fill count so
+// we can audit which drafts arrived incomplete.
+function fillMissingCartesianCombinations(products: JsonMap[]): JsonMap[] {
+  if (products.length === 0) return products;
+  const axisCount = Math.max(...products.map(p => (Array.isArray(p?.property_values) ? p.property_values.length : 0)));
+  if (axisCount < 1) return products;
+
+  type Axis = { property_id: any; property_name: any; scale_id: any; values: string[]; valueIds: Map<string, any> };
+  const axes: Axis[] = [];
+  for (let i = 0; i < axisCount; i++) {
+    const valuesInOrder: string[] = [];
+    const valueIds = new Map<string, any>();
+    let property_id: any = null;
+    let property_name: any = '';
+    let scale_id: any = null;
+    for (const p of products) {
+      const pv = (p?.property_values as JsonMap[])?.[i];
+      if (!pv) continue;
+      if (property_id == null) { property_id = pv.property_id; property_name = pv.property_name; scale_id = pv.scale_id ?? null; }
+      const v = Array.isArray(pv.values) ? pv.values[0] : null;
+      if (v == null) continue;
+      const sv = String(v);
+      if (!valueIds.has(sv)) {
+        valuesInOrder.push(sv);
+        valueIds.set(sv, Array.isArray(pv.value_ids) && pv.value_ids[0] != null ? pv.value_ids[0] : null);
+      }
+    }
+    axes.push({ property_id, property_name, scale_id, values: valuesInOrder, valueIds });
+  }
+  const expected = axes.reduce((acc, a) => acc * Math.max(1, a.values.length), 1);
+  if (expected <= products.length) return products;
+
+  const present = new Set(products.map(p => {
+    const pvs = Array.isArray(p?.property_values) ? p.property_values : [];
+    return pvs.map((pv: JsonMap) => String(Array.isArray(pv.values) ? pv.values[0] ?? '' : '')).join('');
+  }));
+
+  const template = products[0];
+  const templateOffering = Array.isArray(template?.offerings) ? template.offerings[0] : null;
+  const refPrice = templateOffering?.price ?? 0;
+  const refQuantity = templateOffering?.quantity ?? 1;
+
+  const filled: JsonMap[] = [...products];
+  const addCombo = (idx: number, values: string[]) => {
+    if (idx === axes.length) {
+      const key = values.join('');
+      if (present.has(key)) return;
+      present.add(key);
+      const property_values = values.map((v, axisIdx) => {
+        const a = axes[axisIdx];
+        const vid = a.valueIds.get(v);
+        const entry: JsonMap = {
+          property_id: a.property_id,
+          property_name: a.property_name,
+          values: [v],
+          scale_id: a.scale_id,
+        };
+        if (vid != null) entry.value_ids = [vid];
+        return entry;
+      });
+      filled.push({
+        sku: '',
+        property_values,
+        offerings: [{
+          price: typeof refPrice === 'object' && refPrice ? (refPrice.amount / (refPrice.divisor || 100)) : refPrice,
+          quantity: refQuantity,
+          is_enabled: true,
+        }],
+      });
+      return;
+    }
+    for (const v of axes[idx].values) {
+      values.push(v);
+      addCombo(idx + 1, values);
+      values.pop();
+    }
+  };
+  addCombo(0, []);
+  const filledCount = filled.length - products.length;
+  if (filledCount > 0) {
+    logger.warn('Inventory had incomplete Cartesian — auto-filled missing combinations before PUT', {
+      original: products.length,
+      expected,
+      filled: filledCount,
+    });
+  }
+  return filled;
+}
+
 function sanitizeInventoryForEtsy(inventory: JsonMap, fallbackReadinessStateId?: number | string | null) {
   const products = Array.isArray(inventory?.products) ? inventory.products : [];
   const propertyIdMap = new Map<number, number>([
@@ -284,7 +376,8 @@ function sanitizeInventoryForEtsy(inventory: JsonMap, fallbackReadinessStateId?:
     }
   }
 
-  const payload: JsonMap = { products: dedupedProducts };
+  const completedProducts = fillMissingCartesianCombinations(dedupedProducts);
+  const payload: JsonMap = { products: completedProducts };
 
   // Etsy requires *_on_property arrays to contain 0, 1, or ALL variation
   // property IDs. With 3-variation support, an array of length 2 throws

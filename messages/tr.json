@@ -2300,7 +2300,11 @@
       "thirdVariationSetupHint": "Taksonomi özelliği ve önceden tanımlı değerler seçin. Etsy üçüncü varyasyon için yalnızca önceden tanımlı değerlere izin verir — özel değerler reddedilir.",
       "thirdRequiresSecond": "Önce ikinci varyasyon ekleyin",
       "predefinedValues": "Önceden tanımlı değerler",
-      "thirdVariationLimited": "Sadece önceden tanımlı (özel değer yok)"
+      "thirdVariationLimited": "Sadece önceden tanımlı (özel değer yok)",
+      "cartesianIncomplete": "Etsy tüm kombinasyonları ister. {actual}/{expected} mevcut — eksikler kaydederken otomatik tamamlanır.",
+      "fillMissing": "{count} eksiği tamamla",
+      "cartesianFilled": "{count} eksik kombinasyon eklendi",
+      "cartesianAutoFilled": "Etsy için {count} eksik kombinasyon otomatik tamamlandı"
     },
     "smartPricing": {
       "title": "Akıllı Fiyatlandırma",

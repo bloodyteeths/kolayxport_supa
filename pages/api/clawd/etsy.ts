@@ -2708,7 +2708,12 @@ export default async function handler(
                 return rest;
             });
 
-            const payload: Record<string, any> = { products: cleanProducts };
+            // Auto-fill any missing Cartesian cells; Etsy rejects partial
+            // matrices with "All combinations of property values must be
+            // supplied."
+            const { fillMissingCartesianCombinations } = await import('@/lib/etsy/draftService');
+            const completedProducts = fillMissingCartesianCombinations(cleanProducts as any);
+            const payload: Record<string, any> = { products: completedProducts };
             if (Array.isArray(price_on_property)) payload.price_on_property = price_on_property;
             if (Array.isArray(quantity_on_property)) payload.quantity_on_property = quantity_on_property;
             if (Array.isArray(sku_on_property)) payload.sku_on_property = sku_on_property;

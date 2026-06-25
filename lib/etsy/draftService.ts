@@ -229,7 +229,7 @@ function variationDedupKey(product: JsonMap): string {
 // missing. Detect missing combos in the dedup'd product set, fill them with a
 // template offering cloned from the first product, and log the fill count so
 // we can audit which drafts arrived incomplete.
-function fillMissingCartesianCombinations(products: JsonMap[]): JsonMap[] {
+export function fillMissingCartesianCombinations(products: JsonMap[]): JsonMap[] {
   if (products.length === 0) return products;
   const axisCount = Math.max(...products.map(p => (Array.isArray(p?.property_values) ? p.property_values.length : 0)));
   if (axisCount < 1) return products;

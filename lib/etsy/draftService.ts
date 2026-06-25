@@ -661,6 +661,117 @@ async function uploadImageFromBuffer(accessToken: string, shopId: string, listin
 // destroying whatever image already lived there. That deleted images on save —
 // a user-reported bug where 8 photos collapsed to 5 after re-saving a reorder.
 // Sending listing_image_id alone moves the existing image safely.
+// Apply all image-reorder ops as a single batch so we never leave Etsy in an
+// inconsistent intermediate state. Etsy validates that ranks are unique 1..N
+// after every individual PUT, so processing ops one-at-a-time blows up with
+// "The ListingImages for this Listing are in an inconsistent order." whenever
+// the user staged a permutation involving more than a simple swap.
+//
+// Strategy: simulate the reorder locally on the current image list, then issue
+// PUTs in REVERSE order of the target rank. With swap-semantics on Etsy's side,
+// processing rank N first, then N-1, ..., 1 means each move targets a slot
+// whose current occupant we're about to move next.
+async function applyImageReorderBatch(
+  accessToken: string,
+  shopId: string,
+  listingId: bigint,
+  reorderOps: Array<{ etsyMediaId: number | bigint | string; rank?: number | null; altText?: string | null; id?: string }>,
+  context: MediaSyncContext | undefined,
+) {
+  const results: any[] = [];
+  if (reorderOps.length === 0) return results;
+
+  // Filter to ops that still target images currently on the listing.
+  const valid = reorderOps.filter((op) => {
+    const id = String(op.etsyMediaId);
+    return !context?.imageIds || context.imageIds.has(id);
+  });
+  if (valid.length === 0) {
+    return reorderOps.map((op) => ({ skipped: true, mediaId: String(op.etsyMediaId), operation: 'reorder', reason: 'image_not_on_listing' }));
+  }
+
+  // Build current ordering from the context (the snapshot we fetched at the
+  // start of media sync). Sort by current rank so positions match Etsy state.
+  const currentImages = Array.from(context?.imagesById?.values() || []) as any[];
+  if (currentImages.length === 0) {
+    // No snapshot — fall back to one-at-a-time and accept the risk.
+    for (const op of valid) {
+      try {
+        results.push(await reorderListingImage(accessToken, shopId, listingId, op));
+      } catch (err: any) {
+        if (isMissingEtsyMediaError(err)) {
+          results.push({ skipped: true, mediaId: String(op.etsyMediaId), operation: 'reorder', reason: 'image_missing_or_wrong_listing' });
+        } else {
+          throw err;
+        }
+      }
+    }
+    return results;
+  }
+  const ordered = [...currentImages].sort((a, b) => (a.rank || 0) - (b.rank || 0));
+
+  // Apply each reorder op as a splice on the local list — this matches Etsy's
+  // documented "insert at rank, shift others" semantics. After the loop,
+  // `ordered` is the final desired order.
+  for (const op of valid) {
+    const idx = ordered.findIndex((img) => String(img.listing_image_id) === String(op.etsyMediaId));
+    if (idx === -1) continue;
+    const [moved] = ordered.splice(idx, 1);
+    const target = Math.max(0, Math.min(ordered.length, (Number(op.rank) || 1) - 1));
+    ordered.splice(target, 0, moved);
+  }
+
+  // Compute the diff: for each image whose final position changed, queue a PUT
+  // with rank = position + 1. Also collect alt-text updates from the ops, since
+  // we strip them out otherwise.
+  const altById = new Map<string, string | null | undefined>();
+  for (const op of valid) {
+    if (op.altText !== undefined) altById.set(String(op.etsyMediaId), op.altText);
+  }
+  type Move = { etsyMediaId: string; targetRank: number; altText?: string | null };
+  const moves: Move[] = [];
+  for (let i = 0; i < ordered.length; i++) {
+    const img = ordered[i];
+    const targetRank = i + 1;
+    const currentRank = Number(img.rank) || 0;
+    const id = String(img.listing_image_id);
+    const wantsAlt = altById.has(id);
+    if (currentRank !== targetRank || wantsAlt) {
+      moves.push({ etsyMediaId: id, targetRank, altText: wantsAlt ? altById.get(id) : null });
+    }
+  }
+  if (moves.length === 0) {
+    return valid.map((op) => ({ skipped: true, mediaId: String(op.etsyMediaId), operation: 'reorder', reason: 'no_change' }));
+  }
+
+  // Process highest target rank first. Etsy's reassign-by-listing_image_id is a
+  // swap: setting image X to rank R moves whatever was at R into X's old slot.
+  // Going N → 1 means each subsequent move targets a slot that will be cleaned
+  // up by the next one, so we never leave the listing in a bad state.
+  moves.sort((a, b) => b.targetRank - a.targetRank);
+  for (const move of moves) {
+    try {
+      const updated = await reorderListingImage(accessToken, shopId, listingId, {
+        etsyMediaId: move.etsyMediaId,
+        rank: move.targetRank,
+        altText: move.altText ?? null,
+      });
+      const current = context?.imagesById?.get(move.etsyMediaId);
+      context?.imagesById?.set(move.etsyMediaId, { ...(current || {}), ...updated, rank: move.targetRank, alt_text: move.altText ?? updated.alt_text ?? current?.alt_text });
+      results.push(updated);
+    } catch (err: any) {
+      if (isMissingEtsyMediaError(err)) {
+        context?.imageIds?.delete(move.etsyMediaId);
+        context?.imagesById?.delete(move.etsyMediaId);
+        results.push({ skipped: true, mediaId: move.etsyMediaId, operation: 'reorder', reason: 'image_missing_or_wrong_listing' });
+        continue;
+      }
+      throw err;
+    }
+  }
+  return results;
+}
+
 async function reorderListingImage(
   accessToken: string,
   shopId: string,
@@ -1184,7 +1295,21 @@ export async function syncDraft(draftId: string, userId: string) {
       results.push(await syncMediaOperation(accessToken, draft, op, syncedListingId, draft.etsyShopId, mediaContext));
       if (op.id) syncedMediaIds.push(op.id);
     }
-    for (const op of mediaOps.filter((m: any) => ['update_alt', 'reorder'].includes(m.operation))) {
+    // Image reorders need to be applied as a single batched permutation,
+    // otherwise Etsy 400s with "ListingImages ... are in an inconsistent order"
+    // when intermediate states collide. update_alt for images runs through the
+    // same batch (alt text travels with each move), update_alt for videos
+    // remains a per-op call.
+    const imageReorderOps = mediaOps.filter((m: any) => m.kind === 'image' && ['reorder', 'update_alt'].includes(m.operation));
+    const otherMutables = mediaOps.filter((m: any) => m.kind !== 'image' && ['update_alt', 'reorder'].includes(m.operation));
+    if (imageReorderOps.length > 0) {
+      const batchResults = await applyImageReorderBatch(accessToken, draft.etsyShopId, syncedListingId, imageReorderOps, mediaContext);
+      results.push(...batchResults);
+      for (const op of imageReorderOps) {
+        if (op.id) syncedMediaIds.push(op.id);
+      }
+    }
+    for (const op of otherMutables) {
       results.push(await syncMediaOperation(accessToken, draft, op, syncedListingId, draft.etsyShopId, mediaContext));
       if (op.id) syncedMediaIds.push(op.id);
     }

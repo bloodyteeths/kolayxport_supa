@@ -181,10 +181,23 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
           : baseImages;
 
         if (!cancelled && !hasPendingOrderRef.current) {
-          setLocalImages(sortImagesByRank([...reorderedBase, ...pendingUploads]));
+          // Merge — don't overwrite — pending uploads. The user may have
+          // *just* added a pending image via appendPendingUploads (e.g., an AI
+          // generation that hasn't reached this read yet because of replication
+          // lag or because the DB write committed after this fetch started).
+          // Without this merge, the freshly-added image visibly disappears.
+          const dbPendingIds = new Set(pendingUploads.map((p) => p.pending_media_id).filter(Boolean));
+          const localOnlyPending = localImagesRef.current.filter((img) =>
+            img.is_pending_upload && img.pending_media_id && !dbPendingIds.has(img.pending_media_id),
+          );
+          setLocalImages(sortImagesByRank([...reorderedBase, ...pendingUploads, ...localOnlyPending]));
         }
-      } catch {
-        if (!cancelled && !hasPendingOrderRef.current && imagesRef.current.length > 0) {
+      } catch (err) {
+        // Don't silently wipe pending uploads on a transient fetch failure.
+        // Keep what we already have on screen; the next reload will reconcile.
+        // eslint-disable-next-line no-console
+        console.warn('[ImageManager] loadDraftMedia failed, keeping current images', err);
+        if (!cancelled && !hasPendingOrderRef.current && localImagesRef.current.length === 0 && imagesRef.current.length > 0) {
           setLocalImages(sortImagesByRank(imagesRef.current));
         }
       }
@@ -514,7 +527,10 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
       const nextRank = sortedImages.length > 0
         ? Math.max(...sortedImages.map((i) => i.rank)) + 1
         : 1;
-      const aiFile = base64ToFile(aiResult.base64, aiResult.mimeType, `ai-image-${Date.now()}.png`);
+      const filename = aiResult.mimeType === 'image/jpeg'
+        ? `ai-image-${Date.now()}.jpg`
+        : `ai-image-${Date.now()}.png`;
+      const aiFile = base64ToFile(aiResult.base64, aiResult.mimeType, filename);
 
       const staged = await stageEtsyDraftFile({
         shopId,
@@ -525,13 +541,23 @@ export default function ImageManager({ listingId, shopId, images, onImagesChange
         rank: nextRank,
       });
 
+      if (!staged?.media?.id) {
+        // eslint-disable-next-line no-console
+        console.error('[ImageManager] AI upload returned no media id', staged);
+        throw new Error('AI image upload did not return a draft id — server may have rejected the file. Try again or use the regular upload button.');
+      }
+      // eslint-disable-next-line no-console
+      console.log('[ImageManager] AI image staged', { mediaId: staged.media.id, draftId: staged.draftId, rank: nextRank, size: aiFile.size });
+
       appendPendingUploads([aiFile], nextRank, undefined, [staged.media]);
       toast.success('AI image saved to draft. Sync to Etsy when ready.');
       setAiDialogOpen(false);
       setDraftMediaReloadKey((key) => key + 1);
       onImagesChanged();
     } catch (err: any) {
-      toast.error(err.message || t('uploadError'));
+      // eslint-disable-next-line no-console
+      console.error('[ImageManager] AI upload failed', err);
+      toast.error(err.message || t('uploadError'), { duration: 6000 });
     } finally {
       setAiUploading(false);
     }

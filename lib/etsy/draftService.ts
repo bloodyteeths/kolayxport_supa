@@ -1461,25 +1461,57 @@ export async function syncDraft(draftId: string, userId: string) {
         }
 
         const imageIdMap: Record<string, number> = {};
+        let imageCopyAttempted = 0;
+        let imageCopySucceeded = 0;
+        let imageCopyLastError: string | null = null;
         try {
           const images = await callEtsyAPI(`/listings/${sourceListingId}/images`, accessToken);
-          for (const image of ((images.results || []) as any[]).sort((a, b) => (a.rank || 1) - (b.rank || 1))) {
+          const sourceImageList = ((images.results || []) as any[]).sort((a, b) => (a.rank || 1) - (b.rank || 1));
+          imageCopyAttempted = sourceImageList.length;
+          for (const image of sourceImageList) {
             if (!image.url_fullxfull) continue;
-            const imageResp = await fetch(image.url_fullxfull);
-            if (!imageResp.ok) continue;
-            const buffer = Buffer.from(await imageResp.arrayBuffer());
-            const uploadedImage = await uploadImageFromBuffer(accessToken, targetShopId, syncedListingId, buffer, imageResp.headers.get('content-type') || 'image/jpeg', {
-              filename: 'copy-image.jpg',
-              rank: image.rank || 1,
-              overwrite: false,
-            });
-            if (image.listing_image_id && uploadedImage?.listing_image_id) {
-              imageIdMap[String(image.listing_image_id)] = Number(uploadedImage.listing_image_id);
+            try {
+              const imageResp = await fetch(image.url_fullxfull);
+              if (!imageResp.ok) {
+                imageCopyLastError = `download ${imageResp.status}`;
+                logger.warn('Copy listing: source image download failed', { sourceListingId, sourceImageId: image.listing_image_id, status: imageResp.status });
+                continue;
+              }
+              const buffer = Buffer.from(await imageResp.arrayBuffer());
+              const uploadedImage = await uploadImageFromBuffer(accessToken, targetShopId, syncedListingId, buffer, imageResp.headers.get('content-type') || 'image/jpeg', {
+                filename: 'copy-image.jpg',
+                rank: image.rank || 1,
+                overwrite: false,
+              });
+              if (image.listing_image_id && uploadedImage?.listing_image_id) {
+                imageIdMap[String(image.listing_image_id)] = Number(uploadedImage.listing_image_id);
+              }
+              imageCopySucceeded++;
+              results.push(uploadedImage);
+            } catch (perImageErr: any) {
+              imageCopyLastError = perImageErr.message || String(perImageErr);
+              logger.warn('Copy listing: per-image upload failed (continuing)', { sourceListingId, sourceImageId: image.listing_image_id, error: imageCopyLastError });
             }
-            results.push(uploadedImage);
           }
         } catch (copyImageErr: any) {
-          logger.warn('Copy listing image copy partially failed', { error: copyImageErr.message });
+          imageCopyLastError = copyImageErr.message || String(copyImageErr);
+          logger.warn('Copy listing image copy partially failed', { error: imageCopyLastError });
+        }
+        logger.info('Copy listing image copy summary', {
+          sourceListingId,
+          newListingId: String(syncedListingId),
+          attempted: imageCopyAttempted,
+          succeeded: imageCopySucceeded,
+          lastError: imageCopyLastError,
+        });
+        if (imageCopyAttempted > 0 && imageCopySucceeded === 0) {
+          // Partial-success semantics aren't honored downstream — surface
+          // this on the draft itself so the UI can show a clear warning
+          // instead of silently leaving the user with a 0-image listing.
+          await prisma.etsyListingDraft.update({
+            where: { id: draft.id },
+            data: { lastSyncError: `Copy: 0 of ${imageCopyAttempted} source images copied${imageCopyLastError ? ` (last error: ${imageCopyLastError.slice(0, 200)})` : ''}` },
+          }).catch(() => undefined);
         }
 
         const sourceVariationImages = (sourceVariationImagesResult?.results || []) as JsonMap[];

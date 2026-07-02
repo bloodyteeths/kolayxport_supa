@@ -778,11 +778,18 @@ async function reorderListingImage(
   listingId: bigint,
   opts: { etsyMediaId: number | bigint | string; rank?: number | null; altText?: string | null },
 ) {
+  // DO NOT send `overwrite: 'true'` here. When paired with an `image` binary
+  // upload, overwrite=true replaces whatever image lives at the target rank
+  // — which is fine when uploading. But when paired with `listing_image_id`
+  // alone (i.e. a pure reorder/re-alt), Etsy still interprets overwrite=true
+  // as "delete whatever is currently at this rank and put this image there".
+  // That silently deletes the neighbour image on every reorder PUT — the
+  // very "8 photos collapsed to 5" bug the previous comment claimed was
+  // fixed. The reassignment is safe without overwrite.
   const formData = new FormData();
   formData.append('listing_image_id', String(opts.etsyMediaId));
   if (opts.rank !== undefined && opts.rank !== null) formData.append('rank', String(opts.rank));
   if (opts.altText !== undefined && opts.altText !== null) formData.append('alt_text', String(opts.altText));
-  formData.append('overwrite', 'true');
 
   const response = await fetch(`${ETSY_API_BASE}/shops/${shopId}/listings/${listingId}/images`, {
     method: 'POST',

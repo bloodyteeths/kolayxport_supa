@@ -200,6 +200,25 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
   const customerNote =
     rawBuyerMessage || transactionPersonalizations || '';
 
+  // Etsy returns the buyer's shipping address as top-level fields on the
+  // receipt object. When the shop's OAuth token predates the `address_r`
+  // scope (added Jan 31 2026) or the buyer's account restricts sharing,
+  // ALL address fields come back null. Defaulting country to 'US' in that
+  // case falsely tags every foreign order as US — the reported bug. Only
+  // fall back to 'US' when we have at least ONE other address signal
+  // (city / zip / street), meaning Etsy actually delivered the address and
+  // the country field is genuinely missing rather than the whole address
+  // being redacted.
+  const hasAnyAddress = Boolean(receipt.first_line || receipt.city || receipt.zip || receipt.state);
+  const rawCountry = typeof receipt.country_iso === 'string' ? receipt.country_iso.trim().toUpperCase() : '';
+  const resolvedCountry = rawCountry || (hasAnyAddress ? 'US' : '');
+  if (!rawCountry && hasAnyAddress) {
+    logger.warn('Etsy receipt missing country_iso — defaulting to US', { receiptId: receipt.receipt_id });
+  }
+  if (!hasAnyAddress) {
+    logger.warn('Etsy receipt returned no address fields — token may lack address_r scope', { receiptId: receipt.receipt_id, shopId: String(shopName || '') });
+  }
+
   return {
     id: `etsy-${receipt.receipt_id}`,
     source: 'etsy-api',
@@ -220,7 +239,7 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
       city: receipt.city || '',
       state: receipt.state || '',
       postal: receipt.zip || '',
-      country: receipt.country_iso || 'US',
+      country: resolvedCountry,
       isResidential: true,
       email: receipt.buyer_email || '',
     },

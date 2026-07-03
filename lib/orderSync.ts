@@ -278,6 +278,46 @@ async function getEtsyAddress(userId: string, orderNumber: string, marketplace?:
   }
 }
 
+// Full country name → ISO-2 map covering every destination the Etsy seller
+// dashboard renders. The extension scrapes rendered text, so we can receive
+// either the ISO code ("TR", "US") or the display name ("Turkey", "United
+// States") depending on the buyer's browser locale.
+const ETSY_COUNTRY_NAME_TO_ISO: Record<string, string> = {
+  'united states': 'US', 'usa': 'US', 'u.s.': 'US', 'u.s.a.': 'US',
+  'united kingdom': 'GB', 'uk': 'GB', 'great britain': 'GB', 'england': 'GB',
+  'canada': 'CA', 'australia': 'AU', 'new zealand': 'NZ',
+  'germany': 'DE', 'deutschland': 'DE',
+  'france': 'FR', 'italy': 'IT', 'italia': 'IT',
+  'spain': 'ES', 'españa': 'ES', 'espana': 'ES',
+  'netherlands': 'NL', 'holland': 'NL',
+  'belgium': 'BE', 'switzerland': 'CH', 'austria': 'AT',
+  'sweden': 'SE', 'norway': 'NO', 'denmark': 'DK', 'finland': 'FI', 'iceland': 'IS',
+  'ireland': 'IE', 'portugal': 'PT',
+  'poland': 'PL', 'czech republic': 'CZ', 'czechia': 'CZ',
+  'hungary': 'HU', 'romania': 'RO', 'bulgaria': 'BG',
+  'greece': 'GR', 'turkey': 'TR', 'türkiye': 'TR', 'turkiye': 'TR',
+  'russia': 'RU', 'ukraine': 'UA',
+  'japan': 'JP', 'south korea': 'KR', 'korea': 'KR', 'china': 'CN',
+  'india': 'IN', 'singapore': 'SG', 'hong kong': 'HK', 'taiwan': 'TW',
+  'thailand': 'TH', 'vietnam': 'VN', 'indonesia': 'ID', 'malaysia': 'MY', 'philippines': 'PH',
+  'mexico': 'MX', 'brazil': 'BR', 'argentina': 'AR', 'chile': 'CL', 'colombia': 'CO', 'peru': 'PE',
+  'south africa': 'ZA', 'egypt': 'EG', 'israel': 'IL',
+  'saudi arabia': 'SA', 'united arab emirates': 'AE', 'uae': 'AE',
+};
+
+function normalizeCountryCode(raw: unknown): string {
+  if (typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  // Already an ISO code
+  if (trimmed.length === 2 && /^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
+  const lower = trimmed.toLowerCase();
+  if (ETSY_COUNTRY_NAME_TO_ISO[lower]) return ETSY_COUNTRY_NAME_TO_ISO[lower];
+  // 3-letter ISO — take first 2 (rough) or return as-is
+  if (trimmed.length === 3 && /^[A-Za-z]{3}$/.test(trimmed)) return trimmed.toUpperCase();
+  return trimmed.toUpperCase();
+}
+
 // Normalize Etsy address from extension data
 function normalizeEtsyAddress(etsyAddressData: any): NormalizedAddress | undefined {
   if (!etsyAddressData?.shippingAddress) {
@@ -285,16 +325,29 @@ function normalizeEtsyAddress(etsyAddressData: any): NormalizedAddress | undefin
   }
 
   const addr = etsyAddressData.shippingAddress;
-  
+  // Extension may send any of these depending on which DOM node it grabbed:
+  // `country` (usually the display name), `countryCode` / `country_iso`
+  // (ISO-2), or `countryName` (full name). Try them in that order, then
+  // normalize to an ISO-2 code so downstream (label generation, filters)
+  // treats "United States", "US", and "USA" as the same country.
+  const rawCountry =
+    addr.country_iso ??
+    addr.countryCode ??
+    addr.country_code ??
+    addr.country ??
+    addr.countryName ??
+    '';
+  const country = normalizeCountryCode(rawCountry);
+
   return {
     name: addr.name || '',
     phone: addr.phone || '',
-    street1: addr.line1 || '',
-    street2: addr.line2 || '',
+    street1: addr.line1 || addr.street1 || '',
+    street2: addr.line2 || addr.street2 || '',
     city: addr.city || '',
     state: addr.state || '',
-    postal: addr.postalCode || addr.postal || '',
-    country: addr.country || 'US',
+    postal: addr.postalCode || addr.postal || addr.zip || '',
+    country,
     isResidential: true // Etsy orders are typically residential
   };
 }

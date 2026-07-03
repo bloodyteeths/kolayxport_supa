@@ -215,6 +215,10 @@ export interface LabelRow {
   createdAt?: string; // Added for sorting
   labelCreated?: boolean; // Added
   lastCarrier?: string; // Added lastCarrier
+  /** Amazon-fulfilled order: no label needed, Amazon ships from FBA inventory. */
+  isFBA?: boolean;
+  /** Multi-Channel Fulfillment: FBA serving a non-Amazon sale. No buyer-message API. */
+  isMCF?: boolean;
 
 
   // item-level
@@ -369,6 +373,50 @@ function useDebouncedValue<T>(value: T, delay: number): T {
     return () => clearTimeout(handler);
   }, [value, delay]);
   return debounced;
+}
+
+// Extension scrapes the seller dashboard DOM, so we can receive either the
+// ISO-2 code ("TR"), the display name ("Turkey"), or a shorthand
+// ("USA"/"UK"). Normalize to an ISO-2 code so the labels grid and export
+// downstream treat every representation of the same country as one.
+const ETSY_COUNTRY_NAME_TO_ISO_LABELS: Record<string, string> = {
+  'united states': 'US', 'usa': 'US', 'u.s.': 'US', 'u.s.a.': 'US',
+  'united kingdom': 'GB', 'uk': 'GB', 'great britain': 'GB', 'england': 'GB',
+  'canada': 'CA', 'australia': 'AU', 'new zealand': 'NZ',
+  'germany': 'DE', 'deutschland': 'DE',
+  'france': 'FR', 'italy': 'IT', 'italia': 'IT',
+  'spain': 'ES', 'españa': 'ES', 'espana': 'ES',
+  'netherlands': 'NL', 'holland': 'NL',
+  'belgium': 'BE', 'switzerland': 'CH', 'austria': 'AT',
+  'sweden': 'SE', 'norway': 'NO', 'denmark': 'DK', 'finland': 'FI', 'iceland': 'IS',
+  'ireland': 'IE', 'portugal': 'PT',
+  'poland': 'PL', 'czech republic': 'CZ', 'czechia': 'CZ',
+  'hungary': 'HU', 'romania': 'RO', 'bulgaria': 'BG',
+  'greece': 'GR', 'turkey': 'TR', 'türkiye': 'TR', 'turkiye': 'TR',
+  'russia': 'RU', 'ukraine': 'UA',
+  'japan': 'JP', 'south korea': 'KR', 'korea': 'KR', 'china': 'CN',
+  'india': 'IN', 'singapore': 'SG', 'hong kong': 'HK', 'taiwan': 'TW',
+  'thailand': 'TH', 'vietnam': 'VN', 'indonesia': 'ID', 'malaysia': 'MY', 'philippines': 'PH',
+  'mexico': 'MX', 'brazil': 'BR', 'argentina': 'AR', 'chile': 'CL', 'colombia': 'CO', 'peru': 'PE',
+  'south africa': 'ZA', 'egypt': 'EG', 'israel': 'IL',
+  'saudi arabia': 'SA', 'united arab emirates': 'AE', 'uae': 'AE',
+};
+
+function resolveEtsyCountryCode(etsyAddr: any): string {
+  const raw =
+    etsyAddr?.country_iso ??
+    etsyAddr?.countryCode ??
+    etsyAddr?.country_code ??
+    etsyAddr?.country ??
+    etsyAddr?.countryName ??
+    '';
+  if (typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  if (trimmed.length === 2 && /^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
+  const mapped = ETSY_COUNTRY_NAME_TO_ISO_LABELS[trimmed.toLowerCase()];
+  if (mapped) return mapped;
+  return trimmed.toUpperCase();
 }
 
 // --- Etsy address enrichment helper ---
@@ -705,7 +753,7 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
           recipientCity: isMissingValue(extractedAddress.recipientCity) ? (etsyAddr.city || '') : extractedAddress.recipientCity,
           recipientState: isMissingValue(extractedAddress.recipientState) ? (etsyAddr.state || '') : extractedAddress.recipientState,
           recipientPostal: isMissingValue(extractedAddress.recipientPostal) ? (etsyAddr.postalCode || '') : extractedAddress.recipientPostal,
-          recipientCountry: isMissingValue(extractedAddress.recipientCountry) ? (etsyAddr.country || 'US') : extractedAddress.recipientCountry,
+          recipientCountry: isMissingValue(extractedAddress.recipientCountry) ? resolveEtsyCountryCode(etsyAddr) : extractedAddress.recipientCountry,
           // Add Etsy-specific data for debugging/display
           _etsyEnriched: true,
           _etsyStoreName: etsyEnrichment.etsyStoreName,
@@ -1013,6 +1061,8 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         channel: order.channel || safeRaw?.shop_app,
         createdAt: order.marketplaceOrderDate,
         lastCarrier: latestShipment?.carrier || order.lastShipmentCarrier || safeRaw?.cargoProviderName || safeRaw?.delivery_method?.name || safeRaw?.shipping_method || '—',
+        isFBA: (order as any).isFBA === true,
+        isMCF: (order as any).isMCF === true,
 
         itemId: `${order.id}-noitem`,
         sku: '—',
@@ -1108,6 +1158,8 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         channel: order.channel || safeRaw?.shop_app,
         createdAt: order.marketplaceOrderDate,
         lastCarrier: latestLabelJob?.carrier || latestShipment?.carrier || order.lastShipmentCarrier || safeRaw?.delivery_method?.name || safeRaw?.shipping_method || '—',
+        isFBA: (order as any).isFBA === true,
+        isMCF: (order as any).isMCF === true,
 
         itemId: isVeeqoItem ? item.id : (item.object_id || item.id || `${order.id}-item-${lineItems.indexOf(item)}`),
         sku: (isVeeqoItem ? item.sellable?.sku_code : item.sku) ?? '—',
@@ -1541,10 +1593,12 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         setLabelRows([]);
         return;
       }
-      // Amazon FBA orders are fulfilled by Amazon — the seller does not ship them,
-      // so they should never appear on the labels page.
-      const shippable = (fetchedOrders as LocalUIOrder[]).filter((o: any) => !o?.isFBA);
-      const rows = await toLabelRows(shippable);
+      // FBA / MCF orders are shipped by Amazon, not the seller. They stay
+      // visible on the labels page so the seller has full order visibility,
+      // but the action buttons (Print label / Add tracking / UPS / MNG) are
+      // disabled for those rows in the render layer. See the per-row
+      // `isFBA` / `isMCF` flags on LabelRow.
+      const rows = await toLabelRows(fetchedOrders as LocalUIOrder[]);
       setLabelRows(dedupeLabelRows(rows));
     }
     processOrders();
@@ -1568,6 +1622,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
     orderTotalPrice: number;
     currency: string;
     status: string;
+    isFBA: boolean;
+    isMCF: boolean;
     items: LabelRow[];
     primaryRow: LabelRow;
   }
@@ -1588,6 +1644,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       orderTotalPrice: items[0].orderTotalPrice,
       currency: items[0].currency || 'USD',
       status: items[0].status || '',
+      isFBA: !!items[0].isFBA,
+      isMCF: !!items[0].isMCF,
       items,
       primaryRow: items[0],
     }));
@@ -1916,7 +1974,22 @@ function LabelsPage(props: { source?: string; channel?: string }) {
         </Box>
       )
     },
-    { field: 'marketplace', headerName: t('columnStore'), width: 90 },
+    {
+      field: 'marketplace',
+      headerName: t('columnStore'),
+      width: 110,
+      renderCell: (params: GridRenderCellParams<LabelRow>) => (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, py: 0.5 }}>
+          <Typography variant="body2" sx={{ lineHeight: 1.2 }}>{params.value}</Typography>
+          {params.row.isMCF && (
+            <Chip label="MCF" size="small" title={t('mcfBadgeTooltip')} sx={{ height: 16, fontSize: '0.6rem', bgcolor: '#fef3c7', color: '#92400e', fontWeight: 700 }} />
+          )}
+          {params.row.isFBA && !params.row.isMCF && (
+            <Chip label="FBA" size="small" title={t('fbaBadgeTooltip')} sx={{ height: 16, fontSize: '0.6rem', bgcolor: '#dbeafe', color: '#1e40af', fontWeight: 700 }} />
+          )}
+        </Box>
+      ),
+    },
     {
       field: 'status',
       headerName: tc('status'),
@@ -2215,11 +2288,23 @@ function LabelsPage(props: { source?: string; channel?: string }) {
       width: 180,
       minWidth: 180,
       sortable: false,
-      renderCell: (params: GridRenderCellParams<LabelRow>) => (
+      renderCell: (params: GridRenderCellParams<LabelRow>) => {
+        const fbaDisabled = !!params.row.isFBA;
+        const fbaTooltip = params.row.isMCF
+          ? t('mcfRowDisabled')
+          : fbaDisabled ? t('fbaRowDisabled') : '';
+        const disabledBtn = (label: string, child: React.ReactNode) => (
+          <Tooltip title={label}>
+            <span>{child}</span>
+          </Tooltip>
+        );
+        return (
         <>
-          <IconButton onClick={() => openDrawer(params.row as LabelRow)} size="small">
-            <EditIcon fontSize="small"/>
-          </IconButton>
+          {disabledBtn(fbaTooltip,
+            <IconButton onClick={() => openDrawer(params.row as LabelRow)} size="small" disabled={fbaDisabled}>
+              <EditIcon fontSize="small"/>
+            </IconButton>
+          )}
           {(params.row.marketplace || '').toLowerCase().includes('amazon') && (
             <Tooltip title={t('amazonMsgTooltip')}>
               <IconButton
@@ -2244,7 +2329,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
               </IconButton>
             </Tooltip>
           )}
-          <Button size="small" variant="outlined" sx={{ml:1}} onClick={() => {
+          {disabledBtn(fbaTooltip,
+          <Button size="small" variant="outlined" sx={{ml:1}} disabled={fbaDisabled} onClick={() => {
             // Convert LabelRow to UIOrder format for UPS drawer
             const originalOrder = params.row.originalOrder as LocalUIOrder | undefined;
             const uiOrder: UIOrder = {
@@ -2273,7 +2359,9 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           }}>
             UPS
           </Button>
-          <Button size="small" variant="outlined" color="secondary" sx={{ml:0.5}} onClick={() => {
+          )}
+          {disabledBtn(fbaTooltip,
+          <Button size="small" variant="outlined" color="secondary" sx={{ml:0.5}} disabled={fbaDisabled} onClick={() => {
             const originalOrder = params.row.originalOrder as LocalUIOrder | undefined;
             const mngOrder = buildMngOrder(params.row, originalOrder, shipperPhoneNumber);
             setSelectedOrderForMNG(mngOrder);
@@ -2281,8 +2369,10 @@ function LabelsPage(props: { source?: string; channel?: string }) {
           }}>
             MNG
           </Button>
+          )}
         </>
-      )
+        );
+      }
     },
     {
       field: 'delete',
@@ -2943,6 +3033,12 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                           );
                         })()} · {row.marketplace || '-'} · {row.orderDate ? formatDateTime(new Date(row.orderDate)) : '-'}
                         {group.orderTotalPrice > 0 && ` · ${currSymbol}${group.orderTotalPrice.toFixed(2)}`}
+                        {group.isMCF && (
+                          <Chip label="MCF" size="small" title={t('mcfBadgeTooltip')} sx={{ ml: 0.5, height: 14, fontSize: '0.55rem', bgcolor: '#fef3c7', color: '#92400e', fontWeight: 700 }} />
+                        )}
+                        {group.isFBA && !group.isMCF && (
+                          <Chip label="FBA" size="small" title={t('fbaBadgeTooltip')} sx={{ ml: 0.5, height: 14, fontSize: '0.55rem', bgcolor: '#dbeafe', color: '#1e40af', fontWeight: 700 }} />
+                        )}
                       </Typography>
                       {/* Show first item title in collapsed view */}
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', fontSize: '0.65rem' }}>
@@ -3053,9 +3149,12 @@ function LabelsPage(props: { source?: string; channel?: string }) {
 
                       {/* Action buttons — order-level */}
                       <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+                        <Tooltip title={group.isMCF ? t('mcfRowDisabled') : (group.isFBA ? t('fbaRowDisabled') : '')}>
+                        <span>
                         <Button
                           variant="outlined"
                           size="small"
+                          disabled={!!group.isFBA}
                           onClick={() => {
                             setSelectedOrderForTracking(row);
                             setTrackingFormData({ trackingNumber: '', carrierId: 3, notifyCustomer: true, updateRemoteOrder: true });
@@ -3066,6 +3165,8 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                         >
                           {row.trackingNumber ? t('trackingExists') : t('addTracking')}
                         </Button>
+                        </span>
+                        </Tooltip>
                         {(row.marketplace || '').toLowerCase().includes('amazon') && (
                           <Button
                             variant="outlined"
@@ -3082,14 +3183,19 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                             {t('amazonMsgTooltip')}
                           </Button>
                         )}
+                        <Tooltip title={group.isMCF ? t('mcfRowDisabled') : (group.isFBA ? t('fbaRowDisabled') : '')}>
+                        <span>
                         <Button
                           variant="contained"
                           size="small"
+                          disabled={!!group.isFBA}
                           onClick={() => openDrawer(row)}
                           sx={{ textTransform: 'none', fontSize: '0.8rem', py: 0.75 }}
                         >
                           {t('fedexLabel')}
                         </Button>
+                        </span>
+                        </Tooltip>
                         <Button
                           variant="outlined"
                           size="small"

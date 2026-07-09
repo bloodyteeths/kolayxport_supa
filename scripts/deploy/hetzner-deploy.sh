@@ -91,7 +91,10 @@ if [ "$MODE" = "full" ]; then
   fi
 
   echo "==> NEXT_DIST_DIR=.next-new next build --webpack"
-  if ! NEXT_DIST_DIR=.next-new npx next build --webpack; then
+  # Raise the V8 heap for the build. Next's TypeScript pass can spike past the
+  # default ~2GB limit on this box; the VPS has ample RAM (cax21, 8GB). Respect an
+  # externally-provided NODE_OPTIONS if the operator already set one.
+  if ! NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}" NEXT_DIST_DIR=.next-new npx next build --webpack; then
     echo "::error::Build failed; live .next untouched"
     rm -rf .next-new
     exit 3

@@ -18,9 +18,14 @@
  *   - REMOVE CREDENTIAL_ENCRYPTION_KEY       (KMS is now the source of truth)
  */
 import crypto from 'crypto';
-import { google } from 'googleapis';
 
 async function main() {
+  // Dynamic import via a `string`-typed specifier: this file is in the tsconfig
+  // include set, and letting TypeScript resolve googleapis' very large .d.ts here
+  // OOMs the production build's type-check. The annotation makes import() any.
+  const specifier: string = 'googleapis';
+  const { google } = await import(specifier);
+
   const keyName = process.env.GCP_KMS_KEY_NAME;
   if (!keyName) {
     throw new Error('GCP_KMS_KEY_NAME is required (projects/.../cryptoKeys/...)');

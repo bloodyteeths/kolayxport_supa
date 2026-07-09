@@ -40,16 +40,22 @@ async function unwrapDek(): Promise<Buffer> {
     throw new Error('KMS not configured: GCP_KMS_KEY_NAME and CREDENTIAL_DEK_CIPHERTEXT required');
   }
 
-  // Lazy import: googleapis is Node-only (uses `fs`/`stream`). Loading it here
-  // instead of at module top keeps it out of the static bundle graph so the edge
-  // runtime / instrumentation compile never tries to resolve Node builtins.
-  const { google } = await import('googleapis');
+  // Load googleapis at runtime only. Two build hazards to avoid:
+  //  1. TypeScript: googleapis ships enormous .d.ts files; letting the type-check
+  //     resolve them OOMs the build on memory-constrained hosts. The `: string`
+  //     annotation makes `import()` return `any`, so the declarations are never
+  //     loaded.
+  //  2. webpack: `webpackIgnore` leaves this as a native runtime import (resolved
+  //     from node_modules on the Node server) instead of trying to bundle it —
+  //     googleapis is Node-only (`fs`/`stream`).
+  const specifier: string = 'googleapis';
+  const { google } = await import(/* webpackIgnore: true */ specifier);
 
   const auth = new google.auth.GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/cloudkms'],
   });
   const authClient = await auth.getClient();
-  const kms = google.cloudkms({ version: 'v1', auth: authClient as any });
+  const kms = google.cloudkms({ version: 'v1', auth: authClient });
 
   const res = await kms.projects.locations.keyRings.cryptoKeys.decrypt({
     name,

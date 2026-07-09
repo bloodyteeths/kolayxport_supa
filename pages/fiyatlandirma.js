@@ -317,6 +317,21 @@ export default function FiyatlandirmaPage() {
               Şeffaf, esnek ve işletmenizin büyümesine ayak uyduran fiyatlandırma. Tüm planlar 30 gün ücretsiz deneme içerir.
             </p>
           </div>
+
+          {/* English pricing summary — ensures the pricing scheme is clear and
+              transparent to non-Turkish readers (e.g. marketplace app reviewers). */}
+          <div className="max-w-3xl mx-auto mb-12 rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-800 mb-3">Pricing (English)</h3>
+            <ul className="space-y-2 text-slate-600 text-sm md:text-base">
+              <li><span className="font-semibold text-slate-800">Starter:</span> ₺449 / month (₺4,490 / year) — 200 orders &amp; 100 shipping labels per month, 1 user.</li>
+              <li><span className="font-semibold text-slate-800">Growth:</span> ₺999 / month (₺9,990 / year) — 2,000 orders &amp; 500 shipping labels per month, 5 users.</li>
+              <li><span className="font-semibold text-slate-800">Enterprise:</span> custom quote — unlimited usage; request a quote via our <Link href="/iletisim?subject=Enterprise%20Quote%20Request" className="text-blue-600 hover:underline">contact form</Link>.</li>
+            </ul>
+            <p className="mt-4 text-sm text-slate-500">
+              All plans include a 30-day free trial and every marketplace &amp; shipping integration. Prices are in Turkish Lira (₺). There are no hidden or additional service fees.
+            </p>
+          </div>
+
           <div className="flex justify-center mb-8">
             <button
               onClick={() => setBillingInterval('month')}

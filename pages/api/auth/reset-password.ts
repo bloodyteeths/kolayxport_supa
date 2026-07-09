@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { rateLimit } from '@/lib/middleware/rateLimit';
 import { consumeToken } from '@/lib/auth/tokens';
 import { logAuthEvent } from '@/lib/admin/events';
+import { validatePassword } from '@/lib/auth/passwordPolicy';
 
 /**
  * POST /api/auth/reset-password
@@ -33,8 +34,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!token || !newPassword) {
     return res.status(400).json({ ok: false, error: 'invalid_input' });
   }
-  if (newPassword.length < 8) {
-    return res.status(400).json({ ok: false, error: 'password_too_short' });
+  // Complexity/length check up-front so we don't burn the single-use token on a
+  // weak password. The identity check runs again below once we know the e-mail.
+  const preCheck = validatePassword(newPassword);
+  if (!preCheck.ok) {
+    return res.status(400).json({ ok: false, error: preCheck.code, message: preCheck.message });
   }
 
   const result = await consumeToken(token, 'password_reset');
@@ -45,6 +49,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       details: { reason: result.reason },
     });
     return res.status(400).json({ ok: false, error: 'invalid_or_expired' });
+  }
+
+  // Now that the token is validated we know the account e-mail: enforce the
+  // identity restriction (password must not embed the e-mail local-part).
+  const identityCheck = validatePassword(newPassword, { email: result.identifier });
+  if (!identityCheck.ok) {
+    return res.status(400).json({ ok: false, error: identityCheck.code, message: identityCheck.message });
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 12);

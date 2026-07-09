@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { isKmsConfigured, getCachedDek, loadDek } from './kms';
 
 /**
  * Envelope-format credential encryption.
@@ -41,12 +42,37 @@ function parseKey(raw: string): Buffer {
   return buf;
 }
 
+/**
+ * True when the process can encrypt/decrypt — either KMS is configured (the DEK
+ * is wrapped by a KMS-managed KEK) or a raw CREDENTIAL_ENCRYPTION_KEY is present.
+ */
+export function isEncryptionConfigured(): boolean {
+  return isKmsConfigured() || Boolean(process.env.CREDENTIAL_ENCRYPTION_KEY);
+}
+
 export function getEncryptionKey(): Buffer {
   if (cachedKey) return cachedKey;
+
+  // Preferred path: DEK unwrapped by GCP KMS at boot (see initEncryptionKey /
+  // instrumentation.ts). getEncryptionKey stays synchronous, so the unwrap must
+  // have already happened — surface a clear error if it hasn't.
+  if (isKmsConfigured()) {
+    const dek = getCachedDek();
+    if (!dek) {
+      throw new Error(
+        'KMS-managed encryption key is not loaded yet. initEncryptionKey() must run at ' +
+          'startup (instrumentation.ts) before any credential encrypt/decrypt.',
+      );
+    }
+    cachedKey = dek;
+    return cachedKey;
+  }
+
   const raw = process.env.CREDENTIAL_ENCRYPTION_KEY;
   if (!raw) {
     throw new Error(
-      'CREDENTIAL_ENCRYPTION_KEY is not set. Generate one with: openssl rand -hex 32',
+      'No encryption key configured. Set GCP_KMS_KEY_NAME + CREDENTIAL_DEK_CIPHERTEXT ' +
+        '(production) or CREDENTIAL_ENCRYPTION_KEY (dev, via: openssl rand -hex 32).',
     );
   }
   const key = parseKey(raw);
@@ -57,6 +83,28 @@ export function getEncryptionKey(): Buffer {
   }
   cachedKey = key;
   return key;
+}
+
+/**
+ * Boot-time async initialiser. When KMS is configured this unwraps the DEK via
+ * KMS and caches it so the synchronous getEncryptionKey() works for every later
+ * request. Safe to call multiple times; a no-op once the key is cached. Call this
+ * from instrumentation.ts.
+ */
+export async function initEncryptionKey(): Promise<void> {
+  if (cachedKey) return;
+  if (isKmsConfigured()) {
+    const dek = await loadDek();
+    if (dek.length !== KEY_LEN) {
+      throw new Error(`Unwrapped DEK must be ${KEY_LEN} bytes; got ${dek.length}.`);
+    }
+    cachedKey = dek;
+    return;
+  }
+  // env-var path: validate eagerly so a misconfiguration fails fast at boot.
+  if (process.env.CREDENTIAL_ENCRYPTION_KEY) {
+    getEncryptionKey();
+  }
 }
 
 /**
@@ -205,6 +253,6 @@ export function encryptIfNeeded<T extends string | null | undefined>(value: T): 
   if (typeof value !== 'string') return value;
   if (isEncrypted(value)) return value;
   if (looksLikeLegacy(value) && tryLegacyDecrypt(value) != null) return value;
-  if (!process.env.CREDENTIAL_ENCRYPTION_KEY) return value;
+  if (!isEncryptionConfigured()) return value;
   return encrypt(value) as T;
 }

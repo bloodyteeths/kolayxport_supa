@@ -33,7 +33,17 @@ const SECRET_KEY_PATTERN =
 
 const SECRET_SUBSTRING_PATTERN = /(token|secret|password|api[_-]?key|client[_-]?secret|private[_-]?key)/i;
 
+// Buyer/customer PII. We deliberately do NOT match generic `name` (listing/shop/
+// file names are not PII) — only personal-contact fields. Redacting these keeps
+// buyer PII out of the SyncLog store even if a caller passes a raw order object.
+const PII_KEY_PATTERN =
+  /(e[_-]?mail|phone|mobile|first[_-]?name|last[_-]?name|full[_-]?name|buyer[_-]?name|customer[_-]?name|recipient|address|street|postal|zip[_-]?code|national[_-]?id|tax[_-]?id|tckn|iban|card[_-]?number)/i;
+
+// Scrub anything that looks like an e-mail address out of free-text string values.
+const EMAIL_VALUE_PATTERN = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
 const REDACTED = '[REDACTED]' as const;
+const PII_REDACTED = '[PII_REDACTED]' as const;
 const MAX_DEPTH = 8;
 const MAX_STRING_LEN = 4096;
 
@@ -41,6 +51,10 @@ function shouldRedactKey(key: string): boolean {
   if (SECRET_KEY_PATTERN.test(key)) return true;
   if (SECRET_SUBSTRING_PATTERN.test(key)) return true;
   return false;
+}
+
+function isPiiKey(key: string): boolean {
+  return PII_KEY_PATTERN.test(key);
 }
 
 function isPlainObject(v: unknown): v is Record<string, any> {
@@ -63,7 +77,8 @@ export function redact(value: any, depth = 0, seen: WeakSet<object> = new WeakSe
   if (value instanceof Date) return value;
 
   if (typeof value === 'string') {
-    return value.length > MAX_STRING_LEN ? value.slice(0, MAX_STRING_LEN) + '...[TRUNCATED]' : value;
+    const scrubbed = value.replace(EMAIL_VALUE_PATTERN, '[EMAIL_REDACTED]');
+    return scrubbed.length > MAX_STRING_LEN ? scrubbed.slice(0, MAX_STRING_LEN) + '...[TRUNCATED]' : scrubbed;
   }
 
   if (Array.isArray(value)) {
@@ -79,6 +94,10 @@ export function redact(value: any, depth = 0, seen: WeakSet<object> = new WeakSe
     for (const [k, v] of Object.entries(value)) {
       if (shouldRedactKey(k)) {
         out[k] = REDACTED;
+        continue;
+      }
+      if (isPiiKey(k)) {
+        out[k] = PII_REDACTED;
         continue;
       }
       out[k] = redact(v, depth + 1, seen);

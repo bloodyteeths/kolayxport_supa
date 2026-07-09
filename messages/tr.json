@@ -62,7 +62,8 @@
     "alreadyHaveAccount": "Zaten hesabınız var mı?",
     "or": "veya",
     "loginSuccess": "Giriş başarılı!",
-    "signupSuccess": "Kayıt başarılı! Hesabınızı onaylamak için e-postanızı kontrol edin."
+    "signupSuccess": "Kayıt başarılı! Hesabınızı onaylamak için e-postanızı kontrol edin.",
+    "passwordPolicy": "En az 10 karakter; büyük ve küçük harf ile rakam içermeli. Adınızı veya e-postanızı içeremez."
   },
   "nav": {
     "overview": "Genel Bakış",

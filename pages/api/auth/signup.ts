@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/middleware/rateLimit';
 import { issueToken } from '@/lib/auth/tokens';
 import { sendEmail, verificationEmailBody, maskEmail } from '@/lib/auth/email';
 import { logAuthEvent } from '@/lib/admin/events';
+import { validatePassword } from '@/lib/auth/passwordPolicy';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -22,8 +23,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   email = email.toLowerCase().trim();
 
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  const policy = validatePassword(password, { email, name });
+  if (!policy.ok) {
+    return res.status(400).json({ error: policy.message, code: policy.code });
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });

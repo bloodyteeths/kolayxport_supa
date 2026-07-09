@@ -1,13 +1,16 @@
 import * as crypto from 'crypto';
+import { getEncryptionKey } from './crypto/credentials';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
+// Single source of truth for the key material: delegates to the KMS-backed loader
+// in lib/crypto/credentials.ts. Under KMS the DEK is unwrapped at boot; in dev it
+// falls back to CREDENTIAL_ENCRYPTION_KEY. Both this legacy base64 format and the
+// newer `enc:v1:` envelope therefore share the exact same key.
 function getKey(): Buffer {
-  const key = process.env.CREDENTIAL_ENCRYPTION_KEY;
-  if (!key) throw new Error('CREDENTIAL_ENCRYPTION_KEY not set');
-  return Buffer.from(key, 'hex');
+  return getEncryptionKey();
 }
 
 export function encrypt(plaintext: string): string {

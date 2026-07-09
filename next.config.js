@@ -65,6 +65,12 @@ const nextConfig = {
   generateEtags: false,
   compress: true,
 
+  // Keep Node-only SDKs (googleapis + its transitive deps used for GCP KMS) out of
+  // the webpack bundle so they aren't traced into the edge/instrumentation compile,
+  // where Node builtins like `fs`/`stream` can't resolve. They are require()'d at
+  // runtime in the Node server instead.
+  serverExternalPackages: ['googleapis', 'google-auth-library', 'gcp-metadata', 'gaxios', 'googleapis-common'],
+
   // Image optimization
   images: {
     remotePatterns: [

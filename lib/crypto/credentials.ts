@@ -81,22 +81,25 @@ export function getEncryptionKey(): Buffer {
   // if it hasn't.
   if (usesWrappedDek()) {
     const dek = providerCachedDek();
-    if (!dek) {
-      throw new Error(
-        'KMS-managed encryption key is not loaded yet. initEncryptionKey() must run at ' +
-          'startup (instrumentation.ts) before any credential encrypt/decrypt.',
-      );
+    if (dek) {
+      cachedKey = dek;
+      return cachedKey;
     }
-    cachedKey = dek;
-    return cachedKey;
+    // Fall through: Next.js bundles instrumentation and each API route as SEPARATE
+    // server module instances, so the DEK that initEncryptionKey() unwrapped in the
+    // instrumentation instance is NOT in this instance's provider cache. To bridge
+    // that, initEncryptionKey() republishes the unwrapped DEK into process.env
+    // (in-memory only, never written to disk), which every module instance in the
+    // process can read below. If it's not there yet, the error below fires.
   }
 
   const raw = process.env.CREDENTIAL_ENCRYPTION_KEY;
   if (!raw) {
     throw new Error(
-      'No encryption key configured. Set Vault (VAULT_ADDR + VAULT_TRANSIT_KEY + ' +
-        'CREDENTIAL_DEK_CIPHERTEXT) or GCP KMS (GCP_KMS_KEY_NAME + CREDENTIAL_DEK_CIPHERTEXT) ' +
-        'for production, or CREDENTIAL_ENCRYPTION_KEY (dev, via: openssl rand -hex 32).',
+      'No encryption key available. A wrapped-DEK backend (Vault/GCP KMS) is configured ' +
+        'but the DEK was not unwrapped in this context and not published to the process. ' +
+        'Ensure initEncryptionKey() ran at startup (instrumentation). For dev, set ' +
+        'CREDENTIAL_ENCRYPTION_KEY (openssl rand -hex 32).',
     );
   }
   const key = parseKey(raw);
@@ -123,6 +126,14 @@ export async function initEncryptionKey(): Promise<void> {
       throw new Error(`Unwrapped DEK must be ${KEY_LEN} bytes; got ${dek.length}.`);
     }
     cachedKey = dek;
+    // Publish the unwrapped DEK into the process (in-memory only — NEVER written to
+    // disk) so sibling server bundles/module instances, which have their own empty
+    // provider cache, can derive the key synchronously in getEncryptionKey(). This is
+    // what makes credential decrypt work in API routes / order sync under a wrapped
+    // DEK, not just in the instrumentation instance.
+    if (!process.env.CREDENTIAL_ENCRYPTION_KEY) {
+      process.env.CREDENTIAL_ENCRYPTION_KEY = dek.toString('hex');
+    }
     return;
   }
   // env-var path: validate eagerly so a misconfiguration fails fast at boot.

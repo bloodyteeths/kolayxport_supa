@@ -188,7 +188,49 @@ connects/reads (existing ciphertext decrypts because we wrapped the *same* DEK).
 Use a long-lived `VAULT_TOKEN` only for the one-off wrap in 2d; the running app should
 use the AppRole (`VAULT_ROLE_ID`/`VAULT_SECRET_ID`), which mints short-lived tokens.
 
-### 2f. Key rotation & environment separation (for the Amazon answer)
+### 2f. (Optional) Auto-unseal on reboot
+OpenBao starts **sealed** after every VPS reboot, which blocks the app from unwrapping
+the DEK until you unseal it. This installs a boot service that unseals automatically and
+restarts the app. (Tradeoff: the unseal keys live on the host — see the header in the
+script. Keep an OFFLINE copy in a password manager regardless.)
+```bash
+# Store 2 unseal keys (your -key-threshold), one per line, root-only:
+umask 077
+printf '%s\n%s\n' '<UNSEAL_KEY_1>' '<UNSEAL_KEY_2>' > /root/openbao-unseal.keys
+chmod 600 /root/openbao-unseal.keys
+
+# Install the script shipped in the repo:
+install -m 700 /home/deploy/kolayxport/scripts/deploy/openbao-auto-unseal.sh \
+  /opt/openbao/openbao-auto-unseal.sh
+
+# systemd unit that runs it on boot, after Docker, then restarts the app:
+cat >/etc/systemd/system/openbao-unseal.service <<'EOF'
+[Unit]
+Description=Auto-unseal OpenBao and restart the app
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/bin/sleep 5
+ExecStart=/opt/openbao/openbao-auto-unseal.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now openbao-unseal.service
+systemctl status openbao-unseal.service --no-pager   # should be active (exited), "OpenBao unsealed."
+```
+Test it survives a reboot: `reboot`, then after it comes back confirm
+`curl -s http://127.0.0.1:8200/v1/sys/seal-status` shows `"sealed":false` and the app
+health is 200.
+
+### 2g. Key rotation & environment separation (for the Amazon answer)
 - The Transit key auto-rotates every 90 days (`auto_rotate_period=2160h`). Transit keeps
   earlier key versions, so the wrapped-DEK ciphertext keeps decrypting after rotation.
 - To rotate the DEK itself (deeper rotation): generate a new DEK, re-encrypt all
@@ -199,7 +241,7 @@ use the AppRole (`VAULT_ROLE_ID`/`VAULT_SECRET_ID`), which mints short-lived tok
   key — so a non-prod compromise cannot decrypt production data. (Local dev may also just
   use the `CREDENTIAL_ENCRYPTION_KEY` env fallback with a throwaway key.)
 
-### 2g. Disk-level encryption (defence in depth)
+### 2h. Disk-level encryption (defence in depth)
 Application-layer AES-256-GCM already protects every Amazon token/credential regardless
 of disk state. If you also want volume encryption, note Hetzner Cloud does not offer
 transparent disk encryption; enabling LUKS requires a rebuild — track as a follow-up,
@@ -241,6 +283,7 @@ header-only, constant-time-compared internal API keys.
 - [ ] §1 firewall + fail2ban + ClamAV + unattended-upgrades running on the VPS
 - [ ] §1e SSH password auth disabled; §1f laptop FileVault on
 - [ ] §2 OpenBao running + unsealed, Transit key + AppRole created, DEK wrapped, app restarted on Vault
+- [ ] §2f (optional) auto-unseal service installed + reboot-tested
 - [ ] Marketplace connect/read verified after the Vault switch (existing ciphertext still decrypts)
 - [ ] Website pricing page reachable + clear (see AMAZON_SPAPI_PROFILE_ANSWERS.md §Website)
 - [ ] Paste updated answers into the Solution Provider Profile, then reply to the case

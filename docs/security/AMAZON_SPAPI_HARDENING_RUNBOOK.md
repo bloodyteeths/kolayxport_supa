@@ -103,12 +103,21 @@ if OpenBao is briefly down.
 ### 2a. Run OpenBao on the VPS (Docker, persistent file storage)
 ```bash
 mkdir -p /opt/openbao/{data,config}
+# The OpenBao container's server process runs as the non-root "openbao" user (uid 100),
+# so the bind-mounted data dir must be writable by it:
+chown -R 100:100 /opt/openbao/data
+
 cat >/opt/openbao/config/config.hcl <<'EOF'
 storage "file" { path = "/openbao/data" }
 listener "tcp" {
-  address     = "127.0.0.1:8200"   # localhost only — never exposed publicly
-  tls_disable = true               # safe: only reachable over loopback on this host
+  # Bind 0.0.0.0 *inside the container*; Docker's -p 127.0.0.1:8200:8200 below is what
+  # actually restricts exposure to the host's loopback. (Binding 127.0.0.1 inside the
+  # container makes it unreachable via -p, because Docker forwards to the container's
+  # eth0, not its loopback.) The UFW firewall also blocks 8200 from the public net.
+  address     = "0.0.0.0:8200"
+  tls_disable = true
 }
+api_addr = "http://127.0.0.1:8200"
 ui = false
 disable_mlock = true
 EOF

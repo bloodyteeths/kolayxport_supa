@@ -87,84 +87,119 @@ then `systemctl restart ssh`.
 
 ---
 
-## 2. Encryption at Rest 2.4 — GCP KMS envelope encryption
+## 2. Encryption at Rest 2.4 — OpenBao (Vault) Transit envelope encryption
 
 The app encrypts every marketplace credential/token with **AES-256-GCM**. The 32-byte
-data-encryption key (DEK) is wrapped by a **KMS-managed key-encryption key (KEK)** that
-never leaves Google Cloud KMS. This gives us the full key lifecycle Amazon requires:
-generation, storage, rotation, and revocation are all owned by KMS.
+data-encryption key (DEK) is wrapped by a **Transit key that lives inside OpenBao**
+(the Apache-licensed fork of HashiCorp Vault) and never leaves it. Transit owns the full
+key lifecycle Amazon requires: generation, secure storage, versioned rotation, and
+revocation. No cloud billing — it runs on the Hetzner VPS you already pay for.
 
-### 2a. Create separate key rings for prod and non-prod (environment separation)
+Architecture note: the app unwraps the DEK **once at boot** and caches it in memory
+(see `instrumentation-node.ts` → `initEncryptionKey`). So OpenBao only needs to be
+reachable at app start/restart, not on every request — a running app keeps working even
+if OpenBao is briefly down.
+
+### 2a. Run OpenBao on the VPS (Docker, persistent file storage)
 ```bash
-PROJECT=<your-gcp-project>          # same project as Gemini billing
-LOCATION=europe-west3               # near Hetzner (Germany)
+mkdir -p /opt/openbao/{data,config}
+cat >/opt/openbao/config/config.hcl <<'EOF'
+storage "file" { path = "/openbao/data" }
+listener "tcp" {
+  address     = "127.0.0.1:8200"   # localhost only — never exposed publicly
+  tls_disable = true               # safe: only reachable over loopback on this host
+}
+ui = false
+disable_mlock = true
+EOF
 
-gcloud config set project "$PROJECT"
-
-# Production key ring + rotating KEK (90-day rotation):
-gcloud kms keyrings create kolayxport-prod --location="$LOCATION"
-gcloud kms keys create credential-kek \
-  --location="$LOCATION" --keyring=kolayxport-prod \
-  --purpose=encryption --rotation-period=90d --next-rotation-time="$(date -u -d '+90 days' +%Y-%m-%dT%H:%M:%SZ)"
-
-# Non-production key ring (separate key material, never shared with prod):
-gcloud kms keyrings create kolayxport-nonprod --location="$LOCATION"
-gcloud kms keys create credential-kek \
-  --location="$LOCATION" --keyring=kolayxport-nonprod \
-  --purpose=encryption --rotation-period=90d --next-rotation-time="$(date -u -d '+90 days' +%Y-%m-%dT%H:%M:%SZ)"
+docker run -d --name openbao --restart unless-stopped \
+  --cap-add=IPC_LOCK -p 127.0.0.1:8200:8200 \
+  -v /opt/openbao/data:/openbao/data \
+  -v /opt/openbao/config:/openbao/config \
+  openbao/openbao:latest server -config=/openbao/config/config.hcl
 ```
 
-### 2b. Service account with least-privilege KMS access
+### 2b. Initialise & unseal (record the keys somewhere safe — a password manager)
 ```bash
-gcloud iam service-accounts create kolayxport-kms --display-name="KolayXport KMS"
-SA="kolayxport-kms@${PROJECT}.iam.gserviceaccount.com"
+export BAO_ADDR=http://127.0.0.1:8200
+docker exec -e BAO_ADDR=$BAO_ADDR openbao bao operator init -key-shares=3 -key-threshold=2
+# -> prints 3 Unseal Keys + an Initial Root Token. STORE THESE SECURELY (offline).
 
-# Prod app can encrypt+decrypt with the prod key only:
-gcloud kms keys add-iam-policy-binding credential-kek \
-  --location="$LOCATION" --keyring=kolayxport-prod \
-  --member="serviceAccount:${SA}" \
-  --role=roles/cloudkms.cryptoKeyEncrypterDecrypter
-
-gcloud iam service-accounts keys create /root/kolayxport-kms.json --iam-account="$SA"
+# Unseal (run twice with two different unseal keys):
+docker exec -e BAO_ADDR=$BAO_ADDR openbao bao operator unseal <UNSEAL_KEY_1>
+docker exec -e BAO_ADDR=$BAO_ADDR openbao bao operator unseal <UNSEAL_KEY_2>
 ```
-Copy `/root/kolayxport-kms.json` to the VPS (e.g. `/home/deploy/kolayxport/kms-sa.json`,
-`chmod 600`, owned by `deploy`).
+After a VPS reboot OpenBao starts **sealed**; re-run the two unseal commands, then
+restart the app so it can unwrap the DEK. (Optional: a root-only boot script can
+automate unseal — documented tradeoff; ask before enabling.)
 
-### 2c. Wrap the CURRENT encryption key as the DEK (migration-safe — no data re-encryption)
-On the VPS, in the app directory, using the value of the existing `CREDENTIAL_ENCRYPTION_KEY`:
+### 2c. Enable Transit, create the rotating key, and an AppRole for the app
+```bash
+export BAO_TOKEN=<Initial-Root-Token>
+run(){ docker exec -e BAO_ADDR=$BAO_ADDR -e BAO_TOKEN=$BAO_TOKEN openbao bao "$@"; }
+
+run secrets enable transit
+run write -f transit/keys/credential-kek        # the KEK that wraps the DEK
+run write transit/keys/credential-kek/config \
+    auto_rotate_period=2160h                     # rotate every 90 days
+
+# Least-privilege policy: the app may only encrypt/decrypt with this key.
+printf 'path "transit/encrypt/credential-kek" { capabilities = ["update"] }\npath "transit/decrypt/credential-kek" { capabilities = ["update"] }\n' \
+  | run policy write kolayxport-app -
+
+run auth enable approle
+run write auth/approle/role/kolayxport-app \
+    token_policies=kolayxport-app token_ttl=20m token_max_ttl=1h secret_id_ttl=0
+run read -field=role_id  auth/approle/role/kolayxport-app/role-id     # -> VAULT_ROLE_ID
+run write -field=secret_id -f auth/approle/role/kolayxport-app/secret-id  # -> VAULT_SECRET_ID
+```
+
+### 2d. Wrap the CURRENT encryption key as the DEK (migration-safe — no data re-encryption)
+On the VPS, in the app dir, using the existing `CREDENTIAL_ENCRYPTION_KEY` from `.env`:
 ```bash
 cd /home/deploy/kolayxport
-GOOGLE_APPLICATION_CREDENTIALS=/home/deploy/kolayxport/kms-sa.json \
-GCP_KMS_KEY_NAME="projects/${PROJECT}/locations/${LOCATION}/keyRings/kolayxport-prod/cryptoKeys/credential-kek" \
+VAULT_ADDR=http://127.0.0.1:8200 \
+VAULT_TOKEN=<Initial-Root-Token> \
+VAULT_TRANSIT_KEY=credential-kek \
 CREDENTIAL_ENCRYPTION_KEY="<existing-hex-key-from-.env>" \
 npx tsx scripts/kms/wrap-dek.ts
 ```
-It prints `GCP_KMS_KEY_NAME=` and `CREDENTIAL_DEK_CIPHERTEXT=`.
+It prints `CREDENTIAL_DEK_CIPHERTEXT=vault:v1:...`.
 
-### 2d. Switch the app to KMS
+### 2e. Point the app at OpenBao
 Edit `/home/deploy/kolayxport/.env`:
 ```
-GOOGLE_APPLICATION_CREDENTIALS=/home/deploy/kolayxport/kms-sa.json
-GCP_KMS_KEY_NAME=projects/<p>/locations/europe-west3/keyRings/kolayxport-prod/cryptoKeys/credential-kek
-CREDENTIAL_DEK_CIPHERTEXT=<printed value>
+VAULT_ADDR=http://127.0.0.1:8200
+VAULT_TRANSIT_KEY=credential-kek
+VAULT_ROLE_ID=<role_id from 2c>
+VAULT_SECRET_ID=<secret_id from 2c>
+CREDENTIAL_DEK_CIPHERTEXT=vault:v1:<printed value>
 ```
-Then **remove** `CREDENTIAL_ENCRYPTION_KEY` so KMS is the single source of truth, and restart:
+Then **remove** `CREDENTIAL_ENCRYPTION_KEY` so OpenBao is the single source of truth,
+and restart:
 ```bash
 systemctl restart kolayxport     # NOTE: no ".service" suffix (sudoers rule)
 journalctl -u kolayxport.service --since "2 minutes ago" --no-pager | grep -i "DEK unwrapped\|encryption"
 ```
-You should see `Credential DEK unwrapped from GCP KMS.` Verify a marketplace still
+You should see `Credential DEK unwrapped from Vault Transit.` Verify a marketplace still
 connects/reads (existing ciphertext decrypts because we wrapped the *same* DEK).
 
-### 2e. Key rotation notes (for the Amazon answer)
-- The KEK rotates automatically every 90 days (`--rotation-period=90d`). KMS keeps old
-  key versions, so the wrapped-DEK ciphertext keeps decrypting after rotation.
-- To rotate the DEK itself (deeper rotation), generate a new DEK, re-encrypt all
-  credential rows, and re-wrap — documented in `CREDENTIAL_ENCRYPTION_RUNBOOK.md`.
-- Prod and non-prod use **different key rings** (§2a), so a non-prod compromise cannot
-  decrypt production data.
+Use a long-lived `VAULT_TOKEN` only for the one-off wrap in 2d; the running app should
+use the AppRole (`VAULT_ROLE_ID`/`VAULT_SECRET_ID`), which mints short-lived tokens.
 
-### 2f. Disk-level encryption (defence in depth)
+### 2f. Key rotation & environment separation (for the Amazon answer)
+- The Transit key auto-rotates every 90 days (`auto_rotate_period=2160h`). Transit keeps
+  earlier key versions, so the wrapped-DEK ciphertext keeps decrypting after rotation.
+- To rotate the DEK itself (deeper rotation): generate a new DEK, re-encrypt all
+  credential rows, re-wrap — see `CREDENTIAL_ENCRYPTION_RUNBOOK.md`.
+- **Prod vs non-prod separation:** production uses this OpenBao instance + the
+  `credential-kek` Transit key. Non-production/dev uses a **separate** Transit key (e.g.
+  `credential-kek-dev`) or a separate OpenBao instance, and never has access to the prod
+  key — so a non-prod compromise cannot decrypt production data. (Local dev may also just
+  use the `CREDENTIAL_ENCRYPTION_KEY` env fallback with a throwaway key.)
+
+### 2g. Disk-level encryption (defence in depth)
 Application-layer AES-256-GCM already protects every Amazon token/credential regardless
 of disk state. If you also want volume encryption, note Hetzner Cloud does not offer
 transparent disk encryption; enabling LUKS requires a rebuild — track as a follow-up,
@@ -205,7 +240,7 @@ header-only, constant-time-compared internal API keys.
 ## Final checklist before replying to Amazon
 - [ ] §1 firewall + fail2ban + ClamAV + unattended-upgrades running on the VPS
 - [ ] §1e SSH password auth disabled; §1f laptop FileVault on
-- [ ] §2 KMS key rings created (prod + non-prod), DEK wrapped, app restarted on KMS
-- [ ] Marketplace connect/read verified after KMS switch
+- [ ] §2 OpenBao running + unsealed, Transit key + AppRole created, DEK wrapped, app restarted on Vault
+- [ ] Marketplace connect/read verified after the Vault switch (existing ciphertext still decrypts)
 - [ ] Website pricing page reachable + clear (see AMAZON_SPAPI_PROFILE_ANSWERS.md §Website)
 - [ ] Paste updated answers into the Solution Provider Profile, then reply to the case

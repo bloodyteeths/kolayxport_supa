@@ -10,7 +10,9 @@ export async function registerNode() {
   try {
     const { initEncryptionKey } = await import('./lib/crypto/credentials');
     await initEncryptionKey();
-    if (process.env.GCP_KMS_KEY_NAME) {
+    if (process.env.VAULT_ADDR) {
+      console.log('[instrumentation] Credential DEK unwrapped from Vault Transit.');
+    } else if (process.env.GCP_KMS_KEY_NAME) {
       console.log('[instrumentation] Credential DEK unwrapped from GCP KMS.');
     }
   } catch (err) {

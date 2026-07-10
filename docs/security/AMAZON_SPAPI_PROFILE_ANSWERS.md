@@ -47,30 +47,31 @@ application layer using **AES-256-GCM** (authenticated encryption with a unique
 random 96-bit IV and 128-bit authentication tag per record) before it is written to
 our PostgreSQL database.
 
-(b) Key management system. We use **Google Cloud KMS** as our key management system.
-Encryption uses envelope encryption: a 32-byte data-encryption key (DEK) performs the
-AES-256-GCM operations, and the DEK is wrapped (encrypted) by a key-encryption key
-(KEK) that is generated in and never leaves Google Cloud KMS. KMS owns the complete
-key lifecycle:
-- **Generation & secure storage:** the KEK is generated inside KMS and stored in
-  Google's FIPS 140-2 validated HSM-backed infrastructure; the plaintext KEK is never
-  exported.
+(b) Key management system. We use a dedicated **key management system based on the
+OpenBao (HashiCorp Vault) Transit secrets engine** running on isolated,
+access-controlled infrastructure. Encryption uses envelope encryption: a 32-byte
+data-encryption key (DEK) performs the AES-256-GCM operations, and the DEK is wrapped
+(encrypted) by a key-encryption key (KEK) that is generated inside and never leaves the
+KMS (Transit). The KMS owns the complete key lifecycle:
+- **Generation & secure storage:** the KEK is generated inside the Transit engine and
+  stored in its encrypted backend; the plaintext KEK is never exported. The KMS listener
+  is bound to localhost only and is not reachable from the public network.
 - **Rotation:** the KEK is on an automatic 90-day rotation schedule. Previous key
-  versions are retained by KMS so existing ciphertext remains decryptable.
-- **Revocation:** access can be revoked immediately by removing the IAM binding or
-  disabling/destroying the key version.
-- **Access control:** a dedicated least-privilege service account holds only the
-  cryptoKeyEncrypterDecrypter role on the relevant key; the wrapped DEK is unwrapped
-  once at application start-up and held only in process memory.
+  versions are retained so existing ciphertext remains decryptable.
+- **Revocation:** access is revoked immediately by revoking the application's auth
+  credential or its access policy, and key versions can be disabled.
+- **Access control:** the application authenticates with a least-privilege AppRole whose
+  policy permits only encrypt/decrypt on the single credential key; it mints only
+  short-lived tokens. The wrapped DEK is unwrapped once at application start-up and held
+  only in process memory.
 
-Key rotation. Yes — the KEK rotates automatically every 90 days via the KMS rotation
-schedule. The DEK can additionally be rotated via a documented re-encryption
-procedure.
+Key rotation. Yes — the KEK rotates automatically every 90 days. The DEK can
+additionally be rotated via a documented re-encryption procedure.
 
-Environment separation. Production and non-production use **separate KMS key rings**
-with independent key material (`kolayxport-prod` vs `kolayxport-nonprod`). Non-
-production systems have no access to production keys, so a non-production compromise
-cannot decrypt production data.
+Environment separation. Production and non-production use **separate Transit keys with
+independent key material** (and separate KMS instances/credentials). Non-production
+systems have no access to the production key, so a non-production compromise cannot
+decrypt production data.
 
 ---
 

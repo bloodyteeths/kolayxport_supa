@@ -1,5 +1,27 @@
 import crypto from 'crypto';
-import { isKmsConfigured, getCachedDek, loadDek } from './kms';
+import { isKmsConfigured, getCachedDek as getGcpDek, loadDek as loadGcpDek } from './kms';
+import { isVaultConfigured, getCachedDek as getVaultDek, loadDek as loadVaultDek } from './vault';
+
+/**
+ * The credential DEK can be wrapped by one of two KMS backends — Vault Transit
+ * (self-hosted, preferred here) or GCP KMS — selected by which env vars are set.
+ * If neither is configured we fall back to the raw CREDENTIAL_ENCRYPTION_KEY (dev).
+ */
+function usesWrappedDek(): boolean {
+  return isVaultConfigured() || isKmsConfigured();
+}
+
+function providerCachedDek(): Buffer | null {
+  if (isVaultConfigured()) return getVaultDek();
+  if (isKmsConfigured()) return getGcpDek();
+  return null;
+}
+
+function providerLoadDek(): Promise<Buffer> {
+  if (isVaultConfigured()) return loadVaultDek();
+  if (isKmsConfigured()) return loadGcpDek();
+  return Promise.reject(new Error('No wrapped-DEK provider configured'));
+}
 
 /**
  * Envelope-format credential encryption.
@@ -47,17 +69,18 @@ function parseKey(raw: string): Buffer {
  * is wrapped by a KMS-managed KEK) or a raw CREDENTIAL_ENCRYPTION_KEY is present.
  */
 export function isEncryptionConfigured(): boolean {
-  return isKmsConfigured() || Boolean(process.env.CREDENTIAL_ENCRYPTION_KEY);
+  return usesWrappedDek() || Boolean(process.env.CREDENTIAL_ENCRYPTION_KEY);
 }
 
 export function getEncryptionKey(): Buffer {
   if (cachedKey) return cachedKey;
 
-  // Preferred path: DEK unwrapped by GCP KMS at boot (see initEncryptionKey /
-  // instrumentation.ts). getEncryptionKey stays synchronous, so the unwrap must
-  // have already happened — surface a clear error if it hasn't.
-  if (isKmsConfigured()) {
-    const dek = getCachedDek();
+  // Preferred path: DEK unwrapped by the KMS backend (Vault Transit or GCP KMS) at
+  // boot (see initEncryptionKey / instrumentation.ts). getEncryptionKey stays
+  // synchronous, so the unwrap must have already happened — surface a clear error
+  // if it hasn't.
+  if (usesWrappedDek()) {
+    const dek = providerCachedDek();
     if (!dek) {
       throw new Error(
         'KMS-managed encryption key is not loaded yet. initEncryptionKey() must run at ' +
@@ -71,8 +94,9 @@ export function getEncryptionKey(): Buffer {
   const raw = process.env.CREDENTIAL_ENCRYPTION_KEY;
   if (!raw) {
     throw new Error(
-      'No encryption key configured. Set GCP_KMS_KEY_NAME + CREDENTIAL_DEK_CIPHERTEXT ' +
-        '(production) or CREDENTIAL_ENCRYPTION_KEY (dev, via: openssl rand -hex 32).',
+      'No encryption key configured. Set Vault (VAULT_ADDR + VAULT_TRANSIT_KEY + ' +
+        'CREDENTIAL_DEK_CIPHERTEXT) or GCP KMS (GCP_KMS_KEY_NAME + CREDENTIAL_DEK_CIPHERTEXT) ' +
+        'for production, or CREDENTIAL_ENCRYPTION_KEY (dev, via: openssl rand -hex 32).',
     );
   }
   const key = parseKey(raw);
@@ -93,8 +117,8 @@ export function getEncryptionKey(): Buffer {
  */
 export async function initEncryptionKey(): Promise<void> {
   if (cachedKey) return;
-  if (isKmsConfigured()) {
-    const dek = await loadDek();
+  if (usesWrappedDek()) {
+    const dek = await providerLoadDek();
     if (dek.length !== KEY_LEN) {
       throw new Error(`Unwrapped DEK must be ${KEY_LEN} bytes; got ${dek.length}.`);
     }

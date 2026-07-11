@@ -63,7 +63,7 @@
     "or": "veya",
     "loginSuccess": "Giriş başarılı!",
     "signupSuccess": "Kayıt başarılı! Hesabınızı onaylamak için e-postanızı kontrol edin.",
-    "passwordPolicy": "En az 10 karakter; büyük ve küçük harf ile rakam içermeli. Adınızı veya e-postanızı içeremez."
+    "passwordPolicy": "En az 12 karakter; büyük ve küçük harf, rakam ve özel karakter içermeli. Adınızı veya e-postanızı içeremez."
   },
   "nav": {
     "overview": "Genel Bakış",

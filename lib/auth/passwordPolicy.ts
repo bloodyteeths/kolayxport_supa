@@ -5,8 +5,8 @@
  * client that skips validation still cannot store a weak secret. Aligned with
  * Amazon SP-API Data Protection Policy §1.4 (Credential Management):
  *
- *   - Minimum length: 10 characters.
- *   - Complexity: must combine lower-case, upper-case, and digits.
+ *   - Minimum length: 12 characters.
+ *   - Complexity: must combine lower-case, upper-case, digits, and a special character.
  *   - Identity restriction: must not contain the account e-mail local-part or
  *     any significant token from the display name ("restrictions on password
  *     composition relative to user identity information").
@@ -19,7 +19,7 @@
  * policy; document it in the security runbook rather than duplicating the rules.
  */
 
-export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MIN_LENGTH = 12;
 export const PASSWORD_MAX_LENGTH = 200; // guard against bcrypt DoS via huge inputs
 
 export type PasswordPolicyCode =
@@ -28,6 +28,7 @@ export type PasswordPolicyCode =
   | 'password_needs_lowercase'
   | 'password_needs_uppercase'
   | 'password_needs_digit'
+  | 'password_needs_special'
   | 'password_contains_identity'
   | 'password_too_common';
 
@@ -98,6 +99,9 @@ export function validatePassword(
   }
   if (!/[0-9]/.test(password)) {
     return { ok: false, code: 'password_needs_digit', message: 'Password must include a number.' };
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return { ok: false, code: 'password_needs_special', message: 'Password must include a special character.' };
   }
 
   const lower = password.toLowerCase();

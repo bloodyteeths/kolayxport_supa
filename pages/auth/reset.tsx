@@ -4,10 +4,11 @@ import Head from 'next/head';
 
 const STATUS_LABELS: Record<string, string> = {
   invalid_or_expired: 'This reset link is invalid or expired. Request a new one.',
-  password_too_short: 'Password must be at least 10 characters.',
+  password_too_short: 'Password must be at least 12 characters.',
   password_needs_lowercase: 'Password must include a lower-case letter.',
   password_needs_uppercase: 'Password must include an upper-case letter.',
   password_needs_digit: 'Password must include a number.',
+  password_needs_special: 'Password must include a special character.',
   password_contains_identity: 'Password must not contain your name or e-mail address.',
   password_too_common: 'This password is too common. Choose a less predictable one.',
   invalid_input: 'Please fill in both fields.',
@@ -72,9 +73,9 @@ export default function ResetPassword() {
                 value={pw}
                 onChange={(e) => setPw(e.target.value)}
                 required
-                minLength={10}
+                minLength={12}
                 autoComplete="new-password"
-                placeholder="New password (min 10 chars)"
+                placeholder="New password (min 12 chars)"
                 className="w-full border rounded-lg px-3 py-2 text-sm"
               />
               <input
@@ -82,7 +83,7 @@ export default function ResetPassword() {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 required
-                minLength={10}
+                minLength={12}
                 autoComplete="new-password"
                 placeholder="Confirm new password"
                 className="w-full border rounded-lg px-3 py-2 text-sm"

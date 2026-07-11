@@ -63,7 +63,7 @@
     "or": "or",
     "loginSuccess": "Login successful!",
     "signupSuccess": "Signup successful! Please check your email to confirm your account.",
-    "passwordPolicy": "At least 10 characters, with upper- and lower-case letters and a number. Cannot contain your name or email."
+    "passwordPolicy": "At least 12 characters, with upper- and lower-case letters, a number, and a special character. Cannot contain your name or email."
   },
   "nav": {
     "overview": "Overview",

@@ -31,7 +31,7 @@ export interface LogEntry {
 const SECRET_KEY_PATTERN =
   /^(authorization|cookie|set-cookie|x-api-key|x-extension-auth|password|passphrase|token|tokens|access[_-]?token|refresh[_-]?token|id[_-]?token|api[_-]?key|api[_-]?secret|secret|client[_-]?secret|private[_-]?key|stripe[_-]?signature|signing[_-]?secret)$/i;
 
-const SECRET_SUBSTRING_PATTERN = /(token|secret|password|api[_-]?key|client[_-]?secret|private[_-]?key)/i;
+const SECRET_SUBSTRING_PATTERN = /(token|secret|password|api[_-]?key|client[_-]?secret|private[_-]?key|oauth[_-]?code|authorization[_-]?code)/i;
 
 // Buyer/customer PII. We deliberately do NOT match generic `name` (listing/shop/
 // file names are not PII) — only personal-contact fields. Redacting these keeps

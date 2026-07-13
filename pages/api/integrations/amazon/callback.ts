@@ -14,7 +14,14 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  logger.info('Amazon OAuth callback received', { query: req.query });
+  // Do NOT log req.query verbatim — it contains spapi_oauth_code (a single-use
+  // OAuth authorization code). Log only non-sensitive presence flags.
+  logger.info('Amazon OAuth callback received', {
+    hasCode: !!req.query.spapi_oauth_code,
+    hasState: !!req.query.state,
+    sellingPartnerId: req.query.selling_partner_id,
+    error: req.query.error,
+  });
 
   const {
     spapi_oauth_code,

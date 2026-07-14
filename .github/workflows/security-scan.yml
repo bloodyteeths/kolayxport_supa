@@ -1,0 +1,44 @@
+# Vulnerability scanning for the Amazon SP-API Data Security Assessment
+# (domains: Network security & vulnerability management, Application security).
+# Runs on every push/PR and weekly. Non-blocking for now (reports findings); flip to
+# blocking once the backlog is triaged. Critical: remediate 7d, High: 30d.
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '30 3 * * 1' # Mondays 03:30 UTC
+
+jobs:
+  dependencies:
+    name: Dependency audit (npm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # Reads the committed package-lock.json; no install needed.
+      - name: npm audit (high+ severity)
+        run: npm audit --audit-level=high || true
+
+  sast:
+    name: Static analysis (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      # Public rulesets — no token required.
+      - name: Semgrep scan
+        run: semgrep scan --config p/security-audit --config p/typescript --config p/secrets --sarif --output semgrep.sarif || true
+      - name: Upload findings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          if-no-files-found: ignore

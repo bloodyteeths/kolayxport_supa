@@ -19,7 +19,14 @@ Reviewed every 6 months. Last reviewed: 2026-07-14.
 - **Disposal:** on account disconnect or deletion request, Amazon credentials and synced Amazon data are deleted; encryption keys can be revoked via the KMS.
 
 ## Retention
-- **Amazon buyer PII (addresses/names):** retained only while needed to fulfil and support the order — target **≤ 90 days after shipment**, then purged by a scheduled job.
+- **Buyer PII (names/addresses/notes):** retained only while needed to fulfil and support
+  the order — **≤ 90 days** — then automatically purged. Enforced in code by
+  `lib/pii/purge.ts`, run weekly via `/api/cron/purge-pii` (`.github/workflows/cron-purge-pii.yml`):
+  it nulls buyer PII on `Order` (customerName, shippingAddress, giftMessage, customerNote,
+  rawData) and deletes the structured `OrderShipping` recipient rows and cached
+  `EtsyAddress` rows past the window, while keeping non-PII order metadata (order number,
+  totals, SKUs, status) for reporting. Retention window is configurable via
+  `PII_RETENTION_DAYS`; the job runs in dry-run until `PII_PURGE_DRY_RUN=false`.
 - **Order/financial metadata (non-PII):** retained for the seller's reporting needs.
 - **Credentials/tokens:** retained while the integration is connected; deleted on disconnect.
 - **Logs:** 12-month retention, secrets and PII redacted.

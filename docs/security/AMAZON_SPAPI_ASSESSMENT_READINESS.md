@@ -56,12 +56,13 @@ Asset inventory: one VPS + one Postgres + OpenBao container. Baseline: hardened 
 24.04, default-deny UFW, SSH key-only, automatic security updates. Anti-malware: ClamAV +
 freshclam + daily scans. Asset destruction: DB row deletion + KMS key revocation.
 
-**4. Data protection** ✅/⚠️ — At rest: AES-256-GCM, DEK wrapped by OpenBao Transit KMS
+**4. Data protection** ✅ — At rest: AES-256-GCM, DEK wrapped by OpenBao Transit KMS
 (generation/rotation-90d/revocation, prod≠non-prod keys). In transit: TLS everywhere.
 Classification: see data-handling doc (Amazon tokens = secret; buyer PII = restricted).
 API key security: env-vars only, gitignored, KMS-wrapped, constant-time compare.
-Retention/back-up: see gap below. 🔴 Dark-web credential monitoring — not in place (note as
-remediation item).
+Back-up: ✅ nightly restic → Cloudflare R2 (EEUR, off-Hetzner), AES-256 client-side
+encrypted, restore-tested, 7d/4w/3m retention (RPO ≤24h). 🔴 Dark-web credential
+monitoring — not in place (note as remediation item).
 
 **5. Network security & vulnerability management** ✅/⚠️ — UFW default-deny, fail2ban,
 DB localhost-only (segregation). Vulnerability management: Dependabot + CodeQL enabled in
@@ -106,8 +107,8 @@ the support process + that support staff (the founder) access data on a need-to-
 | Data handling & classification + subprocessor register | write `DATA_HANDLING_POLICY.md` | this batch | me |
 | Change management policy | write `CHANGE_MANAGEMENT_POLICY.md` | this batch | me |
 | Code vulnerability scanning | enable Dependabot + CodeQL | this batch | me |
-| Data retention + PII auto-purge | policy + scheduled purge job | small | me |
-| Off-site, geo-separated encrypted DB backup + RTO/RPO | set up encrypted `pg_dump` to separate location | medium | me + you (storage) |
+| ~~Data retention + PII auto-purge~~ | ✅ DONE — `lib/pii/purge.ts` + weekly `/api/cron/purge-pii` (nulls buyer PII / deletes recipient rows past 90d; dry-run until `PII_PURGE_DRY_RUN=false`) | done | done |
+| ~~Off-site, geo-separated encrypted DB backup + RTO/RPO~~ | ✅ DONE — restic → Cloudflare R2 (EEUR), AES-256 client-side encrypted, nightly systemd timer 03:00, 7d/4w/3m retention, restore tested | done | done |
 | Dark-web credential monitoring | add a monitoring service or document compensating controls | small | you |
 | Security awareness training | annual self-attestation record | tiny | you |
 | External network/pen test | Amazon's assessment covers the review; commission if they require | — | you |

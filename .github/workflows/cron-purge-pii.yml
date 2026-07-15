@@ -1,0 +1,30 @@
+name: PII Retention Purge
+
+# Enforces the buyer-PII retention policy weekly (docs/security/DATA_HANDLING_POLICY.md).
+# Server-side it is dry-run until PII_PURGE_DRY_RUN=false is set in the app environment.
+# Idempotency is enforced server-side via lib/cron/idempotency.ts (24h bucket).
+
+on:
+  schedule:
+    - cron: '30 4 * * 0' # Sundays 04:30 UTC
+  workflow_dispatch: {}
+
+jobs:
+  purge-pii:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger PII retention purge
+        env:
+          KOLAYXPORT_BASE_URL: ${{ secrets.KOLAYXPORT_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KOLAYXPORT_BASE_URL:-}" ]; then
+            echo "::error::Missing required secret KOLAYXPORT_BASE_URL"; exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Missing required secret CRON_SECRET"; exit 1
+          fi
+          curl --fail --silent --show-error --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${KOLAYXPORT_BASE_URL}/api/cron/purge-pii"

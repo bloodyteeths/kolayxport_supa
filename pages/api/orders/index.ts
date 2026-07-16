@@ -717,7 +717,7 @@ export default async function handler(
 
       // --- Enhanced Date Processing ---
       let marketplaceOrderDate = rawOrder.uiOrderDate;
-      let shipByDate = null;
+      let shipByDate: string | null = null;
       
       // Always try to extract the actual order date from rawData first
       if (rawOrder.rawData) {
@@ -734,6 +734,18 @@ export default async function handler(
           }
           
           shipByDate = rawData.due_date || rawData.ship_by_date || null;
+
+          // Etsy's expected_ship_date is on each transaction, not the receipt
+          // top level. Pull the earliest across transactions so a multi-item
+          // receipt surfaces the tightest deadline (matches Etsy's dashboard).
+          if (!shipByDate && Array.isArray(rawData.transactions)) {
+            const stamps = rawData.transactions
+              .map((tx: any) => Number(tx?.expected_ship_date))
+              .filter((n: number) => Number.isFinite(n) && n > 0);
+            if (stamps.length > 0) {
+              shipByDate = new Date(Math.min(...stamps) * 1000).toISOString();
+            }
+          }
         } catch (e) {
           console.error('Error parsing rawData for dates:', e);
         }
@@ -750,14 +762,19 @@ export default async function handler(
         (marketplace.includes('etsy') ? 'shippo' :
          marketplace.includes('trendyol') ? 'trendyol' : 'veeqo');
 
-      // --- isFBA derivation (Amazon only) -----------------------------------
-      // FBA / Multi-Channel Fulfillment orders cannot be shipped by the seller
-      // and have no buyer-message API surface. Filter them off the labels page
-      // and short-circuit messaging-related UI. Handle BOTH rawData shapes:
-      //   • direct sync:  rawData.rows[0]['fulfillment-channel'] = 'AFN' | 'Amazon' | 'Merchant'
+      // --- isFBA + isMCF derivation (Amazon only) ---------------------------
+      // FBA  = Amazon ships from FBA inventory. No label needed from seller.
+      // MCF  = FBA AND the sale was placed on a non-Amazon channel (the
+      //        seller's own website, Shopify, etc.) — no Amazon buyer to
+      //        message, no review request possible.
+      //
+      // Handle BOTH rawData shapes:
+      //   • direct sync:  rawData.rows[0]['fulfillment-channel'] = AFN/AMAZON
+      //                   rawData.rows[0]['sales-channel']       = "Amazon.com" | "Non-Amazon US"
       //   • Veeqo legacy: rawData.channel.with_fba | type_code = 'amazon_fba'
-      //                   or rawData.channel.name including 'FBA'
+      //                   or rawData.channel.name includes 'FBA'
       let isFBA = false;
+      let isMCF = false;
       if (marketplace === 'amazon' && rawOrder.rawData) {
         const rd = typeof rawOrder.rawData === 'string'
           ? (() => { try { return JSON.parse(rawOrder.rawData); } catch { return {}; } })()
@@ -768,11 +785,16 @@ export default async function handler(
         if (/fba/i.test(channelName)) isFBA = true;
         if (rd?.channel?.with_fba === true) isFBA = true;
         if (rd?.channel?.type_code === 'amazon_fba') isFBA = true;
+
+        // Sales-channel "Non-Amazon …" → MCF. Direct sync only.
+        const salesChannel = String(rd?.rows?.[0]?.['sales-channel'] || rd?.salesChannel || '');
+        if (isFBA && /^non[- ]?amazon/i.test(salesChannel)) isMCF = true;
       }
 
       return {
         ...rawOrder,
         isFBA,
+        isMCF,
         customerName: fullName || `${firstName} ${lastName}`.trim(),
         recipientFirstName: firstName,
         recipientLastName: lastName,

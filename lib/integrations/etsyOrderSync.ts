@@ -247,9 +247,20 @@ function mapReceiptToUIOrder(receipt: any, shopId: string, shopName: string, ima
     marketplaceOrderDate: receipt.created_timestamp
       ? new Date(receipt.created_timestamp * 1000).toISOString()
       : undefined,
-    shipByDate: receipt.expected_ship_date
-      ? new Date(receipt.expected_ship_date * 1000).toISOString()
-      : undefined,
+    // Etsy's `expected_ship_date` lives on each transaction (not the receipt
+    // top level — a common miss). Use the EARLIEST expected_ship_date across
+    // the receipt's line items so a multi-item order surfaces the tightest
+    // deadline. This matches what Etsy's seller dashboard uses to bucket
+    // orders into "Ship today" / "Ship tomorrow".
+    shipByDate: (() => {
+      const txs = Array.isArray(receipt.transactions) ? receipt.transactions : [];
+      const stamps = txs
+        .map((tx: any) => Number(tx?.expected_ship_date))
+        .filter((n: number) => Number.isFinite(n) && n > 0);
+      if (stamps.length === 0) return undefined;
+      const earliest = Math.min(...stamps);
+      return new Date(earliest * 1000).toISOString();
+    })(),
     giftMessage: rawGiftMessage || undefined,
     customerNote: customerNote || undefined,
     rawData: receipt,

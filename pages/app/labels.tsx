@@ -758,22 +758,13 @@ async function extractAddress(order: LocalUIOrder, preFetchedEnrichment?: any): 
           _etsyEnriched: true,
           _etsyStoreName: etsyEnrichment.etsyStoreName,
           _etsyNotes: etsyEnrichment.notes,
-          _etsyShipByDate: parseShipByDate(etsyEnrichment.shipByDate) || etsyEnrichment.shipByDate || (() => {
-            // Fallback: if no ship by date, use order date + 3 days
-            if (etsyEnrichment.orderDate) {
-              try {
-                const orderDate = new Date(etsyEnrichment.orderDate);
-                if (!isNaN(orderDate.getTime())) {
-                  const shipBy = new Date(orderDate);
-                  shipBy.setDate(shipBy.getDate() + 3);
-                  return shipBy.toISOString();
-                }
-              } catch (e) {
-                // Ignore parsing errors
-              }
-            }
-            return null;
-          })(),
+          // Extension-scraped ship-by only. The old "orderDate + 3 days"
+          // fallback silently invented a deadline for every Etsy order
+          // whether the extension caught one or not, which pushed
+          // "Ship today" orders one day too late. If neither the extension
+          // nor the API sync surfaced a ship-by, prefer null and let the
+          // caller show a blank cell.
+          _etsyShipByDate: parseShipByDate(etsyEnrichment.shipByDate) || etsyEnrichment.shipByDate || null,
           _etsyOrderDate: etsyEnrichment.orderDate,
           // Extract customer note from Etsy notes
           _etsyCustomerNote: parseEtsyPersonalization(etsyEnrichment.notes)

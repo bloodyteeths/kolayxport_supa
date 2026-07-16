@@ -83,9 +83,9 @@ secrets + buyer PII auto-redacted, categorized (security/auth/integration/billin
 retention. Health checks every 15 min. Incident plan: `INCIDENT_RESPONSE_PLAN.md`
 (roles, 24h notify to security@amazon.com, 6-month review).
 
-**9. Privacy** ⚠️ — Privacy regulation: KVKK (Turkey) + GDPR-aligned; `/privacy`. Data
+**9. Privacy** ✅ — Privacy regulation: KVKK (Turkey) + GDPR-aligned; `/privacy`. Data
 movement: documented above. Data-subject rights: account deletion + data export on request.
-🔴 Security awareness training — as a small team, document annual self-training/attestation.
+Security awareness training: `SECURITY_AWARENESS.md` (annual attestation).
 
 **10. Data handling & management** ✅ — lifecycle above; details in data-handling doc.
 
@@ -105,12 +105,12 @@ the support process + that support staff (the founder) access data on a need-to-
 |-----|--------|--------|-------|
 | Incident Response Plan doc | write `INCIDENT_RESPONSE_PLAN.md` | done in this batch | me |
 | Data handling & classification + subprocessor register | write `DATA_HANDLING_POLICY.md` | this batch | me |
-| Change management policy | write `CHANGE_MANAGEMENT_POLICY.md` | this batch | me |
+| ~~Change management policy~~ | ✅ DONE — `CHANGE_MANAGEMENT_POLICY.md` (+ `ACCESS_CONTROL_POLICY.md`) | done | done |
 | Code vulnerability scanning | enable Dependabot + CodeQL | this batch | me |
 | ~~Data retention + PII auto-purge~~ | ✅ DONE — `lib/pii/purge.ts` + weekly `/api/cron/purge-pii` (nulls buyer PII / deletes recipient rows past 90d; dry-run until `PII_PURGE_DRY_RUN=false`) | done | done |
 | ~~Off-site, geo-separated encrypted DB backup + RTO/RPO~~ | ✅ DONE — restic → Cloudflare R2 (EEUR), AES-256 client-side encrypted, nightly systemd timer 03:00, 7d/4w/3m retention, restore tested | done | done |
 | Dark-web credential monitoring | add a monitoring service or document compensating controls | small | you |
-| Security awareness training | annual self-attestation record | tiny | you |
+| ~~Security awareness training~~ | ✅ DONE — `SECURITY_AWARENESS.md` (annual attestation record) | done | done |
 | External network/pen test | Amazon's assessment covers the review; commission if they require | — | you |
 
 Most items are free and I can implement/write them. The only external-cost item is an

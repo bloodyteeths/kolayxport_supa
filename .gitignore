@@ -129,6 +129,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
 
 # Build outputs
 .next/
@@ -174,7 +175,7 @@ public/worker-*.js
 public/worker-*.js.map
 public/fallback-*.js
 public/swe-worker-*.js
-yarn.lock
+package-lock.json
 yarn.lock.backup
 kolay-xport/
 .next-old-root/

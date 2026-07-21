@@ -22,7 +22,7 @@
     "security:smoke": "tsc --noEmit && vitest run --pool=forks test/lib/logger.redactor test/lib/crypto/credentials test/lib/auth.internal-key test/lib/cron.idempotency test/lib/admin test/lib/auth/tokens test/lib/auth/credentials test/api/stripe.webhook test/api/wix.webhook test/api/shopify.webhook test/api/auth.extension test/api/ext.telemetry test/api/admin test/api/auth/password-reset-flow"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.112.4",
+    "@anthropic-ai/sdk": "^0.80.0",
     "@date-io/date-fns": "^2.16.0",
     "@date-io/dayjs": "^3.2.0",
     "@dnd-kit/core": "^6.3.1",
@@ -34,7 +34,6 @@
     "@google/genai": "^1.46.0",
     "@google/generative-ai": "^0.24.1",
     "@headlessui/react": "^2.2.2",
-    "@modelcontextprotocol/sdk": "^1.24.0",
     "@mui/icons-material": "^5.17.1",
     "@mui/x-data-grid": "^8.3.1",
     "@mui/x-date-pickers": "^6.20.2",
@@ -59,22 +58,18 @@
     "google-auth-library": "^9.15.1",
     "google-trends-api": "^4.9.2",
     "googleapis": "^148.0.0",
-    "js-yaml": "^3.15.0",
     "lucide-react": "^0.507.0",
     "micro": "^10.0.1",
-    "next": "^16.1.7",
+    "next": "^16.1.6",
     "next-auth": "^4.24.11",
-    "next-intl": "^4.9.1",
+    "next-intl": "^4.8.4",
     "next-seo": "^6.6.0",
     "next-sitemap": "^4.2.3",
     "node-fetch": "^2.7.0",
-    "nodemailer": "^9.0.3",
+    "nodemailer": "^6.10.1",
     "pdfkit": "^0.17.1",
     "pg": "^8.16.0",
-    "playwright": "^1.55.1",
     "prop-types": "^15.8.1",
-    "protobufjs": "^7.5.5",
-    "qs": "^6.15.3",
     "react": "^18.2.0",
     "react-apexcharts": "^1.7.0",
     "react-dom": "^18.2.0",
@@ -84,22 +79,9 @@
     "stripe": "^18.3.0",
     "supabase-mcp": "^1.5.0",
     "swr": "^2.3.3",
-    "tar": "^7.5.3",
-    "uuid": "^11.1.1",
-    "vite": "^6.4.2",
-    "ws": "^8.20.1",
+    "uuid": "^11.1.0",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.4"
-  },
-  "overrides": {
-    "serialize-javascript": "^7.0.4",
-    "uuid": "^11.1.1",
-    "next": {
-      "postcss": "^8.5.10"
-    },
-    "@cypress/request": {
-      "qs": "^6.14.1"
-    }
   },
   "devDependencies": {
     "@babel/core": "^7.28.0",
@@ -128,7 +110,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jsdom": "^26.1.0",
-    "postcss": "^8.5.10",
+    "postcss": "^8.5.3",
     "prisma": "^6.11.1",
     "supertest": "^6.3.3",
     "tailwindcss": "^4.1.5",
@@ -136,7 +118,7 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.6"
+    "vitest": "^1.6.1"
   },
   "foo": "bar"
 }

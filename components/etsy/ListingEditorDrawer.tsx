@@ -2824,7 +2824,13 @@ export default function ListingEditorDrawer({
           </Box>
         ) : null}
 
-        {/* Footer — GetVela-style bottom bar */}
+        {/* Footer — GetVela-style bottom bar.
+            flexWrap: 'wrap' so on narrow drawer widths (mobile, split-screen,
+            or when many buttons render) the row wraps to a second line
+            instead of pushing "Sync to Etsy" / "Kaydet" off-screen.
+            A user reported the Sync button appearing to be missing — it was
+            actually rendered but overflowed horizontally beyond the drawer's
+            right edge on their screen. */}
         {fields && listing && !loading && !fetchError && (
           <Box
             sx={{
@@ -2839,6 +2845,8 @@ export default function ListingEditorDrawer({
               paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
               display: 'flex',
               alignItems: 'center',
+              flexWrap: 'wrap',
+              rowGap: 1,
               gap: 1,
             }}
           >

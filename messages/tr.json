@@ -2305,7 +2305,17 @@
       "cartesianIncomplete": "Etsy tüm kombinasyonları ister. {actual}/{expected} mevcut — eksikler kaydederken otomatik tamamlanır.",
       "fillMissing": "{count} eksiği tamamla",
       "cartesianFilled": "{count} eksik kombinasyon eklendi",
-      "cartesianAutoFilled": "Etsy için {count} eksik kombinasyon otomatik tamamlandı"
+      "cartesianAutoFilled": "Etsy için {count} eksik kombinasyon otomatik tamamlandı",
+      "priceGroupBy": "Fiyatı şuna göre düzenle",
+      "quantityGroupBy": "Stoğu şuna göre düzenle",
+      "skuGroupBy": "SKU'yu şuna göre düzenle",
+      "groupModeUniform": "Hepsi aynı",
+      "groupModeIndividual": "Tek tek",
+      "applyToAllCount": "{count} varyasyona uygula",
+      "combosCount": "{count} kombinasyon",
+      "mixedPricesHint": "fiyatlar farklı — düzenleme üzerine yazacak",
+      "mixedQuantitiesHint": "stok farklı — düzenleme üzerine yazacak",
+      "mixedSkusHint": "SKU'lar farklı — düzenleme üzerine yazacak"
     },
     "smartPricing": {
       "title": "Akıllı Fiyatlandırma",

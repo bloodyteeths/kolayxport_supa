@@ -2305,7 +2305,17 @@
       "cartesianIncomplete": "Etsy requires every combination. Got {actual} of {expected} — missing rows will be auto-filled on save.",
       "fillMissing": "Fill {count} missing",
       "cartesianFilled": "Added {count} missing combinations",
-      "cartesianAutoFilled": "Auto-filled {count} missing combinations to satisfy Etsy"
+      "cartesianAutoFilled": "Auto-filled {count} missing combinations to satisfy Etsy",
+      "priceGroupBy": "Edit price by",
+      "quantityGroupBy": "Edit stock by",
+      "skuGroupBy": "Edit SKU by",
+      "groupModeUniform": "Same for all",
+      "groupModeIndividual": "One by one",
+      "applyToAllCount": "Apply to all {count}",
+      "combosCount": "{count} combinations",
+      "mixedPricesHint": "prices differ — edit will overwrite",
+      "mixedQuantitiesHint": "stock differs — edit will overwrite",
+      "mixedSkusHint": "SKUs differ — edit will overwrite"
     },
     "smartPricing": {
       "title": "Smart Pricing",

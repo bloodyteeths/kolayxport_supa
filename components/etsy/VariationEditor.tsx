@@ -378,6 +378,59 @@ class VariationErrorBoundary extends React.Component<
   }
 }
 
+// --- Group-by mode selector ------------------------------------------------
+// Chip strip that picks how the Price / Quantity / SKU tabs render:
+//   Uniform      → one bulk input applied to every combo.
+//   <axis name>  → one editable row per unique value on that axis; edits
+//                  propagate to every combo sharing that value.
+//   Individual   → one editable row per combo (full grid).
+type GroupModeSelectorProps = {
+  mode: 'uniform' | 'individual' | number;
+  onChange: (m: 'uniform' | 'individual' | number) => void;
+  axes: Array<{ id: number; name: string }>;
+  label: string;
+  t: (key: string, values?: Record<string, any>) => string;
+};
+
+function GroupModeSelector({ mode, onChange, axes, label, t }: GroupModeSelectorProps) {
+  return (
+    <Paper variant="outlined" sx={{ p: 1.25, mb: 1.5, borderRadius: '8px', bgcolor: 'rgba(102,126,234,0.03)' }}>
+      <Typography variant="caption" fontWeight={700} sx={{ display: 'block', mb: 0.75, textTransform: 'uppercase', color: 'text.secondary' }}>
+        {label}
+      </Typography>
+      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+        <Chip
+          label={t('groupModeUniform')}
+          size="small"
+          color={mode === 'uniform' ? 'primary' : 'default'}
+          variant={mode === 'uniform' ? 'filled' : 'outlined'}
+          onClick={() => onChange('uniform')}
+          sx={{ fontWeight: mode === 'uniform' ? 700 : 400 }}
+        />
+        {axes.map(prop => (
+          <Chip
+            key={prop.id}
+            label={prop.name}
+            size="small"
+            color={mode === prop.id ? 'primary' : 'default'}
+            variant={mode === prop.id ? 'filled' : 'outlined'}
+            onClick={() => onChange(prop.id)}
+            sx={{ fontWeight: mode === prop.id ? 700 : 400 }}
+          />
+        ))}
+        <Chip
+          label={t('groupModeIndividual')}
+          size="small"
+          color={mode === 'individual' ? 'primary' : 'default'}
+          variant={mode === 'individual' ? 'filled' : 'outlined'}
+          onClick={() => onChange('individual')}
+          sx={{ fontWeight: mode === 'individual' ? 700 : 400 }}
+        />
+      </Box>
+    </Paper>
+  );
+}
+
 // --- Sanitize API data to prevent object-as-React-child crashes ---
 
 function sanitizeProducts(raw: any[]): Product[] {
@@ -443,6 +496,23 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   // SKU tab controls
   const [individualSku, setIndividualSku] = useState(false);
   const [uniformSku, setUniformSku] = useState('');
+
+  // Group-by mode for Price / Quantity / SKU tabs. Values:
+  //   'uniform'    → single bulk input applied to every combo (old behavior)
+  //   'individual' → one editable row per combo (old behavior)
+  //   number       → property_id of the variation axis that groups the rows;
+  //                  one editable row per unique value on that axis, and an
+  //                  edit propagates to every combo sharing that value.
+  //
+  // Sellers reason by concept ("all 6T dresses = $79") — the per-axis mode
+  // maps that intent directly. Auto-picked based on where prices actually
+  // vary (see initGroupMode below) so a listing where price only varies by
+  // Size defaults to "grouped by Size", not to the flat 15-row grid.
+  type GroupMode = 'uniform' | 'individual' | number;
+  const [priceGroupBy, setPriceGroupBy] = useState<GroupMode>('uniform');
+  const [quantityGroupBy, setQuantityGroupBy] = useState<GroupMode>('uniform');
+  const [skuGroupBy, setSkuGroupBy] = useState<GroupMode>('uniform');
+  const groupModeInitializedRef = useRef(false);
 
   // Add dialog
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -525,6 +595,32 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
   useEffect(() => {
     if (!priceOnPropertyTouched) setPriceOnPropertyIds(derivedPriceOnPropertyIds);
   }, [derivedPriceOnPropertyIds, priceOnPropertyTouched]);
+
+  // Auto-pick the initial group-by mode once products first arrive. Runs only
+  // once so switching modes manually sticks. The heuristic:
+  //   - No variations at all → uniform (only one combo to price anyway).
+  //   - One axis (e.g. Size only) → group by that axis. Even if prices are
+  //     currently uniform, that's still the most useful editing surface.
+  //   - Multiple axes → group by whichever axis actually drives price today
+  //     (derived from the current price distribution). If prices are uniform
+  //     across the board, default to uniform.
+  useEffect(() => {
+    if (groupModeInitializedRef.current) return;
+    if (products.length === 0 || allPropertyIds.length === 0) return;
+    groupModeInitializedRef.current = true;
+
+    const priceDrivers = derivedPriceOnPropertyIds;
+    const qtyDrivers = derivePropertyDrivers(products, p => p.offerings?.[0]?.quantity);
+    const skuDrivers = derivePropertyDrivers(products, p => p.sku);
+    const pickDefault = (drivers: number[]): GroupMode => {
+      if (drivers.length === 1) return drivers[0];
+      if (allPropertyIds.length === 1) return allPropertyIds[0];
+      return 'uniform';
+    };
+    setPriceGroupBy(pickDefault(priceDrivers));
+    setQuantityGroupBy(pickDefault(qtyDrivers));
+    setSkuGroupBy(pickDefault(skuDrivers));
+  }, [products.length, allPropertyIds.length, derivedPriceOnPropertyIds]);
 
   // Detect which property is primary (first property used)
   const primaryPropertyId = useMemo(() => {
@@ -797,6 +893,84 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       return { ...p, offerings: [o, ...p.offerings.slice(1)] };
     }));
     toast.success(t('stockUpdated'));
+  };
+
+  // --- Per-axis group helpers ------------------------------------------------
+  // For a variation axis (property_id), return the unique values in the order
+  // they first appear. E.g. Size axis → ['3T', '6T', '9T'].
+  const uniqueAxisValues = useCallback((propertyId: number): string[] => {
+    const seen = new Set<string>();
+    const values: string[] = [];
+    for (const p of products) {
+      const pv = p.property_values.find(v => v.property_id === propertyId);
+      const v = pv?.values?.[0];
+      if (v != null && !seen.has(v)) { seen.add(v); values.push(v); }
+    }
+    return values;
+  }, [products]);
+
+  // Indices of products matching a specific value on an axis.
+  const productsMatchingAxisValue = useCallback((propertyId: number, value: string): number[] => {
+    const indices: number[] = [];
+    products.forEach((p, i) => {
+      const pv = p.property_values.find(v => v.property_id === propertyId);
+      if (pv?.values?.[0] === value) indices.push(i);
+    });
+    return indices;
+  }, [products]);
+
+  // For a group of product indices, summarise a field. Returns whether the
+  // members currently agree ("allSame") so the UI can flag mixed-value groups
+  // before a bulk edit overwrites intentional differences.
+  const summarizeGroup = (indices: number[], read: (p: Product) => number | string) => {
+    if (indices.length === 0) return { representative: '' as any, allSame: true, count: 0 };
+    const values = indices.map(i => read(products[i]));
+    const first = values[0];
+    return {
+      representative: first,
+      allSame: values.every(v => v === first),
+      count: indices.length,
+    };
+  };
+
+  // Propagate a new price to every product whose axis value matches. Also
+  // marks priceOnPropertyIds so the payload we send to Etsy reflects that
+  // this axis actually drives price — otherwise Etsy's validator complains.
+  const applyGroupPrice = (propertyId: number, value: string, rawPrice: string) => {
+    const n = parseFloat(rawPrice);
+    if (isNaN(n) || n < 0) return;
+    setProducts(prev => prev.map(p => {
+      const pv = p.property_values.find(v => v.property_id === propertyId);
+      if (pv?.values?.[0] !== value) return p;
+      if (!p.offerings.length) return p;
+      const o = { ...p.offerings[0] };
+      o.price = { ...o.price, amount: Math.round(n * o.price.divisor) };
+      return { ...p, offerings: [o, ...p.offerings.slice(1)] };
+    }));
+    if (!priceOnPropertyIds.includes(propertyId)) {
+      setPriceOnPropertyTouched(true);
+      setPriceOnPropertyIds([propertyId]);
+    }
+  };
+
+  const applyGroupQuantity = (propertyId: number, value: string, rawQty: string) => {
+    const n = parseInt(rawQty, 10);
+    if (isNaN(n) || n < 0) return;
+    setProducts(prev => prev.map(p => {
+      const pv = p.property_values.find(v => v.property_id === propertyId);
+      if (pv?.values?.[0] !== value) return p;
+      if (!p.offerings.length) return p;
+      const o = { ...p.offerings[0], quantity: n };
+      return { ...p, offerings: [o, ...p.offerings.slice(1)] };
+    }));
+  };
+
+  const applyGroupSku = (propertyId: number, value: string, sku: string) => {
+    setProducts(prev => prev.map(p => {
+      const pv = p.property_values.find(v => v.property_id === propertyId);
+      if (pv?.values?.[0] !== value) return p;
+      return { ...p, sku };
+    }));
   };
 
   const applyUniformSku = () => {
@@ -1531,80 +1705,91 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       {/* ============================================================ */}
       {activeTab === 1 && products.length > 0 && (
         <Box sx={{ pt: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap', flexDirection: { xs: 'column', sm: 'row' } }}>
-            <FormControlLabel
-              control={<Checkbox checked={individualPrice} onChange={(e) => setIndividualPrice(e.target.checked)} sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' }, '& .MuiSvgIcon-root': { fontSize: 24 } }} />}
-              label={<Typography variant="body2" fontWeight={600}>{t('individualPrice')}</Typography>}
-            />
-            {!individualPrice && (
-              <>
-                <Select size="small" value={priceAction} onChange={(e) => setPriceAction(e.target.value as any)}
-                  sx={{ minWidth: { xs: '100%', sm: 130 }, height: 36 }}>
-                  <MenuItem value="set">{t('set')}</MenuItem>
-                  <MenuItem value="increase">{t('increase')}</MenuItem>
-                  <MenuItem value="decrease">{t('decrease')}</MenuItem>
-                </Select>
-                <TextField
-                  size="small" type="number" value={priceValue}
-                  onChange={(e) => setPriceValue(e.target.value)}
-                  InputProps={{ startAdornment: <InputAdornment position="start">{sym}</InputAdornment> }}
-                  inputProps={{ min: 0, step: '0.01' }}
-                  sx={{ width: { xs: '100%', sm: 120 } }}
-                  placeholder="0.00"
-                />
-                <Button size="small" variant="contained" onClick={applyBulkPrice} disabled={!priceValue}
-                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36, width: { xs: '100%', sm: 'auto' } }}>
-                  {t('apply')}
-                </Button>
-              </>
-            )}
-          </Box>
+          <GroupModeSelector
+            mode={priceGroupBy}
+            onChange={setPriceGroupBy}
+            axes={existingProperties}
+            label={t('priceGroupBy')}
+            t={t}
+          />
 
-          {allPropertyIds.length > 1 && (
-            <Paper variant="outlined" sx={{ borderRadius: '8px', p: 1.25, mb: 1.5, bgcolor: 'rgba(102,126,234,0.03)' }}>
-              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 0.5, textTransform: 'uppercase' }}>
-                {t('priceAffectedBy')}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-                {existingProperties.map(prop => (
-                  <FormControlLabel
-                    key={prop.id}
-                    control={
-                      <Checkbox
-                        size="small"
-                        checked={priceOnPropertyIds.includes(prop.id)}
-                        onChange={() => togglePriceProperty(prop.id)}
-                        sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' }, p: 0.5 }}
-                      />
-                    }
-                    label={<Typography variant="body2">{prop.name}</Typography>}
-                    sx={{ mr: 1 }}
-                  />
-                ))}
+          {priceGroupBy === 'uniform' && (
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>
+              <Select size="small" value={priceAction} onChange={(e) => setPriceAction(e.target.value as any)}
+                sx={{ minWidth: { xs: '100%', sm: 130 }, height: 36 }}>
+                <MenuItem value="set">{t('set')}</MenuItem>
+                <MenuItem value="increase">{t('increase')}</MenuItem>
+                <MenuItem value="decrease">{t('decrease')}</MenuItem>
+              </Select>
+              <TextField
+                size="small" type="number" value={priceValue}
+                onChange={(e) => setPriceValue(e.target.value)}
+                InputProps={{ startAdornment: <InputAdornment position="start">{sym}</InputAdornment> }}
+                inputProps={{ min: 0, step: '0.01' }}
+                sx={{ width: { xs: '100%', sm: 120 } }}
+                placeholder="0.00"
+              />
+              <Button size="small" variant="contained" onClick={applyBulkPrice} disabled={!priceValue}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36 }}>
+                {t('applyToAllCount', { count: products.length })}
+              </Button>
+            </Box>
+          )}
+
+          {typeof priceGroupBy === 'number' && (
+            <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+              <Box sx={sectionHeaderSx}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {getPropertyName(priceGroupBy)}
+                </Typography>
               </Box>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                {t('priceAffectedByHint')}
-              </Typography>
+              {uniqueAxisValues(priceGroupBy).map((value) => {
+                const indices = productsMatchingAxisValue(priceGroupBy, value);
+                const s = summarizeGroup(indices, (p) => p.offerings[0]?.price?.amount ?? 0);
+                const divisor = products[indices[0]]?.offerings[0]?.price?.divisor || defaultDivisor;
+                const displayPrice = s.count > 0 ? ((s.representative as number) / divisor).toFixed(2) : '';
+                return (
+                  <Box key={value} sx={rowSx}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={600}>{value}</Typography>
+                      <Typography variant="caption" color={s.allSame ? 'text.secondary' : 'warning.main'} sx={{ display: 'block' }}>
+                        {t('combosCount', { count: s.count })}
+                        {!s.allSame && ` · ${t('mixedPricesHint')}`}
+                      </Typography>
+                    </Box>
+                    <TextField
+                      key={`${value}-${displayPrice}`}
+                      size="small" type="number"
+                      defaultValue={displayPrice}
+                      onBlur={(e) => applyGroupPrice(priceGroupBy, value, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                      InputProps={{ startAdornment: <InputAdornment position="start">{sym}</InputAdornment> }}
+                      inputProps={{ min: 0, step: '0.01' }}
+                      sx={{ width: { xs: 130, sm: 140 } }}
+                    />
+                  </Box>
+                );
+              })}
             </Paper>
           )}
 
-          <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
-            {grouped.map(group => (
-              <Box key={group.propName}>
-                {group.propName && (
-                  <Box sx={sectionHeaderSx}>
-                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      {group.propName}
-                    </Typography>
-                  </Box>
-                )}
-                {group.items.map(({ product, globalIdx }) => {
-                  const o = product.offerings[0];
-                  if (!o) return null;
-                  return (
-                    <Box key={globalIdx} sx={rowSx}>
-                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{getLabel(product)}</Typography>
-                      {individualPrice ? (
+          {priceGroupBy === 'individual' && (
+            <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+              {grouped.map(group => (
+                <Box key={group.propName}>
+                  {group.propName && (
+                    <Box sx={sectionHeaderSx}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {group.propName}
+                      </Typography>
+                    </Box>
+                  )}
+                  {group.items.map(({ product, globalIdx }) => {
+                    const o = product.offerings[0];
+                    if (!o) return null;
+                    return (
+                      <Box key={globalIdx} sx={rowSx}>
+                        <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{getLabel(product)}</Typography>
                         <TextField
                           size="small" type="number"
                           value={getPrice(o)}
@@ -1613,17 +1798,13 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                           inputProps={{ min: 0, step: '0.01' }}
                           sx={{ width: { xs: '100%', sm: 120 } }}
                         />
-                      ) : (
-                        <Typography variant="body2" fontWeight={600} sx={{ minWidth: 70, textAlign: 'right' }}>
-                          {sym}{getPrice(o)}
-                        </Typography>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Box>
-            ))}
-          </Paper>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              ))}
+            </Paper>
+          )}
         </Box>
       )}
 
@@ -1632,51 +1813,88 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       {/* ============================================================ */}
       {activeTab === 2 && products.length > 0 && (
         <Box sx={{ pt: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap', flexDirection: { xs: 'column', sm: 'row' } }}>
-            <FormControlLabel
-              control={<Checkbox checked={individualQuantity} onChange={(e) => setIndividualQuantity(e.target.checked)} sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' }, '& .MuiSvgIcon-root': { fontSize: 24 } }} />}
-              label={<Typography variant="body2" fontWeight={600}>{t('individualStock')}</Typography>}
-            />
-            {!individualQuantity && (
-              <>
-                <Select size="small" value={quantityAction} onChange={(e) => setQuantityAction(e.target.value as any)}
-                  sx={{ minWidth: { xs: '100%', sm: 130 }, height: 36 }}>
-                  <MenuItem value="set">{t('set')}</MenuItem>
-                  <MenuItem value="increase">{t('increase')}</MenuItem>
-                  <MenuItem value="decrease">{t('decrease')}</MenuItem>
-                </Select>
-                <TextField
-                  size="small" type="number" value={quantityValue}
-                  onChange={(e) => setQuantityValue(e.target.value)}
-                  inputProps={{ min: 0 }}
-                  sx={{ width: { xs: '100%', sm: 100 } }}
-                  placeholder="0"
-                />
-                <Button size="small" variant="contained" onClick={applyBulkQuantity} disabled={!quantityValue}
-                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36, width: { xs: '100%', sm: 'auto' } }}>
-                  {t('apply')}
-                </Button>
-              </>
-            )}
-          </Box>
+          <GroupModeSelector
+            mode={quantityGroupBy}
+            onChange={setQuantityGroupBy}
+            axes={existingProperties}
+            label={t('quantityGroupBy')}
+            t={t}
+          />
 
-          <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
-            {grouped.map(group => (
-              <Box key={group.propName}>
-                {group.propName && (
-                  <Box sx={sectionHeaderSx}>
-                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      {group.propName}
-                    </Typography>
+          {quantityGroupBy === 'uniform' && (
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>
+              <Select size="small" value={quantityAction} onChange={(e) => setQuantityAction(e.target.value as any)}
+                sx={{ minWidth: { xs: '100%', sm: 130 }, height: 36 }}>
+                <MenuItem value="set">{t('set')}</MenuItem>
+                <MenuItem value="increase">{t('increase')}</MenuItem>
+                <MenuItem value="decrease">{t('decrease')}</MenuItem>
+              </Select>
+              <TextField
+                size="small" type="number" value={quantityValue}
+                onChange={(e) => setQuantityValue(e.target.value)}
+                inputProps={{ min: 0 }}
+                sx={{ width: { xs: '100%', sm: 100 } }}
+                placeholder="0"
+              />
+              <Button size="small" variant="contained" onClick={applyBulkQuantity} disabled={!quantityValue}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36 }}>
+                {t('applyToAllCount', { count: products.length })}
+              </Button>
+            </Box>
+          )}
+
+          {typeof quantityGroupBy === 'number' && (
+            <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+              <Box sx={sectionHeaderSx}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {getPropertyName(quantityGroupBy)}
+                </Typography>
+              </Box>
+              {uniqueAxisValues(quantityGroupBy).map((value) => {
+                const indices = productsMatchingAxisValue(quantityGroupBy, value);
+                const s = summarizeGroup(indices, (p) => p.offerings[0]?.quantity ?? 0);
+                const displayQty = s.count > 0 ? String(s.representative) : '';
+                return (
+                  <Box key={value} sx={rowSx}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={600}>{value}</Typography>
+                      <Typography variant="caption" color={s.allSame ? 'text.secondary' : 'warning.main'} sx={{ display: 'block' }}>
+                        {t('combosCount', { count: s.count })}
+                        {!s.allSame && ` · ${t('mixedQuantitiesHint')}`}
+                      </Typography>
+                    </Box>
+                    <TextField
+                      key={`${value}-${displayQty}`}
+                      size="small" type="number"
+                      defaultValue={displayQty}
+                      onBlur={(e) => applyGroupQuantity(quantityGroupBy, value, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                      inputProps={{ min: 0 }}
+                      sx={{ width: { xs: 130, sm: 100 } }}
+                    />
                   </Box>
-                )}
-                {group.items.map(({ product, globalIdx }) => {
-                  const o = product.offerings[0];
-                  if (!o) return null;
-                  return (
-                    <Box key={globalIdx} sx={rowSx}>
-                      <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{getLabel(product)}</Typography>
-                      {individualQuantity ? (
+                );
+              })}
+            </Paper>
+          )}
+
+          {quantityGroupBy === 'individual' && (
+            <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+              {grouped.map(group => (
+                <Box key={group.propName}>
+                  {group.propName && (
+                    <Box sx={sectionHeaderSx}>
+                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        {group.propName}
+                      </Typography>
+                    </Box>
+                  )}
+                  {group.items.map(({ product, globalIdx }) => {
+                    const o = product.offerings[0];
+                    if (!o) return null;
+                    return (
+                      <Box key={globalIdx} sx={rowSx}>
+                        <Typography variant="body2" fontWeight={500} sx={{ flex: 1 }}>{getLabel(product)}</Typography>
                         <TextField
                           size="small" type="number"
                           value={o.quantity}
@@ -1684,21 +1902,13 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
                           inputProps={{ min: 0 }}
                           sx={{ width: { xs: '100%', sm: 90 } }}
                         />
-                      ) : (
-                        <Chip
-                          label={o.quantity === 0 ? t('outOfStock') : o.quantity}
-                          size="small"
-                          color={o.quantity === 0 ? 'error' : 'default'}
-                          variant="outlined"
-                          sx={{ minWidth: 60 }}
-                        />
-                      )}
-                    </Box>
-                  );
-                })}
-              </Box>
-            ))}
-          </Paper>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              ))}
+            </Paper>
+          )}
         </Box>
       )}
 
@@ -1707,29 +1917,66 @@ function VariationEditorInner({ listingId, shopId, taxonomyId, onSaved }: Variat
       {/* ============================================================ */}
       {activeTab === 3 && products.length > 0 && (
         <Box sx={{ pt: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-            <FormControlLabel
-              control={<Checkbox checked={individualSku} onChange={(e) => setIndividualSku(e.target.checked)} sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' }, '& .MuiSvgIcon-root': { fontSize: 24 } }} />}
-              label={<Typography variant="body2" fontWeight={600}>{t('individualSku')}</Typography>}
-            />
-            {!individualSku && (
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flex: 1 }}>
-                <TextField
-                  size="small"
-                  value={uniformSku}
-                  onChange={(e) => setUniformSku(e.target.value)}
-                  placeholder={t('enterSku')}
-                  sx={{ width: { xs: '100%', sm: 180 } }}
-                />
-                <Button size="small" variant="contained" onClick={applyUniformSku} disabled={!uniformSku}
-                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36 }}>
-                  {t('apply')}
-                </Button>
-              </Box>
-            )}
-          </Box>
+          <GroupModeSelector
+            mode={skuGroupBy}
+            onChange={setSkuGroupBy}
+            axes={existingProperties}
+            label={t('skuGroupBy')}
+            t={t}
+          />
 
-          {individualSku && (
+          {skuGroupBy === 'uniform' && (
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1.5, flexWrap: 'wrap' }}>
+              <TextField
+                size="small"
+                value={uniformSku}
+                onChange={(e) => setUniformSku(e.target.value)}
+                placeholder={t('enterSku')}
+                sx={{ width: { xs: '100%', sm: 180 } }}
+              />
+              <Button size="small" variant="contained" onClick={applyUniformSku} disabled={!uniformSku}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px', bgcolor: '#667eea', height: 36 }}>
+                {t('applyToAllCount', { count: products.length })}
+              </Button>
+            </Box>
+          )}
+
+          {typeof skuGroupBy === 'number' && (
+            <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
+              <Box sx={sectionHeaderSx}>
+                <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {getPropertyName(skuGroupBy)}
+                </Typography>
+              </Box>
+              {uniqueAxisValues(skuGroupBy).map((value) => {
+                const indices = productsMatchingAxisValue(skuGroupBy, value);
+                const s = summarizeGroup(indices, (p) => p.sku || '');
+                const displaySku = s.count > 0 ? String(s.representative) : '';
+                return (
+                  <Box key={value} sx={rowSx}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={600}>{value}</Typography>
+                      <Typography variant="caption" color={s.allSame ? 'text.secondary' : 'warning.main'} sx={{ display: 'block' }}>
+                        {t('combosCount', { count: s.count })}
+                        {!s.allSame && ` · ${t('mixedSkusHint')}`}
+                      </Typography>
+                    </Box>
+                    <TextField
+                      key={`${value}-${displaySku}`}
+                      size="small"
+                      defaultValue={displaySku}
+                      onBlur={(e) => applyGroupSku(skuGroupBy, value, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                      placeholder={t('enterSku')}
+                      sx={{ width: { xs: 140, sm: 160 } }}
+                    />
+                  </Box>
+                );
+              })}
+            </Paper>
+          )}
+
+          {skuGroupBy === 'individual' && (
             <Paper variant="outlined" sx={{ borderRadius: '8px', overflow: 'hidden' }}>
               {grouped.map(group => (
                 <Box key={group.propName}>

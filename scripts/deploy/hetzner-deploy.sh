@@ -140,8 +140,16 @@ sudo -n systemctl restart kolayxport
 sleep 5
 
 # --- 7. Health check; on failure, attempt rollback only if backup exists ---
+#
+# Using `/tmp/health-check-output` as a fixed path meant whichever user ran
+# the first deploy owned the file, and subsequent deploys as a different
+# user hit "Permission denied" on the redirect. Curl's non-zero exit tripped
+# the rollback logic and buried a perfectly healthy new build. mktemp gives
+# each run a fresh writable file that gets cleaned up on script exit.
 echo "==> curl ${HEALTH_URL}"
-if ! curl -fsS --max-time 15 "${HEALTH_URL}" > /tmp/health-check-output; then
+HEALTH_OUT="$(mktemp)"
+trap 'rm -f "$HEALTH_OUT"' EXIT
+if ! curl -fsS --max-time 15 "${HEALTH_URL}" > "$HEALTH_OUT"; then
   echo "::error::Health check failed"
   if [ "$MODE" = "full" ] && [ -d .next-backup ]; then
     echo "::error::Rolling back to .next-backup and restarting again"
@@ -154,7 +162,7 @@ if ! curl -fsS --max-time 15 "${HEALTH_URL}" > /tmp/health-check-output; then
   fi
   exit 6
 fi
-echo "==> health: $(cat /tmp/health-check-output)"
+echo "==> health: $(cat "$HEALTH_OUT")"
 
 # --- 8. Cleanup full-mode backup AFTER health check passes ---
 if [ "$MODE" = "full" ]; then

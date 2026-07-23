@@ -1,6 +1,13 @@
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development',
+  // Also allow disabling in production via DISABLE_PWA=1 — the next-pwa
+  // precache generation hangs indefinitely on this codebase during builds
+  // on the Hetzner VPS (100% CPU, zero file writes for 20+ min at the
+  // "Custom runtimeCaching" step). Every deploy of the last few hours died
+  // at this exact spot. Kill switch until we replace next-pwa or upgrade
+  // it past the bug. Live PWA behavior falls back to no-service-worker
+  // for the user, which is acceptable — the site works without it.
+  disable: process.env.NODE_ENV === 'development' || process.env.DISABLE_PWA === '1',
   register: true,
   skipWaiting: true,
   fallbacks: {

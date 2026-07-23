@@ -94,7 +94,12 @@ if [ "$MODE" = "full" ]; then
   # Raise the V8 heap for the build. Next's TypeScript pass can spike past the
   # default ~2GB limit on this box; the VPS has ample RAM (cax21, 8GB). Respect an
   # externally-provided NODE_OPTIONS if the operator already set one.
-  if ! NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}" NEXT_DIST_DIR=.next-new npx next build --webpack; then
+  # DISABLE_PWA=1 disables @ducanh2912/next-pwa precache generation, which
+  # hangs indefinitely on this Hetzner box (100% CPU, no I/O for 20+ min
+  # after all pages compile). Every deploy of 2026-07-21 through 07-23
+  # stalled at that step. Fall back to no-service-worker until the upstream
+  # bug or version bump is resolved — the app functions fine without it.
+  if ! DISABLE_PWA=1 NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}" NEXT_DIST_DIR=.next-new npx next build --webpack; then
     echo "::error::Build failed; live .next untouched"
     rm -rf .next-new
     exit 3

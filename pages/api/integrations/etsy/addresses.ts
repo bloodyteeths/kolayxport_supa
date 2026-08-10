@@ -215,14 +215,14 @@ async function handler(
                 isResidential: true,
                 email: cur.email || '',
               };
+              // Only fill the address. Personalization/notes come from the Etsy API
+              // (message_from_buyer / transaction personalization in etsyOrderSync) — the
+              // scraped `notes` is the whole order-card text and would overwrite the real
+              // (often empty) personalization with junk, so we deliberately do NOT touch
+              // customerNote here.
               await prisma.order.update({
                 where: { id: order.id },
-                data: {
-                  shippingAddress: JSON.stringify(merged),
-                  // Surface personalization/notes on the order too, if the scrape has them
-                  // and the order doesn't already carry a note.
-                  ...(notes && !(order.customerNote || '').trim() ? { customerNote: notes } : {}),
-                },
+                data: { shippingAddress: JSON.stringify(merged) },
               });
               results.ordersFilled++;
             }

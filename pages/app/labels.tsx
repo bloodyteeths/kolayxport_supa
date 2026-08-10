@@ -251,6 +251,7 @@ export interface LabelRow {
   labelJobStatus?: string; // From item
   trackingNumber?: string; // From item
   shipByDate?: string; // Effective ship by date
+  shippingUpgrade?: string | null; // Buyer-selected shipping upgrade (e.g. "Express")
   customerNote?: string; // Customer personalization/notes (especially from Etsy)
   giftMessage?: string; // Buyer-supplied gift message (Etsy gift_message)
 

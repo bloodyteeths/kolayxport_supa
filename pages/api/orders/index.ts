@@ -718,6 +718,7 @@ export default async function handler(
       // --- Enhanced Date Processing ---
       let marketplaceOrderDate = rawOrder.uiOrderDate;
       let shipByDate: string | null = null;
+      let shippingUpgrade: string | null = null;
       
       // Always try to extract the actual order date from rawData first
       if (rawOrder.rawData) {
@@ -744,6 +745,15 @@ export default async function handler(
               .filter((n: number) => Number.isFinite(n) && n > 0);
             if (stamps.length > 0) {
               shipByDate = new Date(Math.min(...stamps) * 1000).toISOString();
+            }
+          }
+
+          // Buyer-selected shipping upgrade (e.g. "Express") lives on each Etsy
+          // transaction — surface it so the labels UI can flag rush/express orders.
+          if (Array.isArray(rawData.transactions)) {
+            for (const tx of rawData.transactions) {
+              const up = typeof tx?.shipping_upgrade === 'string' ? tx.shipping_upgrade.trim() : '';
+              if (up) { shippingUpgrade = up; break; }
             }
           }
         } catch (e) {
@@ -817,6 +827,7 @@ export default async function handler(
         trackingNumber: rawOrder.trackingNumber || null,
         labelStatus: rawOrder.labelStatus || null,
         shipByDate,
+        shippingUpgrade,
         shipments: shipmentsByOrderId.get(rawOrder.id) || [],
         senkronData: {
           internalNote: rawOrder.senkronInternalNote || null,

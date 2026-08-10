@@ -115,6 +115,7 @@ interface LocalUIOrder {
   recipientFirstName?: string; // Already in LocalUIOrder
   recipientLastName?: string;  // Already in LocalUIOrder
   shipByDate?: string;
+  shippingUpgrade?: string | null;
   fedexServiceType?: string;
   fedexPackagingType?: string;
   imageUrl?: string;
@@ -1196,6 +1197,7 @@ export async function toLabelRows(orders: LocalUIOrder[]): Promise<LabelRow[]> {
         labelJobStatus: latestLabelJob?.status || (order.trackingNumber || safeRaw?.cargoTrackingNumber ? 'created' : undefined),
         trackingNumber: latestLabelJob?.trackingNumber || order.trackingNumber || (safeRaw?.cargoTrackingNumber ? String(safeRaw.cargoTrackingNumber) : undefined),
         shipByDate: item.shipBy || order.shipByDate || (addr as any)?._etsyShipByDate,
+        shippingUpgrade: order.shippingUpgrade || null,
         // Prefer DB-persisted Etsy message_from_buyer (synced from the receipt
         // mapper) over the Chrome extension's _etsyCustomerNote scrape.
         customerNote: order.customerNote || (addr as any)?._etsyCustomerNote || '',
@@ -2992,6 +2994,22 @@ function LabelsPage(props: { source?: string; channel?: string }) {
                           {group.customerName || '—'}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
+                          {(() => {
+                            const up = String(row.shippingUpgrade || '').trim();
+                            if (!up) return null;
+                            // Show the buyer's shipping upgrade name exactly as Etsy provides
+                            // it. Add a ⚡ + red highlight only for express/expedited-type
+                            // upgrades; other named upgrades render as-is in neutral colour.
+                            const isRush = /express|rush|expedit|priority|overnight|next.?day|fast|acele|hızlı/i.test(up);
+                            return (
+                              <Chip
+                                label={isRush ? `⚡ ${up}` : up}
+                                size="small"
+                                title={t('shippingUpgradeTooltip', { upgrade: up })}
+                                sx={{ height: 18, fontSize: '0.6rem', fontWeight: 700, bgcolor: isRush ? '#fee2e2' : '#ede9fe', color: isRush ? '#b91c1c' : '#5b21b6' }}
+                              />
+                            );
+                          })()}
                           <Chip label={statusLabel} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: statusConfig.bg, color: statusConfig.text }} />
                           {group.items.length > 1 && (
                             <Chip label={t('itemCount', { count: group.items.length })} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: '#e3f2fd', color: '#1565c0' }} />

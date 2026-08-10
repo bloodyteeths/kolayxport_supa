@@ -722,7 +722,8 @@
     "productNameCopied": "Ürün adı kopyalandı",
     "integrationOptions": {
       "all": "Tümü"
-    }
+    },
+    "shippingUpgradeTooltip": "Alıcı {upgrade} kargo yükseltmesi için ödeme yaptı"
   },
   "ups": {
     "drawerTitle": "UPS Etiketi Oluştur",

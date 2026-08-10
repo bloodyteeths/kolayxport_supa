@@ -762,7 +762,8 @@
     "productNameCopied": "Product name copied",
     "integrationOptions": {
       "all": "All"
-    }
+    },
+    "shippingUpgradeTooltip": "Buyer paid for the {upgrade} shipping upgrade"
   },
   "ups": {
     "drawerTitle": "Create UPS Label",

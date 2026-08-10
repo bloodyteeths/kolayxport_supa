@@ -289,8 +289,8 @@ function extractOrderRowsFromLinks(orderLinks) {
 
 function extractOrderIdFromHref(href) {
   if (!href) return null;
-  return href.match(/order_id=([^&]+)/)?.[1] ||
-         href.match(/receipt_id=([^&]+)/)?.[1] ||
+  return href.match(/order_id=(\d+)/)?.[1] ||
+         href.match(/receipt_id=(\d+)/)?.[1] ||
          href.match(/\/shop-manager\/[^/]+\/orders\/(\d+)/)?.[1] ||
          href.match(/\/orders\/sold\/(\d+)/)?.[1] ||
          href.match(/\/orders\/(\d+)/)?.[1] ||
@@ -426,7 +426,22 @@ async function extract() {
       const checkbox = row.querySelector('input[type="checkbox"][name]');
       orderId = checkbox?.getAttribute('name');
       if (!orderId) orderId = row.getAttribute('data-order-id') || row.getAttribute('data-receipt-id');
-      if (!orderId) orderId = extractOrderIdFromHref(row.querySelector(getOrderLinkSelector())?.href);
+      if (!orderId) {
+        // Scan EVERY link in the row — Etsy renders a buyer link
+        // (/your/orders/sold?buyer_id=…) BEFORE the order link
+        // (/your/orders/sold?order_id=…), so querySelector's first match has no
+        // order id. Try each candidate and keep the first that yields an id.
+        const links = row.querySelectorAll('a[href]');
+        for (const a of links) {
+          const id = extractOrderIdFromHref(a.getAttribute('href'));
+          if (id) { orderId = id; break; }
+        }
+      }
+      if (!orderId) {
+        // Last resort: Etsy prints the order number as "#<digits>" text in each row.
+        const hashMatch = (row.innerText || '').match(/#(\d{6,})/);
+        if (hashMatch) orderId = hashMatch[1];
+      }
 
       if (!orderId) {
         log.warn(`Row ${index}: No order ID found via any method`);
@@ -459,8 +474,8 @@ async function extract() {
       }
       log.info(`Order ${orderId}: Found buyer name: "${buyerName}"`);
       
-      // Extract order number from link with fallbacks
-      let orderNumber = extractOrderIdFromHref(row.querySelector(getOrderLinkSelector())?.href) || orderId;
+      // Order number is the same receipt id we just resolved above.
+      let orderNumber = orderId;
       log.info(`Order ${orderId}: Found order number: ${orderNumber}`);
       
       // Extract order total

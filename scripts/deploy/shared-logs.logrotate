@@ -1,0 +1,22 @@
+# Rotation for runaway app logs on the shared Hetzner VPS (46.224.169.225 / tenderuk-dl).
+# Runs hourly via /etc/cron.d/shared-logrotate with its own state file (NOT the daily
+# /etc/logrotate.d run) so fast-growing logs are capped between daily cycles.
+#
+# copytruncate: apps (moneymachine, tenderuk) hold the log file open and do not reopen
+# on SIGHUP, so we copy-then-truncate in place instead of renaming (which would orphan
+# the open fd and keep the space allocated).
+
+/home/deploy/moneymachine/logs/*.log
+/home/deploy/moneymachine/logs/*.jsonl
+/home/ubuntu/tenderuk/logs/*.log
+{
+    su root root
+    size 200M
+    rotate 3
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    nomail
+}

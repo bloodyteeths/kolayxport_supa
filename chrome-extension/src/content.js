@@ -618,16 +618,14 @@ async function extract() {
         }
       }
       
-      // Extract customization notes from item details
+      // Personalization / buyer notes are intentionally NOT scraped here. The old
+      // approach grabbed every `.text-body-smaller` in the row — which is the whole
+      // order card (SKU, coupon, item title, size, colour, shipping, address) — and
+      // mislabeled it as personalization, producing junk on orders where the buyer
+      // left none. Personalization comes reliably from the Etsy API
+      // (message_from_buyer / transaction personalization) in etsyOrderSync, so the
+      // extension only needs to supply the buyer address the API no longer returns.
       let notes = '';
-      const customizationElements = row.querySelectorAll('.text-body-smaller, .personalization, .note, [data-test-id*="custom"]');
-      customizationElements.forEach(el => {
-        const text = el.textContent?.trim();
-        if (text && !text.includes('Ordered') && !text.includes('$') && text.length > 10) {
-          if (notes) notes += ' | ';
-          notes += text;
-        }
-      });
       
       // Get store information for multi-store support
       const storeInfo = getEtsyStoreInfo();

@@ -4,6 +4,37 @@ import { logger } from '@/lib/logger';
 import { getAuthUser } from '@/lib/auth';
 import { withUsageLimiter } from '@/lib/middleware/withUsageLimiter';
 
+// Etsy's API no longer returns buyer shipping addresses, so the Chrome extension
+// scrapes them off Shop Manager. Map the scraped shape → the Order.shippingAddress
+// shape and normalise country display names to ISO-2 for carrier/label APIs.
+const COUNTRY_TO_ISO: Record<string, string> = {
+  'united states': 'US', usa: 'US', 'u.s.': 'US', 'u.s.a.': 'US',
+  'united kingdom': 'GB', uk: 'GB', 'great britain': 'GB', england: 'GB', scotland: 'GB', wales: 'GB',
+  canada: 'CA', australia: 'AU', 'new zealand': 'NZ', germany: 'DE', deutschland: 'DE',
+  france: 'FR', italy: 'IT', italia: 'IT', spain: 'ES', 'españa': 'ES', espana: 'ES',
+  netherlands: 'NL', holland: 'NL', belgium: 'BE', switzerland: 'CH', austria: 'AT',
+  sweden: 'SE', norway: 'NO', denmark: 'DK', finland: 'FI', iceland: 'IS', ireland: 'IE',
+  portugal: 'PT', poland: 'PL', czechia: 'CZ', 'czech republic': 'CZ', croatia: 'HR', greece: 'GR',
+  hungary: 'HU', romania: 'RO', slovakia: 'SK', slovenia: 'SI', japan: 'JP', china: 'CN',
+  'south korea': 'KR', korea: 'KR', singapore: 'SG', 'hong kong': 'HK', mexico: 'MX',
+  brazil: 'BR', brasil: 'BR', israel: 'IL', turkey: 'TR', 'türkiye': 'TR', turkiye: 'TR',
+  india: 'IN', 'south africa': 'ZA', 'puerto rico': 'PR',
+};
+
+function toIso(country: string): string {
+  if (!country) return '';
+  if (country.length === 2) return country.toUpperCase();
+  let key = country.trim().toLowerCase();
+  if (key.startsWith('the ')) key = key.slice(4);
+  return COUNTRY_TO_ISO[key] || country;
+}
+
+function parseAddr(val: unknown): any {
+  if (!val) return {};
+  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return {}; } }
+  return val as any;
+}
+
 async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -99,6 +130,7 @@ async function handler(
       success: true,
       processed: 0,
       updated: 0,
+      ordersFilled: 0,
       notFound: 0,
       errors: [] as any[]
     };
@@ -147,15 +179,56 @@ async function handler(
           }
         });
 
-        logger.info(`Stored Etsy address for order ${orderNumber}`, { 
+        logger.info(`Stored Etsy address for order ${orderNumber}`, {
           userId,
           orderNumber,
           etsyStoreId,
           etsyStoreName,
           hasAddress: !!shippingAddress,
-          hasNotes: !!notes 
+          hasNotes: !!notes
         });
-        
+
+        // Fill the live Order.shippingAddress right now so the address shows in the
+        // dashboard immediately — Etsy's API never returns it, so the scrape is the
+        // only source. Only when the order's street is empty (never clobber a
+        // manually-corrected/real address).
+        const scrapedStreet = (shippingAddress?.line1 || shippingAddress?.street1 || '').trim();
+        if (scrapedStreet) {
+          const order = await prisma.order.findFirst({
+            where: { userId, orderNumber },
+            select: { id: true, shippingAddress: true, customerNote: true },
+          });
+          if (!order) {
+            results.notFound++;
+          } else {
+            const cur = parseAddr(order.shippingAddress);
+            if (!(cur.street1 || '').trim()) {
+              const merged = {
+                name: shippingAddress.name || cur.name || '',
+                phone: cur.phone || '',
+                street1: scrapedStreet,
+                street2: (shippingAddress.line2 || '').trim(),
+                city: (shippingAddress.city || '').trim(),
+                state: (shippingAddress.state || '').trim(),
+                postal: (shippingAddress.postalCode || shippingAddress.postal || '').trim(),
+                country: toIso((shippingAddress.country || '').trim()),
+                isResidential: true,
+                email: cur.email || '',
+              };
+              await prisma.order.update({
+                where: { id: order.id },
+                data: {
+                  shippingAddress: JSON.stringify(merged),
+                  // Surface personalization/notes on the order too, if the scrape has them
+                  // and the order doesn't already carry a note.
+                  ...(notes && !(order.customerNote || '').trim() ? { customerNote: notes } : {}),
+                },
+              });
+              results.ordersFilled++;
+            }
+          }
+        }
+
         results.updated++;
         results.processed++;
 

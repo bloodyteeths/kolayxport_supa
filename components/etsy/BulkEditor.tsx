@@ -1425,33 +1425,6 @@ export default function BulkEditor({
     onCompleted();
   }, [photoFiles, photoMode, filteredListings, checkedIds, shopId, onCompleted, t, deleteListingImages]);
 
-  // Bulk delete all photos from checked listings
-  const handleBulkPhotoDelete = useCallback(async () => {
-    const checked = filteredListings.filter(l => checkedIds.has(l.listing_id));
-    if (checked.length === 0) return;
-    if (!confirm(t('confirm.deleteAllPhotos', { count: checked.length }))) return;
-
-    setPhotoUploading(true);
-    setPhotoProgress(0);
-    let success = 0, failed = 0;
-
-    for (let i = 0; i < checked.length; i++) {
-      const listing = checked[i];
-      try {
-        const ok = await deleteListingImages(listing.listing_id);
-        if (ok) success++; else failed++;
-      } catch { failed++; }
-      setPhotoProgress(Math.round(((i + 1) / checked.length) * 100));
-      if (i < checked.length - 1) await new Promise(r => setTimeout(r, 100));
-    }
-
-    setPhotoUploading(false);
-    if (failed === 0) toast.success(t('toast.photoDeleteSuccess', { count: success }));
-    else toast.error(t('toast.photoDeletePartial', { success, failed }));
-    await refreshListingImages(checked.map(l => l.listing_id), true);
-    onCompleted();
-  }, [filteredListings, checkedIds, shopId, onCompleted, deleteListingImages, refreshListingImages]);
-
   const handleBulkImageDrop = useCallback(async (listing: SelectedListing, targetImageId: number) => {
     if (!draggingBulkImage || draggingBulkImage.listingId !== listing.listing_id || draggingBulkImage.imageId === targetImageId) {
       setDraggingBulkImage(null);
@@ -2157,18 +2130,6 @@ export default function BulkEditor({
                     {t('photos.chooseFilesFirst')}
                   </Button>
                 )}
-                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                <Button
-                  variant="outlined"
-                  size="small"
-                  color="error"
-                  startIcon={<DeleteIcon />}
-                  onClick={handleBulkPhotoDelete}
-                  disabled={photoUploading || aiProcessing}
-                  sx={{ minHeight: 40, textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}
-                >
-                  {t('photos.deleteAll')}
-                </Button>
               </Box>
               {/* AI alt text */}
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>

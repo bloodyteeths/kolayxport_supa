@@ -678,6 +678,11 @@ export default function BulkEditor({
   const [savingBulkAlt, setSavingBulkAlt] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const bulkPendingObjectUrlsRef = useRef<string[]>([]);
+  // Latest images map + in-flight tracking so image loading has a stable identity
+  // (avoids re-running the loader effect on every incremental state commit).
+  const listingImagesByIdRef = useRef<Record<number, ListingImage[]>>(listingImagesById);
+  const inFlightImagesRef = useRef<Set<number>>(new Set());
+  useEffect(() => { listingImagesByIdRef.current = listingImagesById; }, [listingImagesById]);
 
   useEffect(() => () => {
     bulkPendingObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -742,25 +747,25 @@ export default function BulkEditor({
   }, [listings, searchTerm]);
 
   const refreshListingImages = useCallback(async (listingIds: number[], force = false) => {
-    const ids = Array.from(new Set(listingIds));
-    const missing = force ? ids : ids.filter(id => listingImagesById[id] === undefined);
+    const current = listingImagesByIdRef.current;
+    const missing = Array.from(new Set(listingIds))
+      .filter(id => (force ? true : current[id] === undefined))
+      // Skip listings whose images are already being fetched by another run.
+      .filter(id => !inFlightImagesRef.current.has(id));
     if (missing.length === 0) return;
 
+    missing.forEach(id => inFlightImagesRef.current.add(id));
     setListingImagesLoading(true);
-    const next: Record<number, ListingImage[]> = {};
 
-    for (const listingId of missing) {
+    const fetchOne = async (listingId: number): Promise<ListingImage[]> => {
       try {
         const res = await fetch(
           `/api/clawd/etsy?action=get_listing_images&listing_id=${listingId}&shop_id=${shopId}`
         );
-        if (!res.ok) {
-          next[listingId] = [];
-          continue;
-        }
+        if (!res.ok) return [];
         const data = await res.json();
         const images = data.images || data.results || [];
-        next[listingId] = images
+        return images
           .map((img: any) => ({
             listing_image_id: Number(img.listing_image_id) || 0,
             url_75x75: img.url_75x75,
@@ -773,13 +778,33 @@ export default function BulkEditor({
           .filter((img: ListingImage) => img.listing_image_id)
           .sort((a: ListingImage, b: ListingImage) => a.rank - b.rank);
       } catch {
-        next[listingId] = [];
+        return [];
       }
-    }
+    };
 
-    setListingImagesById(prev => ({ ...prev, ...next }));
-    setListingImagesLoading(false);
-  }, [listingImagesById, shopId]);
+    // Load in parallel with a small concurrency cap, committing each listing's
+    // images to state as soon as they arrive so thumbnails appear immediately
+    // instead of only after every listing has been fetched.
+    const CONCURRENCY = 6;
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < missing.length) {
+        const listingId = missing[cursor++];
+        const imgs = await fetchOne(listingId);
+        setListingImagesById(prev => {
+          // Preserve any pending (staged, not-yet-synced) uploads for this listing.
+          const pending = (prev[listingId] || []).filter(img => img.is_pending_upload);
+          return { ...prev, [listingId]: [...imgs, ...pending] };
+        });
+        inFlightImagesRef.current.delete(listingId);
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, missing.length) }, worker)
+    );
+
+    if (inFlightImagesRef.current.size === 0) setListingImagesLoading(false);
+  }, [shopId]);
 
   useEffect(() => {
     if (!open || activeField !== 'photos') return;
@@ -794,6 +819,17 @@ export default function BulkEditor({
     loadImages();
     return () => { cancelled = true; };
   }, [open, activeField, filteredListings, refreshListingImages]);
+
+  // Fields with no per-row inline editing can ONLY be edited from the bulk action
+  // bar, so auto-expand it when the user switches to one (e.g. Photos/Videos) —
+  // otherwise the upload/add controls stay hidden behind the collapsed toggle.
+  useEffect(() => {
+    const noInlineFields: FieldCategory[] = [
+      'photos', 'videos', 'about', 'category', 'personalization', 'processing_time',
+      'shipping_profile', 'item_weight', 'item_size', 'return_policy', 'state', 'variations',
+    ];
+    if (noInlineFields.includes(activeField)) setShowBulkActions(true);
+  }, [activeField]);
 
   const pendingCount = pendingChanges.size;
 

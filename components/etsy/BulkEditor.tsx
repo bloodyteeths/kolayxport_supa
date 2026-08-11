@@ -57,6 +57,7 @@ import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import VariationEditor from './VariationEditor';
 import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
+import BulkPhotoStudio from './BulkPhotoStudio';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -3272,6 +3273,29 @@ export default function BulkEditor({
 
         {/* Main content */}
         <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 1, sm: 2 } }}>
+          {activeField === 'photos' ? (
+            <BulkPhotoStudio
+              shopId={shopId}
+              listings={filteredListings}
+              checkedIds={checkedIds}
+              onToggleChecked={(id) => setCheckedIds(prev => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id); else next.add(id);
+                return next;
+              })}
+              onToggleAll={handleToggleAll}
+              allChecked={allChecked}
+              someChecked={someChecked}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              listingImagesById={listingImagesById}
+              setListingImagesById={setListingImagesById}
+              listingImagesLoading={listingImagesLoading}
+              refreshListingImages={refreshListingImages}
+              onCompleted={onCompleted}
+            />
+          ) : (
+          <>
           {/* Bulk action bar toggle + collapsible */}
           <Box sx={{ mb: 1 }}>
             <Button
@@ -3346,6 +3370,8 @@ export default function BulkEditor({
             </Paper>
           ) : (
             filteredListings.map(listing => renderListingRow(listing))
+          )}
+          </>
           )}
         </Box>
       </Box>

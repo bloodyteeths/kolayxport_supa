@@ -11,8 +11,9 @@ export const config = {
   },
 };
 
-// Gemini image generation model — Nano Banana 2 (best quality-to-speed, up to 4K)
-const MODEL = 'gemini-3.1-flash-image-preview';
+// Gemini image generation model — Nano Banana 2 (best quality-to-speed, up to 4K).
+// Use the GA model id; the "-preview" alias is being retired. Override via env.
+const MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image';
 
 // Crop bottom pixels to remove AI watermark/branding
 const WATERMARK_CROP_PX = 20;

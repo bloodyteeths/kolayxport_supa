@@ -1965,7 +1965,16 @@
         "enterPrompt": "Önce bir istem yazın.",
         "allFull": "Seçili tüm ürünlerde zaten 10 fotoğraf var.",
         "batchCapped": "Limitler dahilinde kalmak için ilk {cap} ürün için üretiliyor.",
-        "noneAccepted": "Eklenecek onaylı görsel yok."
+        "noneAccepted": "Eklenecek onaylı görsel yok.",
+        "dragHint": "İpucu: sıralamak için fotoğrafı başka bir konuma sürükleyin, büyütmek için tıklayın veya üzerine gelip × ile silin.",
+        "clickPreviewDragReorder": "Büyütmek için tıkla · sıralamak için sürükle",
+        "pendingReorderBlocked": "Bekleyen (senkronlanmamış) fotoğraflar, Etsy'ye yayınlandıktan sonra sıralanabilir.",
+        "reorderStaged": "Sıralama taslağa kaydedildi. Hazır olduğunda Etsy'ye senkronla.",
+        "reorderFailed": "Değişiklik kaydedilemedi.",
+        "deleteStaged": "Fotoğraf silme taslağa kaydedildi. Hazır olduğunda Etsy'ye senkronla.",
+        "cantDeleteLast": "Son fotoğraf silinemez — Etsy en az bir fotoğraf ister.",
+        "confirmDeleteOne": "Bu üründe {position}. konumdaki fotoğraf silinsin mi?",
+        "position": "Konum"
       },
       "title": "Baslik",
       "description": "Aciklama",

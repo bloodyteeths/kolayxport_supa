@@ -13,6 +13,7 @@ import {
   AutoAwesome as AIIcon,
   Search as SearchIcon,
   Clear as ClearIcon,
+  Close as CloseIcon,
   Image as ImageIcon,
   UploadFile as UploadIcon,
   Refresh as RefreshIcon,
@@ -151,6 +152,8 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
   const [previews, setPreviews] = useState<AiPreview[] | null>(null);
+  const [dragging, setDragging] = useState<{ listingId: number; slot: number } | null>(null);
+  const [lightbox, setLightbox] = useState<{ title: string; img: StudioImage } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const objectUrlsRef = useRef<string[]>([]);
@@ -217,6 +220,64 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
       return { ...prev, [listingId]: next.map((img, i) => ({ ...img, rank: i + 1 })) };
     });
   }, [setListingImagesById]);
+
+  // -------------------------------------------------------------------------
+  // Direct per-listing interactions: drag reorder + single-photo delete
+  // -------------------------------------------------------------------------
+  const dragReorder = useCallback(async (listingId: number, fromSlot: number, toSlot: number) => {
+    if (fromSlot === toSlot) return;
+    const imgs = imagesFor(listingId);
+    const moving = imgs[fromSlot - 1];
+    const dest = imgs[toSlot - 1];
+    if (!moving) return;
+    if (moving.is_pending_upload || moving.listing_image_id <= 0 || (dest && dest.is_pending_upload)) {
+      toast(t('photoStudio.pendingReorderBlocked'), { icon: 'ℹ️' });
+      return;
+    }
+    // Optimistic local reorder (compute new order from a snapshot before mutating state).
+    const arr = imgs.slice();
+    const [m] = arr.splice(fromSlot - 1, 1);
+    arr.splice(toSlot - 1, 0, m);
+    setListingImagesById(prev => ({ ...prev, [listingId]: arr.map((im, i) => ({ ...im, rank: i + 1 })) }));
+
+    // Stage a reorder op for every synced image whose position actually changed,
+    // fully specifying the target order for the draft executor.
+    try {
+      for (let i = 0; i < arr.length; i++) {
+        const im = arr[i];
+        const newRank = i + 1;
+        if (im.is_pending_upload || im.listing_image_id <= 0 || im.rank === newRank) continue;
+        await stageEtsyDraft({ shopId, listingId,
+          media: [{ kind: 'image', operation: 'reorder', etsyMediaId: im.listing_image_id, rank: newRank }] });
+      }
+      toast.success(t('photoStudio.reorderStaged'));
+      onCompleted();
+    } catch {
+      toast.error(t('photoStudio.reorderFailed'));
+      refreshListingImages([listingId], true);
+    }
+  }, [imagesFor, setListingImagesById, shopId, onCompleted, refreshListingImages, t]);
+
+  const deleteSinglePhoto = useCallback(async (listingId: number, slot: number) => {
+    const imgs = imagesFor(listingId);
+    const target = imgs[slot - 1];
+    if (!target) return;
+    if (target.is_pending_upload || target.listing_image_id <= 0) {
+      toast(t('photoStudio.pendingReorderBlocked'), { icon: 'ℹ️' });
+      return;
+    }
+    if (imgs.length <= 1) { toast.error(t('photoStudio.cantDeleteLast')); return; }
+    if (!confirm(t('photoStudio.confirmDeleteOne', { position: slot }))) return;
+    try {
+      await stageEtsyDraft({ shopId, listingId,
+        media: [{ kind: 'image', operation: 'delete', etsyMediaId: target.listing_image_id }] });
+      removeImageAtRank(listingId, slot);
+      toast.success(t('photoStudio.deleteStaged'));
+      onCompleted();
+    } catch {
+      toast.error(t('photoStudio.reorderFailed'));
+    }
+  }, [imagesFor, shopId, removeImageAtRank, onCompleted, t]);
 
   // -------------------------------------------------------------------------
   // File selection (upload source)
@@ -671,6 +732,12 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
         {listingImagesLoading && <CircularProgress size={16} />}
       </Box>
 
+      {listings.length > 0 && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+          {t('photoStudio.dragHint')}
+        </Typography>
+      )}
+
       {/* ---------------- Per-listing position grid ---------------- */}
       {listings.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -693,28 +760,55 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
               </Typography>
               <Chip size="small" label={t('photos.imageCount', { count: imgs.length })} sx={{ fontWeight: 600 }} />
             </Box>
-            {/* Slot strip */}
+            {/* Slot strip — drag a photo onto another slot to reorder */}
             <Box sx={{ display: 'flex', gap: 0.5, mt: 0.75, flexWrap: 'wrap', pl: { xs: 0, sm: 5 } }}>
               {Array.from({ length: MAX_IMAGES }, (_, i) => i + 1).map(slot => {
                 const img = imgs[slot - 1];
                 const hl = highlightSlot(listing.listing_id, slot);
                 const ring = hl === 'from' ? '#f59e0b' : hl === 'to' ? '#10b981' : hl === 'target' ? '#2563eb' : 'transparent';
                 const src = img?.url_170x135 || img?.url_75x75 || img?.url_570xN;
+                const isDragSrc = dragging?.listingId === listing.listing_id && dragging.slot === slot;
+                const canDrag = !!img && !img.is_pending_upload && img.listing_image_id > 0;
                 return (
-                  <Tooltip key={slot} title={img?.alt_text || (img ? `#${slot}` : t('photoStudio.emptySlot', { position: slot }))}>
-                    <Box sx={{ position: 'relative', width: 52, height: 52, borderRadius: 1.5, overflow: 'hidden',
-                      border: '2px solid', borderColor: ring, boxShadow: hl ? `0 0 0 1px ${ring}55` : 'none',
-                      bgcolor: img ? '#fff' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Tooltip key={slot} title={img ? (img.alt_text || t('photoStudio.clickPreviewDragReorder')) : t('photoStudio.emptySlot', { position: slot })}>
+                    <Box
+                      draggable={canDrag}
+                      onDragStart={() => canDrag && setDragging({ listingId: listing.listing_id, slot })}
+                      onDragOver={(e) => { if (dragging?.listingId === listing.listing_id) e.preventDefault(); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragging && dragging.listingId === listing.listing_id && img) {
+                          dragReorder(listing.listing_id, dragging.slot, slot);
+                        }
+                        setDragging(null);
+                      }}
+                      onDragEnd={() => setDragging(null)}
+                      onClick={() => { if (img && !dragging) setLightbox({ title: listing.title, img }); }}
+                      sx={{ position: 'relative', width: 52, height: 52, borderRadius: 1.5, overflow: 'hidden',
+                        border: '2px solid', borderColor: ring, boxShadow: hl ? `0 0 0 1px ${ring}55` : 'none',
+                        bgcolor: img ? '#fff' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        opacity: isDragSrc ? 0.4 : 1, cursor: img ? (canDrag ? 'grab' : 'pointer') : 'default',
+                        '&:active': canDrag ? { cursor: 'grabbing' } : undefined,
+                        '&:hover .slot-del': { opacity: img ? 1 : 0 },
+                        transition: 'opacity 0.12s, border-color 0.12s' }}>
                       {src ? (
-                        <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
                       ) : (
                         <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 700 }}>{slot}</Typography>
                       )}
                       {img && (
                         <Box sx={{ position: 'absolute', top: 1, left: 1, minWidth: 14, height: 14, px: 0.3, borderRadius: '999px',
-                          bgcolor: 'rgba(15,23,42,0.72)', color: 'white', fontSize: 9, lineHeight: '14px', textAlign: 'center', fontWeight: 700 }}>
+                          bgcolor: slot === 1 ? 'rgba(245,158,11,0.95)' : 'rgba(15,23,42,0.72)', color: 'white', fontSize: 9, lineHeight: '14px', textAlign: 'center', fontWeight: 700 }}>
                           {slot}
                         </Box>
+                      )}
+                      {canDrag && (
+                        <IconButton className="slot-del" size="small"
+                          onClick={(e) => { e.stopPropagation(); deleteSinglePhoto(listing.listing_id, slot); }}
+                          sx={{ position: 'absolute', top: -2, right: -2, p: '2px', opacity: 0, bgcolor: 'rgba(220,38,38,0.92)',
+                            color: 'white', '&:hover': { bgcolor: '#b91c1c' }, transition: 'opacity 0.12s' }}>
+                          <CloseIcon sx={{ fontSize: 12 }} />
+                        </IconButton>
                       )}
                       {img?.is_pending_upload && (
                         <Box sx={{ position: 'absolute', bottom: 1, left: 1, px: 0.4, height: 13, borderRadius: '999px',
@@ -790,6 +884,29 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
             {applying ? `${progress}%` : t('photoStudio.stageAccepted', { count: (previews || []).filter(p => p.accepted && p.base64).length })}
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* ---------------- Photo lightbox ---------------- */}
+      <Dialog open={!!lightbox} onClose={() => setLightbox(null)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, fontWeight: 700 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {lightbox?.title}
+          </Typography>
+          <IconButton size="small" onClick={() => setLightbox(null)}><CloseIcon fontSize="small" /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {lightbox && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+              <img src={lightbox.img.url_fullxfull || lightbox.img.url_570xN || lightbox.img.url_170x135}
+                alt={lightbox.img.alt_text || ''}
+                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, objectFit: 'contain' }} />
+              <Typography variant="caption" color="text.secondary">
+                {t('photoStudio.position')}: {lightbox.img.rank}
+                {lightbox.img.alt_text ? ` · ${lightbox.img.alt_text}` : ''}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
       </Dialog>
     </Box>
   );

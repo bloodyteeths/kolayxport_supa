@@ -1965,7 +1965,16 @@
         "enterPrompt": "Write a prompt first.",
         "allFull": "All selected listings already have 10 photos.",
         "batchCapped": "Generating for the first {cap} listings to stay within limits.",
-        "noneAccepted": "No accepted images to stage."
+        "noneAccepted": "No accepted images to stage.",
+        "dragHint": "Tip: drag a photo onto another slot to reorder it, click to enlarge, or hover and press × to delete.",
+        "clickPreviewDragReorder": "Click to enlarge · drag to reorder",
+        "pendingReorderBlocked": "Pending (unsynced) photos can be reordered after you publish them to Etsy.",
+        "reorderStaged": "Reorder saved to draft. Sync to Etsy when ready.",
+        "reorderFailed": "Could not stage the change.",
+        "deleteStaged": "Photo delete saved to draft. Sync to Etsy when ready.",
+        "cantDeleteLast": "Can't delete the last photo — Etsy needs at least one.",
+        "confirmDeleteOne": "Delete the photo at position {position} from this listing?",
+        "position": "Position"
       },
       "title": "Title",
       "description": "Description",

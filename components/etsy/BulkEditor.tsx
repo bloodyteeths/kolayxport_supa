@@ -58,6 +58,7 @@ import { useTranslations } from 'next-intl';
 import VariationEditor from './VariationEditor';
 import { stageEtsyDraft, stageEtsyDraftFile } from '@/lib/etsy/draftClient';
 import BulkPhotoStudio from './BulkPhotoStudio';
+import BulkVideoStudio from './BulkVideoStudio';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -3284,6 +3285,7 @@ export default function BulkEditor({
                 return next;
               })}
               onToggleAll={handleToggleAll}
+              onSetChecked={(ids) => setCheckedIds(new Set(ids))}
               allChecked={allChecked}
               someChecked={someChecked}
               searchTerm={searchTerm}
@@ -3292,6 +3294,24 @@ export default function BulkEditor({
               setListingImagesById={setListingImagesById}
               listingImagesLoading={listingImagesLoading}
               refreshListingImages={refreshListingImages}
+              onCompleted={onCompleted}
+            />
+          ) : activeField === 'videos' ? (
+            <BulkVideoStudio
+              shopId={shopId}
+              listings={filteredListings}
+              checkedIds={checkedIds}
+              onToggleChecked={(id) => setCheckedIds(prev => {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id); else next.add(id);
+                return next;
+              })}
+              onToggleAll={handleToggleAll}
+              onSetChecked={(ids) => setCheckedIds(new Set(ids))}
+              allChecked={allChecked}
+              someChecked={someChecked}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
               onCompleted={onCompleted}
             />
           ) : (

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, Paper, Typography, Button, IconButton, Checkbox, TextField, Chip, Tooltip,
-  ToggleButton, ToggleButtonGroup, CircularProgress, Switch, LinearProgress,
+  ToggleButton, ToggleButtonGroup, CircularProgress, Switch, LinearProgress, Divider,
   Dialog, DialogTitle, DialogContent, DialogActions, InputAdornment,
 } from '@mui/material';
 import {
@@ -17,6 +17,11 @@ import {
   Image as ImageIcon,
   UploadFile as UploadIcon,
   Refresh as RefreshIcon,
+  AutoFixHigh as EnhanceIcon,
+  Wallpaper as BgIcon,
+  Star as StarIcon,
+  FilterList as FilterIcon,
+  Save as SaveIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
@@ -49,6 +54,7 @@ interface BulkPhotoStudioProps {
   checkedIds: Set<number>;
   onToggleChecked: (id: number) => void;
   onToggleAll: () => void;
+  onSetChecked: (ids: number[]) => void;
   allChecked: boolean;
   someChecked: boolean;
   searchTerm: string;
@@ -60,13 +66,17 @@ interface BulkPhotoStudioProps {
   onCompleted: () => void;
 }
 
-type StudioOp = 'add' | 'replace' | 'delete' | 'reorder' | 'alt';
+type StudioOp = 'add' | 'replace' | 'delete' | 'reorder' | 'alt' | 'enhance' | 'removebg';
 type MediaSource = 'upload' | 'ai';
 type PositionTarget = number | 'end';
+type FilterMode = 'all' | 'nophotos' | 'lt5' | 'full' | 'missingalt';
 
 const MAX_IMAGES = 10;
 const AI_CONCURRENCY = 3;
 const AI_BATCH_CAP = 60; // guard against enormous accidental AI runs
+
+const REMOVEBG_PROMPT = 'Remove the background completely and place the exact same product on a pure solid white (#FFFFFF) studio background. Keep the product identical, sharp, well-lit and centered, with a soft natural shadow. No text, no props.';
+const ENHANCE_PROMPT = 'Enhance this product photo: increase sharpness and clarity, fix lighting and white balance, reduce noise, boost detail. Keep the exact same product, framing and background. Photorealistic, high resolution.';
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -129,7 +139,7 @@ interface AiPreview {
 // ---------------------------------------------------------------------------
 export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   const {
-    shopId, listings, checkedIds, onToggleChecked, onToggleAll, allChecked, someChecked,
+    shopId, listings, checkedIds, onToggleChecked, onToggleAll, onSetChecked, allChecked, someChecked,
     searchTerm, onSearchChange, listingImagesById, setListingImagesById,
     listingImagesLoading, refreshListingImages, onCompleted,
   } = props;
@@ -153,10 +163,17 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   const [genProgress, setGenProgress] = useState(0);
   const [previews, setPreviews] = useState<AiPreview[] | null>(null);
   const [dragging, setDragging] = useState<{ listingId: number; slot: number } | null>(null);
-  const [lightbox, setLightbox] = useState<{ title: string; img: StudioImage } | null>(null);
+  const [lightbox, setLightbox] = useState<{ listingId: number; title: string; img: StudioImage } | null>(null);
+  const [lightboxAlt, setLightboxAlt] = useState('');
+  const [lightboxSaving, setLightboxSaving] = useState(false);
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const objectUrlsRef = useRef<string[]>([]);
+  // Per-listing add: which listing+slot a single-listing upload targets.
+  const singleAddRef = useRef<{ listingId: number; slot: number } | null>(null);
+  const singleAddInputRef = useRef<HTMLInputElement>(null);
+  const lightboxReplaceRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => {
     objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
@@ -182,12 +199,51 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     [listingImagesById],
   );
 
+  const isAiOp = op === 'add' || op === 'replace' || op === 'enhance' || op === 'removebg';
+  const isReplaceLike = op === 'replace' || op === 'enhance' || op === 'removebg';
+
   // Resolve a concrete 1-based rank for the current op/position on a given listing.
   const resolveRank = useCallback((listingId: number): number => {
     const count = imagesFor(listingId).length;
     if (position === 'end') return Math.min(count + 1, MAX_IMAGES);
-    return position;
+    return typeof position === 'number' ? position : 1;
   }, [imagesFor, position]);
+
+  // Smart filter: narrow which listings are shown so bulk actions can target the ones that need work.
+  const displayedListings = useMemo(() => {
+    if (filterMode === 'all') return listings;
+    return listings.filter(l => {
+      const imgs = listingImagesById[l.listing_id];
+      if (imgs === undefined) return true; // not loaded yet — don't hide
+      const synced = imgs.filter(im => !im.is_pending_upload && im.listing_image_id > 0);
+      switch (filterMode) {
+        case 'nophotos': return synced.length === 0;
+        case 'lt5': return synced.length < 5;
+        case 'full': return synced.length >= MAX_IMAGES;
+        case 'missingalt': return synced.length > 0 && synced.some(im => !im.alt_text);
+        default: return true;
+      }
+    });
+  }, [listings, filterMode, listingImagesById]);
+
+  // Pre-flight: how many checked listings the current op will actually affect vs skip.
+  const preflight = useMemo(() => {
+    const pos = typeof position === 'number' ? position : 1;
+    let apply = 0, skip = 0;
+    for (const l of checkedListings) {
+      const imgs = imagesFor(l.listing_id);
+      const synced = imgs.filter(im => !im.is_pending_upload && im.listing_image_id > 0);
+      let ok = true;
+      if (op === 'add') ok = imgs.length < MAX_IMAGES;
+      else if (op === 'delete') ok = !!imgs[pos - 1] && imgs.length > 1;
+      else if (op === 'reorder') ok = imgs.length >= reorderFrom && imgs.length >= 2;
+      else if (op === 'alt') ok = synced.length > 0;
+      else if (op === 'enhance' || op === 'removebg') { const t0 = imgs[pos - 1]; ok = !!t0 && !t0.is_pending_upload && t0.listing_image_id > 0; }
+      // 'replace' always applies (adds if empty)
+      if (ok) apply++; else skip++;
+    }
+    return { apply, skip };
+  }, [checkedListings, op, position, reorderFrom, imagesFor]);
 
   const trackObjectUrl = (url: string) => { objectUrlsRef.current.push(url); return url; };
 
@@ -278,6 +334,81 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
       toast.error(t('photoStudio.reorderFailed'));
     }
   }, [imagesFor, shopId, removeImageAtRank, onCompleted, t]);
+
+  const setAsMain = useCallback((listingId: number, slot: number) => {
+    if (slot === 1) return;
+    dragReorder(listingId, slot, 1);
+    setLightbox(null);
+  }, [dragReorder]);
+
+  const openLightbox = useCallback((listingId: number, title: string, img: StudioImage) => {
+    setLightbox({ listingId, title, img });
+    setLightboxAlt(img.alt_text || '');
+  }, []);
+
+  const saveLightboxAlt = useCallback(async () => {
+    if (!lightbox || lightbox.img.is_pending_upload || lightbox.img.listing_image_id <= 0) {
+      toast(t('photoStudio.pendingReorderBlocked'), { icon: 'ℹ️' });
+      return;
+    }
+    const text = lightboxAlt.trim().slice(0, 250);
+    setLightboxSaving(true);
+    try {
+      await stageEtsyDraft({ shopId, listingId: lightbox.listingId,
+        media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: lightbox.img.listing_image_id, altText: text }] });
+      setListingImagesById(prev => ({
+        ...prev,
+        [lightbox.listingId]: (prev[lightbox.listingId] || []).map(im =>
+          im.listing_image_id === lightbox.img.listing_image_id ? { ...im, alt_text: text } : im),
+      }));
+      toast.success(t('photoStudio.altSaved'));
+      onCompleted();
+      setLightbox(null);
+    } catch { toast.error(t('photoStudio.reorderFailed')); }
+    finally { setLightboxSaving(false); }
+  }, [lightbox, lightboxAlt, shopId, setListingImagesById, onCompleted, t]);
+
+  // Add a single photo to one listing at a specific slot (empty-slot click).
+  const onSingleAddFile = useCallback(async (file: File | null) => {
+    const target = singleAddRef.current;
+    singleAddRef.current = null;
+    if (!file || !target) return;
+    const valid = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!valid.includes(file.type)) { toast.error(t('photos.unsupportedFiles')); return; }
+    const { listingId, slot } = target;
+    const rank = Math.min(slot, imagesFor(listingId).length + 1, MAX_IMAGES);
+    try {
+      await stageEtsyDraftFile({ shopId, listingId, file, kind: 'image', operation: 'upload', rank });
+      insertPendingImage(listingId, rank, trackObjectUrl(URL.createObjectURL(file)), file.name);
+      toast.success(t('photoStudio.stagedOk', { count: 1 }));
+      onCompleted();
+    } catch { toast.error(t('photoStudio.reorderFailed')); }
+  }, [imagesFor, shopId, insertPendingImage, onCompleted, t]);
+
+  const triggerSingleAdd = useCallback((listingId: number, slot: number) => {
+    singleAddRef.current = { listingId, slot };
+    singleAddInputRef.current?.click();
+  }, []);
+
+  // Replace the single photo currently open in the lightbox with an uploaded file.
+  const onLightboxReplaceFile = useCallback(async (file: File | null) => {
+    if (!file || !lightbox) return;
+    const valid = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!valid.includes(file.type)) { toast.error(t('photos.unsupportedFiles')); return; }
+    const { listingId, img } = lightbox;
+    const rank = img.rank;
+    try {
+      if (!img.is_pending_upload && img.listing_image_id > 0) {
+        await stageEtsyDraft({ shopId, listingId, media: [{ kind: 'image', operation: 'delete', etsyMediaId: img.listing_image_id }] });
+        removeImageAtRank(listingId, rank);
+      }
+      await stageEtsyDraftFile({ shopId, listingId, file, kind: 'image', operation: 'upload', rank });
+      insertPendingImage(listingId, rank, trackObjectUrl(URL.createObjectURL(file)), file.name);
+      toast.success(t('photoStudio.stagedOk', { count: 1 }));
+      onCompleted();
+      setLightbox(null);
+    } catch { toast.error(t('photoStudio.reorderFailed')); }
+  }, [lightbox, shopId, removeImageAtRank, insertPendingImage, onCompleted, t]);
 
   // -------------------------------------------------------------------------
   // File selection (upload source)
@@ -454,9 +585,22 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   // AI generation (Add / Replace with unique per-listing images)
   // -------------------------------------------------------------------------
   const generateOne = useCallback(async (listing: StudioListing, extraPrompt = ''): Promise<{ base64: string | null; mimeType: string; refUrl?: string }> => {
-    const hero = imagesFor(listing.listing_id).find(im => !im.is_pending_upload && im.listing_image_id > 0);
-    const refUrl = hero?.url_fullxfull || hero?.url_570xN;
-    const basePrompt = aiPrompt.trim() || t('photoStudio.defaultAiPrompt');
+    const imgs = imagesFor(listing.listing_id);
+    const pos = typeof position === 'number' ? position : 1;
+    let refUrl: string | undefined;
+    let basePrompt: string;
+    if (op === 'enhance' || op === 'removebg') {
+      // Reference the actual photo being processed, with a preset instruction.
+      const target = imgs[pos - 1];
+      refUrl = target?.url_fullxfull || target?.url_570xN;
+      basePrompt = op === 'removebg' ? REMOVEBG_PROMPT : ENHANCE_PROMPT;
+      if (aiPrompt.trim()) basePrompt = `${basePrompt} ${aiPrompt.trim()}`;
+    } else {
+      // Add/Replace: reference the listing's hero for on-brand consistency.
+      const hero = imgs.find(im => !im.is_pending_upload && im.listing_image_id > 0);
+      refUrl = hero?.url_fullxfull || hero?.url_570xN;
+      basePrompt = aiPrompt.trim() || t('photoStudio.defaultAiPrompt');
+    }
     const prompt = extraPrompt ? `${basePrompt}. ${extraPrompt.trim()}` : basePrompt;
     try {
       const res = await fetch('/api/ai/generate-image', {
@@ -472,15 +616,20 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     } catch {
       return { base64: null, mimeType: 'image/jpeg', refUrl };
     }
-  }, [imagesFor, aiPrompt, t]);
+  }, [imagesFor, aiPrompt, op, position, t]);
 
   const startAiGeneration = useCallback(async () => {
     if (checkedListings.length === 0) { toast.error(t('photoStudio.selectListings')); return; }
-    if (!aiPrompt.trim()) { toast.error(t('photoStudio.enterPrompt')); return; }
+    if ((op === 'add' || op === 'replace') && !aiPrompt.trim()) { toast.error(t('photoStudio.enterPrompt')); return; }
 
+    const pos = typeof position === 'number' ? position : 1;
     let batch = checkedListings;
     if (op === 'add') batch = batch.filter(l => imagesFor(l.listing_id).length < MAX_IMAGES);
-    if (batch.length === 0) { toast.error(t('photoStudio.allFull')); return; }
+    if (op === 'enhance' || op === 'removebg') batch = batch.filter(l => {
+      const target0 = imagesFor(l.listing_id)[pos - 1];
+      return target0 && !target0.is_pending_upload && target0.listing_image_id > 0;
+    });
+    if (batch.length === 0) { toast.error(op === 'add' ? t('photoStudio.allFull') : t('photoStudio.noPhotoAtPosition')); return; }
     let capped = false;
     if (batch.length > AI_BATCH_CAP) { batch = batch.slice(0, AI_BATCH_CAP); capped = true; }
 
@@ -501,7 +650,7 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
 
     setGenerating(false);
     if (capped) toast(t('photoStudio.batchCapped', { cap: AI_BATCH_CAP }));
-  }, [checkedListings, aiPrompt, op, imagesFor, generateOne, t]);
+  }, [checkedListings, aiPrompt, op, position, imagesFor, generateOne, t]);
 
   const regenerateOne = useCallback(async (listingId: number) => {
     const preview = (previews || []).find(p => p.listingId === listingId);
@@ -526,7 +675,7 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
       if (!listing || !p.base64) { failed++; continue; }
       const rank = resolveRank(p.listingId);
       try {
-        if (op === 'replace') {
+        if (isReplaceLike) {
           const existing = imagesFor(p.listingId)[rank - 1];
           if (existing && !existing.is_pending_upload && existing.listing_image_id > 0) {
             await stageEtsyDraft({ shopId, listingId: p.listingId,
@@ -544,10 +693,9 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     }
     setApplying(false);
     setPreviews(null);
-    setAiPrompt('');
     reportResult(success, failed, 0);
     onCompleted();
-  }, [previews, checkedListings, op, shopId, resolveRank, imagesFor, removeImageAtRank, insertPendingImage, onCompleted, t]);
+  }, [previews, checkedListings, isReplaceLike, shopId, resolveRank, imagesFor, removeImageAtRank, insertPendingImage, onCompleted, t]);
 
   // -------------------------------------------------------------------------
   // Primary apply dispatcher
@@ -556,7 +704,8 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     if (op === 'add' || op === 'replace') {
       if (source === 'ai') startAiGeneration();
       else applyUploadAddOrReplace();
-    } else if (op === 'delete') applyDelete();
+    } else if (op === 'enhance' || op === 'removebg') startAiGeneration();
+    else if (op === 'delete') applyDelete();
     else if (op === 'reorder') applyReorder();
     else if (op === 'alt') applyAltText();
   }, [op, source, startAiGeneration, applyUploadAddOrReplace, applyDelete, applyReorder, applyAltText]);
@@ -570,6 +719,8 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     { key: 'delete', label: t('photoStudio.opDelete'), icon: <DeleteIcon fontSize="small" /> },
     { key: 'reorder', label: t('photoStudio.opReorder'), icon: <ReorderIcon fontSize="small" /> },
     { key: 'alt', label: t('photoStudio.opAlt'), icon: <AltIcon fontSize="small" /> },
+    { key: 'removebg', label: t('photoStudio.opRemoveBg'), icon: <BgIcon fontSize="small" /> },
+    { key: 'enhance', label: t('photoStudio.opEnhance'), icon: <EnhanceIcon fontSize="small" /> },
   ];
 
   const highlightSlot = useCallback((listingId: number, slot: number): 'target' | 'from' | 'to' | null => {
@@ -602,8 +753,16 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     </Box>
   );
 
-  const isAiFlow = (op === 'add' || op === 'replace') && source === 'ai';
+  const isAiFlow = ((op === 'add' || op === 'replace') && source === 'ai') || op === 'enhance' || op === 'removebg';
   const applyDisabled = applying || generating;
+
+  const FILTERS: { key: FilterMode; label: string }[] = [
+    { key: 'all', label: t('photoStudio.filterAll') },
+    { key: 'nophotos', label: t('photoStudio.filterNoPhotos') },
+    { key: 'lt5', label: t('photoStudio.filterLt5') },
+    { key: 'missingalt', label: t('photoStudio.filterMissingAlt') },
+    { key: 'full', label: t('photoStudio.filterFull') },
+  ];
 
   return (
     <Box>
@@ -662,6 +821,23 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
           </Box>
         )}
 
+        {(op === 'enhance' || op === 'removebg') && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                {op === 'removebg' ? t('photoStudio.removeBgAt') : t('photoStudio.enhanceAt')}
+              </Typography>
+              {positionChips(position === 'end' ? 1 : position, (p) => setPosition(p), false)}
+            </Box>
+            <TextField size="small" fullWidth
+              placeholder={op === 'removebg' ? t('photoStudio.removeBgTweak') : t('photoStudio.enhanceTweak')}
+              value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} />
+            <Typography variant="caption" color="text.secondary">
+              {op === 'removebg' ? t('photoStudio.removeBgHelper') : t('photoStudio.enhanceHelper')}
+            </Typography>
+          </Box>
+        )}
+
         {op === 'delete' && (
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
             <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>{t('photoStudio.deleteAt')}</Typography>
@@ -710,6 +886,13 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
               : isAiFlow ? t('photoStudio.generatePreviews', { count: checkedListings.length })
               : t('photoStudio.applyToN', { count: checkedListings.length })}
           </Button>
+          {!applyDisabled && checkedListings.length > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              {preflight.skip > 0
+                ? t('photoStudio.preflightWithSkip', { apply: preflight.apply, skip: preflight.skip })
+                : t('photoStudio.preflightAll', { apply: preflight.apply })}
+            </Typography>
+          )}
           {(applying || generating) && <LinearProgress variant="determinate" value={applying ? progress : genProgress} sx={{ flex: 1, minWidth: 120, borderRadius: 2 }} />}
         </Box>
       </Paper>
@@ -732,18 +915,42 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
         {listingImagesLoading && <CircularProgress size={16} />}
       </Box>
 
-      {listings.length > 0 && (
+      {/* ---------------- Smart filters ---------------- */}
+      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
+        <FilterIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+        {FILTERS.map(f => (
+          <Chip key={f.key} label={f.label} size="small"
+            color={filterMode === f.key ? 'primary' : 'default'}
+            variant={filterMode === f.key ? 'filled' : 'outlined'}
+            onClick={() => setFilterMode(f.key)}
+            sx={{ fontWeight: 600, cursor: 'pointer' }} />
+        ))}
+        {filterMode !== 'all' && (
+          <Button size="small" variant="text" onClick={() => onSetChecked(displayedListings.map(l => l.listing_id))}
+            sx={{ textTransform: 'none', fontWeight: 700 }}>
+            {t('photoStudio.selectFiltered', { count: displayedListings.length })}
+          </Button>
+        )}
+      </Box>
+
+      {/* Hidden inputs for single-listing add / lightbox replace */}
+      <input ref={singleAddInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+        style={{ display: 'none' }} onChange={(e) => { onSingleAddFile(e.target.files?.[0] || null); if (e.target) e.target.value = ''; }} />
+      <input ref={lightboxReplaceRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+        style={{ display: 'none' }} onChange={(e) => { onLightboxReplaceFile(e.target.files?.[0] || null); if (e.target) e.target.value = ''; }} />
+
+      {displayedListings.length > 0 && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
           {t('photoStudio.dragHint')}
         </Typography>
       )}
 
       {/* ---------------- Per-listing position grid ---------------- */}
-      {listings.length === 0 ? (
+      {displayedListings.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography color="text.secondary">{searchTerm ? t('search.noMatch') : t('search.noListings')}</Typography>
+          <Typography color="text.secondary">{searchTerm || filterMode !== 'all' ? t('search.noMatch') : t('search.noListings')}</Typography>
         </Paper>
-      ) : listings.map(listing => {
+      ) : displayedListings.map(listing => {
         const imgs = imagesFor(listing.listing_id);
         const isChecked = checkedIds.has(listing.listing_id);
         return (
@@ -769,8 +976,9 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
                 const src = img?.url_170x135 || img?.url_75x75 || img?.url_570xN;
                 const isDragSrc = dragging?.listingId === listing.listing_id && dragging.slot === slot;
                 const canDrag = !!img && !img.is_pending_upload && img.listing_image_id > 0;
+                const isAddSlot = !img && slot === imgs.length + 1 && imgs.length < MAX_IMAGES;
                 return (
-                  <Tooltip key={slot} title={img ? (img.alt_text || t('photoStudio.clickPreviewDragReorder')) : t('photoStudio.emptySlot', { position: slot })}>
+                  <Tooltip key={slot} title={img ? (img.alt_text || t('photoStudio.clickPreviewDragReorder')) : isAddSlot ? t('photoStudio.addHereHint') : t('photoStudio.emptySlot', { position: slot })}>
                     <Box
                       draggable={canDrag}
                       onDragStart={() => canDrag && setDragging({ listingId: listing.listing_id, slot })}
@@ -783,16 +991,23 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
                         setDragging(null);
                       }}
                       onDragEnd={() => setDragging(null)}
-                      onClick={() => { if (img && !dragging) setLightbox({ title: listing.title, img }); }}
+                      onClick={() => {
+                        if (dragging) return;
+                        if (img) openLightbox(listing.listing_id, listing.title, img);
+                        else if (isAddSlot) triggerSingleAdd(listing.listing_id, slot);
+                      }}
                       sx={{ position: 'relative', width: 52, height: 52, borderRadius: 1.5, overflow: 'hidden',
-                        border: '2px solid', borderColor: ring, boxShadow: hl ? `0 0 0 1px ${ring}55` : 'none',
+                        border: '2px ' + (isAddSlot ? 'dashed' : 'solid'), borderColor: isAddSlot ? '#94a3b8' : ring, boxShadow: hl ? `0 0 0 1px ${ring}55` : 'none',
                         bgcolor: img ? '#fff' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        opacity: isDragSrc ? 0.4 : 1, cursor: img ? (canDrag ? 'grab' : 'pointer') : 'default',
+                        opacity: isDragSrc ? 0.4 : 1, cursor: img ? (canDrag ? 'grab' : 'pointer') : (isAddSlot ? 'pointer' : 'default'),
                         '&:active': canDrag ? { cursor: 'grabbing' } : undefined,
                         '&:hover .slot-del': { opacity: img ? 1 : 0 },
+                        '&:hover': isAddSlot ? { borderColor: 'primary.main', bgcolor: 'primary.50' } : undefined,
                         transition: 'opacity 0.12s, border-color 0.12s' }}>
                       {src ? (
                         <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                      ) : isAddSlot ? (
+                        <AddIcon sx={{ fontSize: 20, color: 'text.disabled' }} />
                       ) : (
                         <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 700 }}>{slot}</Typography>
                       )}
@@ -896,14 +1111,45 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
         </DialogTitle>
         <DialogContent dividers>
           {lightbox && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-              <img src={lightbox.img.url_fullxfull || lightbox.img.url_570xN || lightbox.img.url_170x135}
-                alt={lightbox.img.alt_text || ''}
-                style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 8, objectFit: 'contain' }} />
-              <Typography variant="caption" color="text.secondary">
-                {t('photoStudio.position')}: {lightbox.img.rank}
-                {lightbox.img.alt_text ? ` · ${lightbox.img.alt_text}` : ''}
-              </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) 300px' }, gap: 2, alignItems: 'start' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f8fafc', borderRadius: 2, p: 1, minHeight: 240 }}>
+                <img src={lightbox.img.url_fullxfull || lightbox.img.url_570xN || lightbox.img.url_170x135}
+                  alt={lightbox.img.alt_text || ''}
+                  style={{ maxWidth: '100%', maxHeight: '62vh', borderRadius: 8, objectFit: 'contain' }} />
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                <Chip size="small" label={`${t('photoStudio.position')} ${lightbox.img.rank}${lightbox.img.rank === 1 ? ' · ' + t('photoStudio.mainBadge') : ''}`}
+                  color={lightbox.img.rank === 1 ? 'warning' : 'default'} sx={{ fontWeight: 700, alignSelf: 'flex-start' }} />
+                {lightbox.img.is_pending_upload ? (
+                  <Typography variant="caption" color="text.secondary">{t('photoStudio.pendingReorderBlocked')}</Typography>
+                ) : (
+                  <>
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>{t('photoStudio.altLabel')}</Typography>
+                    <TextField size="small" fullWidth multiline minRows={2} placeholder={t('photoStudio.altPlaceholder')}
+                      value={lightboxAlt} onChange={(e) => setLightboxAlt(e.target.value.slice(0, 250))} />
+                    <Button variant="contained" size="small" onClick={saveLightboxAlt} disabled={lightboxSaving}
+                      startIcon={lightboxSaving ? <CircularProgress size={14} sx={{ color: 'white' }} /> : <SaveIcon />}
+                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px' }}>
+                      {t('photoStudio.saveAlt')}
+                    </Button>
+                    <Divider flexItem />
+                    <Button variant="outlined" size="small" startIcon={<StarIcon />}
+                      disabled={lightbox.img.rank === 1} onClick={() => setAsMain(lightbox.listingId, lightbox.img.rank)}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}>
+                      {t('photoStudio.setAsMain')}
+                    </Button>
+                    <Button variant="outlined" size="small" startIcon={<SwapIcon />} onClick={() => lightboxReplaceRef.current?.click()}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}>
+                      {t('photoStudio.replacePhoto')}
+                    </Button>
+                    <Button variant="outlined" color="error" size="small" startIcon={<DeleteIcon />}
+                      onClick={() => { const s = lightbox.img.rank; setLightbox(null); deleteSinglePhoto(lightbox.listingId, s); }}
+                      sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}>
+                      {t('photoStudio.opDelete')}
+                    </Button>
+                  </>
+                )}
+              </Box>
             </Box>
           )}
         </DialogContent>

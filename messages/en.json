@@ -1998,7 +1998,18 @@
         "saveAlt": "Save alt text",
         "setAsMain": "Set as main",
         "replacePhoto": "Replace photo",
-        "mainBadge": "Main"
+        "mainBadge": "Main",
+        "opCopy": "Copy photos",
+        "sourceUrl": "From URL",
+        "urlPlaceholder": "https://… image URL (jpg/png)",
+        "urlHelper": "The same image URL is added to every selected listing.",
+        "enterUrl": "Enter an image URL.",
+        "multiFileNote": "Files are added to consecutive positions from the chosen start.",
+        "copyFrom": "Copy photos from",
+        "pickCopySource": "Pick a source listing…",
+        "copyHelper": "Appends the source listing's photos to every other selected listing (up to 10 each).",
+        "copySourceEmpty": "The source listing has no synced photos to copy.",
+        "copyNoTargets": "Select at least one other listing to copy into."
       },
       "videoStudio": {
         "opAdd": "Add video",

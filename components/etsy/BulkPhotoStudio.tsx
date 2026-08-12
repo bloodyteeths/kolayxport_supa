@@ -22,6 +22,8 @@ import {
   Star as StarIcon,
   FilterList as FilterIcon,
   Save as SaveIcon,
+  ContentCopy as CopyIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
@@ -66,8 +68,8 @@ interface BulkPhotoStudioProps {
   onCompleted: () => void;
 }
 
-type StudioOp = 'add' | 'replace' | 'delete' | 'reorder' | 'alt' | 'enhance' | 'removebg';
-type MediaSource = 'upload' | 'ai';
+type StudioOp = 'add' | 'replace' | 'delete' | 'reorder' | 'alt' | 'enhance' | 'removebg' | 'copy';
+type MediaSource = 'upload' | 'ai' | 'url';
 type PositionTarget = number | 'end';
 type FilterMode = 'all' | 'nophotos' | 'lt5' | 'full' | 'missingalt';
 
@@ -150,8 +152,9 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   const [position, setPosition] = useState<PositionTarget>('end');
   const [reorderFrom, setReorderFrom] = useState<number>(1);
   const [reorderTo, setReorderTo] = useState<number>(1);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<{ file: File; url: string }[]>([]);
+  const [imageUrl, setImageUrl] = useState('');
+  const [copySourceId, setCopySourceId] = useState<number | ''>('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [altMode, setAltMode] = useState<'manual' | 'ai'>('ai');
   const [altText, setAltText] = useState('');
@@ -411,34 +414,44 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   }, [lightbox, shopId, removeImageAtRank, insertPendingImage, onCompleted, t]);
 
   // -------------------------------------------------------------------------
-  // File selection (upload source)
+  // File selection (upload source) — supports multiple files
   // -------------------------------------------------------------------------
-  const onPickFile = useCallback((file: File | null) => {
-    if (uploadPreview) { URL.revokeObjectURL(uploadPreview); }
-    if (!file) { setUploadFile(null); setUploadPreview(null); return; }
+  const clearUploadFiles = useCallback(() => {
+    setUploadFiles(prev => { prev.forEach(u => URL.revokeObjectURL(u.url)); return []; });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
+
+  const onPickFiles = useCallback((files: File[]) => {
     const valid = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!valid.includes(file.type)) { toast.error(t('photos.unsupportedFiles')); return; }
-    setUploadFile(file);
-    setUploadPreview(URL.createObjectURL(file));
-  }, [uploadPreview, t]);
+    const ok = files.filter(f => valid.includes(f.type));
+    if (ok.length !== files.length) toast.error(t('photos.unsupportedFiles'));
+    if (ok.length === 0) return;
+    setUploadFiles(ok.slice(0, MAX_IMAGES).map(file => ({ file, url: URL.createObjectURL(file) })));
+  }, [t]);
 
   // -------------------------------------------------------------------------
-  // Apply: upload-based Add / Replace
+  // Apply: manual Add / Replace from uploaded file(s) or a URL
   // -------------------------------------------------------------------------
-  const applyUploadAddOrReplace = useCallback(async () => {
-    if (!uploadFile) { toast.error(t('photoStudio.chooseFileFirst')); return; }
+  const applyManualAddOrReplace = useCallback(async (kind: 'file' | 'url') => {
+    if (kind === 'file' && uploadFiles.length === 0) { toast.error(t('photoStudio.chooseFileFirst')); return; }
+    if (kind === 'url' && !imageUrl.trim()) { toast.error(t('photoStudio.enterUrl')); return; }
     if (checkedListings.length === 0) { toast.error(t('photoStudio.selectListings')); return; }
+    // Replace uses a single source; Add can fan multiple files across positions.
+    const items = kind === 'url'
+      ? [{ url: imageUrl.trim(), name: 'url-image', preview: imageUrl.trim(), file: null as File | null }]
+      : (op === 'replace' ? uploadFiles.slice(0, 1) : uploadFiles).map(u => ({ url: '', name: u.file.name, preview: u.url, file: u.file }));
 
     setApplying(true); setProgress(0);
     let success = 0, failed = 0, skipped = 0;
-
     for (let i = 0; i < checkedListings.length; i++) {
       const listing = checkedListings[i];
-      const imgs = imagesFor(listing.listing_id);
-      const rank = resolveRank(listing.listing_id);
       try {
-        if (op === 'add' && imgs.length >= MAX_IMAGES) { skipped++; }
-        else {
+        const startRank = resolveRank(listing.listing_id);
+        for (let k = 0; k < items.length; k++) {
+          const item = items[k];
+          const imgs = imagesFor(listing.listing_id);
+          const rank = Math.min(startRank + k, imgs.length + 1, MAX_IMAGES);
+          if (op === 'add' && imgs.length >= MAX_IMAGES) { skipped++; continue; }
           if (op === 'replace') {
             const existing = imgs[rank - 1];
             if (existing && !existing.is_pending_upload && existing.listing_image_id > 0) {
@@ -447,10 +460,15 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
               removeImageAtRank(listing.listing_id, rank);
             }
           }
-          await stageEtsyDraftFile({ shopId, listingId: listing.listing_id, file: uploadFile,
-            kind: 'image', operation: 'upload', rank });
-          insertPendingImage(listing.listing_id, rank,
-            trackObjectUrl(URL.createObjectURL(uploadFile)), uploadFile.name);
+          let previewUrl: string;
+          if (item.file) {
+            await stageEtsyDraftFile({ shopId, listingId: listing.listing_id, file: item.file, kind: 'image', operation: 'upload', rank });
+            previewUrl = trackObjectUrl(URL.createObjectURL(item.file)); // fresh URL — recipe-bar thumbnails get revoked on clear
+          } else {
+            await stageEtsyDraft({ shopId, listingId: listing.listing_id, media: [{ kind: 'image', operation: 'upload', sourceUrl: item.url, rank }] });
+            previewUrl = item.url;
+          }
+          insertPendingImage(listing.listing_id, rank, previewUrl, item.name);
           success++;
         }
       } catch { failed++; }
@@ -459,10 +477,47 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     }
 
     setApplying(false);
-    onPickFile(null);
+    if (kind === 'file') clearUploadFiles(); else setImageUrl('');
     reportResult(success, failed, skipped);
     onCompleted();
-  }, [uploadFile, checkedListings, op, shopId, imagesFor, resolveRank, insertPendingImage, removeImageAtRank, onCompleted, onPickFile, t]);
+  }, [uploadFiles, imageUrl, checkedListings, op, shopId, imagesFor, resolveRank, insertPendingImage, removeImageAtRank, onCompleted, clearUploadFiles, t]);
+
+  // -------------------------------------------------------------------------
+  // Apply: Copy one listing's photos to the other selected listings (append)
+  // -------------------------------------------------------------------------
+  const applyCopy = useCallback(async () => {
+    if (!copySourceId) { toast.error(t('photoStudio.pickCopySource')); return; }
+    const sourceImgs = imagesFor(copySourceId as number)
+      .filter(im => !im.is_pending_upload && im.listing_image_id > 0 && (im.url_fullxfull || im.url_570xN));
+    if (sourceImgs.length === 0) { toast.error(t('photoStudio.copySourceEmpty')); return; }
+    const targets = checkedListings.filter(l => l.listing_id !== copySourceId);
+    if (targets.length === 0) { toast.error(t('photoStudio.copyNoTargets')); return; }
+
+    setApplying(true); setProgress(0);
+    let success = 0, failed = 0, skipped = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const listing = targets[i];
+      try {
+        let count = imagesFor(listing.listing_id).length;
+        let addedAny = false;
+        for (const src of sourceImgs) {
+          if (count >= MAX_IMAGES) { skipped++; break; }
+          const rank = count + 1;
+          const url = src.url_fullxfull || src.url_570xN!;
+          await stageEtsyDraft({ shopId, listingId: listing.listing_id,
+            media: [{ kind: 'image', operation: 'upload', sourceUrl: url, rank, altText: src.alt_text || undefined }] });
+          insertPendingImage(listing.listing_id, rank, url, 'copied');
+          count++; addedAny = true;
+        }
+        if (addedAny) success++;
+      } catch { failed++; }
+      setProgress(Math.round(((i + 1) / targets.length) * 100));
+      if (i < targets.length - 1) await new Promise(r => setTimeout(r, 120));
+    }
+    setApplying(false);
+    reportResult(success, failed, skipped);
+    onCompleted();
+  }, [copySourceId, checkedListings, imagesFor, shopId, insertPendingImage, onCompleted, t]);
 
   // -------------------------------------------------------------------------
   // Apply: Delete at position
@@ -703,12 +758,14 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   const primaryApply = useCallback(() => {
     if (op === 'add' || op === 'replace') {
       if (source === 'ai') startAiGeneration();
-      else applyUploadAddOrReplace();
+      else if (source === 'url') applyManualAddOrReplace('url');
+      else applyManualAddOrReplace('file');
     } else if (op === 'enhance' || op === 'removebg') startAiGeneration();
+    else if (op === 'copy') applyCopy();
     else if (op === 'delete') applyDelete();
     else if (op === 'reorder') applyReorder();
     else if (op === 'alt') applyAltText();
-  }, [op, source, startAiGeneration, applyUploadAddOrReplace, applyDelete, applyReorder, applyAltText]);
+  }, [op, source, startAiGeneration, applyManualAddOrReplace, applyCopy, applyDelete, applyReorder, applyAltText]);
 
   // -------------------------------------------------------------------------
   // Render helpers
@@ -719,6 +776,7 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     { key: 'delete', label: t('photoStudio.opDelete'), icon: <DeleteIcon fontSize="small" /> },
     { key: 'reorder', label: t('photoStudio.opReorder'), icon: <ReorderIcon fontSize="small" /> },
     { key: 'alt', label: t('photoStudio.opAlt'), icon: <AltIcon fontSize="small" /> },
+    { key: 'copy', label: t('photoStudio.opCopy'), icon: <CopyIcon fontSize="small" /> },
     { key: 'removebg', label: t('photoStudio.opRemoveBg'), icon: <BgIcon fontSize="small" /> },
     { key: 'enhance', label: t('photoStudio.opEnhance'), icon: <EnhanceIcon fontSize="small" /> },
   ];
@@ -791,24 +849,36 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
             <ToggleButtonGroup exclusive size="small" value={source} onChange={(_, v) => v && setSource(v)}
               sx={{ '& .MuiToggleButton-root': { textTransform: 'none', fontWeight: 700, px: 2, gap: 0.5 } }}>
               <ToggleButton value="upload"><UploadIcon fontSize="small" />{t('photoStudio.sourceUpload')}</ToggleButton>
+              <ToggleButton value="url"><LinkIcon fontSize="small" />{t('photoStudio.sourceUrl')}</ToggleButton>
               <ToggleButton value="ai"><AIIcon fontSize="small" />{t('photoStudio.sourceAi')}</ToggleButton>
             </ToggleButtonGroup>
 
             {source === 'upload' ? (
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                 <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp"
-                  style={{ display: 'none' }} onChange={(e) => onPickFile(e.target.files?.[0] || null)} />
+                  multiple={op === 'add'} style={{ display: 'none' }}
+                  onChange={(e) => onPickFiles(Array.from(e.target.files || []))} />
                 <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={() => fileInputRef.current?.click()}
                   sx={{ textTransform: 'none', fontWeight: 600, borderRadius: '8px' }}>
                   {t('photos.selectFiles')}
                 </Button>
-                {uploadPreview && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <img src={uploadPreview} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid #e5e7eb' }} />
-                    <Chip label={uploadFile?.name} size="small" onDelete={() => onPickFile(null)} sx={{ maxWidth: 200 }} />
+                {uploadFiles.map((u, idx) => (
+                  <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <img src={u.url} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover', border: '1px solid #e5e7eb' }} />
                   </Box>
+                ))}
+                {uploadFiles.length > 0 && (
+                  <Chip label={t('photos.filesSelected', { count: uploadFiles.length })} size="small" onDelete={clearUploadFiles} />
                 )}
-                <Typography variant="caption" color="text.secondary">{t('photoStudio.sameFileNote')}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {op === 'add' && uploadFiles.length > 1 ? t('photoStudio.multiFileNote') : t('photoStudio.sameFileNote')}
+                </Typography>
+              </Box>
+            ) : source === 'url' ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <TextField size="small" fullWidth placeholder={t('photoStudio.urlPlaceholder')}
+                  value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
+                <Typography variant="caption" color="text.secondary">{t('photoStudio.urlHelper')}</Typography>
               </Box>
             ) : (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
@@ -818,6 +888,23 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
                 <Typography variant="caption" color="text.secondary">{t('photoStudio.aiPromptHelper')}</Typography>
               </Box>
             )}
+          </Box>
+        )}
+
+        {op === 'copy' && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>{t('photoStudio.copyFrom')}</Typography>
+              <TextField select size="small" SelectProps={{ native: true }} value={copySourceId}
+                onChange={(e) => setCopySourceId(e.target.value ? Number(e.target.value) : '')}
+                sx={{ minWidth: 240 }}>
+                <option value="">{t('photoStudio.pickCopySource')}</option>
+                {listings.map(l => (
+                  <option key={l.listing_id} value={l.listing_id}>{l.title}</option>
+                ))}
+              </TextField>
+            </Box>
+            <Typography variant="caption" color="text.secondary">{t('photoStudio.copyHelper')}</Typography>
           </Box>
         )}
 

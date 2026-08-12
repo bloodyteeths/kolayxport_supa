@@ -1998,7 +1998,18 @@
         "saveAlt": "Alt metni kaydet",
         "setAsMain": "Ana yap",
         "replacePhoto": "Fotoğrafı değiştir",
-        "mainBadge": "Ana"
+        "mainBadge": "Ana",
+        "opCopy": "Fotoğrafları kopyala",
+        "sourceUrl": "URL'den",
+        "urlPlaceholder": "https://… görsel URL'si (jpg/png)",
+        "urlHelper": "Aynı görsel URL'si seçili tüm ürünlere eklenir.",
+        "enterUrl": "Bir görsel URL'si girin.",
+        "multiFileNote": "Dosyalar seçilen başlangıçtan itibaren ardışık konumlara eklenir.",
+        "copyFrom": "Fotoğrafları şuradan kopyala",
+        "pickCopySource": "Kaynak ürün seçin…",
+        "copyHelper": "Kaynak ürünün fotoğraflarını diğer seçili ürünlere ekler (her biri en fazla 10).",
+        "copySourceEmpty": "Kaynak üründe kopyalanacak senkronlanmış fotoğraf yok.",
+        "copyNoTargets": "Kopyalanacak en az bir başka ürün seçin."
       },
       "videoStudio": {
         "opAdd": "Video ekle",

@@ -169,6 +169,7 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
   const [lightbox, setLightbox] = useState<{ listingId: number; title: string; img: StudioImage } | null>(null);
   const [lightboxAlt, setLightboxAlt] = useState('');
   const [lightboxSaving, setLightboxSaving] = useState(false);
+  const [lightboxAltGen, setLightboxAltGen] = useState(false);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -370,6 +371,22 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     } catch { toast.error(t('photoStudio.reorderFailed')); }
     finally { setLightboxSaving(false); }
   }, [lightbox, lightboxAlt, shopId, setListingImagesById, onCompleted, t]);
+
+  const generateLightboxAlt = useCallback(async () => {
+    if (!lightbox) return;
+    setLightboxAltGen(true);
+    try {
+      const imageUrl = lightbox.img.url_fullxfull || lightbox.img.url_570xN || lightbox.img.url_170x135;
+      const res = await fetch('/api/ai/etsy', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate_alt_text', title: lightbox.title, image_url: imageUrl }),
+      });
+      const data = await res.json();
+      const text = String(data?.alt_text || '').slice(0, 250);
+      if (text) setLightboxAlt(text); else toast.error(t('photoStudio.reorderFailed'));
+    } catch { toast.error(t('photoStudio.reorderFailed')); }
+    finally { setLightboxAltGen(false); }
+  }, [lightbox, t]);
 
   // Add a single photo to one listing at a specific slot (empty-slot click).
   const onSingleAddFile = useCallback(async (file: File | null) => {
@@ -598,41 +615,47 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
     if (altMode === 'manual' && !altText.trim()) { toast.error(t('photoStudio.enterAltText')); return; }
     const pos = typeof position === 'number' ? position : MAX_IMAGES;
 
-    setApplying(true); setProgress(0);
-    let success = 0, failed = 0, skipped = 0;
-    for (let i = 0; i < checkedListings.length; i++) {
-      const listing = checkedListings[i];
+    // Build a flat list of individual images to caption — AI writes unique,
+    // vision-based alt text PER image (it actually sees each photo).
+    const targets: { listingId: number; title: string; img: StudioImage }[] = [];
+    for (const listing of checkedListings) {
       const imgs = imagesFor(listing.listing_id).filter(im => !im.is_pending_upload && im.listing_image_id > 0);
-      const targets = altAllPositions ? imgs : (imgs[pos - 1] ? [imgs[pos - 1]] : []);
-      if (targets.length === 0) { skipped++; setProgress(Math.round(((i + 1) / checkedListings.length) * 100)); continue; }
+      const chosen = altAllPositions ? imgs : (imgs[pos - 1] ? [imgs[pos - 1]] : []);
+      for (const img of chosen) targets.push({ listingId: listing.listing_id, title: listing.title, img });
+    }
+    if (targets.length === 0) { toast.error(t('photoStudio.noPhotoAtPosition')); return; }
+
+    setApplying(true); setProgress(0);
+    let success = 0, failed = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const { listingId, title, img } = targets[i];
       try {
         let text = altText.trim();
         if (altMode === 'ai') {
+          const imageUrl = img.url_fullxfull || img.url_570xN || img.url_170x135;
           const res = await fetch('/api/ai/etsy', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'generate_alt_text', title: listing.title }),
+            body: JSON.stringify({ action: 'generate_alt_text', title, image_url: imageUrl }),
           });
           const data = await res.json();
           text = String(data?.alt_text || '').slice(0, 250);
-          if (!text) { failed++; setProgress(Math.round(((i + 1) / checkedListings.length) * 100)); continue; }
+          if (!text) { failed++; setProgress(Math.round(((i + 1) / targets.length) * 100)); continue; }
         }
-        for (const img of targets) {
-          await stageEtsyDraft({ shopId, listingId: listing.listing_id,
-            media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: img.listing_image_id, altText: text }] });
-        }
-        // reflect alt in local state
-        setListingImagesById(prev => {
-          const cur = (prev[listing.listing_id] || []).map(im =>
-            targets.some(tg => tg.listing_image_id === im.listing_image_id) ? { ...im, alt_text: text } : im);
-          return { ...prev, [listing.listing_id]: cur };
-        });
+        await stageEtsyDraft({ shopId, listingId,
+          media: [{ kind: 'image', operation: 'update_alt', etsyMediaId: img.listing_image_id, altText: text }] });
+        setListingImagesById(prev => ({
+          ...prev,
+          [listingId]: (prev[listingId] || []).map(im =>
+            im.listing_image_id === img.listing_image_id ? { ...im, alt_text: text } : im),
+        }));
         success++;
       } catch { failed++; }
-      setProgress(Math.round(((i + 1) / checkedListings.length) * 100));
-      if (i < checkedListings.length - 1) await new Promise(r => setTimeout(r, altMode === 'ai' ? 200 : 100));
+      setProgress(Math.round(((i + 1) / targets.length) * 100));
+      // Pace AI (vision) calls to respect the 30 req/min limit.
+      if (i < targets.length - 1) await new Promise(r => setTimeout(r, altMode === 'ai' ? 2100 : 60));
     }
     setApplying(false);
-    reportResult(success, failed, skipped);
+    reportResult(success, failed, 0);
     onCompleted();
   }, [checkedListings, altMode, altText, position, altAllPositions, shopId, imagesFor, setListingImagesById, onCompleted, t]);
 
@@ -956,6 +979,9 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
               </Box>
               {!altAllPositions && positionChips(position === 'end' ? 1 : position, (p) => setPosition(p), false)}
             </Box>
+            {altMode === 'ai' && (
+              <Typography variant="caption" color="text.secondary">{t('photoStudio.altAiHelper')}</Typography>
+            )}
             {altMode === 'manual' && (
               <TextField size="small" fullWidth placeholder={t('photoStudio.altPlaceholder')}
                 value={altText} onChange={(e) => setAltText(e.target.value.slice(0, 250))} />
@@ -1214,11 +1240,18 @@ export default function BulkPhotoStudio(props: BulkPhotoStudioProps) {
                     <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary' }}>{t('photoStudio.altLabel')}</Typography>
                     <TextField size="small" fullWidth multiline minRows={2} placeholder={t('photoStudio.altPlaceholder')}
                       value={lightboxAlt} onChange={(e) => setLightboxAlt(e.target.value.slice(0, 250))} />
-                    <Button variant="contained" size="small" onClick={saveLightboxAlt} disabled={lightboxSaving}
-                      startIcon={lightboxSaving ? <CircularProgress size={14} sx={{ color: 'white' }} /> : <SaveIcon />}
-                      sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px' }}>
-                      {t('photoStudio.saveAlt')}
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button variant="outlined" size="small" onClick={generateLightboxAlt} disabled={lightboxAltGen || lightboxSaving}
+                        startIcon={lightboxAltGen ? <CircularProgress size={14} /> : <AIIcon />}
+                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px' }}>
+                        {t('photoStudio.altAi')}
+                      </Button>
+                      <Button variant="contained" size="small" onClick={saveLightboxAlt} disabled={lightboxSaving || lightboxAltGen}
+                        startIcon={lightboxSaving ? <CircularProgress size={14} sx={{ color: 'white' }} /> : <SaveIcon />}
+                        sx={{ textTransform: 'none', fontWeight: 700, borderRadius: '8px', flex: 1 }}>
+                        {t('photoStudio.saveAlt')}
+                      </Button>
+                    </Box>
                     <Divider flexItem />
                     <Button variant="outlined" size="small" startIcon={<StarIcon />}
                       disabled={lightbox.img.rank === 1} onClick={() => setAsMain(lightbox.listingId, lightbox.img.rank)}

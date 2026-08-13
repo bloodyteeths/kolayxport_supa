@@ -2009,7 +2009,8 @@
         "pickCopySource": "Kaynak ürün seçin…",
         "copyHelper": "Kaynak ürünün fotoğraflarını diğer seçili ürünlere ekler (her biri en fazla 10).",
         "copySourceEmpty": "Kaynak üründe kopyalanacak senkronlanmış fotoğraf yok.",
-        "copyNoTargets": "Kopyalanacak en az bir başka ürün seçin."
+        "copyNoTargets": "Kopyalanacak en az bir başka ürün seçin.",
+        "altAiHelper": "AI her fotoğrafı (içindeki yazıları da) okur ve Etsy kurallarına uygun, her görsele özel benzersiz SEO alt metni yazar. ~30/dk hızında olduğundan büyük gruplar biraz sürebilir."
       },
       "videoStudio": {
         "opAdd": "Video ekle",

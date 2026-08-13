@@ -329,6 +329,33 @@ Category: ${category || 'N/A'}${improvePart}${buildMarketContextPrompt(body.mark
   return { status: 200, data: { description } };
 }
 
+/** Block SSRF: reject non-https or internal/private hosts. */
+function isUnsafeImageUrl(url: string): boolean {
+  if (!/^https:\/\//i.test(url)) return true;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === 'localhost' || host === '127.0.0.1' || host === '[::1]' ||
+      host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('0.') ||
+      host.endsWith('.local') || host.endsWith('.internal') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host) || /^169\.254\./.test(host)
+    );
+  } catch { return true; }
+}
+
+async function fetchImagePart(imageUrl: string): Promise<{ inlineData: { data: string; mimeType: string } } | null> {
+  if (!imageUrl || isUnsafeImageUrl(imageUrl)) return null;
+  try {
+    const res = await fetch(imageUrl);
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    // Cap at ~5MB to keep the vision request fast.
+    if (buf.length > 5 * 1024 * 1024) return null;
+    const mimeType = res.headers.get('content-type') || 'image/jpeg';
+    return { inlineData: { data: buf.toString('base64'), mimeType } };
+  } catch { return null; }
+}
+
 async function handleGenerateAltText(body: any) {
   const { title, description, image_url } = body;
 
@@ -337,31 +364,42 @@ async function handleGenerateAltText(body: any) {
   }
 
   const model = getGeminiModel();
+  const imagePart = image_url ? await fetchImagePart(image_url) : null;
+
   const prompt = `You are a top Etsy SEO specialist with deep knowledge of Etsy's search algorithm as of March 2026.
 
-ETSY IMAGE ALT TEXT BEST PRACTICES (2026):
-- Etsy now uses alt text as a ranking signal in both Etsy search and Google Image search.
-- Maximum 250 characters — use as much of this space as possible.
-- Describe the product visually: color, material, size, style, and context/setting.
-- Include the primary product keyword naturally in the first few words.
-- Write for both accessibility (screen readers) and SEO — describe what a buyer would SEE.
-- Include occasion/use-case context when relevant (e.g., "on a nursery shelf", "worn as a necklace").
-- Do NOT keyword-stuff or use commas to list unrelated keywords — Etsy's AI detects and penalizes this.
-- Do NOT start with "Image of" or "Photo of" — go straight to describing the product.
-- Regional spelling should match the target marketplace.
+${imagePart
+  ? `You are shown the ACTUAL product photo above. Look at it carefully. Read (OCR) any text, labels, or numbers printed IN the image and incorporate meaningful ones. Describe exactly what is visible: the product, its colour, material, shape, style, and the setting/context of THIS specific photo (e.g. close-up detail, styled on a shelf, held in hand, size-comparison). Each photo of a listing is different — write alt text unique to THIS image, not a generic listing description.`
+  : `No image was provided — write the best possible alt text from the title and description alone.`}
 
-Generate SEO-optimized alt text for this Etsy product image.
-Return a JSON object: { "alt_text": "..." }
+ETSY IMAGE ALT TEXT BEST PRACTICES (2026):
+- Etsy uses alt text as a ranking signal in Etsy search AND Google Image search.
+- 120-250 characters — use most of this space.
+- Lead with the primary product keyword in the first few words, naturally.
+- Describe what a buyer would SEE (colour, material, style, context/use-case).
+- Write for accessibility (screen readers) and SEO simultaneously.
+- NEVER output just a number, filename, position, or placeholder — always a full descriptive sentence.
+- Do NOT keyword-stuff or comma-list unrelated keywords — Etsy penalises this.
+- Do NOT start with "Image of" / "Photo of" — go straight to the product.
+- Use natural, human, US English.
+
+Return ONLY a JSON object: { "alt_text": "..." }
 
 Product title: ${title}
-Description: ${description || 'N/A'}
-Image URL: ${image_url || 'N/A'}`;
+Description: ${description || 'N/A'}`;
 
-  const result = await model.generateContent(prompt);
+  const parts: any[] = imagePart ? [imagePart, { text: prompt }] : [{ text: prompt }];
+  const result = await model.generateContent(parts);
   const text = result.response.text();
   const parsed = JSON.parse(text);
 
-  return { status: 200, data: { alt_text: parsed.alt_text } };
+  let altText = String(parsed.alt_text || '').trim();
+  // Guard against degenerate output (e.g. a bare number) — fall back to the title.
+  if (!altText || /^[\d\s.#-]+$/.test(altText)) {
+    altText = String(title).slice(0, 250);
+  }
+
+  return { status: 200, data: { alt_text: altText.slice(0, 250) } };
 }
 
 async function handleMarketAnalysis(body: any) {

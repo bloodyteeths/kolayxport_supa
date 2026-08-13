@@ -2009,7 +2009,8 @@
         "pickCopySource": "Pick a source listing…",
         "copyHelper": "Appends the source listing's photos to every other selected listing (up to 10 each).",
         "copySourceEmpty": "The source listing has no synced photos to copy.",
-        "copyNoTargets": "Select at least one other listing to copy into."
+        "copyNoTargets": "Select at least one other listing to copy into.",
+        "altAiHelper": "AI reads each photo (including any text in it) and writes unique SEO alt text per image, following Etsy's guidelines. Paced to ~30/min, so large batches take a little while."
       },
       "videoStudio": {
         "opAdd": "Add video",
